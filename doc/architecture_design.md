@@ -49,6 +49,13 @@ doc/            design docs and milestone plans
 10. C/C++ extension layer
    先定义稳定最小 API：object handles、type creation、module definition、argument parsing、exception setting、reference/root guard。C++ binding API 构建在 C API 之上。
 
+## 自举原则
+
+- C++ bootstrap 只负责建立不可避免的种子对象：`object`、`type`、核心 slots、基础异常、最小 VM 和 import 前置环境。
+- 一旦 VM、code object、module object 和 import core 可用，后续 builtins、标准库子集、测试脚本和开发工具应尽量通过运行时自身加载和执行。
+- 手写 bytecode tests 是早期锁定 VM 语义的工具，不是长期执行入口。长期入口必须走 parser/compiler/code object/module 执行链。
+- 每个新的运行时能力都要回答：它是 bootstrap seed，还是应该由 Python 层自举出来。如果是 seed，必须保持小而稳定。
+
 ## C 与 C++ 的分工
 
 - C ABI/API: extension compatibility, stable handles, embedding boundary.
@@ -61,4 +68,3 @@ doc/            design docs and milestone plans
 - bytecode 可先自定义，但 opcode 文档必须完整；后期再评估 CPython bytecode 兼容。
 - C API 先支持高价值子集，不承诺一开始完整兼容。
 - 标准库优先 pure Python 子集，性能敏感模块再 native 化。
-

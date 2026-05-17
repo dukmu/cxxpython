@@ -1,0 +1,52 @@
+#pragma once
+
+#include <cstddef>
+#include <cstdint>
+#include <exception>
+#include <string>
+#include <vector>
+
+#include "cxxpython/object.hpp"
+
+namespace cxxpython
+{
+    enum class Opcode : std::uint8_t
+    {
+        LoadConst,
+        BinaryAdd,
+        ReturnValue,
+    };
+
+    struct Instruction
+    {
+        Opcode opcode;
+        std::uint32_t operand = 0;
+    };
+
+    class BytecodeError final : public std::exception
+    {
+    public:
+        explicit BytecodeError(std::string message);
+
+        const char *what() const noexcept override;
+
+    private:
+        std::string message_;
+    };
+
+    class CodeObject final
+    {
+    public:
+        CodeObject(std::vector<Object *> constants, std::vector<Instruction> instructions);
+
+        const std::vector<Object *> &constants() const noexcept;
+        const std::vector<Instruction> &instructions() const noexcept;
+
+    private:
+        std::vector<Object *> constants_;
+        std::vector<Instruction> instructions_;
+    };
+
+    const char *opcode_name(Opcode opcode);
+    int stack_effect(Instruction instruction);
+}

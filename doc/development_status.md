@@ -384,3 +384,46 @@ Verification:
 - `ctest --test-dir build --output-on-failure`
 
 Result: all tests pass.
+
+## 2026-05-17 Minimal Bytecode VM Slice
+
+Completed:
+
+- Added initial bytecode model:
+  - `Opcode`
+  - `Instruction`
+  - `CodeObject`
+  - opcode names
+  - stack effects
+- Added initial VM model:
+  - `InterpreterState`
+  - `ThreadState`
+  - `Frame`
+  - `VirtualMachine`
+- Added active frame tracking with RAII cleanup during execution.
+- Added direct bytecode execution for:
+  - `LOAD_CONST`
+  - `BINARY_ADD`
+  - `RETURN_VALUE`
+- Added `BINARY_ADD` support for `int + int` and `str + str`.
+- Added Python `TypeError` propagation for unsupported `+` operands.
+- Added host `BytecodeError` for malformed bytecode and VM invariant failures.
+- Added focused bytecode tests for metadata, stack effects, successful
+  execution, Python errors, stack underflow, invalid constants, invalid opcode,
+  and active frame cleanup after errors.
+
+Bootstrap notes:
+
+- This is the execution-kernel seed, not the final user entrypoint.
+- The long-term route is self-bootstrapping: source -> parser/compiler -> code
+  object -> module execution, with builtins and standard library pieces loaded
+  by the runtime rather than permanently hand-assembled in C++.
+- Hand-written bytecode remains acceptable only for focused VM tests and early
+  bootstrap verification.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all tests pass.
