@@ -269,3 +269,34 @@ Verification:
 - `ctest --test-dir build --output-on-failure`
 
 Result: all tests pass.
+
+## 2026-05-17 Object Layer Source Split
+
+Completed:
+
+- Split the former monolithic `Objects/object.cpp` into focused translation
+  units:
+  - `object_core.cpp`
+  - `object_primitives.cpp`
+  - `object_sequences.cpp`
+  - `object_mapping.cpp`
+  - `object_exception.cpp`
+  - `object_utils.cpp`
+- Centralized shared object formatting helpers in `object_utils`.
+- Kept object semantics unchanged while improving locality of type, sequence,
+  mapping, and exception responsibilities.
+- Removed the old monolithic source file from the build.
+
+Design notes:
+
+- The object layer is now organized by responsibility instead of by historical
+  accretion.
+- Runtime.cpp is still a reasonable candidate for a later split when the next
+  subsystem boundary becomes clearer.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all tests pass.

@@ -10,7 +10,12 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_library(cxxpython_core
     Objects/runtime.cpp
-    Objects/object.cpp
+    Objects/object_core.cpp
+    Objects/object_primitives.cpp
+    Objects/object_sequences.cpp
+    Objects/object_mapping.cpp
+    Objects/object_exception.cpp
+    Objects/object_utils.cpp
 )
 
 target_include_directories(cxxpython_core
