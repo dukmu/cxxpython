@@ -14,6 +14,9 @@ namespace cxxpython
         str_type_ = allocate_type("str");
         tuple_type_ = allocate_type("tuple");
         dict_type_ = allocate_type("dict");
+        base_exception_type_ = allocate_type("BaseException");
+        exception_type_ = allocate_type("Exception");
+        type_error_type_ = allocate_type("TypeError");
 
         object_type_->slots = make_object_slots();
         type_type_->slots = make_type_slots();
@@ -23,6 +26,9 @@ namespace cxxpython
         str_type_->slots = make_str_slots();
         tuple_type_->slots = make_tuple_slots();
         dict_type_->slots = make_dict_slots();
+        base_exception_type_->slots = make_exception_slots();
+        exception_type_->slots = make_exception_slots();
+        type_error_type_->slots = make_exception_slots();
 
         object_type_->set_type(type_type_);
         type_type_->set_type(type_type_);
@@ -32,6 +38,9 @@ namespace cxxpython
         str_type_->set_type(type_type_);
         tuple_type_->set_type(type_type_);
         dict_type_->set_type(type_type_);
+        base_exception_type_->set_type(type_type_);
+        exception_type_->set_type(type_type_);
+        type_error_type_->set_type(type_type_);
 
         object_type_->base = nullptr;
         object_type_->bases = {};
@@ -44,6 +53,9 @@ namespace cxxpython
         initialize_type(str_type_, object_type_);
         initialize_type(tuple_type_, object_type_);
         initialize_type(dict_type_, object_type_);
+        initialize_type(base_exception_type_, object_type_);
+        initialize_type(exception_type_, base_exception_type_);
+        initialize_type(type_error_type_, exception_type_);
 
         none_ = allocate<NoneObject>(none_type_);
         true_ = allocate<BoolObject>(bool_type_, true);
@@ -57,6 +69,9 @@ namespace cxxpython
         add_root(str_type_);
         add_root(tuple_type_);
         add_root(dict_type_);
+        add_root(base_exception_type_);
+        add_root(exception_type_);
+        add_root(type_error_type_);
         add_root(none_);
         add_root(true_);
         add_root(false_);
@@ -102,6 +117,21 @@ namespace cxxpython
         return dict_type_;
     }
 
+    TypeObject *Runtime::base_exception_type() const noexcept
+    {
+        return base_exception_type_;
+    }
+
+    TypeObject *Runtime::exception_type() const noexcept
+    {
+        return exception_type_;
+    }
+
+    TypeObject *Runtime::type_error_type() const noexcept
+    {
+        return type_error_type_;
+    }
+
     NoneObject *Runtime::none() const noexcept
     {
         return none_;
@@ -145,6 +175,17 @@ namespace cxxpython
         type->slots = inherit_slots(resolved_base, slots);
         initialize_type(type, resolved_base);
         return type;
+    }
+
+    ExceptionObject *Runtime::new_exception(TypeObject *type, std::string message)
+    {
+        TypeObject *resolved_type = type ? type : exception_type_;
+        return allocate<ExceptionObject>(resolved_type, std::move(message));
+    }
+
+    ExceptionObject *Runtime::new_type_error(std::string message)
+    {
+        return new_exception(type_error_type_, std::move(message));
     }
 
     void Runtime::add_root(Object *object)

@@ -67,6 +67,10 @@ int main()
     CHECK(runtime.bool_type()->base == runtime.int_type());
     CHECK(runtime.bool_type()->bases.size() == 1);
     CHECK(runtime.bool_type()->bases[0] == runtime.int_type());
+    CHECK(runtime.base_exception_type()->base == runtime.object_type());
+    CHECK(runtime.exception_type()->base == runtime.base_exception_type());
+    CHECK(runtime.type_error_type()->base == runtime.exception_type());
+    CHECK(is_subclass(runtime.type_error_type(), runtime.base_exception_type()));
 
     IntObject *one = runtime.new_int(1);
     IntObject *zero = runtime.new_int(0);
@@ -99,6 +103,11 @@ int main()
     CHECK(object_repr(one) == "1");
     CHECK(object_repr(runtime.new_str("hello")) == "'hello'");
     CHECK(object_repr(runtime.type_type()) == "<class 'type'>");
+    ExceptionObject *manual_error = runtime.new_exception(runtime.type_error_type(), "bad operand");
+    CHECK(manual_error->type() == runtime.type_error_type());
+    CHECK(manual_error->message() == "bad operand");
+    CHECK(is_instance(manual_error, runtime.base_exception_type()));
+    CHECK(object_repr(manual_error) == "TypeError('bad operand')");
 
     TypeSlots custom_slots;
     custom_slots.repr = custom_repr;
@@ -129,7 +138,10 @@ int main()
     }
     catch (const PythonError &error)
     {
-        saw_python_error = error.type_name() == "TypeError";
+        saw_python_error = error.type() == runtime.type_error_type() &&
+                           error.value()->type() == runtime.type_error_type() &&
+                           error.value()->message() == "dict key cannot be null" &&
+                           std::string(error.what()) == "dict key cannot be null";
     }
     CHECK(saw_python_error);
 
@@ -140,12 +152,15 @@ int main()
     }
     catch (const PythonError &error)
     {
-        saw_python_error = error.type_name() == "TypeError";
+        saw_python_error = error.type() == runtime.type_error_type() &&
+                           error.value()->type() == runtime.type_error_type() &&
+                           error.value()->message() == "unhashable type: 'dict'" &&
+                           std::string(error.what()) == "unhashable type: 'dict'";
     }
     CHECK(saw_python_error);
 
     CHECK(runtime.heap_size() >= 11);
-    CHECK(runtime.root_count() == 11);
+    CHECK(runtime.root_count() == 14);
 
     std::size_t visited_roots = 0;
     runtime.visit_roots([&](Object *object)

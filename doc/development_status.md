@@ -53,6 +53,43 @@ Verification:
 
 Result: all tests pass.
 
+## 2026-05-17 Runtime Exception Objects
+
+Completed:
+
+- Added runtime-owned builtin exception type hierarchy:
+  - `BaseException`
+  - `Exception`
+  - `TypeError`
+- Added `ExceptionObject` carrying Python exception type and message.
+- Changed `PythonError` from a string-typed carrier into a C++ unwinding shell
+  around an `ExceptionObject`.
+- Added `Runtime::new_exception` and `Runtime::new_type_error` as the current
+  exception allocation entry points.
+- Added `raise_type_error` so object slots and core helpers do not hand-build
+  Python errors.
+- Added a runtime pointer to every runtime-allocated `Object`, avoiding global
+  exception state while letting slots allocate errors in the owning runtime.
+- Updated dict/null-key and unhashable-dict paths to raise object-backed
+  `TypeError`.
+- Cached `PythonError::what()` in the C++ shell so it remains valid according to
+  the `std::exception` contract.
+
+Design notes:
+
+- Python-visible errors now carry a real Python object and type pointer.
+- Remaining host-side `std::logic_error` use is reserved for internal API
+  misuse where no runtime exists to allocate a Python exception object.
+- Future exception work should add args tuples, traceback/context/cause fields,
+  and normalized exception matching before VM bytecode exception handling.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all tests pass.
+
 ## 2026-05-17 TypeObject Slot Dispatch
 
 Completed:

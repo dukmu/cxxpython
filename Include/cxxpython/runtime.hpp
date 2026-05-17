@@ -26,6 +26,9 @@ namespace cxxpython
         TypeObject *str_type() const noexcept;
         TypeObject *tuple_type() const noexcept;
         TypeObject *dict_type() const noexcept;
+        TypeObject *base_exception_type() const noexcept;
+        TypeObject *exception_type() const noexcept;
+        TypeObject *type_error_type() const noexcept;
 
         NoneObject *none() const noexcept;
         BoolObject *true_value() const noexcept;
@@ -36,6 +39,8 @@ namespace cxxpython
         TupleObject *new_tuple(std::vector<Object *> items);
         DictObject *new_dict();
         TypeObject *new_heap_type(std::string name, TypeObject *base, TypeSlots slots = {});
+        ExceptionObject *new_exception(TypeObject *type, std::string message);
+        ExceptionObject *new_type_error(std::string message);
 
         void add_root(Object *object);
         void remove_root(Object *object);
@@ -50,6 +55,7 @@ namespace cxxpython
             static_assert(std::is_base_of_v<Object, T>);
             auto object = std::make_unique<T>(std::forward<Args>(args)...);
             T *raw = object.get();
+            raw->set_runtime(this);
             heap_.push_back(std::move(object));
             return raw;
         }
@@ -70,6 +76,9 @@ namespace cxxpython
         TypeObject *str_type_ = nullptr;
         TypeObject *tuple_type_ = nullptr;
         TypeObject *dict_type_ = nullptr;
+        TypeObject *base_exception_type_ = nullptr;
+        TypeObject *exception_type_ = nullptr;
+        TypeObject *type_error_type_ = nullptr;
 
         NoneObject *none_ = nullptr;
         BoolObject *true_ = nullptr;

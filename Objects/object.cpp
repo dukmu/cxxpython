@@ -1,6 +1,9 @@
 #include "cxxpython/object.hpp"
+#include "cxxpython/runtime.hpp"
 
 #include <sstream>
+#include <stdexcept>
+#include <string_view>
 
 namespace cxxpython
 {
@@ -10,6 +13,18 @@ namespace cxxpython
         {
             std::ostringstream out;
             out << ptr;
+            return out.str();
+        }
+
+        std::string escape_single_quoted(std::string_view value)
+        {
+            std::ostringstream out;
+            for (const char ch : value)
+            {
+                if (ch == '\\' || ch == '\'')
+                    out << '\\';
+                out << ch;
+            }
             return out.str();
         }
 
@@ -206,8 +221,7 @@ namespace cxxpython
 
         std::int64_t dict_hash(const Object &object)
         {
-            (void)object;
-            throw PythonError("TypeError", "unhashable type: 'dict'");
+            raise_type_error(object.runtime(), "unhashable type: 'dict'");
         }
 
         bool dict_equal(const Object &left, const Object &right)
@@ -241,21 +255,37 @@ namespace cxxpython
                     visitor(entry.value);
             }
         }
+
+        std::string exception_repr(const Object &object)
+        {
+            auto *error = static_cast<const ExceptionObject *>(&object);
+            return type_qualified_name(error->type()) + "('" + escape_single_quoted(error->message()) + "')";
+        }
     }
 
-    PythonError::PythonError(std::string type_name, std::string message)
-        : type_name_(std::move(type_name)), message_(std::move(message))
+    PythonError::PythonError(ExceptionObject *value)
+        : value_(value), what_(value ? value->message() : "")
     {
     }
 
-    const std::string &PythonError::type_name() const noexcept
+    ExceptionObject *PythonError::value() const noexcept
     {
-        return type_name_;
+        return value_;
+    }
+
+    TypeObject *PythonError::type() const noexcept
+    {
+        return value_ ? value_->type() : nullptr;
+    }
+
+    std::string PythonError::type_name() const
+    {
+        return type_qualified_name(type());
     }
 
     const char *PythonError::what() const noexcept
     {
-        return message_.c_str();
+        return what_.c_str();
     }
 
     Object::Object(TypeObject *type)
@@ -266,6 +296,16 @@ namespace cxxpython
     TypeObject *Object::type() const noexcept
     {
         return type_;
+    }
+
+    Runtime *Object::runtime() const noexcept
+    {
+        return runtime_;
+    }
+
+    void Object::set_runtime(Runtime *runtime) noexcept
+    {
+        runtime_ = runtime;
     }
 
     void Object::set_type(TypeObject *type) noexcept
@@ -362,7 +402,7 @@ namespace cxxpython
     Object *DictObject::get(Object *key) const
     {
         if (!key)
-            throw PythonError("TypeError", "dict key cannot be null");
+            raise_type_error(runtime(), "dict key cannot be null");
 
         const std::int64_t key_hash = object_hash(key);
         for (const Entry &entry : entries_)
@@ -376,9 +416,9 @@ namespace cxxpython
     void DictObject::set(Object *key, Object *value)
     {
         if (!key)
-            throw PythonError("TypeError", "dict key cannot be null");
+            raise_type_error(runtime(), "dict key cannot be null");
         if (!value)
-            throw PythonError("TypeError", "dict value cannot be null");
+            raise_type_error(runtime(), "dict value cannot be null");
 
         const std::int64_t key_hash = object_hash(key);
         for (Entry &entry : entries_)
@@ -400,6 +440,16 @@ namespace cxxpython
     const std::vector<DictObject::Entry> &DictObject::entries() const noexcept
     {
         return entries_;
+    }
+
+    ExceptionObject::ExceptionObject(TypeObject *type, std::string message)
+        : Object(type), message_(std::move(message))
+    {
+    }
+
+    const std::string &ExceptionObject::message() const noexcept
+    {
+        return message_;
     }
 
     bool is_subclass(const TypeObject *derived, const TypeObject *base) noexcept
@@ -429,7 +479,7 @@ namespace cxxpython
     std::int64_t object_hash(const Object *object)
     {
         if (!object)
-            throw PythonError("TypeError", "hash() argument cannot be null");
+            raise_type_error(nullptr, "hash() argument cannot be null");
         return object->hash();
     }
 
@@ -496,5 +546,17 @@ namespace cxxpython
     TypeSlots make_dict_slots()
     {
         return TypeSlots{dict_repr, dict_hash, dict_equal, dict_truth, dict_traverse};
+    }
+
+    TypeSlots make_exception_slots()
+    {
+        return TypeSlots{exception_repr, default_hash, default_equal, default_truth, default_traverse};
+    }
+
+    void raise_type_error(Runtime *runtime, std::string message)
+    {
+        if (!runtime)
+            throw std::logic_error("cannot raise Python TypeError without a runtime");
+        throw PythonError(runtime->new_type_error(std::move(message)));
     }
 }

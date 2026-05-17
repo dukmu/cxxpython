@@ -12,6 +12,7 @@ namespace cxxpython
     class Runtime;
     class Object;
     class TypeObject;
+    class ExceptionObject;
 
     using VisitChildren = std::function<void(Object *)>;
     using ReprSlot = std::string (*)(const Object &);
@@ -32,14 +33,16 @@ namespace cxxpython
     class PythonError final : public std::exception
     {
     public:
-        PythonError(std::string type_name, std::string message);
+        explicit PythonError(ExceptionObject *value);
 
-        const std::string &type_name() const noexcept;
+        ExceptionObject *value() const noexcept;
+        TypeObject *type() const noexcept;
+        std::string type_name() const;
         const char *what() const noexcept override;
 
     private:
-        std::string type_name_;
-        std::string message_;
+        ExceptionObject *value_;
+        std::string what_;
     };
 
     class Object
@@ -48,6 +51,8 @@ namespace cxxpython
         explicit Object(TypeObject *type);
         virtual ~Object() = default;
 
+        Runtime *runtime() const noexcept;
+        void set_runtime(Runtime *runtime) noexcept;
         TypeObject *type() const noexcept;
         void set_type(TypeObject *type) noexcept;
         std::string repr() const;
@@ -57,6 +62,7 @@ namespace cxxpython
         void visit_children(const VisitChildren &visitor) const;
 
     private:
+        Runtime *runtime_ = nullptr;
         TypeObject *type_;
     };
 
@@ -135,6 +141,17 @@ namespace cxxpython
         std::vector<Entry> entries_;
     };
 
+    class ExceptionObject final : public Object
+    {
+    public:
+        ExceptionObject(TypeObject *type, std::string message);
+
+        const std::string &message() const noexcept;
+
+    private:
+        std::string message_;
+    };
+
     bool is_subclass(const TypeObject *derived, const TypeObject *base) noexcept;
     bool is_instance(const Object *object, const TypeObject *type) noexcept;
     bool is_true(const Object *object);
@@ -152,4 +169,7 @@ namespace cxxpython
     TypeSlots make_str_slots();
     TypeSlots make_tuple_slots();
     TypeSlots make_dict_slots();
+    TypeSlots make_exception_slots();
+
+    [[noreturn]] void raise_type_error(Runtime *runtime, std::string message);
 }
