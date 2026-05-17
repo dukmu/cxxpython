@@ -56,6 +56,7 @@ int main()
     CHECK(runtime.none()->type() == runtime.none_type());
     CHECK(runtime.true_value()->type() == runtime.bool_type());
     CHECK(runtime.false_value()->type() == runtime.bool_type());
+    CHECK(runtime.list_type()->base == runtime.object_type());
 
     CHECK(is_subclass(runtime.bool_type(), runtime.int_type()));
     CHECK(is_subclass(runtime.bool_type(), runtime.object_type()));
@@ -70,7 +71,9 @@ int main()
     CHECK(runtime.base_exception_type()->base == runtime.object_type());
     CHECK(runtime.exception_type()->base == runtime.base_exception_type());
     CHECK(runtime.type_error_type()->base == runtime.exception_type());
+    CHECK(runtime.index_error_type()->base == runtime.exception_type());
     CHECK(is_subclass(runtime.type_error_type(), runtime.base_exception_type()));
+    CHECK(is_subclass(runtime.index_error_type(), runtime.base_exception_type()));
 
     IntObject *one = runtime.new_int(1);
     IntObject *zero = runtime.new_int(0);
@@ -82,6 +85,43 @@ int main()
     CHECK(is_true(runtime.true_value()));
     CHECK(!is_true(runtime.false_value()));
     CHECK(!is_true(runtime.none()));
+
+    ListObject *empty_list = runtime.new_list({});
+    CHECK(object_repr(empty_list) == "[]");
+    CHECK(!is_true(empty_list));
+    ListObject *list = runtime.new_list({one, runtime.new_str("two")});
+    CHECK(list->size() == 2);
+    CHECK(list->get(0) == one);
+    CHECK(object_repr(list) == "[1, 'two']");
+    CHECK(is_true(list));
+    list->append(runtime.new_int(3));
+    CHECK(list->size() == 3);
+    CHECK(static_cast<IntObject *>(list->get(-1))->value == 3);
+    CHECK(object_equal(list, runtime.new_list({one, runtime.new_str("two"), runtime.new_int(3)})));
+
+    bool saw_index_error = false;
+    try
+    {
+        (void)list->get(99);
+    }
+    catch (const PythonError &error)
+    {
+        saw_index_error = error.type() == runtime.index_error_type() &&
+                          error.value()->message() == "list index out of range";
+    }
+    CHECK(saw_index_error);
+
+    bool saw_unhashable_list = false;
+    try
+    {
+        (void)object_hash(list);
+    }
+    catch (const PythonError &error)
+    {
+        saw_unhashable_list = error.type() == runtime.type_error_type() &&
+                              error.value()->message() == "unhashable type: 'list'";
+    }
+    CHECK(saw_unhashable_list);
 
     DictObject *dict = runtime.new_dict();
     StrObject *bool_value = runtime.new_str("bool");
@@ -194,7 +234,7 @@ int main()
     CHECK(saw_python_error);
 
     CHECK(runtime.heap_size() >= 11);
-    CHECK(runtime.root_count() == 14);
+    CHECK(runtime.root_count() == 16);
 
     std::size_t visited_roots = 0;
     runtime.visit_roots([&](Object *object)
@@ -211,6 +251,14 @@ int main()
                                       ++tuple_children;
                               });
     CHECK(tuple_children == 2);
+
+    std::size_t list_children = 0;
+    list->visit_children([&](Object *object)
+                         {
+                             if (object)
+                                 ++list_children;
+                         });
+    CHECK(list_children == list->size());
 
     std::size_t dict_children = 0;
     dict->visit_children([&](Object *object)

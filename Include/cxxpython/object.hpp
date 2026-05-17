@@ -13,6 +13,7 @@ namespace cxxpython
     class Runtime;
     class Object;
     class TypeObject;
+    class ListObject;
     class ExceptionObject;
 
     using VisitChildren = std::function<void(Object *)>;
@@ -108,6 +109,23 @@ namespace cxxpython
         std::string value;
     };
 
+    class ListObject final : public Object
+    {
+    public:
+        ListObject(TypeObject *type, std::vector<Object *> items);
+
+        void append(Object *item);
+        Object *get(std::int64_t index) const;
+        void set(std::int64_t index, Object *item);
+        const std::vector<Object *> &items() const noexcept;
+        std::size_t size() const noexcept;
+
+    private:
+        std::size_t normalize_index(std::int64_t index) const;
+
+        std::vector<Object *> items_;
+    };
+
     class TupleObject final : public Object
     {
     public:
@@ -181,9 +199,11 @@ namespace cxxpython
     TypeSlots make_int_slots();
     TypeSlots make_bool_slots();
     TypeSlots make_str_slots();
+    TypeSlots make_list_slots();
     TypeSlots make_tuple_slots();
     TypeSlots make_dict_slots();
     TypeSlots make_exception_slots();
 
     [[noreturn]] void raise_type_error(Runtime *runtime, std::string message);
+    [[noreturn]] void raise_index_error(Runtime *runtime, std::string message);
 }
