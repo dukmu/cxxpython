@@ -203,3 +203,40 @@ Verification:
 - `ctest --test-dir build --output-on-failure`
 
 Result: all tests pass.
+
+## 2026-05-17 GoogleTest Migration and Pre-Commit Review Rule
+
+Completed:
+
+- Replaced the ad hoc C++ test harness with GoogleTest.
+- Added `FetchContent`-based GTest integration with pinned `v1.14.0`.
+- Split the core object test suite into focused `TEST(...)` cases for:
+  - builtin bootstrap.
+  - exception hierarchy.
+  - bool/int semantics.
+  - list semantics.
+  - list error paths.
+  - dict key behavior.
+  - dict growth and collisions.
+  - dict error paths.
+  - repr and exception objects.
+  - heap type slot inheritance.
+  - root and child traversal.
+- Updated the development guide so every commit must include a technical debt
+  review and a `doc/development_status.md` update.
+- Removed a `reinterpret_cast` from the CLI entrypoint during the review pass.
+
+Design notes:
+
+- GTest is now the default C++ test layer; it will make future bytecode and
+  extension tests easier to isolate.
+- The current test suite still covers only the core object layer. Python-level
+  and bytecode-focused tests remain the next missing layer.
+
+Verification:
+
+- `cmake -S . -B build`
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all tests pass.

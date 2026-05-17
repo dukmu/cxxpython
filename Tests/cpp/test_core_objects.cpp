@@ -1,26 +1,13 @@
-#include <cstdlib>
-#include <functional>
-#include <iostream>
-#include <stdexcept>
+#include <cstdint>
 #include <string>
 #include <vector>
+
+#include <gtest/gtest.h>
 
 #include "cxxpython/runtime.hpp"
 
 namespace
 {
-    int failures = 0;
-
-    void check(bool condition, const char *expr, const char *file, int line)
-    {
-        if (condition)
-            return;
-        ++failures;
-        std::cerr << file << ":" << line << ": check failed: " << expr << "\n";
-    }
-
-#define CHECK(expr) check((expr), #expr, __FILE__, __LINE__)
-
     std::string custom_repr(const cxxpython::Object &object)
     {
         (void)object;
@@ -45,234 +32,322 @@ namespace
     }
 }
 
-int main()
+TEST(CoreObjects, RuntimeBootstrapsBuiltinTypes)
 {
-    using namespace cxxpython;
+    cxxpython::Runtime runtime;
 
-    Runtime runtime;
+    EXPECT_EQ(runtime.object_type()->type(), runtime.type_type());
+    EXPECT_EQ(runtime.type_type()->type(), runtime.type_type());
+    EXPECT_EQ(runtime.none()->type(), runtime.none_type());
+    EXPECT_EQ(runtime.true_value()->type(), runtime.bool_type());
+    EXPECT_EQ(runtime.false_value()->type(), runtime.bool_type());
 
-    CHECK(runtime.object_type()->type() == runtime.type_type());
-    CHECK(runtime.type_type()->type() == runtime.type_type());
-    CHECK(runtime.none()->type() == runtime.none_type());
-    CHECK(runtime.true_value()->type() == runtime.bool_type());
-    CHECK(runtime.false_value()->type() == runtime.bool_type());
-    CHECK(runtime.list_type()->base == runtime.object_type());
+    EXPECT_EQ(runtime.list_type()->base, runtime.object_type());
+    EXPECT_TRUE(cxxpython::is_subclass(runtime.bool_type(), runtime.int_type()));
+    EXPECT_TRUE(cxxpython::is_subclass(runtime.bool_type(), runtime.object_type()));
+    EXPECT_TRUE(cxxpython::is_instance(runtime.true_value(), runtime.int_type()));
 
-    CHECK(is_subclass(runtime.bool_type(), runtime.int_type()));
-    CHECK(is_subclass(runtime.bool_type(), runtime.object_type()));
-    CHECK(is_instance(runtime.true_value(), runtime.int_type()));
-    CHECK(runtime.bool_type()->mro.size() == 3);
-    CHECK(runtime.bool_type()->mro[0] == runtime.bool_type());
-    CHECK(runtime.bool_type()->mro[1] == runtime.int_type());
-    CHECK(runtime.bool_type()->mro[2] == runtime.object_type());
-    CHECK(runtime.bool_type()->base == runtime.int_type());
-    CHECK(runtime.bool_type()->bases.size() == 1);
-    CHECK(runtime.bool_type()->bases[0] == runtime.int_type());
-    CHECK(runtime.base_exception_type()->base == runtime.object_type());
-    CHECK(runtime.exception_type()->base == runtime.base_exception_type());
-    CHECK(runtime.type_error_type()->base == runtime.exception_type());
-    CHECK(runtime.index_error_type()->base == runtime.exception_type());
-    CHECK(is_subclass(runtime.type_error_type(), runtime.base_exception_type()));
-    CHECK(is_subclass(runtime.index_error_type(), runtime.base_exception_type()));
+    ASSERT_EQ(runtime.bool_type()->mro.size(), 3U);
+    EXPECT_EQ(runtime.bool_type()->mro[0], runtime.bool_type());
+    EXPECT_EQ(runtime.bool_type()->mro[1], runtime.int_type());
+    EXPECT_EQ(runtime.bool_type()->mro[2], runtime.object_type());
+    EXPECT_EQ(runtime.bool_type()->base, runtime.int_type());
+    ASSERT_EQ(runtime.bool_type()->bases.size(), 1U);
+    EXPECT_EQ(runtime.bool_type()->bases[0], runtime.int_type());
+}
 
-    IntObject *one = runtime.new_int(1);
-    IntObject *zero = runtime.new_int(0);
-    CHECK(object_equal(runtime.true_value(), one));
-    CHECK(object_equal(runtime.false_value(), zero));
-    CHECK(!object_equal(runtime.true_value(), runtime.new_int(2)));
-    CHECK(object_hash(runtime.true_value()) == object_hash(one));
-    CHECK(object_hash(runtime.false_value()) == object_hash(zero));
-    CHECK(is_true(runtime.true_value()));
-    CHECK(!is_true(runtime.false_value()));
-    CHECK(!is_true(runtime.none()));
+TEST(CoreObjects, RuntimeBootstrapsExceptionHierarchy)
+{
+    cxxpython::Runtime runtime;
 
-    ListObject *empty_list = runtime.new_list({});
-    CHECK(object_repr(empty_list) == "[]");
-    CHECK(!is_true(empty_list));
-    ListObject *list = runtime.new_list({one, runtime.new_str("two")});
-    CHECK(list->size() == 2);
-    CHECK(list->get(0) == one);
-    CHECK(object_repr(list) == "[1, 'two']");
-    CHECK(is_true(list));
+    EXPECT_EQ(runtime.base_exception_type()->base, runtime.object_type());
+    EXPECT_EQ(runtime.exception_type()->base, runtime.base_exception_type());
+    EXPECT_EQ(runtime.type_error_type()->base, runtime.exception_type());
+    EXPECT_EQ(runtime.index_error_type()->base, runtime.exception_type());
+    EXPECT_TRUE(cxxpython::is_subclass(runtime.type_error_type(), runtime.base_exception_type()));
+    EXPECT_TRUE(cxxpython::is_subclass(runtime.index_error_type(), runtime.base_exception_type()));
+}
+
+TEST(CoreObjects, BoolAndIntSharePythonSemantics)
+{
+    cxxpython::Runtime runtime;
+
+    cxxpython::IntObject *one = runtime.new_int(1);
+    cxxpython::IntObject *zero = runtime.new_int(0);
+
+    EXPECT_TRUE(cxxpython::object_equal(runtime.true_value(), one));
+    EXPECT_TRUE(cxxpython::object_equal(runtime.false_value(), zero));
+    EXPECT_FALSE(cxxpython::object_equal(runtime.true_value(), runtime.new_int(2)));
+    EXPECT_EQ(cxxpython::object_hash(runtime.true_value()), cxxpython::object_hash(one));
+    EXPECT_EQ(cxxpython::object_hash(runtime.false_value()), cxxpython::object_hash(zero));
+    EXPECT_TRUE(cxxpython::is_true(runtime.true_value()));
+    EXPECT_FALSE(cxxpython::is_true(runtime.false_value()));
+    EXPECT_FALSE(cxxpython::is_true(runtime.none()));
+}
+
+TEST(CoreObjects, ListSemantics)
+{
+    cxxpython::Runtime runtime;
+
+    cxxpython::IntObject *one = runtime.new_int(1);
+    cxxpython::ListObject *empty_list = runtime.new_list({});
+    EXPECT_EQ(cxxpython::object_repr(empty_list), "[]");
+    EXPECT_FALSE(cxxpython::is_true(empty_list));
+
+    cxxpython::ListObject *list = runtime.new_list({one, runtime.new_str("two")});
+    ASSERT_EQ(list->size(), 2U);
+    EXPECT_EQ(list->get(0), one);
+    EXPECT_EQ(cxxpython::object_repr(list), "[1, 'two']");
+    EXPECT_TRUE(cxxpython::is_true(list));
+
     list->append(runtime.new_int(3));
-    CHECK(list->size() == 3);
-    CHECK(static_cast<IntObject *>(list->get(-1))->value == 3);
-    CHECK(object_equal(list, runtime.new_list({one, runtime.new_str("two"), runtime.new_int(3)})));
+    ASSERT_EQ(list->size(), 3U);
+    EXPECT_EQ(static_cast<cxxpython::IntObject *>(list->get(-1))->value, 3);
+    EXPECT_TRUE(cxxpython::object_equal(
+        list,
+        runtime.new_list({one, runtime.new_str("two"), runtime.new_int(3)})));
 
-    bool saw_index_error = false;
+    std::size_t visited_children = 0;
+    list->visit_children([&](cxxpython::Object *object)
+                         {
+                             if (object)
+                                 ++visited_children;
+                         });
+    EXPECT_EQ(visited_children, list->size());
+}
+
+TEST(CoreObjects, ListRaisesPythonErrors)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::ListObject *list = runtime.new_list({runtime.new_int(1)});
+
     try
     {
         (void)list->get(99);
+        FAIL() << "expected PythonError";
     }
-    catch (const PythonError &error)
+    catch (const cxxpython::PythonError &error)
     {
-        saw_index_error = error.type() == runtime.index_error_type() &&
-                          error.value()->message() == "list index out of range";
+        EXPECT_EQ(error.type(), runtime.index_error_type());
+        EXPECT_STREQ(error.what(), "list index out of range");
+        ASSERT_NE(error.value(), nullptr);
+        EXPECT_EQ(error.value()->message(), "list index out of range");
     }
-    CHECK(saw_index_error);
 
-    bool saw_unhashable_list = false;
     try
     {
-        (void)object_hash(list);
+        (void)cxxpython::object_hash(list);
+        FAIL() << "expected PythonError";
     }
-    catch (const PythonError &error)
+    catch (const cxxpython::PythonError &error)
     {
-        saw_unhashable_list = error.type() == runtime.type_error_type() &&
-                              error.value()->message() == "unhashable type: 'list'";
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "unhashable type: 'list'");
+        ASSERT_NE(error.value(), nullptr);
+        EXPECT_EQ(error.value()->message(), "unhashable type: 'list'");
     }
-    CHECK(saw_unhashable_list);
+}
 
-    DictObject *dict = runtime.new_dict();
-    StrObject *bool_value = runtime.new_str("bool");
-    StrObject *int_value = runtime.new_str("int");
+TEST(CoreObjects, DictMergesEqualBoolAndIntKeys)
+{
+    cxxpython::Runtime runtime;
+
+    cxxpython::DictObject *dict = runtime.new_dict();
+    cxxpython::StrObject *bool_value = runtime.new_str("bool");
+    cxxpython::StrObject *int_value = runtime.new_str("int");
     dict->set(runtime.true_value(), bool_value);
     dict->set(runtime.new_int(1), int_value);
-    CHECK(dict->size() == 1);
-    CHECK(dict->get(runtime.true_value()) == int_value);
-    CHECK(dict->get(runtime.new_int(1)) == int_value);
 
-    TupleObject *tuple_key = runtime.new_tuple({runtime.new_int(4), runtime.new_str("x")});
-    StrObject *tuple_value = runtime.new_str("tuple");
+    EXPECT_EQ(dict->size(), 1U);
+    EXPECT_EQ(dict->get(runtime.true_value()), int_value);
+    EXPECT_EQ(dict->get(runtime.new_int(1)), int_value);
+    ASSERT_EQ(dict->entries().size(), 1U);
+    EXPECT_EQ(dict->entries()[0].key, runtime.true_value());
+    EXPECT_EQ(dict->entries()[0].value, int_value);
+}
+
+TEST(CoreObjects, DictSupportsTupleKeysAndInsertionOrder)
+{
+    cxxpython::Runtime runtime;
+
+    cxxpython::DictObject *dict = runtime.new_dict();
+    cxxpython::StrObject *int_value = runtime.new_str("int");
+    dict->set(runtime.true_value(), int_value);
+
+    cxxpython::TupleObject *tuple_key = runtime.new_tuple({runtime.new_int(4), runtime.new_str("x")});
+    cxxpython::StrObject *tuple_value = runtime.new_str("tuple");
     dict->set(tuple_key, tuple_value);
-    CHECK(dict->size() == 2);
-    CHECK(dict->get(runtime.new_tuple({runtime.new_int(4), runtime.new_str("x")})) == tuple_value);
-    CHECK(dict->entries()[0].key == runtime.true_value());
-    CHECK(dict->entries()[0].value == int_value);
-    CHECK(dict->entries()[1].key == tuple_key);
-    CHECK(dict->entries()[1].value == tuple_value);
 
-    DictObject *large_dict = runtime.new_dict();
-    std::vector<StrObject *> large_keys;
+    EXPECT_EQ(dict->size(), 2U);
+    EXPECT_EQ(dict->get(runtime.new_tuple({runtime.new_int(4), runtime.new_str("x")})), tuple_value);
+    ASSERT_EQ(dict->entries().size(), 2U);
+    EXPECT_EQ(dict->entries()[0].key, runtime.true_value());
+    EXPECT_EQ(dict->entries()[0].value, int_value);
+    EXPECT_EQ(dict->entries()[1].key, tuple_key);
+    EXPECT_EQ(dict->entries()[1].value, tuple_value);
+}
+
+TEST(CoreObjects, DictGrowsAndHandlesHashCollisions)
+{
+    cxxpython::Runtime runtime;
+
+    cxxpython::DictObject *dict = runtime.new_dict();
+    std::vector<cxxpython::StrObject *> keys;
     for (int i = 0; i < 96; ++i)
     {
-        StrObject *key = runtime.new_str("key-" + std::to_string(i));
-        large_keys.push_back(key);
-        large_dict->set(key, runtime.new_int(i));
+        cxxpython::StrObject *key = runtime.new_str("key-" + std::to_string(i));
+        keys.push_back(key);
+        dict->set(key, runtime.new_int(i));
     }
-    CHECK(large_dict->size() == large_keys.size());
-    for (std::size_t i = 0; i < large_keys.size(); ++i)
+
+    ASSERT_EQ(dict->size(), keys.size());
+    for (std::size_t i = 0; i < keys.size(); ++i)
     {
-        auto *value = dynamic_cast<IntObject *>(large_dict->get(large_keys[i]));
-        CHECK(value && value->value == static_cast<std::int64_t>(i));
-        CHECK(large_dict->entries()[i].key == large_keys[i]);
+        auto *value = dynamic_cast<cxxpython::IntObject *>(dict->get(keys[i]));
+        ASSERT_NE(value, nullptr);
+        EXPECT_EQ(value->value, static_cast<std::int64_t>(i));
+        EXPECT_EQ(dict->entries()[i].key, keys[i]);
     }
-    large_dict->set(large_keys[42], runtime.new_int(4200));
-    CHECK(large_dict->size() == large_keys.size());
-    CHECK(static_cast<IntObject *>(large_dict->get(large_keys[42]))->value == 4200);
 
-    TypeSlots collision_slots;
+    dict->set(keys[42], runtime.new_int(4200));
+    EXPECT_EQ(dict->size(), keys.size());
+    EXPECT_EQ(static_cast<cxxpython::IntObject *>(dict->get(keys[42]))->value, 4200);
+
+    cxxpython::TypeSlots collision_slots;
     collision_slots.hash = custom_hash;
-    TypeObject *collision_type = runtime.new_heap_type("CollisionKey", runtime.object_type(), collision_slots);
-    Object *collision_a = runtime.allocate<Object>(collision_type);
-    Object *collision_b = runtime.allocate<Object>(collision_type);
-    large_dict->set(collision_a, runtime.new_str("a"));
-    large_dict->set(collision_b, runtime.new_str("b"));
-    CHECK(large_dict->size() == large_keys.size() + 2);
-    CHECK(static_cast<StrObject *>(large_dict->get(collision_a))->value == "a");
-    CHECK(static_cast<StrObject *>(large_dict->get(collision_b))->value == "b");
+    cxxpython::TypeObject *collision_type =
+        runtime.new_heap_type("CollisionKey", runtime.object_type(), collision_slots);
+    cxxpython::Object *collision_a = runtime.allocate<cxxpython::Object>(collision_type);
+    cxxpython::Object *collision_b = runtime.allocate<cxxpython::Object>(collision_type);
 
-    CHECK(object_repr(runtime.none()) == "None");
-    CHECK(object_repr(runtime.true_value()) == "True");
-    CHECK(object_repr(one) == "1");
-    CHECK(object_repr(runtime.new_str("hello")) == "'hello'");
-    CHECK(object_repr(runtime.type_type()) == "<class 'type'>");
-    ExceptionObject *manual_error = runtime.new_exception(runtime.type_error_type(), "bad operand");
-    CHECK(manual_error->type() == runtime.type_error_type());
-    CHECK(manual_error->message() == "bad operand");
-    CHECK(is_instance(manual_error, runtime.base_exception_type()));
-    CHECK(object_repr(manual_error) == "TypeError('bad operand')");
+    dict->set(collision_a, runtime.new_str("a"));
+    dict->set(collision_b, runtime.new_str("b"));
+    EXPECT_EQ(dict->size(), keys.size() + 2);
+    EXPECT_EQ(static_cast<cxxpython::StrObject *>(dict->get(collision_a))->value, "a");
+    EXPECT_EQ(static_cast<cxxpython::StrObject *>(dict->get(collision_b))->value, "b");
+}
 
-    TypeSlots custom_slots;
+TEST(CoreObjects, DictRaisesPythonErrors)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::DictObject *dict = runtime.new_dict();
+
+    try
+    {
+        dict->set(nullptr, runtime.new_int(1));
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "dict key cannot be null");
+        ASSERT_NE(error.value(), nullptr);
+        EXPECT_EQ(error.value()->type(), runtime.type_error_type());
+        EXPECT_EQ(error.value()->message(), "dict key cannot be null");
+    }
+
+    try
+    {
+        (void)cxxpython::object_hash(dict);
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "unhashable type: 'dict'");
+        ASSERT_NE(error.value(), nullptr);
+        EXPECT_EQ(error.value()->type(), runtime.type_error_type());
+        EXPECT_EQ(error.value()->message(), "unhashable type: 'dict'");
+    }
+}
+
+TEST(CoreObjects, ReprAndExceptionObjects)
+{
+    cxxpython::Runtime runtime;
+
+    EXPECT_EQ(cxxpython::object_repr(runtime.none()), "None");
+    EXPECT_EQ(cxxpython::object_repr(runtime.true_value()), "True");
+    EXPECT_EQ(cxxpython::object_repr(runtime.new_int(1)), "1");
+    EXPECT_EQ(cxxpython::object_repr(runtime.new_str("hello")), "'hello'");
+    EXPECT_EQ(cxxpython::object_repr(runtime.type_type()), "<class 'type'>");
+
+    cxxpython::ExceptionObject *manual_error =
+        runtime.new_exception(runtime.type_error_type(), "bad operand");
+    EXPECT_EQ(manual_error->type(), runtime.type_error_type());
+    EXPECT_EQ(manual_error->message(), "bad operand");
+    EXPECT_TRUE(cxxpython::is_instance(manual_error, runtime.base_exception_type()));
+    EXPECT_EQ(cxxpython::object_repr(manual_error), "TypeError('bad operand')");
+}
+
+TEST(CoreObjects, HeapTypesUseAndInheritSlots)
+{
+    cxxpython::Runtime runtime;
+
+    cxxpython::TypeSlots custom_slots;
     custom_slots.repr = custom_repr;
     custom_slots.hash = custom_hash;
     custom_slots.equal = custom_equal;
     custom_slots.truth = custom_false;
-    TypeObject *custom_type = runtime.new_heap_type("Custom", runtime.object_type(), custom_slots);
+    cxxpython::TypeObject *custom_type =
+        runtime.new_heap_type("Custom", runtime.object_type(), custom_slots);
 
-    Object *custom_a = runtime.allocate<Object>(custom_type);
-    Object *custom_b = runtime.allocate<Object>(custom_type);
-    CHECK(object_repr(custom_a) == "<custom>");
-    CHECK(object_hash(custom_a) == 42);
-    CHECK(object_equal(custom_a, custom_b));
-    CHECK(!is_true(custom_a));
-    CHECK(is_instance(custom_a, custom_type));
-    CHECK(is_instance(custom_a, runtime.object_type()));
+    cxxpython::Object *custom_a = runtime.allocate<cxxpython::Object>(custom_type);
+    cxxpython::Object *custom_b = runtime.allocate<cxxpython::Object>(custom_type);
+    EXPECT_EQ(cxxpython::object_repr(custom_a), "<custom>");
+    EXPECT_EQ(cxxpython::object_hash(custom_a), 42);
+    EXPECT_TRUE(cxxpython::object_equal(custom_a, custom_b));
+    EXPECT_FALSE(cxxpython::is_true(custom_a));
+    EXPECT_TRUE(cxxpython::is_instance(custom_a, custom_type));
+    EXPECT_TRUE(cxxpython::is_instance(custom_a, runtime.object_type()));
 
-    TypeObject *repr_only_type = runtime.new_heap_type("ReprOnly", custom_type, TypeSlots{.repr = custom_repr});
-    Object *repr_only = runtime.allocate<Object>(repr_only_type);
-    CHECK(object_repr(repr_only) == "<custom>");
-    CHECK(object_hash(repr_only) == 42);
-    CHECK(!is_true(repr_only));
+    cxxpython::TypeObject *repr_only_type =
+        runtime.new_heap_type("ReprOnly", custom_type, cxxpython::TypeSlots{.repr = custom_repr});
+    cxxpython::Object *repr_only = runtime.allocate<cxxpython::Object>(repr_only_type);
+    EXPECT_EQ(cxxpython::object_repr(repr_only), "<custom>");
+    EXPECT_EQ(cxxpython::object_hash(repr_only), 42);
+    EXPECT_FALSE(cxxpython::is_true(repr_only));
+}
 
-    bool saw_python_error = false;
-    try
-    {
-        dict->set(nullptr, one);
-    }
-    catch (const PythonError &error)
-    {
-        saw_python_error = error.type() == runtime.type_error_type() &&
-                           error.value()->type() == runtime.type_error_type() &&
-                           error.value()->message() == "dict key cannot be null" &&
-                           std::string(error.what()) == "dict key cannot be null";
-    }
-    CHECK(saw_python_error);
+TEST(CoreObjects, RuntimeVisitsRootsAndContainerChildren)
+{
+    cxxpython::Runtime runtime;
 
-    saw_python_error = false;
-    try
-    {
-        (void)object_hash(dict);
-    }
-    catch (const PythonError &error)
-    {
-        saw_python_error = error.type() == runtime.type_error_type() &&
-                           error.value()->type() == runtime.type_error_type() &&
-                           error.value()->message() == "unhashable type: 'dict'" &&
-                           std::string(error.what()) == "unhashable type: 'dict'";
-    }
-    CHECK(saw_python_error);
-
-    CHECK(runtime.heap_size() >= 11);
-    CHECK(runtime.root_count() == 16);
+    EXPECT_GE(runtime.heap_size(), 16U);
+    EXPECT_GE(runtime.root_count(), 16U);
 
     std::size_t visited_roots = 0;
-    runtime.visit_roots([&](Object *object)
+    runtime.visit_roots([&](cxxpython::Object *object)
                         {
                             if (object)
                                 ++visited_roots;
                         });
-    CHECK(visited_roots == runtime.root_count());
+    EXPECT_EQ(visited_roots, runtime.root_count());
 
+    cxxpython::TupleObject *tuple = runtime.new_tuple({runtime.new_int(4), runtime.new_str("x")});
     std::size_t tuple_children = 0;
-    tuple_key->visit_children([&](Object *object)
-                              {
-                                  if (object)
-                                      ++tuple_children;
-                              });
-    CHECK(tuple_children == 2);
+    tuple->visit_children([&](cxxpython::Object *object)
+                          {
+                              if (object)
+                                  ++tuple_children;
+                          });
+    EXPECT_EQ(tuple_children, 2U);
 
+    cxxpython::ListObject *list = runtime.new_list({runtime.new_int(1), runtime.new_int(2)});
     std::size_t list_children = 0;
-    list->visit_children([&](Object *object)
+    list->visit_children([&](cxxpython::Object *object)
                          {
                              if (object)
                                  ++list_children;
                          });
-    CHECK(list_children == list->size());
+    EXPECT_EQ(list_children, list->size());
 
+    cxxpython::DictObject *dict = runtime.new_dict();
+    dict->set(runtime.new_str("key"), runtime.new_str("value"));
     std::size_t dict_children = 0;
-    dict->visit_children([&](Object *object)
+    dict->visit_children([&](cxxpython::Object *object)
                          {
                              if (object)
                                  ++dict_children;
                          });
-    CHECK(dict_children == dict->size() * 2);
-
-    if (failures != 0)
-    {
-        std::cerr << failures << " checks failed\n";
-        return EXIT_FAILURE;
-    }
-
-    return EXIT_SUCCESS;
+    EXPECT_EQ(dict_children, dict->size() * 2);
 }

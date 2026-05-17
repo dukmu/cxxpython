@@ -2,6 +2,8 @@ cmake_minimum_required(VERSION 3.22)
 
 project(cxxpython LANGUAGES CXX)
 
+include(FetchContent)
+
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -28,8 +30,16 @@ target_link_libraries(cxxpython PRIVATE cxxpython_core)
 
 enable_testing()
 
+FetchContent_Declare(
+    googletest
+    URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.tar.gz
+    URL_HASH SHA256=8ad598c73ad796e0d8280b082cebd82a630d73e73cd3c70057938a6501bba5d7
+)
+FetchContent_MakeAvailable(googletest)
+include(GoogleTest)
+
 add_executable(test_core_objects Tests/cpp/test_core_objects.cpp)
-target_link_libraries(test_core_objects PRIVATE cxxpython_core)
+target_link_libraries(test_core_objects PRIVATE cxxpython_core GTest::gtest_main)
 target_compile_options(test_core_objects PRIVATE
     -Wall
     -Wextra
@@ -37,5 +47,4 @@ target_compile_options(test_core_objects PRIVATE
     -Werror
 )
 
-add_test(NAME core_objects COMMAND test_core_objects)
-
+gtest_discover_tests(test_core_objects)

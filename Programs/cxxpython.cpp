@@ -16,7 +16,7 @@ int main(int argc, char **argv)
     if (argc == 1)
     {
         std::cout << "cxxpython runtime initialized: "
-                  << cxxpython::object_repr(reinterpret_cast<cxxpython::Object *>(runtime.type_type()))
+                  << cxxpython::object_repr(runtime.type_type())
                   << "\n";
         return 0;
     }
@@ -24,4 +24,3 @@ int main(int argc, char **argv)
     std::cerr << "usage: cxxpython [--version]\n";
     return 2;
 }
-

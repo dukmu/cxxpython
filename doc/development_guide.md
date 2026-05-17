@@ -10,7 +10,8 @@
 4. 实现最小正确 vertical slice。
 5. 跑 focused tests。
 6. 跑全量 tests。
-7. 更新文档和兼容性说明。
+7. 按本指南做提交前技术债审查。
+8. 更新文档、兼容性说明和 `doc/development_status.md`。
 
 ## 代码质量原则
 
@@ -20,6 +21,8 @@
 - 不复制核心逻辑到 opcode、builtin、type method 三处。
 - 不创建没有所有权模型的裸指针长期对象。
 - 不新增无测试的 public API。
+- 每次提交前审查一遍可能造成技术债的设计或者代码，并把结果写入
+  `doc/development_status.md`。
 
 ## 对象类型实现清单
 
@@ -68,4 +71,3 @@ Tests/extensions/   C/C++ extension ABI tests
 ```
 
 推荐先建立 golden behavior snippets：同一段 Python 在 CPython 和 cxxpython 上比较 stdout、exception type、repr、MRO、dict behavior。
-
