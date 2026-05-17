@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <functional>
 #include <exception>
+#include <limits>
 #include <string>
 #include <utility>
 #include <vector>
@@ -138,7 +139,20 @@ namespace cxxpython
         const std::vector<Entry> &entries() const noexcept;
 
     private:
+        struct SlotSearch
+        {
+            std::size_t slot;
+            bool found;
+        };
+
+        static constexpr std::size_t empty_index = std::numeric_limits<std::size_t>::max();
+
+        SlotSearch find_slot(Object *key, std::int64_t hash) const;
+        void ensure_index_capacity();
+        void rebuild_indices(std::size_t capacity);
+
         std::vector<Entry> entries_;
+        std::vector<std::size_t> indices_;
     };
 
     class ExceptionObject final : public Object

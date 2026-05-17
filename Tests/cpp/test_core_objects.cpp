@@ -97,6 +97,40 @@ int main()
     dict->set(tuple_key, tuple_value);
     CHECK(dict->size() == 2);
     CHECK(dict->get(runtime.new_tuple({runtime.new_int(4), runtime.new_str("x")})) == tuple_value);
+    CHECK(dict->entries()[0].key == runtime.true_value());
+    CHECK(dict->entries()[0].value == int_value);
+    CHECK(dict->entries()[1].key == tuple_key);
+    CHECK(dict->entries()[1].value == tuple_value);
+
+    DictObject *large_dict = runtime.new_dict();
+    std::vector<StrObject *> large_keys;
+    for (int i = 0; i < 96; ++i)
+    {
+        StrObject *key = runtime.new_str("key-" + std::to_string(i));
+        large_keys.push_back(key);
+        large_dict->set(key, runtime.new_int(i));
+    }
+    CHECK(large_dict->size() == large_keys.size());
+    for (std::size_t i = 0; i < large_keys.size(); ++i)
+    {
+        auto *value = dynamic_cast<IntObject *>(large_dict->get(large_keys[i]));
+        CHECK(value && value->value == static_cast<std::int64_t>(i));
+        CHECK(large_dict->entries()[i].key == large_keys[i]);
+    }
+    large_dict->set(large_keys[42], runtime.new_int(4200));
+    CHECK(large_dict->size() == large_keys.size());
+    CHECK(static_cast<IntObject *>(large_dict->get(large_keys[42]))->value == 4200);
+
+    TypeSlots collision_slots;
+    collision_slots.hash = custom_hash;
+    TypeObject *collision_type = runtime.new_heap_type("CollisionKey", runtime.object_type(), collision_slots);
+    Object *collision_a = runtime.allocate<Object>(collision_type);
+    Object *collision_b = runtime.allocate<Object>(collision_type);
+    large_dict->set(collision_a, runtime.new_str("a"));
+    large_dict->set(collision_b, runtime.new_str("b"));
+    CHECK(large_dict->size() == large_keys.size() + 2);
+    CHECK(static_cast<StrObject *>(large_dict->get(collision_a))->value == "a");
+    CHECK(static_cast<StrObject *>(large_dict->get(collision_b))->value == "b");
 
     CHECK(object_repr(runtime.none()) == "None");
     CHECK(object_repr(runtime.true_value()) == "True");

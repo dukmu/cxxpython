@@ -53,6 +53,40 @@ Verification:
 
 Result: all tests pass.
 
+## 2026-05-17 Ordered Open-Addressed Dict
+
+Completed:
+
+- Replaced dict linear lookup with an ordered compact-table style layout:
+  - `entries_` preserves insertion order.
+  - `indices_` provides open-addressed hash lookup.
+- Kept object-key semantics through stored hash plus `object_equal`.
+- Preserved Python-visible behavior already covered by tests:
+  - `True` and `1` merge as the same key.
+  - tuple structural keys remain retrievable.
+  - updating an existing key does not change size or insertion position.
+- Added tests covering:
+  - insertion-order preservation.
+  - growth across many keys.
+  - retrieval after resizing.
+  - hash collisions between unequal object keys.
+
+Design notes:
+
+- Deletion/tombstones are intentionally not exposed yet because delete
+  semantics are not implemented. When `del` support is added, dict must gain a
+  tombstone state and compaction policy instead of removing ordered entries
+  directly.
+- The probing sequence is CPython-inspired perturb probing, while the external
+  behavior remains independent of CPython's private layout.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all tests pass.
+
 ## 2026-05-17 Runtime Exception Objects
 
 Completed:

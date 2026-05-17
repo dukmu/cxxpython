@@ -392,6 +392,7 @@ namespace cxxpython
     DictObject::DictObject(TypeObject *type)
         : Object(type)
     {
+        rebuild_indices(8);
     }
 
     bool DictObject::contains(Object *key) const
@@ -405,12 +406,10 @@ namespace cxxpython
             raise_type_error(runtime(), "dict key cannot be null");
 
         const std::int64_t key_hash = object_hash(key);
-        for (const Entry &entry : entries_)
-        {
-            if (entry.hash == key_hash && object_equal(entry.key, key))
-                return entry.value;
-        }
-        return nullptr;
+        const SlotSearch search = find_slot(key, key_hash);
+        if (!search.found)
+            return nullptr;
+        return entries_[indices_[search.slot]].value;
     }
 
     void DictObject::set(Object *key, Object *value)
@@ -421,15 +420,17 @@ namespace cxxpython
             raise_type_error(runtime(), "dict value cannot be null");
 
         const std::int64_t key_hash = object_hash(key);
-        for (Entry &entry : entries_)
+        ensure_index_capacity();
+        SlotSearch search = find_slot(key, key_hash);
+        if (search.found)
         {
-            if (entry.hash == key_hash && object_equal(entry.key, key))
-            {
-                entry.value = value;
-                return;
-            }
+            entries_[indices_[search.slot]].value = value;
+            return;
         }
+
         entries_.push_back(Entry{key, value, key_hash});
+        indices_[search.slot] = entries_.size() - 1;
+        ensure_index_capacity();
     }
 
     std::size_t DictObject::size() const noexcept
@@ -440,6 +441,50 @@ namespace cxxpython
     const std::vector<DictObject::Entry> &DictObject::entries() const noexcept
     {
         return entries_;
+    }
+
+    DictObject::SlotSearch DictObject::find_slot(Object *key, std::int64_t hash) const
+    {
+        const std::size_t mask = indices_.size() - 1;
+        std::size_t slot = static_cast<std::uint64_t>(hash) & mask;
+        std::size_t perturb = static_cast<std::uint64_t>(hash);
+        while (true)
+        {
+            const std::size_t entry_index = indices_[slot];
+            if (entry_index == empty_index)
+                return SlotSearch{slot, false};
+
+            const Entry &entry = entries_[entry_index];
+            if (entry.hash == hash && object_equal(entry.key, key))
+                return SlotSearch{slot, true};
+
+            slot = (slot * 5 + perturb + 1) & mask;
+            perturb >>= 5;
+        }
+    }
+
+    void DictObject::ensure_index_capacity()
+    {
+        if (indices_.empty())
+            rebuild_indices(8);
+        if ((entries_.size() + 1) * 3 < indices_.size() * 2)
+            return;
+        rebuild_indices(indices_.size() * 2);
+    }
+
+    void DictObject::rebuild_indices(std::size_t capacity)
+    {
+        std::size_t normalized = 8;
+        while (normalized < capacity)
+            normalized *= 2;
+
+        indices_.assign(normalized, empty_index);
+        for (std::size_t entry_index = 0; entry_index < entries_.size(); ++entry_index)
+        {
+            const Entry &entry = entries_[entry_index];
+            const SlotSearch search = find_slot(entry.key, entry.hash);
+            indices_[search.slot] = entry_index;
+        }
     }
 
     ExceptionObject::ExceptionObject(TypeObject *type, std::string message)
