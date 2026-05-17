@@ -2,6 +2,22 @@
 
 namespace cxxpython
 {
+    namespace
+    {
+        std::string exception_message_from_args(const TupleObject *args)
+        {
+            if (!args || args->size() == 0)
+                return "";
+            if (args->size() == 1)
+            {
+                if (auto *message = dynamic_cast<StrObject *>(args->items()[0]))
+                    return message->value;
+                return object_repr(args->items()[0]);
+            }
+            return object_repr(args);
+        }
+    }
+
     IntObject *Runtime::new_int(std::int64_t value)
     {
         return allocate<IntObject>(int_type_, value);
@@ -39,8 +55,14 @@ namespace cxxpython
 
     ExceptionObject *Runtime::new_exception(TypeObject *type, std::string message)
     {
+        return new_exception(type, {new_str(std::move(message))});
+    }
+
+    ExceptionObject *Runtime::new_exception(TypeObject *type, std::vector<Object *> args)
+    {
         TypeObject *resolved_type = type ? type : exception_type_;
-        return allocate<ExceptionObject>(resolved_type, std::move(message));
+        TupleObject *args_tuple = new_tuple(std::move(args));
+        return allocate<ExceptionObject>(resolved_type, args_tuple, exception_message_from_args(args_tuple));
     }
 
     ExceptionObject *Runtime::new_type_error(std::string message)

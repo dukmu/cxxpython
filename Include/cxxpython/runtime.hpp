@@ -43,6 +43,7 @@ namespace cxxpython
         DictObject *new_dict();
         TypeObject *new_heap_type(std::string name, TypeObject *base, TypeSlots slots = {});
         ExceptionObject *new_exception(TypeObject *type, std::string message);
+        ExceptionObject *new_exception(TypeObject *type, std::vector<Object *> args);
         ExceptionObject *new_type_error(std::string message);
         ExceptionObject *new_index_error(std::string message);
 

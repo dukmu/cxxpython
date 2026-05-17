@@ -355,3 +355,32 @@ Verification:
 - `ctest --test-dir build --output-on-failure`
 
 Result: all tests pass.
+
+## 2026-05-17 Exception Args Semantics
+
+Completed:
+
+- Added Python-level `args` storage to `ExceptionObject` as a `TupleObject`.
+- Kept `message()` as the host-facing exception message used by
+  `PythonError::what()`.
+- Added a vector-args `Runtime::new_exception` overload.
+- Made string-based exception construction create a one-item args tuple.
+- Updated exception repr to render from args instead of directly formatting a
+  message string.
+- Added exception traversal for args so future GC can see the tuple.
+- Added tests covering one-arg exceptions, multi-arg exceptions, repr, and
+  traversal.
+
+Design notes:
+
+- Exception objects now have a real Python-facing payload shape instead of only
+  a C++ message string.
+- Future traceback/context/cause work can build on this object layout without
+  changing the basic exception constructor contract again.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all tests pass.

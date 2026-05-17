@@ -176,11 +176,13 @@ namespace cxxpython
     class ExceptionObject final : public Object
     {
     public:
-        ExceptionObject(TypeObject *type, std::string message);
+        ExceptionObject(TypeObject *type, TupleObject *args, std::string message);
 
+        TupleObject *args() const noexcept;
         const std::string &message() const noexcept;
 
     private:
+        TupleObject *args_;
         std::string message_;
     };
 
