@@ -328,3 +328,30 @@ Verification:
 - `ctest --test-dir build --output-on-failure`
 
 Result: all tests pass.
+
+## 2026-05-17 Test Layer Source Split
+
+Completed:
+
+- Split the former monolithic C++ core test file into focused test translation
+  units:
+  - `test_bootstrap.cpp`
+  - `test_sequences.cpp`
+  - `test_mapping.cpp`
+  - `test_heap_types.cpp`
+- Extracted shared test helpers into `test_support.hpp`.
+- Kept the same focused behavior coverage while improving test locality and
+  maintainability.
+
+Design notes:
+
+- Test files now mirror the object/runtime responsibility boundaries.
+- This structure should make future bytecode, module, and extension test
+  expansion easier to reason about.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all tests pass.

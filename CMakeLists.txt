@@ -46,7 +46,12 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(googletest)
 include(GoogleTest)
 
-add_executable(test_core_objects Tests/cpp/test_core_objects.cpp)
+add_executable(test_core_objects
+    Tests/cpp/test_bootstrap.cpp
+    Tests/cpp/test_sequences.cpp
+    Tests/cpp/test_mapping.cpp
+    Tests/cpp/test_heap_types.cpp
+)
 target_link_libraries(test_core_objects PRIVATE cxxpython_core GTest::gtest_main)
 target_compile_options(test_core_objects PRIVATE
     -Wall
