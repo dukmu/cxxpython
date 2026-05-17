@@ -19,11 +19,37 @@ namespace cxxpython
         std::string escape_single_quoted(std::string_view value)
         {
             std::ostringstream out;
-            for (const char ch : value)
+            for (unsigned char ch : value)
             {
-                if (ch == '\\' || ch == '\'')
-                    out << '\\';
-                out << ch;
+                switch (ch)
+                {
+                case '\\':
+                    out << "\\\\";
+                    break;
+                case '\'':
+                    out << "\\'";
+                    break;
+                case '\n':
+                    out << "\\n";
+                    break;
+                case '\t':
+                    out << "\\t";
+                    break;
+                case '\r':
+                    out << "\\r";
+                    break;
+                default:
+                    if (ch < 0x20 || ch == 0x7f)
+                    {
+                        static constexpr char digits[] = "0123456789abcdef";
+                        out << "\\x" << digits[(ch >> 4) & 0x0f] << digits[ch & 0x0f];
+                    }
+                    else
+                    {
+                        out << static_cast<char>(ch);
+                    }
+                    break;
+                }
             }
             return out.str();
         }
@@ -128,7 +154,7 @@ namespace cxxpython
 
         std::string str_repr(const Object &object)
         {
-            return "'" + static_cast<const StrObject *>(&object)->value + "'";
+            return "'" + escape_single_quoted(static_cast<const StrObject *>(&object)->value) + "'";
         }
 
         std::int64_t str_hash(const Object &object)

@@ -269,14 +269,18 @@ TEST(CoreObjects, ReprAndExceptionObjects)
     EXPECT_EQ(cxxpython::object_repr(runtime.true_value()), "True");
     EXPECT_EQ(cxxpython::object_repr(runtime.new_int(1)), "1");
     EXPECT_EQ(cxxpython::object_repr(runtime.new_str("hello")), "'hello'");
+    EXPECT_EQ(cxxpython::object_repr(runtime.new_str("it's\\ok\n\t")),
+              "'it\\'s\\\\ok\\n\\t'");
+    EXPECT_EQ(cxxpython::object_repr(runtime.new_str(std::string("a") + std::string(1, '\x01') + "z")),
+              "'a\\x01z'");
     EXPECT_EQ(cxxpython::object_repr(runtime.type_type()), "<class 'type'>");
 
     cxxpython::ExceptionObject *manual_error =
-        runtime.new_exception(runtime.type_error_type(), "bad operand");
+        runtime.new_exception(runtime.type_error_type(), "bad\\operand\n");
     EXPECT_EQ(manual_error->type(), runtime.type_error_type());
-    EXPECT_EQ(manual_error->message(), "bad operand");
+    EXPECT_EQ(manual_error->message(), "bad\\operand\n");
     EXPECT_TRUE(cxxpython::is_instance(manual_error, runtime.base_exception_type()));
-    EXPECT_EQ(cxxpython::object_repr(manual_error), "TypeError('bad operand')");
+    EXPECT_EQ(cxxpython::object_repr(manual_error), "TypeError('bad\\\\operand\\n')");
 }
 
 TEST(CoreObjects, HeapTypesUseAndInheritSlots)

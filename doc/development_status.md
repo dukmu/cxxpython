@@ -240,3 +240,32 @@ Verification:
 - `ctest --test-dir build --output-on-failure`
 
 Result: all tests pass.
+
+## 2026-05-17 Python String and Exception Repr Escaping
+
+Completed:
+
+- Added a single shared escape routine for Python single-quoted display.
+- Updated `str` repr to escape:
+  - backslash
+  - single quote
+  - newline
+  - tab
+  - carriage return
+  - other control bytes as `\xNN`
+- Updated `ExceptionObject` repr to reuse the same escaping path.
+- Added tests covering escaped strings and escaped exception messages.
+
+Design notes:
+
+- String display now follows a Python-like debug repr model rather than raw
+  passthrough bytes.
+- The same escape behavior should be reused by future traceback and formatting
+  code to avoid drift.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all tests pass.
