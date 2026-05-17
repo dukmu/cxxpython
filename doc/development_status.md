@@ -300,3 +300,31 @@ Verification:
 - `ctest --test-dir build --output-on-failure`
 
 Result: all tests pass.
+
+## 2026-05-17 Runtime Layer Source Split
+
+Completed:
+
+- Split the former monolithic `Objects/runtime.cpp` into focused translation
+  units:
+  - `runtime_bootstrap.cpp`
+  - `runtime_accessors.cpp`
+  - `runtime_factories.cpp`
+  - `runtime_roots.cpp`
+- Kept runtime bootstrap, accessors, object factories, root management, and
+  type initialization in separate compilation units.
+- Removed the old monolithic runtime source from the build.
+
+Design notes:
+
+- Runtime initialization is now easier to read and extend without turning one
+  file into a full subsystem dump.
+- The next natural split point is likely the test layer or future module/import
+  code, not more churn inside object semantics.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all tests pass.

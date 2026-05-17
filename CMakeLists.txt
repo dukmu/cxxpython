@@ -9,7 +9,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_library(cxxpython_core
-    Objects/runtime.cpp
+    Objects/runtime_bootstrap.cpp
+    Objects/runtime_accessors.cpp
+    Objects/runtime_factories.cpp
+    Objects/runtime_roots.cpp
     Objects/object_core.cpp
     Objects/object_primitives.cpp
     Objects/object_sequences.cpp
