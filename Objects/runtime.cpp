@@ -6,14 +6,23 @@ namespace cxxpython
 {
     Runtime::Runtime()
     {
-        object_type_ = new_type("object");
-        type_type_ = new_type("type");
-        none_type_ = new_type("NoneType");
-        int_type_ = new_type("int");
-        bool_type_ = new_type("bool");
-        str_type_ = new_type("str");
-        tuple_type_ = new_type("tuple");
-        dict_type_ = new_type("dict");
+        object_type_ = allocate_type("object");
+        type_type_ = allocate_type("type");
+        none_type_ = allocate_type("NoneType");
+        int_type_ = allocate_type("int");
+        bool_type_ = allocate_type("bool");
+        str_type_ = allocate_type("str");
+        tuple_type_ = allocate_type("tuple");
+        dict_type_ = allocate_type("dict");
+
+        object_type_->slots = make_object_slots();
+        type_type_->slots = make_type_slots();
+        none_type_->slots = make_none_slots();
+        int_type_->slots = make_int_slots();
+        bool_type_->slots = make_bool_slots();
+        str_type_->slots = make_str_slots();
+        tuple_type_->slots = make_tuple_slots();
+        dict_type_->slots = make_dict_slots();
 
         object_type_->set_type(type_type_);
         type_type_->set_type(type_type_);
@@ -128,6 +137,16 @@ namespace cxxpython
         return allocate<DictObject>(dict_type_);
     }
 
+    TypeObject *Runtime::new_heap_type(std::string name, TypeObject *base, TypeSlots slots)
+    {
+        TypeObject *type = allocate_type(std::move(name));
+        type->set_type(type_type_);
+        TypeObject *resolved_base = base ? base : object_type_;
+        type->slots = inherit_slots(resolved_base, slots);
+        initialize_type(type, resolved_base);
+        return type;
+    }
+
     void Runtime::add_root(Object *object)
     {
         if (!object)
@@ -169,7 +188,7 @@ namespace cxxpython
         return roots_.size();
     }
 
-    TypeObject *Runtime::new_type(std::string name)
+    TypeObject *Runtime::allocate_type(std::string name)
     {
         return allocate<TypeObject>(std::move(name));
     }
@@ -185,5 +204,23 @@ namespace cxxpython
             for (TypeObject *mro_item : base->mro)
                 type->mro.push_back(mro_item);
         }
+    }
+
+    TypeSlots Runtime::inherit_slots(TypeObject *base, TypeSlots slots) const
+    {
+        if (!base)
+            return slots;
+        TypeSlots inherited = base->slots;
+        if (slots.repr)
+            inherited.repr = slots.repr;
+        if (slots.hash)
+            inherited.hash = slots.hash;
+        if (slots.equal)
+            inherited.equal = slots.equal;
+        if (slots.truth)
+            inherited.truth = slots.truth;
+        if (slots.traverse)
+            inherited.traverse = slots.traverse;
+        return inherited;
     }
 }

@@ -1,6 +1,5 @@
 #include "cxxpython/object.hpp"
 
-#include <functional>
 #include <sstream>
 
 namespace cxxpython
@@ -12,6 +11,235 @@ namespace cxxpython
             std::ostringstream out;
             out << ptr;
             return out.str();
+        }
+
+        std::string default_repr(const Object &object)
+        {
+            return "<" + type_qualified_name(object.type()) + " object at " + pointer_hex(&object) + ">";
+        }
+
+        std::int64_t default_hash(const Object &object)
+        {
+            return reinterpret_cast<std::intptr_t>(&object);
+        }
+
+        bool default_equal(const Object &left, const Object &right)
+        {
+            return &left == &right;
+        }
+
+        bool default_truth(const Object &object)
+        {
+            (void)object;
+            return true;
+        }
+
+        void default_traverse(const Object &object, const VisitChildren &visitor)
+        {
+            (void)object;
+            (void)visitor;
+        }
+
+        std::string type_repr(const Object &object)
+        {
+            return "<class '" + type_qualified_name(static_cast<const TypeObject *>(&object)) + "'>";
+        }
+
+        void type_traverse(const Object &object, const VisitChildren &visitor)
+        {
+            auto *type = static_cast<const TypeObject *>(&object);
+            if (type->base)
+                visitor(type->base);
+            for (TypeObject *item : type->bases)
+            {
+                if (item)
+                    visitor(item);
+            }
+            for (TypeObject *item : type->mro)
+            {
+                if (item)
+                    visitor(item);
+            }
+        }
+
+        std::string none_repr(const Object &object)
+        {
+            (void)object;
+            return "None";
+        }
+
+        std::int64_t none_hash(const Object &object)
+        {
+            (void)object;
+            return 0;
+        }
+
+        bool none_equal(const Object &left, const Object &right)
+        {
+            return &left == &right;
+        }
+
+        bool none_truth(const Object &object)
+        {
+            (void)object;
+            return false;
+        }
+
+        std::string int_repr(const Object &object)
+        {
+            return std::to_string(static_cast<const IntObject *>(&object)->value);
+        }
+
+        std::int64_t int_hash(const Object &object)
+        {
+            return static_cast<const IntObject *>(&object)->value;
+        }
+
+        bool int_equal(const Object &left, const Object &right)
+        {
+            auto *right_int = dynamic_cast<const IntObject *>(&right);
+            return right_int && static_cast<const IntObject *>(&left)->value == right_int->value;
+        }
+
+        bool int_truth(const Object &object)
+        {
+            return static_cast<const IntObject *>(&object)->value != 0;
+        }
+
+        std::string bool_repr(const Object &object)
+        {
+            return static_cast<const IntObject *>(&object)->value != 0 ? "True" : "False";
+        }
+
+        std::string str_repr(const Object &object)
+        {
+            return "'" + static_cast<const StrObject *>(&object)->value + "'";
+        }
+
+        std::int64_t str_hash(const Object &object)
+        {
+            return static_cast<std::int64_t>(std::hash<std::string>{}(static_cast<const StrObject *>(&object)->value));
+        }
+
+        bool str_equal(const Object &left, const Object &right)
+        {
+            auto *right_str = dynamic_cast<const StrObject *>(&right);
+            return right_str && static_cast<const StrObject *>(&left)->value == right_str->value;
+        }
+
+        bool str_truth(const Object &object)
+        {
+            return !static_cast<const StrObject *>(&object)->value.empty();
+        }
+
+        std::string tuple_repr(const Object &object)
+        {
+            auto *tuple = static_cast<const TupleObject *>(&object);
+            std::ostringstream out;
+            out << "(";
+            for (std::size_t i = 0; i < tuple->items().size(); ++i)
+            {
+                if (i != 0)
+                    out << ", ";
+                out << object_repr(tuple->items()[i]);
+            }
+            if (tuple->items().size() == 1)
+                out << ",";
+            out << ")";
+            return out.str();
+        }
+
+        std::int64_t tuple_hash(const Object &object)
+        {
+            auto *tuple = static_cast<const TupleObject *>(&object);
+            std::uint64_t result = 0x345678UL;
+            for (const Object *item : tuple->items())
+                result = (result ^ static_cast<std::uint64_t>(object_hash(item))) * 1000003UL;
+            result ^= tuple->items().size();
+            return static_cast<std::int64_t>(result);
+        }
+
+        bool tuple_equal(const Object &left, const Object &right)
+        {
+            auto *left_tuple = static_cast<const TupleObject *>(&left);
+            auto *right_tuple = dynamic_cast<const TupleObject *>(&right);
+            if (!right_tuple || left_tuple->items().size() != right_tuple->items().size())
+                return false;
+            for (std::size_t i = 0; i < left_tuple->items().size(); ++i)
+            {
+                if (!object_equal(left_tuple->items()[i], right_tuple->items()[i]))
+                    return false;
+            }
+            return true;
+        }
+
+        bool tuple_truth(const Object &object)
+        {
+            return static_cast<const TupleObject *>(&object)->size() != 0;
+        }
+
+        void tuple_traverse(const Object &object, const VisitChildren &visitor)
+        {
+            auto *tuple = static_cast<const TupleObject *>(&object);
+            for (Object *item : tuple->items())
+            {
+                if (item)
+                    visitor(item);
+            }
+        }
+
+        std::string dict_repr(const Object &object)
+        {
+            auto *dict = static_cast<const DictObject *>(&object);
+            std::ostringstream out;
+            out << "{";
+            const auto &entries = dict->entries();
+            for (std::size_t i = 0; i < entries.size(); ++i)
+            {
+                if (i != 0)
+                    out << ", ";
+                out << object_repr(entries[i].key) << ": " << object_repr(entries[i].value);
+            }
+            out << "}";
+            return out.str();
+        }
+
+        std::int64_t dict_hash(const Object &object)
+        {
+            (void)object;
+            throw PythonError("TypeError", "unhashable type: 'dict'");
+        }
+
+        bool dict_equal(const Object &left, const Object &right)
+        {
+            auto *left_dict = static_cast<const DictObject *>(&left);
+            auto *right_dict = dynamic_cast<const DictObject *>(&right);
+            if (!right_dict || left_dict->entries().size() != right_dict->entries().size())
+                return false;
+            for (const DictObject::Entry &entry : left_dict->entries())
+            {
+                Object *right_value = right_dict->get(entry.key);
+                if (!right_value || !object_equal(entry.value, right_value))
+                    return false;
+            }
+            return true;
+        }
+
+        bool dict_truth(const Object &object)
+        {
+            return static_cast<const DictObject *>(&object)->size() != 0;
+        }
+
+        void dict_traverse(const Object &object, const VisitChildren &visitor)
+        {
+            auto *dict = static_cast<const DictObject *>(&object);
+            for (const DictObject::Entry &entry : dict->entries())
+            {
+                if (entry.key)
+                    visitor(entry.key);
+                if (entry.value)
+                    visitor(entry.value);
+            }
         }
     }
 
@@ -47,27 +275,38 @@ namespace cxxpython
 
     std::string Object::repr() const
     {
-        return "<" + type_qualified_name(type_) + " object at " + pointer_hex(this) + ">";
+        if (type_ && type_->slots.repr)
+            return type_->slots.repr(*this);
+        return default_repr(*this);
     }
 
     std::int64_t Object::hash() const
     {
-        return reinterpret_cast<std::intptr_t>(this);
+        if (type_ && type_->slots.hash)
+            return type_->slots.hash(*this);
+        return default_hash(*this);
     }
 
     bool Object::equals(const Object &other) const
     {
-        return this == &other;
+        if (type_ && type_->slots.equal)
+            return type_->slots.equal(*this, other);
+        return default_equal(*this, other);
     }
 
-    bool Object::truth() const noexcept
+    bool Object::truth() const
     {
-        return true;
+        if (type_ && type_->slots.truth)
+            return type_->slots.truth(*this);
+        return default_truth(*this);
     }
 
-    void Object::visit_children(const std::function<void(Object *)> &visitor) const
+    void Object::visit_children(const VisitChildren &visitor) const
     {
-        (void)visitor;
+        if (type_ && type_->slots.traverse)
+            type_->slots.traverse(*this, visitor);
+        else
+            default_traverse(*this, visitor);
     }
 
     TypeObject::TypeObject(std::string name)
@@ -75,65 +314,9 @@ namespace cxxpython
     {
     }
 
-    std::string TypeObject::repr() const
-    {
-        return "<class '" + type_qualified_name(this) + "'>";
-    }
-
-    std::int64_t TypeObject::hash() const
-    {
-        return reinterpret_cast<std::intptr_t>(this);
-    }
-
-    bool TypeObject::equals(const Object &other) const
-    {
-        return this == &other;
-    }
-
-    bool TypeObject::truth() const noexcept
-    {
-        return true;
-    }
-
-    void TypeObject::visit_children(const std::function<void(Object *)> &visitor) const
-    {
-        if (base)
-            visitor(base);
-        for (TypeObject *item : bases)
-        {
-            if (item)
-                visitor(item);
-        }
-        for (TypeObject *item : mro)
-        {
-            if (item)
-                visitor(item);
-        }
-    }
-
     NoneObject::NoneObject(TypeObject *type)
         : Object(type)
     {
-    }
-
-    std::string NoneObject::repr() const
-    {
-        return "None";
-    }
-
-    std::int64_t NoneObject::hash() const
-    {
-        return 0;
-    }
-
-    bool NoneObject::equals(const Object &other) const
-    {
-        return this == &other;
-    }
-
-    bool NoneObject::truth() const noexcept
-    {
-        return false;
     }
 
     IntObject::IntObject(TypeObject *type, std::int64_t value)
@@ -141,66 +324,14 @@ namespace cxxpython
     {
     }
 
-    std::string IntObject::repr() const
-    {
-        return std::to_string(value);
-    }
-
-    std::int64_t IntObject::hash() const
-    {
-        return value;
-    }
-
-    bool IntObject::equals(const Object &other) const
-    {
-        auto *other_int = dynamic_cast<const IntObject *>(&other);
-        return other_int && value == other_int->value;
-    }
-
-    bool IntObject::truth() const noexcept
-    {
-        return value != 0;
-    }
-
     BoolObject::BoolObject(TypeObject *type, bool value)
         : IntObject(type, value ? 1 : 0)
     {
     }
 
-    bool BoolObject::truth() const noexcept
-    {
-        return value != 0;
-    }
-
-    std::string BoolObject::repr() const
-    {
-        return truth() ? "True" : "False";
-    }
-
     StrObject::StrObject(TypeObject *type, std::string value)
         : Object(type), value(std::move(value))
     {
-    }
-
-    std::string StrObject::repr() const
-    {
-        return "'" + value + "'";
-    }
-
-    std::int64_t StrObject::hash() const
-    {
-        return static_cast<std::int64_t>(std::hash<std::string>{}(value));
-    }
-
-    bool StrObject::equals(const Object &other) const
-    {
-        auto *other_str = dynamic_cast<const StrObject *>(&other);
-        return other_str && value == other_str->value;
-    }
-
-    bool StrObject::truth() const noexcept
-    {
-        return !value.empty();
     }
 
     TupleObject::TupleObject(TypeObject *type, std::vector<Object *> items)
@@ -216,58 +347,6 @@ namespace cxxpython
     std::size_t TupleObject::size() const noexcept
     {
         return items_.size();
-    }
-
-    std::string TupleObject::repr() const
-    {
-        std::ostringstream out;
-        out << "(";
-        for (std::size_t i = 0; i < items_.size(); ++i)
-        {
-            if (i != 0)
-                out << ", ";
-            out << object_repr(items_[i]);
-        }
-        if (items_.size() == 1)
-            out << ",";
-        out << ")";
-        return out.str();
-    }
-
-    std::int64_t TupleObject::hash() const
-    {
-        std::uint64_t result = 0x345678UL;
-        for (const Object *item : items_)
-            result = (result ^ static_cast<std::uint64_t>(object_hash(item))) * 1000003UL;
-        result ^= items_.size();
-        return static_cast<std::int64_t>(result);
-    }
-
-    bool TupleObject::equals(const Object &other) const
-    {
-        auto *other_tuple = dynamic_cast<const TupleObject *>(&other);
-        if (!other_tuple || items_.size() != other_tuple->items_.size())
-            return false;
-        for (std::size_t i = 0; i < items_.size(); ++i)
-        {
-            if (!object_equal(items_[i], other_tuple->items_[i]))
-                return false;
-        }
-        return true;
-    }
-
-    bool TupleObject::truth() const noexcept
-    {
-        return !items_.empty();
-    }
-
-    void TupleObject::visit_children(const std::function<void(Object *)> &visitor) const
-    {
-        for (Object *item : items_)
-        {
-            if (item)
-                visitor(item);
-        }
     }
 
     DictObject::DictObject(TypeObject *type)
@@ -323,55 +402,6 @@ namespace cxxpython
         return entries_;
     }
 
-    std::string DictObject::repr() const
-    {
-        std::ostringstream out;
-        out << "{";
-        for (std::size_t i = 0; i < entries_.size(); ++i)
-        {
-            if (i != 0)
-                out << ", ";
-            out << object_repr(entries_[i].key) << ": " << object_repr(entries_[i].value);
-        }
-        out << "}";
-        return out.str();
-    }
-
-    std::int64_t DictObject::hash() const
-    {
-        throw PythonError("TypeError", "unhashable type: 'dict'");
-    }
-
-    bool DictObject::equals(const Object &other) const
-    {
-        auto *other_dict = dynamic_cast<const DictObject *>(&other);
-        if (!other_dict || entries_.size() != other_dict->entries_.size())
-            return false;
-        for (const Entry &entry : entries_)
-        {
-            Object *other_value = other_dict->get(entry.key);
-            if (!other_value || !object_equal(entry.value, other_value))
-                return false;
-        }
-        return true;
-    }
-
-    bool DictObject::truth() const noexcept
-    {
-        return !entries_.empty();
-    }
-
-    void DictObject::visit_children(const std::function<void(Object *)> &visitor) const
-    {
-        for (const Entry &entry : entries_)
-        {
-            if (entry.key)
-                visitor(entry.key);
-            if (entry.value)
-                visitor(entry.value);
-        }
-    }
-
     bool is_subclass(const TypeObject *derived, const TypeObject *base) noexcept
     {
         if (!derived || !base)
@@ -391,7 +421,7 @@ namespace cxxpython
         return object && type && is_subclass(object->type(), type);
     }
 
-    bool is_true(const Object *object) noexcept
+    bool is_true(const Object *object)
     {
         return object && object->truth();
     }
@@ -426,5 +456,45 @@ namespace cxxpython
         if (!object)
             return "<null>";
         return object->repr();
+    }
+
+    TypeSlots make_object_slots()
+    {
+        return TypeSlots{default_repr, default_hash, default_equal, default_truth, default_traverse};
+    }
+
+    TypeSlots make_type_slots()
+    {
+        return TypeSlots{type_repr, default_hash, default_equal, default_truth, type_traverse};
+    }
+
+    TypeSlots make_none_slots()
+    {
+        return TypeSlots{none_repr, none_hash, none_equal, none_truth, default_traverse};
+    }
+
+    TypeSlots make_int_slots()
+    {
+        return TypeSlots{int_repr, int_hash, int_equal, int_truth, default_traverse};
+    }
+
+    TypeSlots make_bool_slots()
+    {
+        return TypeSlots{bool_repr, int_hash, int_equal, int_truth, default_traverse};
+    }
+
+    TypeSlots make_str_slots()
+    {
+        return TypeSlots{str_repr, str_hash, str_equal, str_truth, default_traverse};
+    }
+
+    TypeSlots make_tuple_slots()
+    {
+        return TypeSlots{tuple_repr, tuple_hash, tuple_equal, tuple_truth, tuple_traverse};
+    }
+
+    TypeSlots make_dict_slots()
+    {
+        return TypeSlots{dict_repr, dict_hash, dict_equal, dict_truth, dict_traverse};
     }
 }

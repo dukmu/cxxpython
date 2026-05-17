@@ -13,6 +13,22 @@ namespace cxxpython
     class Object;
     class TypeObject;
 
+    using VisitChildren = std::function<void(Object *)>;
+    using ReprSlot = std::string (*)(const Object &);
+    using HashSlot = std::int64_t (*)(const Object &);
+    using EqualSlot = bool (*)(const Object &, const Object &);
+    using TruthSlot = bool (*)(const Object &);
+    using TraverseSlot = void (*)(const Object &, const VisitChildren &);
+
+    struct TypeSlots
+    {
+        ReprSlot repr = nullptr;
+        HashSlot hash = nullptr;
+        EqualSlot equal = nullptr;
+        TruthSlot truth = nullptr;
+        TraverseSlot traverse = nullptr;
+    };
+
     class PythonError final : public std::exception
     {
     public:
@@ -34,11 +50,11 @@ namespace cxxpython
 
         TypeObject *type() const noexcept;
         void set_type(TypeObject *type) noexcept;
-        virtual std::string repr() const;
-        virtual std::int64_t hash() const;
-        virtual bool equals(const Object &other) const;
-        virtual bool truth() const noexcept;
-        virtual void visit_children(const std::function<void(Object *)> &visitor) const;
+        std::string repr() const;
+        std::int64_t hash() const;
+        bool equals(const Object &other) const;
+        bool truth() const;
+        void visit_children(const VisitChildren &visitor) const;
 
     private:
         TypeObject *type_;
@@ -54,23 +70,13 @@ namespace cxxpython
         TypeObject *base = nullptr;
         std::vector<TypeObject *> bases;
         std::vector<TypeObject *> mro;
-
-        std::string repr() const override;
-        std::int64_t hash() const override;
-        bool equals(const Object &other) const override;
-        bool truth() const noexcept override;
-        void visit_children(const std::function<void(Object *)> &visitor) const override;
+        TypeSlots slots;
     };
 
     class NoneObject final : public Object
     {
     public:
         explicit NoneObject(TypeObject *type);
-
-        std::string repr() const override;
-        std::int64_t hash() const override;
-        bool equals(const Object &other) const override;
-        bool truth() const noexcept override;
     };
 
     class IntObject : public Object
@@ -79,20 +85,12 @@ namespace cxxpython
         IntObject(TypeObject *type, std::int64_t value);
 
         std::int64_t value;
-
-        std::string repr() const override;
-        std::int64_t hash() const override;
-        bool equals(const Object &other) const override;
-        bool truth() const noexcept override;
     };
 
     class BoolObject final : public IntObject
     {
     public:
         BoolObject(TypeObject *type, bool value);
-
-        bool truth() const noexcept;
-        std::string repr() const override;
     };
 
     class StrObject final : public Object
@@ -101,11 +99,6 @@ namespace cxxpython
         StrObject(TypeObject *type, std::string value);
 
         std::string value;
-
-        std::string repr() const override;
-        std::int64_t hash() const override;
-        bool equals(const Object &other) const override;
-        bool truth() const noexcept override;
     };
 
     class TupleObject final : public Object
@@ -115,12 +108,6 @@ namespace cxxpython
 
         const std::vector<Object *> &items() const noexcept;
         std::size_t size() const noexcept;
-
-        std::string repr() const override;
-        std::int64_t hash() const override;
-        bool equals(const Object &other) const override;
-        bool truth() const noexcept override;
-        void visit_children(const std::function<void(Object *)> &visitor) const override;
 
     private:
         std::vector<Object *> items_;
@@ -144,22 +131,25 @@ namespace cxxpython
         std::size_t size() const noexcept;
         const std::vector<Entry> &entries() const noexcept;
 
-        std::string repr() const override;
-        std::int64_t hash() const override;
-        bool equals(const Object &other) const override;
-        bool truth() const noexcept override;
-        void visit_children(const std::function<void(Object *)> &visitor) const override;
-
     private:
         std::vector<Entry> entries_;
     };
 
     bool is_subclass(const TypeObject *derived, const TypeObject *base) noexcept;
     bool is_instance(const Object *object, const TypeObject *type) noexcept;
-    bool is_true(const Object *object) noexcept;
+    bool is_true(const Object *object);
 
     std::int64_t object_hash(const Object *object);
     bool object_equal(const Object *left, const Object *right);
     std::string object_repr(const Object *object);
     std::string type_qualified_name(const TypeObject *type);
+
+    TypeSlots make_object_slots();
+    TypeSlots make_type_slots();
+    TypeSlots make_none_slots();
+    TypeSlots make_int_slots();
+    TypeSlots make_bool_slots();
+    TypeSlots make_str_slots();
+    TypeSlots make_tuple_slots();
+    TypeSlots make_dict_slots();
 }

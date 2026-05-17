@@ -21,29 +21,28 @@ namespace
 
 #define CHECK(expr) check((expr), #expr, __FILE__, __LINE__)
 
-    class CustomObject final : public cxxpython::Object
+    std::string custom_repr(const cxxpython::Object &object)
     {
-    public:
-        explicit CustomObject(cxxpython::TypeObject *type)
-            : Object(type)
-        {
-        }
+        (void)object;
+        return "<custom>";
+    }
 
-        std::string repr() const override
-        {
-            return "<custom>";
-        }
+    std::int64_t custom_hash(const cxxpython::Object &object)
+    {
+        (void)object;
+        return 42;
+    }
 
-        std::int64_t hash() const override
-        {
-            return 42;
-        }
+    bool custom_equal(const cxxpython::Object &left, const cxxpython::Object &right)
+    {
+        return left.type() == right.type();
+    }
 
-        bool equals(const Object &other) const override
-        {
-            return dynamic_cast<const CustomObject *>(&other) != nullptr;
-        }
-    };
+    bool custom_false(const cxxpython::Object &object)
+    {
+        (void)object;
+        return false;
+    }
 }
 
 int main()
@@ -101,11 +100,27 @@ int main()
     CHECK(object_repr(runtime.new_str("hello")) == "'hello'");
     CHECK(object_repr(runtime.type_type()) == "<class 'type'>");
 
-    CustomObject *custom_a = runtime.allocate<CustomObject>(runtime.object_type());
-    CustomObject *custom_b = runtime.allocate<CustomObject>(runtime.object_type());
+    TypeSlots custom_slots;
+    custom_slots.repr = custom_repr;
+    custom_slots.hash = custom_hash;
+    custom_slots.equal = custom_equal;
+    custom_slots.truth = custom_false;
+    TypeObject *custom_type = runtime.new_heap_type("Custom", runtime.object_type(), custom_slots);
+
+    Object *custom_a = runtime.allocate<Object>(custom_type);
+    Object *custom_b = runtime.allocate<Object>(custom_type);
     CHECK(object_repr(custom_a) == "<custom>");
     CHECK(object_hash(custom_a) == 42);
     CHECK(object_equal(custom_a, custom_b));
+    CHECK(!is_true(custom_a));
+    CHECK(is_instance(custom_a, custom_type));
+    CHECK(is_instance(custom_a, runtime.object_type()));
+
+    TypeObject *repr_only_type = runtime.new_heap_type("ReprOnly", custom_type, TypeSlots{.repr = custom_repr});
+    Object *repr_only = runtime.allocate<Object>(repr_only_type);
+    CHECK(object_repr(repr_only) == "<custom>");
+    CHECK(object_hash(repr_only) == 42);
+    CHECK(!is_true(repr_only));
 
     bool saw_python_error = false;
     try

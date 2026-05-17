@@ -35,6 +35,7 @@ namespace cxxpython
         StrObject *new_str(std::string value);
         TupleObject *new_tuple(std::vector<Object *> items);
         DictObject *new_dict();
+        TypeObject *new_heap_type(std::string name, TypeObject *base, TypeSlots slots = {});
 
         void add_root(Object *object);
         void remove_root(Object *object);
@@ -54,8 +55,9 @@ namespace cxxpython
         }
 
     private:
-        TypeObject *new_type(std::string name);
+        TypeObject *allocate_type(std::string name);
         void initialize_type(TypeObject *type, TypeObject *base);
+        TypeSlots inherit_slots(TypeObject *base, TypeSlots slots) const;
 
         std::vector<std::unique_ptr<Object>> heap_;
         std::vector<Object *> roots_;
