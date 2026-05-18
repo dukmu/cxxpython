@@ -1,5 +1,60 @@
 # Development Status
 
+## 2026-05-18 Type Dictionaries Foundation
+
+Pre-change review:
+
+- Architecture docs require type dicts before attribute lookup, descriptor
+  protocol, method tables, user classes, and script-level reflection can be
+  implemented cleanly.
+- Keeping type metadata in C++ side fields only would force future descriptor
+  and builtin-method work to duplicate lookup logic outside the object model.
+
+Debt addressed:
+
+- `TypeObject` now owns a runtime `DictObject *dict`.
+- Builtin types receive type dictionaries during runtime bootstrap.
+- Heap types receive type dictionaries during `Runtime::new_heap_type`.
+- Type traversal now visits the type dictionary, making method/descriptor
+  objects reachable through normal object graph traversal.
+
+Completed:
+
+- Type dicts are initialized with:
+  - `__name__`
+  - `__module__`
+- Added tests proving:
+  - builtin types have runtime dictionaries
+  - type dict metadata is present
+  - type traversal reaches the dict
+  - heap types get their own dict
+
+Design notes:
+
+- This is not yet attribute lookup. It deliberately adds the storage and
+  traversal foundation first, so attribute lookup can later be one central
+  runtime API instead of a VM or builtin special case.
+- Type traversal includes MRO entries and can therefore include self-cycles.
+  Future GC must use a mark set rather than assuming object graphs are trees.
+- Type dict bootstrap currently stores only metadata. Builtin methods,
+  descriptors, slot wrappers, and class attributes should land in later
+  focused slices.
+
+Next:
+
+- Add a central attribute lookup API over type dicts and instance/module dicts.
+- Add descriptor slots (`descr_get`, `descr_set`) before exposing property,
+  method binding, or user classes.
+- Revisit type dict visibility once `type.__dict__` mappingproxy semantics are
+  introduced.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all tests pass.
+
 ## 2026-05-18 Active Frame Root Traversal
 
 Pre-change review:

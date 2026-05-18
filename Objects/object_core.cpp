@@ -30,6 +30,8 @@ namespace cxxpython
                 if (item)
                     visitor(item);
             }
+            if (type->dict)
+                visitor(type->dict);
         }
     }
 

@@ -118,6 +118,7 @@ namespace cxxpython
         add_root(true_);
         add_root(false_);
 
+        initialize_type_dicts();
         initialize_builtins();
         add_root(builtins_module_);
     }

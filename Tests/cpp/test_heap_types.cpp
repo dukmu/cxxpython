@@ -17,6 +17,10 @@ TEST(CoreObjects, HeapTypesUseAndInheritSlots)
 
     cxxpython::Object *custom_a = runtime.allocate<cxxpython::Object>(custom_type);
     cxxpython::Object *custom_b = runtime.allocate<cxxpython::Object>(custom_type);
+    ASSERT_NE(custom_type->dict, nullptr);
+    auto *custom_name = dynamic_cast<cxxpython::StrObject *>(custom_type->dict->get(runtime.new_str("__name__")));
+    ASSERT_NE(custom_name, nullptr);
+    EXPECT_EQ(custom_name->value, "Custom");
     EXPECT_EQ(cxxpython::object_repr(custom_a), "<custom>");
     EXPECT_EQ(cxxpython::object_hash(custom_a), 42);
     EXPECT_TRUE(cxxpython::object_equal(custom_a, custom_b));

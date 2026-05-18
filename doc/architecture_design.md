@@ -136,8 +136,11 @@ doc/            design docs and milestone plans
 ## 类型系统开放性路线
 
 - TypeObject 当前只有基础 slots 和单继承 MRO。用户类开放前必须补齐：
-  type dict、attribute lookup、descriptor protocol、call/new/init、C3 MRO、
+  attribute lookup、descriptor protocol、call/new/init、C3 MRO、
   metaclass conflict checks。
+- TypeObject 必须持有 runtime dict。内建类型和 heap type 的 `__name__`、
+  `__module__`、方法表、descriptor 都应进入这条 typed dict 路径，而不是
+  放在 VM、builtin helper 或 C++ side table 中。
 - Slot 扩展必须按协议族推进，不能每个 opcode 单独加临时入口。例如数值
   协议应一次性规划 normal/reflected/in-place，比较协议应返回 Python bool 或
   NotImplemented 语义。

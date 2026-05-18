@@ -84,6 +84,7 @@ namespace cxxpython
         TypeObject *base = nullptr;
         std::vector<TypeObject *> bases;
         std::vector<TypeObject *> mro;
+        DictObject *dict = nullptr;
         TypeSlots slots;
     };
 

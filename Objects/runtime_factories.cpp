@@ -114,6 +114,7 @@ namespace cxxpython
         TypeObject *resolved_base = base ? base : object_type_;
         type->slots = inherit_slots(resolved_base, slots);
         initialize_type(type, resolved_base);
+        initialize_type_dict(type);
         return type;
     }
 

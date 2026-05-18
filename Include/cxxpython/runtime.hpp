@@ -107,6 +107,8 @@ namespace cxxpython
     private:
         TypeObject *allocate_type(std::string name);
         void initialize_type(TypeObject *type, TypeObject *base);
+        void initialize_type_dict(TypeObject *type);
+        void initialize_type_dicts();
         TypeSlots inherit_slots(TypeObject *base, TypeSlots slots) const;
         void initialize_builtins();
 

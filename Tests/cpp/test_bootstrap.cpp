@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
+
 #include "cxxpython/runtime.hpp"
 #include "test_support.hpp"
 
@@ -26,6 +28,29 @@ TEST(CoreObjects, RuntimeBootstrapsBuiltinTypes)
     EXPECT_EQ(runtime.bool_type()->base, runtime.int_type());
     ASSERT_EQ(runtime.bool_type()->bases.size(), 1U);
     EXPECT_EQ(runtime.bool_type()->bases[0], runtime.int_type());
+}
+
+TEST(CoreObjects, BuiltinTypesHaveRuntimeDictionaries)
+{
+    cxxpython::Runtime runtime;
+
+    ASSERT_NE(runtime.object_type()->dict, nullptr);
+    ASSERT_NE(runtime.type_type()->dict, nullptr);
+    ASSERT_NE(runtime.int_type()->dict, nullptr);
+
+    auto *object_name = dynamic_cast<cxxpython::StrObject *>(
+        runtime.object_type()->dict->get(runtime.new_str("__name__")));
+    auto *object_module = dynamic_cast<cxxpython::StrObject *>(
+        runtime.object_type()->dict->get(runtime.new_str("__module__")));
+    ASSERT_NE(object_name, nullptr);
+    ASSERT_NE(object_module, nullptr);
+    EXPECT_EQ(object_name->value, "object");
+    EXPECT_EQ(object_module->value, "builtins");
+
+    std::vector<cxxpython::Object *> children;
+    runtime.object_type()->visit_children([&children](cxxpython::Object *object)
+                                          { children.push_back(object); });
+    EXPECT_NE(std::find(children.begin(), children.end(), runtime.object_type()->dict), children.end());
 }
 
 TEST(CoreObjects, RuntimeBootstrapsExceptionHierarchy)

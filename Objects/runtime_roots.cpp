@@ -63,6 +63,39 @@ namespace cxxpython
         }
     }
 
+    void Runtime::initialize_type_dict(TypeObject *type)
+    {
+        if (!type || type->dict)
+            return;
+        DictObject *dict = new_dict();
+        dict->set(new_str("__name__"), new_str(type->name));
+        dict->set(new_str("__module__"), new_str(type->module));
+        type->dict = dict;
+    }
+
+    void Runtime::initialize_type_dicts()
+    {
+        initialize_type_dict(object_type_);
+        initialize_type_dict(type_type_);
+        initialize_type_dict(none_type_);
+        initialize_type_dict(int_type_);
+        initialize_type_dict(bool_type_);
+        initialize_type_dict(str_type_);
+        initialize_type_dict(list_type_);
+        initialize_type_dict(tuple_type_);
+        initialize_type_dict(dict_type_);
+        initialize_type_dict(module_type_);
+        initialize_type_dict(native_function_type_);
+        initialize_type_dict(code_type_);
+        initialize_type_dict(frame_type_);
+        initialize_type_dict(base_exception_type_);
+        initialize_type_dict(exception_type_);
+        initialize_type_dict(type_error_type_);
+        initialize_type_dict(index_error_type_);
+        initialize_type_dict(syntax_error_type_);
+        initialize_type_dict(name_error_type_);
+    }
+
     TypeSlots Runtime::inherit_slots(TypeObject *base, TypeSlots slots) const
     {
         if (!base)
