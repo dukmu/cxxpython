@@ -53,6 +53,48 @@ Verification:
 
 Result: all tests pass.
 
+## 2026-05-18 AST Visitor Compiler Passes
+
+Debt addressed:
+
+- Historical status entries noted that compiler AST handling used repeated
+  `dynamic_cast` passes. That would force every new syntax node to update
+  multiple ad hoc type-dispatch trees.
+
+Completed:
+
+- Added AST visitor interfaces:
+  - `ExprVisitor`
+  - `StmtVisitor`
+- Added `accept(...)` dispatch to all current AST nodes:
+  - integer expression
+  - string expression
+  - name expression
+  - binary-add expression
+  - expression statement
+  - assignment statement
+- Replaced compiler AST `dynamic_cast` dispatch with visitors:
+  - `SymbolCollector`
+  - `BytecodeBuilder`
+- Kept behavior unchanged while making future AST extension points explicit.
+
+Design notes:
+
+- Compiler passes now fail at compile time when a new AST node is added without
+  visitor support, instead of silently depending on runtime fallthrough.
+- The next AST hardening step is source-location metadata on tokens and nodes;
+  visitor structure gives that work a cleaner place to attach diagnostics.
+- Runtime-object casts, such as checking that `CodeObject.names` entries are
+  strings, remain separate runtime safety checks and are not part of the AST
+  dispatch debt.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all tests pass.
+
 ## 2026-05-18 Frame Name Resolution Hardening
 
 Debt addressed:

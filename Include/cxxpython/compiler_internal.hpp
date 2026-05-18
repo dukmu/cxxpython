@@ -4,6 +4,7 @@
 #include <memory>
 #include <string>
 #include <string_view>
+#include <utility>
 #include <vector>
 
 #include "cxxpython/bytecode.hpp"
@@ -12,6 +13,29 @@
 
 namespace cxxpython::compiler_internal
 {
+    struct IntegerExpr;
+    struct StringExpr;
+    struct BinaryAddExpr;
+    struct NameExpr;
+    struct ExprStmt;
+    struct AssignStmt;
+
+    struct ExprVisitor
+    {
+        virtual ~ExprVisitor() = default;
+        virtual void visit(const IntegerExpr &expression) = 0;
+        virtual void visit(const StringExpr &expression) = 0;
+        virtual void visit(const BinaryAddExpr &expression) = 0;
+        virtual void visit(const NameExpr &expression) = 0;
+    };
+
+    struct StmtVisitor
+    {
+        virtual ~StmtVisitor() = default;
+        virtual void visit(const ExprStmt &statement) = 0;
+        virtual void visit(const AssignStmt &statement) = 0;
+    };
+
     enum class TokenKind
     {
         Integer,
@@ -35,6 +59,7 @@ namespace cxxpython::compiler_internal
     struct Expr
     {
         virtual ~Expr() = default;
+        virtual void accept(ExprVisitor &visitor) const = 0;
     };
 
     struct IntegerExpr final : Expr
@@ -45,6 +70,11 @@ namespace cxxpython::compiler_internal
         }
 
         std::int64_t value;
+
+        void accept(ExprVisitor &visitor) const override
+        {
+            visitor.visit(*this);
+        }
     };
 
     struct StringExpr final : Expr
@@ -55,6 +85,11 @@ namespace cxxpython::compiler_internal
         }
 
         std::string value;
+
+        void accept(ExprVisitor &visitor) const override
+        {
+            visitor.visit(*this);
+        }
     };
 
     struct BinaryAddExpr final : Expr
@@ -66,6 +101,11 @@ namespace cxxpython::compiler_internal
 
         std::unique_ptr<Expr> left;
         std::unique_ptr<Expr> right;
+
+        void accept(ExprVisitor &visitor) const override
+        {
+            visitor.visit(*this);
+        }
     };
 
     struct NameExpr final : Expr
@@ -76,6 +116,11 @@ namespace cxxpython::compiler_internal
         }
 
         std::string value;
+
+        void accept(ExprVisitor &visitor) const override
+        {
+            visitor.visit(*this);
+        }
     };
 
     std::unique_ptr<Expr> parse_expression(Runtime &runtime, const std::vector<Token> &tokens);
@@ -83,6 +128,7 @@ namespace cxxpython::compiler_internal
     struct Stmt
     {
         virtual ~Stmt() = default;
+        virtual void accept(StmtVisitor &visitor) const = 0;
     };
 
     struct ExprStmt final : Stmt
@@ -93,6 +139,11 @@ namespace cxxpython::compiler_internal
         }
 
         std::unique_ptr<Expr> expression;
+
+        void accept(StmtVisitor &visitor) const override
+        {
+            visitor.visit(*this);
+        }
     };
 
     struct AssignStmt final : Stmt
@@ -104,6 +155,11 @@ namespace cxxpython::compiler_internal
 
         std::string target;
         std::unique_ptr<Expr> value;
+
+        void accept(StmtVisitor &visitor) const override
+        {
+            visitor.visit(*this);
+        }
     };
 
     struct Module final
