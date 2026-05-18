@@ -165,6 +165,121 @@ TEST(CoreObjects, InplaceBinaryOperatorFallsBackToBinaryProtocol)
     EXPECT_EQ(fallback->value, "binary-subtract");
 }
 
+TEST(CoreObjects, RichCompareProtocolUsesNotImplementedFallbacks)
+{
+    cxxpython::Runtime runtime;
+
+    cxxpython::TypeSlots left_slots;
+    left_slots.rich_compare = [](const cxxpython::Object &left,
+                                 const cxxpython::Object &right,
+                                 cxxpython::RichCompareOp op) -> cxxpython::Object *
+    {
+        (void)right;
+        (void)op;
+        return left.runtime()->not_implemented();
+    };
+    cxxpython::TypeObject *left_type = runtime.new_heap_type("LeftComparable", runtime.object_type(), left_slots);
+
+    cxxpython::TypeSlots right_slots;
+    right_slots.rich_compare = [](const cxxpython::Object &right,
+                                  const cxxpython::Object &left,
+                                  cxxpython::RichCompareOp op) -> cxxpython::Object *
+    {
+        (void)left;
+        if (op == cxxpython::RichCompareOp::Equal)
+            return right.runtime()->new_str("right-equal");
+        if (op == cxxpython::RichCompareOp::Greater)
+            return right.runtime()->new_str("right-greater");
+        return right.runtime()->not_implemented();
+    };
+    cxxpython::TypeObject *right_type = runtime.new_heap_type("RightComparable", runtime.object_type(), right_slots);
+
+    cxxpython::Object *left = runtime.allocate<cxxpython::Object>(left_type);
+    cxxpython::Object *right = runtime.allocate<cxxpython::Object>(right_type);
+
+    auto *equal = dynamic_cast<cxxpython::StrObject *>(
+        cxxpython::object_rich_compare(left, right, cxxpython::RichCompareOp::Equal));
+    ASSERT_NE(equal, nullptr);
+    EXPECT_EQ(equal->value, "right-equal");
+
+    auto *less = dynamic_cast<cxxpython::StrObject *>(
+        cxxpython::object_rich_compare(left, right, cxxpython::RichCompareOp::Less));
+    ASSERT_NE(less, nullptr);
+    EXPECT_EQ(less->value, "right-greater");
+}
+
+TEST(CoreObjects, RichCompareProtocolPrefersSubclassSlot)
+{
+    cxxpython::Runtime runtime;
+
+    cxxpython::TypeSlots base_slots;
+    base_slots.rich_compare = [](const cxxpython::Object &left,
+                                 const cxxpython::Object &right,
+                                 cxxpython::RichCompareOp op) -> cxxpython::Object *
+    {
+        (void)right;
+        if (op == cxxpython::RichCompareOp::Equal)
+            return left.runtime()->new_str("base-equal");
+        return left.runtime()->not_implemented();
+    };
+    cxxpython::TypeObject *base_type = runtime.new_heap_type("BaseComparable", runtime.object_type(), base_slots);
+
+    cxxpython::TypeSlots child_slots;
+    child_slots.rich_compare = [](const cxxpython::Object &left,
+                                  const cxxpython::Object &right,
+                                  cxxpython::RichCompareOp op) -> cxxpython::Object *
+    {
+        (void)right;
+        if (op == cxxpython::RichCompareOp::Equal)
+            return left.runtime()->new_str("child-equal");
+        return left.runtime()->not_implemented();
+    };
+    cxxpython::TypeObject *child_type = runtime.new_heap_type("ChildComparable", base_type, child_slots);
+
+    cxxpython::Object *base = runtime.allocate<cxxpython::Object>(base_type);
+    cxxpython::Object *child = runtime.allocate<cxxpython::Object>(child_type);
+    auto *result = dynamic_cast<cxxpython::StrObject *>(
+        cxxpython::object_rich_compare(base, child, cxxpython::RichCompareOp::Equal));
+    ASSERT_NE(result, nullptr);
+    EXPECT_EQ(result->value, "child-equal");
+}
+
+TEST(CoreObjects, RichCompareNotImplementedFallsBackToDefaultResults)
+{
+    cxxpython::Runtime runtime;
+
+    cxxpython::TypeSlots slots;
+    slots.rich_compare = [](const cxxpython::Object &left,
+                            const cxxpython::Object &right,
+                            cxxpython::RichCompareOp op) -> cxxpython::Object *
+    {
+        (void)right;
+        (void)op;
+        return left.runtime()->not_implemented();
+    };
+    cxxpython::TypeObject *type = runtime.new_heap_type("DefaultComparable", runtime.object_type(), slots);
+    cxxpython::Object *first = runtime.allocate<cxxpython::Object>(type);
+    cxxpython::Object *second = runtime.allocate<cxxpython::Object>(type);
+
+    EXPECT_EQ(cxxpython::object_rich_compare(first, first, cxxpython::RichCompareOp::Equal),
+              runtime.true_value());
+    EXPECT_EQ(cxxpython::object_rich_compare(first, second, cxxpython::RichCompareOp::Equal),
+              runtime.false_value());
+    EXPECT_EQ(cxxpython::object_rich_compare(first, second, cxxpython::RichCompareOp::NotEqual),
+              runtime.true_value());
+
+    try
+    {
+        (void)cxxpython::object_rich_compare(first, second, cxxpython::RichCompareOp::Less);
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "comparison not supported between instances of 'DefaultComparable' and 'DefaultComparable'");
+    }
+}
+
 TEST(CoreObjects, UnaryOperatorProtocolDispatchesBuiltinTypes)
 {
     cxxpython::Runtime runtime;

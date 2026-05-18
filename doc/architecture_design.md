@@ -94,8 +94,8 @@ doc/            design docs and milestone plans
   到同一协议。一元运算通过 `UnaryOp`、`unary_op` 和 `UNARY_OP` 调度。
   `NotImplemented`、subclass priority、reflected/in-place fallback 已接入
   `object_binary_op`/`object_inplace_binary_op`，不能散落在各个内置类型中。
-- Rich compare: `==`/`!=` 已走 `object_rich_compare`；`lt/le/gt/ge`、`NotImplemented`
-  和 reverse/subclass dispatch 需要在控制流前继续补齐。
+- Rich compare: `object_rich_compare` 支持 `NotImplemented`、reverse/subclass
+  dispatch 和 equality fallback；`lt/le/gt/ge` 语法与比较链 lowering 仍需补齐。
 - Sequence/mapping: length, getitem, setitem, contains, iterator。
 - Attribute/descriptor: getattro/setattro, descr_get/descr_set。
 - Call/construction: call, new, init。

@@ -83,6 +83,50 @@ namespace cxxpython
                 "reflected binary operator slot returned null");
             return is_not_implemented(result) ? nullptr : result;
         }
+
+        RichCompareOp reflected_rich_compare_op(RichCompareOp op)
+        {
+            switch (op)
+            {
+            case RichCompareOp::Equal:
+                return RichCompareOp::Equal;
+            case RichCompareOp::NotEqual:
+                return RichCompareOp::NotEqual;
+            case RichCompareOp::Less:
+                return RichCompareOp::Greater;
+            case RichCompareOp::LessEqual:
+                return RichCompareOp::GreaterEqual;
+            case RichCompareOp::Greater:
+                return RichCompareOp::Less;
+            case RichCompareOp::GreaterEqual:
+                return RichCompareOp::LessEqual;
+            }
+            return op;
+        }
+
+        Object *call_rich_compare_slot(RichCompareSlot slot,
+                                       const Object &left,
+                                       const Object &right,
+                                       RichCompareOp op)
+        {
+            Object *result = slot(left, right, op);
+            if (!result)
+                raise_type_error(left.runtime(), "rich comparison returned null");
+            return result;
+        }
+
+        Object *try_rich_compare(Object *left, Object *right, RichCompareOp op)
+        {
+            if (!left || !left->type() || !left->type()->slots.rich_compare)
+                return nullptr;
+            Object *result = call_rich_compare_slot(left->type()->slots.rich_compare, *left, *right, op);
+            return is_not_implemented(result) ? nullptr : result;
+        }
+
+        Object *try_reflected_rich_compare(Object *left, Object *right, RichCompareOp op)
+        {
+            return try_rich_compare(right, left, reflected_rich_compare_op(op));
+        }
     }
 
     PythonError::PythonError(ExceptionObject *value)
@@ -234,12 +278,24 @@ namespace cxxpython
         if (!left || !right)
             raise_type_error(runtime, "rich comparison operands cannot be null");
 
-        if (left->type() && left->type()->slots.rich_compare)
+        const bool right_is_strict_subclass =
+            left->type() && right->type() &&
+            left->type() != right->type() &&
+            is_subclass(right->type(), left->type());
+
+        if (right_is_strict_subclass)
         {
-            Object *result = left->type()->slots.rich_compare(*left, *right, op);
-            if (!result)
-                raise_type_error(left->runtime(), "rich comparison returned null");
+            if (Object *result = try_reflected_rich_compare(left, right, op))
+                return result;
+        }
+
+        if (Object *result = try_rich_compare(left, right, op))
             return result;
+
+        if (!right_is_strict_subclass && right->type() && right->type() != left->type())
+        {
+            if (Object *result = try_reflected_rich_compare(left, right, op))
+                return result;
         }
 
         if (op == RichCompareOp::Equal || op == RichCompareOp::NotEqual)

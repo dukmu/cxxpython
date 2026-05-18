@@ -1,5 +1,66 @@
 # Development Status
 
+## 2026-05-18 Rich Compare NotImplemented Dispatch
+
+Pre-change review:
+
+- Binary operators now had a proper `NotImplemented` fallback path, but
+  `object_rich_compare` still called only the left slot and otherwise fell back
+  directly to low-level equality for `==`/`!=`.
+- Keeping comparison different from arithmetic would split the object protocol
+  model and make ordering operators risky to expose.
+- CPython-style rich comparison does not need a separate reflected slot; it
+  reuses the other operand's `rich_compare` with operands swapped and the
+  operator reflected.
+
+Debt addressed:
+
+- `object_rich_compare` now treats `NotImplemented` as a protocol signal.
+- Added reflected rich-compare dispatch using the same `RichCompareSlot`:
+  - `a < b` reflects to `b > a`
+  - `a <= b` reflects to `b >= a`
+  - equality and inequality keep the same operator
+- Subclass right-hand rich compare gets priority over the base left-hand slot.
+- Equality and inequality still fall back to `object_equal` only after both
+  rich-compare candidates decline with `NotImplemented` or are absent.
+- Ordering comparisons still raise one central `TypeError` after both sides
+  decline.
+
+Completed:
+
+- Added tests proving:
+  - left rich-compare `NotImplemented` falls back to right rich-compare
+  - reflected ordering flips the comparison operator
+  - subclass rich-compare slot has priority
+  - both-sides-`NotImplemented` equality falls back to default equality
+  - both-sides-`NotImplemented` ordering raises Python `TypeError`
+
+Design notes:
+
+- Rich comparison and binary arithmetic now share the same protocol shape:
+  slots return a Python object for handled cases, `NotImplemented` for
+  unsupported operand combinations, and raise only for real errors.
+- Ordering syntax remains intentionally unavailable until parser/compiler tests
+  include ordering precedence, chained-comparison rejection or lowering, and
+  script-level TypeError behavior.
+
+Next:
+
+- Add parser/compiler support for `<`, `<=`, `>`, `>=` only with complete
+  bytecode and Python golden tests.
+- Then revisit comparison chaining with control-flow lowering rather than
+  compiling it incorrectly.
+- Keep arbitrary-precision `int` deferred per current instruction.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects '--gtest_filter=CoreObjects.RichCompareProtocolUsesNotImplementedFallbacks:CoreObjects.RichCompareProtocolPrefersSubclassSlot:CoreObjects.RichCompareNotImplementedFallsBackToDefaultResults:CoreObjects.HeapTypesUseAndInheritSlots:Bytecode.DispatchesCompareOpThroughRichCompareProtocol:PythonScripts.RunsGoldenFiles'`
+- `ctest --test-dir build --output-on-failure`
+- `git diff --check`
+
+Result: all tests pass.
+
 ## 2026-05-18 NotImplemented Binary Dispatch
 
 Pre-change review:
@@ -47,16 +108,14 @@ Design notes:
 - `NotImplemented` is now the protocol signal for binary slots. Slots should
   return it when they cannot handle an operand combination; they should raise
   only for real execution errors.
-- Rich comparison still needs the same quality of treatment: `RichCompareSlot`
-  currently does not participate in `NotImplemented` reverse dispatch. That
-  should be the next comparison-protocol slice.
+- Rich comparison now has the same quality of treatment in the next status
+  entry above.
 - In-place syntax/opcodes are not parser-visible yet, but the object API is now
   ready for augmented assignment lowering.
 
 Next:
 
-- Add `NotImplemented` and reverse/subclass dispatch to rich comparison before
-  adding ordering syntax.
+- Add ordering syntax after rich comparison dispatch is complete.
 - Add augmented assignment only after compiler target evaluation order is
   reviewed and tested.
 - Keep arbitrary-precision `int` deferred per current instruction.
