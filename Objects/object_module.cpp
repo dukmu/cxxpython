@@ -63,6 +63,12 @@ namespace cxxpython
 
     TypeSlots make_module_slots()
     {
-        return TypeSlots{module_repr, module_hash, module_equal, module_truth, module_traverse, nullptr};
+        return TypeSlots{
+            .repr = module_repr,
+            .hash = module_hash,
+            .equal = module_equal,
+            .truth = module_truth,
+            .traverse = module_traverse,
+        };
     }
 }

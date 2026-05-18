@@ -27,6 +27,7 @@ namespace cxxpython
     using BinarySlot = Object *(*)(const Object &, const Object &);
     using CallSlot = Object *(*)(Object &, const std::vector<Object *> &);
     using DescrGetSlot = Object *(*)(Object &, Object *, TypeObject *);
+    using DescrSetSlot = void (*)(Object &, Object *, Object *);
 
     struct TypeSlots
     {
@@ -38,6 +39,7 @@ namespace cxxpython
         BinarySlot binary_add = nullptr;
         CallSlot call = nullptr;
         DescrGetSlot descr_get = nullptr;
+        DescrSetSlot descr_set = nullptr;
     };
 
     class PythonError final : public std::exception
@@ -70,10 +72,13 @@ namespace cxxpython
         bool equals(const Object &other) const;
         bool truth() const;
         void visit_children(const VisitChildren &visitor) const;
+        DictObject *instance_dict() const noexcept;
+        void set_instance_dict(DictObject *dict) noexcept;
 
     private:
         Runtime *runtime_ = nullptr;
         TypeObject *type_;
+        DictObject *instance_dict_ = nullptr;
     };
 
     class TypeObject : public Object
@@ -233,6 +238,8 @@ namespace cxxpython
     Object *object_call(Object *callable, const std::vector<Object *> &args);
     Object *object_get_attr(Object *object, StrObject *name);
     Object *object_get_attr(Object *object, const std::string &name);
+    void object_set_attr(Object *object, StrObject *name, Object *value);
+    void object_set_attr(Object *object, const std::string &name, Object *value);
     Object *type_lookup_attribute(TypeObject *type, StrObject *name);
     std::string object_repr(const Object *object);
     std::string type_qualified_name(const TypeObject *type);

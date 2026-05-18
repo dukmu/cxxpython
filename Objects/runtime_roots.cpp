@@ -118,6 +118,8 @@ namespace cxxpython
             inherited.call = slots.call;
         if (slots.descr_get)
             inherited.descr_get = slots.descr_get;
+        if (slots.descr_set)
+            inherited.descr_set = slots.descr_set;
         return inherited;
     }
 }

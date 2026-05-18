@@ -142,15 +142,21 @@ doc/            design docs and milestone plans
   `__module__`、方法表、descriptor 都应进入这条 typed dict 路径，而不是
   放在 VM、builtin helper 或 C++ side table 中。
 - Attribute lookup 的入口是统一 `object_get_attr` API。当前最小顺序是：
-  module dict -> type/class MRO dict -> metatype MRO dict。后续 instance dict、
-  data/non-data descriptor priority、`__getattr__`、slot wrappers 和
+  module dict -> data descriptor -> instance dict -> non-data descriptor/type
+  attribute -> metatype MRO dict。后续 `__getattr__`、slot wrappers 和
   mappingproxy 必须扩展这条 API，而不是在 opcode 或 builtin 中另开查找路径。
 - Descriptor access is also centralized through `object_get_attr`: values found
   in type/class dictionaries with a `descr_get` slot are invoked with
   `(descriptor, instance, owner)`. Module namespace entries are direct values;
   module type descriptors still flow through type lookup.
+- Object instance dictionaries are optional and lazily allocated through
+  `object_set_attr`; they are traversed by the base object traversal path so
+  future GC does not need per-type special cases for normal instance state.
 - Slot 扩展必须按协议族推进，不能每个 opcode 单独加临时入口。例如数值
   协议应一次性规划 normal/reflected/in-place，比较协议应返回 Python bool 或
   NotImplemented 语义。
+- `TypeSlots` must be initialized with designated fields in factories and
+  tests. Positional aggregate initialization is forbidden because new slots can
+  otherwise silently shift behavior or encourage placeholder `nullptr` clutter.
 - 模块、函数、code、frame、异常等运行时对象都应是普通 typed objects，
   让脚本层反射、调试、traceback 和扩展 API 共享同一对象模型。

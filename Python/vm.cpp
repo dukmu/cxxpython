@@ -304,6 +304,12 @@ namespace cxxpython
 
     TypeSlots make_frame_slots()
     {
-        return TypeSlots{frame_repr, frame_hash, frame_equal, frame_truth, frame_traverse};
+        return TypeSlots{
+            .repr = frame_repr,
+            .hash = frame_hash,
+            .equal = frame_equal,
+            .truth = frame_truth,
+            .traverse = frame_traverse,
+        };
     }
 }

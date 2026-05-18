@@ -51,6 +51,12 @@ namespace cxxpython
 
     TypeSlots make_exception_slots()
     {
-        return TypeSlots{exception_repr, default_hash, default_equal, default_truth, exception_traverse};
+        return TypeSlots{
+            .repr = exception_repr,
+            .hash = default_hash,
+            .equal = default_equal,
+            .truth = default_truth,
+            .traverse = exception_traverse,
+        };
     }
 }

@@ -61,13 +61,12 @@ namespace cxxpython
     TypeSlots make_native_function_slots()
     {
         return TypeSlots{
-            native_function_repr,
-            native_function_hash,
-            native_function_equal,
-            native_function_truth,
-            default_traverse,
-            nullptr,
-            native_function_call,
+            .repr = native_function_repr,
+            .hash = native_function_hash,
+            .equal = native_function_equal,
+            .truth = native_function_truth,
+            .traverse = default_traverse,
+            .call = native_function_call,
         };
     }
 }

@@ -15,6 +15,8 @@ namespace
         cxxpython::Object *result;
         cxxpython::Object *last_instance = nullptr;
         cxxpython::TypeObject *last_owner = nullptr;
+        cxxpython::Object *last_set_instance = nullptr;
+        cxxpython::Object *last_set_value = nullptr;
     };
 
     cxxpython::Object *descriptor_get(cxxpython::Object &object,
@@ -26,6 +28,15 @@ namespace
         descriptor.last_owner = owner;
         return descriptor.result;
     }
+
+    void descriptor_set(cxxpython::Object &object,
+                        cxxpython::Object *instance,
+                        cxxpython::Object *value)
+    {
+        auto &descriptor = static_cast<DescriptorObject &>(object);
+        descriptor.last_set_instance = instance;
+        descriptor.last_set_value = value;
+    }
 }
 
 TEST(Attributes, ReadsModuleDictionaryBeforeTypeDictionary)
@@ -36,6 +47,22 @@ TEST(Attributes, ReadsModuleDictionaryBeforeTypeDictionary)
     module->dict()->set(runtime.new_str("answer"), value);
 
     EXPECT_EQ(cxxpython::object_get_attr(module, "answer"), value);
+}
+
+TEST(Attributes, SetsModuleAndTypeDictionariesThroughAttributeApi)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::ModuleObject *module = runtime.new_module("sample", "sample.py");
+    cxxpython::Object *module_value = runtime.new_str("module");
+    cxxpython::Object *type_value = runtime.new_str("type");
+
+    cxxpython::object_set_attr(module, "answer", module_value);
+    cxxpython::object_set_attr(runtime.int_type(), "answer", type_value);
+
+    EXPECT_EQ(module->dict()->get(runtime.new_str("answer")), module_value);
+    EXPECT_EQ(runtime.int_type()->dict->get(runtime.new_str("answer")), type_value);
+    EXPECT_EQ(cxxpython::object_get_attr(module, "answer"), module_value);
+    EXPECT_EQ(cxxpython::object_get_attr(runtime.int_type(), "answer"), type_value);
 }
 
 TEST(Attributes, ReadsTypeDictionariesAndMro)
@@ -62,6 +89,28 @@ TEST(Attributes, ReadsInstanceAttributesFromTypeMro)
     cxxpython::Object *instance = runtime.allocate<cxxpython::Object>(custom_type);
 
     EXPECT_EQ(cxxpython::object_get_attr(instance, "marker"), value);
+}
+
+TEST(Attributes, StoresAndReadsInstanceDictionaries)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::TypeObject *custom_type = runtime.new_heap_type("Custom", runtime.object_type());
+    cxxpython::Object *class_value = runtime.new_str("from-type");
+    cxxpython::Object *instance_value = runtime.new_str("from-instance");
+    custom_type->dict->set(runtime.new_str("name"), class_value);
+    cxxpython::Object *instance = runtime.allocate<cxxpython::Object>(custom_type);
+
+    EXPECT_EQ(instance->instance_dict(), nullptr);
+    cxxpython::object_set_attr(instance, "name", instance_value);
+
+    ASSERT_NE(instance->instance_dict(), nullptr);
+    EXPECT_EQ(cxxpython::object_get_attr(instance, "name"), instance_value);
+
+    std::vector<cxxpython::Object *> children;
+    instance->visit_children([&children](cxxpython::Object *object)
+                             { children.push_back(object); });
+    ASSERT_EQ(children.size(), 1U);
+    EXPECT_EQ(children[0], instance->instance_dict());
 }
 
 TEST(Attributes, InvokesDescriptorsFromTypeDictionaries)
@@ -94,6 +143,43 @@ TEST(Attributes, InvokesDescriptorsFromTypeDictionaries)
     EXPECT_EQ(cxxpython::object_get_attr(instance, "derived_field"), derived_result);
     EXPECT_EQ(derived_descriptor->last_instance, instance);
     EXPECT_EQ(derived_descriptor->last_owner, owner_type);
+}
+
+TEST(Attributes, DataDescriptorsOverrideInstanceDictionaries)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::TypeSlots descriptor_slots;
+    descriptor_slots.descr_get = descriptor_get;
+    descriptor_slots.descr_set = descriptor_set;
+    cxxpython::TypeObject *descriptor_type =
+        runtime.new_heap_type("DataDescriptor", runtime.object_type(), descriptor_slots);
+    cxxpython::TypeObject *owner_type = runtime.new_heap_type("Owner", runtime.object_type());
+    cxxpython::Object *descriptor_result = runtime.new_str("from-descriptor");
+    cxxpython::Object *instance_value = runtime.new_str("from-instance");
+    cxxpython::Object *set_value = runtime.new_str("set-value");
+    auto *descriptor = runtime.allocate<DescriptorObject>(descriptor_type, descriptor_result);
+    owner_type->dict->set(runtime.new_str("field"), descriptor);
+    cxxpython::Object *instance = runtime.allocate<cxxpython::Object>(owner_type);
+
+    cxxpython::object_set_attr(instance, "field", instance_value);
+    EXPECT_EQ(cxxpython::object_get_attr(instance, "field"), descriptor_result);
+    EXPECT_EQ(descriptor->last_set_instance, instance);
+    EXPECT_EQ(descriptor->last_set_value, instance_value);
+    EXPECT_EQ(instance->instance_dict(), nullptr);
+
+    cxxpython::object_set_attr(instance, "plain", set_value);
+    EXPECT_EQ(cxxpython::object_get_attr(instance, "plain"), set_value);
+
+    cxxpython::TypeObject *derived_descriptor_type =
+        runtime.new_heap_type("DerivedDataDescriptor", descriptor_type);
+    cxxpython::Object *derived_result = runtime.new_str("derived-descriptor");
+    auto *derived_descriptor = runtime.allocate<DescriptorObject>(derived_descriptor_type, derived_result);
+    owner_type->dict->set(runtime.new_str("derived_field"), derived_descriptor);
+    cxxpython::object_set_attr(instance, "derived_field", set_value);
+
+    EXPECT_EQ(cxxpython::object_get_attr(instance, "derived_field"), derived_result);
+    EXPECT_EQ(derived_descriptor->last_set_instance, instance);
+    EXPECT_EQ(derived_descriptor->last_set_value, set_value);
 }
 
 TEST(Attributes, RaisesAttributeErrorForMissingAttribute)

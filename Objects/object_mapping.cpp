@@ -160,6 +160,12 @@ namespace cxxpython
 
     TypeSlots make_dict_slots()
     {
-        return TypeSlots{dict_repr, dict_hash, dict_equal, dict_truth, dict_traverse};
+        return TypeSlots{
+            .repr = dict_repr,
+            .hash = dict_hash,
+            .equal = dict_equal,
+            .truth = dict_truth,
+            .traverse = dict_traverse,
+        };
     }
 }

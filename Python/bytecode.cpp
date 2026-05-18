@@ -101,7 +101,13 @@ namespace cxxpython
 
     TypeSlots make_code_slots()
     {
-        return TypeSlots{code_repr, code_hash, code_equal, code_truth, code_traverse, nullptr};
+        return TypeSlots{
+            .repr = code_repr,
+            .hash = code_hash,
+            .equal = code_equal,
+            .truth = code_truth,
+            .traverse = code_traverse,
+        };
     }
 
     const char *opcode_name(Opcode opcode)

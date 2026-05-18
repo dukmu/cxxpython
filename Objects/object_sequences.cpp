@@ -172,11 +172,23 @@ namespace cxxpython
 
     TypeSlots make_list_slots()
     {
-        return TypeSlots{list_repr, list_hash, list_equal, list_truth, list_traverse};
+        return TypeSlots{
+            .repr = list_repr,
+            .hash = list_hash,
+            .equal = list_equal,
+            .truth = list_truth,
+            .traverse = list_traverse,
+        };
     }
 
     TypeSlots make_tuple_slots()
     {
-        return TypeSlots{tuple_repr, tuple_hash, tuple_equal, tuple_truth, tuple_traverse};
+        return TypeSlots{
+            .repr = tuple_repr,
+            .hash = tuple_hash,
+            .equal = tuple_equal,
+            .truth = tuple_truth,
+            .traverse = tuple_traverse,
+        };
     }
 }

@@ -136,21 +136,48 @@ namespace cxxpython
 
     TypeSlots make_none_slots()
     {
-        return TypeSlots{none_repr, none_hash, none_equal, none_truth, default_traverse};
+        return TypeSlots{
+            .repr = none_repr,
+            .hash = none_hash,
+            .equal = none_equal,
+            .truth = none_truth,
+            .traverse = default_traverse,
+        };
     }
 
     TypeSlots make_int_slots()
     {
-        return TypeSlots{int_repr, int_hash, int_equal, int_truth, default_traverse, int_binary_add};
+        return TypeSlots{
+            .repr = int_repr,
+            .hash = int_hash,
+            .equal = int_equal,
+            .truth = int_truth,
+            .traverse = default_traverse,
+            .binary_add = int_binary_add,
+        };
     }
 
     TypeSlots make_bool_slots()
     {
-        return TypeSlots{bool_repr, int_hash, int_equal, int_truth, default_traverse, int_binary_add};
+        return TypeSlots{
+            .repr = bool_repr,
+            .hash = int_hash,
+            .equal = int_equal,
+            .truth = int_truth,
+            .traverse = default_traverse,
+            .binary_add = int_binary_add,
+        };
     }
 
     TypeSlots make_str_slots()
     {
-        return TypeSlots{str_repr, str_hash, str_equal, str_truth, default_traverse, str_binary_add};
+        return TypeSlots{
+            .repr = str_repr,
+            .hash = str_hash,
+            .equal = str_equal,
+            .truth = str_truth,
+            .traverse = default_traverse,
+            .binary_add = str_binary_add,
+        };
     }
 }

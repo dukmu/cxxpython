@@ -1,5 +1,79 @@
 # Development Status
 
+## 2026-05-18 Instance Dict And Data Descriptor Priority
+
+Pre-change review:
+
+- `TypeSlots` had begun to grow, but most slot factories still used positional
+  aggregate initialization. That is a slot-growth debt: adding a new slot can
+  leave confusing placeholder `nullptr` entries or accidentally shift behavior.
+- Attribute lookup had descriptor `__get__` but no instance dictionaries or
+  `__set__` path. Without those, class/user-object work would immediately need
+  a second, lower-quality attribute implementation.
+- Dict semantics themselves are solid object-key mappings, but they were not
+  yet connected to ordinary object instance state.
+
+Debt addressed:
+
+- Added optional lazy instance dictionaries to `Object`.
+- Added `object_set_attr(...)` as the write-side twin of `object_get_attr`.
+- Added `TypeSlots::descr_set` and data descriptor detection.
+- Updated attribute lookup order for normal instances:
+  - data descriptor
+  - instance dict
+  - non-data descriptor/type attribute
+- Base `Object::visit_children` now visits the instance dict after type-specific
+  traversal, so future GC sees normal object state through one path.
+- Heap-type slot inheritance now includes `descr_set`.
+- Converted slot factories and tests to designated `TypeSlots` initialization.
+
+Completed:
+
+- Added tests covering:
+  - setting module and type attributes through `object_set_attr`
+  - lazy instance dict allocation
+  - instance dict traversal
+  - instance dict overriding a non-data type attribute
+  - data descriptor assignment dispatch
+  - data descriptor priority over instance dict
+  - inherited `descr_set` slots
+- Preserved the existing descriptor `descr_get` behavior and full test suite.
+
+Design notes:
+
+- The current model intentionally gives all plain objects a possible instance
+  dict. This is correct enough for heap/user-object groundwork, but future
+  builtin compact objects will likely need flags controlling whether an
+  instance dict is allowed.
+- There is still no delete path, no read-only descriptor error behavior, no
+  `__slots__`, no mappingproxy for `type.__dict__`, and no `__getattr__` or
+  `__getattribute__` override support.
+- `object_set_attr` writes directly to type dicts for type objects. Metaclass
+  data descriptors and type attribute assignment rules should be refined before
+  exposing broad user class mutation.
+- Slot growth must continue to update:
+  - `TypeSlots`
+  - `Runtime::inherit_slots`
+  - focused inheritance tests
+  - all slot factories with designated initializers
+
+Next:
+
+- Add descriptor delete/read-only semantics and assignment error tests.
+- Add `LOAD_ATTR` / `STORE_ATTR` bytecode only after the runtime API remains
+  stable.
+- Introduce type flags or layout metadata before optimizing away instance dicts
+  for compact builtin objects.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects '--gtest_filter=Attributes.*'`
+- `ctest --test-dir build --output-on-failure`
+- `git diff --check`
+
+Result: all tests pass.
+
 ## 2026-05-18 Descriptor Get Slot Foundation
 
 Pre-change review:

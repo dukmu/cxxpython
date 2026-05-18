@@ -119,12 +119,12 @@ TEST(Bytecode, DispatchesBinaryAddThroughTypeSlots)
         "Adder",
         runtime.int_type(),
         cxxpython::TypeSlots{
-            add_repr,
-            cxxpython::make_int_slots().hash,
-            cxxpython::make_int_slots().equal,
-            cxxpython::make_int_slots().truth,
-            add_traverse,
-            add_binary,
+            .repr = add_repr,
+            .hash = cxxpython::make_int_slots().hash,
+            .equal = cxxpython::make_int_slots().equal,
+            .truth = cxxpython::make_int_slots().truth,
+            .traverse = add_traverse,
+            .binary_add = add_binary,
         });
 
     cxxpython::IntObject *left = runtime.allocate<cxxpython::IntObject>(adder_type, 7);

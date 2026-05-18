@@ -10,6 +10,11 @@ namespace cxxpython
 {
     namespace
     {
+        bool is_data_descriptor(Object *value)
+        {
+            return value && value->type() && value->type()->slots.descr_set;
+        }
+
         Object *apply_descriptor(Object *value, Object *instance, TypeObject *owner)
         {
             if (!value || !value->type() || !value->type()->slots.descr_get)
@@ -129,6 +134,18 @@ namespace cxxpython
             type_->slots.traverse(*this, visitor);
         else
             default_traverse(*this, visitor);
+        if (instance_dict_)
+            visitor(instance_dict_);
+    }
+
+    DictObject *Object::instance_dict() const noexcept
+    {
+        return instance_dict_;
+    }
+
+    void Object::set_instance_dict(DictObject *dict) noexcept
+    {
+        instance_dict_ = dict;
     }
 
     TypeObject::TypeObject(std::string name)
@@ -243,9 +260,18 @@ namespace cxxpython
                     return apply_descriptor(value, object, type->type());
             }
         }
-        else if (Object *value = type_lookup_attribute(object->type(), name))
+        else
         {
-            return apply_descriptor(value, object, object->type());
+            Object *type_value = type_lookup_attribute(object->type(), name);
+            if (is_data_descriptor(type_value))
+                return apply_descriptor(type_value, object, object->type());
+            if (object->instance_dict())
+            {
+                if (Object *value = object->instance_dict()->get(name))
+                    return value;
+            }
+            if (type_value)
+                return apply_descriptor(type_value, object, object->type());
         }
 
         std::ostringstream message;
@@ -261,6 +287,44 @@ namespace cxxpython
         if (!runtime)
             raise_attribute_error(nullptr, "'<null>' object has no attribute '" + name + "'");
         return object_get_attr(object, runtime->new_str(name));
+    }
+
+    void object_set_attr(Object *object, StrObject *name, Object *value)
+    {
+        if (!object || !name || !value)
+            raise_attribute_error(object ? object->runtime() : nullptr,
+                                  "'<null>' object has no attribute '<null>'");
+
+        if (auto *module = dynamic_cast<ModuleObject *>(object))
+        {
+            module->dict()->set(name, value);
+            return;
+        }
+
+        if (auto *type = dynamic_cast<TypeObject *>(object))
+        {
+            type->dict->set(name, value);
+            return;
+        }
+
+        Object *type_value = type_lookup_attribute(object->type(), name);
+        if (type_value && type_value->type() && type_value->type()->slots.descr_set)
+        {
+            type_value->type()->slots.descr_set(*type_value, object, value);
+            return;
+        }
+
+        if (!object->instance_dict())
+            object->set_instance_dict(object->runtime()->new_dict());
+        object->instance_dict()->set(name, value);
+    }
+
+    void object_set_attr(Object *object, const std::string &name, Object *value)
+    {
+        Runtime *runtime = object ? object->runtime() : nullptr;
+        if (!runtime)
+            raise_attribute_error(nullptr, "'<null>' object has no attribute '" + name + "'");
+        object_set_attr(object, runtime->new_str(name), value);
     }
 
     std::string type_qualified_name(const TypeObject *type)
@@ -281,12 +345,24 @@ namespace cxxpython
 
     TypeSlots make_object_slots()
     {
-        return TypeSlots{default_repr, default_hash, default_equal, default_truth, default_traverse};
+        return TypeSlots{
+            .repr = default_repr,
+            .hash = default_hash,
+            .equal = default_equal,
+            .truth = default_truth,
+            .traverse = default_traverse,
+        };
     }
 
     TypeSlots make_type_slots()
     {
-        return TypeSlots{type_repr, default_hash, default_equal, default_truth, type_traverse};
+        return TypeSlots{
+            .repr = type_repr,
+            .hash = default_hash,
+            .equal = default_equal,
+            .truth = default_truth,
+            .traverse = type_traverse,
+        };
     }
 
     void raise_type_error(Runtime *runtime, std::string message)
