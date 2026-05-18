@@ -49,6 +49,7 @@ namespace cxxpython
         dict->set(new_str("__builtins__"), builtins_module_);
         dict->set(new_str("NotImplemented"), not_implemented_);
         dict->set(new_str("object"), object_type_);
+        dict->set(new_str("type"), type_type_);
         dict->set(new_str("list"), list_type_);
         dict->set(new_str("print"), new_native_function("print", builtin_print));
         dict->set(new_str("len"), new_native_function("len", builtin_len));

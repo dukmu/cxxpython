@@ -82,6 +82,18 @@ namespace cxxpython
             auto *type = dynamic_cast<TypeObject *>(&object);
             if (!type)
                 raise_type_error(object.runtime(), "type call target has invalid layout");
+            if (type == type->runtime()->type_type())
+            {
+                if (args.size() == 1)
+                {
+                    if (!args[0])
+                        raise_type_error(type->runtime(), "type() argument cannot be null");
+                    return args[0]->type();
+                }
+                if (args.size() != 3)
+                    raise_type_error(type->runtime(), "type() takes 1 or 3 arguments");
+                raise_type_error(type->runtime(), "type(name, bases, namespace) is not implemented");
+            }
             if (!type->slots.new_object)
             {
                 std::ostringstream message;

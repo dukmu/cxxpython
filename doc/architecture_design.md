@@ -252,6 +252,10 @@ doc/            design docs and milestone plans
 - `type.__call__` 是对象构造唯一入口：选择 `__new__`，再在返回对象是目标
   类型实例时调用 `__init__`。内建类型构造和 Python 类构造都必须复用这条
   call/new/init 协议。
+- `type(obj)` 是 `type` call path 的 introspection 形式，直接返回对象的
+  runtime type。三参数 `type(name, bases, namespace)` 必须与 class statement
+  共用 metaclass selection、C3 MRO 和 namespace validation，不允许单独做一条
+  简化创建路径。
 - `class` statement 编译为“执行 class body code object -> 收集 namespace ->
   调用 metaclass”的路径。class body locals 是类 namespace，不是模块 globals；
   `__module__`、`__qualname__`、方法函数对象和 descriptors 都写入该 namespace。

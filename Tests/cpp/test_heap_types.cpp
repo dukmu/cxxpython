@@ -115,6 +115,7 @@ TEST(CoreObjects, TypeCallConstructsObjectsThroughNewInitProtocol)
     cxxpython::Object *plain_object = cxxpython::object_call(runtime.object_type(), {});
     ASSERT_NE(plain_object, nullptr);
     EXPECT_EQ(plain_object->type(), runtime.object_type());
+    EXPECT_EQ(cxxpython::object_call(runtime.type_type(), {plain_object}), runtime.object_type());
 
     cxxpython::TypeObject *heap_type = runtime.new_heap_type("HeapObject", runtime.object_type());
     cxxpython::Object *heap_object = cxxpython::object_call(heap_type, {});
@@ -161,6 +162,17 @@ TEST(CoreObjects, TypeCallConstructsObjectsThroughNewInitProtocol)
     {
         EXPECT_EQ(error.type(), runtime.type_error_type());
         EXPECT_STREQ(error.what(), "object() takes no arguments");
+    }
+
+    try
+    {
+        (void)cxxpython::object_call(runtime.type_type(), {});
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "type() takes 1 or 3 arguments");
     }
 }
 

@@ -1,5 +1,47 @@
 # Development Status
 
+## 2026-05-18 Type Introspection Builtin
+
+Pre-change review:
+
+- `object` and `list` were script-visible constructors, but `type(obj)` was
+  still unavailable despite `__class__` descriptors and runtime type objects
+  already existing.
+- Exposing `type` without a correct one-argument path would break normal Python
+  introspection and force tests to keep using `obj.__class__` as a workaround.
+- Three-argument `type(name, bases, namespace)` must share the future class
+  creation and metaclass path, so it should not be faked in this slice.
+
+Debt addressed:
+
+- Exposed `type` in the builtins module.
+- `type` call now handles the one-argument introspection form by returning the
+  operand's runtime type.
+- Invalid arity reports a Python `TypeError`; the three-argument form reports a
+  clear not-implemented Python `TypeError` until class creation lands.
+
+Completed:
+
+- Extended construction tests for `type(object())`.
+- Extended Python golden coverage for `type(object())` and `type(list())`.
+- Updated architecture notes to tie three-argument `type(...)` to the planned
+  class statement/metaclass implementation.
+
+Next:
+
+- Implement Python function objects and bound Python methods.
+- Then implement class body namespace execution and route both `class` and
+  `type(name, bases, namespace)` through one class creation API.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects '--gtest_filter=CoreObjects.TypeCallConstructsObjectsThroughNewInitProtocol:Module.BootstrapsBuiltinsModule:PythonScripts.RunsGoldenFiles'`
+- `ctest --test-dir build --output-on-failure`
+- `git diff --check`
+
+Result: all tests pass.
+
 ## 2026-05-18 Type Construction Protocol
 
 Pre-change review:
