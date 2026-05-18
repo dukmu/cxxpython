@@ -18,6 +18,7 @@ namespace cxxpython::compiler_internal
     struct UnaryExpr;
     struct BinaryExpr;
     struct CompareExpr;
+    struct SingletonExpr;
     struct NameExpr;
     struct AttributeExpr;
     struct SubscriptExpr;
@@ -42,6 +43,7 @@ namespace cxxpython::compiler_internal
         virtual void visit(const UnaryExpr &expression) = 0;
         virtual void visit(const BinaryExpr &expression) = 0;
         virtual void visit(const CompareExpr &expression) = 0;
+        virtual void visit(const SingletonExpr &expression) = 0;
         virtual void visit(const NameExpr &expression) = 0;
         virtual void visit(const AttributeExpr &expression) = 0;
         virtual void visit(const SubscriptExpr &expression) = 0;
@@ -99,6 +101,9 @@ namespace cxxpython::compiler_internal
         Def,
         Return,
         Class,
+        TrueLiteral,
+        FalseLiteral,
+        NoneLiteral,
         Indent,
         Dedent,
         Newline,
@@ -205,6 +210,28 @@ namespace cxxpython::compiler_internal
 
         std::unique_ptr<Expr> left;
         std::vector<Comparison> comparisons;
+
+        void accept(ExprVisitor &visitor) const override
+        {
+            visitor.visit(*this);
+        }
+    };
+
+    enum class SingletonKind
+    {
+        TrueValue,
+        FalseValue,
+        NoneValue,
+    };
+
+    struct SingletonExpr final : Expr
+    {
+        explicit SingletonExpr(SingletonKind kind_in)
+            : kind(kind_in)
+        {
+        }
+
+        SingletonKind kind;
 
         void accept(ExprVisitor &visitor) const override
         {

@@ -439,6 +439,15 @@ namespace cxxpython::compiler_internal
                     return std::make_unique<IntegerExpr>(advance().int_value);
                 case TokenKind::String:
                     return std::make_unique<StringExpr>(advance().lexeme);
+                case TokenKind::TrueLiteral:
+                    advance();
+                    return std::make_unique<SingletonExpr>(SingletonKind::TrueValue);
+                case TokenKind::FalseLiteral:
+                    advance();
+                    return std::make_unique<SingletonExpr>(SingletonKind::FalseValue);
+                case TokenKind::NoneLiteral:
+                    advance();
+                    return std::make_unique<SingletonExpr>(SingletonKind::NoneValue);
                 case TokenKind::Identifier:
                     return std::make_unique<NameExpr>(advance().lexeme);
                 case TokenKind::LeftParen:
@@ -553,6 +562,9 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Def:
                 case TokenKind::Return:
                 case TokenKind::Class:
+                case TokenKind::TrueLiteral:
+                case TokenKind::FalseLiteral:
+                case TokenKind::NoneLiteral:
                 case TokenKind::Indent:
                 case TokenKind::Dedent:
                 case TokenKind::Newline:

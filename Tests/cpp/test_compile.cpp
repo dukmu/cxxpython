@@ -580,7 +580,6 @@ TEST(Compile, CompilesTupleAndDictLiterals)
     cxxpython::Runtime runtime;
     cxxpython::VirtualMachine vm(runtime);
     cxxpython::DictObject *globals = runtime.new_dict();
-    globals->set(runtime.new_str("True"), runtime.true_value());
 
     cxxpython::CodeObject *code = cxxpython::compile_exec_input(
         runtime,
@@ -628,6 +627,42 @@ TEST(Compile, CompilesTupleAndDictLiterals)
     EXPECT_EQ(static_cast<cxxpython::StrObject *>(dict->get(runtime.new_str("key")))->value, "value");
     EXPECT_EQ(static_cast<cxxpython::IntObject *>(dict->get(runtime.new_str("n")))->value, 2);
     EXPECT_EQ(static_cast<cxxpython::StrObject *>(globals->get(runtime.new_str("result")))->value, "value");
+}
+
+TEST(Compile, CompilesSingletonLiteralsWithoutNameLookup)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(
+        runtime,
+        "truth = True\n"
+        "lie = False\n"
+        "missing = None\n"
+        "result = (truth, lie, missing)\n",
+        "script.py");
+    ASSERT_NE(code, nullptr);
+
+    std::size_t load_names = 0;
+    for (const cxxpython::Instruction &instruction : code->instructions())
+    {
+        if (instruction.opcode == cxxpython::Opcode::LoadName)
+            ++load_names;
+    }
+    EXPECT_EQ(load_names, 3U);
+
+    EXPECT_EQ(vm.execute(*code, *globals), runtime.none());
+    EXPECT_EQ(globals->get(runtime.new_str("truth")), runtime.true_value());
+    EXPECT_EQ(globals->get(runtime.new_str("lie")), runtime.false_value());
+    EXPECT_EQ(globals->get(runtime.new_str("missing")), runtime.none());
+
+    auto *result = dynamic_cast<cxxpython::TupleObject *>(globals->get(runtime.new_str("result")));
+    ASSERT_NE(result, nullptr);
+    ASSERT_EQ(result->size(), 3U);
+    EXPECT_EQ(result->items()[0], runtime.true_value());
+    EXPECT_EQ(result->items()[1], runtime.false_value());
+    EXPECT_EQ(result->items()[2], runtime.none());
 }
 
 TEST(Compile, CompilesFunctionDefinitionsAndReturns)
@@ -800,6 +835,39 @@ TEST(Compile, RaisesSyntaxErrorForInvalidAssignmentTarget)
     {
         EXPECT_EQ(error.type_name(), "SyntaxError");
         EXPECT_STREQ(error.what(), "broken.py:1:3: invalid assignment target");
+    }
+
+    try
+    {
+        (void)cxxpython::compile_exec_input(runtime, "True = 2\n", "broken.py");
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type_name(), "SyntaxError");
+        EXPECT_STREQ(error.what(), "broken.py:1:6: invalid assignment target");
+    }
+
+    try
+    {
+        (void)cxxpython::compile_exec_input(runtime, "False = 2\n", "broken.py");
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type_name(), "SyntaxError");
+        EXPECT_STREQ(error.what(), "broken.py:1:7: invalid assignment target");
+    }
+
+    try
+    {
+        (void)cxxpython::compile_exec_input(runtime, "None = 2\n", "broken.py");
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type_name(), "SyntaxError");
+        EXPECT_STREQ(error.what(), "broken.py:1:6: invalid assignment target");
     }
 }
 

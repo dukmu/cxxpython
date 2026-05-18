@@ -153,6 +153,12 @@ namespace cxxpython::compiler_internal
                     kind = TokenKind::Return;
                 else if (lexeme == "class")
                     kind = TokenKind::Class;
+                else if (lexeme == "True")
+                    kind = TokenKind::TrueLiteral;
+                else if (lexeme == "False")
+                    kind = TokenKind::FalseLiteral;
+                else if (lexeme == "None")
+                    kind = TokenKind::NoneLiteral;
                 tokens.push_back(Token{kind, lexeme, 0, line, start_column});
                 continue;
             }

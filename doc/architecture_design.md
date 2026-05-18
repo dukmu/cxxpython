@@ -173,6 +173,9 @@ doc/            design docs and milestone plans
   constants. The compiler lowers them to `BUILD_TUPLE` and `BUILD_MAP` after
   emitting element/key/value expressions in source order, preserving dynamic
   evaluation semantics and dict insertion order.
+- `True`、`False` 和 `None` 是 lexer/parser 层的 singleton literals，而不是
+  ordinary names。它们应编译为直接加载 runtime singleton，赋值目标转换必须
+  拒绝这些表达式；不要通过 builtins name lookup 模拟这些常量。
 
 ## 模块系统路线
 

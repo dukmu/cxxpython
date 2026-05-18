@@ -71,6 +71,11 @@ namespace cxxpython
                     comparison.right->accept(*this);
             }
 
+            void visit(const compiler_internal::SingletonExpr &expression) override
+            {
+                (void)expression;
+            }
+
             void visit(const compiler_internal::NameExpr &expression) override
             {
                 (void)symbols_.add_name(expression.value);
@@ -292,6 +297,23 @@ namespace cxxpython
                         patch_jump(jump, cleanup_target);
                     patch_jump(end_jump, instructions_.size());
                 }
+            }
+
+            void visit(const compiler_internal::SingletonExpr &expression) override
+            {
+                switch (expression.kind)
+                {
+                case compiler_internal::SingletonKind::TrueValue:
+                    emit_constant(runtime_.true_value());
+                    return;
+                case compiler_internal::SingletonKind::FalseValue:
+                    emit_constant(runtime_.false_value());
+                    return;
+                case compiler_internal::SingletonKind::NoneValue:
+                    emit_constant(runtime_.none());
+                    return;
+                }
+                raise_syntax_error(&runtime_, "unknown singleton literal");
             }
 
             void visit(const compiler_internal::NameExpr &expression) override

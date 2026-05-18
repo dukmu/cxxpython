@@ -1,5 +1,66 @@
 # Development Status
 
+## 2026-05-18 Singleton Literal Keywords
+
+Pre-change review:
+
+- `True`, `False`, and `None` were still parsed as ordinary names. That meant
+  scripts depended on globals/builtins lookup for Python constants and could
+  assign to names that must be syntax-level constants.
+- Fixing this in the VM or builtins would have preserved the wrong parser and
+  symbol-table semantics. These values need to be lexer/parser AST literals.
+
+Debt addressed:
+
+- Added distinct lexer token kinds for `True`, `False`, and `None`.
+- Added `SingletonExpr` AST with explicit `TrueValue`, `FalseValue`, and
+  `NoneValue` variants.
+- Compiler lowers singleton literals directly to runtime singleton constants.
+- Assignment target conversion now rejects singleton literals naturally instead
+  of treating them as `NameTarget`.
+
+Completed:
+
+- Added compiler tests proving singleton literals execute without preloaded
+  globals and compile to direct constants rather than name lookup at literal
+  sites.
+- Extended invalid assignment target tests for `True = ...`, `False = ...`,
+  and `None = ...`.
+- Added Python golden coverage for printing singleton literals, tuple literals
+  containing them, and boolean control flow.
+
+Design review:
+
+- The implementation keeps singleton semantics in lexer/parser/compiler, not in
+  VM name resolution or builtins. That is the right boundary for Python
+  constants and avoids a long-term compatibility trap.
+- `SingletonExpr` is deliberately narrow instead of a generic object-constant
+  AST. Broader constant folding can come later without making AST nodes hold
+  arbitrary runtime object pointers.
+
+Known debt and next risk:
+
+- `list` and set literals are still absent.
+- Assignment target diagnostics are currently generic `invalid assignment
+  target`; CPython has more specific messages for assigning to constants.
+- `global`/`nonlocal` and keyword restrictions for function parameter names are
+  still future parser work.
+
+Next:
+
+- Add list literal syntax and `BUILD_LIST`, then use it to cover list methods
+  at script level without C++ wrapper setup.
+- Continue toward metaclass preparation after literal coverage catches up.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects '--gtest_filter=Compile.CompilesTupleAndDictLiterals:Compile.CompilesSingletonLiteralsWithoutNameLookup:Compile.RaisesSyntaxErrorForInvalidAssignmentTarget:PythonScripts.RunsGoldenFiles'`
+- `ctest --test-dir build --output-on-failure`
+- `git diff --check`
+
+Result: all tests pass.
+
 ## 2026-05-18 Class Base List Syntax
 
 Pre-change review:
@@ -47,7 +108,7 @@ Known debt and next risk:
 
 Next:
 
-- Keywordize `True`/`False`/`None` and reject attempts to assign to them.
+- Add list literal syntax and `BUILD_LIST`.
 - Then start metaclass preparation: parse class keywords, introduce selected
   metaclass calculation, and keep all paths routed through `Runtime::new_class`
   or its eventual metaclass-aware successor.
