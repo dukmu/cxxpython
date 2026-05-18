@@ -120,8 +120,11 @@ doc/            design docs and milestone plans
 - Value stack 只保存 `Object*`，所有跨 GC/分配边界的活跃对象必须能从
   active frames traversal 访问到。后续引入 GC 时，active frame stack、
   block stack、exception state 都必须成为根。
-- Name resolution 必须保持一条统一路径：locals -> globals -> builtins。
-  opcode、builtin helper、module execution 不能各自实现一套查找。
+- Name resolution 必须区分编译期 fast locals 和动态 namespace lookup。函数
+  scope 中编译期判定为 local 的名字使用 `LOAD_FAST`/`STORE_FAST`，只访问
+  frame locals，缺失时抛 `UnboundLocalError`；模块和 class body 的动态名字
+  使用 `LOAD_NAME`/`STORE_NAME`，按 locals -> globals -> builtins 查找。opcode、
+  builtin helper、module execution 不能各自实现一套查找。
 - VM opcode 只负责调度和栈效果，类型语义由 object/type slots 或统一 runtime
   API 完成。新增 opcode 必须同时更新 stack effect、disassembly/metadata、
   compiler emission、VM execution 和测试。
@@ -274,6 +277,12 @@ doc/            design docs and milestone plans
   then ordinary `STORE_NAME`. This keeps function creation in the VM/runtime
   path where globals and active frame context are available; the compiler must
   not pre-build function objects with placeholder globals.
+- Function code objects store parameters first in `varnames`, followed by
+  compiler-discovered local assignment names. The current scope analysis is a
+  strict first slice: parameters, assignment targets, nested `def`, and nested
+  `class` bind fast locals in function scope; module/class scopes remain
+  dynamic namespaces. `global`、`nonlocal`、freevars/cellvars 和 closure objects
+  must extend this analysis instead of reintroducing dynamic function locals.
 - `type.__call__` 是对象构造唯一入口：选择 `__new__`，再在返回对象是目标
   类型实例时调用 `__init__`。内建类型构造和 Python 类构造都必须复用这条
   call/new/init 协议。

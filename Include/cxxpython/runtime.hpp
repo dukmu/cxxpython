@@ -64,6 +64,7 @@ namespace cxxpython
         TypeObject *key_error_type() const noexcept;
         TypeObject *syntax_error_type() const noexcept;
         TypeObject *name_error_type() const noexcept;
+        TypeObject *unbound_local_error_type() const noexcept;
         TypeObject *attribute_error_type() const noexcept;
 
         NoneObject *none() const noexcept;
@@ -138,6 +139,7 @@ namespace cxxpython
         ExceptionObject *new_key_error(Object *key);
         ExceptionObject *new_syntax_error(std::string message);
         ExceptionObject *new_name_error(std::string message);
+        ExceptionObject *new_unbound_local_error(std::string message);
         ExceptionObject *new_attribute_error(std::string message);
 
         void add_root(Object *object);
@@ -204,6 +206,7 @@ namespace cxxpython
         TypeObject *key_error_type_ = nullptr;
         TypeObject *syntax_error_type_ = nullptr;
         TypeObject *name_error_type_ = nullptr;
+        TypeObject *unbound_local_error_type_ = nullptr;
         TypeObject *attribute_error_type_ = nullptr;
 
         NoneObject *none_ = nullptr;

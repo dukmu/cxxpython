@@ -10,6 +10,8 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::LoadConst), "LOAD_CONST");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::LoadName), "LOAD_NAME");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::StoreName), "STORE_NAME");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::LoadFast), "LOAD_FAST");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::StoreFast), "STORE_FAST");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::LoadAttr), "LOAD_ATTR");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::StoreAttr), "STORE_ATTR");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::PopTop), "POP_TOP");
@@ -36,6 +38,8 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::LoadConst, 0}), 1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::LoadName, 0}), 1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::StoreName, 0}), -1);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::LoadFast, 0}), 1);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::StoreFast, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::LoadAttr, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::StoreAttr, 0}), -2);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::PopTop, 0}), -1);

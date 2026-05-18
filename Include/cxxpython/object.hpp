@@ -442,5 +442,6 @@ namespace cxxpython
     [[noreturn]] void raise_key_error(Runtime *runtime, Object *key);
     [[noreturn]] void raise_syntax_error(Runtime *runtime, std::string message);
     [[noreturn]] void raise_name_error(Runtime *runtime, std::string message);
+    [[noreturn]] void raise_unbound_local_error(Runtime *runtime, std::string message);
     [[noreturn]] void raise_attribute_error(Runtime *runtime, std::string message);
 }

@@ -15,6 +15,8 @@ namespace cxxpython
         LoadConst,
         LoadName,
         StoreName,
+        LoadFast,
+        StoreFast,
         LoadAttr,
         StoreAttr,
         PopTop,

@@ -6,9 +6,26 @@ namespace cxxpython
 {
     namespace
     {
+        enum class SymbolScope
+        {
+            Module,
+            Function,
+            Class,
+        };
+
         class SymbolTable final
         {
         public:
+            explicit SymbolTable(SymbolScope scope)
+                : scope_(scope)
+            {
+            }
+
+            SymbolScope scope() const noexcept
+            {
+                return scope_;
+            }
+
             std::size_t add_name(const std::string &name)
             {
                 for (std::size_t index = 0; index < names_.size(); ++index)
@@ -29,8 +46,50 @@ namespace cxxpython
                 return names;
             }
 
+            std::size_t add_local(const std::string &name)
+            {
+                for (std::size_t index = 0; index < varnames_.size(); ++index)
+                {
+                    if (varnames_[index] == name)
+                        return index;
+                }
+                varnames_.push_back(name);
+                return varnames_.size() - 1;
+            }
+
+            bool is_local(const std::string &name) const
+            {
+                for (const std::string &entry : varnames_)
+                {
+                    if (entry == name)
+                        return true;
+                }
+                return false;
+            }
+
+            std::size_t local_index(const std::string &name) const
+            {
+                for (std::size_t index = 0; index < varnames_.size(); ++index)
+                {
+                    if (varnames_[index] == name)
+                        return index;
+                }
+                return static_cast<std::size_t>(-1);
+            }
+
+            std::vector<Object *> make_varname_objects(Runtime &runtime) const
+            {
+                std::vector<Object *> varnames;
+                varnames.reserve(varnames_.size());
+                for (const std::string &name : varnames_)
+                    varnames.push_back(runtime.new_str(name));
+                return varnames;
+            }
+
         private:
+            SymbolScope scope_;
             std::vector<std::string> names_;
+            std::vector<std::string> varnames_;
         };
 
         class SymbolCollector final : public compiler_internal::ExprVisitor,
@@ -180,13 +239,78 @@ namespace cxxpython
             SymbolTable &symbols_;
         };
 
+        class FunctionLocalCollector final : public compiler_internal::TargetVisitor,
+                                             public compiler_internal::StmtVisitor
+        {
+        public:
+            explicit FunctionLocalCollector(SymbolTable &symbols)
+                : symbols_(symbols)
+            {
+            }
+
+            void visit(const compiler_internal::NameTarget &target) override
+            {
+                (void)symbols_.add_local(target.name);
+            }
+
+            void visit(const compiler_internal::AttributeTarget &target) override
+            {
+                (void)target;
+            }
+
+            void visit(const compiler_internal::SubscriptTarget &target) override
+            {
+                (void)target;
+            }
+
+            void visit(const compiler_internal::ExprStmt &statement) override
+            {
+                (void)statement;
+            }
+
+            void visit(const compiler_internal::AssignStmt &statement) override
+            {
+                statement.target->accept(*this);
+            }
+
+            void visit(const compiler_internal::IfStmt &statement) override
+            {
+                for (const auto &item : statement.then_body)
+                    item->accept(*this);
+                for (const auto &item : statement.else_body)
+                    item->accept(*this);
+            }
+
+            void visit(const compiler_internal::ReturnStmt &statement) override
+            {
+                (void)statement;
+            }
+
+            void visit(const compiler_internal::FunctionDefStmt &statement) override
+            {
+                (void)symbols_.add_local(statement.name);
+            }
+
+            void visit(const compiler_internal::ClassDefStmt &statement) override
+            {
+                (void)symbols_.add_local(statement.name);
+            }
+
+        private:
+            SymbolTable &symbols_;
+        };
+
         class BytecodeBuilder final : public compiler_internal::ExprVisitor,
                                       public compiler_internal::TargetVisitor,
                                       public compiler_internal::StmtVisitor
         {
         public:
             BytecodeBuilder(Runtime &runtime, const SymbolTable &symbols, std::string filename)
-                : runtime_(runtime), filename_(std::move(filename)), names_(symbols.make_name_objects(runtime))
+                : runtime_(runtime),
+                  symbols_(symbols),
+                  filename_(std::move(filename)),
+                  names_(symbols.make_name_objects(runtime)),
+                  varnames_(symbols.make_varname_objects(runtime))
             {
             }
 
@@ -223,7 +347,7 @@ namespace cxxpython
                 return runtime_.new_code(function.name,
                                          filename_,
                                          static_cast<std::uint32_t>(function.params.size()),
-                                         make_varnames(function.params),
+                                         std::move(varnames_),
                                          std::move(constants_),
                                          std::move(names_),
                                          std::move(instructions_));
@@ -324,6 +448,14 @@ namespace cxxpython
 
             void visit(const compiler_internal::NameExpr &expression) override
             {
+                if (symbols_.scope() == SymbolScope::Function && symbols_.is_local(expression.value))
+                {
+                    instructions_.push_back(Instruction{
+                        Opcode::LoadFast,
+                        static_cast<std::uint32_t>(local_index(expression.value)),
+                    });
+                    return;
+                }
                 instructions_.push_back(Instruction{
                     Opcode::LoadName,
                     static_cast<std::uint32_t>(name_index(expression.value)),
@@ -393,6 +525,14 @@ namespace cxxpython
             void visit(const compiler_internal::NameTarget &target) override
             {
                 emit_pending_assignment_value();
+                if (symbols_.scope() == SymbolScope::Function && symbols_.is_local(target.name))
+                {
+                    instructions_.push_back(Instruction{
+                        Opcode::StoreFast,
+                        static_cast<std::uint32_t>(local_index(target.name)),
+                    });
+                    return;
+                }
                 instructions_.push_back(Instruction{
                     Opcode::StoreName,
                     static_cast<std::uint32_t>(name_index(target.name)),
@@ -545,7 +685,12 @@ namespace cxxpython
 
             SymbolTable collect_function_symbols(const compiler_internal::FunctionDefStmt &function) const
             {
-                SymbolTable symbols;
+                SymbolTable symbols(SymbolScope::Function);
+                for (const std::string &param : function.params)
+                    (void)symbols.add_local(param);
+                FunctionLocalCollector locals(symbols);
+                for (const auto &statement : function.body)
+                    statement->accept(locals);
                 SymbolCollector collector(symbols);
                 for (const auto &statement : function.body)
                     statement->accept(collector);
@@ -554,20 +699,11 @@ namespace cxxpython
 
             SymbolTable collect_class_symbols(const compiler_internal::ClassDefStmt &klass) const
             {
-                SymbolTable symbols;
+                SymbolTable symbols(SymbolScope::Class);
                 SymbolCollector collector(symbols);
                 for (const auto &statement : klass.body)
                     statement->accept(collector);
                 return symbols;
-            }
-
-            std::vector<Object *> make_varnames(const std::vector<std::string> &params)
-            {
-                std::vector<Object *> varnames;
-                varnames.reserve(params.size());
-                for (const std::string &param : params)
-                    varnames.push_back(runtime_.new_str(param));
-                return varnames;
             }
 
             std::size_t name_index(const std::string &name) const
@@ -581,9 +717,19 @@ namespace cxxpython
                 raise_syntax_error(&runtime_, "unknown symbol table entry");
             }
 
+            std::size_t local_index(const std::string &name) const
+            {
+                const std::size_t index = symbols_.local_index(name);
+                if (index == static_cast<std::size_t>(-1))
+                    raise_syntax_error(&runtime_, "unknown local variable entry");
+                return index;
+            }
+
             Runtime &runtime_;
+            const SymbolTable &symbols_;
             std::string filename_;
             std::vector<Object *> names_;
+            std::vector<Object *> varnames_;
             std::vector<Object *> constants_;
             std::vector<Instruction> instructions_;
             const compiler_internal::Expr *pending_assignment_value_ = nullptr;
@@ -591,7 +737,7 @@ namespace cxxpython
 
         SymbolTable collect_symbols(const compiler_internal::Expr &expression)
         {
-            SymbolTable symbols;
+            SymbolTable symbols(SymbolScope::Module);
             SymbolCollector collector(symbols);
             expression.accept(collector);
             return symbols;
@@ -599,7 +745,7 @@ namespace cxxpython
 
         SymbolTable collect_symbols(const compiler_internal::Module &module)
         {
-            SymbolTable symbols;
+            SymbolTable symbols(SymbolScope::Module);
             SymbolCollector collector(symbols);
             for (const auto &statement : module.statements)
                 statement->accept(collector);

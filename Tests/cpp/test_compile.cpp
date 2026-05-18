@@ -751,6 +751,66 @@ TEST(Compile, CompilesFunctionDefinitionsAndReturns)
     EXPECT_EQ(second->value, "arg");
 }
 
+TEST(Compile, FunctionsUseFastLocalsForAssignedNames)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(
+        runtime,
+        "value = 'global'\n"
+        "def choose(flag):\n"
+        "    if flag:\n"
+        "        value = 'local'\n"
+        "    return value\n"
+        "first = choose(True)\n",
+        "script.py");
+    ASSERT_NE(code, nullptr);
+
+    EXPECT_EQ(vm.execute(*code, *globals), runtime.none());
+    auto *function = dynamic_cast<cxxpython::PythonFunctionObject *>(globals->get(runtime.new_str("choose")));
+    ASSERT_NE(function, nullptr);
+    for (const cxxpython::Instruction &instruction : function->code()->instructions())
+    {
+        EXPECT_NE(instruction.opcode, cxxpython::Opcode::StoreName);
+    }
+    bool saw_load_fast = false;
+    bool saw_store_fast = false;
+    for (const cxxpython::Instruction &instruction : function->code()->instructions())
+    {
+        if (instruction.opcode == cxxpython::Opcode::LoadFast)
+            saw_load_fast = true;
+        if (instruction.opcode == cxxpython::Opcode::StoreFast)
+            saw_store_fast = true;
+    }
+    EXPECT_TRUE(saw_load_fast);
+    EXPECT_TRUE(saw_store_fast);
+
+    ASSERT_EQ(function->code()->varnames().size(), 2U);
+    auto *param = dynamic_cast<cxxpython::StrObject *>(function->code()->varnames()[0]);
+    auto *local = dynamic_cast<cxxpython::StrObject *>(function->code()->varnames()[1]);
+    ASSERT_NE(param, nullptr);
+    ASSERT_NE(local, nullptr);
+    EXPECT_EQ(param->value, "flag");
+    EXPECT_EQ(local->value, "value");
+
+    auto *first = dynamic_cast<cxxpython::StrObject *>(globals->get(runtime.new_str("first")));
+    ASSERT_NE(first, nullptr);
+    EXPECT_EQ(first->value, "local");
+
+    try
+    {
+        (void)cxxpython::object_call(function, {runtime.false_value()});
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.unbound_local_error_type());
+        EXPECT_STREQ(error.what(), "cannot access local variable 'value' where it is not associated with a value");
+    }
+}
+
 TEST(Compile, FunctionWithoutReturnDefaultsToNone)
 {
     cxxpython::Runtime runtime;

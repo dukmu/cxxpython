@@ -320,6 +320,11 @@ namespace cxxpython
         return new_exception(name_error_type_, std::move(message));
     }
 
+    ExceptionObject *Runtime::new_unbound_local_error(std::string message)
+    {
+        return new_exception(unbound_local_error_type_, std::move(message));
+    }
+
     ExceptionObject *Runtime::new_attribute_error(std::string message)
     {
         return new_exception(attribute_error_type_, std::move(message));

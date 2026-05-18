@@ -139,6 +139,10 @@ namespace cxxpython
             return "LOAD_NAME";
         case Opcode::StoreName:
             return "STORE_NAME";
+        case Opcode::LoadFast:
+            return "LOAD_FAST";
+        case Opcode::StoreFast:
+            return "STORE_FAST";
         case Opcode::LoadAttr:
             return "LOAD_ATTR";
         case Opcode::StoreAttr:
@@ -193,6 +197,7 @@ namespace cxxpython
         {
         case Opcode::LoadConst:
         case Opcode::LoadName:
+        case Opcode::LoadFast:
             return 1;
         case Opcode::LoadAttr:
         case Opcode::JumpAbsolute:
@@ -206,6 +211,7 @@ namespace cxxpython
         case Opcode::DupTop:
             return 1;
         case Opcode::StoreName:
+        case Opcode::StoreFast:
         case Opcode::PopTop:
         case Opcode::PopJumpIfFalse:
         case Opcode::PopJumpIfTrue:

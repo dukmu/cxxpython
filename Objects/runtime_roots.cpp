@@ -167,6 +167,7 @@ namespace cxxpython
         initialize_type_dict(key_error_type_);
         initialize_type_dict(syntax_error_type_);
         initialize_type_dict(name_error_type_);
+        initialize_type_dict(unbound_local_error_type_);
         initialize_type_dict(attribute_error_type_);
     }
 

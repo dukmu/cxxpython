@@ -326,6 +326,33 @@ namespace cxxpython
                 locals.set(name, value);
                 break;
             }
+            case Opcode::LoadFast:
+            {
+                if (instruction.operand >= code.varnames().size())
+                    throw BytecodeError("LOAD_FAST operand out of range");
+                auto *name = dynamic_cast<StrObject *>(code.varnames()[instruction.operand]);
+                if (!name)
+                    throw BytecodeError("LOAD_FAST requires a str varname");
+                Object *value = locals.get(name);
+                if (!value)
+                    raise_unbound_local_error(
+                        &runtime_,
+                        "cannot access local variable '" + name->value +
+                            "' where it is not associated with a value");
+                frame->push(value);
+                break;
+            }
+            case Opcode::StoreFast:
+            {
+                if (instruction.operand >= code.varnames().size())
+                    throw BytecodeError("STORE_FAST operand out of range");
+                auto *name = dynamic_cast<StrObject *>(code.varnames()[instruction.operand]);
+                if (!name)
+                    throw BytecodeError("STORE_FAST requires a str varname");
+                Object *value = frame->pop();
+                locals.set(name, value);
+                break;
+            }
             case Opcode::LoadAttr:
             {
                 if (instruction.operand >= code.names().size())

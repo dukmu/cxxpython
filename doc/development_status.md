@@ -20,10 +20,10 @@ Seven tracked risks:
    selection and `__prepare__`. `MAKE_CLASS`, `type(...)`, and metaclass calls
    now share `ClassConstructionRequest` and runtime metaclass selection;
    syntax-level `metaclass=` and full `__prepare__` invocation remain open.
-3. High: function scope is not Python semantics yet. The current symbol table
-   is a name list and `LOAD_NAME` resolves locals -> globals -> builtins, so
-   local/global/free/cell analysis, `global`, `nonlocal`, and
-   `UnboundLocalError` remain missing.
+3. High, first semantics slice fixed in current slice: function scope used to
+   be dynamic `LOAD_NAME` lookup. Function locals are now compiler-discovered
+   fast locals with `LOAD_FAST`/`STORE_FAST` and `UnboundLocalError`; `global`,
+   `nonlocal`, free/cell analysis, and closures remain open.
 4. Medium/high: `CodeObject` and `Frame` still lack line table, flags,
    traceback integration, and script-visible debugging metadata. CLI errors
    currently print only exception type and message.
@@ -44,9 +44,78 @@ Immediate order:
   Python-level list coverage without C++ wrapper setup.
 - Done in current slice: class statement, `type(...)`, and metaclass calls now
   share a metaclass-aware construction request.
-- Next: continue through `__prepare__`, syntax-level `metaclass=`, function scope analysis,
+- Done in current slice: function local assignment names now use fast-local
+  semantics and raise `UnboundLocalError` instead of falling through to globals.
+- Next: continue through `global`/`nonlocal`/closures, `__prepare__`,
+  syntax-level `metaclass=`,
   traceback metadata, root guards, builtin protocol cleanup, and descriptor
   completeness.
+
+## 2026-05-18 Function Fast Locals And UnboundLocalError
+
+Pre-change review:
+
+- Function bodies used the same name table and `LOAD_NAME`/`STORE_NAME` opcodes
+  as module and class body execution. That meant a function-local assignment
+  did not make the name local at compile time.
+- A function that read a name before assigning it could incorrectly fall
+  through to module globals instead of raising Python's local binding error.
+
+Debt addressed:
+
+- Added `LOAD_FAST` and `STORE_FAST` bytecodes for function-local names.
+- Added `UnboundLocalError` as a `NameError` subclass in the runtime exception
+  hierarchy.
+- Split symbol state by scope kind: module/class scopes remain dynamic
+  namespace scopes, while function scopes record parameters and assignment
+  targets as fast locals.
+- Function `CodeObject::varnames()` now stores parameters first, followed by
+  compiler-discovered local names.
+- Function-body loads and stores for local names now emit
+  `LOAD_FAST`/`STORE_FAST`; dynamic global/builtin reads still use `LOAD_NAME`.
+
+Completed:
+
+- Added opcode metadata tests for `LOAD_FAST` and `STORE_FAST`.
+- Added exception hierarchy tests for `UnboundLocalError`.
+- Added compiler tests proving assigned function locals use fast-local opcodes,
+  parameters remain first in `varnames`, and unbound locals raise
+  `UnboundLocalError`.
+- Added Python golden coverage for successful local reads and failed unbound
+  local reads.
+
+Design review:
+
+- This is the first correct scope-analysis slice, not the full Python symbol
+  table. It intentionally avoids pretending closures or declarations exist.
+- Nested `def` and `class` bind their names as fast locals in an enclosing
+  function, but their bodies are separate scopes. Class bodies remain dynamic
+  namespace execution because class locals need descriptor/metaclass semantics,
+  not function fast locals.
+- `LOAD_NAME` remains the correct opcode for module/class dynamic lookup;
+  `LOAD_FAST` is the function-local opcode and must not fall back to globals.
+
+Known debt and next risk:
+
+- Parser/compiler still lack `global` and `nonlocal` declarations.
+- Freevars/cellvars and closure objects are still absent.
+- `CodeObject` still lacks flags to record optimized/function/class/module
+  scope shape, which should land with broader code metadata work.
+
+Next:
+
+- Continue scope work with explicit `global`/`nonlocal` syntax and code flags,
+  or move to line-table/traceback metadata if debugging complex scope tests
+  becomes the higher leverage risk.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects '--gtest_filter=Bytecode.MetadataNamesAndStackEffects:CoreObjects.RuntimeBootstrapsExceptionHierarchy:Compile.FunctionsUseFastLocalsForAssignedNames:Compile.CompilesFunctionDefinitionsAndReturns:PythonScripts.RunsGoldenFiles'`
+- `ctest --test-dir build --output-on-failure`
+- `git diff --check`
+
+Result: all tests pass.
 
 ## 2026-05-18 Metaclass-Aware Class Construction Request
 

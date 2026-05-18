@@ -34,6 +34,7 @@ namespace cxxpython
         key_error_type_ = allocate_type("KeyError");
         syntax_error_type_ = allocate_type("SyntaxError");
         name_error_type_ = allocate_type("NameError");
+        unbound_local_error_type_ = allocate_type("UnboundLocalError");
         attribute_error_type_ = allocate_type("AttributeError");
 
         object_type_->slots = make_object_slots();
@@ -62,6 +63,7 @@ namespace cxxpython
         key_error_type_->slots = make_exception_slots();
         syntax_error_type_->slots = make_exception_slots();
         name_error_type_->slots = make_exception_slots();
+        unbound_local_error_type_->slots = make_exception_slots();
         attribute_error_type_->slots = make_exception_slots();
 
         object_type_->set_type(type_type_);
@@ -90,6 +92,7 @@ namespace cxxpython
         key_error_type_->set_type(type_type_);
         syntax_error_type_->set_type(type_type_);
         name_error_type_->set_type(type_type_);
+        unbound_local_error_type_->set_type(type_type_);
         attribute_error_type_->set_type(type_type_);
 
         object_type_->base = nullptr;
@@ -121,6 +124,7 @@ namespace cxxpython
         initialize_type(key_error_type_, exception_type_);
         initialize_type(syntax_error_type_, exception_type_);
         initialize_type(name_error_type_, exception_type_);
+        initialize_type(unbound_local_error_type_, name_error_type_);
         initialize_type(attribute_error_type_, exception_type_);
 
         object_type_->solid_base = object_type_;
@@ -149,6 +153,7 @@ namespace cxxpython
         key_error_type_->solid_base = base_exception_type_;
         syntax_error_type_->solid_base = base_exception_type_;
         name_error_type_->solid_base = base_exception_type_;
+        unbound_local_error_type_->solid_base = base_exception_type_;
         attribute_error_type_->solid_base = base_exception_type_;
 
         none_ = allocate<NoneObject>(none_type_);
@@ -182,6 +187,7 @@ namespace cxxpython
         add_root(key_error_type_);
         add_root(syntax_error_type_);
         add_root(name_error_type_);
+        add_root(unbound_local_error_type_);
         add_root(attribute_error_type_);
         add_root(none_);
         add_root(not_implemented_);

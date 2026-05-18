@@ -754,6 +754,13 @@ namespace cxxpython
         throw PythonError(runtime->new_name_error(std::move(message)));
     }
 
+    void raise_unbound_local_error(Runtime *runtime, std::string message)
+    {
+        if (!runtime)
+            throw std::logic_error("cannot raise Python UnboundLocalError without a runtime");
+        throw PythonError(runtime->new_unbound_local_error(std::move(message)));
+    }
+
     void raise_attribute_error(Runtime *runtime, std::string message)
     {
         if (!runtime)
