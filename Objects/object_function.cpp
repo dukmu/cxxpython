@@ -118,15 +118,26 @@ namespace cxxpython
 
     Object *PythonFunctionObject::call(const std::vector<Object *> &args)
     {
-        if (!args.empty())
+        const std::uint32_t expected = code_->arg_count();
+        if (args.size() != expected)
         {
             std::ostringstream message;
-            message << name_ << "() takes 0 positional arguments but "
+            message << name_ << "() takes " << expected << " positional "
+                    << positional_count_word(expected) << " but "
                     << args.size() << " " << positional_count_word(args.size())
                     << " " << positional_count_verb(args.size()) << " given";
             raise_type_error(runtime(), message.str());
         }
         DictObject *locals = runtime()->new_dict();
+        if (code_->varnames().size() < args.size())
+            throw BytecodeError("function code object argcount exceeds varnames");
+        for (std::size_t index = 0; index < args.size(); ++index)
+        {
+            auto *name = dynamic_cast<StrObject *>(code_->varnames()[index]);
+            if (!name)
+                throw BytecodeError("function varname must be a str");
+            locals->set(name, args[index]);
+        }
         if (VirtualMachine *active_vm = runtime()->active_vm())
             return active_vm->execute(*code_, *locals, *globals_, *runtime()->builtins_dict());
         VirtualMachine vm(*runtime());

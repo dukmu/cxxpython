@@ -99,6 +99,13 @@ namespace cxxpython
                               std::vector<Object *> constants,
                               std::vector<Object *> names,
                               std::vector<Instruction> instructions);
+        CodeObject *new_code(std::string name,
+                              std::string filename,
+                              std::uint32_t arg_count,
+                              std::vector<Object *> varnames,
+                              std::vector<Object *> constants,
+                              std::vector<Object *> names,
+                              std::vector<Instruction> instructions);
         Frame *new_frame(CodeObject *code,
                          DictObject *locals = nullptr,
                          DictObject *globals = nullptr,

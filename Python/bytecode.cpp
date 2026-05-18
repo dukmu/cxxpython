@@ -56,18 +56,27 @@ namespace cxxpython
                 if (name)
                     visitor(name);
             }
+            for (Object *varname : code->varnames())
+            {
+                if (varname)
+                    visitor(varname);
+            }
         }
     }
 
     CodeObject::CodeObject(TypeObject *type,
                            std::string name,
                            std::string filename,
+                           std::uint32_t arg_count,
+                           std::vector<Object *> varnames,
                            std::vector<Object *> constants,
                            std::vector<Object *> names,
                            std::vector<Instruction> instructions)
         : Object(type),
           name_(std::move(name)),
           filename_(std::move(filename)),
+          arg_count_(arg_count),
+          varnames_(std::move(varnames)),
           constants_(std::move(constants)),
           names_(std::move(names)),
           instructions_(std::move(instructions))
@@ -82,6 +91,16 @@ namespace cxxpython
     const std::string &CodeObject::filename() const noexcept
     {
         return filename_;
+    }
+
+    std::uint32_t CodeObject::arg_count() const noexcept
+    {
+        return arg_count_;
+    }
+
+    const std::vector<Object *> &CodeObject::varnames() const noexcept
+    {
+        return varnames_;
     }
 
     const std::vector<Object *> &CodeObject::constants() const noexcept

@@ -57,12 +57,16 @@ namespace cxxpython
         CodeObject(TypeObject *type,
                    std::string name,
                    std::string filename,
+                   std::uint32_t arg_count,
+                   std::vector<Object *> varnames,
                    std::vector<Object *> constants,
                    std::vector<Object *> names,
                    std::vector<Instruction> instructions);
 
         const std::string &name() const noexcept;
         const std::string &filename() const noexcept;
+        std::uint32_t arg_count() const noexcept;
+        const std::vector<Object *> &varnames() const noexcept;
         const std::vector<Object *> &constants() const noexcept;
         const std::vector<Object *> &names() const noexcept;
         const std::vector<Instruction> &instructions() const noexcept;
@@ -70,6 +74,8 @@ namespace cxxpython
     private:
         std::string name_;
         std::string filename_;
+        std::uint32_t arg_count_ = 0;
+        std::vector<Object *> varnames_;
         std::vector<Object *> constants_;
         std::vector<Object *> names_;
         std::vector<Instruction> instructions_;

@@ -461,6 +461,39 @@ TEST(Bytecode, CodeObjectsTraverseReferencedConstants)
     EXPECT_NE(code->repr().find("file '<string>'"), std::string::npos);
 }
 
+TEST(Bytecode, CodeObjectsExposeArgumentMetadata)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::StrObject *self_name = runtime.new_str("self");
+    cxxpython::StrObject *value_name = runtime.new_str("value");
+    cxxpython::Object *constant = runtime.new_int(1);
+    cxxpython::StrObject *global_name = runtime.new_str("global_name");
+    cxxpython::CodeObject *code = runtime.new_code(
+        "method",
+        "test.py",
+        2,
+        {self_name, value_name},
+        {constant},
+        {global_name},
+        {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::ReturnValue, 0}});
+
+    EXPECT_EQ(code->arg_count(), 2U);
+    ASSERT_EQ(code->varnames().size(), 2U);
+    EXPECT_EQ(code->varnames()[0], self_name);
+    EXPECT_EQ(code->varnames()[1], value_name);
+
+    std::vector<cxxpython::Object *> visited;
+    code->visit_children([&visited](cxxpython::Object *object)
+                         { visited.push_back(object); });
+
+    ASSERT_EQ(visited.size(), 4U);
+    EXPECT_EQ(visited[0], constant);
+    EXPECT_EQ(visited[1], global_name);
+    EXPECT_EQ(visited[2], self_name);
+    EXPECT_EQ(visited[3], value_name);
+}
+
 TEST(Bytecode, FrameObjectsTrackCodeAndStackReferences)
 {
     cxxpython::Runtime runtime;

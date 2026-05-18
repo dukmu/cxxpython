@@ -50,8 +50,11 @@ TEST(Functions, PythonFunctionsBindAsMethodsThroughDescriptorProtocol)
     cxxpython::CodeObject *code = runtime.new_code(
         "method",
         "test.py",
-        {runtime.none()},
-        {{cxxpython::Opcode::LoadConst, 0},
+        1,
+        {runtime.new_str("self")},
+        {},
+        {runtime.new_str("self")},
+        {{cxxpython::Opcode::LoadName, 0},
          {cxxpython::Opcode::ReturnValue, 0}});
     cxxpython::PythonFunctionObject *function = runtime.new_function("method", code, globals);
     cxxpython::TypeObject *owner_type = runtime.new_heap_type("Owner", runtime.object_type());
@@ -71,17 +74,66 @@ TEST(Functions, PythonFunctionsBindAsMethodsThroughDescriptorProtocol)
     ASSERT_EQ(children.size(), 2U);
     EXPECT_EQ(children[0], function);
     EXPECT_EQ(children[1], instance);
+    EXPECT_EQ(cxxpython::object_call(bound, {}), instance);
+}
+
+TEST(Functions, PythonFunctionArgumentBindingUsesCodeObjectVarnames)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::DictObject *globals = runtime.new_dict();
+    cxxpython::CodeObject *code = runtime.new_code(
+        "identity",
+        "test.py",
+        1,
+        {runtime.new_str("value")},
+        {},
+        {runtime.new_str("value")},
+        {{cxxpython::Opcode::LoadName, 0},
+         {cxxpython::Opcode::ReturnValue, 0}});
+    cxxpython::PythonFunctionObject *function = runtime.new_function("identity", code, globals);
+    cxxpython::Object *argument = runtime.new_str("arg");
+
+    EXPECT_EQ(cxxpython::object_call(function, {argument}), argument);
 
     try
     {
-        (void)cxxpython::object_call(bound, {});
+        (void)cxxpython::object_call(function, {});
         FAIL() << "expected PythonError";
     }
     catch (const cxxpython::PythonError &error)
     {
         EXPECT_EQ(error.type(), runtime.type_error_type());
-        EXPECT_STREQ(error.what(), "method() takes 0 positional arguments but 1 argument was given");
+        EXPECT_STREQ(error.what(), "identity() takes 1 positional argument but 0 arguments were given");
     }
+
+    try
+    {
+        (void)cxxpython::object_call(function, {argument, argument});
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "identity() takes 1 positional argument but 2 arguments were given");
+    }
+}
+
+TEST(Functions, RejectsMalformedFunctionCodeObjectMetadata)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::DictObject *globals = runtime.new_dict();
+    cxxpython::CodeObject *missing_varname = runtime.new_code(
+        "broken",
+        "test.py",
+        1,
+        {},
+        {runtime.none()},
+        {},
+        {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::ReturnValue, 0}});
+    cxxpython::PythonFunctionObject *function = runtime.new_function("broken", missing_varname, globals);
+
+    EXPECT_THROW((void)cxxpython::object_call(function, {runtime.none()}), cxxpython::BytecodeError);
 }
 
 TEST(Functions, PythonFunctionCallsReuseActiveVirtualMachineFrames)

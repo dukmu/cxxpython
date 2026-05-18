@@ -1,5 +1,61 @@
 # Development Status
 
+## 2026-05-18 CodeObject Argument Metadata
+
+Pre-change review:
+
+- Python function objects existed, but function calls only supported zero-arg
+  code because `CodeObject` did not carry argcount or local variable names.
+- Keeping arguments outside `CodeObject` would split function metadata from the
+  executable object and make future `def`, traceback, introspection, and method
+  binding brittle.
+- Bound Python methods could create a `method` object, but prepended `self`
+  could not be bound to a local name yet.
+
+Debt addressed:
+
+- Added `CodeObject::arg_count()` and `CodeObject::varnames()`.
+- Added a runtime `new_code(...)` overload that accepts argcount and varnames.
+- Code object traversal now visits varnames in addition to constants and names.
+- Python function calls bind positional arguments into a fresh locals dict using
+  the first `arg_count` varnames before executing the code.
+- Bound Python method calls now prepend `self` and can execute code that loads
+  the `self` local.
+
+Completed:
+
+- Added bytecode tests for code object argument metadata and traversal.
+- Added function tests for:
+  - positional arg binding through varnames
+  - too few and too many positional argument errors
+  - malformed code metadata detection
+  - bound method calls returning the receiver through the `self` local
+
+Design notes:
+
+- This is deliberately positional-only and minimal. Defaults, keyword-only
+  args, `*args`, `**kwargs`, closures, annotations, and qualnames belong in the
+  function-definition slice, with explicit `CodeObject`/function metadata.
+- Varnames are object references and must remain traversed so future GC sees
+  function/code metadata consistently.
+
+Next:
+
+- Add parser/compiler support for a zero-or-positional-only `def` slice:
+  function AST node, nested code object creation, function object creation, and
+  `STORE_NAME`.
+- Add Python golden scripts for module-level functions and simple methods once
+  class body execution exists.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects '--gtest_filter=Functions.*:Bytecode.CodeObjectsExposeArgumentMetadata:Bytecode.CodeObjectsTraverseReferencedConstants'`
+- `ctest --test-dir build --output-on-failure`
+- `git diff --check`
+
+Result: all tests pass.
+
 ## 2026-05-18 Python Function And Method Objects
 
 Pre-change review:

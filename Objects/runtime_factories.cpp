@@ -147,9 +147,28 @@ namespace cxxpython
                                   std::vector<Object *> names,
                                   std::vector<Instruction> instructions)
     {
+        return new_code(std::move(name),
+                        std::move(filename),
+                        0,
+                        {},
+                        std::move(constants),
+                        std::move(names),
+                        std::move(instructions));
+    }
+
+    CodeObject *Runtime::new_code(std::string name,
+                                  std::string filename,
+                                  std::uint32_t arg_count,
+                                  std::vector<Object *> varnames,
+                                  std::vector<Object *> constants,
+                                  std::vector<Object *> names,
+                                  std::vector<Instruction> instructions)
+    {
         return allocate<CodeObject>(code_type_,
                                     std::move(name),
                                     std::move(filename),
+                                    arg_count,
+                                    std::move(varnames),
                                     std::move(constants),
                                     std::move(names),
                                     std::move(instructions));
