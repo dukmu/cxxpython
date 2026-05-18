@@ -13,6 +13,8 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::StoreAttr), "STORE_ATTR");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::PopTop), "POP_TOP");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::BinaryAdd), "BINARY_ADD");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::BinarySubscr), "BINARY_SUBSCR");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::StoreSubscr), "STORE_SUBSCR");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::Call), "CALL");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::ReturnValue), "RETURN_VALUE");
 
@@ -23,9 +25,97 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::StoreAttr, 0}), -2);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::PopTop, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BinaryAdd, 0}), -1);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BinarySubscr, 0}), -1);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::StoreSubscr, 0}), -3);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::Call, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::Call, 2}), -2);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::ReturnValue, 0}), -1);
+}
+
+TEST(Bytecode, DispatchesSubscriptOpcodesThroughObjectProtocol)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::ListObject *list = runtime.new_list({runtime.new_str("zero"), runtime.new_str("one")});
+    cxxpython::Object *replacement = runtime.new_str("updated");
+    cxxpython::CodeObject *load_list = runtime.new_code(
+        {list, runtime.new_int(1)},
+        {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::LoadConst, 1},
+         {cxxpython::Opcode::BinarySubscr, 0},
+         {cxxpython::Opcode::ReturnValue, 0}});
+
+    EXPECT_EQ(vm.execute(*load_list), list->get(1));
+
+    cxxpython::CodeObject *store_list = runtime.new_code(
+        {list, runtime.new_int(1), replacement, runtime.none()},
+        {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::LoadConst, 1},
+         {cxxpython::Opcode::LoadConst, 2},
+         {cxxpython::Opcode::StoreSubscr, 0},
+         {cxxpython::Opcode::LoadConst, 3},
+         {cxxpython::Opcode::ReturnValue, 0}});
+
+    EXPECT_EQ(vm.execute(*store_list), runtime.none());
+    EXPECT_EQ(list->get(1), replacement);
+
+    cxxpython::DictObject *dict = runtime.new_dict();
+    cxxpython::Object *key = runtime.new_str("name");
+    cxxpython::Object *value = runtime.new_str("dict-value");
+    dict->set(key, value);
+    cxxpython::CodeObject *load_dict = runtime.new_code(
+        {dict, key},
+        {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::LoadConst, 1},
+         {cxxpython::Opcode::BinarySubscr, 0},
+         {cxxpython::Opcode::ReturnValue, 0}});
+
+    EXPECT_EQ(vm.execute(*load_dict), value);
+}
+
+TEST(Bytecode, SubscriptOpcodesRaisePythonErrorsThroughObjectProtocol)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *dict = runtime.new_dict();
+    cxxpython::Object *missing = runtime.new_str("missing");
+    cxxpython::CodeObject *missing_key = runtime.new_code(
+        {dict, missing},
+        {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::LoadConst, 1},
+         {cxxpython::Opcode::BinarySubscr, 0},
+         {cxxpython::Opcode::ReturnValue, 0}});
+
+    try
+    {
+        (void)vm.execute(*missing_key);
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.key_error_type());
+        EXPECT_STREQ(error.what(), "'missing'");
+    }
+
+    cxxpython::TupleObject *tuple = runtime.new_tuple({runtime.new_int(1)});
+    cxxpython::CodeObject *store_tuple = runtime.new_code(
+        {tuple, runtime.new_int(0), runtime.new_int(9)},
+        {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::LoadConst, 1},
+         {cxxpython::Opcode::LoadConst, 2},
+         {cxxpython::Opcode::StoreSubscr, 0},
+         {cxxpython::Opcode::ReturnValue, 0}});
+
+    try
+    {
+        (void)vm.execute(*store_tuple);
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "'tuple' object does not support item assignment");
+    }
 }
 
 TEST(Bytecode, ExecutesLoadConstAndReturn)

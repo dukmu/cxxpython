@@ -19,6 +19,8 @@ namespace cxxpython
         StoreAttr,
         PopTop,
         BinaryAdd,
+        BinarySubscr,
+        StoreSubscr,
         Call,
         ReturnValue,
     };

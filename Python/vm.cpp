@@ -302,6 +302,21 @@ namespace cxxpython
                 frame->push(binary_add(left, right));
                 break;
             }
+            case Opcode::BinarySubscr:
+            {
+                Object *key = frame->pop();
+                Object *object = frame->pop();
+                frame->push(object_get_item(object, key));
+                break;
+            }
+            case Opcode::StoreSubscr:
+            {
+                Object *value = frame->pop();
+                Object *key = frame->pop();
+                Object *object = frame->pop();
+                object_set_item(object, key, value);
+                break;
+            }
             case Opcode::Call:
             {
                 std::vector<Object *> args(instruction.operand);

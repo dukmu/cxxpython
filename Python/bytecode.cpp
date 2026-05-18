@@ -128,6 +128,10 @@ namespace cxxpython
             return "POP_TOP";
         case Opcode::BinaryAdd:
             return "BINARY_ADD";
+        case Opcode::BinarySubscr:
+            return "BINARY_SUBSCR";
+        case Opcode::StoreSubscr:
+            return "STORE_SUBSCR";
         case Opcode::Call:
             return "CALL";
         case Opcode::ReturnValue:
@@ -151,7 +155,10 @@ namespace cxxpython
         case Opcode::StoreAttr:
             return -2;
         case Opcode::BinaryAdd:
+        case Opcode::BinarySubscr:
             return -1;
+        case Opcode::StoreSubscr:
+            return -3;
         case Opcode::Call:
             return -static_cast<int>(instruction.operand);
         case Opcode::ReturnValue:

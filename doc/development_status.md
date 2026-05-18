@@ -1,5 +1,69 @@
 # Development Status
 
+## 2026-05-18 Subscript Bytecode Integration
+
+Pre-change review:
+
+- The object protocol now had `object_get_item` and `object_set_item`, but the
+  VM still lacked subscript opcodes. Adding compiler support before VM
+  metadata and direct bytecode tests would make parser/compiler bugs harder to
+  isolate.
+- VM dispatch must not recognize `list`, `dict`, `tuple`, or `mappingproxy`
+  directly. Subscript semantics belong to the object protocol slots added in
+  the previous slice.
+- Store stack order needs to be explicit before compiler integration. This VM
+  currently follows the existing attribute-assignment convention: target parts
+  are pushed before the value. `STORE_SUBSCR` consumes `object`, `key`, `value`
+  and has stack effect `-3`.
+
+Debt addressed:
+
+- Added bytecode opcodes:
+  - `BINARY_SUBSCR`
+  - `STORE_SUBSCR`
+- Added opcode names and stack effects:
+  - `BINARY_SUBSCR`: object + key -> value, net stack effect `-1`
+  - `STORE_SUBSCR`: object + key + value -> empty, net stack effect `-3`
+- VM dispatch now routes:
+  - `BINARY_SUBSCR` through `object_get_item`
+  - `STORE_SUBSCR` through `object_set_item`
+
+Completed:
+
+- Added direct bytecode tests proving:
+  - list subscript load dispatches through object protocol
+  - list subscript store dispatches through object protocol
+  - dict subscript load dispatches through object protocol
+  - dict missing key propagates Python `KeyError`
+  - tuple item assignment propagates Python `TypeError`
+  - opcode names and stack effects are documented in metadata
+
+Design notes:
+
+- This slice deliberately does not change parser/compiler yet. Subscript
+  expressions and assignments should be added only after assignment targets
+  are reviewed, because name assignment, attribute assignment, and subscript
+  assignment should share a coherent target representation.
+- Future compiler support must preserve the VM stack contract above, or change
+  `STORE_ATTR`/`STORE_SUBSCR` together with tests if the project chooses to
+  realign assignment evaluation with CPython bytecode order.
+
+Next:
+
+- Review and refactor assignment-target AST before adding subscript assignment.
+- Add parser/compiler support for subscript expressions using `BINARY_SUBSCR`.
+- Add parser/compiler support for subscript assignment using `STORE_SUBSCR`.
+- Add a `len` builtin backed by `object_length`.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects '--gtest_filter=Bytecode.MetadataNamesAndStackEffects:Bytecode.DispatchesSubscriptOpcodesThroughObjectProtocol:Bytecode.SubscriptOpcodesRaisePythonErrorsThroughObjectProtocol'`
+- `ctest --test-dir build --output-on-failure`
+- `git diff --check`
+
+Result: all tests pass.
+
 ## 2026-05-18 Sequence And Mapping Slot Family
 
 Pre-change review:
