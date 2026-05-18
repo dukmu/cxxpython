@@ -54,7 +54,16 @@ namespace cxxpython
         ModuleObject *new_module(std::string name, std::string filename);
         CodeObject *new_code(std::vector<Object *> constants,
                               std::vector<Instruction> instructions);
+        CodeObject *new_code(std::string name,
+                              std::string filename,
+                              std::vector<Object *> constants,
+                              std::vector<Instruction> instructions);
         CodeObject *new_code(std::vector<Object *> constants,
+                              std::vector<Object *> names,
+                              std::vector<Instruction> instructions);
+        CodeObject *new_code(std::string name,
+                              std::string filename,
+                              std::vector<Object *> constants,
                               std::vector<Object *> names,
                               std::vector<Instruction> instructions);
         Frame *new_frame(CodeObject *code,

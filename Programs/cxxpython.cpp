@@ -52,7 +52,7 @@ int main(int argc, char **argv)
         {
             cxxpython::VirtualMachine vm(runtime);
             cxxpython::ModuleObject *module = runtime.new_module("__main__", argv[1]);
-            cxxpython::CodeObject *code = cxxpython::compile_exec_input(runtime, source);
+            cxxpython::CodeObject *code = cxxpython::compile_exec_input(runtime, source, argv[1]);
             (void)vm.execute(*code, *module->dict());
             return 0;
         }

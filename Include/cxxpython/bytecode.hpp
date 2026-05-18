@@ -41,15 +41,21 @@ namespace cxxpython
     {
     public:
         CodeObject(TypeObject *type,
+                   std::string name,
+                   std::string filename,
                    std::vector<Object *> constants,
                    std::vector<Object *> names,
                    std::vector<Instruction> instructions);
 
+        const std::string &name() const noexcept;
+        const std::string &filename() const noexcept;
         const std::vector<Object *> &constants() const noexcept;
         const std::vector<Object *> &names() const noexcept;
         const std::vector<Instruction> &instructions() const noexcept;
 
     private:
+        std::string name_;
+        std::string filename_;
         std::vector<Object *> constants_;
         std::vector<Object *> names_;
         std::vector<Instruction> instructions_;

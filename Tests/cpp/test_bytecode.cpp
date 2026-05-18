@@ -143,6 +143,9 @@ TEST(Bytecode, CodeObjectsTraverseReferencedConstants)
                                                    {{cxxpython::Opcode::LoadConst, 0},
                                                     {cxxpython::Opcode::ReturnValue, 0}});
 
+    EXPECT_EQ(code->name(), "<module>");
+    EXPECT_EQ(code->filename(), "<string>");
+
     std::vector<cxxpython::Object *> visited;
     code->visit_children([&visited](cxxpython::Object *object)
                          { visited.push_back(object); });
@@ -150,7 +153,8 @@ TEST(Bytecode, CodeObjectsTraverseReferencedConstants)
     ASSERT_EQ(visited.size(), 2U);
     EXPECT_EQ(visited[0], first);
     EXPECT_EQ(visited[1], second);
-    EXPECT_EQ(code->repr().find("<code object at "), 0U);
+    EXPECT_EQ(code->repr().find("<code object <module> at "), 0U);
+    EXPECT_NE(code->repr().find("file '<string>'"), std::string::npos);
 }
 
 TEST(Bytecode, FrameObjectsTrackCodeAndStackReferences)

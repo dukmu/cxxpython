@@ -52,9 +52,11 @@ namespace cxxpython::compiler_internal
         TokenKind kind;
         std::string lexeme;
         std::int64_t int_value = 0;
+        std::size_t line = 1;
+        std::size_t column = 1;
     };
 
-    std::vector<Token> lex_source(Runtime &runtime, std::string_view source);
+    std::vector<Token> lex_source(Runtime &runtime, std::string_view source, std::string filename);
 
     struct Expr
     {
@@ -123,7 +125,9 @@ namespace cxxpython::compiler_internal
         }
     };
 
-    std::unique_ptr<Expr> parse_expression(Runtime &runtime, const std::vector<Token> &tokens);
+    std::unique_ptr<Expr> parse_expression(Runtime &runtime,
+                                           const std::vector<Token> &tokens,
+                                           std::string filename);
 
     struct Stmt
     {
@@ -167,5 +171,5 @@ namespace cxxpython::compiler_internal
         std::vector<std::unique_ptr<Stmt>> statements;
     };
 
-    Module parse_module(Runtime &runtime, const std::vector<Token> &tokens);
+    Module parse_module(Runtime &runtime, const std::vector<Token> &tokens, std::string filename);
 }

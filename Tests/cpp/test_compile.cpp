@@ -8,8 +8,10 @@ TEST(Compile, CompilesSingleIntegerLiteral)
     cxxpython::Runtime runtime;
     cxxpython::VirtualMachine vm(runtime);
 
-    cxxpython::CodeObject *code = cxxpython::compile_eval_input(runtime, "42");
+    cxxpython::CodeObject *code = cxxpython::compile_eval_input(runtime, "42", "<test>");
     ASSERT_NE(code, nullptr);
+    EXPECT_EQ(code->name(), "<eval>");
+    EXPECT_EQ(code->filename(), "<test>");
     ASSERT_EQ(code->constants().size(), 1U);
     ASSERT_EQ(code->instructions().size(), 2U);
 
@@ -119,13 +121,13 @@ TEST(Compile, RaisesSyntaxErrorForMalformedSource)
 
     try
     {
-        (void)cxxpython::compile_eval_input(runtime, "1 +");
+        (void)cxxpython::compile_eval_input(runtime, "1 +", "broken.py");
         FAIL() << "expected PythonError";
     }
     catch (const cxxpython::PythonError &error)
     {
         EXPECT_EQ(error.type_name(), "SyntaxError");
-        EXPECT_STREQ(error.what(), "expected expression");
+        EXPECT_STREQ(error.what(), "broken.py:1:4: expected expression");
     }
 }
 
@@ -135,13 +137,13 @@ TEST(Compile, RaisesSyntaxErrorForUnexpectedToken)
 
     try
     {
-        (void)cxxpython::compile_eval_input(runtime, "1 2");
+        (void)cxxpython::compile_eval_input(runtime, "1 2", "broken.py");
         FAIL() << "expected PythonError";
     }
     catch (const cxxpython::PythonError &error)
     {
         EXPECT_EQ(error.type_name(), "SyntaxError");
-        EXPECT_STREQ(error.what(), "unexpected token after expression");
+        EXPECT_STREQ(error.what(), "broken.py:1:3: unexpected token after expression");
     }
 }
 
@@ -151,8 +153,10 @@ TEST(Compile, CompilesAssignmentModuleAndStoresGlobals)
     cxxpython::VirtualMachine vm(runtime);
     cxxpython::DictObject *globals = runtime.new_dict();
 
-    cxxpython::CodeObject *code = cxxpython::compile_exec_input(runtime, "x = 40 + 2\n");
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(runtime, "x = 40 + 2\n", "script.py");
     ASSERT_NE(code, nullptr);
+    EXPECT_EQ(code->name(), "<module>");
+    EXPECT_EQ(code->filename(), "script.py");
     ASSERT_EQ(code->names().size(), 1U);
     auto *name = dynamic_cast<cxxpython::StrObject *>(code->names()[0]);
     ASSERT_NE(name, nullptr);

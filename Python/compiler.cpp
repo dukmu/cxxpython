@@ -87,20 +87,28 @@ namespace cxxpython
             {
             }
 
-            CodeObject *build_eval(const compiler_internal::Expr &expression)
+            CodeObject *build_eval(const compiler_internal::Expr &expression, const std::string &filename)
             {
                 expression.accept(*this);
                 instructions_.push_back(Instruction{Opcode::ReturnValue, 0});
-                return runtime_.new_code(std::move(constants_), std::move(names_), std::move(instructions_));
+                return runtime_.new_code("<eval>",
+                                         filename,
+                                         std::move(constants_),
+                                         std::move(names_),
+                                         std::move(instructions_));
             }
 
-            CodeObject *build_exec(const compiler_internal::Module &module)
+            CodeObject *build_exec(const compiler_internal::Module &module, const std::string &filename)
             {
                 for (const auto &statement : module.statements)
                     statement->accept(*this);
                 emit_constant(runtime_.none());
                 instructions_.push_back(Instruction{Opcode::ReturnValue, 0});
-                return runtime_.new_code(std::move(constants_), std::move(names_), std::move(instructions_));
+                return runtime_.new_code("<module>",
+                                         filename,
+                                         std::move(constants_),
+                                         std::move(names_),
+                                         std::move(instructions_));
             }
 
             void visit(const compiler_internal::IntegerExpr &expression) override
@@ -190,20 +198,32 @@ namespace cxxpython
 
     CodeObject *compile_eval_input(Runtime &runtime, std::string_view source)
     {
-        const std::vector<compiler_internal::Token> tokens = compiler_internal::lex_source(runtime, source);
+        return compile_eval_input(runtime, source, "<string>");
+    }
+
+    CodeObject *compile_eval_input(Runtime &runtime, std::string_view source, std::string filename)
+    {
+        const std::vector<compiler_internal::Token> tokens =
+            compiler_internal::lex_source(runtime, source, filename);
         std::unique_ptr<compiler_internal::Expr> expression =
-            compiler_internal::parse_expression(runtime, tokens);
+            compiler_internal::parse_expression(runtime, tokens, filename);
         SymbolTable symbols = collect_symbols(*expression);
         BytecodeBuilder builder(runtime, symbols);
-        return builder.build_eval(*expression);
+        return builder.build_eval(*expression, filename);
     }
 
     CodeObject *compile_exec_input(Runtime &runtime, std::string_view source)
     {
-        const std::vector<compiler_internal::Token> tokens = compiler_internal::lex_source(runtime, source);
-        compiler_internal::Module module = compiler_internal::parse_module(runtime, tokens);
+        return compile_exec_input(runtime, source, "<string>");
+    }
+
+    CodeObject *compile_exec_input(Runtime &runtime, std::string_view source, std::string filename)
+    {
+        const std::vector<compiler_internal::Token> tokens =
+            compiler_internal::lex_source(runtime, source, filename);
+        compiler_internal::Module module = compiler_internal::parse_module(runtime, tokens, filename);
         SymbolTable symbols = collect_symbols(module);
         BytecodeBuilder builder(runtime, symbols);
-        return builder.build_exec(module);
+        return builder.build_exec(module, filename);
     }
 }

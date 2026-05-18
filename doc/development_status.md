@@ -53,6 +53,52 @@ Verification:
 
 Result: all tests pass.
 
+## 2026-05-18 Code Metadata And Syntax Locations
+
+Debt addressed:
+
+- Historical entries called out missing `CodeObject` filename/name metadata and
+  missing `SyntaxError` source locations. Without these, CLI diagnostics,
+  traceback, frames, functions, and script-level introspection would need
+  incompatible side channels later.
+
+Completed:
+
+- Added `CodeObject::name()` and `CodeObject::filename()`.
+- Added runtime factory overloads for creating named code objects.
+- Updated compiler APIs with filename-aware overloads:
+  - `compile_eval_input(runtime, source, filename)`
+  - `compile_exec_input(runtime, source, filename)`
+- Kept existing compiler overloads as `<string>` defaults.
+- Added token line/column tracking in the lexer.
+- Updated parser and lexer syntax errors to include
+  `filename:line:column: message`.
+- Updated CLI file execution to pass the script path into compilation.
+- Updated code repr to expose code name and filename.
+- Added tests covering:
+  - code object name/filename for eval and module code
+  - SyntaxError location for parser errors
+  - CLI SyntaxError location reporting
+
+Design notes:
+
+- Syntax location is currently encoded in the exception message only. This is
+  enough to remove the diagnostic blind spot, but future `SyntaxError` should
+  expose Python fields such as filename, lineno, offset, text, end_lineno, and
+  end_offset.
+- Code objects now have filename/name but still lack line tables, varnames,
+  freevars/cellvars, stacksize, and flags. Those should arrive before function
+  objects and traceback support.
+- Architecture docs now spell out VM stack/frame/module/type openness rules so
+  future work does not reintroduce hidden side channels.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all tests pass.
+
 ## 2026-05-18 AST Visitor Compiler Passes
 
 Debt addressed:

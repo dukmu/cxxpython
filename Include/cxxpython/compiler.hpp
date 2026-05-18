@@ -8,5 +8,7 @@
 namespace cxxpython
 {
     CodeObject *compile_eval_input(Runtime &runtime, std::string_view source);
+    CodeObject *compile_eval_input(Runtime &runtime, std::string_view source, std::string filename);
     CodeObject *compile_exec_input(Runtime &runtime, std::string_view source);
+    CodeObject *compile_exec_input(Runtime &runtime, std::string_view source, std::string filename);
 }

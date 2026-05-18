@@ -1,5 +1,7 @@
 #include "cxxpython/compiler_internal.hpp"
 
+#include <sstream>
+
 namespace cxxpython::compiler_internal
 {
     namespace
@@ -7,8 +9,8 @@ namespace cxxpython::compiler_internal
         class Parser final
         {
         public:
-            Parser(Runtime &runtime, const std::vector<Token> &tokens)
-                : runtime_(runtime), tokens_(tokens)
+            Parser(Runtime &runtime, const std::vector<Token> &tokens, std::string filename)
+                : runtime_(runtime), tokens_(tokens), filename_(std::move(filename))
             {
             }
 
@@ -18,7 +20,7 @@ namespace cxxpython::compiler_internal
                 std::unique_ptr<Expr> expression = parse_expression_only();
                 skip_newlines();
                 if (peek().kind != TokenKind::End)
-                    raise_syntax_error(&runtime_, "unexpected token after expression");
+                    raise_at(peek(), "unexpected token after expression");
                 return expression;
             }
 
@@ -35,7 +37,7 @@ namespace cxxpython::compiler_internal
                     }
                     else if (peek().kind != TokenKind::End)
                     {
-                        raise_syntax_error(&runtime_, "expected newline after statement");
+                        raise_at(peek(), "expected newline after statement");
                     }
                 }
                 return module;
@@ -81,9 +83,9 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Newline:
                 case TokenKind::Plus:
                 case TokenKind::Equal:
-                    raise_syntax_error(&runtime_, "expected expression");
+                    raise_at(token, "expected expression");
                 }
-                raise_syntax_error(&runtime_, "expected expression");
+                raise_at(token, "expected expression");
             }
 
             void skip_newlines()
@@ -109,21 +111,31 @@ namespace cxxpython::compiler_internal
                 return tokens_[index_++];
             }
 
+            [[noreturn]] void raise_at(const Token &token, const std::string &message) const
+            {
+                std::ostringstream out;
+                out << filename_ << ":" << token.line << ":" << token.column << ": " << message;
+                raise_syntax_error(&runtime_, out.str());
+            }
+
             Runtime &runtime_;
             const std::vector<Token> &tokens_;
+            std::string filename_;
             std::size_t index_ = 0;
         };
     }
 
-    std::unique_ptr<Expr> parse_expression(Runtime &runtime, const std::vector<Token> &tokens)
+    std::unique_ptr<Expr> parse_expression(Runtime &runtime,
+                                           const std::vector<Token> &tokens,
+                                           std::string filename)
     {
-        Parser parser(runtime, tokens);
+        Parser parser(runtime, tokens, std::move(filename));
         return parser.parse_eval_input();
     }
 
-    Module parse_module(Runtime &runtime, const std::vector<Token> &tokens)
+    Module parse_module(Runtime &runtime, const std::vector<Token> &tokens, std::string filename)
     {
-        Parser parser(runtime, tokens);
+        Parser parser(runtime, tokens, std::move(filename));
         return parser.parse_file_input();
     }
 }

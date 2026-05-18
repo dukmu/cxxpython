@@ -78,3 +78,14 @@ TEST(Cli, ReportsPythonErrors)
     EXPECT_EQ(result.output, "NameError: name 'missing' is not defined\n");
     std::filesystem::remove(script);
 }
+
+TEST(Cli, ReportsSyntaxErrorsWithLocation)
+{
+    const std::filesystem::path script = write_script("cxxpython_cli_syntax_error.py", "x = 1 +\n");
+
+    const CommandResult result = run_command(std::string(CXXPYTHON_PROGRAM_PATH) + " " + shell_quote(script));
+
+    EXPECT_EQ(result.exit_code, 1);
+    EXPECT_NE(result.output.find("SyntaxError: " + script.string() + ":1:8: expected expression"), std::string::npos);
+    std::filesystem::remove(script);
+}

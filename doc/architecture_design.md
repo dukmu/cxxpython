@@ -93,3 +93,45 @@ doc/            design docs and milestone plans
 - Attribute/descriptor: getattro/setattro, descr_get/descr_set。
 - Call/construction: call, new, init。
 - Buffer/extension hooks: buffer protocol 和 C/C++ extension 需要的稳定边界。
+
+## VM、栈和脚本层开放性路线
+
+- `CodeObject` 是脚本执行的稳定载体，必须逐步补齐 CPython 类似的元数据：
+  `name`、`filename`、line table、constants、names、varnames、freevars、
+  cellvars、flags。任何 CLI、traceback、function object、debug API 都不应
+  绕过 `CodeObject` 私下保存这些执行信息。
+- `Frame` 是运行时可观察对象，不是临时 C++ stack helper。Frame 必须明确
+  持有 code、locals、globals、builtins、value stack、block stack、last
+  instruction/line。当前 VM 可以保留宿主执行器，但脚本层观察执行状态时
+  应通过 frame/code/module 对象，而不是暴露 `VirtualMachine` 内部结构。
+- Value stack 只保存 `Object*`，所有跨 GC/分配边界的活跃对象必须能从
+  active frames traversal 访问到。后续引入 GC 时，active frame stack、
+  block stack、exception state 都必须成为根。
+- Name resolution 必须保持一条统一路径：locals -> globals -> builtins。
+  opcode、builtin helper、module execution 不能各自实现一套查找。
+- VM opcode 只负责调度和栈效果，类型语义由 object/type slots 或统一 runtime
+  API 完成。新增 opcode 必须同时更新 stack effect、disassembly/metadata、
+  compiler emission、VM execution 和测试。
+
+## 模块系统路线
+
+- 模块是 typed runtime object，模块 dict 是脚本层可见 namespace。CLI、
+  import、`sys.modules`、package execution 都应围绕 module object 工作，
+  不再退回裸 dict 模块模型。
+- 模块初始化最小字段包括 `__name__`、`__file__`、`__builtins__`。后续导入
+  系统加入 `__spec__`、`__package__`、`__loader__`、`__path__`。
+- Builtins 应首先作为模块对象存在，再由 frame name resolution 的 builtins
+  dict 暴露给脚本。不要在 VM 或 CLI 特判 `print`、`len` 等名字。
+- Import core 引入前，CLI file execution 可以创建 `__main__` module，但一旦
+  `sys.modules` 存在，`__main__` 必须通过同一模块注册/清理路径。
+
+## 类型系统开放性路线
+
+- TypeObject 当前只有基础 slots 和单继承 MRO。用户类开放前必须补齐：
+  type dict、attribute lookup、descriptor protocol、call/new/init、C3 MRO、
+  metaclass conflict checks。
+- Slot 扩展必须按协议族推进，不能每个 opcode 单独加临时入口。例如数值
+  协议应一次性规划 normal/reflected/in-place，比较协议应返回 Python bool 或
+  NotImplemented 语义。
+- 模块、函数、code、frame、异常等运行时对象都应是普通 typed objects，
+  让脚本层反射、调试、traceback 和扩展 API 共享同一对象模型。

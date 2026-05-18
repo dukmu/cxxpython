@@ -19,8 +19,11 @@ namespace cxxpython
     {
         std::string code_repr(const Object &object)
         {
+            auto *code = static_cast<const CodeObject *>(&object);
             std::ostringstream out;
-            out << "<code object at " << &object << ">";
+            out << "<code object " << code->name()
+                << " at " << &object
+                << ", file '" << code->filename() << "'>";
             return out.str();
         }
 
@@ -57,14 +60,28 @@ namespace cxxpython
     }
 
     CodeObject::CodeObject(TypeObject *type,
+                           std::string name,
+                           std::string filename,
                            std::vector<Object *> constants,
                            std::vector<Object *> names,
                            std::vector<Instruction> instructions)
         : Object(type),
+          name_(std::move(name)),
+          filename_(std::move(filename)),
           constants_(std::move(constants)),
           names_(std::move(names)),
           instructions_(std::move(instructions))
     {
+    }
+
+    const std::string &CodeObject::name() const noexcept
+    {
+        return name_;
+    }
+
+    const std::string &CodeObject::filename() const noexcept
+    {
+        return filename_;
     }
 
     const std::vector<Object *> &CodeObject::constants() const noexcept
