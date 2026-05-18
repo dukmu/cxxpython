@@ -1,6 +1,7 @@
 #include "cxxpython/runtime.hpp"
 
 #include <ostream>
+#include <sstream>
 
 namespace cxxpython
 {
@@ -25,6 +26,17 @@ namespace cxxpython
             out << '\n';
             return runtime.none();
         }
+
+        Object *builtin_len(Runtime &runtime, const std::vector<Object *> &args)
+        {
+            if (args.size() != 1)
+            {
+                std::ostringstream message;
+                message << "len() takes exactly one argument (" << args.size() << " given)";
+                raise_type_error(&runtime, message.str());
+            }
+            return runtime.new_int(static_cast<std::int64_t>(object_length(args[0])));
+        }
     }
 
     void Runtime::initialize_builtins()
@@ -36,5 +48,6 @@ namespace cxxpython
         builtins_module_ = allocate<ModuleObject>(module_type_, "builtins", "", dict);
         dict->set(new_str("__builtins__"), builtins_module_);
         dict->set(new_str("print"), new_native_function("print", builtin_print));
+        dict->set(new_str("len"), new_native_function("len", builtin_len));
     }
 }

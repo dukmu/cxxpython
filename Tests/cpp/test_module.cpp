@@ -40,6 +40,11 @@ TEST(Module, BootstrapsBuiltinsModule)
     ASSERT_NE(print, nullptr);
     EXPECT_EQ(print->type(), runtime.native_function_type());
     EXPECT_EQ(cxxpython::object_repr(print), "<built-in function print>");
+
+    cxxpython::Object *len = runtime.builtins_dict()->get(runtime.new_str("len"));
+    ASSERT_NE(len, nullptr);
+    EXPECT_EQ(len->type(), runtime.native_function_type());
+    EXPECT_EQ(cxxpython::object_repr(len), "<built-in function len>");
 }
 
 TEST(Module, ExecutesCodeUsingModuleGlobals)

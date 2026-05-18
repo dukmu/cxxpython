@@ -1,5 +1,62 @@
 # Development Status
 
+## 2026-05-18 Builtin `len`
+
+Pre-change review:
+
+- Sequence and mapping slots already exposed `object_length`, but script code
+  had no `len` builtin. Leaving that gap would encourage future parser, VM, or
+  tests to call object internals directly instead of using normal name lookup
+  and call dispatch.
+- Builtins must remain normal runtime objects stored in the `builtins` module
+  dictionary. Adding `len` as a VM opcode shortcut would duplicate call
+  semantics and bypass module visibility.
+- Arity errors need to be Python `TypeError`; type errors for unsupported
+  objects should come from `object_length` so the slot protocol owns the
+  semantic decision.
+
+Debt addressed:
+
+- Added native builtin `len`.
+- Registered `len` in the runtime-owned `builtins` module dictionary.
+- Implemented `len(obj)` as a normal native function call that returns an
+  `int` from `object_length(obj)`.
+
+Completed:
+
+- Added tests proving:
+  - `builtins.len` is present and represented as a native function
+  - script-level `len(items)` resolves through normal name lookup and call
+    dispatch
+  - list length is reported through the object protocol
+  - wrong arity raises Python `TypeError`
+  - unsupported object type raises the `object_length` TypeError path
+
+Design notes:
+
+- `len` intentionally has no VM special case. It participates in the same
+  `LOAD_NAME`/`CALL` path as `print` and future builtins.
+- The implementation currently returns the runtime's signed `int` object.
+  If future containers can report sizes beyond that range, the runtime should
+  add `OverflowError` and mirror CPython's overflow behavior.
+
+Next:
+
+- Continue reviewing compiler architecture: AST source locations, symbol table
+  responsibilities, and statement parsing boundaries.
+- Add comparison and truth-control primitives only after the rich comparison
+  slot family is designed, so `if`, `while`, and boolean operations do not grow
+  one-off VM semantics.
+- Plan slice objects and slice subscript semantics before extending subscript
+  parsing beyond a single key expression.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects '--gtest_filter=Module.BootstrapsBuiltinsModule:Compile.CallsBuiltinLenThroughObjectProtocol:Compile.BuiltinLenRaisesPythonTypeError'`
+
+Result: focused tests pass.
+
 ## 2026-05-18 Compiler Subscript And Assignment Targets
 
 Pre-change review:
@@ -58,7 +115,6 @@ Design notes:
 
 Next:
 
-- Add a `len` builtin backed by `object_length`.
 - Continue reviewing compiler architecture: AST source locations, symbol table
   roles, and a clean path for comparisons/calls before user functions land.
 - Start planning slice objects and slice subscript semantics before extending

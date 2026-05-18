@@ -226,6 +226,58 @@ TEST(Compile, CompilesAndExecutesCallExpressions)
     EXPECT_EQ(output.str(), "hello 42\n");
 }
 
+TEST(Compile, CallsBuiltinLenThroughObjectProtocol)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+    globals->set(runtime.new_str("items"), runtime.new_list({runtime.new_int(1), runtime.new_int(2)}));
+
+    cxxpython::CodeObject *code = cxxpython::compile_eval_input(runtime, "len(items)", "script.py");
+    ASSERT_NE(code, nullptr);
+    ASSERT_EQ(code->names().size(), 2U);
+    auto *len_name = dynamic_cast<cxxpython::StrObject *>(code->names()[0]);
+    auto *items_name = dynamic_cast<cxxpython::StrObject *>(code->names()[1]);
+    ASSERT_NE(len_name, nullptr);
+    ASSERT_NE(items_name, nullptr);
+    EXPECT_EQ(len_name->value, "len");
+    EXPECT_EQ(items_name->value, "items");
+
+    auto *result = dynamic_cast<cxxpython::IntObject *>(vm.execute(*code, *globals));
+    ASSERT_NE(result, nullptr);
+    EXPECT_EQ(result->value, 2);
+}
+
+TEST(Compile, BuiltinLenRaisesPythonTypeError)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+
+    cxxpython::CodeObject *bad_arity = cxxpython::compile_eval_input(runtime, "len()", "script.py");
+    try
+    {
+        (void)vm.execute(*bad_arity);
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "len() takes exactly one argument (0 given)");
+    }
+
+    cxxpython::CodeObject *bad_type = cxxpython::compile_eval_input(runtime, "len(1)", "script.py");
+    try
+    {
+        (void)vm.execute(*bad_type);
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "object of type 'int' has no len()");
+    }
+}
+
 TEST(Compile, CompilesAttributeLoadAndStore)
 {
     cxxpython::Runtime runtime;
