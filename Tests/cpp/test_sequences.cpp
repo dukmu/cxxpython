@@ -82,3 +82,65 @@ TEST(CoreObjects, ListRaisesPythonErrors)
         EXPECT_EQ(error.value()->message(), "unhashable type: 'list'");
     }
 }
+
+TEST(CoreObjects, ListAppendIsExposedAsMethodDescriptor)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::ListObject *list = runtime.new_list({});
+    cxxpython::Object *item = runtime.new_int(7);
+
+    cxxpython::Object *descriptor = cxxpython::object_get_attr(runtime.list_type(), "append");
+    ASSERT_NE(descriptor, nullptr);
+    EXPECT_EQ(descriptor->type(), runtime.method_descriptor_type());
+    EXPECT_EQ(cxxpython::object_repr(descriptor), "<method 'append' of 'list' objects>");
+
+    cxxpython::Object *unbound_result = cxxpython::object_call(descriptor, {list, item});
+    EXPECT_EQ(unbound_result, runtime.none());
+    ASSERT_EQ(list->size(), 1U);
+    EXPECT_EQ(list->get(0), item);
+
+    cxxpython::Object *bound = cxxpython::object_get_attr(list, "append");
+    ASSERT_NE(bound, nullptr);
+    EXPECT_EQ(bound->type(), runtime.native_function_type());
+    EXPECT_TRUE(cxxpython::object_repr(bound).starts_with("<built-in method append of list object at "));
+    std::vector<cxxpython::Object *> bound_children;
+    bound->visit_children([&bound_children](cxxpython::Object *object)
+                          { bound_children.push_back(object); });
+    ASSERT_EQ(bound_children.size(), 2U);
+    EXPECT_EQ(bound_children[0], descriptor);
+    EXPECT_EQ(bound_children[1], list);
+
+    cxxpython::Object *second = runtime.new_str("second");
+    cxxpython::Object *bound_result = cxxpython::object_call(bound, {second});
+    EXPECT_EQ(bound_result, runtime.none());
+    ASSERT_EQ(list->size(), 2U);
+    EXPECT_EQ(list->get(1), second);
+}
+
+TEST(CoreObjects, ListAppendDescriptorValidatesReceiverAndArguments)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::Object *descriptor = cxxpython::object_get_attr(runtime.list_type(), "append");
+
+    try
+    {
+        (void)cxxpython::object_call(descriptor, {runtime.new_int(1)});
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "descriptor 'append' for 'list' objects doesn't apply to a 'int' object");
+    }
+
+    try
+    {
+        (void)cxxpython::object_call(descriptor, {runtime.new_list({})});
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "list.append() takes exactly one argument (0 given)");
+    }
+}

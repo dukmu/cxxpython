@@ -36,6 +36,17 @@ TEST(CoreObjects, HeapTypesUseAndInheritSlots)
     EXPECT_FALSE(cxxpython::is_true(repr_only));
 }
 
+TEST(CoreObjects, TypeFlagsSeparateCompactBuiltinsFromHeapInstances)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::TypeObject *heap_type = runtime.new_heap_type("HeapObject", runtime.object_type());
+
+    EXPECT_EQ(runtime.object_type()->flags & cxxpython::TypeFlagHasInstanceDict, 0U);
+    EXPECT_EQ(runtime.list_type()->flags & cxxpython::TypeFlagHasInstanceDict, 0U);
+    EXPECT_NE(heap_type->flags & cxxpython::TypeFlagHeapType, 0U);
+    EXPECT_NE(heap_type->flags & cxxpython::TypeFlagHasInstanceDict, 0U);
+}
+
 TEST(CoreObjects, RuntimeVisitsRootsAndContainerChildren)
 {
     cxxpython::Runtime runtime;

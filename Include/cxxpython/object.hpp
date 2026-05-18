@@ -4,6 +4,7 @@
 #include <functional>
 #include <exception>
 #include <limits>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -16,9 +17,13 @@ namespace cxxpython
     class ListObject;
     class DictObject;
     class ExceptionObject;
+    class MethodDescriptorObject;
 
     using VisitChildren = std::function<void(Object *)>;
+    using ObjectSpan = std::span<Object *const>;
     using NativeFunctionCallback = std::function<Object *(Runtime &, const std::vector<Object *> &)>;
+    using MethodDescriptorCallback =
+        std::function<Object *(Runtime &, Object *, ObjectSpan)>;
     using ReprSlot = std::string (*)(const Object &);
     using HashSlot = std::int64_t (*)(const Object &);
     using EqualSlot = bool (*)(const Object &, const Object &);
@@ -41,6 +46,10 @@ namespace cxxpython
         DescrGetSlot descr_get = nullptr;
         DescrSetSlot descr_set = nullptr;
     };
+
+    using TypeFlags = std::uint32_t;
+    constexpr TypeFlags TypeFlagHeapType = 1U << 0;
+    constexpr TypeFlags TypeFlagHasInstanceDict = 1U << 1;
 
     class PythonError final : public std::exception
     {
@@ -92,6 +101,7 @@ namespace cxxpython
         std::vector<TypeObject *> bases;
         std::vector<TypeObject *> mro;
         DictObject *dict = nullptr;
+        TypeFlags flags = 0;
         TypeSlots slots;
     };
 
@@ -215,6 +225,38 @@ namespace cxxpython
         NativeFunctionCallback callback_;
     };
 
+    class MethodDescriptorObject final : public Object
+    {
+    public:
+        MethodDescriptorObject(TypeObject *type,
+                               std::string name,
+                               TypeObject *owner,
+                               MethodDescriptorCallback callback);
+
+        const std::string &name() const noexcept;
+        TypeObject *owner() const noexcept;
+        Object *call_unbound(const std::vector<Object *> &args);
+        Object *call_bound(Object *self, ObjectSpan args);
+
+    private:
+        std::string name_;
+        TypeObject *owner_;
+        MethodDescriptorCallback callback_;
+    };
+
+    class BoundMethodObject final : public Object
+    {
+    public:
+        BoundMethodObject(TypeObject *type, MethodDescriptorObject *method, Object *self);
+
+        MethodDescriptorObject *method() const noexcept;
+        Object *self() const noexcept;
+
+    private:
+        MethodDescriptorObject *method_;
+        Object *self_;
+    };
+
     class ExceptionObject final : public Object
     {
     public:
@@ -255,6 +297,7 @@ namespace cxxpython
     TypeSlots make_dict_slots();
     TypeSlots make_module_slots();
     TypeSlots make_native_function_slots();
+    TypeSlots make_method_descriptor_slots();
     TypeSlots make_exception_slots();
     TypeSlots make_code_slots();
     TypeSlots make_frame_slots();

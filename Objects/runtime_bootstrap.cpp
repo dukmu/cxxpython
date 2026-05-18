@@ -19,6 +19,7 @@ namespace cxxpython
         dict_type_ = allocate_type("dict");
         module_type_ = allocate_type("module");
         native_function_type_ = allocate_type("builtin_function_or_method");
+        method_descriptor_type_ = allocate_type("method_descriptor");
         code_type_ = allocate_type("code");
         frame_type_ = allocate_type("frame");
         base_exception_type_ = allocate_type("BaseException");
@@ -40,6 +41,7 @@ namespace cxxpython
         dict_type_->slots = make_dict_slots();
         module_type_->slots = make_module_slots();
         native_function_type_->slots = make_native_function_slots();
+        method_descriptor_type_->slots = make_method_descriptor_slots();
         code_type_->slots = make_code_slots();
         frame_type_->slots = make_frame_slots();
         base_exception_type_->slots = make_exception_slots();
@@ -61,6 +63,7 @@ namespace cxxpython
         dict_type_->set_type(type_type_);
         module_type_->set_type(type_type_);
         native_function_type_->set_type(type_type_);
+        method_descriptor_type_->set_type(type_type_);
         code_type_->set_type(type_type_);
         frame_type_->set_type(type_type_);
         base_exception_type_->set_type(type_type_);
@@ -85,6 +88,7 @@ namespace cxxpython
         initialize_type(dict_type_, object_type_);
         initialize_type(module_type_, object_type_);
         initialize_type(native_function_type_, object_type_);
+        initialize_type(method_descriptor_type_, object_type_);
         initialize_type(code_type_, object_type_);
         initialize_type(frame_type_, object_type_);
         initialize_type(base_exception_type_, object_type_);
@@ -110,6 +114,7 @@ namespace cxxpython
         add_root(dict_type_);
         add_root(module_type_);
         add_root(native_function_type_);
+        add_root(method_descriptor_type_);
         add_root(code_type_);
         add_root(frame_type_);
         add_root(base_exception_type_);
@@ -124,6 +129,7 @@ namespace cxxpython
         add_root(false_);
 
         initialize_type_dicts();
+        initialize_type_methods();
         initialize_builtins();
         add_root(builtins_module_);
     }

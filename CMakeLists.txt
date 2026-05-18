@@ -25,6 +25,7 @@ add_library(cxxpython_core
     Objects/object_mapping.cpp
     Objects/object_module.cpp
     Objects/object_native_function.cpp
+    Objects/object_method.cpp
     Objects/object_exception.cpp
     Objects/object_utils.cpp
 )

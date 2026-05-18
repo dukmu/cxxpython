@@ -1,5 +1,82 @@
 # Development Status
 
+## 2026-05-18 Type Layout Flags And List Method Descriptor
+
+Pre-change review:
+
+- `Object::instance_dict` existed for every object and `object_set_attr`
+  created it unconditionally for normal instances. That was an early layout
+  debt: compact builtin instances such as `list` would accidentally accept
+  arbitrary attributes, unlike CPython.
+- Builtin operations such as `ListObject::append` were only C++ member
+  functions. Exposing methods later through opcode or builtin-specific helper
+  paths would duplicate attribute lookup and drift away from descriptor
+  semantics.
+- `TypeSlots` must stay a protocol dispatch table. Adding method-shaped slots
+  such as `append` would pollute the slot layer and scale poorly as builtin
+  methods grow.
+
+Debt addressed:
+
+- Added `TypeFlags` with:
+  - `TypeFlagHeapType`
+  - `TypeFlagHasInstanceDict`
+- Heap types now default to heap layout plus instance dictionaries.
+- Compact builtin instances now reject arbitrary attribute writes through the
+  central `object_set_attr` path unless a data descriptor handles the write.
+- Added a typed `method_descriptor` object with descriptor and call behavior.
+- Added bound builtin-method objects that use the existing
+  `builtin_function_or_method` type, matching CPython's public split between
+  `list.append` and `[].append`.
+- Installed `list.append` in `list_type->dict`; both unbound and bound calls
+  now route through descriptor binding and generic `object_call`.
+
+Completed:
+
+- Added tests proving:
+  - builtin compact instances reject arbitrary attributes without allocating an
+    instance dict
+  - heap types carry the instance-dict layout flag
+  - `list.append` class access returns a `method_descriptor`
+  - `list.append(list_obj, item)` appends and returns `None`
+  - `list_obj.append(item)` returns a `builtin_function_or_method` callable,
+    traverses descriptor and receiver, appends, and returns `None`
+  - wrong receiver and wrong argument count raise Python `TypeError`
+
+Design notes:
+
+- `TypeObject::dict` is the Python-visible namespace for builtin methods and
+  descriptors. `TypeSlots` remains the low-level protocol table.
+- Bound builtin methods are represented by an internal C++ object layout, but
+  script-visible type identity is `builtin_function_or_method`; its slots now
+  dispatch both plain native functions and bound builtin methods.
+- Method descriptor callbacks receive `ObjectSpan`, avoiding vector copies
+  when the descriptor strips the receiver from an unbound call.
+- Data descriptors still take precedence over the instance-dict permission
+  check, so compact builtins can later expose settable descriptors without
+  opening arbitrary attributes.
+
+Next:
+
+- Add `__class__` as a descriptor on `object`/`type`, with read support first
+  and assignment guarded later by layout compatibility checks.
+- Add mappingproxy semantics for `type.__dict__` before exposing broad
+  script-level type mutation.
+- Expand builtin method descriptors for list sequence protocol (`__len__`,
+  `__getitem__`, `__setitem__`) only after sequence/mapping slots are planned
+  as a family.
+- Design heap subtypes of builtin layouts before allowing `list` subclasses to
+  combine list storage with heap instance dictionaries.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects '--gtest_filter=Attributes.*:CoreObjects.List*:CoreObjects.TypeFlagsSeparateCompactBuiltinsFromHeapInstances'`
+- `ctest --test-dir build --output-on-failure`
+- `git diff --check`
+
+Result: all tests pass.
+
 ## 2026-05-18 Attribute Bytecode Integration
 
 Pre-change review:

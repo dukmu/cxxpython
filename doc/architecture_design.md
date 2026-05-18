@@ -84,8 +84,8 @@ doc/            design docs and milestone plans
 
 ## Slot 扩展路线
 
-当前 slot 只覆盖第一批对象协议：`repr`、`hash`、`equal`、`truth`、
-`traverse`、`binary_add`。后续扩展顺序：
+当前 slot 覆盖第一批对象协议：`repr`、`hash`、`equal`、`truth`、
+`traverse`、`binary_add`、`call`、`descr_get`、`descr_set`。后续扩展顺序：
 
 - Numeric: add/sub/mul/div/mod/pow, unary, in-place, reflected operators.
 - Rich compare: eq/ne/lt/le/gt/ge 返回 Python bool/NotImplemented 语义。
@@ -144,6 +144,18 @@ doc/            design docs and milestone plans
 - TypeObject 必须持有 runtime dict。内建类型和 heap type 的 `__name__`、
   `__module__`、方法表、descriptor 都应进入这条 typed dict 路径，而不是
   放在 VM、builtin helper 或 C++ side table 中。
+- `TypeSlots` 是低层对象协议调度表，不是 Python 可见 namespace。像
+  `list.append` 这样的内建方法必须作为 descriptor object 放进
+  `list_type->dict`，实例访问时由 descriptor 协议生成 bound callable；
+  不允许为每个 Python 方法新增临时 slot。
+- `TypeFlags` 记录类型布局能力。紧凑内建实例默认不带 arbitrary instance
+  dict；heap type 默认带 `HasInstanceDict`，普通用户对象属性写入才会懒建
+  `Object::instance_dict`。模块对象和类型对象有自己的 namespace 路径，不依赖
+  普通实例字典。
+- Builtin method binding follows CPython's split: class access such as
+  `list.append` returns a `method_descriptor`; instance access such as
+  `[].append` returns a `builtin_function_or_method`-typed callable carrying
+  both descriptor and receiver, and it must traverse both references for GC.
 - Attribute lookup 的入口是统一 `object_get_attr` API。当前最小顺序是：
   module dict -> data descriptor -> instance dict -> non-data descriptor/type
   attribute -> metatype MRO dict。后续 `__getattr__`、slot wrappers 和

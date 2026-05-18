@@ -63,6 +63,25 @@ namespace cxxpython
         return allocate<NativeFunctionObject>(native_function_type_, std::move(name), std::move(callback));
     }
 
+    MethodDescriptorObject *Runtime::new_method_descriptor(std::string name,
+                                                           TypeObject *owner,
+                                                           MethodDescriptorCallback callback)
+    {
+        if (!owner)
+            raise_type_error(this, "method descriptor owner cannot be null");
+        return allocate<MethodDescriptorObject>(method_descriptor_type_,
+                                                std::move(name),
+                                                owner,
+                                                std::move(callback));
+    }
+
+    BoundMethodObject *Runtime::new_bound_method(MethodDescriptorObject *method, Object *self)
+    {
+        if (!method || !self)
+            raise_type_error(this, "bound method requires method and self");
+        return allocate<BoundMethodObject>(native_function_type_, method, self);
+    }
+
     CodeObject *Runtime::new_code(std::vector<Object *> constants, std::vector<Instruction> instructions)
     {
         return new_code("<module>", "<string>", std::move(constants), {}, std::move(instructions));
@@ -111,6 +130,7 @@ namespace cxxpython
     {
         TypeObject *type = allocate_type(std::move(name));
         type->set_type(type_type_);
+        type->flags = TypeFlagHeapType | TypeFlagHasInstanceDict;
         TypeObject *resolved_base = base ? base : object_type_;
         type->slots = inherit_slots(resolved_base, slots);
         initialize_type(type, resolved_base);

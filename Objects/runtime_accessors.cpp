@@ -57,6 +57,11 @@ namespace cxxpython
         return native_function_type_;
     }
 
+    TypeObject *Runtime::method_descriptor_type() const noexcept
+    {
+        return method_descriptor_type_;
+    }
+
     TypeObject *Runtime::code_type() const noexcept
     {
         return code_type_;

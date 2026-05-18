@@ -15,6 +15,11 @@ namespace cxxpython
             return value && value->type() && value->type()->slots.descr_set;
         }
 
+        bool allows_instance_dict(const TypeObject *type)
+        {
+            return type && (type->flags & TypeFlagHasInstanceDict) != 0;
+        }
+
         Object *apply_descriptor(Object *value, Object *instance, TypeObject *owner)
         {
             if (!value || !value->type() || !value->type()->slots.descr_get)
@@ -312,6 +317,15 @@ namespace cxxpython
         {
             type_value->type()->slots.descr_set(*type_value, object, value);
             return;
+        }
+
+        if (!allows_instance_dict(object->type()))
+        {
+            std::ostringstream message;
+            message << "'" << type_qualified_name(object->type())
+                    << "' object has no attribute '"
+                    << name->value << "'";
+            raise_attribute_error(object->runtime(), message.str());
         }
 
         if (!object->instance_dict())

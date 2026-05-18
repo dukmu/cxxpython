@@ -86,6 +86,7 @@ namespace cxxpython
         initialize_type_dict(dict_type_);
         initialize_type_dict(module_type_);
         initialize_type_dict(native_function_type_);
+        initialize_type_dict(method_descriptor_type_);
         initialize_type_dict(code_type_);
         initialize_type_dict(frame_type_);
         initialize_type_dict(base_exception_type_);

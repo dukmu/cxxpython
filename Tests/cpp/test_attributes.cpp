@@ -113,6 +113,24 @@ TEST(Attributes, StoresAndReadsInstanceDictionaries)
     EXPECT_EQ(children[0], instance->instance_dict());
 }
 
+TEST(Attributes, BuiltinCompactInstancesRejectArbitraryAttributes)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::ListObject *list = runtime.new_list({});
+
+    try
+    {
+        cxxpython::object_set_attr(list, "marker", runtime.new_int(1));
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.attribute_error_type());
+        EXPECT_STREQ(error.what(), "'list' object has no attribute 'marker'");
+        EXPECT_EQ(list->instance_dict(), nullptr);
+    }
+}
+
 TEST(Attributes, InvokesDescriptorsFromTypeDictionaries)
 {
     cxxpython::Runtime runtime;
