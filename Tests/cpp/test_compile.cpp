@@ -39,14 +39,69 @@ TEST(Compile, CompilesLeftAssociativeAddition)
     ASSERT_EQ(code->instructions().size(), 6U);
     EXPECT_EQ(code->instructions()[0].opcode, cxxpython::Opcode::LoadConst);
     EXPECT_EQ(code->instructions()[1].opcode, cxxpython::Opcode::LoadConst);
-    EXPECT_EQ(code->instructions()[2].opcode, cxxpython::Opcode::BinaryAdd);
+    EXPECT_EQ(code->instructions()[2].opcode, cxxpython::Opcode::BinaryOp);
+    EXPECT_EQ(code->instructions()[2].operand, static_cast<std::uint32_t>(cxxpython::BinaryOp::Add));
     EXPECT_EQ(code->instructions()[3].opcode, cxxpython::Opcode::LoadConst);
-    EXPECT_EQ(code->instructions()[4].opcode, cxxpython::Opcode::BinaryAdd);
+    EXPECT_EQ(code->instructions()[4].opcode, cxxpython::Opcode::BinaryOp);
+    EXPECT_EQ(code->instructions()[4].operand, static_cast<std::uint32_t>(cxxpython::BinaryOp::Add));
     EXPECT_EQ(code->instructions()[5].opcode, cxxpython::Opcode::ReturnValue);
 
     auto *result = dynamic_cast<cxxpython::IntObject *>(vm.execute(*code));
     ASSERT_NE(result, nullptr);
     EXPECT_EQ(result->value, 6);
+}
+
+TEST(Compile, CompilesBinaryOperatorPrecedence)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+
+    cxxpython::CodeObject *code = cxxpython::compile_eval_input(runtime, "10 - 2 * 3 + 4");
+    ASSERT_NE(code, nullptr);
+    ASSERT_EQ(code->instructions().size(), 8U);
+    EXPECT_EQ(code->instructions()[0].opcode, cxxpython::Opcode::LoadConst);
+    EXPECT_EQ(code->instructions()[1].opcode, cxxpython::Opcode::LoadConst);
+    EXPECT_EQ(code->instructions()[2].opcode, cxxpython::Opcode::LoadConst);
+    EXPECT_EQ(code->instructions()[3].opcode, cxxpython::Opcode::BinaryOp);
+    EXPECT_EQ(code->instructions()[3].operand, static_cast<std::uint32_t>(cxxpython::BinaryOp::Multiply));
+    EXPECT_EQ(code->instructions()[4].opcode, cxxpython::Opcode::BinaryOp);
+    EXPECT_EQ(code->instructions()[4].operand, static_cast<std::uint32_t>(cxxpython::BinaryOp::Subtract));
+    EXPECT_EQ(code->instructions()[5].opcode, cxxpython::Opcode::LoadConst);
+    EXPECT_EQ(code->instructions()[6].opcode, cxxpython::Opcode::BinaryOp);
+    EXPECT_EQ(code->instructions()[6].operand, static_cast<std::uint32_t>(cxxpython::BinaryOp::Add));
+    EXPECT_EQ(code->instructions()[7].opcode, cxxpython::Opcode::ReturnValue);
+
+    auto *result = dynamic_cast<cxxpython::IntObject *>(vm.execute(*code));
+    ASSERT_NE(result, nullptr);
+    EXPECT_EQ(result->value, 8);
+}
+
+TEST(Compile, CompilesUnaryOperators)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+
+    cxxpython::CodeObject *code = cxxpython::compile_eval_input(runtime, "-2 * +3 + ~1");
+    ASSERT_NE(code, nullptr);
+    ASSERT_EQ(code->instructions().size(), 9U);
+    EXPECT_EQ(code->instructions()[0].opcode, cxxpython::Opcode::LoadConst);
+    EXPECT_EQ(code->instructions()[1].opcode, cxxpython::Opcode::UnaryOp);
+    EXPECT_EQ(code->instructions()[1].operand, static_cast<std::uint32_t>(cxxpython::UnaryOp::Negative));
+    EXPECT_EQ(code->instructions()[2].opcode, cxxpython::Opcode::LoadConst);
+    EXPECT_EQ(code->instructions()[3].opcode, cxxpython::Opcode::UnaryOp);
+    EXPECT_EQ(code->instructions()[3].operand, static_cast<std::uint32_t>(cxxpython::UnaryOp::Positive));
+    EXPECT_EQ(code->instructions()[4].opcode, cxxpython::Opcode::BinaryOp);
+    EXPECT_EQ(code->instructions()[4].operand, static_cast<std::uint32_t>(cxxpython::BinaryOp::Multiply));
+    EXPECT_EQ(code->instructions()[5].opcode, cxxpython::Opcode::LoadConst);
+    EXPECT_EQ(code->instructions()[6].opcode, cxxpython::Opcode::UnaryOp);
+    EXPECT_EQ(code->instructions()[6].operand, static_cast<std::uint32_t>(cxxpython::UnaryOp::Invert));
+    EXPECT_EQ(code->instructions()[7].opcode, cxxpython::Opcode::BinaryOp);
+    EXPECT_EQ(code->instructions()[7].operand, static_cast<std::uint32_t>(cxxpython::BinaryOp::Add));
+    EXPECT_EQ(code->instructions()[8].opcode, cxxpython::Opcode::ReturnValue);
+
+    auto *result = dynamic_cast<cxxpython::IntObject *>(vm.execute(*code));
+    ASSERT_NE(result, nullptr);
+    EXPECT_EQ(result->value, -8);
 }
 
 TEST(Compile, CompilesStringLiteralAndAddition)
@@ -73,7 +128,8 @@ TEST(Compile, CompilesEqualityAndInequality)
     ASSERT_EQ(equal->instructions().size(), 6U);
     EXPECT_EQ(equal->instructions()[0].opcode, cxxpython::Opcode::LoadConst);
     EXPECT_EQ(equal->instructions()[1].opcode, cxxpython::Opcode::LoadConst);
-    EXPECT_EQ(equal->instructions()[2].opcode, cxxpython::Opcode::BinaryAdd);
+    EXPECT_EQ(equal->instructions()[2].opcode, cxxpython::Opcode::BinaryOp);
+    EXPECT_EQ(equal->instructions()[2].operand, static_cast<std::uint32_t>(cxxpython::BinaryOp::Add));
     EXPECT_EQ(equal->instructions()[3].opcode, cxxpython::Opcode::LoadConst);
     EXPECT_EQ(equal->instructions()[4].opcode, cxxpython::Opcode::CompareOp);
     EXPECT_EQ(equal->instructions()[4].operand, static_cast<std::uint32_t>(cxxpython::RichCompareOp::Equal));
@@ -273,7 +329,8 @@ TEST(Compile, CompilesAssignmentModuleAndStoresGlobals)
     EXPECT_EQ(name->value, "x");
     EXPECT_EQ(code->instructions()[0].opcode, cxxpython::Opcode::LoadConst);
     EXPECT_EQ(code->instructions()[1].opcode, cxxpython::Opcode::LoadConst);
-    EXPECT_EQ(code->instructions()[2].opcode, cxxpython::Opcode::BinaryAdd);
+    EXPECT_EQ(code->instructions()[2].opcode, cxxpython::Opcode::BinaryOp);
+    EXPECT_EQ(code->instructions()[2].operand, static_cast<std::uint32_t>(cxxpython::BinaryOp::Add));
     EXPECT_EQ(code->instructions()[3].opcode, cxxpython::Opcode::StoreName);
 
     EXPECT_EQ(vm.execute(*code, *globals), runtime.none());
@@ -307,7 +364,8 @@ TEST(Compile, ModuleExpressionStatementsAreDiscarded)
 
     cxxpython::CodeObject *code = cxxpython::compile_exec_input(runtime, "1 + 2\n");
     ASSERT_NE(code, nullptr);
-    EXPECT_EQ(code->instructions()[2].opcode, cxxpython::Opcode::BinaryAdd);
+    EXPECT_EQ(code->instructions()[2].opcode, cxxpython::Opcode::BinaryOp);
+    EXPECT_EQ(code->instructions()[2].operand, static_cast<std::uint32_t>(cxxpython::BinaryOp::Add));
     EXPECT_EQ(code->instructions()[3].opcode, cxxpython::Opcode::PopTop);
     EXPECT_EQ(vm.execute(*code), runtime.none());
 }

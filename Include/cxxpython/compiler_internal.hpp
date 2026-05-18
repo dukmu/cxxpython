@@ -15,7 +15,8 @@ namespace cxxpython::compiler_internal
 {
     struct IntegerExpr;
     struct StringExpr;
-    struct BinaryAddExpr;
+    struct UnaryExpr;
+    struct BinaryExpr;
     struct CompareExpr;
     struct NameExpr;
     struct AttributeExpr;
@@ -33,7 +34,8 @@ namespace cxxpython::compiler_internal
         virtual ~ExprVisitor() = default;
         virtual void visit(const IntegerExpr &expression) = 0;
         virtual void visit(const StringExpr &expression) = 0;
-        virtual void visit(const BinaryAddExpr &expression) = 0;
+        virtual void visit(const UnaryExpr &expression) = 0;
+        virtual void visit(const BinaryExpr &expression) = 0;
         virtual void visit(const CompareExpr &expression) = 0;
         virtual void visit(const NameExpr &expression) = 0;
         virtual void visit(const AttributeExpr &expression) = 0;
@@ -63,6 +65,9 @@ namespace cxxpython::compiler_internal
         String,
         Identifier,
         Plus,
+        Minus,
+        Star,
+        Tilde,
         LeftParen,
         RightParen,
         Comma,
@@ -128,15 +133,32 @@ namespace cxxpython::compiler_internal
         }
     };
 
-    struct BinaryAddExpr final : Expr
+    struct BinaryExpr final : Expr
     {
-        BinaryAddExpr(std::unique_ptr<Expr> left_in, std::unique_ptr<Expr> right_in)
-            : left(std::move(left_in)), right(std::move(right_in))
+        BinaryExpr(std::unique_ptr<Expr> left_in, BinaryOp op_in, std::unique_ptr<Expr> right_in)
+            : left(std::move(left_in)), op(op_in), right(std::move(right_in))
         {
         }
 
         std::unique_ptr<Expr> left;
+        BinaryOp op;
         std::unique_ptr<Expr> right;
+
+        void accept(ExprVisitor &visitor) const override
+        {
+            visitor.visit(*this);
+        }
+    };
+
+    struct UnaryExpr final : Expr
+    {
+        UnaryExpr(UnaryOp op_in, std::unique_ptr<Expr> operand_in)
+            : op(op_in), operand(std::move(operand_in))
+        {
+        }
+
+        UnaryOp op;
+        std::unique_ptr<Expr> operand;
 
         void accept(ExprVisitor &visitor) const override
         {

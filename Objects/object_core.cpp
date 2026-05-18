@@ -254,9 +254,20 @@ namespace cxxpython
         raise_type_error(left->runtime(), unsupported_binary_op_message(op, left, right));
     }
 
-    Object *object_binary_add(Object *left, Object *right)
+    Object *object_unary_op(Object *operand, UnaryOp op)
     {
-        return object_binary_op(left, right, BinaryOp::Add);
+        if (!operand)
+            raise_type_error(nullptr, unsupported_unary_op_message(op, nullptr));
+
+        if (operand->type() && operand->type()->slots.unary_op)
+        {
+            Object *result = operand->type()->slots.unary_op(*operand, op);
+            if (!result)
+                raise_type_error(operand->runtime(), "unary operator slot returned null");
+            return result;
+        }
+
+        raise_type_error(operand->runtime(), unsupported_unary_op_message(op, operand));
     }
 
     Object *object_call(Object *callable, const std::vector<Object *> &args)

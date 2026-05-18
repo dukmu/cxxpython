@@ -175,14 +175,44 @@ namespace cxxpython::compiler_internal
 
             std::unique_ptr<Expr> parse_sum()
             {
-                std::unique_ptr<Expr> left = parse_postfix();
-                while (peek().kind == TokenKind::Plus)
+                std::unique_ptr<Expr> left = parse_term();
+                while (peek().kind == TokenKind::Plus || peek().kind == TokenKind::Minus)
                 {
-                    advance();
-                    std::unique_ptr<Expr> right = parse_postfix();
-                    left = std::make_unique<BinaryAddExpr>(std::move(left), std::move(right));
+                    const TokenKind op_kind = advance().kind;
+                    std::unique_ptr<Expr> right = parse_term();
+                    const BinaryOp op = op_kind == TokenKind::Plus ? BinaryOp::Add : BinaryOp::Subtract;
+                    left = std::make_unique<BinaryExpr>(std::move(left), op, std::move(right));
                 }
                 return left;
+            }
+
+            std::unique_ptr<Expr> parse_term()
+            {
+                std::unique_ptr<Expr> left = parse_unary();
+                while (peek().kind == TokenKind::Star)
+                {
+                    advance();
+                    std::unique_ptr<Expr> right = parse_unary();
+                    left = std::make_unique<BinaryExpr>(std::move(left), BinaryOp::Multiply, std::move(right));
+                }
+                return left;
+            }
+
+            std::unique_ptr<Expr> parse_unary()
+            {
+                if (peek().kind == TokenKind::Plus ||
+                    peek().kind == TokenKind::Minus ||
+                    peek().kind == TokenKind::Tilde)
+                {
+                    const TokenKind op_kind = advance().kind;
+                    UnaryOp op = UnaryOp::Invert;
+                    if (op_kind == TokenKind::Plus)
+                        op = UnaryOp::Positive;
+                    else if (op_kind == TokenKind::Minus)
+                        op = UnaryOp::Negative;
+                    return std::make_unique<UnaryExpr>(op, parse_unary());
+                }
+                return parse_postfix();
             }
 
             std::unique_ptr<Expr> parse_postfix()
@@ -244,6 +274,9 @@ namespace cxxpython::compiler_internal
                 case TokenKind::End:
                 case TokenKind::Newline:
                 case TokenKind::Plus:
+                case TokenKind::Minus:
+                case TokenKind::Star:
+                case TokenKind::Tilde:
                 case TokenKind::LeftParen:
                 case TokenKind::RightParen:
                 case TokenKind::Comma:

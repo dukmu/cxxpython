@@ -13,6 +13,7 @@ TEST(CoreObjects, HeapTypesUseAndInheritSlots)
     custom_slots.equal = test_support::custom_equal;
     custom_slots.truth = test_support::custom_false;
     custom_slots.binary_op = test_support::custom_binary_op;
+    custom_slots.unary_op = test_support::custom_unary_op;
     custom_slots.length = test_support::custom_length;
     custom_slots.getitem = test_support::custom_getitem;
     custom_slots.setitem = test_support::custom_setitem;
@@ -38,6 +39,10 @@ TEST(CoreObjects, HeapTypesUseAndInheritSlots)
         cxxpython::object_binary_op(custom_a, custom_b, cxxpython::BinaryOp::Add));
     ASSERT_NE(custom_add, nullptr);
     EXPECT_EQ(custom_add->value, "custom-add");
+    auto *custom_negative = dynamic_cast<cxxpython::StrObject *>(
+        cxxpython::object_unary_op(custom_a, cxxpython::UnaryOp::Negative));
+    ASSERT_NE(custom_negative, nullptr);
+    EXPECT_EQ(custom_negative->value, "custom-negative");
     EXPECT_EQ(cxxpython::object_length(custom_a), 7U);
     EXPECT_EQ(cxxpython::object_get_item(custom_a, custom_b), custom_b);
     EXPECT_TRUE(cxxpython::object_contains(custom_a, custom_b));
@@ -57,6 +62,10 @@ TEST(CoreObjects, HeapTypesUseAndInheritSlots)
         cxxpython::object_binary_op(repr_only, repr_only_peer, cxxpython::BinaryOp::Subtract));
     ASSERT_NE(inherited_subtract, nullptr);
     EXPECT_EQ(inherited_subtract->value, "custom-subtract");
+    auto *inherited_invert = dynamic_cast<cxxpython::StrObject *>(
+        cxxpython::object_unary_op(repr_only, cxxpython::UnaryOp::Invert));
+    ASSERT_NE(inherited_invert, nullptr);
+    EXPECT_EQ(inherited_invert->value, "custom-invert");
     EXPECT_FALSE(cxxpython::is_true(repr_only));
     EXPECT_EQ(cxxpython::object_length(repr_only), 7U);
     EXPECT_EQ(cxxpython::object_get_item(repr_only, custom_a), custom_a);

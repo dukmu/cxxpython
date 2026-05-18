@@ -212,6 +212,30 @@ namespace cxxpython::compiler_internal
                 continue;
             }
 
+            if (ch == '-')
+            {
+                tokens.push_back(Token{TokenKind::Minus, "-", 0, line, column});
+                ++index;
+                ++column;
+                continue;
+            }
+
+            if (ch == '*')
+            {
+                tokens.push_back(Token{TokenKind::Star, "*", 0, line, column});
+                ++index;
+                ++column;
+                continue;
+            }
+
+            if (ch == '~')
+            {
+                tokens.push_back(Token{TokenKind::Tilde, "~", 0, line, column});
+                ++index;
+                ++column;
+                continue;
+            }
+
             if (ch == '(')
             {
                 tokens.push_back(Token{TokenKind::LeftParen, "(", 0, line, column});

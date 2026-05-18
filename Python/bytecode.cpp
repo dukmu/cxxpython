@@ -126,8 +126,8 @@ namespace cxxpython
             return "STORE_ATTR";
         case Opcode::PopTop:
             return "POP_TOP";
-        case Opcode::BinaryAdd:
-            return "BINARY_ADD";
+        case Opcode::UnaryOp:
+            return "UNARY_OP";
         case Opcode::BinaryOp:
             return "BINARY_OP";
         case Opcode::BinarySubscr:
@@ -159,6 +159,7 @@ namespace cxxpython
             return 1;
         case Opcode::LoadAttr:
         case Opcode::JumpAbsolute:
+        case Opcode::UnaryOp:
             return 0;
         case Opcode::StoreName:
         case Opcode::PopTop:
@@ -167,7 +168,6 @@ namespace cxxpython
             return -1;
         case Opcode::StoreAttr:
             return -2;
-        case Opcode::BinaryAdd:
         case Opcode::BinaryOp:
         case Opcode::BinarySubscr:
         case Opcode::CompareOp:

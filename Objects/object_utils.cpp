@@ -66,6 +66,31 @@ namespace cxxpython
         return message.str();
     }
 
+    const char *unary_op_symbol(UnaryOp op)
+    {
+        switch (op)
+        {
+        case UnaryOp::Positive:
+            return "+";
+        case UnaryOp::Negative:
+            return "-";
+        case UnaryOp::Invert:
+            return "~";
+        }
+        return "?";
+    }
+
+    std::string unsupported_unary_op_message(UnaryOp op, const Object *operand)
+    {
+        std::ostringstream message;
+        message << "bad operand type for unary "
+                << unary_op_symbol(op)
+                << ": '"
+                << type_qualified_name(operand ? operand->type() : nullptr)
+                << "'";
+        return message.str();
+    }
+
     std::string pointer_hex(const void *ptr)
     {
         std::ostringstream out;

@@ -50,6 +50,13 @@ namespace cxxpython
         Power,
     };
 
+    enum class UnaryOp : std::uint8_t
+    {
+        Positive,
+        Negative,
+        Invert,
+    };
+
     using ReprSlot = std::string (*)(const Object &);
     using HashSlot = std::int64_t (*)(const Object &);
     using EqualSlot = bool (*)(const Object &, const Object &);
@@ -57,6 +64,7 @@ namespace cxxpython
     using TruthSlot = bool (*)(const Object &);
     using TraverseSlot = void (*)(const Object &, const VisitChildren &);
     using BinaryOpSlot = Object *(*)(const Object &, const Object &, BinaryOp);
+    using UnaryOpSlot = Object *(*)(const Object &, UnaryOp);
     using CallSlot = Object *(*)(Object &, const std::vector<Object *> &);
     using LengthSlot = std::size_t (*)(const Object &);
     using GetItemSlot = Object *(*)(Object &, Object *);
@@ -76,6 +84,7 @@ namespace cxxpython
         BinaryOpSlot binary_op = nullptr;
         BinaryOpSlot reflected_binary_op = nullptr;
         BinaryOpSlot inplace_binary_op = nullptr;
+        UnaryOpSlot unary_op = nullptr;
         CallSlot call = nullptr;
         LengthSlot length = nullptr;
         GetItemSlot getitem = nullptr;
@@ -349,7 +358,7 @@ namespace cxxpython
     bool object_equal(const Object *left, const Object *right);
     Object *object_rich_compare(Object *left, Object *right, RichCompareOp op);
     Object *object_binary_op(Object *left, Object *right, BinaryOp op);
-    Object *object_binary_add(Object *left, Object *right);
+    Object *object_unary_op(Object *operand, UnaryOp op);
     Object *object_call(Object *callable, const std::vector<Object *> &args);
     std::size_t object_length(Object *object);
     Object *object_get_item(Object *object, Object *key);

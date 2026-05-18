@@ -56,6 +56,11 @@ namespace cxxpython
             raise_type_error(left.runtime(), unsupported_binary_op_message(op, &left, &right));
         }
 
+        [[noreturn]] void raise_unsupported_unary_op(const Object &operand, UnaryOp op)
+        {
+            raise_type_error(operand.runtime(), unsupported_unary_op_message(op, &operand));
+        }
+
         Object *int_binary_op(const Object &left, const Object &right, BinaryOp op)
         {
             auto *right_int = dynamic_cast<const IntObject *>(&right);
@@ -77,6 +82,21 @@ namespace cxxpython
                 break;
             }
             raise_unsupported_binary_op(left, right, op);
+        }
+
+        Object *int_unary_op(const Object &operand, UnaryOp op)
+        {
+            auto *value = static_cast<const IntObject *>(&operand);
+            switch (op)
+            {
+            case UnaryOp::Positive:
+                return operand.runtime()->new_int(value->value);
+            case UnaryOp::Negative:
+                return operand.runtime()->new_int(-value->value);
+            case UnaryOp::Invert:
+                return operand.runtime()->new_int(~value->value);
+            }
+            raise_unsupported_unary_op(operand, op);
         }
 
         std::string bool_repr(const Object &object)
@@ -155,6 +175,7 @@ namespace cxxpython
             .truth = int_truth,
             .traverse = default_traverse,
             .binary_op = int_binary_op,
+            .unary_op = int_unary_op,
         };
     }
 
@@ -167,6 +188,7 @@ namespace cxxpython
             .truth = int_truth,
             .traverse = default_traverse,
             .binary_op = int_binary_op,
+            .unary_op = int_unary_op,
         };
     }
 

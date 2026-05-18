@@ -20,6 +20,13 @@ namespace cxxpython
             return static_cast<BinaryOp>(operand);
         }
 
+        UnaryOp decode_unary_op(std::uint32_t operand)
+        {
+            if (operand > static_cast<std::uint32_t>(UnaryOp::Invert))
+                throw BytecodeError("UNARY_OP operand out of range");
+            return static_cast<UnaryOp>(operand);
+        }
+
         std::string frame_repr(const Object &object)
         {
             auto *frame = static_cast<const Frame *>(&object);
@@ -314,11 +321,11 @@ namespace cxxpython
             case Opcode::PopTop:
                 (void)frame->pop();
                 break;
-            case Opcode::BinaryAdd:
+            case Opcode::UnaryOp:
             {
-                Object *right = frame->pop();
-                Object *left = frame->pop();
-                frame->push(object_binary_op(left, right, BinaryOp::Add));
+                const UnaryOp op = decode_unary_op(instruction.operand);
+                Object *operand = frame->pop();
+                frame->push(object_unary_op(operand, op));
                 break;
             }
             case Opcode::BinaryOp:

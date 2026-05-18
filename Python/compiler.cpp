@@ -53,7 +53,12 @@ namespace cxxpython
                 (void)expression;
             }
 
-            void visit(const compiler_internal::BinaryAddExpr &expression) override
+            void visit(const compiler_internal::UnaryExpr &expression) override
+            {
+                expression.operand->accept(*this);
+            }
+
+            void visit(const compiler_internal::BinaryExpr &expression) override
             {
                 expression.left->accept(*this);
                 expression.right->accept(*this);
@@ -174,11 +179,23 @@ namespace cxxpython
                 emit_constant(runtime_.new_str(expression.value));
             }
 
-            void visit(const compiler_internal::BinaryAddExpr &expression) override
+            void visit(const compiler_internal::UnaryExpr &expression) override
+            {
+                expression.operand->accept(*this);
+                instructions_.push_back(Instruction{
+                    Opcode::UnaryOp,
+                    static_cast<std::uint32_t>(expression.op),
+                });
+            }
+
+            void visit(const compiler_internal::BinaryExpr &expression) override
             {
                 expression.left->accept(*this);
                 expression.right->accept(*this);
-                instructions_.push_back(Instruction{Opcode::BinaryAdd, 0});
+                instructions_.push_back(Instruction{
+                    Opcode::BinaryOp,
+                    static_cast<std::uint32_t>(expression.op),
+                });
             }
 
             void visit(const compiler_internal::CompareExpr &expression) override

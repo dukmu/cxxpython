@@ -124,6 +124,8 @@ namespace cxxpython
             inherited.reflected_binary_op = slots.reflected_binary_op;
         if (slots.inplace_binary_op)
             inherited.inplace_binary_op = slots.inplace_binary_op;
+        if (slots.unary_op)
+            inherited.unary_op = slots.unary_op;
         if (slots.call)
             inherited.call = slots.call;
         if (slots.length)

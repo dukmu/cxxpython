@@ -45,6 +45,37 @@ TEST(CoreObjects, BinaryOperatorProtocolDispatchesBuiltinTypes)
     EXPECT_EQ(text->value, "python");
 }
 
+TEST(CoreObjects, UnaryOperatorProtocolDispatchesBuiltinTypes)
+{
+    cxxpython::Runtime runtime;
+
+    auto *positive = dynamic_cast<cxxpython::IntObject *>(
+        cxxpython::object_unary_op(runtime.new_int(4), cxxpython::UnaryOp::Positive));
+    ASSERT_NE(positive, nullptr);
+    EXPECT_EQ(positive->value, 4);
+
+    auto *negative = dynamic_cast<cxxpython::IntObject *>(
+        cxxpython::object_unary_op(runtime.new_int(4), cxxpython::UnaryOp::Negative));
+    ASSERT_NE(negative, nullptr);
+    EXPECT_EQ(negative->value, -4);
+
+    auto *inverted = dynamic_cast<cxxpython::IntObject *>(
+        cxxpython::object_unary_op(runtime.new_int(1), cxxpython::UnaryOp::Invert));
+    ASSERT_NE(inverted, nullptr);
+    EXPECT_EQ(inverted->value, -2);
+
+    try
+    {
+        (void)cxxpython::object_unary_op(runtime.new_str("x"), cxxpython::UnaryOp::Negative);
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "bad operand type for unary -: 'str'");
+    }
+}
+
 TEST(CoreObjects, ListSemantics)
 {
     cxxpython::Runtime runtime;

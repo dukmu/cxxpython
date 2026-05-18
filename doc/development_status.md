@@ -1,5 +1,86 @@
 # Development Status
 
+## 2026-05-18 Operator Protocol Migration And Unary Operators
+
+Pre-change review:
+
+- The public object API still exposed `object_binary_add(...)`, and bytecode
+  still exposed `Opcode::BinaryAdd`/`BINARY_ADD`. Keeping those compatibility
+  paths would preserve the exact ad hoc surface the operator-family work was
+  meant to remove.
+- Parser/compiler still had `BinaryAddExpr`, so source syntax was structurally
+  add-only even after VM gained `BINARY_OP`.
+- Unary operators had no protocol at all. Deferring them would likely recreate
+  the same one-off path for `-x` that `binary_add` created for `x + y`.
+- Current integer storage is still fixed-width `int64_t`; this is not Python
+  integer semantics. Operator work must keep this visible as high-priority
+  debt rather than normalizing it as the final numeric model.
+
+Debt addressed:
+
+- Removed old binary-add interfaces from active code:
+  - `object_binary_add(...)`
+  - `Opcode::BinaryAdd`
+  - `BINARY_ADD`
+  - `BinaryAddExpr`
+- Parser/compiler now use `BinaryExpr` carrying `BinaryOp`.
+- Lexer/parser/compiler now support `+`, `-`, and `*` with precedence-aware
+  `sum -> term -> unary -> postfix` parsing.
+- Added a unary operator family:
+  - `UnaryOp`
+  - `TypeSlots::unary_op`
+  - `object_unary_op(...)`
+  - `UNARY_OP` bytecode
+  - `UnaryExpr`
+- Heap type slot inheritance now carries `unary_op`.
+- Builtin `int`/`bool` support unary positive, negative, and invert through the
+  shared slot. Unsupported unary operations use centralized Python-style error
+  formatting.
+
+Completed:
+
+- Added tests proving:
+  - no active source files under `Include/`, `Objects/`, `Python/`, `Parser/`,
+    or `Tests/` reference the old binary-add names
+  - binary and unary object protocols dispatch on builtin types
+  - heap types define and inherit binary and unary slots
+  - `BINARY_OP` and `UNARY_OP` metadata, stack effects, operand validation, and
+    VM execution work
+  - compiler emits `BINARY_OP` for add/subtract/multiply and `UNARY_OP` for
+    positive/negative/invert
+  - Python golden scripts cover arithmetic precedence and unary operators
+
+Design notes:
+
+- Historical status entries below still mention `binary_add`/`BINARY_ADD`
+  because they describe earlier repository states. The active code and current
+  architecture no longer expose those names.
+- `BinaryOp::TrueDivide`, `FloorDivide`, `Modulo`, and `Power` are protocol
+  values but are not parser-visible yet. They should land with their numeric
+  semantics and tests, not as syntax-only tokens.
+- The fixed-width integer representation is now the largest numeric semantic
+  debt: Python-visible integer arithmetic must move toward arbitrary precision
+  before division/modulo/power work becomes broad.
+
+Next:
+
+- Design arbitrary-precision `int` storage and overflow-free numeric helpers
+  before expanding arithmetic further.
+- Add `NotImplemented`, reflected dispatch priority, and in-place binary
+  fallback rules as one coherent operator protocol slice.
+- Add ordering comparisons only after the richer `NotImplemented` dispatch path
+  exists.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects '--gtest_filter=CoreObjects.BinaryOperatorProtocolDispatchesBuiltinTypes:CoreObjects.UnaryOperatorProtocolDispatchesBuiltinTypes:CoreObjects.HeapTypesUseAndInheritSlots:Bytecode.MetadataNamesAndStackEffects:Bytecode.ExecutesIntegerBinaryOpAdd:Bytecode.ExecutesStringBinaryOpAdd:Bytecode.ExecutesGenericUnaryOp:Bytecode.ExecutesGenericBinaryOp:Bytecode.RaisesPythonTypeErrorForUnsupportedBinaryOp:Bytecode.DispatchesBinaryOpThroughTypeSlots:Bytecode.RejectsMalformedBytecode:Compile.CompilesLeftAssociativeAddition:Compile.CompilesBinaryOperatorPrecedence:Compile.CompilesUnaryOperators:Compile.CompilesEqualityAndInequality:Compile.CompilesAssignmentModuleAndStoresGlobals:Compile.ModuleExpressionStatementsAreDiscarded:PythonScripts.RunsGoldenFiles'`
+- `ctest --test-dir build --output-on-failure`
+- `git diff --check`
+- `if rg -n "BinaryAdd|BINARY_ADD|binary_add|object_binary_add|BinarySlot" Include Objects Python Parser Tests -S; then exit 1; else echo "no active binary-add remnants"; fi`
+
+Result: all tests pass; active code has no binary-add remnants.
+
 ## 2026-05-18 VM Generic Binary Operator
 
 Pre-change review:

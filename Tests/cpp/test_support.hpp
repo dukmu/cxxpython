@@ -48,6 +48,16 @@ namespace test_support
         cxxpython::raise_type_error(left.runtime(), "custom binary operator does not support this operation");
     }
 
+    inline cxxpython::Object *custom_unary_op(const cxxpython::Object &operand,
+                                              cxxpython::UnaryOp op)
+    {
+        if (op == cxxpython::UnaryOp::Negative)
+            return operand.runtime()->new_str("custom-negative");
+        if (op == cxxpython::UnaryOp::Invert)
+            return operand.runtime()->new_str("custom-invert");
+        cxxpython::raise_type_error(operand.runtime(), "custom unary operator does not support this operation");
+    }
+
     inline bool custom_false(const cxxpython::Object &object)
     {
         (void)object;

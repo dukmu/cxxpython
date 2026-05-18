@@ -13,7 +13,7 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::LoadAttr), "LOAD_ATTR");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::StoreAttr), "STORE_ATTR");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::PopTop), "POP_TOP");
-    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::BinaryAdd), "BINARY_ADD");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::UnaryOp), "UNARY_OP");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::BinaryOp), "BINARY_OP");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::BinarySubscr), "BINARY_SUBSCR");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::StoreSubscr), "STORE_SUBSCR");
@@ -30,7 +30,7 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::LoadAttr, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::StoreAttr, 0}), -2);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::PopTop, 0}), -1);
-    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BinaryAdd, 0}), -1);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::UnaryOp, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BinaryOp, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BinarySubscr, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::StoreSubscr, 0}), -3);
@@ -208,14 +208,15 @@ TEST(Bytecode, ExecutesLoadConstAndReturn)
     EXPECT_EQ(&vm.interpreter_state().runtime(), &runtime);
 }
 
-TEST(Bytecode, ExecutesIntegerBinaryAdd)
+TEST(Bytecode, ExecutesIntegerBinaryOpAdd)
 {
     cxxpython::Runtime runtime;
     cxxpython::VirtualMachine vm(runtime);
     cxxpython::CodeObject *code = runtime.new_code({runtime.new_int(2), runtime.new_int(3)},
                                                    {{cxxpython::Opcode::LoadConst, 0},
                                                     {cxxpython::Opcode::LoadConst, 1},
-                                                    {cxxpython::Opcode::BinaryAdd, 0},
+                                                    {cxxpython::Opcode::BinaryOp,
+                                                     static_cast<std::uint32_t>(cxxpython::BinaryOp::Add)},
                                                     {cxxpython::Opcode::ReturnValue, 0}});
 
     auto *result = dynamic_cast<cxxpython::IntObject *>(vm.execute(*code));
@@ -223,19 +224,45 @@ TEST(Bytecode, ExecutesIntegerBinaryAdd)
     EXPECT_EQ(result->value, 5);
 }
 
-TEST(Bytecode, ExecutesStringBinaryAdd)
+TEST(Bytecode, ExecutesStringBinaryOpAdd)
 {
     cxxpython::Runtime runtime;
     cxxpython::VirtualMachine vm(runtime);
     cxxpython::CodeObject *code = runtime.new_code({runtime.new_str("py"), runtime.new_str("thon")},
                                                    {{cxxpython::Opcode::LoadConst, 0},
                                                     {cxxpython::Opcode::LoadConst, 1},
-                                                    {cxxpython::Opcode::BinaryAdd, 0},
+                                                    {cxxpython::Opcode::BinaryOp,
+                                                     static_cast<std::uint32_t>(cxxpython::BinaryOp::Add)},
                                                     {cxxpython::Opcode::ReturnValue, 0}});
 
     auto *result = dynamic_cast<cxxpython::StrObject *>(vm.execute(*code));
     ASSERT_NE(result, nullptr);
     EXPECT_EQ(result->value, "python");
+}
+
+TEST(Bytecode, ExecutesGenericUnaryOp)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::CodeObject *negative = runtime.new_code(
+        {runtime.new_int(5)},
+        {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::UnaryOp, static_cast<std::uint32_t>(cxxpython::UnaryOp::Negative)},
+         {cxxpython::Opcode::ReturnValue, 0}});
+
+    auto *negative_result = dynamic_cast<cxxpython::IntObject *>(vm.execute(*negative));
+    ASSERT_NE(negative_result, nullptr);
+    EXPECT_EQ(negative_result->value, -5);
+
+    cxxpython::CodeObject *invert = runtime.new_code(
+        {runtime.new_int(1)},
+        {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::UnaryOp, static_cast<std::uint32_t>(cxxpython::UnaryOp::Invert)},
+         {cxxpython::Opcode::ReturnValue, 0}});
+
+    auto *invert_result = dynamic_cast<cxxpython::IntObject *>(vm.execute(*invert));
+    ASSERT_NE(invert_result, nullptr);
+    EXPECT_EQ(invert_result->value, -2);
 }
 
 TEST(Bytecode, ExecutesGenericBinaryOp)
@@ -265,14 +292,15 @@ TEST(Bytecode, ExecutesGenericBinaryOp)
     EXPECT_EQ(product->value, 42);
 }
 
-TEST(Bytecode, RaisesPythonTypeErrorForUnsupportedBinaryAdd)
+TEST(Bytecode, RaisesPythonTypeErrorForUnsupportedBinaryOp)
 {
     cxxpython::Runtime runtime;
     cxxpython::VirtualMachine vm(runtime);
     cxxpython::CodeObject *code = runtime.new_code({runtime.new_int(1), runtime.new_str("x")},
                                                    {{cxxpython::Opcode::LoadConst, 0},
                                                     {cxxpython::Opcode::LoadConst, 1},
-                                                    {cxxpython::Opcode::BinaryAdd, 0},
+                                                    {cxxpython::Opcode::BinaryOp,
+                                                     static_cast<std::uint32_t>(cxxpython::BinaryOp::Add)},
                                                     {cxxpython::Opcode::ReturnValue, 0}});
 
     try
@@ -287,7 +315,7 @@ TEST(Bytecode, RaisesPythonTypeErrorForUnsupportedBinaryAdd)
     }
 }
 
-TEST(Bytecode, DispatchesBinaryAddThroughTypeSlots)
+TEST(Bytecode, DispatchesBinaryOpThroughTypeSlots)
 {
     cxxpython::Runtime runtime;
     cxxpython::VirtualMachine vm(runtime);
@@ -330,7 +358,8 @@ TEST(Bytecode, DispatchesBinaryAddThroughTypeSlots)
     cxxpython::CodeObject *code = runtime.new_code({left, runtime.new_int(3)},
                                                    {{cxxpython::Opcode::LoadConst, 0},
                                                     {cxxpython::Opcode::LoadConst, 1},
-                                                    {cxxpython::Opcode::BinaryAdd, 0},
+                                                    {cxxpython::Opcode::BinaryOp,
+                                                     static_cast<std::uint32_t>(cxxpython::BinaryOp::Add)},
                                                     {cxxpython::Opcode::ReturnValue, 0}});
 
     auto *result = dynamic_cast<cxxpython::IntObject *>(vm.execute(*code));
@@ -550,6 +579,14 @@ TEST(Bytecode, RejectsMalformedBytecode)
 
     EXPECT_THROW((void)cxxpython::stack_effect({static_cast<cxxpython::Opcode>(255), 0}),
                  cxxpython::BytecodeError);
+
+    EXPECT_THROW((void)vm.execute(*runtime.new_code(
+                     {runtime.new_int(1)},
+                     {{cxxpython::Opcode::LoadConst, 0},
+                      {cxxpython::Opcode::UnaryOp, 255},
+                      {cxxpython::Opcode::ReturnValue, 0}})),
+                 cxxpython::BytecodeError);
+    EXPECT_EQ(vm.thread_state().frame_depth(), 0U);
 
     EXPECT_THROW((void)vm.execute(*runtime.new_code(
                      {runtime.new_int(1), runtime.new_int(1)},
