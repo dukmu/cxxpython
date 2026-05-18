@@ -53,6 +53,52 @@ Verification:
 
 Result: all tests pass.
 
+## 2026-05-18 Eval Compiler Bootstrap Slice
+
+Completed:
+
+- Added a first real source-to-bytecode path:
+  - `compile_eval_input(Runtime&, std::string_view)`
+  - `Parser/lexer.cpp`
+  - `Parser/parser.cpp`
+  - `Python/compiler.cpp`
+- Added a minimal expression grammar:
+  - integer literals
+  - single-quoted string literals with basic escapes
+  - left-associative `+`
+- Added AST nodes for integer, string, and binary-add expressions.
+- Added bytecode emission to runtime-owned `CodeObject` values.
+- Added runtime-owned `SyntaxError` to the exception hierarchy.
+- Added compiler tests proving:
+  - integer literal compilation and execution
+  - left-associative addition compilation and execution
+  - string literal addition compilation and execution
+  - malformed input raises Python `SyntaxError`
+  - unexpected trailing tokens raise Python `SyntaxError`
+
+Design notes:
+
+- This is the first self-bootstrap-oriented vertical slice:
+  source -> lexer -> parser/AST -> compiler -> code object -> VM.
+- The public compiler API is intentionally named `compile_eval_input` because
+  it currently accepts expression input only. Full module/script compilation
+  should get a separate API when statement and module scopes exist.
+- The lexer now validates integer literals once and stores the parsed value in
+  tokens, so parser/compiler do not duplicate literal parsing.
+- `SyntaxError` currently stores only message args. The next parser hardening
+  pass should add source location fields and tests before grammar expansion
+  becomes large.
+- There is still no symbol table because this slice has no names or scopes.
+  The first name/load/store feature must add a symbol-table phase instead of
+  compiling names directly from AST to bytecode.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all tests pass.
+
 ## 2026-05-18 Code/Frame Objectization And Slot-Driven Binary Add
 
 Completed:

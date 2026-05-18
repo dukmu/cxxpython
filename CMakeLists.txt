@@ -9,7 +9,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_library(cxxpython_core
+    Parser/lexer.cpp
+    Parser/parser.cpp
     Python/bytecode.cpp
+    Python/compiler.cpp
     Python/vm.cpp
     Objects/runtime_bootstrap.cpp
     Objects/runtime_accessors.cpp
@@ -54,6 +57,7 @@ add_executable(test_core_objects
     Tests/cpp/test_mapping.cpp
     Tests/cpp/test_heap_types.cpp
     Tests/cpp/test_bytecode.cpp
+    Tests/cpp/test_compile.cpp
 )
 target_link_libraries(test_core_objects PRIVATE cxxpython_core GTest::gtest_main)
 target_compile_options(test_core_objects PRIVATE

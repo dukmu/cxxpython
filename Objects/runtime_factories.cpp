@@ -87,4 +87,9 @@ namespace cxxpython
     {
         return new_exception(index_error_type_, std::move(message));
     }
+
+    ExceptionObject *Runtime::new_syntax_error(std::string message)
+    {
+        return new_exception(syntax_error_type_, std::move(message));
+    }
 }

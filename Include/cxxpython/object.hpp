@@ -213,4 +213,5 @@ namespace cxxpython
 
     [[noreturn]] void raise_type_error(Runtime *runtime, std::string message);
     [[noreturn]] void raise_index_error(Runtime *runtime, std::string message);
+    [[noreturn]] void raise_syntax_error(Runtime *runtime, std::string message);
 }

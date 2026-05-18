@@ -37,6 +37,7 @@ namespace cxxpython
         TypeObject *exception_type() const noexcept;
         TypeObject *type_error_type() const noexcept;
         TypeObject *index_error_type() const noexcept;
+        TypeObject *syntax_error_type() const noexcept;
 
         NoneObject *none() const noexcept;
         BoolObject *true_value() const noexcept;
@@ -54,6 +55,7 @@ namespace cxxpython
         ExceptionObject *new_exception(TypeObject *type, std::vector<Object *> args);
         ExceptionObject *new_type_error(std::string message);
         ExceptionObject *new_index_error(std::string message);
+        ExceptionObject *new_syntax_error(std::string message);
 
         void add_root(Object *object);
         void remove_root(Object *object);
@@ -96,6 +98,7 @@ namespace cxxpython
         TypeObject *exception_type_ = nullptr;
         TypeObject *type_error_type_ = nullptr;
         TypeObject *index_error_type_ = nullptr;
+        TypeObject *syntax_error_type_ = nullptr;
 
         NoneObject *none_ = nullptr;
         BoolObject *true_ = nullptr;
