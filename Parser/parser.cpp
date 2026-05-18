@@ -30,10 +30,16 @@ namespace cxxpython::compiler_internal
                 skip_newlines();
                 while (peek().kind != TokenKind::End)
                 {
-                    module.statements.push_back(parse_statement());
+                    ParsedStatement parsed = parse_statement();
+                    const bool compound = parsed.compound;
+                    module.statements.push_back(std::move(parsed.statement));
                     if (peek().kind == TokenKind::Newline)
                     {
                         skip_newlines();
+                    }
+                    else if (compound)
+                    {
+                        continue;
                     }
                     else if (peek().kind != TokenKind::End)
                     {
@@ -44,8 +50,17 @@ namespace cxxpython::compiler_internal
             }
 
         private:
-            std::unique_ptr<Stmt> parse_statement()
+            struct ParsedStatement
             {
+                std::unique_ptr<Stmt> statement;
+                bool compound;
+            };
+
+            ParsedStatement parse_statement()
+            {
+                if (peek().kind == TokenKind::If)
+                    return parse_if_statement();
+
                 std::unique_ptr<Expr> target_or_expression = parse_expression_only();
                 if (peek().kind == TokenKind::Equal)
                 {
@@ -53,9 +68,67 @@ namespace cxxpython::compiler_internal
                     std::unique_ptr<Expr> value = parse_expression_only();
                     std::unique_ptr<AssignTarget> target =
                         make_assignment_target(std::move(target_or_expression), equals);
-                    return std::make_unique<AssignStmt>(std::move(target), std::move(value));
+                    return ParsedStatement{
+                        std::make_unique<AssignStmt>(std::move(target), std::move(value)),
+                        false,
+                    };
                 }
-                return std::make_unique<ExprStmt>(std::move(target_or_expression));
+                return ParsedStatement{
+                    std::make_unique<ExprStmt>(std::move(target_or_expression)),
+                    false,
+                };
+            }
+
+            ParsedStatement parse_if_statement()
+            {
+                advance();
+                std::unique_ptr<Expr> condition = parse_expression_only();
+                consume(TokenKind::Colon, "expected ':' after if condition");
+                consume(TokenKind::Newline, "expected newline after if condition");
+                std::vector<std::unique_ptr<Stmt>> then_body = parse_block();
+                std::vector<std::unique_ptr<Stmt>> else_body;
+
+                if (peek().kind == TokenKind::Else)
+                {
+                    advance();
+                    consume(TokenKind::Colon, "expected ':' after else");
+                    consume(TokenKind::Newline, "expected newline after else");
+                    else_body = parse_block();
+                }
+
+                return ParsedStatement{
+                    std::make_unique<IfStmt>(
+                        std::move(condition),
+                        std::move(then_body),
+                        std::move(else_body)),
+                    true,
+                };
+            }
+
+            std::vector<std::unique_ptr<Stmt>> parse_block()
+            {
+                if (peek().kind != TokenKind::Indent)
+                    raise_at(peek(), "expected indented block");
+                advance();
+
+                std::vector<std::unique_ptr<Stmt>> body;
+                skip_newlines();
+                while (peek().kind != TokenKind::Dedent && peek().kind != TokenKind::End)
+                {
+                    ParsedStatement parsed = parse_statement();
+                    const bool compound = parsed.compound;
+                    body.push_back(std::move(parsed.statement));
+                    if (peek().kind == TokenKind::Newline)
+                        skip_newlines();
+                    else if (compound)
+                        continue;
+                    else if (peek().kind != TokenKind::Dedent && peek().kind != TokenKind::End)
+                        raise_at(peek(), "expected newline after statement");
+                }
+                consume(TokenKind::Dedent, "expected dedent after block");
+                if (body.empty())
+                    raise_at(previous(), "expected indented block");
+                return body;
             }
 
             std::unique_ptr<AssignTarget> make_assignment_target(std::unique_ptr<Expr> expression,
@@ -177,9 +250,14 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Dot:
                 case TokenKind::LeftBracket:
                 case TokenKind::RightBracket:
+                case TokenKind::Colon:
                 case TokenKind::Equal:
                 case TokenKind::EqualEqual:
                 case TokenKind::BangEqual:
+                case TokenKind::If:
+                case TokenKind::Else:
+                case TokenKind::Indent:
+                case TokenKind::Dedent:
                     raise_at(token, "expected expression");
                 }
                 raise_at(token, "expected expression");

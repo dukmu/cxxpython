@@ -30,7 +30,7 @@
 | 特性 | 目标 |
 | --- | --- |
 | lexer/parser/AST | P0 |
-| 表达式、语句、控制流 | P0 |
+| 表达式、语句、控制流 (`if` 部分可用) | P0 |
 | 函数和类定义 | P0 |
 | comprehensions | P1 |
 | f-string | P1 |

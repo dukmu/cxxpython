@@ -117,6 +117,15 @@ namespace cxxpython
                 statement.value->accept(*this);
             }
 
+            void visit(const compiler_internal::IfStmt &statement) override
+            {
+                statement.condition->accept(*this);
+                for (const auto &item : statement.then_body)
+                    item->accept(*this);
+                for (const auto &item : statement.else_body)
+                    item->accept(*this);
+            }
+
         private:
             SymbolTable &symbols_;
         };
@@ -256,6 +265,26 @@ namespace cxxpython
                 statement.target->accept(*this);
             }
 
+            void visit(const compiler_internal::IfStmt &statement) override
+            {
+                statement.condition->accept(*this);
+                const std::size_t false_jump = emit_jump(Opcode::PopJumpIfFalse);
+                for (const auto &item : statement.then_body)
+                    item->accept(*this);
+
+                if (statement.else_body.empty())
+                {
+                    patch_jump(false_jump, instructions_.size());
+                    return;
+                }
+
+                const std::size_t end_jump = emit_jump(Opcode::JumpAbsolute);
+                patch_jump(false_jump, instructions_.size());
+                for (const auto &item : statement.else_body)
+                    item->accept(*this);
+                patch_jump(end_jump, instructions_.size());
+            }
+
         private:
             class PendingAssignmentValue final
             {
@@ -293,6 +322,17 @@ namespace cxxpython
                     Opcode::LoadConst,
                     static_cast<std::uint32_t>(constants_.size() - 1),
                 });
+            }
+
+            std::size_t emit_jump(Opcode opcode)
+            {
+                instructions_.push_back(Instruction{opcode, 0});
+                return instructions_.size() - 1;
+            }
+
+            void patch_jump(std::size_t instruction_index, std::size_t target)
+            {
+                instructions_[instruction_index].operand = static_cast<std::uint32_t>(target);
             }
 
             std::size_t name_index(const std::string &name) const

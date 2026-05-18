@@ -86,6 +86,59 @@ TEST(Compile, CompilesEqualityAndInequality)
     EXPECT_EQ(vm.execute(*not_equal), runtime.true_value());
 }
 
+TEST(Compile, CompilesIfElseStatements)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(
+        runtime,
+        "if 1 == 1:\n"
+        "    result = 'yes'\n"
+        "else:\n"
+        "    result = 'no'\n",
+        "script.py");
+    ASSERT_NE(code, nullptr);
+
+    bool saw_conditional_jump = false;
+    bool saw_absolute_jump = false;
+    for (const cxxpython::Instruction &instruction : code->instructions())
+    {
+        if (instruction.opcode == cxxpython::Opcode::PopJumpIfFalse)
+            saw_conditional_jump = true;
+        if (instruction.opcode == cxxpython::Opcode::JumpAbsolute)
+            saw_absolute_jump = true;
+    }
+    EXPECT_TRUE(saw_conditional_jump);
+    EXPECT_TRUE(saw_absolute_jump);
+
+    EXPECT_EQ(vm.execute(*code, *globals), runtime.none());
+    auto *result = dynamic_cast<cxxpython::StrObject *>(globals->get(runtime.new_str("result")));
+    ASSERT_NE(result, nullptr);
+    EXPECT_EQ(result->value, "yes");
+}
+
+TEST(Compile, CompilesIfWithoutElse)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(
+        runtime,
+        "x = 'initial'\n"
+        "if 0:\n"
+        "    x = 'changed'\n",
+        "script.py");
+    ASSERT_NE(code, nullptr);
+
+    EXPECT_EQ(vm.execute(*code, *globals), runtime.none());
+    auto *x = dynamic_cast<cxxpython::StrObject *>(globals->get(runtime.new_str("x")));
+    ASSERT_NE(x, nullptr);
+    EXPECT_EQ(x->value, "initial");
+}
+
 TEST(Compile, RejectsChainedComparisonsUntilJumpSemanticsExist)
 {
     cxxpython::Runtime runtime;
@@ -99,6 +152,22 @@ TEST(Compile, RejectsChainedComparisonsUntilJumpSemanticsExist)
     {
         EXPECT_EQ(error.type_name(), "SyntaxError");
         EXPECT_STREQ(error.what(), "broken.py:1:8: chained comparisons are not implemented");
+    }
+}
+
+TEST(Compile, RaisesSyntaxErrorForInvalidIfBlock)
+{
+    cxxpython::Runtime runtime;
+
+    try
+    {
+        (void)cxxpython::compile_exec_input(runtime, "if 1:\nresult = 'bad'\n", "broken.py");
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type_name(), "SyntaxError");
+        EXPECT_STREQ(error.what(), "broken.py:2:1: expected indented block");
     }
 }
 

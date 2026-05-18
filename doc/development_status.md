@@ -1,5 +1,68 @@
 # Development Status
 
+## 2026-05-18 Parser And Compiler `if`
+
+Pre-change review:
+
+- Jump bytecodes existed, but script-level control flow still had no parser or
+  compiler path. Keeping control-flow tests only at bytecode level would miss
+  tokenizer, block parsing, symbol collection, and CLI integration bugs.
+- Python block syntax needs explicit indentation tokens. Treating leading
+  whitespace as ordinary skipped trivia would make nested compound statements
+  impossible to model cleanly.
+- Parser state around compound statements must be explicit. A hidden
+  "previous statement was compound" flag would be fragile once `while`,
+  function definitions, and class definitions arrive.
+
+Debt addressed:
+
+- Added lexer tokens:
+  - `If`
+  - `Else`
+  - `Colon`
+  - `Indent`
+  - `Dedent`
+- Added minimal indentation stack handling with dedent validation.
+- Added `IfStmt` AST node with condition, then body, and else body.
+- Parser now handles block suites using `INDENT`/`DEDENT`.
+- Parser statement parsing returns an explicit compound-statement marker so
+  surrounding block/file parsing does not rely on hidden state.
+- Compiler lowers `if`/`else` through `POP_JUMP_IF_FALSE` and
+  `JUMP_ABSOLUTE`.
+
+Completed:
+
+- Added tests proving:
+  - `if`/`else` compiles to jump opcodes and executes the true branch
+  - `if` without `else` skips the body when the condition is false
+  - missing indentation after `if` raises `SyntaxError`
+  - Python golden script `if_else.py` runs through the real CLI path
+
+Design notes:
+
+- The first syntax slice intentionally supports statement blocks only, not
+  single-line suites such as `if x: y = 1`.
+- `if` lowering consumes the condition through `POP_JUMP_IF_FALSE`; all truth
+  semantics remain in VM/object protocol.
+- This block parser is the base for `while`, function definitions, and class
+  definitions. Future compound statements should reuse `parse_block`.
+
+Next:
+
+- Add `while` using backward `JUMP_ABSOLUTE`.
+- Then begin the CPython-style operator infrastructure work requested by the
+  user: first C++ slot/API layer, then VM opcodes, then parser/compiler syntax.
+- Continue adding Python golden scripts for user-visible control-flow behavior.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects '--gtest_filter=Compile.CompilesIfElseStatements:Compile.CompilesIfWithoutElse:Compile.RaisesSyntaxErrorForInvalidIfBlock:PythonScripts.RunsGoldenFiles'`
+- `ctest --test-dir build --output-on-failure`
+- `git diff --check`
+
+Result: all tests pass.
+
 ## 2026-05-18 Jump Bytecode And Truth Control
 
 Pre-change review:

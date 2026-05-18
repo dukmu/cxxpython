@@ -26,6 +26,7 @@ namespace cxxpython::compiler_internal
     struct SubscriptTarget;
     struct ExprStmt;
     struct AssignStmt;
+    struct IfStmt;
 
     struct ExprVisitor
     {
@@ -53,6 +54,7 @@ namespace cxxpython::compiler_internal
         virtual ~StmtVisitor() = default;
         virtual void visit(const ExprStmt &statement) = 0;
         virtual void visit(const AssignStmt &statement) = 0;
+        virtual void visit(const IfStmt &statement) = 0;
     };
 
     enum class TokenKind
@@ -67,9 +69,14 @@ namespace cxxpython::compiler_internal
         Dot,
         LeftBracket,
         RightBracket,
+        Colon,
         Equal,
         EqualEqual,
         BangEqual,
+        If,
+        Else,
+        Indent,
+        Dedent,
         Newline,
         End,
     };
@@ -304,6 +311,27 @@ namespace cxxpython::compiler_internal
 
         std::unique_ptr<AssignTarget> target;
         std::unique_ptr<Expr> value;
+
+        void accept(StmtVisitor &visitor) const override
+        {
+            visitor.visit(*this);
+        }
+    };
+
+    struct IfStmt final : Stmt
+    {
+        IfStmt(std::unique_ptr<Expr> condition_in,
+               std::vector<std::unique_ptr<Stmt>> then_body_in,
+               std::vector<std::unique_ptr<Stmt>> else_body_in)
+            : condition(std::move(condition_in)),
+              then_body(std::move(then_body_in)),
+              else_body(std::move(else_body_in))
+        {
+        }
+
+        std::unique_ptr<Expr> condition;
+        std::vector<std::unique_ptr<Stmt>> then_body;
+        std::vector<std::unique_ptr<Stmt>> else_body;
 
         void accept(StmtVisitor &visitor) const override
         {

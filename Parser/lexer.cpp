@@ -39,11 +39,52 @@ namespace cxxpython::compiler_internal
     std::vector<Token> lex_source(Runtime &runtime, std::string_view source, std::string filename)
     {
         std::vector<Token> tokens;
+        std::vector<std::size_t> indent_stack{0};
         std::size_t index = 0;
         std::size_t line = 1;
         std::size_t column = 1;
+        bool at_line_start = true;
         while (index < source.size())
         {
+            if (at_line_start)
+            {
+                const std::size_t indent_line = line;
+                std::size_t indent_column = column;
+                std::size_t indentation = 0;
+                while (index < source.size() && (source[index] == ' ' || source[index] == '\t'))
+                {
+                    if (source[index] == '\t')
+                        indentation += 8 - (indentation % 8);
+                    else
+                        ++indentation;
+                    ++index;
+                    ++column;
+                }
+
+                if (index >= source.size())
+                    break;
+                if (source[index] != '\n' && source[index] != '\r')
+                {
+                    const std::size_t current = indent_stack.back();
+                    if (indentation > current)
+                    {
+                        indent_stack.push_back(indentation);
+                        tokens.push_back(Token{TokenKind::Indent, "", 0, indent_line, indent_column});
+                    }
+                    else if (indentation < current)
+                    {
+                        while (indent_stack.size() > 1 && indentation < indent_stack.back())
+                        {
+                            indent_stack.pop_back();
+                            tokens.push_back(Token{TokenKind::Dedent, "", 0, indent_line, indent_column});
+                        }
+                        if (indentation != indent_stack.back())
+                            raise_at(runtime, filename, indent_line, indent_column, "unindent does not match any outer indentation level");
+                    }
+                    at_line_start = false;
+                }
+            }
+
             const char ch = source[index];
             if (is_inline_space(ch))
             {
@@ -58,6 +99,7 @@ namespace cxxpython::compiler_internal
                 ++index;
                 ++line;
                 column = 1;
+                at_line_start = true;
                 continue;
             }
 
@@ -69,6 +111,7 @@ namespace cxxpython::compiler_internal
                 ++index;
                 ++line;
                 column = 1;
+                at_line_start = true;
                 continue;
             }
 
@@ -98,7 +141,13 @@ namespace cxxpython::compiler_internal
                     ++index;
                     ++column;
                 }
-                tokens.push_back(Token{TokenKind::Identifier, std::string(source.substr(start, index - start)), 0, line, start_column});
+                const std::string lexeme(source.substr(start, index - start));
+                TokenKind kind = TokenKind::Identifier;
+                if (lexeme == "if")
+                    kind = TokenKind::If;
+                else if (lexeme == "else")
+                    kind = TokenKind::Else;
+                tokens.push_back(Token{kind, lexeme, 0, line, start_column});
                 continue;
             }
 
@@ -211,6 +260,14 @@ namespace cxxpython::compiler_internal
                 continue;
             }
 
+            if (ch == ':')
+            {
+                tokens.push_back(Token{TokenKind::Colon, ":", 0, line, column});
+                ++index;
+                ++column;
+                continue;
+            }
+
             if (ch == '=')
             {
                 if (index + 1 < source.size() && source[index + 1] == '=')
@@ -239,6 +296,11 @@ namespace cxxpython::compiler_internal
             raise_at(runtime, filename, line, column, "unexpected character");
         }
 
+        while (indent_stack.size() > 1)
+        {
+            indent_stack.pop_back();
+            tokens.push_back(Token{TokenKind::Dedent, "", 0, line, column});
+        }
         tokens.push_back(Token{TokenKind::End, "", 0, line, column});
         return tokens;
     }

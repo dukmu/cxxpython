@@ -144,6 +144,9 @@ doc/            design docs and milestone plans
   assignment 都应扩展这条 target 层，而不是绕回 parser 分支。
 - Symbol table 和 bytecode builder 都通过 `TargetVisitor` 处理赋值目标。目标
   子表达式、目标名称和值表达式的收集/发射顺序必须由这条 visitor 明确表达。
+- Compound statements such as `if` own nested statement vectors in AST. Parser
+  block handling must use explicit `INDENT`/`DEDENT` tokens and return whether a
+  statement is compound instead of relying on hidden parser state.
 - Store bytecode 的栈契约要保持集中记录并由测试锁住。当前 `STORE_ATTR`
   使用 object + value；`STORE_SUBSCR` 使用 object + key + value。未来若对齐
   CPython 调整求值顺序，必须同时更新 compiler、VM、stack effect 和测试。
