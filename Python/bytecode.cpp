@@ -159,6 +159,10 @@ namespace cxxpython
             return "BINARY_SUBSCR";
         case Opcode::StoreSubscr:
             return "STORE_SUBSCR";
+        case Opcode::BuildTuple:
+            return "BUILD_TUPLE";
+        case Opcode::BuildMap:
+            return "BUILD_MAP";
         case Opcode::CompareOp:
             return "COMPARE_OP";
         case Opcode::JumpAbsolute:
@@ -212,6 +216,10 @@ namespace cxxpython
             return -1;
         case Opcode::StoreSubscr:
             return -3;
+        case Opcode::BuildTuple:
+            return 1 - static_cast<int>(instruction.operand);
+        case Opcode::BuildMap:
+            return 1 - 2 * static_cast<int>(instruction.operand);
         case Opcode::Call:
             return -static_cast<int>(instruction.operand);
         case Opcode::ReturnValue:

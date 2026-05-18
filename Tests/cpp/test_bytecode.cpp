@@ -20,6 +20,8 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::BinaryOp), "BINARY_OP");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::BinarySubscr), "BINARY_SUBSCR");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::StoreSubscr), "STORE_SUBSCR");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::BuildTuple), "BUILD_TUPLE");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::BuildMap), "BUILD_MAP");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::CompareOp), "COMPARE_OP");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::JumpAbsolute), "JUMP_ABSOLUTE");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::PopJumpIfFalse), "POP_JUMP_IF_FALSE");
@@ -43,6 +45,10 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BinaryOp, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BinarySubscr, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::StoreSubscr, 0}), -3);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BuildTuple, 0}), 1);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BuildTuple, 3}), -2);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BuildMap, 0}), 1);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BuildMap, 2}), -3);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::CompareOp, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::JumpAbsolute, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::PopJumpIfFalse, 0}), -1);
@@ -270,6 +276,41 @@ TEST(Bytecode, TypeCallClassCreationUsesActiveFrameModule)
     auto *module = dynamic_cast<cxxpython::StrObject *>(cxxpython::object_get_attr(type, "__module__"));
     ASSERT_NE(module, nullptr);
     EXPECT_EQ(module->value, "__main__");
+}
+
+TEST(Bytecode, DispatchesBuildCollectionLiterals)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+
+    auto *tuple = dynamic_cast<cxxpython::TupleObject *>(vm.execute(*runtime.new_code(
+        {runtime.new_int(1), runtime.new_str("x"), runtime.true_value()},
+        {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::LoadConst, 1},
+         {cxxpython::Opcode::LoadConst, 2},
+         {cxxpython::Opcode::BuildTuple, 3},
+         {cxxpython::Opcode::ReturnValue, 0}})));
+    ASSERT_NE(tuple, nullptr);
+    ASSERT_EQ(tuple->size(), 3U);
+    EXPECT_EQ(static_cast<cxxpython::IntObject *>(tuple->items()[0])->value, 1);
+    EXPECT_EQ(static_cast<cxxpython::StrObject *>(tuple->items()[1])->value, "x");
+    EXPECT_EQ(tuple->items()[2], runtime.true_value());
+
+    auto *dict = dynamic_cast<cxxpython::DictObject *>(vm.execute(*runtime.new_code(
+        {runtime.new_str("left"),
+         runtime.new_int(1),
+         runtime.new_str("right"),
+         runtime.new_int(2)},
+        {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::LoadConst, 1},
+         {cxxpython::Opcode::LoadConst, 2},
+         {cxxpython::Opcode::LoadConst, 3},
+         {cxxpython::Opcode::BuildMap, 2},
+         {cxxpython::Opcode::ReturnValue, 0}})));
+    ASSERT_NE(dict, nullptr);
+    EXPECT_EQ(dict->size(), 2U);
+    EXPECT_EQ(static_cast<cxxpython::IntObject *>(dict->get(runtime.new_str("left")))->value, 1);
+    EXPECT_EQ(static_cast<cxxpython::IntObject *>(dict->get(runtime.new_str("right")))->value, 2);
 }
 
 TEST(Bytecode, DispatchesSubscriptOpcodesThroughObjectProtocol)

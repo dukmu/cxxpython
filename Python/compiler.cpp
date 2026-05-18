@@ -88,6 +88,21 @@ namespace cxxpython
                 expression.key->accept(*this);
             }
 
+            void visit(const compiler_internal::TupleExpr &expression) override
+            {
+                for (const auto &item : expression.items)
+                    item->accept(*this);
+            }
+
+            void visit(const compiler_internal::DictExpr &expression) override
+            {
+                for (const compiler_internal::DictItem &item : expression.items)
+                {
+                    item.key->accept(*this);
+                    item.value->accept(*this);
+                }
+            }
+
             void visit(const compiler_internal::CallExpr &expression) override
             {
                 expression.callee->accept(*this);
@@ -299,6 +314,29 @@ namespace cxxpython
                 expression.object->accept(*this);
                 expression.key->accept(*this);
                 instructions_.push_back(Instruction{Opcode::BinarySubscr, 0});
+            }
+
+            void visit(const compiler_internal::TupleExpr &expression) override
+            {
+                for (const auto &item : expression.items)
+                    item->accept(*this);
+                instructions_.push_back(Instruction{
+                    Opcode::BuildTuple,
+                    static_cast<std::uint32_t>(expression.items.size()),
+                });
+            }
+
+            void visit(const compiler_internal::DictExpr &expression) override
+            {
+                for (const compiler_internal::DictItem &item : expression.items)
+                {
+                    item.key->accept(*this);
+                    item.value->accept(*this);
+                }
+                instructions_.push_back(Instruction{
+                    Opcode::BuildMap,
+                    static_cast<std::uint32_t>(expression.items.size()),
+                });
             }
 
             void visit(const compiler_internal::CallExpr &expression) override

@@ -169,6 +169,10 @@ doc/            design docs and milestone plans
   `BINARY_SUBSCR`。Subscript assignment 使用同一个语法节点转换出的
   `SubscriptTarget`，编译为 target object、key expression、value expression、
   `STORE_SUBSCR`。
+- Tuple and dict literals are normal expression AST nodes, not prebuilt
+  constants. The compiler lowers them to `BUILD_TUPLE` and `BUILD_MAP` after
+  emitting element/key/value expressions in source order, preserving dynamic
+  evaluation semantics and dict insertion order.
 
 ## 模块系统路线
 

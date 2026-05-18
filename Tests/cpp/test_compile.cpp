@@ -575,6 +575,61 @@ TEST(Compile, CompilesDictSubscriptThroughObjectProtocol)
     EXPECT_EQ(result->value, 42);
 }
 
+TEST(Compile, CompilesTupleAndDictLiterals)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+    globals->set(runtime.new_str("True"), runtime.true_value());
+
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(
+        runtime,
+        "t = (1, 'x', True)\n"
+        "single = ('only',)\n"
+        "empty = ()\n"
+        "d = {'key': 'value', 'n': 2}\n"
+        "result = d['key']\n",
+        "script.py");
+    ASSERT_NE(code, nullptr);
+
+    bool saw_build_tuple = false;
+    bool saw_build_map = false;
+    for (const cxxpython::Instruction &instruction : code->instructions())
+    {
+        if (instruction.opcode == cxxpython::Opcode::BuildTuple)
+            saw_build_tuple = true;
+        if (instruction.opcode == cxxpython::Opcode::BuildMap)
+            saw_build_map = true;
+    }
+    EXPECT_TRUE(saw_build_tuple);
+    EXPECT_TRUE(saw_build_map);
+
+    EXPECT_EQ(vm.execute(*code, *globals), runtime.none());
+
+    auto *tuple = dynamic_cast<cxxpython::TupleObject *>(globals->get(runtime.new_str("t")));
+    ASSERT_NE(tuple, nullptr);
+    ASSERT_EQ(tuple->size(), 3U);
+    EXPECT_EQ(static_cast<cxxpython::IntObject *>(tuple->items()[0])->value, 1);
+    EXPECT_EQ(static_cast<cxxpython::StrObject *>(tuple->items()[1])->value, "x");
+    EXPECT_EQ(tuple->items()[2], runtime.true_value());
+
+    auto *single = dynamic_cast<cxxpython::TupleObject *>(globals->get(runtime.new_str("single")));
+    ASSERT_NE(single, nullptr);
+    ASSERT_EQ(single->size(), 1U);
+    EXPECT_EQ(static_cast<cxxpython::StrObject *>(single->items()[0])->value, "only");
+
+    auto *empty = dynamic_cast<cxxpython::TupleObject *>(globals->get(runtime.new_str("empty")));
+    ASSERT_NE(empty, nullptr);
+    EXPECT_EQ(empty->size(), 0U);
+
+    auto *dict = dynamic_cast<cxxpython::DictObject *>(globals->get(runtime.new_str("d")));
+    ASSERT_NE(dict, nullptr);
+    EXPECT_EQ(dict->size(), 2U);
+    EXPECT_EQ(static_cast<cxxpython::StrObject *>(dict->get(runtime.new_str("key")))->value, "value");
+    EXPECT_EQ(static_cast<cxxpython::IntObject *>(dict->get(runtime.new_str("n")))->value, 2);
+    EXPECT_EQ(static_cast<cxxpython::StrObject *>(globals->get(runtime.new_str("result")))->value, "value");
+}
+
 TEST(Compile, CompilesFunctionDefinitionsAndReturns)
 {
     cxxpython::Runtime runtime;

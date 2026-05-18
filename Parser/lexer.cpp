@@ -290,6 +290,22 @@ namespace cxxpython::compiler_internal
                 continue;
             }
 
+            if (ch == '{')
+            {
+                tokens.push_back(Token{TokenKind::LeftBrace, "{", 0, line, column});
+                ++index;
+                ++column;
+                continue;
+            }
+
+            if (ch == '}')
+            {
+                tokens.push_back(Token{TokenKind::RightBrace, "}", 0, line, column});
+                ++index;
+                ++column;
+                continue;
+            }
+
             if (ch == ':')
             {
                 tokens.push_back(Token{TokenKind::Colon, ":", 0, line, column});

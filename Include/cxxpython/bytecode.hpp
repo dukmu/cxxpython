@@ -25,6 +25,8 @@ namespace cxxpython
         BinaryOp,
         BinarySubscr,
         StoreSubscr,
+        BuildTuple,
+        BuildMap,
         CompareOp,
         JumpAbsolute,
         PopJumpIfFalse,

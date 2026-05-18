@@ -21,6 +21,8 @@ namespace cxxpython::compiler_internal
     struct NameExpr;
     struct AttributeExpr;
     struct SubscriptExpr;
+    struct TupleExpr;
+    struct DictExpr;
     struct CallExpr;
     struct NameTarget;
     struct AttributeTarget;
@@ -43,6 +45,8 @@ namespace cxxpython::compiler_internal
         virtual void visit(const NameExpr &expression) = 0;
         virtual void visit(const AttributeExpr &expression) = 0;
         virtual void visit(const SubscriptExpr &expression) = 0;
+        virtual void visit(const TupleExpr &expression) = 0;
+        virtual void visit(const DictExpr &expression) = 0;
         virtual void visit(const CallExpr &expression) = 0;
     };
 
@@ -80,6 +84,8 @@ namespace cxxpython::compiler_internal
         Dot,
         LeftBracket,
         RightBracket,
+        LeftBrace,
+        RightBrace,
         Colon,
         Equal,
         EqualEqual,
@@ -262,6 +268,47 @@ namespace cxxpython::compiler_internal
 
         std::unique_ptr<Expr> object;
         std::unique_ptr<Expr> key;
+
+        void accept(ExprVisitor &visitor) const override
+        {
+            visitor.visit(*this);
+        }
+    };
+
+    struct TupleExpr final : Expr
+    {
+        explicit TupleExpr(std::vector<std::unique_ptr<Expr>> items_in)
+            : items(std::move(items_in))
+        {
+        }
+
+        std::vector<std::unique_ptr<Expr>> items;
+
+        void accept(ExprVisitor &visitor) const override
+        {
+            visitor.visit(*this);
+        }
+    };
+
+    struct DictItem final
+    {
+        DictItem(std::unique_ptr<Expr> key_in, std::unique_ptr<Expr> value_in)
+            : key(std::move(key_in)), value(std::move(value_in))
+        {
+        }
+
+        std::unique_ptr<Expr> key;
+        std::unique_ptr<Expr> value;
+    };
+
+    struct DictExpr final : Expr
+    {
+        explicit DictExpr(std::vector<DictItem> items_in)
+            : items(std::move(items_in))
+        {
+        }
+
+        std::vector<DictItem> items;
 
         void accept(ExprVisitor &visitor) const override
         {

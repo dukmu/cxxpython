@@ -407,6 +407,29 @@ namespace cxxpython
                 object_set_item(object, key, value);
                 break;
             }
+            case Opcode::BuildTuple:
+            {
+                std::vector<Object *> items(instruction.operand);
+                for (std::size_t index = items.size(); index > 0; --index)
+                    items[index - 1] = frame->pop();
+                frame->push(runtime_.new_tuple(std::move(items)));
+                break;
+            }
+            case Opcode::BuildMap:
+            {
+                std::vector<Object *> keys(instruction.operand);
+                std::vector<Object *> values(instruction.operand);
+                for (std::size_t index = keys.size(); index > 0; --index)
+                {
+                    values[index - 1] = frame->pop();
+                    keys[index - 1] = frame->pop();
+                }
+                DictObject *dict = runtime_.new_dict();
+                for (std::size_t index = 0; index < keys.size(); ++index)
+                    dict->set(keys[index], values[index]);
+                frame->push(dict);
+                break;
+            }
             case Opcode::CompareOp:
             {
                 if (instruction.operand > static_cast<std::uint32_t>(RichCompareOp::GreaterEqual))

@@ -357,6 +357,61 @@ namespace cxxpython::compiler_internal
                 return expression;
             }
 
+            std::unique_ptr<Expr> parse_parenthesized_expression()
+            {
+                advance();
+                if (peek().kind == TokenKind::RightParen)
+                {
+                    advance();
+                    return std::make_unique<TupleExpr>(std::vector<std::unique_ptr<Expr>>{});
+                }
+
+                std::unique_ptr<Expr> first = parse_expression_only();
+                if (peek().kind != TokenKind::Comma)
+                {
+                    consume(TokenKind::RightParen, "expected ')' after expression");
+                    return first;
+                }
+
+                std::vector<std::unique_ptr<Expr>> items;
+                items.push_back(std::move(first));
+                while (peek().kind == TokenKind::Comma)
+                {
+                    advance();
+                    if (peek().kind == TokenKind::RightParen)
+                        break;
+                    items.push_back(parse_expression_only());
+                }
+                consume(TokenKind::RightParen, "expected ')' after tuple literal");
+                return std::make_unique<TupleExpr>(std::move(items));
+            }
+
+            std::unique_ptr<Expr> parse_dict_expression()
+            {
+                advance();
+                std::vector<DictItem> items;
+                if (peek().kind == TokenKind::RightBrace)
+                {
+                    advance();
+                    return std::make_unique<DictExpr>(std::move(items));
+                }
+
+                while (true)
+                {
+                    std::unique_ptr<Expr> key = parse_expression_only();
+                    consume(TokenKind::Colon, "expected ':' after dict key");
+                    std::unique_ptr<Expr> value = parse_expression_only();
+                    items.emplace_back(std::move(key), std::move(value));
+                    if (peek().kind != TokenKind::Comma)
+                        break;
+                    advance();
+                    if (peek().kind == TokenKind::RightBrace)
+                        break;
+                }
+                consume(TokenKind::RightBrace, "expected '}' after dict literal");
+                return std::make_unique<DictExpr>(std::move(items));
+            }
+
             std::unique_ptr<Expr> parse_primary()
             {
                 const Token &token = peek();
@@ -368,18 +423,22 @@ namespace cxxpython::compiler_internal
                     return std::make_unique<StringExpr>(advance().lexeme);
                 case TokenKind::Identifier:
                     return std::make_unique<NameExpr>(advance().lexeme);
+                case TokenKind::LeftParen:
+                    return parse_parenthesized_expression();
+                case TokenKind::LeftBrace:
+                    return parse_dict_expression();
                 case TokenKind::End:
                 case TokenKind::Newline:
                 case TokenKind::Plus:
                 case TokenKind::Minus:
                 case TokenKind::Star:
                 case TokenKind::Tilde:
-                case TokenKind::LeftParen:
                 case TokenKind::RightParen:
                 case TokenKind::Comma:
                 case TokenKind::Dot:
                 case TokenKind::LeftBracket:
                 case TokenKind::RightBracket:
+                case TokenKind::RightBrace:
                 case TokenKind::Colon:
                 case TokenKind::Equal:
                 case TokenKind::EqualEqual:
@@ -467,6 +526,8 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Dot:
                 case TokenKind::LeftBracket:
                 case TokenKind::RightBracket:
+                case TokenKind::LeftBrace:
+                case TokenKind::RightBrace:
                 case TokenKind::Colon:
                 case TokenKind::Equal:
                 case TokenKind::If:

@@ -1,5 +1,65 @@
 # Development Status
 
+## 2026-05-18 Tuple/Dict Literals For Type Construction Scripts
+
+Pre-change review:
+
+- Three-argument `type(...)` was covered at object and bytecode levels, but
+  script tests could not express `(Base,)` or `{'name': value}` naturally.
+- Building tuple/dict literals as precomputed constants would have hidden
+  expression evaluation order and blocked dynamic keys/values.
+- Literal support needed to be a normal parser -> AST -> bytecode -> VM path.
+
+Debt addressed:
+
+- Added tuple literal AST and parsing for `()`, `(expr,)`, and
+  `(expr, expr, ...)`, while preserving parenthesized grouping for `(expr)`.
+- Added dict literal AST and parsing for `{}`, `{key: value}`, trailing comma,
+  and multiple entries.
+- Added `BUILD_TUPLE` and `BUILD_MAP` opcode metadata, stack effects, VM
+  execution, and compiler lowering.
+- Added Python golden coverage for direct `type('Made', (Base,), {...})` class
+  construction through the CLI script path.
+
+Completed:
+
+- Added bytecode tests for collection literal build opcodes.
+- Added compiler tests for empty/single/multiple tuple literals and dict
+  literals with subscript reads.
+- Added `Tests/python/type_dynamic.py` covering direct runtime class creation,
+  inherited attributes, `__bases__`, `__module__`, and instance construction.
+
+Design notes:
+
+- `BUILD_MAP` evaluates and pushes key/value expressions in source order, then
+  inserts them into the runtime dict in the same order.
+- Parenthesized grouping remains distinct from tuple syntax: only an empty
+  pair or a comma creates a tuple.
+
+Known debt and next risk:
+
+- `list` and set literals are still absent.
+- `True`, `False`, and `None` are not yet keyword/literal AST nodes, so the
+  compiler still treats them as names where encountered.
+- Class base-list syntax still needs parser/compiler integration with the
+  bases-aware class creation runtime.
+
+Next:
+
+- Add `class A(Base):` and `class A(B, C):` syntax, compiling evaluated base
+  expressions into the same class creation path.
+- Then keywordize `True`/`False`/`None` as literal tokens and reject assignment
+  targets that try to bind them.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects '--gtest_filter=Bytecode.MetadataNamesAndStackEffects:Bytecode.DispatchesBuildCollectionLiterals:Compile.CompilesTupleAndDictLiterals:PythonScripts.RunsGoldenFiles'`
+- `ctest --test-dir build --output-on-failure`
+- `git diff --check`
+
+Result: all tests pass.
+
 ## 2026-05-18 Three-Argument Type Construction And C3 Seed
 
 Pre-change review:
@@ -53,10 +113,9 @@ Known debt and next risk:
 
 Next:
 
-- Add tuple and dict literal syntax plus `BUILD_TUPLE`/`BUILD_MAP` or equivalent
-  bytecode so Python golden tests can cover `type('A', (object,), {...})`.
-- Then add base-list parsing for `class A(Base):` and route it through the same
+- Add base-list parsing for `class A(Base):` and route it through the same
   bases-aware class creation API.
+- Add literal keyword handling for `True`/`False`/`None`.
 
 Verification:
 
