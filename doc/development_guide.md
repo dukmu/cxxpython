@@ -65,9 +65,16 @@
 ```text
 Tests/cpp/          C++ unit tests for object and VM internals
 Tests/bytecode/     direct bytecode behavior tests
-Tests/scripts/      Python-level behavior tests
+Tests/python/       Python-level golden behavior tests
 Tests/compat/       CPython comparison snippets
 Tests/extensions/   C/C++ extension ABI tests
 ```
 
 推荐先建立 golden behavior snippets：同一段 Python 在 CPython 和 cxxpython 上比较 stdout、exception type、repr、MRO、dict behavior。
+
+`Tests/python/` 规则：
+
+- 每个测试用例是一个 `.py` 文件。
+- 必须提供同名 `.py.out`，内容是 CLI 合并 stdout/stderr 后的精确输出。
+- 期望退出码默认为 `0`；非零退出码用同名 `.py.exit` 指定。
+- 新增脚本测试时优先覆盖用户可见语义，不在 C++ test 中重复手写同一段脚本包装。

@@ -1,5 +1,67 @@
 # Development Status
 
+## 2026-05-18 Python Golden Script Tests
+
+Pre-change review:
+
+- CLI execution was already available, but script-level behavior still mostly
+  lived in C++ tests that hand-built source strings. Continuing that pattern
+  would make parser/compiler/runtime integration tests noisy and expensive to
+  extend.
+- `test_cli.cpp` carried local process-spawning helpers. Adding a second
+  script test runner by copying those helpers would create low-value test
+  infrastructure duplication.
+- The current language subset is small, so the first Python script suite needs
+  a minimal golden format that works before assertions, comparisons, and
+  control flow exist in the language itself.
+
+Debt addressed:
+
+- Added `Tests/python/` as the Python-level golden behavior test directory.
+- Added `Tests/cpp/test_python_scripts.cpp`, a single runner that discovers
+  all `.py` files in `Tests/python/`.
+- Added sidecar golden files:
+  - `.py.out` for expected combined stdout/stderr
+  - optional `.py.exit` for expected non-zero exit codes
+- Extracted CLI process helpers into `Tests/cpp/test_process.hpp` and reused
+  them from both CLI tests and the Python script runner.
+- Updated the development guide to document `Tests/python/` conventions.
+
+Completed:
+
+- Added initial Python golden tests covering:
+  - assignment, integer addition, string addition, and `print`
+  - `__name__` initialization for file execution
+  - Python `TypeError` reporting through the CLI for `len(1)`
+
+Design notes:
+
+- Script tests intentionally run through the real `cxxpython file.py` path.
+  They validate parser, compiler, module setup, VM execution, builtin lookup,
+  and CLI error formatting together.
+- Expected output is externalized in golden files so future behavior cases can
+  be added without writing one C++ wrapper per feature.
+- This is not a replacement for focused C++ tests. Internals such as slot
+  inheritance, GC traversal, opcode stack effects, and exact object layout
+  should remain C++ tests.
+
+Next:
+
+- Add Python golden cases whenever a feature becomes script-expressible.
+- Add CPython comparison tooling once enough syntax exists to share snippets
+  between CPython and cxxpython.
+- Continue compiler/VM technical debt review before adding comparison and
+  control-flow opcodes.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects '--gtest_filter=PythonScripts.RunsGoldenFiles:Cli.*'`
+- `ctest --test-dir build --output-on-failure`
+- `git diff --check`
+
+Result: all tests pass.
+
 ## 2026-05-18 Builtin `len`
 
 Pre-change review:

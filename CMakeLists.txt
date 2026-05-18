@@ -66,10 +66,12 @@ add_executable(test_core_objects
     Tests/cpp/test_bytecode.cpp
     Tests/cpp/test_compile.cpp
     Tests/cpp/test_cli.cpp
+    Tests/cpp/test_python_scripts.cpp
 )
 target_link_libraries(test_core_objects PRIVATE cxxpython_core GTest::gtest_main)
 target_compile_definitions(test_core_objects PRIVATE
     CXXPYTHON_PROGRAM_PATH=\"$<TARGET_FILE:cxxpython>\"
+    CXXPYTHON_PYTHON_TEST_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/Tests/python\"
 )
 target_compile_options(test_core_objects PRIVATE
     -Wall
