@@ -162,15 +162,14 @@ namespace cxxpython::compiler_internal
                 if (!is_comparison(peek().kind))
                     return left;
 
-                const Token &op_token = advance();
-                std::unique_ptr<Expr> right = parse_sum();
-                if (is_comparison(peek().kind))
-                    raise_at(peek(), "chained comparisons are not implemented");
+                std::vector<Comparison> comparisons;
+                while (is_comparison(peek().kind))
+                {
+                    const Token &op_token = advance();
+                    comparisons.emplace_back(rich_compare_op_for(op_token), parse_sum());
+                }
 
-                return std::make_unique<CompareExpr>(
-                    std::move(left),
-                    rich_compare_op_for(op_token),
-                    std::move(right));
+                return std::make_unique<CompareExpr>(std::move(left), std::move(comparisons));
             }
 
             std::unique_ptr<Expr> parse_sum()

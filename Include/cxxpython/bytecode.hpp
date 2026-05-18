@@ -18,6 +18,9 @@ namespace cxxpython
         LoadAttr,
         StoreAttr,
         PopTop,
+        DupTop,
+        RotTwo,
+        RotThree,
         UnaryOp,
         BinaryOp,
         BinarySubscr,
@@ -26,6 +29,7 @@ namespace cxxpython
         JumpAbsolute,
         PopJumpIfFalse,
         PopJumpIfTrue,
+        JumpIfFalseOrPop,
         Call,
         ReturnValue,
     };

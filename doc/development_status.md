@@ -1,5 +1,71 @@
 # Development Status
 
+## 2026-05-18 Chained Comparison Lowering
+
+Pre-change review:
+
+- Parser accepted only one comparison segment and rejected `1 < 2 < 3`.
+- Correct Python semantics require short-circuiting and evaluating the middle
+  operand exactly once; compiling a chain as `(1 < 2) < 3` or as two independent
+  comparisons would be wrong.
+- VM lacked stack shuffling and a conditional jump that preserves the false
+  comparison result for cleanup.
+
+Debt addressed:
+
+- `CompareExpr` now stores a left operand plus a vector of comparison segments.
+- Parser accepts chained comparison operators and still reports malformed chains
+  such as `1 < < 3` as syntax errors at the broken operand.
+- Added structural stack/control opcodes:
+  - `DUP_TOP`
+  - `ROT_TWO`
+  - `ROT_THREE`
+  - `JUMP_IF_FALSE_OR_POP`
+- Compiler lowers comparison chains with CPython-style stack preservation:
+  middle operands are duplicated for the next comparison, false comparison
+  results jump to a cleanup block, and true intermediate results are popped.
+
+Completed:
+
+- Added bytecode metadata, stack-effect, VM dispatch, malformed bytecode, and
+  compiler tests for chained comparison lowering.
+- Python golden scripts now cover true and false chains, including a false first
+  comparison that must not evaluate the later missing name.
+- Updated architecture notes for comparison chains and Python class-system
+  planning.
+
+Design notes:
+
+- `JUMP_IF_FALSE_OR_POP` has path-dependent runtime stack effect. The current
+  metadata function returns the true-path effect `-1`; any future static stack
+  verifier must model conditional effects explicitly instead of relying on this
+  scalar helper.
+- The new stack opcodes are VM structure only. Comparison truth, rich-compare
+  dispatch, and errors still flow through `object_rich_compare` and `is_true`.
+- Class-system work should proceed through function/bound-method descriptors,
+  `type.__call__`, class-body execution namespaces, C3 MRO, and metaclass
+  selection rather than ad hoc parser or VM shortcuts.
+
+Next:
+
+- Begin Python class-system foundation with TDD:
+  - function object and bound method descriptor semantics
+  - `type.__call__`, `__new__`, and `__init__` protocol
+  - class statement lowering to body code object and namespace
+  - C3 MRO and metaclass conflict tests
+- Consider `is`, `is not`, `in`, and `not in` as comparison-family syntax after
+  identity and containment opcodes are designed.
+- Keep arbitrary-precision `int` deferred per current instruction.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects '--gtest_filter=PythonScripts.RunsGoldenFiles:Compile.CompilesChainedComparisonsWithShortCircuit:Bytecode.MetadataNamesAndStackEffects:Bytecode.DispatchesStackManipulationOpcodes:Bytecode.DispatchesJumpIfFalseOrPop:Bytecode.RejectsMalformedBytecode'`
+- `ctest --test-dir build --output-on-failure`
+- `git diff --check`
+
+Result: all tests pass.
+
 ## 2026-05-18 Ordering Comparisons
 
 Pre-change review:

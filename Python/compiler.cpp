@@ -67,7 +67,8 @@ namespace cxxpython
             void visit(const compiler_internal::CompareExpr &expression) override
             {
                 expression.left->accept(*this);
-                expression.right->accept(*this);
+                for (const compiler_internal::Comparison &comparison : expression.comparisons)
+                    comparison.right->accept(*this);
             }
 
             void visit(const compiler_internal::NameExpr &expression) override
@@ -201,11 +202,35 @@ namespace cxxpython
             void visit(const compiler_internal::CompareExpr &expression) override
             {
                 expression.left->accept(*this);
-                expression.right->accept(*this);
-                instructions_.push_back(Instruction{
-                    Opcode::CompareOp,
-                    static_cast<std::uint32_t>(expression.op),
-                });
+                std::vector<std::size_t> cleanup_jumps;
+                for (std::size_t index = 0; index < expression.comparisons.size(); ++index)
+                {
+                    const compiler_internal::Comparison &comparison = expression.comparisons[index];
+                    const bool last = index + 1 == expression.comparisons.size();
+                    comparison.right->accept(*this);
+                    if (!last)
+                    {
+                        instructions_.push_back(Instruction{Opcode::DupTop, 0});
+                        instructions_.push_back(Instruction{Opcode::RotThree, 0});
+                    }
+                    instructions_.push_back(Instruction{
+                        Opcode::CompareOp,
+                        static_cast<std::uint32_t>(comparison.op),
+                    });
+                    if (!last)
+                        cleanup_jumps.push_back(emit_jump(Opcode::JumpIfFalseOrPop));
+                }
+
+                if (!cleanup_jumps.empty())
+                {
+                    const std::size_t end_jump = emit_jump(Opcode::JumpAbsolute);
+                    const std::size_t cleanup_target = instructions_.size();
+                    instructions_.push_back(Instruction{Opcode::RotTwo, 0});
+                    instructions_.push_back(Instruction{Opcode::PopTop, 0});
+                    for (std::size_t jump : cleanup_jumps)
+                        patch_jump(jump, cleanup_target);
+                    patch_jump(end_jump, instructions_.size());
+                }
             }
 
             void visit(const compiler_internal::NameExpr &expression) override

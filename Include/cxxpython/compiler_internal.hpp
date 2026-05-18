@@ -170,16 +170,26 @@ namespace cxxpython::compiler_internal
         }
     };
 
+    struct Comparison final
+    {
+        Comparison(RichCompareOp op_in, std::unique_ptr<Expr> right_in)
+            : op(op_in), right(std::move(right_in))
+        {
+        }
+
+        RichCompareOp op;
+        std::unique_ptr<Expr> right;
+    };
+
     struct CompareExpr final : Expr
     {
-        CompareExpr(std::unique_ptr<Expr> left_in, RichCompareOp op_in, std::unique_ptr<Expr> right_in)
-            : left(std::move(left_in)), op(op_in), right(std::move(right_in))
+        CompareExpr(std::unique_ptr<Expr> left_in, std::vector<Comparison> comparisons_in)
+            : left(std::move(left_in)), comparisons(std::move(comparisons_in))
         {
         }
 
         std::unique_ptr<Expr> left;
-        RichCompareOp op;
-        std::unique_ptr<Expr> right;
+        std::vector<Comparison> comparisons;
 
         void accept(ExprVisitor &visitor) const override
         {

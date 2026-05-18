@@ -163,6 +163,39 @@ TEST(Compile, CompilesOrderingComparisons)
     EXPECT_EQ(vm.execute(*greater_equal), runtime.true_value());
 }
 
+TEST(Compile, CompilesChainedComparisonsWithShortCircuit)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+
+    cxxpython::CodeObject *true_chain = cxxpython::compile_eval_input(runtime, "1 < 2 < 3", "script.py");
+    ASSERT_NE(true_chain, nullptr);
+    bool saw_dup = false;
+    bool saw_rot_three = false;
+    bool saw_jump_if_false_or_pop = false;
+    bool saw_cleanup_rot_two = false;
+    for (const cxxpython::Instruction &instruction : true_chain->instructions())
+    {
+        if (instruction.opcode == cxxpython::Opcode::DupTop)
+            saw_dup = true;
+        if (instruction.opcode == cxxpython::Opcode::RotThree)
+            saw_rot_three = true;
+        if (instruction.opcode == cxxpython::Opcode::JumpIfFalseOrPop)
+            saw_jump_if_false_or_pop = true;
+        if (instruction.opcode == cxxpython::Opcode::RotTwo)
+            saw_cleanup_rot_two = true;
+    }
+    EXPECT_TRUE(saw_dup);
+    EXPECT_TRUE(saw_rot_three);
+    EXPECT_TRUE(saw_jump_if_false_or_pop);
+    EXPECT_TRUE(saw_cleanup_rot_two);
+    EXPECT_EQ(vm.execute(*true_chain), runtime.true_value());
+
+    cxxpython::CodeObject *false_chain = cxxpython::compile_eval_input(runtime, "1 < 0 < missing", "script.py");
+    ASSERT_NE(false_chain, nullptr);
+    EXPECT_EQ(vm.execute(*false_chain), runtime.false_value());
+}
+
 TEST(Compile, CompilesIfElseStatements)
 {
     cxxpython::Runtime runtime;
@@ -216,19 +249,19 @@ TEST(Compile, CompilesIfWithoutElse)
     EXPECT_EQ(x->value, "initial");
 }
 
-TEST(Compile, RejectsChainedComparisonsUntilJumpSemanticsExist)
+TEST(Compile, RejectsMalformedChainedComparisons)
 {
     cxxpython::Runtime runtime;
 
     try
     {
-        (void)cxxpython::compile_eval_input(runtime, "1 < 2 < 3", "broken.py");
+        (void)cxxpython::compile_eval_input(runtime, "1 < < 3", "broken.py");
         FAIL() << "expected PythonError";
     }
     catch (const cxxpython::PythonError &error)
     {
         EXPECT_EQ(error.type_name(), "SyntaxError");
-        EXPECT_STREQ(error.what(), "broken.py:1:7: chained comparisons are not implemented");
+        EXPECT_STREQ(error.what(), "broken.py:1:5: expected expression");
     }
 }
 

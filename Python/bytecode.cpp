@@ -126,6 +126,12 @@ namespace cxxpython
             return "STORE_ATTR";
         case Opcode::PopTop:
             return "POP_TOP";
+        case Opcode::DupTop:
+            return "DUP_TOP";
+        case Opcode::RotTwo:
+            return "ROT_TWO";
+        case Opcode::RotThree:
+            return "ROT_THREE";
         case Opcode::UnaryOp:
             return "UNARY_OP";
         case Opcode::BinaryOp:
@@ -142,6 +148,8 @@ namespace cxxpython
             return "POP_JUMP_IF_FALSE";
         case Opcode::PopJumpIfTrue:
             return "POP_JUMP_IF_TRUE";
+        case Opcode::JumpIfFalseOrPop:
+            return "JUMP_IF_FALSE_OR_POP";
         case Opcode::Call:
             return "CALL";
         case Opcode::ReturnValue:
@@ -159,12 +167,17 @@ namespace cxxpython
             return 1;
         case Opcode::LoadAttr:
         case Opcode::JumpAbsolute:
+        case Opcode::RotTwo:
+        case Opcode::RotThree:
         case Opcode::UnaryOp:
             return 0;
+        case Opcode::DupTop:
+            return 1;
         case Opcode::StoreName:
         case Opcode::PopTop:
         case Opcode::PopJumpIfFalse:
         case Opcode::PopJumpIfTrue:
+        case Opcode::JumpIfFalseOrPop:
             return -1;
         case Opcode::StoreAttr:
             return -2;

@@ -96,7 +96,8 @@ doc/            design docs and milestone plans
   `object_binary_op`/`object_inplace_binary_op`，不能散落在各个内置类型中。
 - Rich compare: `object_rich_compare` 支持 `NotImplemented`、reverse/subclass
   dispatch 和 equality fallback；`==`、`!=`、`<`、`<=`、`>`、`>=` 语法降级到
-  `COMPARE_OP`。比较链 lowering 仍需补齐，不能用普通二元比较串联代替。
+  `COMPARE_OP`。比较链由 compiler lowering 成显式栈操作和短路跳转，保持
+  CPython 语义：中间 operand 只求值一次，失败后不继续求后续 operand。
 - Sequence/mapping: length, getitem, setitem, contains, iterator。
 - Attribute/descriptor: getattro/setattro, descr_get/descr_set。
 - Call/construction: call, new, init。
@@ -233,3 +234,33 @@ doc/            design docs and milestone plans
   otherwise silently shift behavior or encourage placeholder `nullptr` clutter.
 - 模块、函数、code、frame、异常等运行时对象都应是普通 typed objects，
   让脚本层反射、调试、traceback 和扩展 API 共享同一对象模型。
+
+## Python 类系统实现路线
+
+- 第一阶段先完善“当前类的方法”基础设施：函数对象、bound method、builtin
+  method descriptor、getset/member descriptor、slot wrapper 都必须是普通
+  descriptor object，并统一接入 `object_get_attr`、`object_set_attr` 和
+  `object_call`。不要在 VM 或 parser 里为 `list.append`、`__class__`、
+  `__dict__`、`__new__`、`__init__` 加私有捷径。
+- Python 函数对象应持有 `CodeObject`、globals、defaults、kwdefaults、
+  annotations、closure 和 `__qualname__`。函数作为类属性读取时通过 descriptor
+  返回 bound method；作为模块变量或普通值调用时直接走 call slot。
+- `type.__call__` 是对象构造唯一入口：选择 `__new__`，再在返回对象是目标
+  类型实例时调用 `__init__`。内建类型构造和 Python 类构造都必须复用这条
+  call/new/init 协议。
+- `class` statement 编译为“执行 class body code object -> 收集 namespace ->
+  调用 metaclass”的路径。class body locals 是类 namespace，不是模块 globals；
+  `__module__`、`__qualname__`、方法函数对象和 descriptors 都写入该 namespace。
+- 继承采用 tuple `__bases__` 和 C3 linearization。单继承路径不能固化成长期
+  设计；`TypeObject::base` 只能作为快速主基类缓存，真实语义以 `bases` 和
+  `mro` 为准。
+- 元类选择遵循 CPython 规则：显式 `metaclass=` 优先，否则取所有 base 的
+  metatype 的最派生公共子类型；存在冲突时抛 `TypeError`。类创建最终通过
+  selected metaclass 的 call/new/init 路径完成。
+- heap type 与内建静态类型共享同一 attribute engine。差别只在 layout flags、
+  slot table 和 allocation policy；Python 层可见 attrs 一律来自 type dict、
+  instance dict、descriptors 和 MRO。
+- `__slots__` 后置到 heap type layout 稳定后实现，但现在的 instance dict 设计
+  必须允许以后区分 dict-backed instance、slot-only instance 和二者并存的实例。
+- `super`、`classmethod`、`staticmethod`、`property` 都应作为 descriptor
+  协议的自然结果实现。先补 descriptor 行为和绑定对象，再暴露语法和 builtins。

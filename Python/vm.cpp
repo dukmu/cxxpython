@@ -321,6 +321,31 @@ namespace cxxpython
             case Opcode::PopTop:
                 (void)frame->pop();
                 break;
+            case Opcode::DupTop:
+            {
+                Object *top = frame->pop();
+                frame->push(top);
+                frame->push(top);
+                break;
+            }
+            case Opcode::RotTwo:
+            {
+                Object *top = frame->pop();
+                Object *second = frame->pop();
+                frame->push(top);
+                frame->push(second);
+                break;
+            }
+            case Opcode::RotThree:
+            {
+                Object *top = frame->pop();
+                Object *second = frame->pop();
+                Object *third = frame->pop();
+                frame->push(top);
+                frame->push(third);
+                frame->push(second);
+                break;
+            }
             case Opcode::UnaryOp:
             {
                 const UnaryOp op = decode_unary_op(instruction.operand);
@@ -378,6 +403,16 @@ namespace cxxpython
                 Object *condition = frame->pop();
                 if (is_true(condition))
                     jump_to(*frame, code, instruction.operand);
+                break;
+            }
+            case Opcode::JumpIfFalseOrPop:
+            {
+                Object *condition = frame->pop();
+                if (!is_true(condition))
+                {
+                    frame->push(condition);
+                    jump_to(*frame, code, instruction.operand);
+                }
                 break;
             }
             case Opcode::Call:
