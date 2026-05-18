@@ -187,6 +187,14 @@ namespace cxxpython::compiler_internal
                 continue;
             }
 
+            if (ch == '.')
+            {
+                tokens.push_back(Token{TokenKind::Dot, ".", 0, line, column});
+                ++index;
+                ++column;
+                continue;
+            }
+
             if (ch == '=')
             {
                 tokens.push_back(Token{TokenKind::Equal, "=", 0, line, column});

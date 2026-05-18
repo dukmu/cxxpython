@@ -120,6 +120,10 @@ namespace cxxpython
             return "LOAD_NAME";
         case Opcode::StoreName:
             return "STORE_NAME";
+        case Opcode::LoadAttr:
+            return "LOAD_ATTR";
+        case Opcode::StoreAttr:
+            return "STORE_ATTR";
         case Opcode::PopTop:
             return "POP_TOP";
         case Opcode::BinaryAdd:
@@ -139,9 +143,13 @@ namespace cxxpython
         case Opcode::LoadConst:
         case Opcode::LoadName:
             return 1;
+        case Opcode::LoadAttr:
+            return 0;
         case Opcode::StoreName:
         case Opcode::PopTop:
             return -1;
+        case Opcode::StoreAttr:
+            return -2;
         case Opcode::BinaryAdd:
             return -1;
         case Opcode::Call:

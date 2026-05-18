@@ -46,49 +46,67 @@ namespace cxxpython::compiler_internal
         private:
             std::unique_ptr<Stmt> parse_statement()
             {
-                if (peek().kind == TokenKind::Identifier && peek_next().kind == TokenKind::Equal)
+                std::unique_ptr<Expr> target_or_expression = parse_expression_only();
+                if (peek().kind == TokenKind::Equal)
                 {
-                    std::string target = advance().lexeme;
                     advance();
                     std::unique_ptr<Expr> value = parse_expression_only();
-                    return std::make_unique<AssignStmt>(std::move(target), std::move(value));
+                    if (auto *target = dynamic_cast<NameExpr *>(target_or_expression.get()))
+                        return std::make_unique<AssignStmt>(target->value, std::move(value));
+                    if (auto *target = dynamic_cast<AttributeExpr *>(target_or_expression.get()))
+                    {
+                        return std::make_unique<AssignAttrStmt>(
+                            std::move(target->object),
+                            target->name,
+                            std::move(value));
+                    }
+                    raise_at(previous(), "invalid assignment target");
                 }
-                return std::make_unique<ExprStmt>(parse_expression_only());
+                return std::make_unique<ExprStmt>(std::move(target_or_expression));
             }
 
             std::unique_ptr<Expr> parse_expression_only()
             {
-                std::unique_ptr<Expr> left = parse_call();
+                std::unique_ptr<Expr> left = parse_postfix();
                 while (peek().kind == TokenKind::Plus)
                 {
                     advance();
-                    std::unique_ptr<Expr> right = parse_call();
+                    std::unique_ptr<Expr> right = parse_postfix();
                     left = std::make_unique<BinaryAddExpr>(std::move(left), std::move(right));
                 }
                 return left;
             }
 
-            std::unique_ptr<Expr> parse_call()
+            std::unique_ptr<Expr> parse_postfix()
             {
                 std::unique_ptr<Expr> expression = parse_primary();
-                while (peek().kind == TokenKind::LeftParen)
+                while (peek().kind == TokenKind::LeftParen || peek().kind == TokenKind::Dot)
                 {
-                    advance();
-                    std::vector<std::unique_ptr<Expr>> args;
-                    if (peek().kind != TokenKind::RightParen)
+                    if (peek().kind == TokenKind::LeftParen)
                     {
-                        while (true)
+                        advance();
+                        std::vector<std::unique_ptr<Expr>> args;
+                        if (peek().kind != TokenKind::RightParen)
                         {
-                            args.push_back(parse_expression_only());
-                            if (peek().kind != TokenKind::Comma)
-                                break;
-                            advance();
-                            if (peek().kind == TokenKind::RightParen)
-                                break;
+                            while (true)
+                            {
+                                args.push_back(parse_expression_only());
+                                if (peek().kind != TokenKind::Comma)
+                                    break;
+                                advance();
+                                if (peek().kind == TokenKind::RightParen)
+                                    break;
+                            }
                         }
+                        consume(TokenKind::RightParen, "expected ')' after arguments");
+                        expression = std::make_unique<CallExpr>(std::move(expression), std::move(args));
+                        continue;
                     }
-                    consume(TokenKind::RightParen, "expected ')' after arguments");
-                    expression = std::make_unique<CallExpr>(std::move(expression), std::move(args));
+
+                    advance();
+                    if (peek().kind != TokenKind::Identifier)
+                        raise_at(peek(), "expected attribute name");
+                    expression = std::make_unique<AttributeExpr>(std::move(expression), advance().lexeme);
                 }
                 return expression;
             }
@@ -110,6 +128,7 @@ namespace cxxpython::compiler_internal
                 case TokenKind::LeftParen:
                 case TokenKind::RightParen:
                 case TokenKind::Comma:
+                case TokenKind::Dot:
                 case TokenKind::Equal:
                     raise_at(token, "expected expression");
                 }
@@ -144,6 +163,11 @@ namespace cxxpython::compiler_internal
             const Token &advance()
             {
                 return tokens_[index_++];
+            }
+
+            const Token &previous() const
+            {
+                return tokens_[index_ - 1];
             }
 
             [[noreturn]] void raise_at(const Token &token, const std::string &message) const

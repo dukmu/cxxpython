@@ -226,6 +226,33 @@ TEST(Compile, CompilesAndExecutesCallExpressions)
     EXPECT_EQ(output.str(), "hello 42\n");
 }
 
+TEST(Compile, CompilesAttributeLoadAndStore)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+    cxxpython::TypeObject *type = runtime.new_heap_type("Carrier", runtime.object_type());
+    cxxpython::Object *object = runtime.allocate<cxxpython::Object>(type);
+    globals->set(runtime.new_str("obj"), object);
+
+    cxxpython::CodeObject *store = cxxpython::compile_exec_input(runtime, "obj.field = 'ok'\n", "script.py");
+    ASSERT_NE(store, nullptr);
+    EXPECT_EQ(store->instructions()[0].opcode, cxxpython::Opcode::LoadName);
+    EXPECT_EQ(store->instructions()[1].opcode, cxxpython::Opcode::LoadConst);
+    EXPECT_EQ(store->instructions()[2].opcode, cxxpython::Opcode::StoreAttr);
+
+    EXPECT_EQ(vm.execute(*store, *globals), runtime.none());
+    auto *stored = dynamic_cast<cxxpython::StrObject *>(cxxpython::object_get_attr(object, "field"));
+    ASSERT_NE(stored, nullptr);
+    EXPECT_EQ(stored->value, "ok");
+
+    cxxpython::CodeObject *load = cxxpython::compile_eval_input(runtime, "obj.field", "script.py");
+    ASSERT_NE(load, nullptr);
+    EXPECT_EQ(load->instructions()[0].opcode, cxxpython::Opcode::LoadName);
+    EXPECT_EQ(load->instructions()[1].opcode, cxxpython::Opcode::LoadAttr);
+    EXPECT_EQ(vm.execute(*load, *globals), stored);
+}
+
 TEST(Compile, CallsNonCallableThroughNormalTypeErrorPath)
 {
     cxxpython::Runtime runtime;

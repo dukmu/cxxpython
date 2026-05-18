@@ -116,6 +116,9 @@ doc/            design docs and milestone plans
   `object_call`/type call slot，再把返回值压栈。函数对象、native function、
   type construction、bound method 后续都必须接入这条协议，而不是让 opcode
   识别具体对象类型。
+- `LOAD_ATTR`/`STORE_ATTR` 的职责也是栈调度和 name operand 解码；属性语义
+  必须继续由 `object_get_attr`/`object_set_attr` 处理。不要在 VM opcode 中
+  复制 descriptor、module dict、instance dict 或 type MRO 规则。
 
 ## 模块系统路线
 

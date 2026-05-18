@@ -269,6 +269,29 @@ namespace cxxpython
                 locals.set(name, value);
                 break;
             }
+            case Opcode::LoadAttr:
+            {
+                if (instruction.operand >= code.names().size())
+                    throw BytecodeError("LOAD_ATTR operand out of range");
+                auto *name = dynamic_cast<StrObject *>(code.names()[instruction.operand]);
+                if (!name)
+                    throw BytecodeError("LOAD_ATTR requires a str name");
+                Object *object = frame->pop();
+                frame->push(object_get_attr(object, name));
+                break;
+            }
+            case Opcode::StoreAttr:
+            {
+                if (instruction.operand >= code.names().size())
+                    throw BytecodeError("STORE_ATTR operand out of range");
+                auto *name = dynamic_cast<StrObject *>(code.names()[instruction.operand]);
+                if (!name)
+                    throw BytecodeError("STORE_ATTR requires a str name");
+                Object *value = frame->pop();
+                Object *object = frame->pop();
+                object_set_attr(object, name, value);
+                break;
+            }
             case Opcode::PopTop:
                 (void)frame->pop();
                 break;

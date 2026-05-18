@@ -1,5 +1,65 @@
 # Development Status
 
+## 2026-05-18 Attribute Bytecode Integration
+
+Pre-change review:
+
+- Runtime attribute semantics had been centralized in `object_get_attr` and
+  `object_set_attr`, but bytecode and compiler still had no attribute path.
+  Leaving this gap would invite future opcode implementations to duplicate
+  dict/descriptor logic.
+- New opcodes must update metadata, stack effect, VM dispatch, compiler
+  emission, and tests together.
+
+Completed:
+
+- Added bytecode:
+  - `LOAD_ATTR`
+  - `STORE_ATTR`
+- Added opcode names and stack effects:
+  - `LOAD_ATTR`: object -> attribute value, net stack effect 0
+  - `STORE_ATTR`: object + value -> empty, net stack effect -2
+- VM dispatch now routes attribute load/store through:
+  - `object_get_attr`
+  - `object_set_attr`
+- Parser/compiler now support:
+  - attribute expressions such as `obj.field`
+  - attribute assignments such as `obj.field = 'ok'`
+- Added tests proving direct bytecode and compiled source both use the runtime
+  attribute API.
+
+Design notes:
+
+- Attribute assignment target parsing currently classifies `NameExpr` versus
+  `AttributeExpr` in the parser. This is acceptable for the current tiny
+  grammar, but once subscript assignment, tuple unpacking, or augmented
+  assignment appear, assignment targets should become a dedicated AST family
+  instead of ad hoc expression checks.
+- `STORE_ATTR` evaluates object first and value second, then pops value before
+  object in the VM. Keep this order explicit when adding side-effecting
+  expressions.
+- The CLI still cannot create user objects from script source, so script-level
+  attribute integration remains covered through C++ tests until class/function
+  syntax lands.
+
+Next:
+
+- Add a dedicated assignment-target AST hierarchy before expanding assignment
+  syntax materially.
+- Add descriptor delete/read-only behavior before exposing `del obj.attr` or
+  property setter/deleter semantics.
+- Move toward user class creation and function objects so attribute bytecode is
+  exercised by script-level class/method snippets.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects '--gtest_filter=Bytecode.MetadataNamesAndStackEffects:Bytecode.DispatchesLoadAttrAndStoreAttrThroughObjectApi:Compile.CompilesAttributeLoadAndStore'`
+- `ctest --test-dir build --output-on-failure`
+- `git diff --check`
+
+Result: all tests pass.
+
 ## 2026-05-18 Instance Dict And Data Descriptor Priority
 
 Pre-change review:

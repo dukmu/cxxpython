@@ -63,6 +63,12 @@ namespace cxxpython
                 (void)symbols_.add_name(expression.value);
             }
 
+            void visit(const compiler_internal::AttributeExpr &expression) override
+            {
+                expression.object->accept(*this);
+                (void)symbols_.add_name(expression.name);
+            }
+
             void visit(const compiler_internal::CallExpr &expression) override
             {
                 expression.callee->accept(*this);
@@ -78,6 +84,13 @@ namespace cxxpython
             void visit(const compiler_internal::AssignStmt &statement) override
             {
                 (void)symbols_.add_name(statement.target);
+                statement.value->accept(*this);
+            }
+
+            void visit(const compiler_internal::AssignAttrStmt &statement) override
+            {
+                statement.object->accept(*this);
+                (void)symbols_.add_name(statement.name);
                 statement.value->accept(*this);
             }
 
@@ -143,6 +156,15 @@ namespace cxxpython
                 });
             }
 
+            void visit(const compiler_internal::AttributeExpr &expression) override
+            {
+                expression.object->accept(*this);
+                instructions_.push_back(Instruction{
+                    Opcode::LoadAttr,
+                    static_cast<std::uint32_t>(name_index(expression.name)),
+                });
+            }
+
             void visit(const compiler_internal::CallExpr &expression) override
             {
                 expression.callee->accept(*this);
@@ -166,6 +188,16 @@ namespace cxxpython
                 instructions_.push_back(Instruction{
                     Opcode::StoreName,
                     static_cast<std::uint32_t>(name_index(statement.target)),
+                });
+            }
+
+            void visit(const compiler_internal::AssignAttrStmt &statement) override
+            {
+                statement.object->accept(*this);
+                statement.value->accept(*this);
+                instructions_.push_back(Instruction{
+                    Opcode::StoreAttr,
+                    static_cast<std::uint32_t>(name_index(statement.name)),
                 });
             }
 

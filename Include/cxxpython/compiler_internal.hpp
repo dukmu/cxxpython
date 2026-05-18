@@ -17,9 +17,11 @@ namespace cxxpython::compiler_internal
     struct StringExpr;
     struct BinaryAddExpr;
     struct NameExpr;
+    struct AttributeExpr;
     struct CallExpr;
     struct ExprStmt;
     struct AssignStmt;
+    struct AssignAttrStmt;
 
     struct ExprVisitor
     {
@@ -28,6 +30,7 @@ namespace cxxpython::compiler_internal
         virtual void visit(const StringExpr &expression) = 0;
         virtual void visit(const BinaryAddExpr &expression) = 0;
         virtual void visit(const NameExpr &expression) = 0;
+        virtual void visit(const AttributeExpr &expression) = 0;
         virtual void visit(const CallExpr &expression) = 0;
     };
 
@@ -36,6 +39,7 @@ namespace cxxpython::compiler_internal
         virtual ~StmtVisitor() = default;
         virtual void visit(const ExprStmt &statement) = 0;
         virtual void visit(const AssignStmt &statement) = 0;
+        virtual void visit(const AssignAttrStmt &statement) = 0;
     };
 
     enum class TokenKind
@@ -47,6 +51,7 @@ namespace cxxpython::compiler_internal
         LeftParen,
         RightParen,
         Comma,
+        Dot,
         Equal,
         Newline,
         End,
@@ -146,6 +151,22 @@ namespace cxxpython::compiler_internal
         }
     };
 
+    struct AttributeExpr final : Expr
+    {
+        AttributeExpr(std::unique_ptr<Expr> object_in, std::string name_in)
+            : object(std::move(object_in)), name(std::move(name_in))
+        {
+        }
+
+        std::unique_ptr<Expr> object;
+        std::string name;
+
+        void accept(ExprVisitor &visitor) const override
+        {
+            visitor.visit(*this);
+        }
+    };
+
     std::unique_ptr<Expr> parse_expression(Runtime &runtime,
                                            const std::vector<Token> &tokens,
                                            std::string filename);
@@ -179,6 +200,25 @@ namespace cxxpython::compiler_internal
         }
 
         std::string target;
+        std::unique_ptr<Expr> value;
+
+        void accept(StmtVisitor &visitor) const override
+        {
+            visitor.visit(*this);
+        }
+    };
+
+    struct AssignAttrStmt final : Stmt
+    {
+        AssignAttrStmt(std::unique_ptr<Expr> object_in,
+                       std::string name_in,
+                       std::unique_ptr<Expr> value_in)
+            : object(std::move(object_in)), name(std::move(name_in)), value(std::move(value_in))
+        {
+        }
+
+        std::unique_ptr<Expr> object;
+        std::string name;
         std::unique_ptr<Expr> value;
 
         void accept(StmtVisitor &visitor) const override

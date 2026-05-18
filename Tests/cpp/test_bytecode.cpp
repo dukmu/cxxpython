@@ -9,6 +9,8 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::LoadConst), "LOAD_CONST");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::LoadName), "LOAD_NAME");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::StoreName), "STORE_NAME");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::LoadAttr), "LOAD_ATTR");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::StoreAttr), "STORE_ATTR");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::PopTop), "POP_TOP");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::BinaryAdd), "BINARY_ADD");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::Call), "CALL");
@@ -17,6 +19,8 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::LoadConst, 0}), 1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::LoadName, 0}), 1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::StoreName, 0}), -1);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::LoadAttr, 0}), 0);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::StoreAttr, 0}), -2);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::PopTop, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BinaryAdd, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::Call, 0}), 0);
@@ -224,6 +228,36 @@ TEST(Bytecode, LoadNameResolvesLocalsGlobalsThenBuiltins)
     auto *builtin_result = dynamic_cast<cxxpython::IntObject *>(vm.execute(*code, *locals, *globals, *builtins));
     ASSERT_NE(builtin_result, nullptr);
     EXPECT_EQ(builtin_result->value, 1);
+}
+
+TEST(Bytecode, DispatchesLoadAttrAndStoreAttrThroughObjectApi)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::TypeObject *type = runtime.new_heap_type("Carrier", runtime.object_type());
+    cxxpython::Object *object = runtime.allocate<cxxpython::Object>(type);
+    cxxpython::Object *value = runtime.new_str("stored");
+    cxxpython::StrObject *name = runtime.new_str("field");
+    cxxpython::CodeObject *store = runtime.new_code(
+        {object, value, runtime.none()},
+        {name},
+        {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::LoadConst, 1},
+         {cxxpython::Opcode::StoreAttr, 0},
+         {cxxpython::Opcode::LoadConst, 2},
+         {cxxpython::Opcode::ReturnValue, 0}});
+
+    EXPECT_EQ(vm.execute(*store), runtime.none());
+    EXPECT_EQ(cxxpython::object_get_attr(object, "field"), value);
+
+    cxxpython::CodeObject *load = runtime.new_code(
+        {object},
+        {name},
+        {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::LoadAttr, 0},
+         {cxxpython::Opcode::ReturnValue, 0}});
+
+    EXPECT_EQ(vm.execute(*load), value);
 }
 
 TEST(Bytecode, CallsCallableObjectsThroughTypeSlot)
