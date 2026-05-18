@@ -267,13 +267,17 @@ doc/            design docs and milestone plans
 - `class` statement 编译为“执行 class body code object -> 收集 namespace ->
   调用 metaclass”的路径。class body locals 是类 namespace，不是模块 globals；
   `__module__`、`__qualname__`、方法函数对象和 descriptors 都写入该 namespace。
-- 当前最小实现已采用这条路径的种子版本：`MAKE_CLASS` 执行 class body code
-  object，`Runtime::new_class` 复制 namespace 到 heap type dict。后续
-  `type(name, bases, namespace)`、继承语法、C3 和 metaclass selection 必须扩展
-  这条中心路径，而不是新增并行创建逻辑。
+- 当前实现已采用这条路径的种子版本：`MAKE_CLASS` 执行 class body code
+  object，`Runtime::new_class` 复制 namespace 到 heap type dict；
+  `type(name, bases, namespace)` 也调用同一 bases-aware API。继承语法、
+  metaclass selection 和 `__prepare__` 必须继续扩展这条中心路径，而不是新增
+  并行创建逻辑。
 - 继承采用 tuple `__bases__` 和 C3 linearization。单继承路径不能固化成长期
   设计；`TypeObject::base` 只能作为快速主基类缓存，真实语义以 `bases` 和
   `mro` 为准。
+- C3 MRO 已作为 heap type 初始化的一部分存在。后续要补的是 builtin/C
+  extension layout conflict checks、metaclass-derived MRO override，以及
+  脚本层 `class A(Base):` 降级到同一 runtime API。
 - 元类选择遵循 CPython 规则：显式 `metaclass=` 优先，否则取所有 base 的
   metatype 的最派生公共子类型；存在冲突时抛 `TypeError`。类创建最终通过
   selected metaclass 的 call/new/init 路径完成。

@@ -1,6 +1,7 @@
 #include "cxxpython/runtime.hpp"
 
 #include <algorithm>
+#include <sstream>
 
 namespace cxxpython
 {
@@ -52,14 +53,79 @@ namespace cxxpython
 
     void Runtime::initialize_type(TypeObject *type, TypeObject *base)
     {
-        type->base = base;
-        type->bases = base ? std::vector<TypeObject *>{base} : std::vector<TypeObject *>{};
+        initialize_type(type, base ? std::vector<TypeObject *>{base} : std::vector<TypeObject *>{});
+    }
+
+    void Runtime::initialize_type(TypeObject *type, const std::vector<TypeObject *> &bases)
+    {
+        type->base = bases.empty() ? nullptr : bases[0];
+        type->bases = bases;
         type->mro.clear();
         type->mro.push_back(type);
-        if (base)
+
+        std::vector<std::vector<TypeObject *>> sequences;
+        sequences.reserve(bases.size() + 1);
+        std::vector<TypeObject *> seen_bases;
+        for (TypeObject *base : bases)
         {
-            for (TypeObject *mro_item : base->mro)
-                type->mro.push_back(mro_item);
+            if (!base)
+                raise_type_error(this, "class bases cannot contain null");
+            if (std::find(seen_bases.begin(), seen_bases.end(), base) != seen_bases.end())
+            {
+                std::ostringstream message;
+                message << "duplicate base class " << type_qualified_name(base);
+                raise_type_error(this, message.str());
+            }
+            seen_bases.push_back(base);
+            sequences.push_back(base->mro);
+        }
+        sequences.push_back(bases);
+
+        while (true)
+        {
+            sequences.erase(std::remove_if(sequences.begin(),
+                                           sequences.end(),
+                                           [](const std::vector<TypeObject *> &sequence)
+                                           { return sequence.empty(); }),
+                            sequences.end());
+            if (sequences.empty())
+                return;
+
+            TypeObject *candidate = nullptr;
+            for (const std::vector<TypeObject *> &sequence : sequences)
+            {
+                TypeObject *head = sequence.front();
+                bool appears_in_tail = false;
+                for (const std::vector<TypeObject *> &other : sequences)
+                {
+                    if (std::find(other.begin() + 1, other.end(), head) != other.end())
+                    {
+                        appears_in_tail = true;
+                        break;
+                    }
+                }
+                if (!appears_in_tail)
+                {
+                    candidate = head;
+                    break;
+                }
+            }
+
+            if (!candidate)
+            {
+                std::ostringstream message;
+                message << "cannot create a consistent method resolution order (MRO) for bases";
+                for (TypeObject *base : bases)
+                    message << " " << type_qualified_name(base);
+                raise_type_error(this, message.str());
+            }
+
+            type->mro.push_back(candidate);
+            for (std::vector<TypeObject *> &sequence : sequences)
+            {
+                if (!sequence.empty() && sequence.front() == candidate)
+                    sequence.erase(sequence.begin());
+            }
         }
     }
 

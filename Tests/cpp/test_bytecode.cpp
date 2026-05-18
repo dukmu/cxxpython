@@ -240,6 +240,38 @@ TEST(Bytecode, DispatchesMakeClass)
     EXPECT_EQ(value->value, "class-value");
 }
 
+TEST(Bytecode, TypeCallClassCreationUsesActiveFrameModule)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+    globals->set(runtime.new_str("__name__"), runtime.new_str("__main__"));
+
+    cxxpython::DictObject *namespace_dict = runtime.new_dict();
+    namespace_dict->set(runtime.new_str("value"), runtime.new_str("from-type"));
+    cxxpython::CodeObject *code = runtime.new_code(
+        {runtime.new_str("Made"),
+         runtime.new_tuple({runtime.object_type()}),
+         namespace_dict},
+        {runtime.new_str("type"), runtime.new_str("Made")},
+        {{cxxpython::Opcode::LoadName, 0},
+         {cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::LoadConst, 1},
+         {cxxpython::Opcode::LoadConst, 2},
+         {cxxpython::Opcode::Call, 3},
+         {cxxpython::Opcode::StoreName, 1},
+         {cxxpython::Opcode::LoadName, 1},
+         {cxxpython::Opcode::ReturnValue, 0}});
+
+    auto *type = dynamic_cast<cxxpython::TypeObject *>(vm.execute(*code, *globals));
+    ASSERT_NE(type, nullptr);
+    EXPECT_EQ(type->name, "Made");
+    EXPECT_EQ(type->module, "__main__");
+    auto *module = dynamic_cast<cxxpython::StrObject *>(cxxpython::object_get_attr(type, "__module__"));
+    ASSERT_NE(module, nullptr);
+    EXPECT_EQ(module->value, "__main__");
+}
+
 TEST(Bytecode, DispatchesSubscriptOpcodesThroughObjectProtocol)
 {
     cxxpython::Runtime runtime;

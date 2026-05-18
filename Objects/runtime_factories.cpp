@@ -196,21 +196,58 @@ namespace cxxpython
         return type;
     }
 
-    TypeObject *Runtime::new_class(std::string name, TypeObject *base, DictObject *namespace_dict)
+    TypeObject *Runtime::new_class(std::string name,
+                                   std::vector<TypeObject *> bases,
+                                   DictObject *namespace_dict,
+                                   std::string module_fallback)
     {
         if (!namespace_dict)
             raise_type_error(this, "class namespace cannot be null");
-        TypeObject *type = new_heap_type(std::move(name), base ? base : object_type_);
+        if (bases.empty())
+            bases.push_back(object_type_);
+        for (TypeObject *base : bases)
+        {
+            if (!base)
+                raise_type_error(this, "class bases cannot contain null");
+        }
+
+        auto *namespace_module = dynamic_cast<StrObject *>(namespace_dict->get(new_str("__module__")));
+        TypeObject *type = allocate_type(std::move(name));
+        type->set_type(type_type_);
+        type->flags = TypeFlagHeapType | TypeFlagHasInstanceDict;
+        type->slots = inherit_slots(bases[0], {});
+        initialize_type(type, bases);
+        initialize_type_dict(type);
         for (const DictObject::Entry &entry : namespace_dict->entries())
         {
             if (entry.key && entry.value)
                 type->dict->set(entry.key, entry.value);
         }
-        if (auto *module = dynamic_cast<StrObject *>(type->dict->get(new_str("__module__"))))
-            type->module = module->value;
+        if (namespace_module)
+            type->module = namespace_module->value;
+        else
+            type->module = std::move(module_fallback);
         type->dict->set(new_str("__name__"), new_str(type->name));
         type->dict->set(new_str("__module__"), new_str(type->module));
+        if (!type->dict->contains(new_str("__qualname__")))
+            type->dict->set(new_str("__qualname__"), new_str(type->name));
+        std::vector<Object *> base_objects;
+        base_objects.reserve(type->bases.size());
+        for (TypeObject *base : type->bases)
+            base_objects.push_back(base);
+        type->dict->set(new_str("__bases__"), new_tuple(std::move(base_objects)));
         return type;
+    }
+
+    TypeObject *Runtime::new_class(std::string name,
+                                   TypeObject *base,
+                                   DictObject *namespace_dict,
+                                   std::string module_fallback)
+    {
+        std::vector<TypeObject *> bases;
+        if (base)
+            bases.push_back(base);
+        return new_class(std::move(name), std::move(bases), namespace_dict, std::move(module_fallback));
     }
 
     ExceptionObject *Runtime::new_exception(TypeObject *type, std::string message)

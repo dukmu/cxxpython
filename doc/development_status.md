@@ -1,5 +1,72 @@
 # Development Status
 
+## 2026-05-18 Three-Argument Type Construction And C3 Seed
+
+Pre-change review:
+
+- `type(obj)` worked, but `type(name, bases, namespace)` still reported a
+  placeholder `TypeError`. That forced class statements and direct type
+  construction onto different paths.
+- `Runtime::new_class` accepted only a single base, which would have made
+  `TypeObject::bases`/`mro` decorative instead of semantic.
+- Default `__module__` handling had to come from the active executing frame
+  when `type(...)` is called from bytecode, while class statements still pass
+  an explicit class namespace.
+
+Debt addressed:
+
+- Implemented three-argument `type(name, bases, namespace)` with validation for
+  `str`, `tuple`, and `dict` arguments.
+- Expanded `Runtime::new_class` to accept a vector of bases and made the
+  single-base overload a convenience wrapper.
+- Added C3 MRO calculation for heap type initialization, including duplicate
+  base detection and inconsistent MRO errors.
+- `type(...)` now uses the active VM frame globals to populate `__module__`
+  when the namespace did not provide one.
+- Class type dictionaries now expose `__bases__` and ensure `__qualname__`.
+
+Completed:
+
+- Added object-level tests for direct type construction, inherited attributes,
+  instance construction, explicit module names, empty bases, multi-base C3 MRO,
+  invalid argument types, duplicate bases, and inconsistent MRO.
+- Added bytecode-level coverage proving `type(...)` called through a VM frame
+  uses the module globals `__name__` for `__module__`.
+
+Design notes:
+
+- `TypeObject::base` remains a primary-base cache. Semantics are driven by
+  `bases` and `mro`.
+- Slot inheritance still uses the primary base. Layout-conflict validation for
+  extension/builtin multiple inheritance remains a distinct type-layout task;
+  this slice establishes C3 ordering for heap/object-layout classes.
+- Script-level golden coverage for direct `type(...)` waits on tuple and dict
+  literal syntax so tests can be written naturally in `Tests/python/`.
+
+Known debt and next risk:
+
+- No metaclass selection/conflict handling or `__prepare__` yet.
+- No `class A(Base):` parser/compiler syntax yet, even though the runtime can
+  now represent multiple bases.
+- Builtin/extension type layout conflict checks need explicit flags before
+  arbitrary multiple inheritance over non-object layouts is safe.
+
+Next:
+
+- Add tuple and dict literal syntax plus `BUILD_TUPLE`/`BUILD_MAP` or equivalent
+  bytecode so Python golden tests can cover `type('A', (object,), {...})`.
+- Then add base-list parsing for `class A(Base):` and route it through the same
+  bases-aware class creation API.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects '--gtest_filter=CoreObjects.TypeCallCreatesHeapTypesFromNameBasesNamespace:CoreObjects.TypeCallValidatesThreeArgumentClassCreation:Bytecode.TypeCallClassCreationUsesActiveFrameModule'`
+- `ctest --test-dir build --output-on-failure`
+- `git diff --check`
+
+Result: all tests pass.
+
 ## 2026-05-18 Minimal Class Definition Syntax
 
 Pre-change review:
@@ -57,11 +124,10 @@ Known debt and next risk:
 
 Next:
 
-- Implement three-argument `type(name, bases, namespace)` using the class
-  creation API, starting with validation for `(str, tuple, dict)` and a single
-  base while keeping the API shaped for multiple bases and C3.
-- Then add parser/compiler support for `class A(Base):` and replace single-base
-  initialization internals with a bases/MRO-oriented implementation.
+- Implement tuple/dict literal syntax and script-level coverage for direct
+  `type(name, bases, namespace)`.
+- Then add parser/compiler support for `class A(Base):` on top of the
+  bases/MRO-oriented runtime API.
 
 Verification:
 

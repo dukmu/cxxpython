@@ -1,5 +1,6 @@
 #include "cxxpython/object.hpp"
 #include "cxxpython/runtime.hpp"
+#include "cxxpython/vm.hpp"
 
 #include "object_utils.hpp"
 
@@ -77,6 +78,47 @@ namespace cxxpython
             }
         }
 
+        std::string active_module_name(Runtime &runtime)
+        {
+            VirtualMachine *vm = runtime.active_vm();
+            Frame *frame = vm ? vm->thread_state().current_frame() : nullptr;
+            DictObject *globals = frame ? frame->globals() : nullptr;
+            if (globals)
+            {
+                if (auto *name = dynamic_cast<StrObject *>(globals->get(runtime.new_str("__name__"))))
+                    return name->value;
+            }
+            return "builtins";
+        }
+
+        TypeObject *type_new_from_three_args(TypeObject &type, const std::vector<Object *> &args)
+        {
+            Runtime *runtime = type.runtime();
+            auto *name = dynamic_cast<StrObject *>(args[0]);
+            if (!name)
+                raise_type_error(runtime, "type() name must be a str");
+            auto *bases_tuple = dynamic_cast<TupleObject *>(args[1]);
+            if (!bases_tuple)
+                raise_type_error(runtime, "type() bases must be a tuple");
+            auto *namespace_dict = dynamic_cast<DictObject *>(args[2]);
+            if (!namespace_dict)
+                raise_type_error(runtime, "type() namespace must be a dict");
+
+            std::vector<TypeObject *> bases;
+            bases.reserve(bases_tuple->size());
+            for (Object *base : bases_tuple->items())
+            {
+                auto *base_type = dynamic_cast<TypeObject *>(base);
+                if (!base_type)
+                    raise_type_error(runtime, "type() bases must contain only types");
+                bases.push_back(base_type);
+            }
+            return runtime->new_class(name->value,
+                                      std::move(bases),
+                                      namespace_dict,
+                                      active_module_name(*runtime));
+        }
+
         Object *type_call(Object &object, const std::vector<Object *> &args)
         {
             auto *type = dynamic_cast<TypeObject *>(&object);
@@ -92,7 +134,7 @@ namespace cxxpython
                 }
                 if (args.size() != 3)
                     raise_type_error(type->runtime(), "type() takes 1 or 3 arguments");
-                raise_type_error(type->runtime(), "type(name, bases, namespace) is not implemented");
+                return type_new_from_three_args(*type, args);
             }
             if (!type->slots.new_object)
             {

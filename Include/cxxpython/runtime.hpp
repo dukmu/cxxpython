@@ -111,7 +111,14 @@ namespace cxxpython
                          DictObject *globals = nullptr,
                          DictObject *builtins = nullptr);
         TypeObject *new_heap_type(std::string name, TypeObject *base, TypeSlots slots = {});
-        TypeObject *new_class(std::string name, TypeObject *base, DictObject *namespace_dict);
+        TypeObject *new_class(std::string name,
+                              std::vector<TypeObject *> bases,
+                              DictObject *namespace_dict,
+                              std::string module_fallback = "builtins");
+        TypeObject *new_class(std::string name,
+                              TypeObject *base,
+                              DictObject *namespace_dict,
+                              std::string module_fallback = "builtins");
         ExceptionObject *new_exception(TypeObject *type, std::string message);
         ExceptionObject *new_exception(TypeObject *type, std::vector<Object *> args);
         ExceptionObject *new_type_error(std::string message);
@@ -142,6 +149,7 @@ namespace cxxpython
     private:
         TypeObject *allocate_type(std::string name);
         void initialize_type(TypeObject *type, TypeObject *base);
+        void initialize_type(TypeObject *type, const std::vector<TypeObject *> &bases);
         void initialize_type_dict(TypeObject *type);
         void initialize_type_dicts();
         void initialize_type_descriptors();

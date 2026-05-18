@@ -176,6 +176,186 @@ TEST(CoreObjects, TypeCallConstructsObjectsThroughNewInitProtocol)
     }
 }
 
+TEST(CoreObjects, TypeCallCreatesHeapTypesFromNameBasesNamespace)
+{
+    cxxpython::Runtime runtime;
+
+    cxxpython::DictObject *base_namespace = runtime.new_dict();
+    cxxpython::Object *base_value = runtime.new_str("base-value");
+    base_namespace->set(runtime.new_str("base_attr"), base_value);
+    auto *base_type = dynamic_cast<cxxpython::TypeObject *>(cxxpython::object_call(
+        runtime.type_type(),
+        {runtime.new_str("Base"), runtime.new_tuple({runtime.object_type()}), base_namespace}));
+    ASSERT_NE(base_type, nullptr);
+    EXPECT_EQ(base_type->name, "Base");
+    EXPECT_EQ(base_type->base, runtime.object_type());
+    EXPECT_EQ(base_type->bases.size(), 1U);
+    EXPECT_EQ(base_type->bases[0], runtime.object_type());
+    EXPECT_EQ(cxxpython::object_get_attr(base_type, "base_attr"), base_value);
+
+    cxxpython::DictObject *namespace_dict = runtime.new_dict();
+    cxxpython::Object *class_value = runtime.new_str("class-value");
+    namespace_dict->set(runtime.new_str("class_attr"), class_value);
+    namespace_dict->set(runtime.new_str("__module__"), runtime.new_str("custom_module"));
+    auto *type = dynamic_cast<cxxpython::TypeObject *>(cxxpython::object_call(
+        runtime.type_type(),
+        {runtime.new_str("Made"), runtime.new_tuple({base_type}), namespace_dict}));
+    ASSERT_NE(type, nullptr);
+    EXPECT_EQ(type->name, "Made");
+    EXPECT_EQ(type->module, "custom_module");
+    EXPECT_EQ(type->base, base_type);
+    ASSERT_EQ(type->bases.size(), 1U);
+    EXPECT_EQ(type->bases[0], base_type);
+    EXPECT_TRUE(cxxpython::is_subclass(type, base_type));
+    EXPECT_TRUE(cxxpython::is_subclass(type, runtime.object_type()));
+    EXPECT_EQ(cxxpython::object_get_attr(type, "class_attr"), class_value);
+    EXPECT_EQ(cxxpython::object_get_attr(type, "base_attr"), base_value);
+
+    auto *bases_attr = dynamic_cast<cxxpython::TupleObject *>(cxxpython::object_get_attr(type, "__bases__"));
+    ASSERT_NE(bases_attr, nullptr);
+    ASSERT_EQ(bases_attr->size(), 1U);
+    EXPECT_EQ(bases_attr->items()[0], base_type);
+
+    cxxpython::Object *instance = cxxpython::object_call(type, {});
+    ASSERT_NE(instance, nullptr);
+    EXPECT_EQ(instance->type(), type);
+    EXPECT_EQ(cxxpython::object_get_attr(instance, "class_attr"), class_value);
+    EXPECT_EQ(cxxpython::object_get_attr(instance, "base_attr"), base_value);
+
+    auto *default_base_type = dynamic_cast<cxxpython::TypeObject *>(cxxpython::object_call(
+        runtime.type_type(),
+        {runtime.new_str("DefaultBase"), runtime.new_tuple({}), runtime.new_dict()}));
+    ASSERT_NE(default_base_type, nullptr);
+    EXPECT_EQ(default_base_type->base, runtime.object_type());
+    ASSERT_EQ(default_base_type->bases.size(), 1U);
+    EXPECT_EQ(default_base_type->bases[0], runtime.object_type());
+
+    cxxpython::DictObject *right_namespace = runtime.new_dict();
+    cxxpython::Object *right_value = runtime.new_str("right-value");
+    right_namespace->set(runtime.new_str("right_attr"), right_value);
+    auto *right_type = dynamic_cast<cxxpython::TypeObject *>(cxxpython::object_call(
+        runtime.type_type(),
+        {runtime.new_str("Right"), runtime.new_tuple({runtime.object_type()}), right_namespace}));
+    ASSERT_NE(right_type, nullptr);
+
+    cxxpython::DictObject *multi_namespace = runtime.new_dict();
+    auto *multi_type = dynamic_cast<cxxpython::TypeObject *>(cxxpython::object_call(
+        runtime.type_type(),
+        {runtime.new_str("Multi"), runtime.new_tuple({base_type, right_type}), multi_namespace}));
+    ASSERT_NE(multi_type, nullptr);
+    EXPECT_EQ(multi_type->base, base_type);
+    ASSERT_EQ(multi_type->bases.size(), 2U);
+    EXPECT_EQ(multi_type->bases[0], base_type);
+    EXPECT_EQ(multi_type->bases[1], right_type);
+    ASSERT_GE(multi_type->mro.size(), 4U);
+    EXPECT_EQ(multi_type->mro[0], multi_type);
+    EXPECT_EQ(multi_type->mro[1], base_type);
+    EXPECT_EQ(multi_type->mro[2], right_type);
+    EXPECT_EQ(multi_type->mro.back(), runtime.object_type());
+    EXPECT_EQ(cxxpython::object_get_attr(multi_type, "base_attr"), base_value);
+    EXPECT_EQ(cxxpython::object_get_attr(multi_type, "right_attr"), right_value);
+}
+
+TEST(CoreObjects, TypeCallValidatesThreeArgumentClassCreation)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::DictObject *namespace_dict = runtime.new_dict();
+
+    try
+    {
+        (void)cxxpython::object_call(
+            runtime.type_type(),
+            {runtime.new_int(1), runtime.new_tuple({runtime.object_type()}), namespace_dict});
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "type() name must be a str");
+    }
+
+    try
+    {
+        (void)cxxpython::object_call(
+            runtime.type_type(),
+            {runtime.new_str("BadBases"), runtime.new_list({runtime.object_type()}), namespace_dict});
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "type() bases must be a tuple");
+    }
+
+    try
+    {
+        (void)cxxpython::object_call(
+            runtime.type_type(),
+            {runtime.new_str("BadBase"), runtime.new_tuple({runtime.new_str("not-type")}), namespace_dict});
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "type() bases must contain only types");
+    }
+
+    try
+    {
+        (void)cxxpython::object_call(
+            runtime.type_type(),
+            {runtime.new_str("BadNamespace"), runtime.new_tuple({runtime.object_type()}), runtime.new_list({})});
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "type() namespace must be a dict");
+    }
+
+    try
+    {
+        (void)cxxpython::object_call(
+            runtime.type_type(),
+            {runtime.new_str("DuplicateBase"),
+             runtime.new_tuple({runtime.object_type(), runtime.object_type()}),
+             namespace_dict});
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "duplicate base class object");
+    }
+
+    auto *x_type = dynamic_cast<cxxpython::TypeObject *>(cxxpython::object_call(
+        runtime.type_type(),
+        {runtime.new_str("X"), runtime.new_tuple({runtime.object_type()}), runtime.new_dict()}));
+    auto *y_type = dynamic_cast<cxxpython::TypeObject *>(cxxpython::object_call(
+        runtime.type_type(),
+        {runtime.new_str("Y"), runtime.new_tuple({runtime.object_type()}), runtime.new_dict()}));
+    auto *a_type = dynamic_cast<cxxpython::TypeObject *>(cxxpython::object_call(
+        runtime.type_type(),
+        {runtime.new_str("A"), runtime.new_tuple({x_type, y_type}), runtime.new_dict()}));
+    auto *b_type = dynamic_cast<cxxpython::TypeObject *>(cxxpython::object_call(
+        runtime.type_type(),
+        {runtime.new_str("B"), runtime.new_tuple({y_type, x_type}), runtime.new_dict()}));
+    ASSERT_NE(a_type, nullptr);
+    ASSERT_NE(b_type, nullptr);
+    try
+    {
+        (void)cxxpython::object_call(
+            runtime.type_type(),
+            {runtime.new_str("Inconsistent"), runtime.new_tuple({a_type, b_type}), runtime.new_dict()});
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "cannot create a consistent method resolution order (MRO) for bases A B");
+    }
+}
+
 TEST(CoreObjects, RuntimeVisitsRootsAndContainerChildren)
 {
     cxxpython::Runtime runtime;
