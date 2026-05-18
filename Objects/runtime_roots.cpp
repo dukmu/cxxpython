@@ -95,6 +95,7 @@ namespace cxxpython
         initialize_type_dict(exception_type_);
         initialize_type_dict(type_error_type_);
         initialize_type_dict(index_error_type_);
+        initialize_type_dict(key_error_type_);
         initialize_type_dict(syntax_error_type_);
         initialize_type_dict(name_error_type_);
         initialize_type_dict(attribute_error_type_);
@@ -119,6 +120,14 @@ namespace cxxpython
             inherited.binary_add = slots.binary_add;
         if (slots.call)
             inherited.call = slots.call;
+        if (slots.length)
+            inherited.length = slots.length;
+        if (slots.getitem)
+            inherited.getitem = slots.getitem;
+        if (slots.setitem)
+            inherited.setitem = slots.setitem;
+        if (slots.contains)
+            inherited.contains = slots.contains;
         if (slots.descr_get)
             inherited.descr_get = slots.descr_get;
         if (slots.descr_set)

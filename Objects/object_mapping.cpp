@@ -59,6 +59,31 @@ namespace cxxpython
             }
         }
 
+        std::size_t dict_length(const Object &object)
+        {
+            return static_cast<const DictObject *>(&object)->size();
+        }
+
+        Object *dict_getitem(Object &object, Object *key)
+        {
+            auto &dict = static_cast<DictObject &>(object);
+            if (Object *value = dict.get(key))
+                return value;
+            raise_key_error(object.runtime(), key);
+        }
+
+        void dict_setitem(Object &object, Object *key, Object *value)
+        {
+            auto &dict = static_cast<DictObject &>(object);
+            dict.set(key, value);
+        }
+
+        bool dict_contains(Object &object, Object *key)
+        {
+            auto &dict = static_cast<DictObject &>(object);
+            return dict.contains(key);
+        }
+
         std::string mappingproxy_repr(const Object &object)
         {
             auto *proxy = static_cast<const MappingProxyObject *>(&object);
@@ -89,6 +114,31 @@ namespace cxxpython
             auto *proxy = static_cast<const MappingProxyObject *>(&object);
             if (proxy->referenced_mapping())
                 visitor(proxy->referenced_mapping());
+        }
+
+        std::size_t mappingproxy_length(const Object &object)
+        {
+            auto *proxy = static_cast<const MappingProxyObject *>(&object);
+            return proxy->mapping()->size();
+        }
+
+        Object *mappingproxy_getitem(Object &object, Object *key)
+        {
+            auto &proxy = static_cast<MappingProxyObject &>(object);
+            if (Object *value = proxy.referenced_mapping()->get(key))
+                return value;
+            raise_key_error(object.runtime(), key);
+        }
+
+        void mappingproxy_setitem(Object &object, Object *, Object *)
+        {
+            raise_type_error(object.runtime(), "'mappingproxy' object does not support item assignment");
+        }
+
+        bool mappingproxy_contains(Object &object, Object *key)
+        {
+            auto &proxy = static_cast<MappingProxyObject &>(object);
+            return proxy.referenced_mapping()->contains(key);
         }
     }
 
@@ -213,6 +263,10 @@ namespace cxxpython
             .equal = dict_equal,
             .truth = dict_truth,
             .traverse = dict_traverse,
+            .length = dict_length,
+            .getitem = dict_getitem,
+            .setitem = dict_setitem,
+            .contains = dict_contains,
         };
     }
 
@@ -224,6 +278,10 @@ namespace cxxpython
             .equal = mappingproxy_equal,
             .truth = mappingproxy_truth,
             .traverse = mappingproxy_traverse,
+            .length = mappingproxy_length,
+            .getitem = mappingproxy_getitem,
+            .setitem = mappingproxy_setitem,
+            .contains = mappingproxy_contains,
         };
     }
 }

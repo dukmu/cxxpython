@@ -1,5 +1,84 @@
 # Development Status
 
+## 2026-05-18 Sequence And Mapping Slot Family
+
+Pre-change review:
+
+- `list`, `tuple`, `dict`, and `mappingproxy` had direct C++ methods, but no
+  unified object protocol for length, subscript, assignment, or membership.
+  Adding subscript opcodes directly against concrete types would duplicate
+  logic in the VM and block heap/user types from participating.
+- `mappingproxy` could expose type dictionaries but had no script-facing
+  read protocol yet. That made `C.__dict__['x']` impossible to implement
+  cleanly later.
+- `dict` misses need Python `KeyError`, not a placeholder `TypeError` or null
+  return leaking through higher layers.
+- Every new slot family must update heap-type inheritance tests, because slot
+  omissions here become quiet long-term bugs.
+
+Debt addressed:
+
+- Added sequence/mapping slots to `TypeSlots`:
+  - `length`
+  - `getitem`
+  - `setitem`
+  - `contains`
+- Added central object helpers:
+  - `object_length`
+  - `object_get_item`
+  - `object_set_item`
+  - `object_contains`
+- Implemented the slot family for:
+  - `list`
+  - `tuple`
+  - `dict`
+  - `mappingproxy`
+- Added runtime-owned `KeyError` under `Exception`, with CPython-like message
+  formatting for missing keys.
+- Extended heap-type slot inheritance and tests to cover the new slot family.
+
+Completed:
+
+- Added tests proving:
+  - list length, getitem, setitem, negative index, and membership
+  - tuple length, getitem, membership, and item-assignment `TypeError`
+  - list non-integer subscript `TypeError`
+  - dict length, getitem, setitem, replacement, membership, and missing-key
+    `KeyError`
+  - mappingproxy length, getitem, membership, and item-assignment `TypeError`
+  - heap types inherit `length`/`getitem`/`setitem`/`contains`
+  - `KeyError` is bootstrapped in the exception hierarchy
+
+Design notes:
+
+- The VM still has no subscript opcodes; this slice deliberately establishes
+  the object protocol first. Future bytecode must dispatch through these
+  helpers rather than branching on concrete list/dict types.
+- Slice objects and slice indexing are not implemented yet. They should enter
+  through the same `getitem`/`setitem` slots once `slice` semantics are planned
+  as a full feature.
+- Dict/mappingproxy item access now raises `KeyError`; direct `DictObject::get`
+  remains a nullable internal lookup helper for attribute tables and bootstrap
+  code.
+
+Next:
+
+- Add bytecode metadata and VM dispatch for `BINARY_SUBSCR` and `STORE_SUBSCR`,
+  then parser/compiler support for subscript expressions and assignments.
+- Add a `len` builtin through the existing builtin module/call protocol,
+  backed by `object_length`.
+- Review assignment-target AST before adding subscript assignment to avoid
+  growing ad hoc parser checks.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects '--gtest_filter=CoreObjects.HeapTypesUseAndInheritSlots:CoreObjects.MappingSlotsReadWriteAndContainDictItems:CoreObjects.MappingProxySlotsReadAndContainWrappedDictItems:CoreObjects.SequenceSlotsReadAndWriteListAndTupleItems'`
+- `ctest --test-dir build --output-on-failure`
+- `git diff --check`
+
+Result: all tests pass.
+
 ## 2026-05-18 `__dict__` And MappingProxy
 
 Pre-change review:

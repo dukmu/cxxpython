@@ -42,6 +42,66 @@ TEST(CoreObjects, DictSupportsTupleKeysAndInsertionOrder)
     EXPECT_EQ(dict->entries()[1].value, tuple_value);
 }
 
+TEST(CoreObjects, MappingSlotsReadWriteAndContainDictItems)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::DictObject *dict = runtime.new_dict();
+    cxxpython::Object *key = runtime.new_str("key");
+    cxxpython::Object *value = runtime.new_int(1);
+    cxxpython::Object *replacement = runtime.new_int(2);
+
+    EXPECT_EQ(cxxpython::object_length(dict), 0);
+    EXPECT_FALSE(cxxpython::object_contains(dict, key));
+
+    cxxpython::object_set_item(dict, key, value);
+    EXPECT_EQ(cxxpython::object_length(dict), 1);
+    EXPECT_EQ(cxxpython::object_get_item(dict, key), value);
+    EXPECT_TRUE(cxxpython::object_contains(dict, key));
+
+    cxxpython::object_set_item(dict, key, replacement);
+    EXPECT_EQ(cxxpython::object_length(dict), 1);
+    EXPECT_EQ(cxxpython::object_get_item(dict, key), replacement);
+
+    try
+    {
+        (void)cxxpython::object_get_item(dict, runtime.new_str("missing"));
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.key_error_type());
+        EXPECT_STREQ(error.what(), "'missing'");
+    }
+}
+
+TEST(CoreObjects, MappingProxySlotsReadAndContainWrappedDictItems)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::DictObject *dict = runtime.new_dict();
+    cxxpython::Object *key = runtime.new_str("key");
+    cxxpython::Object *value = runtime.new_str("value");
+    cxxpython::MappingProxyObject *proxy = runtime.new_mappingproxy(dict);
+
+    EXPECT_EQ(cxxpython::object_length(proxy), 0);
+    EXPECT_FALSE(cxxpython::object_contains(proxy, key));
+
+    dict->set(key, value);
+    EXPECT_EQ(cxxpython::object_length(proxy), 1);
+    EXPECT_EQ(cxxpython::object_get_item(proxy, key), value);
+    EXPECT_TRUE(cxxpython::object_contains(proxy, key));
+
+    try
+    {
+        cxxpython::object_set_item(proxy, key, runtime.new_str("no"));
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "'mappingproxy' object does not support item assignment");
+    }
+}
+
 TEST(CoreObjects, DictGrowsAndHandlesHashCollisions)
 {
     cxxpython::Runtime runtime;

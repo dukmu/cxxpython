@@ -12,6 +12,10 @@ TEST(CoreObjects, HeapTypesUseAndInheritSlots)
     custom_slots.hash = test_support::custom_hash;
     custom_slots.equal = test_support::custom_equal;
     custom_slots.truth = test_support::custom_false;
+    custom_slots.length = test_support::custom_length;
+    custom_slots.getitem = test_support::custom_getitem;
+    custom_slots.setitem = test_support::custom_setitem;
+    custom_slots.contains = test_support::custom_contains;
     cxxpython::TypeObject *custom_type =
         runtime.new_heap_type("Custom", runtime.object_type(), custom_slots);
 
@@ -25,6 +29,10 @@ TEST(CoreObjects, HeapTypesUseAndInheritSlots)
     EXPECT_EQ(cxxpython::object_hash(custom_a), 42);
     EXPECT_TRUE(cxxpython::object_equal(custom_a, custom_b));
     EXPECT_FALSE(cxxpython::is_true(custom_a));
+    EXPECT_EQ(cxxpython::object_length(custom_a), 7U);
+    EXPECT_EQ(cxxpython::object_get_item(custom_a, custom_b), custom_b);
+    EXPECT_TRUE(cxxpython::object_contains(custom_a, custom_b));
+    cxxpython::object_set_item(custom_a, custom_b, runtime.new_str("ok"));
     EXPECT_TRUE(cxxpython::is_instance(custom_a, custom_type));
     EXPECT_TRUE(cxxpython::is_instance(custom_a, runtime.object_type()));
 
@@ -34,6 +42,9 @@ TEST(CoreObjects, HeapTypesUseAndInheritSlots)
     EXPECT_EQ(cxxpython::object_repr(repr_only), "<custom>");
     EXPECT_EQ(cxxpython::object_hash(repr_only), 42);
     EXPECT_FALSE(cxxpython::is_true(repr_only));
+    EXPECT_EQ(cxxpython::object_length(repr_only), 7U);
+    EXPECT_EQ(cxxpython::object_get_item(repr_only, custom_a), custom_a);
+    EXPECT_TRUE(cxxpython::object_contains(repr_only, custom_a));
 }
 
 TEST(CoreObjects, TypeFlagsSeparateCompactBuiltinsFromHeapInstances)

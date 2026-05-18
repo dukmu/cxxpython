@@ -51,6 +51,39 @@ TEST(CoreObjects, ListSemantics)
     EXPECT_EQ(visited_children, list->size());
 }
 
+TEST(CoreObjects, SequenceSlotsReadAndWriteListAndTupleItems)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::Object *first = runtime.new_str("first");
+    cxxpython::Object *replacement = runtime.new_str("replacement");
+    cxxpython::ListObject *list = runtime.new_list({first, runtime.new_str("second")});
+    cxxpython::TupleObject *tuple = runtime.new_tuple({first, runtime.new_int(2)});
+
+    EXPECT_EQ(cxxpython::object_length(list), 2);
+    EXPECT_EQ(cxxpython::object_get_item(list, runtime.new_int(0)), first);
+    EXPECT_EQ(cxxpython::object_get_item(list, runtime.new_int(-1)), list->get(1));
+    EXPECT_TRUE(cxxpython::object_contains(list, first));
+    EXPECT_FALSE(cxxpython::object_contains(list, runtime.new_str("missing")));
+
+    cxxpython::object_set_item(list, runtime.new_int(1), replacement);
+    EXPECT_EQ(cxxpython::object_get_item(list, runtime.new_int(1)), replacement);
+
+    EXPECT_EQ(cxxpython::object_length(tuple), 2);
+    EXPECT_EQ(cxxpython::object_get_item(tuple, runtime.new_int(0)), first);
+    EXPECT_TRUE(cxxpython::object_contains(tuple, runtime.new_int(2)));
+
+    try
+    {
+        cxxpython::object_set_item(tuple, runtime.new_int(0), replacement);
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "'tuple' object does not support item assignment");
+    }
+}
+
 TEST(CoreObjects, ListRaisesPythonErrors)
 {
     cxxpython::Runtime runtime;
@@ -80,6 +113,17 @@ TEST(CoreObjects, ListRaisesPythonErrors)
         EXPECT_STREQ(error.what(), "unhashable type: 'list'");
         ASSERT_NE(error.value(), nullptr);
         EXPECT_EQ(error.value()->message(), "unhashable type: 'list'");
+    }
+
+    try
+    {
+        (void)cxxpython::object_get_item(list, runtime.new_str("bad"));
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "list indices must be integers");
     }
 }
 

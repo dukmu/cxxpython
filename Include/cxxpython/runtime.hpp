@@ -45,6 +45,7 @@ namespace cxxpython
         TypeObject *exception_type() const noexcept;
         TypeObject *type_error_type() const noexcept;
         TypeObject *index_error_type() const noexcept;
+        TypeObject *key_error_type() const noexcept;
         TypeObject *syntax_error_type() const noexcept;
         TypeObject *name_error_type() const noexcept;
         TypeObject *attribute_error_type() const noexcept;
@@ -96,6 +97,7 @@ namespace cxxpython
         ExceptionObject *new_exception(TypeObject *type, std::vector<Object *> args);
         ExceptionObject *new_type_error(std::string message);
         ExceptionObject *new_index_error(std::string message);
+        ExceptionObject *new_key_error(Object *key);
         ExceptionObject *new_syntax_error(std::string message);
         ExceptionObject *new_name_error(std::string message);
         ExceptionObject *new_attribute_error(std::string message);
@@ -151,6 +153,7 @@ namespace cxxpython
         TypeObject *exception_type_ = nullptr;
         TypeObject *type_error_type_ = nullptr;
         TypeObject *index_error_type_ = nullptr;
+        TypeObject *key_error_type_ = nullptr;
         TypeObject *syntax_error_type_ = nullptr;
         TypeObject *name_error_type_ = nullptr;
         TypeObject *attribute_error_type_ = nullptr;

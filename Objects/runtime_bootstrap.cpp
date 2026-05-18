@@ -28,6 +28,7 @@ namespace cxxpython
         exception_type_ = allocate_type("Exception");
         type_error_type_ = allocate_type("TypeError");
         index_error_type_ = allocate_type("IndexError");
+        key_error_type_ = allocate_type("KeyError");
         syntax_error_type_ = allocate_type("SyntaxError");
         name_error_type_ = allocate_type("NameError");
         attribute_error_type_ = allocate_type("AttributeError");
@@ -52,6 +53,7 @@ namespace cxxpython
         exception_type_->slots = make_exception_slots();
         type_error_type_->slots = make_exception_slots();
         index_error_type_->slots = make_exception_slots();
+        key_error_type_->slots = make_exception_slots();
         syntax_error_type_->slots = make_exception_slots();
         name_error_type_->slots = make_exception_slots();
         attribute_error_type_->slots = make_exception_slots();
@@ -76,6 +78,7 @@ namespace cxxpython
         exception_type_->set_type(type_type_);
         type_error_type_->set_type(type_type_);
         index_error_type_->set_type(type_type_);
+        key_error_type_->set_type(type_type_);
         syntax_error_type_->set_type(type_type_);
         name_error_type_->set_type(type_type_);
         attribute_error_type_->set_type(type_type_);
@@ -103,6 +106,7 @@ namespace cxxpython
         initialize_type(exception_type_, base_exception_type_);
         initialize_type(type_error_type_, exception_type_);
         initialize_type(index_error_type_, exception_type_);
+        initialize_type(key_error_type_, exception_type_);
         initialize_type(syntax_error_type_, exception_type_);
         initialize_type(name_error_type_, exception_type_);
         initialize_type(attribute_error_type_, exception_type_);
@@ -131,6 +135,7 @@ namespace cxxpython
         add_root(exception_type_);
         add_root(type_error_type_);
         add_root(index_error_type_);
+        add_root(key_error_type_);
         add_root(syntax_error_type_);
         add_root(name_error_type_);
         add_root(attribute_error_type_);

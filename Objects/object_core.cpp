@@ -229,6 +229,61 @@ namespace cxxpython
         raise_type_error(callable->runtime(), message.str());
     }
 
+    std::size_t object_length(Object *object)
+    {
+        if (!object)
+            raise_type_error(nullptr, "object of type '<null>' has no len()");
+        if (object->type() && object->type()->slots.length)
+            return object->type()->slots.length(*object);
+
+        std::ostringstream message;
+        message << "object of type '" << type_qualified_name(object->type())
+                << "' has no len()";
+        raise_type_error(object->runtime(), message.str());
+    }
+
+    Object *object_get_item(Object *object, Object *key)
+    {
+        if (!object || !key)
+            raise_type_error(object ? object->runtime() : nullptr, "subscript target and key cannot be null");
+        if (object->type() && object->type()->slots.getitem)
+            return object->type()->slots.getitem(*object, key);
+
+        std::ostringstream message;
+        message << "'" << type_qualified_name(object->type())
+                << "' object is not subscriptable";
+        raise_type_error(object->runtime(), message.str());
+    }
+
+    void object_set_item(Object *object, Object *key, Object *value)
+    {
+        if (!object || !key || !value)
+            raise_type_error(object ? object->runtime() : nullptr, "subscript target, key, and value cannot be null");
+        if (object->type() && object->type()->slots.setitem)
+        {
+            object->type()->slots.setitem(*object, key, value);
+            return;
+        }
+
+        std::ostringstream message;
+        message << "'" << type_qualified_name(object->type())
+                << "' object does not support item assignment";
+        raise_type_error(object->runtime(), message.str());
+    }
+
+    bool object_contains(Object *object, Object *key)
+    {
+        if (!object || !key)
+            raise_type_error(object ? object->runtime() : nullptr, "contains target and key cannot be null");
+        if (object->type() && object->type()->slots.contains)
+            return object->type()->slots.contains(*object, key);
+
+        std::ostringstream message;
+        message << "argument of type '" << type_qualified_name(object->type())
+                << "' is not iterable";
+        raise_type_error(object->runtime(), message.str());
+    }
+
     Object *type_lookup_attribute(TypeObject *type, StrObject *name)
     {
         if (!type || !name)
@@ -397,6 +452,13 @@ namespace cxxpython
         if (!runtime)
             throw std::logic_error("cannot raise Python IndexError without a runtime");
         throw PythonError(runtime->new_index_error(std::move(message)));
+    }
+
+    void raise_key_error(Runtime *runtime, Object *key)
+    {
+        if (!runtime)
+            throw std::logic_error("cannot raise Python KeyError without a runtime");
+        throw PythonError(runtime->new_key_error(key));
     }
 
     void raise_syntax_error(Runtime *runtime, std::string message)

@@ -183,6 +183,13 @@ namespace cxxpython
         return new_exception(index_error_type_, std::move(message));
     }
 
+    ExceptionObject *Runtime::new_key_error(Object *key)
+    {
+        Object *resolved_key = key ? key : new_str("<null>");
+        TupleObject *args_tuple = new_tuple({resolved_key});
+        return allocate<ExceptionObject>(key_error_type_, args_tuple, object_repr(resolved_key));
+    }
+
     ExceptionObject *Runtime::new_syntax_error(std::string message)
     {
         return new_exception(syntax_error_type_, std::move(message));

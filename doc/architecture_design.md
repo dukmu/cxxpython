@@ -85,7 +85,8 @@ doc/            design docs and milestone plans
 ## Slot 扩展路线
 
 当前 slot 覆盖第一批对象协议：`repr`、`hash`、`equal`、`truth`、
-`traverse`、`binary_add`、`call`、`descr_get`、`descr_set`。后续扩展顺序：
+`traverse`、`binary_add`、`call`、`length`、`getitem`、`setitem`、
+`contains`、`descr_get`、`descr_set`。后续扩展顺序：
 
 - Numeric: add/sub/mul/div/mod/pow, unary, in-place, reflected operators.
 - Rich compare: eq/ne/lt/le/gt/ge 返回 Python bool/NotImplemented 语义。
@@ -119,6 +120,10 @@ doc/            design docs and milestone plans
 - `LOAD_ATTR`/`STORE_ATTR` 的职责也是栈调度和 name operand 解码；属性语义
   必须继续由 `object_get_attr`/`object_set_attr` 处理。不要在 VM opcode 中
   复制 descriptor、module dict、instance dict 或 type MRO 规则。
+- Future subscript opcodes must follow the same rule: `BINARY_SUBSCR`,
+  `STORE_SUBSCR`, containment, and `len()` dispatch through
+  `object_get_item`/`object_set_item`/`object_contains`/`object_length`, not
+  direct `list`/`dict` checks in the VM.
 
 ## 模块系统路线
 

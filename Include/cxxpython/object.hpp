@@ -35,6 +35,10 @@ namespace cxxpython
     using TraverseSlot = void (*)(const Object &, const VisitChildren &);
     using BinarySlot = Object *(*)(const Object &, const Object &);
     using CallSlot = Object *(*)(Object &, const std::vector<Object *> &);
+    using LengthSlot = std::size_t (*)(const Object &);
+    using GetItemSlot = Object *(*)(Object &, Object *);
+    using SetItemSlot = void (*)(Object &, Object *, Object *);
+    using ContainsSlot = bool (*)(Object &, Object *);
     using DescrGetSlot = Object *(*)(Object &, Object *, TypeObject *);
     using DescrSetSlot = void (*)(Object &, Object *, Object *);
 
@@ -47,6 +51,10 @@ namespace cxxpython
         TraverseSlot traverse = nullptr;
         BinarySlot binary_add = nullptr;
         CallSlot call = nullptr;
+        LengthSlot length = nullptr;
+        GetItemSlot getitem = nullptr;
+        SetItemSlot setitem = nullptr;
+        ContainsSlot contains = nullptr;
         DescrGetSlot descr_get = nullptr;
         DescrSetSlot descr_set = nullptr;
     };
@@ -315,6 +323,10 @@ namespace cxxpython
     bool object_equal(const Object *left, const Object *right);
     Object *object_binary_add(Object *left, Object *right);
     Object *object_call(Object *callable, const std::vector<Object *> &args);
+    std::size_t object_length(Object *object);
+    Object *object_get_item(Object *object, Object *key);
+    void object_set_item(Object *object, Object *key, Object *value);
+    bool object_contains(Object *object, Object *key);
     Object *object_get_attr(Object *object, StrObject *name);
     Object *object_get_attr(Object *object, const std::string &name);
     void object_set_attr(Object *object, StrObject *name, Object *value);
@@ -343,6 +355,7 @@ namespace cxxpython
 
     [[noreturn]] void raise_type_error(Runtime *runtime, std::string message);
     [[noreturn]] void raise_index_error(Runtime *runtime, std::string message);
+    [[noreturn]] void raise_key_error(Runtime *runtime, Object *key);
     [[noreturn]] void raise_syntax_error(Runtime *runtime, std::string message);
     [[noreturn]] void raise_name_error(Runtime *runtime, std::string message);
     [[noreturn]] void raise_attribute_error(Runtime *runtime, std::string message);
