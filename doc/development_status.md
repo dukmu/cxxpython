@@ -16,9 +16,10 @@ Seven tracked risks:
    `Runtime::new_class` inherited slots from the primary base only, so
    arbitrary combinations such as `list` plus `dict` could create a type whose
    C++ object layout could not be allocated or safely operated on.
-2. High: class creation still bypasses metaclass selection and `__prepare__`.
-   `MAKE_CLASS` builds a raw dict namespace and calls `Runtime::new_class`;
-   three-argument `type(...)` reaches the same factory directly.
+2. High, core entry fixed in current slice: class creation bypassed metaclass
+   selection and `__prepare__`. `MAKE_CLASS`, `type(...)`, and metaclass calls
+   now share `ClassConstructionRequest` and runtime metaclass selection;
+   syntax-level `metaclass=` and full `__prepare__` invocation remain open.
 3. High: function scope is not Python semantics yet. The current symbol table
    is a name list and `LOAD_NAME` resolves locals -> globals -> builtins, so
    local/global/free/cell analysis, `global`, `nonlocal`, and
@@ -41,9 +42,80 @@ Immediate order:
   type, builtin subclass, and C/C++ extension type work.
 - Done in current slice: list literal syntax and `BUILD_LIST` now provide
   Python-level list coverage without C++ wrapper setup.
-- Next: continue through metaclass/class creation, function scope analysis,
+- Done in current slice: class statement, `type(...)`, and metaclass calls now
+  share a metaclass-aware construction request.
+- Next: continue through `__prepare__`, syntax-level `metaclass=`, function scope analysis,
   traceback metadata, root guards, builtin protocol cleanup, and descriptor
   completeness.
+
+## 2026-05-18 Metaclass-Aware Class Construction Request
+
+Pre-change review:
+
+- Class creation had two clean but separate entry points: `MAKE_CLASS` created
+  and prefilled a namespace before calling `Runtime::new_class`, while
+  three-argument `type(...)` parsed arguments in `object_core.cpp` and called
+  the same factory directly.
+- Continuing to add metaclass conflict checks, `Meta(...)`, `metaclass=`, and
+  `__prepare__` on top of both call sites would have created duplicate class
+  creation semantics.
+
+Debt addressed:
+
+- Added `ClassConstructionRequest` carrying name, bases, namespace,
+  module fallback, qualname, and explicit metaclass seed.
+- Added `Runtime::prepare_class_namespace` so `MAKE_CLASS` no longer owns the
+  namespace prefill rules.
+- Added runtime metaclass selection with CPython's winner rule: explicit
+  metaclass seed first, otherwise select the most derived metaclass among all
+  bases; incompatible metaclasses raise `TypeError`.
+- `type.__call__` now treats subclasses of `type` as metaclass callables for
+  the three-argument form, so `Meta('Base', (), {})` creates a class whose
+  runtime type is `Meta`.
+- `MAKE_CLASS`, direct `type(name, bases, namespace)`, and
+  `Meta(name, bases, namespace)` all converge on `Runtime::new_class(request)`.
+
+Completed:
+
+- Added C++ tests for metaclass selection, inherited metaclass use, and
+  metaclass conflict errors.
+- Added compiler coverage proving `class Child(Base):` inherits Base's custom
+  metaclass when Base was created through `Meta(...)`.
+- Added Python golden coverage in `Tests/python/metaclass.py`.
+
+Design review:
+
+- This is intentionally not a fake `metaclass=` syntax slice. The important
+  architecture move is that all current class creation paths now share a
+  request object and one runtime selector, leaving a single place to add
+  `__prepare__`, class keywords, and explicit metaclass syntax.
+- `Runtime::new_class(request)` still performs the final heap type allocation
+  internally. A later full `type.__new__`/metaclass override implementation
+  should preserve the same request boundary while allowing metaclass slots to
+  customize creation.
+
+Known debt and next risk:
+
+- `__prepare__` lookup/call is not implemented; class statement namespaces are
+  still plain dicts prepared by runtime.
+- Parser/compiler do not support class keyword arguments such as
+  `class A(Base, metaclass=Meta):`.
+- Function scope analysis remains the next high-risk semantic debt.
+
+Next:
+
+- Start real symbol analysis for module/function scopes before defaults,
+  closures, or more complex class body behavior expand the incorrect
+  `LOAD_NAME` semantics.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects '--gtest_filter=CoreObjects.ClassCreationSelectsMostDerivedMetaclass:CoreObjects.ClassCreationRejectsMetaclassConflicts:CoreObjects.TypeCallCreatesHeapTypesFromNameBasesNamespace:Compile.ClassDefinitionsSelectInheritedMetaclass:PythonScripts.RunsGoldenFiles'`
+- `ctest --test-dir build --output-on-failure`
+- `git diff --check`
+
+Result: all tests pass.
 
 ## 2026-05-18 Type Layout Compatibility And List Literal
 

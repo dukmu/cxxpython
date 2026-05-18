@@ -284,11 +284,12 @@ doc/            design docs and milestone plans
 - `class` statement 编译为“执行 class body code object -> 收集 namespace ->
   调用 metaclass”的路径。class body locals 是类 namespace，不是模块 globals；
   `__module__`、`__qualname__`、方法函数对象和 descriptors 都写入该 namespace。
-- 当前实现已采用这条路径的种子版本：`MAKE_CLASS` 执行 class body code
-  object，`Runtime::new_class` 复制 namespace 到 heap type dict；
-  `type(name, bases, namespace)` 也调用同一 bases-aware API。继承语法、
-  metaclass selection 和 `__prepare__` 必须继续扩展这条中心路径，而不是新增
-  并行创建逻辑。
+- 当前实现通过 `ClassConstructionRequest` 统一 class statement、
+  `type(name, bases, namespace)` 和 `Meta(name, bases, namespace)`。`MAKE_CLASS`
+  只负责求值 bases、执行 class body，并把 request 交给 runtime；三参数
+  type/metaclass call 也构造同一 request。后续 `metaclass=`、class keywords
+  和 `__prepare__` 必须扩展 request/prepare path，而不是在 VM、parser 或
+  factory 中新增并行创建逻辑。
 - Class statement lowering evaluates base expressions first, builds a bases
   tuple, then executes the class body with an isolated namespace. `MAKE_CLASS`
   consumes that bases tuple and the class body `CodeObject`, so no-base and
@@ -296,12 +297,14 @@ doc/            design docs and milestone plans
 - 继承采用 tuple `__bases__` 和 C3 linearization。单继承路径不能固化成长期
   设计；`TypeObject::base` 只能作为快速主基类缓存，真实语义以 `bases` 和
   `mro` 为准。
-- C3 MRO 已作为 heap type 初始化的一部分存在。后续要补的是 builtin/C
-  extension layout conflict checks、metaclass-derived MRO override，以及
-  脚本层 `class A(Base):` 降级到同一 runtime API。
-- 元类选择遵循 CPython 规则：显式 `metaclass=` 优先，否则取所有 base 的
-  metatype 的最派生公共子类型；存在冲突时抛 `TypeError`。类创建最终通过
-  selected metaclass 的 call/new/init 路径完成。
+- C3 MRO 已作为 heap type 初始化的一部分存在。后续要补的是
+  metaclass-derived MRO override、class keyword arguments 和 full
+  `__prepare__` invocation。
+- 元类选择遵循 CPython 的核心 winner 规则：显式 metaclass seed 优先，否则取
+  所有 base 的 metatype 的最派生公共子类型；存在冲突时抛 `TypeError`。当前
+  `Meta = type('Meta', (type,), {})`、`Meta('Base', (), {})` 和继承 Base 的
+  class statement 已走同一 selection path。语法层 `metaclass=` 和
+  `__prepare__` lookup/call 是下一步。
 - heap type 与内建静态类型共享同一 attribute engine。差别只在 layout flags、
   slot table 和 allocation policy；Python 层可见 attrs 一律来自 type dict、
   instance dict、descriptors 和 MRO。

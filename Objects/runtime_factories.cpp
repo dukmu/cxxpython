@@ -197,13 +197,22 @@ namespace cxxpython
         return type;
     }
 
-    TypeObject *Runtime::new_class(std::string name,
-                                   std::vector<TypeObject *> bases,
-                                   DictObject *namespace_dict,
-                                   std::string module_fallback)
+    DictObject *Runtime::prepare_class_namespace(const ClassConstructionRequest &request)
     {
-        if (!namespace_dict)
+        DictObject *namespace_dict = request.namespace_dict ? request.namespace_dict : new_dict();
+        if (!namespace_dict->contains(new_str("__module__")))
+            namespace_dict->set(new_str("__module__"), new_str(request.module_fallback));
+        const std::string qualname = request.qualname.empty() ? request.name : request.qualname;
+        if (!namespace_dict->contains(new_str("__qualname__")))
+            namespace_dict->set(new_str("__qualname__"), new_str(qualname));
+        return namespace_dict;
+    }
+
+    TypeObject *Runtime::new_class(ClassConstructionRequest request)
+    {
+        if (!request.namespace_dict)
             raise_type_error(this, "class namespace cannot be null");
+        std::vector<TypeObject *> bases = std::move(request.bases);
         if (bases.empty())
             bases.push_back(object_type_);
         for (TypeObject *base : bases)
@@ -213,17 +222,20 @@ namespace cxxpython
         }
 
         validate_base_layouts(bases);
+        TypeObject *metaclass = select_metaclass(request.explicit_metaclass, bases);
         TypeObject *best_base = best_base_for_layout(bases);
-        auto *namespace_module = dynamic_cast<StrObject *>(namespace_dict->get(new_str("__module__")));
-        TypeObject *type = allocate_type(std::move(name));
-        type->set_type(type_type_);
+        auto *namespace_module = dynamic_cast<StrObject *>(request.namespace_dict->get(new_str("__module__")));
+        std::string class_name = std::move(request.name);
+        std::string qualname = request.qualname.empty() ? class_name : std::move(request.qualname);
+        TypeObject *type = allocate_type(std::move(class_name));
+        type->set_type(metaclass);
         type->flags = TypeFlagHeapType | TypeFlagHasInstanceDict;
         type->slots = inherit_slots(best_base, {});
         initialize_type(type, bases);
         type->base = best_base;
         type->solid_base = best_base && best_base->solid_base ? best_base->solid_base : object_type_;
         initialize_type_dict(type);
-        for (const DictObject::Entry &entry : namespace_dict->entries())
+        for (const DictObject::Entry &entry : request.namespace_dict->entries())
         {
             if (entry.key && entry.value)
                 type->dict->set(entry.key, entry.value);
@@ -231,17 +243,31 @@ namespace cxxpython
         if (namespace_module)
             type->module = namespace_module->value;
         else
-            type->module = std::move(module_fallback);
+            type->module = std::move(request.module_fallback);
         type->dict->set(new_str("__name__"), new_str(type->name));
         type->dict->set(new_str("__module__"), new_str(type->module));
         if (!type->dict->contains(new_str("__qualname__")))
-            type->dict->set(new_str("__qualname__"), new_str(type->name));
+            type->dict->set(new_str("__qualname__"), new_str(std::move(qualname)));
         std::vector<Object *> base_objects;
         base_objects.reserve(type->bases.size());
         for (TypeObject *base : type->bases)
             base_objects.push_back(base);
         type->dict->set(new_str("__bases__"), new_tuple(std::move(base_objects)));
         return type;
+    }
+
+    TypeObject *Runtime::new_class(std::string name,
+                                   std::vector<TypeObject *> bases,
+                                   DictObject *namespace_dict,
+                                   std::string module_fallback)
+    {
+        ClassConstructionRequest request;
+        request.name = std::move(name);
+        request.bases = std::move(bases);
+        request.namespace_dict = namespace_dict;
+        request.module_fallback = std::move(module_fallback);
+        request.qualname = request.name;
+        return new_class(std::move(request));
     }
 
     TypeObject *Runtime::new_class(std::string name,

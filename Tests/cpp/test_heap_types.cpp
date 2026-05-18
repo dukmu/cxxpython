@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
+
 #include "cxxpython/runtime.hpp"
 #include "test_support.hpp"
 
@@ -311,6 +313,75 @@ TEST(CoreObjects, TypeCallCreatesHeapTypesFromNameBasesNamespace)
     EXPECT_EQ(multi_type->mro.back(), runtime.object_type());
     EXPECT_EQ(cxxpython::object_get_attr(multi_type, "base_attr"), base_value);
     EXPECT_EQ(cxxpython::object_get_attr(multi_type, "right_attr"), right_value);
+}
+
+TEST(CoreObjects, ClassCreationSelectsMostDerivedMetaclass)
+{
+    cxxpython::Runtime runtime;
+
+    auto *meta = dynamic_cast<cxxpython::TypeObject *>(cxxpython::object_call(
+        runtime.type_type(),
+        {runtime.new_str("Meta"), runtime.new_tuple({runtime.type_type()}), runtime.new_dict()}));
+    ASSERT_NE(meta, nullptr);
+    EXPECT_EQ(meta->type(), runtime.type_type());
+    EXPECT_TRUE(cxxpython::is_subclass(meta, runtime.type_type()));
+
+    auto *base = dynamic_cast<cxxpython::TypeObject *>(cxxpython::object_call(
+        meta,
+        {runtime.new_str("Base"), runtime.new_tuple({}), runtime.new_dict()}));
+    ASSERT_NE(base, nullptr);
+    EXPECT_EQ(base->type(), meta);
+    EXPECT_EQ(base->base, runtime.object_type());
+    std::vector<cxxpython::Object *> base_children;
+    base->visit_children([&base_children](cxxpython::Object *object)
+                         { base_children.push_back(object); });
+    EXPECT_NE(std::find(base_children.begin(), base_children.end(), meta), base_children.end());
+
+    auto *child = dynamic_cast<cxxpython::TypeObject *>(cxxpython::object_call(
+        runtime.type_type(),
+        {runtime.new_str("Child"), runtime.new_tuple({base}), runtime.new_dict()}));
+    ASSERT_NE(child, nullptr);
+    EXPECT_EQ(child->type(), meta);
+    EXPECT_EQ(child->base, base);
+    EXPECT_TRUE(cxxpython::is_subclass(child, base));
+}
+
+TEST(CoreObjects, ClassCreationRejectsMetaclassConflicts)
+{
+    cxxpython::Runtime runtime;
+
+    auto *left_meta = dynamic_cast<cxxpython::TypeObject *>(cxxpython::object_call(
+        runtime.type_type(),
+        {runtime.new_str("LeftMeta"), runtime.new_tuple({runtime.type_type()}), runtime.new_dict()}));
+    auto *right_meta = dynamic_cast<cxxpython::TypeObject *>(cxxpython::object_call(
+        runtime.type_type(),
+        {runtime.new_str("RightMeta"), runtime.new_tuple({runtime.type_type()}), runtime.new_dict()}));
+    ASSERT_NE(left_meta, nullptr);
+    ASSERT_NE(right_meta, nullptr);
+
+    auto *left = dynamic_cast<cxxpython::TypeObject *>(cxxpython::object_call(
+        left_meta,
+        {runtime.new_str("Left"), runtime.new_tuple({}), runtime.new_dict()}));
+    auto *right = dynamic_cast<cxxpython::TypeObject *>(cxxpython::object_call(
+        right_meta,
+        {runtime.new_str("Right"), runtime.new_tuple({}), runtime.new_dict()}));
+    ASSERT_NE(left, nullptr);
+    ASSERT_NE(right, nullptr);
+
+    try
+    {
+        (void)cxxpython::object_call(
+            runtime.type_type(),
+            {runtime.new_str("Bad"), runtime.new_tuple({left, right}), runtime.new_dict()});
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(),
+                     "metaclass conflict: the metaclass of a derived class must be a (non-strict) "
+                     "subclass of the metaclasses of all its bases");
+    }
 }
 
 TEST(CoreObjects, TypeCallValidatesThreeArgumentClassCreation)

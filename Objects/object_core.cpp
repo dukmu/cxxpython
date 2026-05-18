@@ -39,6 +39,8 @@ namespace cxxpython
         void type_traverse(const Object &object, const VisitChildren &visitor)
         {
             auto *type = static_cast<const TypeObject *>(&object);
+            if (type->type() && type->type() != type)
+                visitor(type->type());
             if (type->base)
                 visitor(type->base);
             if (type->solid_base && type->solid_base != type->base)
@@ -93,9 +95,9 @@ namespace cxxpython
             return "builtins";
         }
 
-        TypeObject *type_new_from_three_args(TypeObject &type, const std::vector<Object *> &args)
+        TypeObject *type_new_from_three_args(TypeObject &metaclass, const std::vector<Object *> &args)
         {
-            Runtime *runtime = type.runtime();
+            Runtime *runtime = metaclass.runtime();
             auto *name = dynamic_cast<StrObject *>(args[0]);
             if (!name)
                 raise_type_error(runtime, "type() name must be a str");
@@ -115,10 +117,14 @@ namespace cxxpython
                     raise_type_error(runtime, "type() bases must contain only types");
                 bases.push_back(base_type);
             }
-            return runtime->new_class(name->value,
-                                      std::move(bases),
-                                      namespace_dict,
-                                      active_module_name(*runtime));
+            ClassConstructionRequest request;
+            request.name = name->value;
+            request.bases = std::move(bases);
+            request.namespace_dict = namespace_dict;
+            request.module_fallback = active_module_name(*runtime);
+            request.qualname = name->value;
+            request.explicit_metaclass = &metaclass == runtime->type_type() ? nullptr : &metaclass;
+            return runtime->new_class(std::move(request));
         }
 
         Object *type_call(Object &object, const std::vector<Object *> &args)
@@ -126,9 +132,9 @@ namespace cxxpython
             auto *type = dynamic_cast<TypeObject *>(&object);
             if (!type)
                 raise_type_error(object.runtime(), "type call target has invalid layout");
-            if (type == type->runtime()->type_type())
+            if (is_subclass(type, type->runtime()->type_type()))
             {
-                if (args.size() == 1)
+                if (type == type->runtime()->type_type() && args.size() == 1)
                 {
                     if (!args[0])
                         raise_type_error(type->runtime(), "type() argument cannot be null");

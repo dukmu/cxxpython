@@ -21,6 +21,16 @@ namespace cxxpython
     class PythonMethodObject;
     class VirtualMachine;
 
+    struct ClassConstructionRequest
+    {
+        std::string name;
+        std::vector<TypeObject *> bases;
+        DictObject *namespace_dict = nullptr;
+        std::string module_fallback = "builtins";
+        std::string qualname;
+        TypeObject *explicit_metaclass = nullptr;
+    };
+
     class Runtime final
     {
     public:
@@ -111,6 +121,8 @@ namespace cxxpython
                          DictObject *globals = nullptr,
                          DictObject *builtins = nullptr);
         TypeObject *new_heap_type(std::string name, TypeObject *base, TypeSlots slots = {});
+        DictObject *prepare_class_namespace(const ClassConstructionRequest &request);
+        TypeObject *new_class(ClassConstructionRequest request);
         TypeObject *new_class(std::string name,
                               std::vector<TypeObject *> bases,
                               DictObject *namespace_dict,
@@ -157,6 +169,8 @@ namespace cxxpython
         TypeSlots inherit_slots(TypeObject *base, TypeSlots slots) const;
         TypeObject *best_base_for_layout(const std::vector<TypeObject *> &bases) const;
         void validate_base_layouts(const std::vector<TypeObject *> &bases);
+        TypeObject *select_metaclass(TypeObject *explicit_metaclass,
+                                      const std::vector<TypeObject *> &bases);
         void initialize_builtins();
 
         friend class VirtualMachine;

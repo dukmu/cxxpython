@@ -249,4 +249,35 @@ namespace cxxpython
                 raise_type_error(this, "multiple bases have instance lay-out conflict");
         }
     }
+
+    TypeObject *Runtime::select_metaclass(TypeObject *explicit_metaclass,
+                                          const std::vector<TypeObject *> &bases)
+    {
+        TypeObject *winner = explicit_metaclass;
+        if (winner && !is_subclass(winner, type_type_))
+            raise_type_error(this, "metaclass must be a subclass of type");
+
+        if (!winner)
+            winner = bases.empty() ? type_type_ : bases[0]->type();
+
+        for (TypeObject *base : bases)
+        {
+            TypeObject *base_metaclass = base ? base->type() : nullptr;
+            if (!base_metaclass)
+                raise_type_error(this, "class base has no metaclass");
+            if (is_subclass(winner, base_metaclass))
+                continue;
+            if (is_subclass(base_metaclass, winner))
+            {
+                winner = base_metaclass;
+                continue;
+            }
+            raise_type_error(
+                this,
+                "metaclass conflict: the metaclass of a derived class must be a (non-strict) "
+                "subclass of the metaclasses of all its bases");
+        }
+
+        return winner;
+    }
 }

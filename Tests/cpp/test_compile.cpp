@@ -863,6 +863,37 @@ TEST(Compile, CompilesClassDefinitionsWithBases)
     EXPECT_EQ(static_cast<cxxpython::StrObject *>(globals->get(runtime.new_str("child_result")))->value, "child");
 }
 
+TEST(Compile, ClassDefinitionsSelectInheritedMetaclass)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+    globals->set(runtime.new_str("__name__"), runtime.new_str("__main__"));
+
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(
+        runtime,
+        "Meta = type('Meta', (type,), {})\n"
+        "Base = Meta('Base', (), {})\n"
+        "class Child(Base):\n"
+        "    label = 'child'\n"
+        "result = type(Child)\n"
+        "instance = Child()\n",
+        "script.py");
+    ASSERT_NE(code, nullptr);
+
+    EXPECT_EQ(vm.execute(*code, *globals), runtime.none());
+    auto *meta = dynamic_cast<cxxpython::TypeObject *>(globals->get(runtime.new_str("Meta")));
+    auto *base = dynamic_cast<cxxpython::TypeObject *>(globals->get(runtime.new_str("Base")));
+    auto *child = dynamic_cast<cxxpython::TypeObject *>(globals->get(runtime.new_str("Child")));
+    ASSERT_NE(meta, nullptr);
+    ASSERT_NE(base, nullptr);
+    ASSERT_NE(child, nullptr);
+    EXPECT_EQ(base->type(), meta);
+    EXPECT_EQ(child->type(), meta);
+    EXPECT_EQ(globals->get(runtime.new_str("result")), meta);
+    EXPECT_EQ(globals->get(runtime.new_str("instance"))->type(), child);
+}
+
 TEST(Compile, RaisesSyntaxErrorForInvalidAssignmentTarget)
 {
     cxxpython::Runtime runtime;

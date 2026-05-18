@@ -510,12 +510,15 @@ namespace cxxpython
                         raise_type_error(&runtime_, "class bases must be types");
                     bases.push_back(base_type);
                 }
-                DictObject *namespace_dict = runtime_.new_dict();
-                namespace_dict->set(runtime_.new_str("__module__"),
-                                    runtime_.new_str(module_name_from_globals(runtime_, globals)));
-                namespace_dict->set(runtime_.new_str("__qualname__"), runtime_.new_str(class_name->value));
+                ClassConstructionRequest request;
+                request.name = class_name->value;
+                request.bases = std::move(bases);
+                request.module_fallback = module_name_from_globals(runtime_, globals);
+                request.qualname = class_name->value;
+                DictObject *namespace_dict = runtime_.prepare_class_namespace(request);
                 (void)execute(*class_code, *namespace_dict, globals, builtins);
-                frame->push(runtime_.new_class(class_name->value, std::move(bases), namespace_dict));
+                request.namespace_dict = namespace_dict;
+                frame->push(runtime_.new_class(std::move(request)));
                 break;
             }
             case Opcode::Call:
