@@ -1,5 +1,66 @@
 # Development Status
 
+## 2026-05-18 Class Base List Syntax
+
+Pre-change review:
+
+- Runtime class creation could represent bases and C3 MRO, but `class`
+  statements still always created an implicit `object` subclass.
+- Keeping no-base and with-base class statements on different VM protocols
+  would split class semantics again.
+- Base expressions must be evaluated before class body execution, while the
+  class body itself still runs in a fresh namespace.
+
+Debt addressed:
+
+- Extended `ClassDefStmt` with evaluated base expressions.
+- Parser now accepts `class A():`, `class A(Base):`, and
+  `class A(Base, Right):`.
+- Compiler emits base expressions, `BUILD_TUPLE`, class body `CodeObject`, and
+  `MAKE_CLASS` for every class statement.
+- `MAKE_CLASS` now consumes a bases tuple plus class code object and delegates
+  to `Runtime::new_class`.
+
+Completed:
+
+- Updated bytecode metadata and malformed-bytecode coverage for the new
+  `MAKE_CLASS` stack contract.
+- Added bytecode coverage proving evaluated bases are used for class creation.
+- Added compiler coverage for multiple class bases, inherited attributes,
+  instance construction, and C3 MRO order.
+- Extended Python golden class tests for `class B(A):`, `__bases__`, inherited
+  attributes, and instance type repr.
+
+Design notes:
+
+- Class statement, direct `type(...)`, and runtime C++ class creation now share
+  the same bases-aware construction API.
+- `TypeObject::base` remains a primary-base cache only; `bases` and `mro` are
+  the semantic source of truth.
+
+Known debt and next risk:
+
+- No metaclass selection, `metaclass=` keyword, `__prepare__`, decorators, or
+  `super` yet.
+- Builtin/extension layout conflict checks still need explicit type flags.
+- `True`/`False`/`None` still need literal token handling.
+
+Next:
+
+- Keywordize `True`/`False`/`None` and reject attempts to assign to them.
+- Then start metaclass preparation: parse class keywords, introduce selected
+  metaclass calculation, and keep all paths routed through `Runtime::new_class`
+  or its eventual metaclass-aware successor.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects '--gtest_filter=Bytecode.MetadataNamesAndStackEffects:Bytecode.DispatchesMakeClass:Bytecode.MakeClassUsesEvaluatedBases:Bytecode.RejectsMalformedBytecode:Compile.CompilesMinimalClassDefinitions:Compile.CompilesClassDefinitionsWithBases:PythonScripts.RunsGoldenFiles'`
+- `ctest --test-dir build --output-on-failure`
+- `git diff --check`
+
+Result: all tests pass.
+
 ## 2026-05-18 Tuple/Dict Literals For Type Construction Scripts
 
 Pre-change review:
@@ -46,9 +107,7 @@ Known debt and next risk:
 
 Next:
 
-- Add `class A(Base):` and `class A(B, C):` syntax, compiling evaluated base
-  expressions into the same class creation path.
-- Then keywordize `True`/`False`/`None` as literal tokens and reject assignment
+- Keywordize `True`/`False`/`None` as literal tokens and reject assignment
   targets that try to bind them.
 
 Verification:

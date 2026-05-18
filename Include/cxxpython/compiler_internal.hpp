@@ -467,12 +467,15 @@ namespace cxxpython::compiler_internal
 
     struct ClassDefStmt final : Stmt
     {
-        ClassDefStmt(std::string name_in, std::vector<std::unique_ptr<Stmt>> body_in)
-            : name(std::move(name_in)), body(std::move(body_in))
+        ClassDefStmt(std::string name_in,
+                     std::vector<std::unique_ptr<Expr>> bases_in,
+                     std::vector<std::unique_ptr<Stmt>> body_in)
+            : name(std::move(name_in)), bases(std::move(bases_in)), body(std::move(body_in))
         {
         }
 
         std::string name;
+        std::vector<std::unique_ptr<Expr>> bases;
         std::vector<std::unique_ptr<Stmt>> body;
 
         void accept(StmtVisitor &visitor) const override

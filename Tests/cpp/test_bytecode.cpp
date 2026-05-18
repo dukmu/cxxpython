@@ -55,7 +55,7 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::PopJumpIfTrue, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::JumpIfFalseOrPop, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::MakeFunction, 0}), 0);
-    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::MakeClass, 0}), 0);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::MakeClass, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::Call, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::Call, 2}), -2);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::ReturnValue, 0}), -1);
@@ -229,9 +229,10 @@ TEST(Bytecode, DispatchesMakeClass)
          {cxxpython::Opcode::LoadConst, 0},
          {cxxpython::Opcode::ReturnValue, 0}});
     cxxpython::CodeObject *module_code = runtime.new_code(
-        {class_code},
+        {runtime.new_tuple({runtime.object_type()}), class_code},
         {runtime.new_str("Made")},
         {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::LoadConst, 1},
          {cxxpython::Opcode::MakeClass, 0},
          {cxxpython::Opcode::ReturnValue, 0}});
 
@@ -244,6 +245,43 @@ TEST(Bytecode, DispatchesMakeClass)
     auto *value = dynamic_cast<cxxpython::StrObject *>(cxxpython::object_get_attr(type, "value"));
     ASSERT_NE(value, nullptr);
     EXPECT_EQ(value->value, "class-value");
+}
+
+TEST(Bytecode, MakeClassUsesEvaluatedBases)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+    globals->set(runtime.new_str("__name__"), runtime.new_str("__main__"));
+
+    cxxpython::DictObject *base_namespace = runtime.new_dict();
+    cxxpython::Object *base_value = runtime.new_str("base-value");
+    base_namespace->set(runtime.new_str("base_attr"), base_value);
+    cxxpython::TypeObject *base = runtime.new_class("Base", runtime.object_type(), base_namespace, "__main__");
+    cxxpython::CodeObject *class_code = runtime.new_code(
+        "Child",
+        "test.py",
+        {runtime.new_str("child-value")},
+        {runtime.new_str("child_attr")},
+        {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::StoreName, 0},
+         {cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::ReturnValue, 0}});
+    cxxpython::CodeObject *module_code = runtime.new_code(
+        {runtime.new_tuple({base}), class_code},
+        {runtime.new_str("Child")},
+        {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::LoadConst, 1},
+         {cxxpython::Opcode::MakeClass, 0},
+         {cxxpython::Opcode::ReturnValue, 0}});
+
+    auto *type = dynamic_cast<cxxpython::TypeObject *>(vm.execute(*module_code, *globals));
+    ASSERT_NE(type, nullptr);
+    EXPECT_EQ(type->base, base);
+    ASSERT_EQ(type->bases.size(), 1U);
+    EXPECT_EQ(type->bases[0], base);
+    EXPECT_TRUE(cxxpython::is_subclass(type, base));
+    EXPECT_EQ(cxxpython::object_get_attr(type, "base_attr"), base_value);
 }
 
 TEST(Bytecode, TypeCallClassCreationUsesActiveFrameModule)
@@ -875,18 +913,30 @@ TEST(Bytecode, RejectsMalformedBytecode)
     EXPECT_EQ(vm.thread_state().frame_depth(), 0U);
 
     EXPECT_THROW((void)vm.execute(*runtime.new_code(
-                     {runtime.new_str("not-code")},
+                     {runtime.new_tuple({runtime.object_type()}), runtime.new_str("not-code")},
                      {runtime.new_str("Broken")},
                      {{cxxpython::Opcode::LoadConst, 0},
+                      {cxxpython::Opcode::LoadConst, 1},
                       {cxxpython::Opcode::MakeClass, 0},
                       {cxxpython::Opcode::ReturnValue, 0}})),
                  cxxpython::BytecodeError);
     EXPECT_EQ(vm.thread_state().frame_depth(), 0U);
 
     EXPECT_THROW((void)vm.execute(*runtime.new_code(
-                     {runtime.new_code({}, {{cxxpython::Opcode::ReturnValue, 0}})},
+                     {runtime.new_tuple({runtime.object_type()}), runtime.new_code({}, {{cxxpython::Opcode::ReturnValue, 0}})},
                      {},
                      {{cxxpython::Opcode::LoadConst, 0},
+                      {cxxpython::Opcode::LoadConst, 1},
+                      {cxxpython::Opcode::MakeClass, 0},
+                      {cxxpython::Opcode::ReturnValue, 0}})),
+                 cxxpython::BytecodeError);
+    EXPECT_EQ(vm.thread_state().frame_depth(), 0U);
+
+    EXPECT_THROW((void)vm.execute(*runtime.new_code(
+                     {runtime.new_str("not-bases"), runtime.new_code({}, {{cxxpython::Opcode::ReturnValue, 0}})},
+                     {runtime.new_str("Broken")},
+                     {{cxxpython::Opcode::LoadConst, 0},
+                      {cxxpython::Opcode::LoadConst, 1},
                       {cxxpython::Opcode::MakeClass, 0},
                       {cxxpython::Opcode::ReturnValue, 0}})),
                  cxxpython::BytecodeError);

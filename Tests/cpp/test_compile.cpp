@@ -745,6 +745,48 @@ TEST(Compile, CompilesMinimalClassDefinitions)
     EXPECT_EQ(result->value, "class-label");
 }
 
+TEST(Compile, CompilesClassDefinitionsWithBases)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+    globals->set(runtime.new_str("__name__"), runtime.new_str("__main__"));
+
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(
+        runtime,
+        "class Base:\n"
+        "    base_attr = 'base'\n"
+        "class Right:\n"
+        "    right_attr = 'right'\n"
+        "class Child(Base, Right):\n"
+        "    child_attr = 'child'\n"
+        "obj = Child()\n"
+        "base_result = obj.base_attr\n"
+        "right_result = obj.right_attr\n"
+        "child_result = obj.child_attr\n",
+        "script.py");
+    ASSERT_NE(code, nullptr);
+
+    EXPECT_EQ(vm.execute(*code, *globals), runtime.none());
+    auto *base = dynamic_cast<cxxpython::TypeObject *>(globals->get(runtime.new_str("Base")));
+    auto *right = dynamic_cast<cxxpython::TypeObject *>(globals->get(runtime.new_str("Right")));
+    auto *child = dynamic_cast<cxxpython::TypeObject *>(globals->get(runtime.new_str("Child")));
+    ASSERT_NE(base, nullptr);
+    ASSERT_NE(right, nullptr);
+    ASSERT_NE(child, nullptr);
+    ASSERT_EQ(child->bases.size(), 2U);
+    EXPECT_EQ(child->bases[0], base);
+    EXPECT_EQ(child->bases[1], right);
+    ASSERT_GE(child->mro.size(), 4U);
+    EXPECT_EQ(child->mro[0], child);
+    EXPECT_EQ(child->mro[1], base);
+    EXPECT_EQ(child->mro[2], right);
+    EXPECT_EQ(child->mro.back(), runtime.object_type());
+    EXPECT_EQ(static_cast<cxxpython::StrObject *>(globals->get(runtime.new_str("base_result")))->value, "base");
+    EXPECT_EQ(static_cast<cxxpython::StrObject *>(globals->get(runtime.new_str("right_result")))->value, "right");
+    EXPECT_EQ(static_cast<cxxpython::StrObject *>(globals->get(runtime.new_str("child_result")))->value, "child");
+}
+
 TEST(Compile, RaisesSyntaxErrorForInvalidAssignmentTarget)
 {
     cxxpython::Runtime runtime;

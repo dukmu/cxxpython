@@ -194,11 +194,29 @@ namespace cxxpython::compiler_internal
                 if (peek().kind != TokenKind::Identifier)
                     raise_at(peek(), "expected class name");
                 std::string name = advance().lexeme;
+                std::vector<std::unique_ptr<Expr>> bases;
+                if (peek().kind == TokenKind::LeftParen)
+                {
+                    advance();
+                    if (peek().kind != TokenKind::RightParen)
+                    {
+                        while (true)
+                        {
+                            bases.push_back(parse_expression_only());
+                            if (peek().kind != TokenKind::Comma)
+                                break;
+                            advance();
+                            if (peek().kind == TokenKind::RightParen)
+                                break;
+                        }
+                    }
+                    consume(TokenKind::RightParen, "expected ')' after class bases");
+                }
                 consume(TokenKind::Colon, "expected ':' after class name");
                 consume(TokenKind::Newline, "expected newline after class definition");
                 std::vector<std::unique_ptr<Stmt>> body = parse_block();
                 return ParsedStatement{
-                    std::make_unique<ClassDefStmt>(std::move(name), std::move(body)),
+                    std::make_unique<ClassDefStmt>(std::move(name), std::move(bases), std::move(body)),
                     true,
                 };
             }

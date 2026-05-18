@@ -160,6 +160,8 @@ namespace cxxpython
 
             void visit(const compiler_internal::ClassDefStmt &statement) override
             {
+                for (const auto &base : statement.bases)
+                    base->accept(*this);
                 (void)symbols_.add_name(statement.name);
             }
 
@@ -433,6 +435,12 @@ namespace cxxpython
 
             void visit(const compiler_internal::ClassDefStmt &statement) override
             {
+                for (const auto &base : statement.bases)
+                    base->accept(*this);
+                instructions_.push_back(Instruction{
+                    Opcode::BuildTuple,
+                    static_cast<std::uint32_t>(statement.bases.size()),
+                });
                 SymbolTable class_symbols = collect_class_symbols(statement);
                 BytecodeBuilder class_builder(runtime_, class_symbols, filename_);
                 CodeObject *code = class_builder.build_class(statement);

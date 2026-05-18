@@ -276,6 +276,10 @@ doc/            design docs and milestone plans
   `type(name, bases, namespace)` 也调用同一 bases-aware API。继承语法、
   metaclass selection 和 `__prepare__` 必须继续扩展这条中心路径，而不是新增
   并行创建逻辑。
+- Class statement lowering evaluates base expressions first, builds a bases
+  tuple, then executes the class body with an isolated namespace. `MAKE_CLASS`
+  consumes that bases tuple and the class body `CodeObject`, so no-base and
+  with-base class statements share the same VM contract.
 - 继承采用 tuple `__bases__` 和 C3 linearization。单继承路径不能固化成长期
   设计；`TypeObject::base` 只能作为快速主基类缓存，真实语义以 `bases` 和
   `mro` 为准。

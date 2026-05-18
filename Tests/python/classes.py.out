@@ -5,3 +5,7 @@ class-label
 class-label
 <class '__main__.A'>
 <class 'type'>
+(<class '__main__.A'>,)
+class-label
+B.extra
+<class '__main__.B'>

@@ -489,12 +489,25 @@ namespace cxxpython
                 auto *class_code = dynamic_cast<CodeObject *>(code_object);
                 if (!class_code)
                     throw BytecodeError("MAKE_CLASS requires a code object");
+                Object *bases_object = frame->pop();
+                auto *bases_tuple = dynamic_cast<TupleObject *>(bases_object);
+                if (!bases_tuple)
+                    throw BytecodeError("MAKE_CLASS requires a tuple of bases");
+                std::vector<TypeObject *> bases;
+                bases.reserve(bases_tuple->size());
+                for (Object *base : bases_tuple->items())
+                {
+                    auto *base_type = dynamic_cast<TypeObject *>(base);
+                    if (!base_type)
+                        raise_type_error(&runtime_, "class bases must be types");
+                    bases.push_back(base_type);
+                }
                 DictObject *namespace_dict = runtime_.new_dict();
                 namespace_dict->set(runtime_.new_str("__module__"),
                                     runtime_.new_str(module_name_from_globals(runtime_, globals)));
                 namespace_dict->set(runtime_.new_str("__qualname__"), runtime_.new_str(class_name->value));
                 (void)execute(*class_code, *namespace_dict, globals, builtins);
-                frame->push(runtime_.new_class(class_name->value, runtime_.object_type(), namespace_dict));
+                frame->push(runtime_.new_class(class_name->value, std::move(bases), namespace_dict));
                 break;
             }
             case Opcode::Call:

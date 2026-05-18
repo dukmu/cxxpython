@@ -198,8 +198,9 @@ namespace cxxpython
         case Opcode::RotThree:
         case Opcode::UnaryOp:
         case Opcode::MakeFunction:
-        case Opcode::MakeClass:
             return 0;
+        case Opcode::MakeClass:
+            return -1;
         case Opcode::DupTop:
             return 1;
         case Opcode::StoreName:
