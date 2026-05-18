@@ -1,5 +1,66 @@
 # Development Status
 
+## 2026-05-18 VM Generic Binary Operator
+
+Pre-change review:
+
+- The C++ object protocol now has a generic `BinaryOp`, but the VM still exposed
+  arithmetic as a one-off `BINARY_ADD` path. Leaving that in place would make
+  subtraction, multiplication, and later arithmetic syntax repeat the old
+  special-case pattern.
+- `VirtualMachine::binary_add(...)` was a thin private wrapper with no VM state.
+  Keeping it would hide the real dispatch path and invite one wrapper per
+  operator.
+- Malformed arithmetic opcode operands needed explicit bytecode validation
+  before parser/compiler starts emitting broader operator syntax.
+
+Debt addressed:
+
+- Added `Opcode::BinaryOp` with `BINARY_OP` metadata and stack effect.
+- `BINARY_OP` decodes its operand as `BinaryOp` and dispatches through
+  `object_binary_op`.
+- Legacy `BINARY_ADD` now dispatches directly through
+  `object_binary_op(..., BinaryOp::Add)` and remains only as compatibility for
+  the current compiler/tests.
+- Removed the private VM `binary_add` helper.
+
+Completed:
+
+- Added tests proving:
+  - opcode metadata exposes `BINARY_OP`
+  - `BINARY_OP` has the same stack effect as other binary stack operations
+  - VM executes subtract and multiply through generic `BINARY_OP`
+  - malformed `BINARY_OP` operands raise `BytecodeError` and unwind active
+    frames
+  - legacy `BINARY_ADD` still works through the object protocol
+
+Design notes:
+
+- `BINARY_OP` is now the VM-level architecture for arithmetic. New arithmetic
+  operators should be added by expanding `BinaryOp` and type slots, not by
+  adding opcode-specific VM helpers.
+- `BINARY_ADD` is still present because the parser/compiler still has
+  `BinaryAddExpr`. The next parser/compiler slice should migrate add emission
+  to `BINARY_OP(Add)` and then remove the old add-only AST shape when tests are
+  updated.
+
+Next:
+
+- Generalize `BinaryAddExpr` to a precedence-aware `BinaryExpr` carrying
+  `BinaryOp`.
+- Add lexer/parser/compiler support for `-` and `*`; emit `BINARY_OP` operands
+  for `+`, `-`, and `*`.
+- Add Python golden script tests for script-visible arithmetic precedence.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects '--gtest_filter=Bytecode.MetadataNamesAndStackEffects:Bytecode.ExecutesGenericBinaryOp:Bytecode.ExecutesIntegerBinaryAdd:Bytecode.DispatchesBinaryAddThroughTypeSlots:Bytecode.RejectsMalformedBytecode'`
+- `ctest --test-dir build --output-on-failure`
+- `git diff --check`
+
+Result: all tests pass.
+
 ## 2026-05-18 Binary Operator Slot Family
 
 Pre-change review:

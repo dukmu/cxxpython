@@ -75,8 +75,6 @@ namespace cxxpython
         Object *execute(CodeObject &code, DictObject &locals, DictObject &globals, DictObject &builtins);
 
     private:
-        Object *binary_add(Object *left, Object *right);
-
         Runtime &runtime_;
         InterpreterState interpreter_;
         ThreadState thread_;

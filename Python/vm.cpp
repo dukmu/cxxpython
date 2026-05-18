@@ -13,6 +13,13 @@ namespace cxxpython
             frame.jump_to(target);
         }
 
+        BinaryOp decode_binary_op(std::uint32_t operand)
+        {
+            if (operand > static_cast<std::uint32_t>(BinaryOp::Power))
+                throw BytecodeError("BINARY_OP operand out of range");
+            return static_cast<BinaryOp>(operand);
+        }
+
         std::string frame_repr(const Object &object)
         {
             auto *frame = static_cast<const Frame *>(&object);
@@ -311,7 +318,15 @@ namespace cxxpython
             {
                 Object *right = frame->pop();
                 Object *left = frame->pop();
-                frame->push(binary_add(left, right));
+                frame->push(object_binary_op(left, right, BinaryOp::Add));
+                break;
+            }
+            case Opcode::BinaryOp:
+            {
+                const BinaryOp op = decode_binary_op(instruction.operand);
+                Object *right = frame->pop();
+                Object *left = frame->pop();
+                frame->push(object_binary_op(left, right, op));
                 break;
             }
             case Opcode::BinarySubscr:
@@ -374,11 +389,6 @@ namespace cxxpython
             }
         }
         throw BytecodeError("code object terminated without RETURN_VALUE");
-    }
-
-    Object *VirtualMachine::binary_add(Object *left, Object *right)
-    {
-        return object_binary_add(left, right);
     }
 
     TypeSlots make_frame_slots()

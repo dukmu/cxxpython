@@ -128,6 +128,8 @@ namespace cxxpython
             return "POP_TOP";
         case Opcode::BinaryAdd:
             return "BINARY_ADD";
+        case Opcode::BinaryOp:
+            return "BINARY_OP";
         case Opcode::BinarySubscr:
             return "BINARY_SUBSCR";
         case Opcode::StoreSubscr:
@@ -166,6 +168,7 @@ namespace cxxpython
         case Opcode::StoreAttr:
             return -2;
         case Opcode::BinaryAdd:
+        case Opcode::BinaryOp:
         case Opcode::BinarySubscr:
         case Opcode::CompareOp:
             return -1;
