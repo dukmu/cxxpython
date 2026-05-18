@@ -68,6 +68,19 @@ TEST(Cli, ExecutesScriptFile)
     std::filesystem::remove(script);
 }
 
+TEST(Cli, ExecutesBuiltinPrintThroughScriptPath)
+{
+    const std::filesystem::path script = write_script(
+        "cxxpython_cli_print.py",
+        "print('hello', 42)\n");
+
+    const CommandResult result = run_command(std::string(CXXPYTHON_PROGRAM_PATH) + " " + shell_quote(script));
+
+    EXPECT_EQ(result.exit_code, 0);
+    EXPECT_EQ(result.output, "hello 42\n");
+    std::filesystem::remove(script);
+}
+
 TEST(Cli, ReportsPythonErrors)
 {
     const std::filesystem::path script = write_script("cxxpython_cli_name_error.py", "missing\n");

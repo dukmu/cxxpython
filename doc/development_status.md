@@ -1,5 +1,87 @@
 # Development Status
 
+## 2026-05-18 Builtins Module And Callable Protocol
+
+Pre-change review:
+
+- `doc/architecture_design.md` requires builtins to be real module objects and
+  forbids VM/CLI special-casing names such as `print`.
+- `CALL` belongs in the VM as stack dispatch only; callable semantics must live
+  in object/type protocol slots.
+- The slot inheritance path must be reviewed with every new slot, because a
+  previous `binary_add` change exposed this exact debt.
+- Module globals need `__builtins__` before script execution grows more user
+  visible behavior.
+
+Debt addressed:
+
+- Replaced the empty per-execution builtins dict shortcut with a runtime-owned
+  `builtins` module and shared builtins dict.
+- Added `__builtins__` to new module dictionaries.
+- Added a generic callable slot and centralized `object_call(...)` helper.
+- Added a typed `NativeFunctionObject` for bootstrap native functions.
+- Added a minimal `print` builtin without special-casing it in the VM or CLI.
+- Added `CALL` bytecode metadata, stack effect, VM execution, AST node,
+  parser support, symbol collection, and compiler emission.
+
+Completed:
+
+- `Runtime` now bootstraps:
+  - `builtin_function_or_method` type
+  - `builtins` module
+  - `builtins.print`
+  - runtime stdout stream injection for tests and CLI use
+- `VirtualMachine::execute(code, globals)` now uses runtime builtins rather
+  than allocating an empty dict.
+- Parser/compiler support call expressions such as `print('hello', 42)` and
+  `1()`.
+- `CALL argc` pops arguments in source order, pops callable, calls the object
+  protocol, and pushes the result.
+- Added tests covering:
+  - builtins module bootstrap and module `__builtins__`
+  - opcode name and stack effect for `CALL`
+  - callable slot dispatch through bytecode
+  - non-callable Python `TypeError`
+  - compiler emission and execution for call expressions
+  - CLI script stdout for `print('hello', 42)`
+
+Design notes:
+
+- `print` currently implements only positional arguments, space separation, and
+  trailing newline. That is enough to prove the correct architecture, but not a
+  full Python builtin.
+- `print` renders `str` objects as raw text and other objects with `repr`
+  because there is not yet a `str()` protocol or `__str__` slot. The next text
+  protocol slice should remove this limitation through general object
+  conversion, not by adding more `print` cases.
+- There is still no Python function object, keyword argument protocol, bound
+  method call path, or type construction via call. Those should all extend the
+  same slot.
+- Native function callbacks are currently C++ closures. They must not capture
+  GC-managed objects unless traversal/rooting is designed for that use case.
+- Runtime stdout injection is a testable bridge toward `sys.stdout` and `_io`;
+  once `sys` and file objects exist, `print(file=...)` should write through
+  Python-visible stream objects.
+
+Next:
+
+- Split argument passing into an explicit call args structure before adding
+  kwargs, defaults, bound methods, or Python function objects.
+- Add source locations to AST nodes and eventually instruction line tables so
+  call errors and tracebacks point at the right source span.
+- Continue VM/frame hardening: active frame roots, block stack, exception
+  state, and `CodeObject` stacksize/flags.
+- Start the next technical-debt slice from the type system: type dictionaries,
+  attribute lookup, descriptor hooks, and class/type call protocol.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+- `git diff --check`
+
+Result: all tests pass.
+
 ## 2026-05-17
 
 Current phase: Milestone 0/1 bootstrap.

@@ -53,7 +53,14 @@ namespace cxxpython
             raise_type_error(this, "module dict cannot be null");
         dict->set(new_str("__name__"), new_str(name));
         dict->set(new_str("__file__"), new_str(filename));
+        if (builtins_module_)
+            dict->set(new_str("__builtins__"), builtins_module_);
         return allocate<ModuleObject>(module_type_, std::move(name), std::move(filename), dict);
+    }
+
+    NativeFunctionObject *Runtime::new_native_function(std::string name, NativeFunctionCallback callback)
+    {
+        return allocate<NativeFunctionObject>(native_function_type_, std::move(name), std::move(callback));
     }
 
     CodeObject *Runtime::new_code(std::vector<Object *> constants, std::vector<Instruction> instructions)
@@ -94,7 +101,9 @@ namespace cxxpython
     {
         DictObject *resolved_globals = globals ? globals : new_dict();
         DictObject *resolved_locals = locals ? locals : resolved_globals;
-        DictObject *resolved_builtins = builtins ? builtins : new_dict();
+        DictObject *resolved_builtins = builtins ? builtins : builtins_dict();
+        if (!resolved_builtins)
+            raise_type_error(this, "runtime builtins are not initialized");
         return allocate<Frame>(frame_type_, code, resolved_locals, resolved_globals, resolved_builtins);
     }
 

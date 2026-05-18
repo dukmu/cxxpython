@@ -80,6 +80,8 @@ namespace cxxpython
             inherited.traverse = slots.traverse;
         if (slots.binary_add)
             inherited.binary_add = slots.binary_add;
+        if (slots.call)
+            inherited.call = slots.call;
         return inherited;
     }
 }

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <iosfwd>
 #include <memory>
 #include <string>
 #include <functional>
@@ -15,6 +16,7 @@ namespace cxxpython
     class CodeObject;
     class Frame;
     class ModuleObject;
+    class NativeFunctionObject;
 
     class Runtime final
     {
@@ -33,6 +35,7 @@ namespace cxxpython
         TypeObject *tuple_type() const noexcept;
         TypeObject *dict_type() const noexcept;
         TypeObject *module_type() const noexcept;
+        TypeObject *native_function_type() const noexcept;
         TypeObject *code_type() const noexcept;
         TypeObject *frame_type() const noexcept;
         TypeObject *base_exception_type() const noexcept;
@@ -45,6 +48,10 @@ namespace cxxpython
         NoneObject *none() const noexcept;
         BoolObject *true_value() const noexcept;
         BoolObject *false_value() const noexcept;
+        ModuleObject *builtins_module() const noexcept;
+        DictObject *builtins_dict() const noexcept;
+        std::ostream &stdout_stream() const noexcept;
+        void set_stdout(std::ostream &stream) noexcept;
 
         IntObject *new_int(std::int64_t value);
         StrObject *new_str(std::string value);
@@ -52,6 +59,7 @@ namespace cxxpython
         TupleObject *new_tuple(std::vector<Object *> items);
         DictObject *new_dict();
         ModuleObject *new_module(std::string name, std::string filename);
+        NativeFunctionObject *new_native_function(std::string name, NativeFunctionCallback callback);
         CodeObject *new_code(std::vector<Object *> constants,
                               std::vector<Instruction> instructions);
         CodeObject *new_code(std::string name,
@@ -100,6 +108,7 @@ namespace cxxpython
         TypeObject *allocate_type(std::string name);
         void initialize_type(TypeObject *type, TypeObject *base);
         TypeSlots inherit_slots(TypeObject *base, TypeSlots slots) const;
+        void initialize_builtins();
 
         std::vector<std::unique_ptr<Object>> heap_;
         std::vector<Object *> roots_;
@@ -114,6 +123,7 @@ namespace cxxpython
         TypeObject *tuple_type_ = nullptr;
         TypeObject *dict_type_ = nullptr;
         TypeObject *module_type_ = nullptr;
+        TypeObject *native_function_type_ = nullptr;
         TypeObject *code_type_ = nullptr;
         TypeObject *frame_type_ = nullptr;
         TypeObject *base_exception_type_ = nullptr;
@@ -126,5 +136,7 @@ namespace cxxpython
         NoneObject *none_ = nullptr;
         BoolObject *true_ = nullptr;
         BoolObject *false_ = nullptr;
+        ModuleObject *builtins_module_ = nullptr;
+        std::ostream *stdout_ = nullptr;
     };
 }

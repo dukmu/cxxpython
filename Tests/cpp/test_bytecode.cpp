@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <sstream>
+
 #include "cxxpython/vm.hpp"
 
 TEST(Bytecode, MetadataNamesAndStackEffects)
@@ -9,6 +11,7 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::StoreName), "STORE_NAME");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::PopTop), "POP_TOP");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::BinaryAdd), "BINARY_ADD");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::Call), "CALL");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::ReturnValue), "RETURN_VALUE");
 
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::LoadConst, 0}), 1);
@@ -16,6 +19,8 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::StoreName, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::PopTop, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BinaryAdd, 0}), -1);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::Call, 0}), 0);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::Call, 2}), -2);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::ReturnValue, 0}), -1);
 }
 
@@ -219,6 +224,49 @@ TEST(Bytecode, LoadNameResolvesLocalsGlobalsThenBuiltins)
     auto *builtin_result = dynamic_cast<cxxpython::IntObject *>(vm.execute(*code, *locals, *globals, *builtins));
     ASSERT_NE(builtin_result, nullptr);
     EXPECT_EQ(builtin_result->value, 1);
+}
+
+TEST(Bytecode, CallsCallableObjectsThroughTypeSlot)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::Object *callable = runtime.builtins_dict()->get(runtime.new_str("print"));
+    ASSERT_NE(callable, nullptr);
+
+    std::ostringstream output;
+    runtime.set_stdout(output);
+    cxxpython::CodeObject *code = runtime.new_code(
+        {callable, runtime.new_str("answer"), runtime.new_int(42)},
+        {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::LoadConst, 1},
+         {cxxpython::Opcode::LoadConst, 2},
+         {cxxpython::Opcode::Call, 2},
+         {cxxpython::Opcode::ReturnValue, 0}});
+
+    EXPECT_EQ(vm.execute(*code), runtime.none());
+    EXPECT_EQ(output.str(), "answer 42\n");
+}
+
+TEST(Bytecode, RaisesPythonTypeErrorForNonCallable)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::CodeObject *code = runtime.new_code(
+        {runtime.new_int(1)},
+        {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::Call, 0},
+         {cxxpython::Opcode::ReturnValue, 0}});
+
+    try
+    {
+        (void)vm.execute(*code);
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "'int' object is not callable");
+    }
 }
 
 TEST(Bytecode, RejectsMalformedBytecode)

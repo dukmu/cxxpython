@@ -52,6 +52,11 @@ namespace cxxpython
         return module_type_;
     }
 
+    TypeObject *Runtime::native_function_type() const noexcept
+    {
+        return native_function_type_;
+    }
+
     TypeObject *Runtime::code_type() const noexcept
     {
         return code_type_;
@@ -105,5 +110,25 @@ namespace cxxpython
     BoolObject *Runtime::false_value() const noexcept
     {
         return false_;
+    }
+
+    ModuleObject *Runtime::builtins_module() const noexcept
+    {
+        return builtins_module_;
+    }
+
+    DictObject *Runtime::builtins_dict() const noexcept
+    {
+        return builtins_module_ ? builtins_module_->dict() : nullptr;
+    }
+
+    std::ostream &Runtime::stdout_stream() const noexcept
+    {
+        return *stdout_;
+    }
+
+    void Runtime::set_stdout(std::ostream &stream) noexcept
+    {
+        stdout_ = &stream;
     }
 }

@@ -18,12 +18,14 @@ namespace cxxpython
     class ExceptionObject;
 
     using VisitChildren = std::function<void(Object *)>;
+    using NativeFunctionCallback = std::function<Object *(Runtime &, const std::vector<Object *> &)>;
     using ReprSlot = std::string (*)(const Object &);
     using HashSlot = std::int64_t (*)(const Object &);
     using EqualSlot = bool (*)(const Object &, const Object &);
     using TruthSlot = bool (*)(const Object &);
     using TraverseSlot = void (*)(const Object &, const VisitChildren &);
     using BinarySlot = Object *(*)(const Object &, const Object &);
+    using CallSlot = Object *(*)(Object &, const std::vector<Object *> &);
 
     struct TypeSlots
     {
@@ -33,6 +35,7 @@ namespace cxxpython
         TruthSlot truth = nullptr;
         TraverseSlot traverse = nullptr;
         BinarySlot binary_add = nullptr;
+        CallSlot call = nullptr;
     };
 
     class PythonError final : public std::exception
@@ -191,6 +194,19 @@ namespace cxxpython
         DictObject *dict_;
     };
 
+    class NativeFunctionObject final : public Object
+    {
+    public:
+        NativeFunctionObject(TypeObject *type, std::string name, NativeFunctionCallback callback);
+
+        const std::string &name() const noexcept;
+        Object *call(Runtime &runtime, const std::vector<Object *> &args);
+
+    private:
+        std::string name_;
+        NativeFunctionCallback callback_;
+    };
+
     class ExceptionObject final : public Object
     {
     public:
@@ -211,6 +227,7 @@ namespace cxxpython
     std::int64_t object_hash(const Object *object);
     bool object_equal(const Object *left, const Object *right);
     Object *object_binary_add(Object *left, Object *right);
+    Object *object_call(Object *callable, const std::vector<Object *> &args);
     std::string object_repr(const Object *object);
     std::string type_qualified_name(const TypeObject *type);
 
@@ -224,6 +241,7 @@ namespace cxxpython
     TypeSlots make_tuple_slots();
     TypeSlots make_dict_slots();
     TypeSlots make_module_slots();
+    TypeSlots make_native_function_slots();
     TypeSlots make_exception_slots();
     TypeSlots make_code_slots();
     TypeSlots make_frame_slots();

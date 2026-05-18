@@ -221,8 +221,7 @@ namespace cxxpython
 
     Object *VirtualMachine::execute(CodeObject &code, DictObject &globals)
     {
-        DictObject *builtins = runtime_.new_dict();
-        return execute(code, globals, globals, *builtins);
+        return execute(code, globals, globals, *runtime_.builtins_dict());
     }
 
     Object *VirtualMachine::execute(CodeObject &code, DictObject &locals, DictObject &globals, DictObject &builtins)
@@ -280,6 +279,15 @@ namespace cxxpython
                 frame->push(binary_add(left, right));
                 break;
             }
+            case Opcode::Call:
+            {
+                std::vector<Object *> args(instruction.operand);
+                for (std::size_t index = args.size(); index > 0; --index)
+                    args[index - 1] = frame->pop();
+                Object *callable = frame->pop();
+                frame->push(object_call(callable, args));
+                break;
+            }
             case Opcode::ReturnValue:
                 return frame->pop();
             default:
@@ -296,6 +304,6 @@ namespace cxxpython
 
     TypeSlots make_frame_slots()
     {
-        return TypeSlots{frame_repr, frame_hash, frame_equal, frame_truth, frame_traverse, nullptr};
+        return TypeSlots{frame_repr, frame_hash, frame_equal, frame_truth, frame_traverse};
     }
 }

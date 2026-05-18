@@ -17,6 +17,7 @@ namespace cxxpython
         StoreName,
         PopTop,
         BinaryAdd,
+        Call,
         ReturnValue,
     };
 

@@ -63,6 +63,13 @@ namespace cxxpython
                 (void)symbols_.add_name(expression.value);
             }
 
+            void visit(const compiler_internal::CallExpr &expression) override
+            {
+                expression.callee->accept(*this);
+                for (const auto &arg : expression.args)
+                    arg->accept(*this);
+            }
+
             void visit(const compiler_internal::ExprStmt &statement) override
             {
                 statement.expression->accept(*this);
@@ -133,6 +140,17 @@ namespace cxxpython
                 instructions_.push_back(Instruction{
                     Opcode::LoadName,
                     static_cast<std::uint32_t>(name_index(expression.value)),
+                });
+            }
+
+            void visit(const compiler_internal::CallExpr &expression) override
+            {
+                expression.callee->accept(*this);
+                for (const auto &arg : expression.args)
+                    arg->accept(*this);
+                instructions_.push_back(Instruction{
+                    Opcode::Call,
+                    static_cast<std::uint32_t>(expression.args.size()),
                 });
             }
 

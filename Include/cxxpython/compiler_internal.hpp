@@ -17,6 +17,7 @@ namespace cxxpython::compiler_internal
     struct StringExpr;
     struct BinaryAddExpr;
     struct NameExpr;
+    struct CallExpr;
     struct ExprStmt;
     struct AssignStmt;
 
@@ -27,6 +28,7 @@ namespace cxxpython::compiler_internal
         virtual void visit(const StringExpr &expression) = 0;
         virtual void visit(const BinaryAddExpr &expression) = 0;
         virtual void visit(const NameExpr &expression) = 0;
+        virtual void visit(const CallExpr &expression) = 0;
     };
 
     struct StmtVisitor
@@ -42,6 +44,9 @@ namespace cxxpython::compiler_internal
         String,
         Identifier,
         Plus,
+        LeftParen,
+        RightParen,
+        Comma,
         Equal,
         Newline,
         End,
@@ -118,6 +123,22 @@ namespace cxxpython::compiler_internal
         }
 
         std::string value;
+
+        void accept(ExprVisitor &visitor) const override
+        {
+            visitor.visit(*this);
+        }
+    };
+
+    struct CallExpr final : Expr
+    {
+        CallExpr(std::unique_ptr<Expr> callee_in, std::vector<std::unique_ptr<Expr>> args_in)
+            : callee(std::move(callee_in)), args(std::move(args_in))
+        {
+        }
+
+        std::unique_ptr<Expr> callee;
+        std::vector<std::unique_ptr<Expr>> args;
 
         void accept(ExprVisitor &visitor) const override
         {

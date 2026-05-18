@@ -58,14 +58,39 @@ namespace cxxpython::compiler_internal
 
             std::unique_ptr<Expr> parse_expression_only()
             {
-                std::unique_ptr<Expr> left = parse_primary();
+                std::unique_ptr<Expr> left = parse_call();
                 while (peek().kind == TokenKind::Plus)
                 {
                     advance();
-                    std::unique_ptr<Expr> right = parse_primary();
+                    std::unique_ptr<Expr> right = parse_call();
                     left = std::make_unique<BinaryAddExpr>(std::move(left), std::move(right));
                 }
                 return left;
+            }
+
+            std::unique_ptr<Expr> parse_call()
+            {
+                std::unique_ptr<Expr> expression = parse_primary();
+                while (peek().kind == TokenKind::LeftParen)
+                {
+                    advance();
+                    std::vector<std::unique_ptr<Expr>> args;
+                    if (peek().kind != TokenKind::RightParen)
+                    {
+                        while (true)
+                        {
+                            args.push_back(parse_expression_only());
+                            if (peek().kind != TokenKind::Comma)
+                                break;
+                            advance();
+                            if (peek().kind == TokenKind::RightParen)
+                                break;
+                        }
+                    }
+                    consume(TokenKind::RightParen, "expected ')' after arguments");
+                    expression = std::make_unique<CallExpr>(std::move(expression), std::move(args));
+                }
+                return expression;
             }
 
             std::unique_ptr<Expr> parse_primary()
@@ -82,10 +107,20 @@ namespace cxxpython::compiler_internal
                 case TokenKind::End:
                 case TokenKind::Newline:
                 case TokenKind::Plus:
+                case TokenKind::LeftParen:
+                case TokenKind::RightParen:
+                case TokenKind::Comma:
                 case TokenKind::Equal:
                     raise_at(token, "expected expression");
                 }
                 raise_at(token, "expected expression");
+            }
+
+            void consume(TokenKind kind, const std::string &message)
+            {
+                if (peek().kind != kind)
+                    raise_at(peek(), message);
+                advance();
             }
 
             void skip_newlines()

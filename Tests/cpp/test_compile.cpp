@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <sstream>
+
 #include "cxxpython/compiler.hpp"
 #include "cxxpython/vm.hpp"
 
@@ -200,4 +202,44 @@ TEST(Compile, ModuleExpressionStatementsAreDiscarded)
     EXPECT_EQ(code->instructions()[2].opcode, cxxpython::Opcode::BinaryAdd);
     EXPECT_EQ(code->instructions()[3].opcode, cxxpython::Opcode::PopTop);
     EXPECT_EQ(vm.execute(*code), runtime.none());
+}
+
+TEST(Compile, CompilesAndExecutesCallExpressions)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    std::ostringstream output;
+    runtime.set_stdout(output);
+
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(runtime, "print('hello', 42)\n", "script.py");
+    ASSERT_NE(code, nullptr);
+    ASSERT_EQ(code->names().size(), 1U);
+    auto *name = dynamic_cast<cxxpython::StrObject *>(code->names()[0]);
+    ASSERT_NE(name, nullptr);
+    EXPECT_EQ(name->value, "print");
+    ASSERT_GE(code->instructions().size(), 5U);
+    EXPECT_EQ(code->instructions()[0].opcode, cxxpython::Opcode::LoadName);
+    EXPECT_EQ(code->instructions()[3].opcode, cxxpython::Opcode::Call);
+    EXPECT_EQ(code->instructions()[3].operand, 2U);
+
+    EXPECT_EQ(vm.execute(*code, *runtime.new_dict()), runtime.none());
+    EXPECT_EQ(output.str(), "hello 42\n");
+}
+
+TEST(Compile, CallsNonCallableThroughNormalTypeErrorPath)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::CodeObject *code = cxxpython::compile_eval_input(runtime, "1()", "script.py");
+
+    try
+    {
+        (void)vm.execute(*code);
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "'int' object is not callable");
+    }
 }

@@ -15,6 +15,7 @@ add_library(cxxpython_core
     Python/compiler.cpp
     Python/vm.cpp
     Objects/runtime_bootstrap.cpp
+    Objects/runtime_builtins.cpp
     Objects/runtime_accessors.cpp
     Objects/runtime_factories.cpp
     Objects/runtime_roots.cpp
@@ -23,6 +24,7 @@ add_library(cxxpython_core
     Objects/object_sequences.cpp
     Objects/object_mapping.cpp
     Objects/object_module.cpp
+    Objects/object_native_function.cpp
     Objects/object_exception.cpp
     Objects/object_utils.cpp
 )

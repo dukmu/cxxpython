@@ -16,11 +16,30 @@ TEST(Module, CreatesModuleWithInitializedGlobals)
 
     auto *name = dynamic_cast<cxxpython::StrObject *>(module->dict()->get(runtime.new_str("__name__")));
     auto *file = dynamic_cast<cxxpython::StrObject *>(module->dict()->get(runtime.new_str("__file__")));
+    auto *builtins = dynamic_cast<cxxpython::ModuleObject *>(module->dict()->get(runtime.new_str("__builtins__")));
     ASSERT_NE(name, nullptr);
     ASSERT_NE(file, nullptr);
+    ASSERT_NE(builtins, nullptr);
     EXPECT_EQ(name->value, "__main__");
     EXPECT_EQ(file->value, "/tmp/example.py");
+    EXPECT_EQ(builtins, runtime.builtins_module());
     EXPECT_EQ(module->repr(), "<module '__main__' from '/tmp/example.py'>");
+}
+
+TEST(Module, BootstrapsBuiltinsModule)
+{
+    cxxpython::Runtime runtime;
+
+    cxxpython::ModuleObject *builtins = runtime.builtins_module();
+    ASSERT_NE(builtins, nullptr);
+    EXPECT_EQ(builtins->type(), runtime.module_type());
+    EXPECT_EQ(builtins->name(), "builtins");
+    EXPECT_EQ(runtime.builtins_dict(), builtins->dict());
+
+    cxxpython::Object *print = runtime.builtins_dict()->get(runtime.new_str("print"));
+    ASSERT_NE(print, nullptr);
+    EXPECT_EQ(print->type(), runtime.native_function_type());
+    EXPECT_EQ(cxxpython::object_repr(print), "<built-in function print>");
 }
 
 TEST(Module, ExecutesCodeUsingModuleGlobals)

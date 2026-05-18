@@ -182,6 +182,19 @@ namespace cxxpython
         raise_type_error(left->runtime(), message.str());
     }
 
+    Object *object_call(Object *callable, const std::vector<Object *> &args)
+    {
+        if (!callable)
+            raise_type_error(nullptr, "'<null>' object is not callable");
+
+        if (callable->type() && callable->type()->slots.call)
+            return callable->type()->slots.call(*callable, args);
+
+        std::ostringstream message;
+        message << "'" << type_qualified_name(callable->type()) << "' object is not callable";
+        raise_type_error(callable->runtime(), message.str());
+    }
+
     std::string type_qualified_name(const TypeObject *type)
     {
         if (!type)

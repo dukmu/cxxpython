@@ -112,6 +112,10 @@ doc/            design docs and milestone plans
 - VM opcode 只负责调度和栈效果，类型语义由 object/type slots 或统一 runtime
   API 完成。新增 opcode 必须同时更新 stack effect、disassembly/metadata、
   compiler emission、VM execution 和测试。
+- `CALL` 的职责是栈调度：弹出 positional arguments 和 callable，调用统一
+  `object_call`/type call slot，再把返回值压栈。函数对象、native function、
+  type construction、bound method 后续都必须接入这条协议，而不是让 opcode
+  识别具体对象类型。
 
 ## 模块系统路线
 
@@ -122,6 +126,10 @@ doc/            design docs and milestone plans
   系统加入 `__spec__`、`__package__`、`__loader__`、`__path__`。
 - Builtins 应首先作为模块对象存在，再由 frame name resolution 的 builtins
   dict 暴露给脚本。不要在 VM 或 CLI 特判 `print`、`len` 等名字。
+- 最小 native builtins 可以作为 bootstrap seed 存在，但必须是普通 typed
+  objects，放入 `builtins` module dict，并通过 `LOAD_NAME`/`CALL` 访问。标准
+  行为扩展时优先补通用协议，例如 `str()`、keyword arguments、stdout/file
+  对象，而不是继续扩展 `print` 的内部特例。
 - Import core 引入前，CLI file execution 可以创建 `__main__` module，但一旦
   `sys.modules` 存在，`__main__` 必须通过同一模块注册/清理路径。
 

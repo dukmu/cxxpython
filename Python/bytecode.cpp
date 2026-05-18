@@ -118,6 +118,8 @@ namespace cxxpython
             return "POP_TOP";
         case Opcode::BinaryAdd:
             return "BINARY_ADD";
+        case Opcode::Call:
+            return "CALL";
         case Opcode::ReturnValue:
             return "RETURN_VALUE";
         }
@@ -136,6 +138,8 @@ namespace cxxpython
             return -1;
         case Opcode::BinaryAdd:
             return -1;
+        case Opcode::Call:
+            return -static_cast<int>(instruction.operand);
         case Opcode::ReturnValue:
             return -1;
         }
