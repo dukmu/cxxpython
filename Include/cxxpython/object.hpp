@@ -26,6 +26,7 @@ namespace cxxpython
     using TraverseSlot = void (*)(const Object &, const VisitChildren &);
     using BinarySlot = Object *(*)(const Object &, const Object &);
     using CallSlot = Object *(*)(Object &, const std::vector<Object *> &);
+    using DescrGetSlot = Object *(*)(Object &, Object *, TypeObject *);
 
     struct TypeSlots
     {
@@ -36,6 +37,7 @@ namespace cxxpython
         TraverseSlot traverse = nullptr;
         BinarySlot binary_add = nullptr;
         CallSlot call = nullptr;
+        DescrGetSlot descr_get = nullptr;
     };
 
     class PythonError final : public std::exception

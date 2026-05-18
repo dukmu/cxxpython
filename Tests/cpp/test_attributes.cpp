@@ -2,6 +2,32 @@
 
 #include "cxxpython/runtime.hpp"
 
+namespace
+{
+    class DescriptorObject final : public cxxpython::Object
+    {
+    public:
+        DescriptorObject(cxxpython::TypeObject *type, cxxpython::Object *result)
+            : Object(type), result(result)
+        {
+        }
+
+        cxxpython::Object *result;
+        cxxpython::Object *last_instance = nullptr;
+        cxxpython::TypeObject *last_owner = nullptr;
+    };
+
+    cxxpython::Object *descriptor_get(cxxpython::Object &object,
+                                      cxxpython::Object *instance,
+                                      cxxpython::TypeObject *owner)
+    {
+        auto &descriptor = static_cast<DescriptorObject &>(object);
+        descriptor.last_instance = instance;
+        descriptor.last_owner = owner;
+        return descriptor.result;
+    }
+}
+
 TEST(Attributes, ReadsModuleDictionaryBeforeTypeDictionary)
 {
     cxxpython::Runtime runtime;
@@ -36,6 +62,38 @@ TEST(Attributes, ReadsInstanceAttributesFromTypeMro)
     cxxpython::Object *instance = runtime.allocate<cxxpython::Object>(custom_type);
 
     EXPECT_EQ(cxxpython::object_get_attr(instance, "marker"), value);
+}
+
+TEST(Attributes, InvokesDescriptorsFromTypeDictionaries)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::TypeSlots descriptor_slots;
+    descriptor_slots.descr_get = descriptor_get;
+    cxxpython::TypeObject *descriptor_type =
+        runtime.new_heap_type("Descriptor", runtime.object_type(), descriptor_slots);
+    cxxpython::TypeObject *owner_type = runtime.new_heap_type("Owner", runtime.object_type());
+    cxxpython::Object *result = runtime.new_str("computed");
+    auto *descriptor = runtime.allocate<DescriptorObject>(descriptor_type, result);
+    owner_type->dict->set(runtime.new_str("field"), descriptor);
+    cxxpython::Object *instance = runtime.allocate<cxxpython::Object>(owner_type);
+
+    EXPECT_EQ(cxxpython::object_get_attr(instance, "field"), result);
+    EXPECT_EQ(descriptor->last_instance, instance);
+    EXPECT_EQ(descriptor->last_owner, owner_type);
+
+    EXPECT_EQ(cxxpython::object_get_attr(owner_type, "field"), result);
+    EXPECT_EQ(descriptor->last_instance, nullptr);
+    EXPECT_EQ(descriptor->last_owner, owner_type);
+
+    cxxpython::TypeObject *derived_descriptor_type =
+        runtime.new_heap_type("DerivedDescriptor", descriptor_type);
+    cxxpython::Object *derived_result = runtime.new_str("derived");
+    auto *derived_descriptor = runtime.allocate<DescriptorObject>(derived_descriptor_type, derived_result);
+    owner_type->dict->set(runtime.new_str("derived_field"), derived_descriptor);
+
+    EXPECT_EQ(cxxpython::object_get_attr(instance, "derived_field"), derived_result);
+    EXPECT_EQ(derived_descriptor->last_instance, instance);
+    EXPECT_EQ(derived_descriptor->last_owner, owner_type);
 }
 
 TEST(Attributes, RaisesAttributeErrorForMissingAttribute)

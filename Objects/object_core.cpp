@@ -10,6 +10,16 @@ namespace cxxpython
 {
     namespace
     {
+        Object *apply_descriptor(Object *value, Object *instance, TypeObject *owner)
+        {
+            if (!value || !value->type() || !value->type()->slots.descr_get)
+                return value;
+            Object *result = value->type()->slots.descr_get(*value, instance, owner);
+            if (!result)
+                raise_type_error(value->runtime(), "descriptor __get__ returned null");
+            return result;
+        }
+
         std::string type_repr(const Object &object)
         {
             return "<class '" + type_qualified_name(static_cast<const TypeObject *>(&object)) + "'>";
@@ -226,16 +236,16 @@ namespace cxxpython
         if (auto *type = dynamic_cast<TypeObject *>(object))
         {
             if (Object *value = type_lookup_attribute(type, name))
-                return value;
+                return apply_descriptor(value, nullptr, type);
             if (type->type() && type->type() != type)
             {
                 if (Object *value = type_lookup_attribute(type->type(), name))
-                    return value;
+                    return apply_descriptor(value, object, type->type());
             }
         }
         else if (Object *value = type_lookup_attribute(object->type(), name))
         {
-            return value;
+            return apply_descriptor(value, object, object->type());
         }
 
         std::ostringstream message;

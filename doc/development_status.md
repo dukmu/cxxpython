@@ -1,5 +1,59 @@
 # Development Status
 
+## 2026-05-18 Descriptor Get Slot Foundation
+
+Pre-change review:
+
+- Central attribute lookup still returned raw objects from type dictionaries.
+  That would block property, function method binding, slot wrappers, and class
+  descriptors from sharing one lookup path.
+- New slots must update heap-type inheritance and tests, because previous slot
+  additions exposed inheritance omissions.
+
+Debt addressed:
+
+- Added `TypeSlots::descr_get`.
+- `object_get_attr` now invokes descriptors found through type/class MRO and
+  metatype MRO lookup.
+- Heap types inherit `descr_get` from their base type.
+
+Completed:
+
+- Added descriptor tests proving:
+  - instance access calls `descr_get(descriptor, instance, owner)`
+  - class/type access calls `descr_get(descriptor, nullptr, owner)`
+  - derived descriptor types inherit the slot
+- Kept module namespace lookup as direct dict access, while module type
+  descriptors can still flow through normal type lookup.
+
+Design notes:
+
+- This is only the `__get__` half of descriptor protocol. There is no
+  `descr_set`, no data-vs-non-data priority, no instance dict, and no method
+  binding yet.
+- Once instance dictionaries exist, `object_get_attr` must implement CPython's
+  descriptor priority order: data descriptor, instance dict, non-data
+  descriptor/class attribute, then fallback hooks.
+- Native function binding should become a descriptor-driven behavior rather
+  than special casing functions in attribute lookup.
+
+Next:
+
+- Add instance dictionaries for heap/user objects.
+- Add `descr_set` and `object_set_attr`, with tests for read-only descriptor
+  assignment and data descriptor priority.
+- Move future `property`, bound method, and function object behavior onto this
+  descriptor path.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects '--gtest_filter=Attributes.*'`
+- `ctest --test-dir build --output-on-failure`
+- `git diff --check`
+
+Result: all tests pass.
+
 ## 2026-05-18 Central Attribute Lookup Foundation
 
 Pre-change review:

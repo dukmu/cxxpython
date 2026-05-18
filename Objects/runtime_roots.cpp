@@ -116,6 +116,8 @@ namespace cxxpython
             inherited.binary_add = slots.binary_add;
         if (slots.call)
             inherited.call = slots.call;
+        if (slots.descr_get)
+            inherited.descr_get = slots.descr_get;
         return inherited;
     }
 }

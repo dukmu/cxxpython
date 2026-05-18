@@ -145,6 +145,10 @@ doc/            design docs and milestone plans
   module dict -> type/class MRO dict -> metatype MRO dict。后续 instance dict、
   data/non-data descriptor priority、`__getattr__`、slot wrappers 和
   mappingproxy 必须扩展这条 API，而不是在 opcode 或 builtin 中另开查找路径。
+- Descriptor access is also centralized through `object_get_attr`: values found
+  in type/class dictionaries with a `descr_get` slot are invoked with
+  `(descriptor, instance, owner)`. Module namespace entries are direct values;
+  module type descriptors still flow through type lookup.
 - Slot 扩展必须按协议族推进，不能每个 opcode 单独加临时入口。例如数值
   协议应一次性规划 normal/reflected/in-place，比较协议应返回 Python bool 或
   NotImplemented 语义。
