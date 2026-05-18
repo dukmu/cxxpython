@@ -118,8 +118,12 @@ namespace cxxpython
             inherited.truth = slots.truth;
         if (slots.traverse)
             inherited.traverse = slots.traverse;
-        if (slots.binary_add)
-            inherited.binary_add = slots.binary_add;
+        if (slots.binary_op)
+            inherited.binary_op = slots.binary_op;
+        if (slots.reflected_binary_op)
+            inherited.reflected_binary_op = slots.reflected_binary_op;
+        if (slots.inplace_binary_op)
+            inherited.inplace_binary_op = slots.inplace_binary_op;
         if (slots.call)
             inherited.call = slots.call;
         if (slots.length)

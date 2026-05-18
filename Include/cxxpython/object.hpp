@@ -39,13 +39,24 @@ namespace cxxpython
         GreaterEqual,
     };
 
+    enum class BinaryOp : std::uint8_t
+    {
+        Add,
+        Subtract,
+        Multiply,
+        TrueDivide,
+        FloorDivide,
+        Modulo,
+        Power,
+    };
+
     using ReprSlot = std::string (*)(const Object &);
     using HashSlot = std::int64_t (*)(const Object &);
     using EqualSlot = bool (*)(const Object &, const Object &);
     using RichCompareSlot = Object *(*)(const Object &, const Object &, RichCompareOp);
     using TruthSlot = bool (*)(const Object &);
     using TraverseSlot = void (*)(const Object &, const VisitChildren &);
-    using BinarySlot = Object *(*)(const Object &, const Object &);
+    using BinaryOpSlot = Object *(*)(const Object &, const Object &, BinaryOp);
     using CallSlot = Object *(*)(Object &, const std::vector<Object *> &);
     using LengthSlot = std::size_t (*)(const Object &);
     using GetItemSlot = Object *(*)(Object &, Object *);
@@ -62,7 +73,9 @@ namespace cxxpython
         RichCompareSlot rich_compare = nullptr;
         TruthSlot truth = nullptr;
         TraverseSlot traverse = nullptr;
-        BinarySlot binary_add = nullptr;
+        BinaryOpSlot binary_op = nullptr;
+        BinaryOpSlot reflected_binary_op = nullptr;
+        BinaryOpSlot inplace_binary_op = nullptr;
         CallSlot call = nullptr;
         LengthSlot length = nullptr;
         GetItemSlot getitem = nullptr;
@@ -335,6 +348,7 @@ namespace cxxpython
     std::int64_t object_hash(const Object *object);
     bool object_equal(const Object *left, const Object *right);
     Object *object_rich_compare(Object *left, Object *right, RichCompareOp op);
+    Object *object_binary_op(Object *left, Object *right, BinaryOp op);
     Object *object_binary_add(Object *left, Object *right);
     Object *object_call(Object *callable, const std::vector<Object *> &args);
     std::size_t object_length(Object *object);

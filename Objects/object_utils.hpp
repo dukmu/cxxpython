@@ -15,4 +15,6 @@ namespace cxxpython
     bool default_equal(const Object &left, const Object &right);
     bool default_truth(const Object &object);
     void default_traverse(const Object &object, const VisitChildren &visitor);
+    const char *binary_op_symbol(BinaryOp op);
+    std::string unsupported_binary_op_message(BinaryOp op, const Object *left, const Object *right);
 }

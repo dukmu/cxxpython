@@ -31,6 +31,41 @@ namespace cxxpython
         (void)visitor;
     }
 
+    const char *binary_op_symbol(BinaryOp op)
+    {
+        switch (op)
+        {
+        case BinaryOp::Add:
+            return "+";
+        case BinaryOp::Subtract:
+            return "-";
+        case BinaryOp::Multiply:
+            return "*";
+        case BinaryOp::TrueDivide:
+            return "/";
+        case BinaryOp::FloorDivide:
+            return "//";
+        case BinaryOp::Modulo:
+            return "%";
+        case BinaryOp::Power:
+            return "**";
+        }
+        return "?";
+    }
+
+    std::string unsupported_binary_op_message(BinaryOp op, const Object *left, const Object *right)
+    {
+        std::ostringstream message;
+        message << "unsupported operand type(s) for "
+                << binary_op_symbol(op)
+                << ": '"
+                << type_qualified_name(left ? left->type() : nullptr)
+                << "' and '"
+                << type_qualified_name(right ? right->type() : nullptr)
+                << "'";
+        return message.str();
+    }
+
     std::string pointer_hex(const void *ptr)
     {
         std::ostringstream out;

@@ -229,22 +229,34 @@ namespace cxxpython
         raise_type_error(left->runtime(), message.str());
     }
 
-    Object *object_binary_add(Object *left, Object *right)
+    Object *object_binary_op(Object *left, Object *right, BinaryOp op)
     {
         if (!left || !right)
             raise_type_error(left ? left->runtime() : (right ? right->runtime() : nullptr),
-                             "unsupported operand type(s) for +: '<null>' and '<null>'");
+                             unsupported_binary_op_message(op, left, right));
 
-        if (left->type() && left->type()->slots.binary_add)
-            return left->type()->slots.binary_add(*left, *right);
+        if (left->type() && left->type()->slots.binary_op)
+        {
+            Object *result = left->type()->slots.binary_op(*left, *right, op);
+            if (!result)
+                raise_type_error(left->runtime(), "binary operator slot returned null");
+            return result;
+        }
 
-        std::ostringstream message;
-        message << "unsupported operand type(s) for +: '"
-                << type_qualified_name(left->type())
-                << "' and '"
-                << type_qualified_name(right->type())
-                << "'";
-        raise_type_error(left->runtime(), message.str());
+        if (right->type() && right->type() != left->type() && right->type()->slots.reflected_binary_op)
+        {
+            Object *result = right->type()->slots.reflected_binary_op(*right, *left, op);
+            if (!result)
+                raise_type_error(right->runtime(), "reflected binary operator slot returned null");
+            return result;
+        }
+
+        raise_type_error(left->runtime(), unsupported_binary_op_message(op, left, right));
+    }
+
+    Object *object_binary_add(Object *left, Object *right)
+    {
+        return object_binary_op(left, right, BinaryOp::Add);
     }
 
     Object *object_call(Object *callable, const std::vector<Object *> &args)

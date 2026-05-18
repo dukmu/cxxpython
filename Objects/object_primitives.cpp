@@ -3,8 +3,6 @@
 
 #include "object_utils.hpp"
 
-#include <sstream>
-
 namespace cxxpython
 {
     namespace
@@ -53,21 +51,32 @@ namespace cxxpython
             return static_cast<const IntObject *>(&object)->value != 0;
         }
 
-        Object *int_binary_add(const Object &left, const Object &right)
+        [[noreturn]] void raise_unsupported_binary_op(const Object &left, const Object &right, BinaryOp op)
+        {
+            raise_type_error(left.runtime(), unsupported_binary_op_message(op, &left, &right));
+        }
+
+        Object *int_binary_op(const Object &left, const Object &right, BinaryOp op)
         {
             auto *right_int = dynamic_cast<const IntObject *>(&right);
             if (!right_int)
-            {
-                std::ostringstream message;
-                message << "unsupported operand type(s) for +: '"
-                        << type_qualified_name(left.type())
-                        << "' and '"
-                        << type_qualified_name(right.type())
-                        << "'";
-                raise_type_error(left.runtime(), message.str());
-            }
+                raise_unsupported_binary_op(left, right, op);
             auto *left_int = static_cast<const IntObject *>(&left);
-            return left.runtime()->new_int(left_int->value + right_int->value);
+            switch (op)
+            {
+            case BinaryOp::Add:
+                return left.runtime()->new_int(left_int->value + right_int->value);
+            case BinaryOp::Subtract:
+                return left.runtime()->new_int(left_int->value - right_int->value);
+            case BinaryOp::Multiply:
+                return left.runtime()->new_int(left_int->value * right_int->value);
+            case BinaryOp::TrueDivide:
+            case BinaryOp::FloorDivide:
+            case BinaryOp::Modulo:
+            case BinaryOp::Power:
+                break;
+            }
+            raise_unsupported_binary_op(left, right, op);
         }
 
         std::string bool_repr(const Object &object)
@@ -96,19 +105,11 @@ namespace cxxpython
             return !static_cast<const StrObject *>(&object)->value.empty();
         }
 
-        Object *str_binary_add(const Object &left, const Object &right)
+        Object *str_binary_op(const Object &left, const Object &right, BinaryOp op)
         {
             auto *right_str = dynamic_cast<const StrObject *>(&right);
-            if (!right_str)
-            {
-                std::ostringstream message;
-                message << "unsupported operand type(s) for +: '"
-                        << type_qualified_name(left.type())
-                        << "' and '"
-                        << type_qualified_name(right.type())
-                        << "'";
-                raise_type_error(left.runtime(), message.str());
-            }
+            if (!right_str || op != BinaryOp::Add)
+                raise_unsupported_binary_op(left, right, op);
             auto *left_str = static_cast<const StrObject *>(&left);
             return left.runtime()->new_str(left_str->value + right_str->value);
         }
@@ -153,7 +154,7 @@ namespace cxxpython
             .equal = int_equal,
             .truth = int_truth,
             .traverse = default_traverse,
-            .binary_add = int_binary_add,
+            .binary_op = int_binary_op,
         };
     }
 
@@ -165,7 +166,7 @@ namespace cxxpython
             .equal = int_equal,
             .truth = int_truth,
             .traverse = default_traverse,
-            .binary_add = int_binary_add,
+            .binary_op = int_binary_op,
         };
     }
 
@@ -177,7 +178,7 @@ namespace cxxpython
             .equal = str_equal,
             .truth = str_truth,
             .traverse = default_traverse,
-            .binary_add = str_binary_add,
+            .binary_op = str_binary_op,
         };
     }
 }

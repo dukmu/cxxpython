@@ -1,5 +1,72 @@
 # Development Status
 
+## 2026-05-18 Binary Operator Slot Family
+
+Pre-change review:
+
+- Arithmetic was represented as a single `binary_add` slot. That shape would
+  force every future operator to add another ad hoc slot, VM helper, compiler
+  branch, and test fixture.
+- Operator error formatting was already at risk of drifting between core
+  dispatch and builtin implementations.
+- The VM still has only `BINARY_ADD`; changing parser syntax first would bake
+  in more special cases before the object protocol is ready.
+
+Debt addressed:
+
+- Replaced the narrow `BinarySlot binary_add` with a protocol-family shape:
+  - `BinaryOp`
+  - `TypeSlots::binary_op`
+  - `TypeSlots::reflected_binary_op`
+  - `TypeSlots::inplace_binary_op`
+  - `object_binary_op(...)`
+- Kept `object_binary_add(...)` as the compatibility wrapper used by the
+  current VM opcode, but it now delegates to `object_binary_op(..., Add)`.
+- Heap type slot inheritance now carries the full binary operator slot family.
+- Builtin `int` now supports C++-level add/subtract/multiply through the same
+  slot, and `str` supports add through the same protocol.
+- Consolidated operator symbols and unsupported-operand error formatting in
+  `object_utils` so future builtin operator implementations share one message
+  path.
+
+Completed:
+
+- Added tests proving:
+  - builtin int add/subtract/multiply dispatch through `object_binary_op`
+  - builtin str add dispatches through `object_binary_op`
+  - heap types can define and inherit the generic binary operator slot
+  - existing `BINARY_ADD` still dispatches through the type slot path
+
+Design notes:
+
+- This is intentionally the C++ object-protocol layer only. VM opcode shape and
+  parser syntax remain unchanged in this commit.
+- `reflected_binary_op` and `inplace_binary_op` are structural hooks, but full
+  CPython dispatch still needs a `NotImplemented` object, subclass-priority
+  ordering, and in-place fallback rules. Those should land as a complete
+  protocol slice, not as scattered special cases.
+- `EqualSlot` remains the low-level hash/dict equality contract. The operator
+  family is separate from `RichCompareSlot`, which returns Python objects.
+
+Next:
+
+- Replace VM arithmetic special casing with a generic `BINARY_OP`-style opcode
+  operand carrying `BinaryOp`, while preserving source compatibility for the
+  current `BINARY_ADD` tests until migration is complete.
+- Add bytecode metadata, malformed operand validation, stack-effect tests, and
+  VM dispatch through `object_binary_op`.
+- Then generalize parser/compiler expression AST from add-only binary syntax to
+  precedence-aware binary expressions for `+`, `-`, and `*`.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects '--gtest_filter=CoreObjects.BinaryOperatorProtocolDispatchesBuiltinTypes:CoreObjects.HeapTypesUseAndInheritSlots:Bytecode.DispatchesBinaryAddThroughTypeSlots:Bytecode.ExecutesIntegerBinaryAdd:Bytecode.ExecutesStringBinaryAdd:Bytecode.RaisesPythonTypeErrorForUnsupportedBinaryAdd'`
+- `ctest --test-dir build --output-on-failure`
+- `git diff --check`
+
+Result: all tests pass.
+
 ## 2026-05-18 Parser And Compiler `if`
 
 Pre-change review:

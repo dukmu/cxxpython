@@ -12,6 +12,7 @@ TEST(CoreObjects, HeapTypesUseAndInheritSlots)
     custom_slots.hash = test_support::custom_hash;
     custom_slots.equal = test_support::custom_equal;
     custom_slots.truth = test_support::custom_false;
+    custom_slots.binary_op = test_support::custom_binary_op;
     custom_slots.length = test_support::custom_length;
     custom_slots.getitem = test_support::custom_getitem;
     custom_slots.setitem = test_support::custom_setitem;
@@ -33,6 +34,10 @@ TEST(CoreObjects, HeapTypesUseAndInheritSlots)
     EXPECT_EQ(cxxpython::object_rich_compare(custom_a, custom_b, cxxpython::RichCompareOp::NotEqual),
               runtime.false_value());
     EXPECT_FALSE(cxxpython::is_true(custom_a));
+    auto *custom_add = dynamic_cast<cxxpython::StrObject *>(
+        cxxpython::object_binary_op(custom_a, custom_b, cxxpython::BinaryOp::Add));
+    ASSERT_NE(custom_add, nullptr);
+    EXPECT_EQ(custom_add->value, "custom-add");
     EXPECT_EQ(cxxpython::object_length(custom_a), 7U);
     EXPECT_EQ(cxxpython::object_get_item(custom_a, custom_b), custom_b);
     EXPECT_TRUE(cxxpython::object_contains(custom_a, custom_b));
@@ -48,6 +53,10 @@ TEST(CoreObjects, HeapTypesUseAndInheritSlots)
     EXPECT_EQ(cxxpython::object_hash(repr_only), 42);
     EXPECT_EQ(cxxpython::object_rich_compare(repr_only, repr_only_peer, cxxpython::RichCompareOp::Equal),
               runtime.true_value());
+    auto *inherited_subtract = dynamic_cast<cxxpython::StrObject *>(
+        cxxpython::object_binary_op(repr_only, repr_only_peer, cxxpython::BinaryOp::Subtract));
+    ASSERT_NE(inherited_subtract, nullptr);
+    EXPECT_EQ(inherited_subtract->value, "custom-subtract");
     EXPECT_FALSE(cxxpython::is_true(repr_only));
     EXPECT_EQ(cxxpython::object_length(repr_only), 7U);
     EXPECT_EQ(cxxpython::object_get_item(repr_only, custom_a), custom_a);

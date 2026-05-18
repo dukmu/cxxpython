@@ -20,6 +20,31 @@ TEST(CoreObjects, BoolAndIntSharePythonSemantics)
     EXPECT_FALSE(cxxpython::is_true(runtime.none()));
 }
 
+TEST(CoreObjects, BinaryOperatorProtocolDispatchesBuiltinTypes)
+{
+    cxxpython::Runtime runtime;
+
+    auto *sum = dynamic_cast<cxxpython::IntObject *>(
+        cxxpython::object_binary_op(runtime.new_int(4), runtime.new_int(3), cxxpython::BinaryOp::Add));
+    ASSERT_NE(sum, nullptr);
+    EXPECT_EQ(sum->value, 7);
+
+    auto *difference = dynamic_cast<cxxpython::IntObject *>(
+        cxxpython::object_binary_op(runtime.new_int(4), runtime.new_int(3), cxxpython::BinaryOp::Subtract));
+    ASSERT_NE(difference, nullptr);
+    EXPECT_EQ(difference->value, 1);
+
+    auto *product = dynamic_cast<cxxpython::IntObject *>(
+        cxxpython::object_binary_op(runtime.new_int(4), runtime.new_int(3), cxxpython::BinaryOp::Multiply));
+    ASSERT_NE(product, nullptr);
+    EXPECT_EQ(product->value, 12);
+
+    auto *text = dynamic_cast<cxxpython::StrObject *>(
+        cxxpython::object_binary_op(runtime.new_str("py"), runtime.new_str("thon"), cxxpython::BinaryOp::Add));
+    ASSERT_NE(text, nullptr);
+    EXPECT_EQ(text->value, "python");
+}
+
 TEST(CoreObjects, ListSemantics)
 {
     cxxpython::Runtime runtime;

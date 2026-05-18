@@ -267,8 +267,12 @@ TEST(Bytecode, DispatchesBinaryAddThroughTypeSlots)
     {
         return "<adder " + std::to_string(static_cast<const cxxpython::IntObject &>(object).value) + ">";
     };
-    auto add_binary = [](const cxxpython::Object &left, const cxxpython::Object &right) -> cxxpython::Object *
+    auto add_binary = [](const cxxpython::Object &left,
+                         const cxxpython::Object &right,
+                         cxxpython::BinaryOp op) -> cxxpython::Object *
     {
+        if (op != cxxpython::BinaryOp::Add)
+            cxxpython::raise_type_error(left.runtime(), "adder only supports add");
         auto &left_value = static_cast<const cxxpython::IntObject &>(left);
         auto *right_value = dynamic_cast<const cxxpython::IntObject *>(&right);
         if (!right_value)
@@ -290,7 +294,7 @@ TEST(Bytecode, DispatchesBinaryAddThroughTypeSlots)
             .equal = cxxpython::make_int_slots().equal,
             .truth = cxxpython::make_int_slots().truth,
             .traverse = add_traverse,
-            .binary_add = add_binary,
+            .binary_op = add_binary,
         });
 
     cxxpython::IntObject *left = runtime.allocate<cxxpython::IntObject>(adder_type, 7);

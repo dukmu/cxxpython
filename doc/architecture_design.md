@@ -85,10 +85,14 @@ doc/            design docs and milestone plans
 ## Slot 扩展路线
 
 当前 slot 覆盖第一批对象协议：`repr`、`hash`、`equal`、`rich_compare`、`truth`、
-`traverse`、`binary_add`、`call`、`length`、`getitem`、`setitem`、
-`contains`、`descr_get`、`descr_set`。后续扩展顺序：
+`traverse`、`binary_op`、`reflected_binary_op`、`inplace_binary_op`、`call`、
+`length`、`getitem`、`setitem`、`contains`、`descr_get`、`descr_set`。后续扩展顺序：
 
-- Numeric: add/sub/mul/div/mod/pow, unary, in-place, reflected operators.
+- Numeric: C++ 层使用 `BinaryOp` 统一表示 add/sub/mul/div/mod/pow，并通过
+  `object_binary_op` 调度。VM 层应使用携带 `BinaryOp` operand 的通用
+  `BINARY_OP` 形态，parser/compiler 层再按优先级把 `+`、`-`、`*` 等语法降级
+  到同一协议。`NotImplemented`、subclass priority、reflected/in-place fallback
+  需要作为完整协议一次实现，不能散落在各个内置类型中。
 - Rich compare: `==`/`!=` 已走 `object_rich_compare`；`lt/le/gt/ge`、`NotImplemented`
   和 reverse/subclass dispatch 需要在控制流前继续补齐。
 - Sequence/mapping: length, getitem, setitem, contains, iterator。
@@ -114,6 +118,9 @@ doc/            design docs and milestone plans
 - VM opcode 只负责调度和栈效果，类型语义由 object/type slots 或统一 runtime
   API 完成。新增 opcode 必须同时更新 stack effect、disassembly/metadata、
   compiler emission、VM execution 和测试。
+- Arithmetic opcode must dispatch through `object_binary_op`. The legacy
+  `object_binary_add` helper is only a compatibility wrapper for the initial
+  `BINARY_ADD` path and must not become the model for adding each operator.
 - `COMPARE_OP` 的职责是弹出左右操作数，解码比较 operator，调用
   `object_rich_compare`，再把 Python bool/object 结果压栈。比较语义不能在
   VM 中直接调用 `object_equal` 或识别 `int`/`str` 等具体类型。

@@ -36,6 +36,18 @@ namespace test_support
         cxxpython::raise_type_error(left.runtime(), "custom rich comparison does not support ordering");
     }
 
+    inline cxxpython::Object *custom_binary_op(const cxxpython::Object &left,
+                                               const cxxpython::Object &right,
+                                               cxxpython::BinaryOp op)
+    {
+        (void)right;
+        if (op == cxxpython::BinaryOp::Add)
+            return left.runtime()->new_str("custom-add");
+        if (op == cxxpython::BinaryOp::Subtract)
+            return left.runtime()->new_str("custom-subtract");
+        cxxpython::raise_type_error(left.runtime(), "custom binary operator does not support this operation");
+    }
+
     inline bool custom_false(const cxxpython::Object &object)
     {
         (void)object;
