@@ -11,6 +11,7 @@ namespace cxxpython
         object_type_ = allocate_type("object");
         type_type_ = allocate_type("type");
         none_type_ = allocate_type("NoneType");
+        not_implemented_type_ = allocate_type("NotImplementedType");
         int_type_ = allocate_type("int");
         bool_type_ = allocate_type("bool");
         str_type_ = allocate_type("str");
@@ -36,6 +37,7 @@ namespace cxxpython
         object_type_->slots = make_object_slots();
         type_type_->slots = make_type_slots();
         none_type_->slots = make_none_slots();
+        not_implemented_type_->slots = make_not_implemented_slots();
         int_type_->slots = make_int_slots();
         bool_type_->slots = make_bool_slots();
         str_type_->slots = make_str_slots();
@@ -61,6 +63,7 @@ namespace cxxpython
         object_type_->set_type(type_type_);
         type_type_->set_type(type_type_);
         none_type_->set_type(type_type_);
+        not_implemented_type_->set_type(type_type_);
         int_type_->set_type(type_type_);
         bool_type_->set_type(type_type_);
         str_type_->set_type(type_type_);
@@ -89,6 +92,7 @@ namespace cxxpython
 
         initialize_type(type_type_, object_type_);
         initialize_type(none_type_, object_type_);
+        initialize_type(not_implemented_type_, object_type_);
         initialize_type(int_type_, object_type_);
         initialize_type(bool_type_, int_type_);
         initialize_type(str_type_, object_type_);
@@ -112,12 +116,14 @@ namespace cxxpython
         initialize_type(attribute_error_type_, exception_type_);
 
         none_ = allocate<NoneObject>(none_type_);
+        not_implemented_ = allocate<NotImplementedObject>(not_implemented_type_);
         true_ = allocate<BoolObject>(bool_type_, true);
         false_ = allocate<BoolObject>(bool_type_, false);
 
         add_root(object_type_);
         add_root(type_type_);
         add_root(none_type_);
+        add_root(not_implemented_type_);
         add_root(int_type_);
         add_root(bool_type_);
         add_root(str_type_);
@@ -140,6 +146,7 @@ namespace cxxpython
         add_root(name_error_type_);
         add_root(attribute_error_type_);
         add_root(none_);
+        add_root(not_implemented_);
         add_root(true_);
         add_root(false_);
 

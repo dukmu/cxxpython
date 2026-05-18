@@ -30,6 +30,17 @@ namespace cxxpython
             return false;
         }
 
+        std::string not_implemented_repr(const Object &object)
+        {
+            (void)object;
+            return "NotImplemented";
+        }
+
+        bool not_implemented_equal(const Object &left, const Object &right)
+        {
+            return &left == &right;
+        }
+
         std::string int_repr(const Object &object)
         {
             return std::to_string(static_cast<const IntObject *>(&object)->value);
@@ -51,11 +62,6 @@ namespace cxxpython
             return static_cast<const IntObject *>(&object)->value != 0;
         }
 
-        [[noreturn]] void raise_unsupported_binary_op(const Object &left, const Object &right, BinaryOp op)
-        {
-            raise_type_error(left.runtime(), unsupported_binary_op_message(op, &left, &right));
-        }
-
         [[noreturn]] void raise_unsupported_unary_op(const Object &operand, UnaryOp op)
         {
             raise_type_error(operand.runtime(), unsupported_unary_op_message(op, &operand));
@@ -65,7 +71,7 @@ namespace cxxpython
         {
             auto *right_int = dynamic_cast<const IntObject *>(&right);
             if (!right_int)
-                raise_unsupported_binary_op(left, right, op);
+                return left.runtime()->not_implemented();
             auto *left_int = static_cast<const IntObject *>(&left);
             switch (op)
             {
@@ -81,7 +87,7 @@ namespace cxxpython
             case BinaryOp::Power:
                 break;
             }
-            raise_unsupported_binary_op(left, right, op);
+            return left.runtime()->not_implemented();
         }
 
         Object *int_unary_op(const Object &operand, UnaryOp op)
@@ -129,13 +135,18 @@ namespace cxxpython
         {
             auto *right_str = dynamic_cast<const StrObject *>(&right);
             if (!right_str || op != BinaryOp::Add)
-                raise_unsupported_binary_op(left, right, op);
+                return left.runtime()->not_implemented();
             auto *left_str = static_cast<const StrObject *>(&left);
             return left.runtime()->new_str(left_str->value + right_str->value);
         }
     }
 
     NoneObject::NoneObject(TypeObject *type)
+        : Object(type)
+    {
+    }
+
+    NotImplementedObject::NotImplementedObject(TypeObject *type)
         : Object(type)
     {
     }
@@ -162,6 +173,17 @@ namespace cxxpython
             .hash = none_hash,
             .equal = none_equal,
             .truth = none_truth,
+            .traverse = default_traverse,
+        };
+    }
+
+    TypeSlots make_not_implemented_slots()
+    {
+        return TypeSlots{
+            .repr = not_implemented_repr,
+            .hash = default_hash,
+            .equal = not_implemented_equal,
+            .truth = default_truth,
             .traverse = default_traverse,
         };
     }

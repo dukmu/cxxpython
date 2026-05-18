@@ -14,6 +14,7 @@ namespace cxxpython
     class Runtime;
     class Object;
     class TypeObject;
+    class NotImplementedObject;
     class ListObject;
     class DictObject;
     class MappingProxyObject;
@@ -156,6 +157,12 @@ namespace cxxpython
     {
     public:
         explicit NoneObject(TypeObject *type);
+    };
+
+    class NotImplementedObject final : public Object
+    {
+    public:
+        explicit NotImplementedObject(TypeObject *type);
     };
 
     class IntObject : public Object
@@ -358,6 +365,7 @@ namespace cxxpython
     bool object_equal(const Object *left, const Object *right);
     Object *object_rich_compare(Object *left, Object *right, RichCompareOp op);
     Object *object_binary_op(Object *left, Object *right, BinaryOp op);
+    Object *object_inplace_binary_op(Object *left, Object *right, BinaryOp op);
     Object *object_unary_op(Object *operand, UnaryOp op);
     Object *object_call(Object *callable, const std::vector<Object *> &args);
     std::size_t object_length(Object *object);
@@ -375,6 +383,7 @@ namespace cxxpython
     TypeSlots make_object_slots();
     TypeSlots make_type_slots();
     TypeSlots make_none_slots();
+    TypeSlots make_not_implemented_slots();
     TypeSlots make_int_slots();
     TypeSlots make_bool_slots();
     TypeSlots make_str_slots();

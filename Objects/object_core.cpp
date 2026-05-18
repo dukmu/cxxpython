@@ -53,6 +53,36 @@ namespace cxxpython
             if (type->dict)
                 visitor(type->dict);
         }
+
+        bool is_not_implemented(Object *object)
+        {
+            return object && object->runtime() && object == object->runtime()->not_implemented();
+        }
+
+        Object *call_binary_slot(BinaryOpSlot slot,
+                                 const Object &left,
+                                 const Object &right,
+                                 BinaryOp op,
+                                 const char *null_message)
+        {
+            Object *result = slot(left, right, op);
+            if (!result)
+                raise_type_error(left.runtime(), null_message);
+            return result;
+        }
+
+        Object *try_reflected_binary_op(Object *left, Object *right, BinaryOp op)
+        {
+            if (!right || !right->type() || !right->type()->slots.reflected_binary_op)
+                return nullptr;
+            Object *result = call_binary_slot(
+                right->type()->slots.reflected_binary_op,
+                *right,
+                *left,
+                op,
+                "reflected binary operator slot returned null");
+            return is_not_implemented(result) ? nullptr : result;
+        }
     }
 
     PythonError::PythonError(ExceptionObject *value)
@@ -235,23 +265,57 @@ namespace cxxpython
             raise_type_error(left ? left->runtime() : (right ? right->runtime() : nullptr),
                              unsupported_binary_op_message(op, left, right));
 
-        if (left->type() && left->type()->slots.binary_op)
+        const bool right_is_strict_subclass =
+            left->type() && right->type() &&
+            left->type() != right->type() &&
+            is_subclass(right->type(), left->type());
+
+        if (right_is_strict_subclass)
         {
-            Object *result = left->type()->slots.binary_op(*left, *right, op);
-            if (!result)
-                raise_type_error(left->runtime(), "binary operator slot returned null");
-            return result;
+            if (Object *result = try_reflected_binary_op(left, right, op))
+                return result;
         }
 
-        if (right->type() && right->type() != left->type() && right->type()->slots.reflected_binary_op)
+        if (left->type() && left->type()->slots.binary_op)
         {
-            Object *result = right->type()->slots.reflected_binary_op(*right, *left, op);
-            if (!result)
-                raise_type_error(right->runtime(), "reflected binary operator slot returned null");
-            return result;
+            Object *result = call_binary_slot(
+                left->type()->slots.binary_op,
+                *left,
+                *right,
+                op,
+                "binary operator slot returned null");
+            if (!is_not_implemented(result))
+                return result;
+        }
+
+        if (!right_is_strict_subclass && right->type() && right->type() != left->type())
+        {
+            if (Object *result = try_reflected_binary_op(left, right, op))
+                return result;
         }
 
         raise_type_error(left->runtime(), unsupported_binary_op_message(op, left, right));
+    }
+
+    Object *object_inplace_binary_op(Object *left, Object *right, BinaryOp op)
+    {
+        if (!left || !right)
+            raise_type_error(left ? left->runtime() : (right ? right->runtime() : nullptr),
+                             unsupported_binary_op_message(op, left, right));
+
+        if (left->type() && left->type()->slots.inplace_binary_op)
+        {
+            Object *result = call_binary_slot(
+                left->type()->slots.inplace_binary_op,
+                *left,
+                *right,
+                op,
+                "in-place binary operator slot returned null");
+            if (!is_not_implemented(result))
+                return result;
+        }
+
+        return object_binary_op(left, right, op);
     }
 
     Object *object_unary_op(Object *operand, UnaryOp op)

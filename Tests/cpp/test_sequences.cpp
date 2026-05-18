@@ -45,6 +45,126 @@ TEST(CoreObjects, BinaryOperatorProtocolDispatchesBuiltinTypes)
     EXPECT_EQ(text->value, "python");
 }
 
+TEST(CoreObjects, BinaryOperatorProtocolUsesNotImplementedFallbacks)
+{
+    cxxpython::Runtime runtime;
+
+    cxxpython::TypeSlots left_slots;
+    left_slots.binary_op = [](const cxxpython::Object &left,
+                              const cxxpython::Object &right,
+                              cxxpython::BinaryOp op) -> cxxpython::Object *
+    {
+        (void)right;
+        (void)op;
+        return left.runtime()->not_implemented();
+    };
+    cxxpython::TypeObject *left_type = runtime.new_heap_type("LeftOperand", runtime.object_type(), left_slots);
+
+    cxxpython::TypeSlots right_slots;
+    right_slots.reflected_binary_op = [](const cxxpython::Object &right,
+                                         const cxxpython::Object &left,
+                                         cxxpython::BinaryOp op) -> cxxpython::Object *
+    {
+        (void)left;
+        if (op == cxxpython::BinaryOp::Add)
+            return right.runtime()->new_str("reflected-add");
+        return right.runtime()->not_implemented();
+    };
+    cxxpython::TypeObject *right_type = runtime.new_heap_type("RightOperand", runtime.object_type(), right_slots);
+
+    cxxpython::Object *left = runtime.allocate<cxxpython::Object>(left_type);
+    cxxpython::Object *right = runtime.allocate<cxxpython::Object>(right_type);
+    auto *result = dynamic_cast<cxxpython::StrObject *>(
+        cxxpython::object_binary_op(left, right, cxxpython::BinaryOp::Add));
+    ASSERT_NE(result, nullptr);
+    EXPECT_EQ(result->value, "reflected-add");
+
+    try
+    {
+        (void)cxxpython::object_binary_op(left, right, cxxpython::BinaryOp::Subtract);
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "unsupported operand type(s) for -: 'LeftOperand' and 'RightOperand'");
+    }
+}
+
+TEST(CoreObjects, BinaryOperatorProtocolPrefersSubclassReflectedSlot)
+{
+    cxxpython::Runtime runtime;
+
+    cxxpython::TypeSlots base_slots;
+    base_slots.binary_op = [](const cxxpython::Object &left,
+                              const cxxpython::Object &right,
+                              cxxpython::BinaryOp op) -> cxxpython::Object *
+    {
+        (void)right;
+        if (op == cxxpython::BinaryOp::Add)
+            return left.runtime()->new_str("base-add");
+        return left.runtime()->not_implemented();
+    };
+    cxxpython::TypeObject *base_type = runtime.new_heap_type("BaseOperand", runtime.object_type(), base_slots);
+
+    cxxpython::TypeSlots child_slots;
+    child_slots.reflected_binary_op = [](const cxxpython::Object &right,
+                                         const cxxpython::Object &left,
+                                         cxxpython::BinaryOp op) -> cxxpython::Object *
+    {
+        (void)left;
+        if (op == cxxpython::BinaryOp::Add)
+            return right.runtime()->new_str("child-reflected-add");
+        return right.runtime()->not_implemented();
+    };
+    cxxpython::TypeObject *child_type = runtime.new_heap_type("ChildOperand", base_type, child_slots);
+
+    cxxpython::Object *base = runtime.allocate<cxxpython::Object>(base_type);
+    cxxpython::Object *child = runtime.allocate<cxxpython::Object>(child_type);
+    auto *result = dynamic_cast<cxxpython::StrObject *>(
+        cxxpython::object_binary_op(base, child, cxxpython::BinaryOp::Add));
+    ASSERT_NE(result, nullptr);
+    EXPECT_EQ(result->value, "child-reflected-add");
+}
+
+TEST(CoreObjects, InplaceBinaryOperatorFallsBackToBinaryProtocol)
+{
+    cxxpython::Runtime runtime;
+
+    cxxpython::TypeSlots inplace_slots;
+    inplace_slots.inplace_binary_op = [](const cxxpython::Object &left,
+                                         const cxxpython::Object &right,
+                                         cxxpython::BinaryOp op) -> cxxpython::Object *
+    {
+        (void)right;
+        if (op == cxxpython::BinaryOp::Add)
+            return left.runtime()->new_str("inplace-add");
+        return left.runtime()->not_implemented();
+    };
+    inplace_slots.binary_op = [](const cxxpython::Object &left,
+                                 const cxxpython::Object &right,
+                                 cxxpython::BinaryOp op) -> cxxpython::Object *
+    {
+        (void)right;
+        if (op == cxxpython::BinaryOp::Subtract)
+            return left.runtime()->new_str("binary-subtract");
+        return left.runtime()->not_implemented();
+    };
+    cxxpython::TypeObject *type = runtime.new_heap_type("InplaceOperand", runtime.object_type(), inplace_slots);
+    cxxpython::Object *left = runtime.allocate<cxxpython::Object>(type);
+    cxxpython::Object *right = runtime.allocate<cxxpython::Object>(type);
+
+    auto *inplace = dynamic_cast<cxxpython::StrObject *>(
+        cxxpython::object_inplace_binary_op(left, right, cxxpython::BinaryOp::Add));
+    ASSERT_NE(inplace, nullptr);
+    EXPECT_EQ(inplace->value, "inplace-add");
+
+    auto *fallback = dynamic_cast<cxxpython::StrObject *>(
+        cxxpython::object_inplace_binary_op(left, right, cxxpython::BinaryOp::Subtract));
+    ASSERT_NE(fallback, nullptr);
+    EXPECT_EQ(fallback->value, "binary-subtract");
+}
+
 TEST(CoreObjects, UnaryOperatorProtocolDispatchesBuiltinTypes)
 {
     cxxpython::Runtime runtime;

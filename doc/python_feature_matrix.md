@@ -11,6 +11,7 @@
 | 特性 | 目标 |
 | --- | --- |
 | `None`, `bool`, `int`, `str`, `bytes` | P0 |
+| `NotImplemented` singleton | P0 |
 | `tuple`, `list`, `dict`, `set`, `frozenset` | P0/P1 |
 | `==`, `!=`, rich comparison protocol | P0 |
 | `+`, `-`, `*`, `/`, `//`, `%`, `**` binary operator protocol | P0 |

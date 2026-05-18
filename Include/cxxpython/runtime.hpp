@@ -28,6 +28,7 @@ namespace cxxpython
         TypeObject *object_type() const noexcept;
         TypeObject *type_type() const noexcept;
         TypeObject *none_type() const noexcept;
+        TypeObject *not_implemented_type() const noexcept;
         TypeObject *int_type() const noexcept;
         TypeObject *bool_type() const noexcept;
         TypeObject *str_type() const noexcept;
@@ -51,6 +52,7 @@ namespace cxxpython
         TypeObject *attribute_error_type() const noexcept;
 
         NoneObject *none() const noexcept;
+        NotImplementedObject *not_implemented() const noexcept;
         BoolObject *true_value() const noexcept;
         BoolObject *false_value() const noexcept;
         ModuleObject *builtins_module() const noexcept;
@@ -136,6 +138,7 @@ namespace cxxpython
         TypeObject *object_type_ = nullptr;
         TypeObject *type_type_ = nullptr;
         TypeObject *none_type_ = nullptr;
+        TypeObject *not_implemented_type_ = nullptr;
         TypeObject *int_type_ = nullptr;
         TypeObject *bool_type_ = nullptr;
         TypeObject *str_type_ = nullptr;
@@ -159,6 +162,7 @@ namespace cxxpython
         TypeObject *attribute_error_type_ = nullptr;
 
         NoneObject *none_ = nullptr;
+        NotImplementedObject *not_implemented_ = nullptr;
         BoolObject *true_ = nullptr;
         BoolObject *false_ = nullptr;
         ModuleObject *builtins_module_ = nullptr;

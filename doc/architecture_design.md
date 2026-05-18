@@ -92,8 +92,8 @@ doc/            design docs and milestone plans
   `object_binary_op` 调度。VM 层应使用携带 `BinaryOp` operand 的通用
   `BINARY_OP` 形态，parser/compiler 层按优先级把 `+`、`-`、`*` 等语法降级
   到同一协议。一元运算通过 `UnaryOp`、`unary_op` 和 `UNARY_OP` 调度。
-  `NotImplemented`、subclass priority、reflected/in-place fallback 需要作为
-  完整协议一次实现，不能散落在各个内置类型中。
+  `NotImplemented`、subclass priority、reflected/in-place fallback 已接入
+  `object_binary_op`/`object_inplace_binary_op`，不能散落在各个内置类型中。
 - Rich compare: `==`/`!=` 已走 `object_rich_compare`；`lt/le/gt/ge`、`NotImplemented`
   和 reverse/subclass dispatch 需要在控制流前继续补齐。
 - Sequence/mapping: length, getitem, setitem, contains, iterator。

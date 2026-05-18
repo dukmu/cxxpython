@@ -17,6 +17,11 @@ namespace cxxpython
         return none_type_;
     }
 
+    TypeObject *Runtime::not_implemented_type() const noexcept
+    {
+        return not_implemented_type_;
+    }
+
     TypeObject *Runtime::int_type() const noexcept
     {
         return int_type_;
@@ -125,6 +130,11 @@ namespace cxxpython
     NoneObject *Runtime::none() const noexcept
     {
         return none_;
+    }
+
+    NotImplementedObject *Runtime::not_implemented() const noexcept
+    {
+        return not_implemented_;
     }
 
     BoolObject *Runtime::true_value() const noexcept

@@ -1,5 +1,75 @@
 # Development Status
 
+## 2026-05-18 NotImplemented Binary Dispatch
+
+Pre-change review:
+
+- `reflected_binary_op` and `inplace_binary_op` existed structurally, but there
+  was no `NotImplemented` singleton and no central fallback rule. Without this
+  slice, individual type slots would have to raise or manually redispatch,
+  recreating scattered operator semantics.
+- Builtin `int` and `str` raised `TypeError` from their slots for unsupported
+  operands. That prevented the right operand from participating in reflected
+  dispatch.
+- `NotImplemented` must be a real runtime object, visible to scripts and rooted
+  like `None`, `True`, and `False`.
+- Per user direction, arbitrary-precision `int` remains deferred for now.
+
+Debt addressed:
+
+- Added `NotImplementedType` and the `NotImplemented` singleton.
+- Added `Runtime::not_implemented_type()` and `Runtime::not_implemented()`.
+- Exposed `NotImplemented` in the builtins module.
+- Added `object_inplace_binary_op(...)`.
+- Centralized binary operator fallback rules:
+  - subclass right reflected slot gets priority
+  - left `binary_op` may return `NotImplemented`
+  - non-subclass right reflected slot runs after left returns
+    `NotImplemented` or has no slot
+  - in-place binary dispatch falls back to normal binary dispatch when the
+    in-place slot returns `NotImplemented`
+  - unsupported operations raise one central `TypeError`
+- Builtin `int` and `str` binary slots now return `NotImplemented` for
+  unsupported operands or operators instead of raising directly.
+
+Completed:
+
+- Added tests proving:
+  - `NotImplemented` has its own type and repr
+  - script-level `print(NotImplemented)` resolves through builtins
+  - left `NotImplemented` return falls back to right reflected slot
+  - subclass reflected slot has priority over base left slot
+  - in-place binary slot falls back to ordinary binary protocol
+  - unsupported operations still report Python `TypeError`
+
+Design notes:
+
+- `NotImplemented` is now the protocol signal for binary slots. Slots should
+  return it when they cannot handle an operand combination; they should raise
+  only for real execution errors.
+- Rich comparison still needs the same quality of treatment: `RichCompareSlot`
+  currently does not participate in `NotImplemented` reverse dispatch. That
+  should be the next comparison-protocol slice.
+- In-place syntax/opcodes are not parser-visible yet, but the object API is now
+  ready for augmented assignment lowering.
+
+Next:
+
+- Add `NotImplemented` and reverse/subclass dispatch to rich comparison before
+  adding ordering syntax.
+- Add augmented assignment only after compiler target evaluation order is
+  reviewed and tested.
+- Keep arbitrary-precision `int` deferred per current instruction.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects '--gtest_filter=CoreObjects.RuntimeBootstrapsBuiltinTypes:CoreObjects.ReprAndExceptionObjects:CoreObjects.BinaryOperatorProtocolDispatchesBuiltinTypes:CoreObjects.BinaryOperatorProtocolUsesNotImplementedFallbacks:CoreObjects.BinaryOperatorProtocolPrefersSubclassReflectedSlot:CoreObjects.InplaceBinaryOperatorFallsBackToBinaryProtocol:PythonScripts.RunsGoldenFiles'`
+- `ctest --test-dir build --output-on-failure`
+- `git diff --check`
+
+Result: all tests pass.
+
 ## 2026-05-18 Operator Protocol Migration And Unary Operators
 
 Pre-change review:

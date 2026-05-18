@@ -12,6 +12,7 @@ TEST(CoreObjects, RuntimeBootstrapsBuiltinTypes)
     EXPECT_EQ(runtime.object_type()->type(), runtime.type_type());
     EXPECT_EQ(runtime.type_type()->type(), runtime.type_type());
     EXPECT_EQ(runtime.none()->type(), runtime.none_type());
+    EXPECT_EQ(runtime.not_implemented()->type(), runtime.not_implemented_type());
     EXPECT_EQ(runtime.true_value()->type(), runtime.bool_type());
     EXPECT_EQ(runtime.false_value()->type(), runtime.bool_type());
 
@@ -78,6 +79,7 @@ TEST(CoreObjects, ReprAndExceptionObjects)
     cxxpython::Runtime runtime;
 
     EXPECT_EQ(cxxpython::object_repr(runtime.none()), "None");
+    EXPECT_EQ(cxxpython::object_repr(runtime.not_implemented()), "NotImplemented");
     EXPECT_EQ(cxxpython::object_repr(runtime.true_value()), "True");
     EXPECT_EQ(cxxpython::object_repr(runtime.new_int(1)), "1");
     EXPECT_EQ(cxxpython::object_repr(runtime.new_str("hello")), "'hello'");
