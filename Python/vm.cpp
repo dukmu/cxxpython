@@ -6,6 +6,13 @@ namespace cxxpython
 {
     namespace
     {
+        void jump_to(Frame &frame, const CodeObject &code, std::uint32_t target)
+        {
+            if (target >= code.instructions().size())
+                throw BytecodeError("jump target out of range");
+            frame.jump_to(target);
+        }
+
         std::string frame_repr(const Object &object)
         {
             auto *frame = static_cast<const Frame *>(&object);
@@ -111,6 +118,11 @@ namespace cxxpython
     void Frame::advance() noexcept
     {
         ++ip_;
+    }
+
+    void Frame::jump_to(std::size_t target) noexcept
+    {
+        ip_ = target;
     }
 
     void Frame::push(Object *object)
@@ -325,6 +337,25 @@ namespace cxxpython
                 Object *right = frame->pop();
                 Object *left = frame->pop();
                 frame->push(object_rich_compare(left, right, op));
+                break;
+            }
+            case Opcode::JumpAbsolute:
+            {
+                jump_to(*frame, code, instruction.operand);
+                break;
+            }
+            case Opcode::PopJumpIfFalse:
+            {
+                Object *condition = frame->pop();
+                if (!is_true(condition))
+                    jump_to(*frame, code, instruction.operand);
+                break;
+            }
+            case Opcode::PopJumpIfTrue:
+            {
+                Object *condition = frame->pop();
+                if (is_true(condition))
+                    jump_to(*frame, code, instruction.operand);
                 break;
             }
             case Opcode::Call:

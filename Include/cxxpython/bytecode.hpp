@@ -22,6 +22,9 @@ namespace cxxpython
         BinarySubscr,
         StoreSubscr,
         CompareOp,
+        JumpAbsolute,
+        PopJumpIfFalse,
+        PopJumpIfTrue,
         Call,
         ReturnValue,
     };

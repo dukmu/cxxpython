@@ -1,5 +1,64 @@
 # Development Status
 
+## 2026-05-18 Jump Bytecode And Truth Control
+
+Pre-change review:
+
+- `==` and `!=` now produce Python bool values, but the VM had no structural
+  jump opcodes. Adding `if`/`while` syntax before jump bytecode would force
+  compiler or parser shortcuts.
+- Truth conversion must stay centralized through `is_true` and type truth
+  slots. Branch opcodes should not special-case bool, int, list, or any
+  concrete runtime type.
+- Jump targets need bytecode validation so malformed control flow fails as
+  `BytecodeError` and active frames are unwound cleanly.
+
+Debt addressed:
+
+- Added control-flow bytecodes:
+  - `JUMP_ABSOLUTE`
+  - `POP_JUMP_IF_FALSE`
+  - `POP_JUMP_IF_TRUE`
+- Added opcode names and stack effects.
+- Added `Frame::jump_to(...)` so absolute jumps can move forward or backward.
+- VM conditional jumps pop one object and call `is_true(...)`.
+- VM validates jump targets before rewriting frame instruction pointers.
+
+Completed:
+
+- Added direct bytecode tests proving:
+  - unconditional jumps dispatch correctly
+  - false conditional jumps use custom type truth slots
+  - true conditional jumps use Python truth conversion
+  - malformed jump targets raise `BytecodeError`
+  - frame stack depth is restored after jump bytecode errors
+
+Design notes:
+
+- This slice deliberately does not add `if` parser syntax yet. It establishes
+  the VM control-flow substrate first so parser/compiler lowering can remain a
+  pure bytecode emission concern.
+- `JUMP_ABSOLUTE` is enough for the next `if` and `while` slices. A future
+  assembler/bytecode builder can add symbolic labels and relative jumps without
+  changing VM truth semantics.
+
+Next:
+
+- Add parser/compiler support for minimal `if`/`else` blocks using indentation
+  tokens and the new jump opcodes.
+- Then implement while loops with backward `JUMP_ABSOLUTE`.
+- After control flow is script-visible, continue the broader CPython-style
+  operator infrastructure plan from C++ slots to VM to parser.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects '--gtest_filter=Bytecode.MetadataNamesAndStackEffects:Bytecode.DispatchesJumpOpcodesThroughTruthProtocol:Bytecode.RejectsMalformedBytecode'`
+- `ctest --test-dir build --output-on-failure`
+- `git diff --check`
+
+Result: all tests pass.
+
 ## 2026-05-18 Rich Compare Equality
 
 Pre-change review:

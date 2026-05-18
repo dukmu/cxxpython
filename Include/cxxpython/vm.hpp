@@ -19,6 +19,7 @@ namespace cxxpython
         DictObject *builtins() const noexcept;
         std::size_t instruction_pointer() const noexcept;
         void advance() noexcept;
+        void jump_to(std::size_t target) noexcept;
 
         void push(Object *object);
         Object *pop();

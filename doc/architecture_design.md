@@ -117,6 +117,11 @@ doc/            design docs and milestone plans
 - `COMPARE_OP` 的职责是弹出左右操作数，解码比较 operator，调用
   `object_rich_compare`，再把 Python bool/object 结果压栈。比较语义不能在
   VM 中直接调用 `object_equal` 或识别 `int`/`str` 等具体类型。
+- Jump opcodes are structural VM control flow. `JUMP_ABSOLUTE` rewrites the
+  frame instruction pointer after validating the target; conditional jumps pop
+  one Python object and dispatch truth through `is_true`/type truth slots.
+  Parser/compiler control-flow syntax must lower to these opcodes instead of
+  embedding truth or branch behavior outside the VM.
 - `CALL` 的职责是栈调度：弹出 positional arguments 和 callable，调用统一
   `object_call`/type call slot，再把返回值压栈。函数对象、native function、
   type construction、bound method 后续都必须接入这条协议，而不是让 opcode

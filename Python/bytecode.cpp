@@ -134,6 +134,12 @@ namespace cxxpython
             return "STORE_SUBSCR";
         case Opcode::CompareOp:
             return "COMPARE_OP";
+        case Opcode::JumpAbsolute:
+            return "JUMP_ABSOLUTE";
+        case Opcode::PopJumpIfFalse:
+            return "POP_JUMP_IF_FALSE";
+        case Opcode::PopJumpIfTrue:
+            return "POP_JUMP_IF_TRUE";
         case Opcode::Call:
             return "CALL";
         case Opcode::ReturnValue:
@@ -150,9 +156,12 @@ namespace cxxpython
         case Opcode::LoadName:
             return 1;
         case Opcode::LoadAttr:
+        case Opcode::JumpAbsolute:
             return 0;
         case Opcode::StoreName:
         case Opcode::PopTop:
+        case Opcode::PopJumpIfFalse:
+        case Opcode::PopJumpIfTrue:
             return -1;
         case Opcode::StoreAttr:
             return -2;

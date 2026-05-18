@@ -3,6 +3,7 @@
 #include <sstream>
 
 #include "cxxpython/vm.hpp"
+#include "test_support.hpp"
 
 TEST(Bytecode, MetadataNamesAndStackEffects)
 {
@@ -16,6 +17,9 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::BinarySubscr), "BINARY_SUBSCR");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::StoreSubscr), "STORE_SUBSCR");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::CompareOp), "COMPARE_OP");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::JumpAbsolute), "JUMP_ABSOLUTE");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::PopJumpIfFalse), "POP_JUMP_IF_FALSE");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::PopJumpIfTrue), "POP_JUMP_IF_TRUE");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::Call), "CALL");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::ReturnValue), "RETURN_VALUE");
 
@@ -29,6 +33,9 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BinarySubscr, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::StoreSubscr, 0}), -3);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::CompareOp, 0}), -1);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::JumpAbsolute, 0}), 0);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::PopJumpIfFalse, 0}), -1);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::PopJumpIfTrue, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::Call, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::Call, 2}), -2);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::ReturnValue, 0}), -1);
@@ -54,6 +61,47 @@ TEST(Bytecode, DispatchesCompareOpThroughRichCompareProtocol)
          {cxxpython::Opcode::CompareOp, static_cast<std::uint32_t>(cxxpython::RichCompareOp::NotEqual)},
          {cxxpython::Opcode::ReturnValue, 0}});
     EXPECT_EQ(vm.execute(*not_equal), runtime.true_value());
+}
+
+TEST(Bytecode, DispatchesJumpOpcodesThroughTruthProtocol)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+
+    cxxpython::TypeSlots false_slots;
+    false_slots.truth = test_support::custom_false;
+    cxxpython::TypeObject *false_type = runtime.new_heap_type("FalseLike", runtime.object_type(), false_slots);
+    cxxpython::Object *false_like = runtime.allocate<cxxpython::Object>(false_type);
+
+    cxxpython::Object *taken = runtime.new_str("taken");
+    cxxpython::Object *skipped = runtime.new_str("skipped");
+    cxxpython::CodeObject *false_jump = runtime.new_code(
+        {false_like, skipped, taken},
+        {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::PopJumpIfFalse, 4},
+         {cxxpython::Opcode::LoadConst, 1},
+         {cxxpython::Opcode::ReturnValue, 0},
+         {cxxpython::Opcode::LoadConst, 2},
+         {cxxpython::Opcode::ReturnValue, 0}});
+    EXPECT_EQ(vm.execute(*false_jump), taken);
+
+    cxxpython::CodeObject *true_jump = runtime.new_code(
+        {runtime.true_value(), skipped, taken},
+        {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::PopJumpIfTrue, 4},
+         {cxxpython::Opcode::LoadConst, 1},
+         {cxxpython::Opcode::ReturnValue, 0},
+         {cxxpython::Opcode::LoadConst, 2},
+         {cxxpython::Opcode::ReturnValue, 0}});
+    EXPECT_EQ(vm.execute(*true_jump), taken);
+
+    cxxpython::CodeObject *absolute = runtime.new_code(
+        {skipped, taken},
+        {{cxxpython::Opcode::JumpAbsolute, 2},
+         {cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::LoadConst, 1},
+         {cxxpython::Opcode::ReturnValue, 0}});
+    EXPECT_EQ(vm.execute(*absolute), taken);
 }
 
 TEST(Bytecode, DispatchesSubscriptOpcodesThroughObjectProtocol)
@@ -475,6 +523,14 @@ TEST(Bytecode, RejectsMalformedBytecode)
                      {{cxxpython::Opcode::LoadConst, 0},
                       {cxxpython::Opcode::LoadConst, 1},
                       {cxxpython::Opcode::CompareOp, 255},
+                      {cxxpython::Opcode::ReturnValue, 0}})),
+                 cxxpython::BytecodeError);
+    EXPECT_EQ(vm.thread_state().frame_depth(), 0U);
+
+    EXPECT_THROW((void)vm.execute(*runtime.new_code(
+                     {runtime.true_value()},
+                     {{cxxpython::Opcode::LoadConst, 0},
+                      {cxxpython::Opcode::PopJumpIfFalse, 99},
                       {cxxpython::Opcode::ReturnValue, 0}})),
                  cxxpython::BytecodeError);
     EXPECT_EQ(vm.thread_state().frame_depth(), 0U);
