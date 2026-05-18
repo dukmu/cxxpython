@@ -59,6 +59,7 @@ add_executable(test_core_objects
     Tests/cpp/test_sequences.cpp
     Tests/cpp/test_mapping.cpp
     Tests/cpp/test_heap_types.cpp
+    Tests/cpp/test_attributes.cpp
     Tests/cpp/test_module.cpp
     Tests/cpp/test_bytecode.cpp
     Tests/cpp/test_compile.cpp

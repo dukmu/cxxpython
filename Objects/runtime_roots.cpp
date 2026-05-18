@@ -94,6 +94,7 @@ namespace cxxpython
         initialize_type_dict(index_error_type_);
         initialize_type_dict(syntax_error_type_);
         initialize_type_dict(name_error_type_);
+        initialize_type_dict(attribute_error_type_);
     }
 
     TypeSlots Runtime::inherit_slots(TypeObject *base, TypeSlots slots) const

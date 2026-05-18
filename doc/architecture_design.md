@@ -141,6 +141,10 @@ doc/            design docs and milestone plans
 - TypeObject 必须持有 runtime dict。内建类型和 heap type 的 `__name__`、
   `__module__`、方法表、descriptor 都应进入这条 typed dict 路径，而不是
   放在 VM、builtin helper 或 C++ side table 中。
+- Attribute lookup 的入口是统一 `object_get_attr` API。当前最小顺序是：
+  module dict -> type/class MRO dict -> metatype MRO dict。后续 instance dict、
+  data/non-data descriptor priority、`__getattr__`、slot wrappers 和
+  mappingproxy 必须扩展这条 API，而不是在 opcode 或 builtin 中另开查找路径。
 - Slot 扩展必须按协议族推进，不能每个 opcode 单独加临时入口。例如数值
   协议应一次性规划 normal/reflected/in-place，比较协议应返回 Python bool 或
   NotImplemented 语义。

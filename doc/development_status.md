@@ -1,5 +1,70 @@
 # Development Status
 
+## 2026-05-18 Central Attribute Lookup Foundation
+
+Pre-change review:
+
+- The previous type-dict slice added storage and traversal, but there was still
+  no central attribute lookup API. That would force future VM opcodes, builtin
+  helpers, method binding, modules, and C APIs to duplicate lookup behavior.
+- `AttributeError` was also missing from the runtime exception hierarchy, so
+  attribute errors would otherwise regress into generic host errors or the
+  wrong Python exception type.
+
+Debt addressed:
+
+- Added runtime-owned `AttributeError` under `Exception`.
+- Added centralized attribute lookup:
+  - `object_get_attr(Object *, StrObject *)`
+  - `object_get_attr(Object *, const std::string &)`
+  - `type_lookup_attribute(TypeObject *, StrObject *)`
+- Attribute lookup now covers:
+  - module dictionaries first
+  - class/type MRO dictionaries
+  - metatype MRO dictionaries for type objects
+  - normal instance lookup through the instance type MRO
+- Missing attributes now raise Python `AttributeError`.
+
+Completed:
+
+- Added focused attribute tests for:
+  - module dict lookup
+  - type dict lookup
+  - inherited type attributes through MRO
+  - metatype attributes
+  - instance attributes resolved through type MRO
+  - missing attribute `AttributeError`
+- Added `Tests/cpp/test_attributes.cpp` to the GTest suite.
+
+Design notes:
+
+- This is a foundation slice, not a full descriptor implementation. There is
+  intentionally no instance dict, data descriptor precedence, non-data
+  descriptor binding, `__getattr__`, `__getattribute__`, or mappingproxy yet.
+- The API shape keeps future descriptor work centralized: VM opcodes, native
+  functions, and extension APIs should call `object_get_attr` rather than
+  reading dicts directly.
+- The current class-object lookup is simplified but forward-compatible:
+  class/type MRO dicts are checked before metatype dicts because descriptor
+  priority has not been introduced yet. Descriptor slots must refine this
+  ordering before user-visible classes become broad.
+
+Next:
+
+- Add descriptor slots (`descr_get`, `descr_set`) and tests for data vs
+  non-data descriptor priority.
+- Add object instance dictionaries before user class instances are exposed.
+- Add `LOAD_ATTR` bytecode and parser support only after attribute semantics
+  stay centralized.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects '--gtest_filter=Attributes.*:CoreObjects.RuntimeBootstrapsExceptionHierarchy'`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all tests pass.
+
 ## 2026-05-18 Type Dictionaries Foundation
 
 Pre-change review:

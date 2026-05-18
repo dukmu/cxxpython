@@ -229,6 +229,9 @@ namespace cxxpython
     bool object_equal(const Object *left, const Object *right);
     Object *object_binary_add(Object *left, Object *right);
     Object *object_call(Object *callable, const std::vector<Object *> &args);
+    Object *object_get_attr(Object *object, StrObject *name);
+    Object *object_get_attr(Object *object, const std::string &name);
+    Object *type_lookup_attribute(TypeObject *type, StrObject *name);
     std::string object_repr(const Object *object);
     std::string type_qualified_name(const TypeObject *type);
 
@@ -251,4 +254,5 @@ namespace cxxpython
     [[noreturn]] void raise_index_error(Runtime *runtime, std::string message);
     [[noreturn]] void raise_syntax_error(Runtime *runtime, std::string message);
     [[noreturn]] void raise_name_error(Runtime *runtime, std::string message);
+    [[noreturn]] void raise_attribute_error(Runtime *runtime, std::string message);
 }

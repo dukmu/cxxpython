@@ -197,6 +197,62 @@ namespace cxxpython
         raise_type_error(callable->runtime(), message.str());
     }
 
+    Object *type_lookup_attribute(TypeObject *type, StrObject *name)
+    {
+        if (!type || !name)
+            return nullptr;
+        for (TypeObject *candidate : type->mro)
+        {
+            if (!candidate || !candidate->dict)
+                continue;
+            if (Object *value = candidate->dict->get(name))
+                return value;
+        }
+        return nullptr;
+    }
+
+    Object *object_get_attr(Object *object, StrObject *name)
+    {
+        if (!object || !name)
+            raise_attribute_error(object ? object->runtime() : (name ? name->runtime() : nullptr),
+                                  "'<null>' object has no attribute '<null>'");
+
+        if (auto *module = dynamic_cast<ModuleObject *>(object))
+        {
+            if (Object *value = module->dict()->get(name))
+                return value;
+        }
+
+        if (auto *type = dynamic_cast<TypeObject *>(object))
+        {
+            if (Object *value = type_lookup_attribute(type, name))
+                return value;
+            if (type->type() && type->type() != type)
+            {
+                if (Object *value = type_lookup_attribute(type->type(), name))
+                    return value;
+            }
+        }
+        else if (Object *value = type_lookup_attribute(object->type(), name))
+        {
+            return value;
+        }
+
+        std::ostringstream message;
+        message << "'" << type_qualified_name(object->type())
+                << "' object has no attribute '"
+                << name->value << "'";
+        raise_attribute_error(object->runtime(), message.str());
+    }
+
+    Object *object_get_attr(Object *object, const std::string &name)
+    {
+        Runtime *runtime = object ? object->runtime() : nullptr;
+        if (!runtime)
+            raise_attribute_error(nullptr, "'<null>' object has no attribute '" + name + "'");
+        return object_get_attr(object, runtime->new_str(name));
+    }
+
     std::string type_qualified_name(const TypeObject *type)
     {
         if (!type)
@@ -249,5 +305,12 @@ namespace cxxpython
         if (!runtime)
             throw std::logic_error("cannot raise Python NameError without a runtime");
         throw PythonError(runtime->new_name_error(std::move(message)));
+    }
+
+    void raise_attribute_error(Runtime *runtime, std::string message)
+    {
+        if (!runtime)
+            throw std::logic_error("cannot raise Python AttributeError without a runtime");
+        throw PythonError(runtime->new_attribute_error(std::move(message)));
     }
 }

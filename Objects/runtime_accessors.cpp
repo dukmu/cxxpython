@@ -97,6 +97,11 @@ namespace cxxpython
         return name_error_type_;
     }
 
+    TypeObject *Runtime::attribute_error_type() const noexcept
+    {
+        return attribute_error_type_;
+    }
+
     NoneObject *Runtime::none() const noexcept
     {
         return none_;
