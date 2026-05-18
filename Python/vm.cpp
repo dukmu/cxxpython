@@ -439,6 +439,15 @@ namespace cxxpython
                 }
                 break;
             }
+            case Opcode::MakeFunction:
+            {
+                Object *code_object = frame->pop();
+                auto *function_code = dynamic_cast<CodeObject *>(code_object);
+                if (!function_code)
+                    throw BytecodeError("MAKE_FUNCTION requires a code object");
+                frame->push(runtime_.new_function(function_code->name(), function_code, &globals));
+                break;
+            }
             case Opcode::Call:
             {
                 std::vector<Object *> args(instruction.operand);

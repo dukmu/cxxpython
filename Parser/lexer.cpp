@@ -147,6 +147,10 @@ namespace cxxpython::compiler_internal
                     kind = TokenKind::If;
                 else if (lexeme == "else")
                     kind = TokenKind::Else;
+                else if (lexeme == "def")
+                    kind = TokenKind::Def;
+                else if (lexeme == "return")
+                    kind = TokenKind::Return;
                 tokens.push_back(Token{kind, lexeme, 0, line, start_column});
                 continue;
             }

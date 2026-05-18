@@ -575,6 +575,69 @@ TEST(Compile, CompilesDictSubscriptThroughObjectProtocol)
     EXPECT_EQ(result->value, 42);
 }
 
+TEST(Compile, CompilesFunctionDefinitionsAndReturns)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(
+        runtime,
+        "def answer():\n"
+        "    return 'ok'\n"
+        "def identity(value):\n"
+        "    return value\n"
+        "first = answer()\n"
+        "second = identity('arg')\n",
+        "script.py");
+    ASSERT_NE(code, nullptr);
+
+    bool saw_make_function = false;
+    for (const cxxpython::Instruction &instruction : code->instructions())
+    {
+        if (instruction.opcode == cxxpython::Opcode::MakeFunction)
+            saw_make_function = true;
+    }
+    EXPECT_TRUE(saw_make_function);
+
+    EXPECT_EQ(vm.execute(*code, *globals), runtime.none());
+    auto *answer = dynamic_cast<cxxpython::PythonFunctionObject *>(globals->get(runtime.new_str("answer")));
+    auto *identity = dynamic_cast<cxxpython::PythonFunctionObject *>(globals->get(runtime.new_str("identity")));
+    ASSERT_NE(answer, nullptr);
+    ASSERT_NE(identity, nullptr);
+    EXPECT_EQ(answer->code()->arg_count(), 0U);
+    EXPECT_EQ(identity->code()->arg_count(), 1U);
+    ASSERT_EQ(identity->code()->varnames().size(), 1U);
+    auto *identity_arg = dynamic_cast<cxxpython::StrObject *>(identity->code()->varnames()[0]);
+    ASSERT_NE(identity_arg, nullptr);
+    EXPECT_EQ(identity_arg->value, "value");
+
+    auto *first = dynamic_cast<cxxpython::StrObject *>(globals->get(runtime.new_str("first")));
+    auto *second = dynamic_cast<cxxpython::StrObject *>(globals->get(runtime.new_str("second")));
+    ASSERT_NE(first, nullptr);
+    ASSERT_NE(second, nullptr);
+    EXPECT_EQ(first->value, "ok");
+    EXPECT_EQ(second->value, "arg");
+}
+
+TEST(Compile, FunctionWithoutReturnDefaultsToNone)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(
+        runtime,
+        "def implicit():\n"
+        "    value = 'ignored'\n"
+        "result = implicit()\n",
+        "script.py");
+    ASSERT_NE(code, nullptr);
+
+    EXPECT_EQ(vm.execute(*code, *globals), runtime.none());
+    EXPECT_EQ(globals->get(runtime.new_str("result")), runtime.none());
+}
+
 TEST(Compile, RaisesSyntaxErrorForInvalidAssignmentTarget)
 {
     cxxpython::Runtime runtime;
@@ -588,6 +651,22 @@ TEST(Compile, RaisesSyntaxErrorForInvalidAssignmentTarget)
     {
         EXPECT_EQ(error.type_name(), "SyntaxError");
         EXPECT_STREQ(error.what(), "broken.py:1:3: invalid assignment target");
+    }
+}
+
+TEST(Compile, RaisesSyntaxErrorForReturnOutsideFunction)
+{
+    cxxpython::Runtime runtime;
+
+    try
+    {
+        (void)cxxpython::compile_exec_input(runtime, "return 1\n", "broken.py");
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type_name(), "SyntaxError");
+        EXPECT_STREQ(error.what(), "broken.py:1:1: 'return' outside function");
     }
 }
 

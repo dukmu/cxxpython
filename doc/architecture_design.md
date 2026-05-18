@@ -253,6 +253,10 @@ doc/            design docs and milestone plans
   bytecode, so nested frames remain in one `ThreadState` for GC roots,
   traceback, tracing, and future generators. Host-side calls may create a VM
   entrypoint, but opcode calls must not silently fork execution state.
+- Function definitions lower to a code object constant plus `MAKE_FUNCTION`,
+  then ordinary `STORE_NAME`. This keeps function creation in the VM/runtime
+  path where globals and active frame context are available; the compiler must
+  not pre-build function objects with placeholder globals.
 - `type.__call__` 是对象构造唯一入口：选择 `__new__`，再在返回对象是目标
   类型实例时调用 `__init__`。内建类型构造和 Python 类构造都必须复用这条
   call/new/init 协议。

@@ -169,6 +169,8 @@ namespace cxxpython
             return "POP_JUMP_IF_TRUE";
         case Opcode::JumpIfFalseOrPop:
             return "JUMP_IF_FALSE_OR_POP";
+        case Opcode::MakeFunction:
+            return "MAKE_FUNCTION";
         case Opcode::Call:
             return "CALL";
         case Opcode::ReturnValue:
@@ -189,6 +191,7 @@ namespace cxxpython
         case Opcode::RotTwo:
         case Opcode::RotThree:
         case Opcode::UnaryOp:
+        case Opcode::MakeFunction:
             return 0;
         case Opcode::DupTop:
             return 1;

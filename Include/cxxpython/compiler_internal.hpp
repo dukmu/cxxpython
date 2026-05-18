@@ -28,6 +28,8 @@ namespace cxxpython::compiler_internal
     struct ExprStmt;
     struct AssignStmt;
     struct IfStmt;
+    struct ReturnStmt;
+    struct FunctionDefStmt;
 
     struct ExprVisitor
     {
@@ -57,6 +59,8 @@ namespace cxxpython::compiler_internal
         virtual void visit(const ExprStmt &statement) = 0;
         virtual void visit(const AssignStmt &statement) = 0;
         virtual void visit(const IfStmt &statement) = 0;
+        virtual void visit(const ReturnStmt &statement) = 0;
+        virtual void visit(const FunctionDefStmt &statement) = 0;
     };
 
     enum class TokenKind
@@ -84,6 +88,8 @@ namespace cxxpython::compiler_internal
         GreaterEqual,
         If,
         Else,
+        Def,
+        Return,
         Indent,
         Dedent,
         Newline,
@@ -368,6 +374,40 @@ namespace cxxpython::compiler_internal
         std::unique_ptr<Expr> condition;
         std::vector<std::unique_ptr<Stmt>> then_body;
         std::vector<std::unique_ptr<Stmt>> else_body;
+
+        void accept(StmtVisitor &visitor) const override
+        {
+            visitor.visit(*this);
+        }
+    };
+
+    struct ReturnStmt final : Stmt
+    {
+        explicit ReturnStmt(std::unique_ptr<Expr> value_in)
+            : value(std::move(value_in))
+        {
+        }
+
+        std::unique_ptr<Expr> value;
+
+        void accept(StmtVisitor &visitor) const override
+        {
+            visitor.visit(*this);
+        }
+    };
+
+    struct FunctionDefStmt final : Stmt
+    {
+        FunctionDefStmt(std::string name_in,
+                        std::vector<std::string> params_in,
+                        std::vector<std::unique_ptr<Stmt>> body_in)
+            : name(std::move(name_in)), params(std::move(params_in)), body(std::move(body_in))
+        {
+        }
+
+        std::string name;
+        std::vector<std::string> params;
+        std::vector<std::unique_ptr<Stmt>> body;
 
         void accept(StmtVisitor &visitor) const override
         {

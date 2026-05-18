@@ -56,10 +56,35 @@ namespace cxxpython::compiler_internal
                 bool compound;
             };
 
+            class FunctionDepthGuard final
+            {
+            public:
+                explicit FunctionDepthGuard(std::size_t &depth)
+                    : depth_(depth)
+                {
+                    ++depth_;
+                }
+
+                ~FunctionDepthGuard()
+                {
+                    --depth_;
+                }
+
+                FunctionDepthGuard(const FunctionDepthGuard &) = delete;
+                FunctionDepthGuard &operator=(const FunctionDepthGuard &) = delete;
+
+            private:
+                std::size_t &depth_;
+            };
+
             ParsedStatement parse_statement()
             {
                 if (peek().kind == TokenKind::If)
                     return parse_if_statement();
+                if (peek().kind == TokenKind::Def)
+                    return parse_function_def_statement();
+                if (peek().kind == TokenKind::Return)
+                    return parse_return_statement();
 
                 std::unique_ptr<Expr> target_or_expression = parse_expression_only();
                 if (peek().kind == TokenKind::Equal)
@@ -75,6 +100,22 @@ namespace cxxpython::compiler_internal
                 }
                 return ParsedStatement{
                     std::make_unique<ExprStmt>(std::move(target_or_expression)),
+                    false,
+                };
+            }
+
+            ParsedStatement parse_return_statement()
+            {
+                const Token &return_token = advance();
+                if (function_depth_ == 0)
+                    raise_at(return_token, "'return' outside function");
+                std::unique_ptr<Expr> value;
+                if (peek().kind != TokenKind::Newline &&
+                    peek().kind != TokenKind::Dedent &&
+                    peek().kind != TokenKind::End)
+                    value = parse_expression_only();
+                return ParsedStatement{
+                    std::make_unique<ReturnStmt>(std::move(value)),
                     false,
                 };
             }
@@ -101,6 +142,46 @@ namespace cxxpython::compiler_internal
                         std::move(condition),
                         std::move(then_body),
                         std::move(else_body)),
+                    true,
+                };
+            }
+
+            ParsedStatement parse_function_def_statement()
+            {
+                advance();
+                if (peek().kind != TokenKind::Identifier)
+                    raise_at(peek(), "expected function name");
+                std::string name = advance().lexeme;
+                consume(TokenKind::LeftParen, "expected '(' after function name");
+                std::vector<std::string> params;
+                if (peek().kind != TokenKind::RightParen)
+                {
+                    while (true)
+                    {
+                        if (peek().kind != TokenKind::Identifier)
+                            raise_at(peek(), "expected parameter name");
+                        std::string param = advance().lexeme;
+                        for (const std::string &existing : params)
+                        {
+                            if (existing == param)
+                                raise_at(previous(), "duplicate parameter name");
+                        }
+                        params.push_back(std::move(param));
+                        if (peek().kind != TokenKind::Comma)
+                            break;
+                        advance();
+                        if (peek().kind == TokenKind::RightParen)
+                            break;
+                    }
+                }
+                consume(TokenKind::RightParen, "expected ')' after parameters");
+                consume(TokenKind::Colon, "expected ':' after function signature");
+                consume(TokenKind::Newline, "expected newline after function signature");
+
+                FunctionDepthGuard guard(function_depth_);
+                std::vector<std::unique_ptr<Stmt>> body = parse_block();
+                return ParsedStatement{
+                    std::make_unique<FunctionDefStmt>(std::move(name), std::move(params), std::move(body)),
                     true,
                 };
             }
@@ -292,6 +373,8 @@ namespace cxxpython::compiler_internal
                 case TokenKind::GreaterEqual:
                 case TokenKind::If:
                 case TokenKind::Else:
+                case TokenKind::Def:
+                case TokenKind::Return:
                 case TokenKind::Indent:
                 case TokenKind::Dedent:
                     raise_at(token, "expected expression");
@@ -370,6 +453,8 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Equal:
                 case TokenKind::If:
                 case TokenKind::Else:
+                case TokenKind::Def:
+                case TokenKind::Return:
                 case TokenKind::Indent:
                 case TokenKind::Dedent:
                 case TokenKind::Newline:
@@ -390,6 +475,7 @@ namespace cxxpython::compiler_internal
             const std::vector<Token> &tokens_;
             std::string filename_;
             std::size_t index_ = 0;
+            std::size_t function_depth_ = 0;
         };
     }
 

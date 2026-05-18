@@ -30,6 +30,7 @@ namespace cxxpython
         PopJumpIfFalse,
         PopJumpIfTrue,
         JumpIfFalseOrPop,
+        MakeFunction,
         Call,
         ReturnValue,
     };

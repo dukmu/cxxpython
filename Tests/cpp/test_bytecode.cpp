@@ -25,6 +25,7 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::PopJumpIfFalse), "POP_JUMP_IF_FALSE");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::PopJumpIfTrue), "POP_JUMP_IF_TRUE");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::JumpIfFalseOrPop), "JUMP_IF_FALSE_OR_POP");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::MakeFunction), "MAKE_FUNCTION");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::Call), "CALL");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::ReturnValue), "RETURN_VALUE");
 
@@ -46,6 +47,7 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::PopJumpIfFalse, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::PopJumpIfTrue, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::JumpIfFalseOrPop, 0}), -1);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::MakeFunction, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::Call, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::Call, 2}), -2);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::ReturnValue, 0}), -1);
@@ -175,6 +177,31 @@ TEST(Bytecode, DispatchesJumpIfFalseOrPop)
          {cxxpython::Opcode::LoadConst, 0},
          {cxxpython::Opcode::ReturnValue, 0}});
     EXPECT_EQ(vm.execute(*true_pop), taken);
+}
+
+TEST(Bytecode, DispatchesMakeFunction)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+    cxxpython::Object *result = runtime.new_str("made");
+    cxxpython::CodeObject *function_code = runtime.new_code(
+        "made_function",
+        "test.py",
+        {result},
+        {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::ReturnValue, 0}});
+    cxxpython::CodeObject *module_code = runtime.new_code(
+        {function_code},
+        {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::MakeFunction, 0},
+         {cxxpython::Opcode::ReturnValue, 0}});
+
+    auto *function = dynamic_cast<cxxpython::PythonFunctionObject *>(vm.execute(*module_code, *globals));
+    ASSERT_NE(function, nullptr);
+    EXPECT_EQ(function->name(), "made_function");
+    EXPECT_EQ(function->globals(), globals);
+    EXPECT_EQ(cxxpython::object_call(function, {}), result);
 }
 
 TEST(Bytecode, DispatchesSubscriptOpcodesThroughObjectProtocol)
@@ -727,6 +754,14 @@ TEST(Bytecode, RejectsMalformedBytecode)
     EXPECT_EQ(vm.thread_state().frame_depth(), 0U);
 
     EXPECT_THROW((void)vm.execute(*runtime.new_code({}, {{cxxpython::Opcode::DupTop, 0}})),
+                 cxxpython::BytecodeError);
+    EXPECT_EQ(vm.thread_state().frame_depth(), 0U);
+
+    EXPECT_THROW((void)vm.execute(*runtime.new_code(
+                     {runtime.new_str("not-code")},
+                     {{cxxpython::Opcode::LoadConst, 0},
+                      {cxxpython::Opcode::MakeFunction, 0},
+                      {cxxpython::Opcode::ReturnValue, 0}})),
                  cxxpython::BytecodeError);
     EXPECT_EQ(vm.thread_state().frame_depth(), 0U);
 

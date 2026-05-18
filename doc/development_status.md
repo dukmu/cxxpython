@@ -1,5 +1,71 @@
 # Development Status
 
+## 2026-05-18 Function Definition Syntax
+
+Pre-change review:
+
+- Python function objects and argument metadata existed only through C++ tests.
+  Scripts still had no `def` statement, no `return`, and no runtime function
+  creation opcode.
+- Creating function objects at compile time would capture the wrong globals.
+  Function creation must happen while a frame is executing so the VM can bind
+  the new function to the current globals dict.
+- Returning from outside a function must be a syntax error, not a runtime
+  fallback.
+
+Debt addressed:
+
+- Added lexer/parser support for:
+  - `def name(positional, params):`
+  - function body blocks
+  - `return expr`
+  - bare `return`
+- Added `FunctionDefStmt` and `ReturnStmt` AST nodes.
+- Added `MAKE_FUNCTION`, which pops a `CodeObject` and creates a
+  `PythonFunctionObject` with the active frame globals.
+- Compiler lowers function definitions to:
+  - nested function `CodeObject` constant
+  - `MAKE_FUNCTION`
+  - `STORE_NAME`
+- Function bodies compile with their own symbol table and code object metadata.
+
+Completed:
+
+- Added bytecode tests for `MAKE_FUNCTION` metadata, dispatch, and malformed
+  bytecode.
+- Added compiler tests for:
+  - zero-arg functions
+  - positional-only one-arg functions
+  - explicit return values
+  - implicit `None` return
+  - `return` outside function syntax error
+- Added Python golden script coverage for module-level functions.
+
+Design notes:
+
+- This slice is intentionally positional-only and does not implement defaults,
+  keyword calls, closures, `global`, `nonlocal`, annotations, decorators, or
+  nested-scope closure cells.
+- Function creation now has the right shape for future class bodies: a function
+  object is created at runtime and stored in the current namespace, so class
+  namespace execution can reuse the same statement compiler.
+
+Next:
+
+- Add class body namespace execution and minimal `class Name:` syntax, using
+  function objects already stored in the class namespace as descriptors.
+- Then route three-argument `type(name, bases, namespace)` through the same
+  class creation API.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects '--gtest_filter=Bytecode.MetadataNamesAndStackEffects:Bytecode.DispatchesMakeFunction:Bytecode.RejectsMalformedBytecode:Compile.CompilesFunctionDefinitionsAndReturns:Compile.FunctionWithoutReturnDefaultsToNone:Compile.RaisesSyntaxErrorForReturnOutsideFunction:PythonScripts.RunsGoldenFiles'`
+- `ctest --test-dir build --output-on-failure`
+- `git diff --check`
+
+Result: all tests pass.
+
 ## 2026-05-18 CodeObject Argument Metadata
 
 Pre-change review:

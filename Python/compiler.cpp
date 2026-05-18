@@ -132,6 +132,17 @@ namespace cxxpython
                     item->accept(*this);
             }
 
+            void visit(const compiler_internal::ReturnStmt &statement) override
+            {
+                if (statement.value)
+                    statement.value->accept(*this);
+            }
+
+            void visit(const compiler_internal::FunctionDefStmt &statement) override
+            {
+                (void)symbols_.add_name(statement.name);
+            }
+
         private:
             SymbolTable &symbols_;
         };
@@ -141,30 +152,45 @@ namespace cxxpython
                                       public compiler_internal::StmtVisitor
         {
         public:
-            BytecodeBuilder(Runtime &runtime, const SymbolTable &symbols)
-                : runtime_(runtime), names_(symbols.make_name_objects(runtime))
+            BytecodeBuilder(Runtime &runtime, const SymbolTable &symbols, std::string filename)
+                : runtime_(runtime), filename_(std::move(filename)), names_(symbols.make_name_objects(runtime))
             {
             }
 
-            CodeObject *build_eval(const compiler_internal::Expr &expression, const std::string &filename)
+            CodeObject *build_eval(const compiler_internal::Expr &expression)
             {
                 expression.accept(*this);
                 instructions_.push_back(Instruction{Opcode::ReturnValue, 0});
                 return runtime_.new_code("<eval>",
-                                         filename,
+                                         filename_,
                                          std::move(constants_),
                                          std::move(names_),
                                          std::move(instructions_));
             }
 
-            CodeObject *build_exec(const compiler_internal::Module &module, const std::string &filename)
+            CodeObject *build_exec(const compiler_internal::Module &module)
             {
                 for (const auto &statement : module.statements)
                     statement->accept(*this);
                 emit_constant(runtime_.none());
                 instructions_.push_back(Instruction{Opcode::ReturnValue, 0});
                 return runtime_.new_code("<module>",
-                                         filename,
+                                         filename_,
+                                         std::move(constants_),
+                                         std::move(names_),
+                                         std::move(instructions_));
+            }
+
+            CodeObject *build_function(const compiler_internal::FunctionDefStmt &function)
+            {
+                for (const auto &statement : function.body)
+                    statement->accept(*this);
+                emit_constant(runtime_.none());
+                instructions_.push_back(Instruction{Opcode::ReturnValue, 0});
+                return runtime_.new_code(function.name,
+                                         filename_,
+                                         static_cast<std::uint32_t>(function.params.size()),
+                                         make_varnames(function.params),
                                          std::move(constants_),
                                          std::move(names_),
                                          std::move(instructions_));
@@ -327,6 +353,28 @@ namespace cxxpython
                 patch_jump(end_jump, instructions_.size());
             }
 
+            void visit(const compiler_internal::ReturnStmt &statement) override
+            {
+                if (statement.value)
+                    statement.value->accept(*this);
+                else
+                    emit_constant(runtime_.none());
+                instructions_.push_back(Instruction{Opcode::ReturnValue, 0});
+            }
+
+            void visit(const compiler_internal::FunctionDefStmt &statement) override
+            {
+                SymbolTable function_symbols = collect_function_symbols(statement);
+                BytecodeBuilder function_builder(runtime_, function_symbols, filename_);
+                CodeObject *code = function_builder.build_function(statement);
+                emit_constant(code);
+                instructions_.push_back(Instruction{Opcode::MakeFunction, 0});
+                instructions_.push_back(Instruction{
+                    Opcode::StoreName,
+                    static_cast<std::uint32_t>(name_index(statement.name)),
+                });
+            }
+
         private:
             class PendingAssignmentValue final
             {
@@ -377,6 +425,24 @@ namespace cxxpython
                 instructions_[instruction_index].operand = static_cast<std::uint32_t>(target);
             }
 
+            SymbolTable collect_function_symbols(const compiler_internal::FunctionDefStmt &function) const
+            {
+                SymbolTable symbols;
+                SymbolCollector collector(symbols);
+                for (const auto &statement : function.body)
+                    statement->accept(collector);
+                return symbols;
+            }
+
+            std::vector<Object *> make_varnames(const std::vector<std::string> &params)
+            {
+                std::vector<Object *> varnames;
+                varnames.reserve(params.size());
+                for (const std::string &param : params)
+                    varnames.push_back(runtime_.new_str(param));
+                return varnames;
+            }
+
             std::size_t name_index(const std::string &name) const
             {
                 for (std::size_t index = 0; index < names_.size(); ++index)
@@ -389,6 +455,7 @@ namespace cxxpython
             }
 
             Runtime &runtime_;
+            std::string filename_;
             std::vector<Object *> names_;
             std::vector<Object *> constants_;
             std::vector<Instruction> instructions_;
@@ -425,8 +492,8 @@ namespace cxxpython
         std::unique_ptr<compiler_internal::Expr> expression =
             compiler_internal::parse_expression(runtime, tokens, filename);
         SymbolTable symbols = collect_symbols(*expression);
-        BytecodeBuilder builder(runtime, symbols);
-        return builder.build_eval(*expression, filename);
+        BytecodeBuilder builder(runtime, symbols, filename);
+        return builder.build_eval(*expression);
     }
 
     CodeObject *compile_exec_input(Runtime &runtime, std::string_view source)
@@ -440,7 +507,7 @@ namespace cxxpython
             compiler_internal::lex_source(runtime, source, filename);
         compiler_internal::Module module = compiler_internal::parse_module(runtime, tokens, filename);
         SymbolTable symbols = collect_symbols(module);
-        BytecodeBuilder builder(runtime, symbols);
-        return builder.build_exec(module, filename);
+        BytecodeBuilder builder(runtime, symbols, filename);
+        return builder.build_exec(module);
     }
 }
