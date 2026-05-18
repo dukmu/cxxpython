@@ -171,6 +171,8 @@ namespace cxxpython
             return "JUMP_IF_FALSE_OR_POP";
         case Opcode::MakeFunction:
             return "MAKE_FUNCTION";
+        case Opcode::MakeClass:
+            return "MAKE_CLASS";
         case Opcode::Call:
             return "CALL";
         case Opcode::ReturnValue:
@@ -192,6 +194,7 @@ namespace cxxpython
         case Opcode::RotThree:
         case Opcode::UnaryOp:
         case Opcode::MakeFunction:
+        case Opcode::MakeClass:
             return 0;
         case Opcode::DupTop:
             return 1;

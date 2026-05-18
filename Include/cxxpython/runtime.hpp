@@ -111,6 +111,7 @@ namespace cxxpython
                          DictObject *globals = nullptr,
                          DictObject *builtins = nullptr);
         TypeObject *new_heap_type(std::string name, TypeObject *base, TypeSlots slots = {});
+        TypeObject *new_class(std::string name, TypeObject *base, DictObject *namespace_dict);
         ExceptionObject *new_exception(TypeObject *type, std::string message);
         ExceptionObject *new_exception(TypeObject *type, std::vector<Object *> args);
         ExceptionObject *new_type_error(std::string message);

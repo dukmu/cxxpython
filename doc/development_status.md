@@ -1,5 +1,77 @@
 # Development Status
 
+## 2026-05-18 Minimal Class Definition Syntax
+
+Pre-change review:
+
+- Python functions and bound methods existed, but scripts still could not build
+  a class namespace through `class Name:`.
+- Implementing class bodies by writing directly into module globals would have
+  broken Python semantics and made descriptors/method binding depend on parser
+  shortcuts.
+- Class creation needs one runtime entrypoint so future `class` statements and
+  three-argument `type(name, bases, namespace)` can share validation,
+  namespace copying, module naming, bases, MRO, and metaclass selection.
+
+Debt addressed:
+
+- Added lexer/parser/AST/compiler support for minimal `class Name:` blocks.
+- Added `MAKE_CLASS`, which pops a class body `CodeObject`, executes it with a
+  fresh class namespace as locals and module globals as globals, then creates a
+  heap type through `Runtime::new_class`.
+- Added `Runtime::new_class(name, base, namespace)` as the central class
+  construction seed for this phase.
+- Class body assignments now populate the class namespace; functions defined in
+  a class body become ordinary Python function descriptor objects and bind as
+  methods when read from an instance.
+
+Completed:
+
+- Added bytecode tests for `MAKE_CLASS` metadata, stack effect, dispatch, and
+  malformed bytecode.
+- Added compiler tests for class attributes, instance attribute fallback,
+  method descriptor binding, and method calls.
+- Added Python golden script coverage for class metadata, class/instance
+  attribute reads, bound Python methods, and `type(a)` for a user class.
+
+Design notes:
+
+- This is deliberately the smallest correct class statement slice:
+  `class Name:` with an implicit `object` base.
+- `__module__` and `__qualname__` are written into the class namespace before
+  executing the class body. `Runtime::new_class` copies the namespace into the
+  type dict and synchronizes the type's module field.
+- The VM does not implement descriptor, construction, or attribute semantics
+  directly. It executes the class body and delegates creation to runtime/type
+  APIs.
+
+Known debt and next risk:
+
+- No base-class syntax, tuple `__bases__`, C3 MRO, metaclass selection,
+  `__prepare__`, decorators, `super`, or class keyword arguments yet.
+- Three-argument `type(name, bases, namespace)` still reports not implemented;
+  it must be routed through the same class creation path before inheritance
+  syntax expands.
+- Class `CodeObject` metadata still lacks qualname/line table details needed
+  for tracebacks and introspection.
+
+Next:
+
+- Implement three-argument `type(name, bases, namespace)` using the class
+  creation API, starting with validation for `(str, tuple, dict)` and a single
+  base while keeping the API shaped for multiple bases and C3.
+- Then add parser/compiler support for `class A(Base):` and replace single-base
+  initialization internals with a bases/MRO-oriented implementation.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects '--gtest_filter=Bytecode.MetadataNamesAndStackEffects:Bytecode.DispatchesMakeClass:Bytecode.RejectsMalformedBytecode:Compile.CompilesMinimalClassDefinitions:PythonScripts.RunsGoldenFiles'`
+- `ctest --test-dir build --output-on-failure`
+- `git diff --check`
+
+Result: all tests pass.
+
 ## 2026-05-18 Function Definition Syntax
 
 Pre-change review:

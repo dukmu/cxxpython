@@ -26,6 +26,7 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::PopJumpIfTrue), "POP_JUMP_IF_TRUE");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::JumpIfFalseOrPop), "JUMP_IF_FALSE_OR_POP");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::MakeFunction), "MAKE_FUNCTION");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::MakeClass), "MAKE_CLASS");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::Call), "CALL");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::ReturnValue), "RETURN_VALUE");
 
@@ -48,6 +49,7 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::PopJumpIfTrue, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::JumpIfFalseOrPop, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::MakeFunction, 0}), 0);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::MakeClass, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::Call, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::Call, 2}), -2);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::ReturnValue, 0}), -1);
@@ -202,6 +204,40 @@ TEST(Bytecode, DispatchesMakeFunction)
     EXPECT_EQ(function->name(), "made_function");
     EXPECT_EQ(function->globals(), globals);
     EXPECT_EQ(cxxpython::object_call(function, {}), result);
+}
+
+TEST(Bytecode, DispatchesMakeClass)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+    globals->set(runtime.new_str("__name__"), runtime.new_str("__main__"));
+
+    cxxpython::CodeObject *class_code = runtime.new_code(
+        "Made",
+        "test.py",
+        {runtime.new_str("class-value")},
+        {runtime.new_str("value")},
+        {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::StoreName, 0},
+         {cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::ReturnValue, 0}});
+    cxxpython::CodeObject *module_code = runtime.new_code(
+        {class_code},
+        {runtime.new_str("Made")},
+        {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::MakeClass, 0},
+         {cxxpython::Opcode::ReturnValue, 0}});
+
+    auto *type = dynamic_cast<cxxpython::TypeObject *>(vm.execute(*module_code, *globals));
+    ASSERT_NE(type, nullptr);
+    EXPECT_EQ(type->name, "Made");
+    EXPECT_EQ(type->module, "__main__");
+    EXPECT_EQ(type->base, runtime.object_type());
+    EXPECT_TRUE(cxxpython::is_subclass(type, runtime.object_type()));
+    auto *value = dynamic_cast<cxxpython::StrObject *>(cxxpython::object_get_attr(type, "value"));
+    ASSERT_NE(value, nullptr);
+    EXPECT_EQ(value->value, "class-value");
 }
 
 TEST(Bytecode, DispatchesSubscriptOpcodesThroughObjectProtocol)
@@ -761,6 +797,24 @@ TEST(Bytecode, RejectsMalformedBytecode)
                      {runtime.new_str("not-code")},
                      {{cxxpython::Opcode::LoadConst, 0},
                       {cxxpython::Opcode::MakeFunction, 0},
+                      {cxxpython::Opcode::ReturnValue, 0}})),
+                 cxxpython::BytecodeError);
+    EXPECT_EQ(vm.thread_state().frame_depth(), 0U);
+
+    EXPECT_THROW((void)vm.execute(*runtime.new_code(
+                     {runtime.new_str("not-code")},
+                     {runtime.new_str("Broken")},
+                     {{cxxpython::Opcode::LoadConst, 0},
+                      {cxxpython::Opcode::MakeClass, 0},
+                      {cxxpython::Opcode::ReturnValue, 0}})),
+                 cxxpython::BytecodeError);
+    EXPECT_EQ(vm.thread_state().frame_depth(), 0U);
+
+    EXPECT_THROW((void)vm.execute(*runtime.new_code(
+                     {runtime.new_code({}, {{cxxpython::Opcode::ReturnValue, 0}})},
+                     {},
+                     {{cxxpython::Opcode::LoadConst, 0},
+                      {cxxpython::Opcode::MakeClass, 0},
                       {cxxpython::Opcode::ReturnValue, 0}})),
                  cxxpython::BytecodeError);
     EXPECT_EQ(vm.thread_state().frame_depth(), 0U);

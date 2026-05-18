@@ -638,6 +638,58 @@ TEST(Compile, FunctionWithoutReturnDefaultsToNone)
     EXPECT_EQ(globals->get(runtime.new_str("result")), runtime.none());
 }
 
+TEST(Compile, CompilesMinimalClassDefinitions)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+    globals->set(runtime.new_str("__name__"), runtime.new_str("__main__"));
+
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(
+        runtime,
+        "class A:\n"
+        "    label = 'class-label'\n"
+        "    def get_label(self):\n"
+        "        return self.label\n"
+        "a = A()\n"
+        "result = a.get_label()\n",
+        "script.py");
+    ASSERT_NE(code, nullptr);
+
+    bool saw_make_class = false;
+    for (const cxxpython::Instruction &instruction : code->instructions())
+    {
+        if (instruction.opcode == cxxpython::Opcode::MakeClass)
+            saw_make_class = true;
+    }
+    EXPECT_TRUE(saw_make_class);
+
+    EXPECT_EQ(vm.execute(*code, *globals), runtime.none());
+    auto *type = dynamic_cast<cxxpython::TypeObject *>(globals->get(runtime.new_str("A")));
+    ASSERT_NE(type, nullptr);
+    EXPECT_EQ(type->name, "A");
+    EXPECT_EQ(type->module, "__main__");
+    EXPECT_EQ(type->base, runtime.object_type());
+    EXPECT_TRUE(cxxpython::is_subclass(type, runtime.object_type()));
+
+    auto *label = dynamic_cast<cxxpython::StrObject *>(cxxpython::object_get_attr(type, "label"));
+    ASSERT_NE(label, nullptr);
+    EXPECT_EQ(label->value, "class-label");
+
+    cxxpython::Object *instance = globals->get(runtime.new_str("a"));
+    ASSERT_NE(instance, nullptr);
+    EXPECT_EQ(instance->type(), type);
+    EXPECT_EQ(cxxpython::object_get_attr(instance, "label"), label);
+
+    auto *method = dynamic_cast<cxxpython::PythonMethodObject *>(cxxpython::object_get_attr(instance, "get_label"));
+    ASSERT_NE(method, nullptr);
+    EXPECT_EQ(method->self(), instance);
+
+    auto *result = dynamic_cast<cxxpython::StrObject *>(globals->get(runtime.new_str("result")));
+    ASSERT_NE(result, nullptr);
+    EXPECT_EQ(result->value, "class-label");
+}
+
 TEST(Compile, RaisesSyntaxErrorForInvalidAssignmentTarget)
 {
     cxxpython::Runtime runtime;

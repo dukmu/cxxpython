@@ -83,6 +83,8 @@ namespace cxxpython::compiler_internal
                     return parse_if_statement();
                 if (peek().kind == TokenKind::Def)
                     return parse_function_def_statement();
+                if (peek().kind == TokenKind::Class)
+                    return parse_class_def_statement();
                 if (peek().kind == TokenKind::Return)
                     return parse_return_statement();
 
@@ -182,6 +184,21 @@ namespace cxxpython::compiler_internal
                 std::vector<std::unique_ptr<Stmt>> body = parse_block();
                 return ParsedStatement{
                     std::make_unique<FunctionDefStmt>(std::move(name), std::move(params), std::move(body)),
+                    true,
+                };
+            }
+
+            ParsedStatement parse_class_def_statement()
+            {
+                advance();
+                if (peek().kind != TokenKind::Identifier)
+                    raise_at(peek(), "expected class name");
+                std::string name = advance().lexeme;
+                consume(TokenKind::Colon, "expected ':' after class name");
+                consume(TokenKind::Newline, "expected newline after class definition");
+                std::vector<std::unique_ptr<Stmt>> body = parse_block();
+                return ParsedStatement{
+                    std::make_unique<ClassDefStmt>(std::move(name), std::move(body)),
                     true,
                 };
             }
@@ -375,6 +392,7 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Else:
                 case TokenKind::Def:
                 case TokenKind::Return:
+                case TokenKind::Class:
                 case TokenKind::Indent:
                 case TokenKind::Dedent:
                     raise_at(token, "expected expression");
@@ -455,6 +473,7 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Else:
                 case TokenKind::Def:
                 case TokenKind::Return:
+                case TokenKind::Class:
                 case TokenKind::Indent:
                 case TokenKind::Dedent:
                 case TokenKind::Newline:

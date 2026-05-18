@@ -30,6 +30,7 @@ namespace cxxpython::compiler_internal
     struct IfStmt;
     struct ReturnStmt;
     struct FunctionDefStmt;
+    struct ClassDefStmt;
 
     struct ExprVisitor
     {
@@ -61,6 +62,7 @@ namespace cxxpython::compiler_internal
         virtual void visit(const IfStmt &statement) = 0;
         virtual void visit(const ReturnStmt &statement) = 0;
         virtual void visit(const FunctionDefStmt &statement) = 0;
+        virtual void visit(const ClassDefStmt &statement) = 0;
     };
 
     enum class TokenKind
@@ -90,6 +92,7 @@ namespace cxxpython::compiler_internal
         Else,
         Def,
         Return,
+        Class,
         Indent,
         Dedent,
         Newline,
@@ -407,6 +410,22 @@ namespace cxxpython::compiler_internal
 
         std::string name;
         std::vector<std::string> params;
+        std::vector<std::unique_ptr<Stmt>> body;
+
+        void accept(StmtVisitor &visitor) const override
+        {
+            visitor.visit(*this);
+        }
+    };
+
+    struct ClassDefStmt final : Stmt
+    {
+        ClassDefStmt(std::string name_in, std::vector<std::unique_ptr<Stmt>> body_in)
+            : name(std::move(name_in)), body(std::move(body_in))
+        {
+        }
+
+        std::string name;
         std::vector<std::unique_ptr<Stmt>> body;
 
         void accept(StmtVisitor &visitor) const override

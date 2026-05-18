@@ -68,6 +68,13 @@ namespace cxxpython
             return true;
         }
 
+        std::string module_name_from_globals(Runtime &runtime, DictObject &globals)
+        {
+            if (auto *module_name = dynamic_cast<StrObject *>(globals.get(runtime.new_str("__name__"))))
+                return module_name->value;
+            return "__main__";
+        }
+
         class ActiveFrame final
         {
         public:
@@ -446,6 +453,25 @@ namespace cxxpython
                 if (!function_code)
                     throw BytecodeError("MAKE_FUNCTION requires a code object");
                 frame->push(runtime_.new_function(function_code->name(), function_code, &globals));
+                break;
+            }
+            case Opcode::MakeClass:
+            {
+                if (instruction.operand >= code.names().size())
+                    throw BytecodeError("MAKE_CLASS operand out of range");
+                auto *class_name = dynamic_cast<StrObject *>(code.names()[instruction.operand]);
+                if (!class_name)
+                    throw BytecodeError("MAKE_CLASS requires a str name");
+                Object *code_object = frame->pop();
+                auto *class_code = dynamic_cast<CodeObject *>(code_object);
+                if (!class_code)
+                    throw BytecodeError("MAKE_CLASS requires a code object");
+                DictObject *namespace_dict = runtime_.new_dict();
+                namespace_dict->set(runtime_.new_str("__module__"),
+                                    runtime_.new_str(module_name_from_globals(runtime_, globals)));
+                namespace_dict->set(runtime_.new_str("__qualname__"), runtime_.new_str(class_name->value));
+                (void)execute(*class_code, *namespace_dict, globals, builtins);
+                frame->push(runtime_.new_class(class_name->value, runtime_.object_type(), namespace_dict));
                 break;
             }
             case Opcode::Call:

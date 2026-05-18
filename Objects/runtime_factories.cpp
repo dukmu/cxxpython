@@ -196,6 +196,23 @@ namespace cxxpython
         return type;
     }
 
+    TypeObject *Runtime::new_class(std::string name, TypeObject *base, DictObject *namespace_dict)
+    {
+        if (!namespace_dict)
+            raise_type_error(this, "class namespace cannot be null");
+        TypeObject *type = new_heap_type(std::move(name), base ? base : object_type_);
+        for (const DictObject::Entry &entry : namespace_dict->entries())
+        {
+            if (entry.key && entry.value)
+                type->dict->set(entry.key, entry.value);
+        }
+        if (auto *module = dynamic_cast<StrObject *>(type->dict->get(new_str("__module__"))))
+            type->module = module->value;
+        type->dict->set(new_str("__name__"), new_str(type->name));
+        type->dict->set(new_str("__module__"), new_str(type->module));
+        return type;
+    }
+
     ExceptionObject *Runtime::new_exception(TypeObject *type, std::string message)
     {
         return new_exception(type, {new_str(std::move(message))});

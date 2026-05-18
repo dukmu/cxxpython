@@ -143,6 +143,11 @@ namespace cxxpython
                 (void)symbols_.add_name(statement.name);
             }
 
+            void visit(const compiler_internal::ClassDefStmt &statement) override
+            {
+                (void)symbols_.add_name(statement.name);
+            }
+
         private:
             SymbolTable &symbols_;
         };
@@ -191,6 +196,19 @@ namespace cxxpython
                                          filename_,
                                          static_cast<std::uint32_t>(function.params.size()),
                                          make_varnames(function.params),
+                                         std::move(constants_),
+                                         std::move(names_),
+                                         std::move(instructions_));
+            }
+
+            CodeObject *build_class(const compiler_internal::ClassDefStmt &klass)
+            {
+                for (const auto &statement : klass.body)
+                    statement->accept(*this);
+                emit_constant(runtime_.none());
+                instructions_.push_back(Instruction{Opcode::ReturnValue, 0});
+                return runtime_.new_code(klass.name,
+                                         filename_,
                                          std::move(constants_),
                                          std::move(names_),
                                          std::move(instructions_));
@@ -375,6 +393,22 @@ namespace cxxpython
                 });
             }
 
+            void visit(const compiler_internal::ClassDefStmt &statement) override
+            {
+                SymbolTable class_symbols = collect_class_symbols(statement);
+                BytecodeBuilder class_builder(runtime_, class_symbols, filename_);
+                CodeObject *code = class_builder.build_class(statement);
+                emit_constant(code);
+                instructions_.push_back(Instruction{
+                    Opcode::MakeClass,
+                    static_cast<std::uint32_t>(name_index(statement.name)),
+                });
+                instructions_.push_back(Instruction{
+                    Opcode::StoreName,
+                    static_cast<std::uint32_t>(name_index(statement.name)),
+                });
+            }
+
         private:
             class PendingAssignmentValue final
             {
@@ -430,6 +464,15 @@ namespace cxxpython
                 SymbolTable symbols;
                 SymbolCollector collector(symbols);
                 for (const auto &statement : function.body)
+                    statement->accept(collector);
+                return symbols;
+            }
+
+            SymbolTable collect_class_symbols(const compiler_internal::ClassDefStmt &klass) const
+            {
+                SymbolTable symbols;
+                SymbolCollector collector(symbols);
+                for (const auto &statement : klass.body)
                     statement->accept(collector);
                 return symbols;
             }
