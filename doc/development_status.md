@@ -1,5 +1,67 @@
 # Development Status
 
+## 2026-05-18 Type Construction Protocol
+
+Pre-change review:
+
+- `object_call` could call native functions and method descriptors, but type
+  objects were not callable through a central construction protocol.
+- Letting future `class` syntax allocate instances directly would duplicate
+  construction semantics across parser/compiler, VM, builtin helpers, and
+  extension type creation.
+- The class-system plan needs a stable `type.__call__ -> __new__ -> __init__`
+  shaped path before Python-defined classes, inheritance, or metaclasses land.
+
+Debt addressed:
+
+- Added `TypeSlots::new_object` and `TypeSlots::init`.
+- `type` now has a call slot that dispatches construction through the target
+  type's `new_object` slot, then invokes `init` when the result is an instance
+  of the requested type.
+- `object` provides the generic allocation slot inherited by heap types.
+- `list` provides a layout-correct constructor slot, so `list()` creates a real
+  `ListObject` instead of a generic `Object` carrying `list` as its type.
+- Exposed `object` and `list` in the builtins module so construction is visible
+  through the normal script path.
+
+Completed:
+
+- Added C++ tests proving:
+  - `object_call(object_type, {})` constructs an object instance
+  - heap types inherit the generic allocation path and preserve instance dicts
+  - an `init` slot receives constructor arguments after allocation
+  - `list()` constructs an empty list through the same call protocol
+  - unsupported constructor arguments raise Python `TypeError`
+- Added a Python golden script covering `object().__class__`, `list()`, and
+  `list().__class__`.
+
+Design notes:
+
+- This is the construction protocol foundation, not the full `type()` builtin
+  behavior. `type(obj)` and `type(name, bases, namespace)` should land with
+  Python class creation and metaclass selection tests.
+- `new_object` receives the requested `TypeObject`, so builtins with custom C++
+  layout can construct subtype instances without hard-coding VM behavior.
+- `init` is deliberately separate from `new_object`; later Python `__init__`
+  methods and native extension initializers should plug into the same slot.
+
+Next:
+
+- Add Python function objects and Python bound method objects so methods stored
+  in type dictionaries bind through descriptors like builtin method descriptors.
+- Add class body code object execution with an explicit namespace before class
+  statement syntax.
+- Keep arbitrary-precision `int` deferred per current instruction.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects '--gtest_filter=CoreObjects.TypeCallConstructsObjectsThroughNewInitProtocol:Module.BootstrapsBuiltinsModule:PythonScripts.RunsGoldenFiles'`
+- `ctest --test-dir build --output-on-failure`
+- `git diff --check`
+
+Result: all tests pass.
+
 ## 2026-05-18 Chained Comparison Lowering
 
 Pre-change review:

@@ -86,7 +86,8 @@ doc/            design docs and milestone plans
 
 当前 slot 覆盖第一批对象协议：`repr`、`hash`、`equal`、`rich_compare`、`truth`、
 `traverse`、`binary_op`、`reflected_binary_op`、`inplace_binary_op`、`unary_op`、`call`、
-`length`、`getitem`、`setitem`、`contains`、`descr_get`、`descr_set`。后续扩展顺序：
+`length`、`getitem`、`setitem`、`contains`、`descr_get`、`descr_set`、`new_object`、
+`init`。后续扩展顺序：
 
 - Numeric: C++ 层使用 `BinaryOp` 统一表示 add/sub/mul/div/mod/pow，并通过
   `object_binary_op` 调度。VM 层应使用携带 `BinaryOp` operand 的通用
@@ -100,7 +101,10 @@ doc/            design docs and milestone plans
   CPython 语义：中间 operand 只求值一次，失败后不继续求后续 operand。
 - Sequence/mapping: length, getitem, setitem, contains, iterator。
 - Attribute/descriptor: getattro/setattro, descr_get/descr_set。
-- Call/construction: call, new, init。
+- Call/construction: `type` 的 call slot 统一调度目标 type 的 `new_object` 和
+  `init` slots。Python 类、heap type 和内建类型构造都必须接这条路径；
+  `class` statement、builtin constructors 和 C/C++ extension type creation 不应
+  各自实现对象分配。
 - Buffer/extension hooks: buffer protocol 和 C/C++ extension 需要的稳定边界。
 
 ## VM、栈和脚本层开放性路线

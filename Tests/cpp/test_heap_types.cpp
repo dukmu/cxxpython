@@ -3,6 +3,16 @@
 #include "cxxpython/runtime.hpp"
 #include "test_support.hpp"
 
+namespace
+{
+    void init_sets_value(cxxpython::Object &object, const std::vector<cxxpython::Object *> &args)
+    {
+        if (args.size() != 1)
+            cxxpython::raise_type_error(object.runtime(), "InitCarrier() takes exactly one argument");
+        cxxpython::object_set_attr(&object, "value", args[0]);
+    }
+}
+
 TEST(CoreObjects, HeapTypesUseAndInheritSlots)
 {
     cxxpython::Runtime runtime;
@@ -96,6 +106,62 @@ TEST(CoreObjects, TypeFlagsSeparateCompactBuiltinsFromHeapInstances)
     EXPECT_EQ(runtime.list_type()->flags & cxxpython::TypeFlagHasInstanceDict, 0U);
     EXPECT_NE(heap_type->flags & cxxpython::TypeFlagHeapType, 0U);
     EXPECT_NE(heap_type->flags & cxxpython::TypeFlagHasInstanceDict, 0U);
+}
+
+TEST(CoreObjects, TypeCallConstructsObjectsThroughNewInitProtocol)
+{
+    cxxpython::Runtime runtime;
+
+    cxxpython::Object *plain_object = cxxpython::object_call(runtime.object_type(), {});
+    ASSERT_NE(plain_object, nullptr);
+    EXPECT_EQ(plain_object->type(), runtime.object_type());
+
+    cxxpython::TypeObject *heap_type = runtime.new_heap_type("HeapObject", runtime.object_type());
+    cxxpython::Object *heap_object = cxxpython::object_call(heap_type, {});
+    ASSERT_NE(heap_object, nullptr);
+    EXPECT_EQ(heap_object->type(), heap_type);
+    EXPECT_TRUE(cxxpython::is_instance(heap_object, runtime.object_type()));
+
+    cxxpython::Object *stored = runtime.new_str("stored");
+    cxxpython::object_set_attr(heap_object, "field", stored);
+    EXPECT_EQ(cxxpython::object_get_attr(heap_object, "field"), stored);
+
+    cxxpython::TypeObject *init_type = runtime.new_heap_type(
+        "InitCarrier",
+        runtime.object_type(),
+        cxxpython::TypeSlots{.init = init_sets_value});
+    cxxpython::Object *argument = runtime.new_str("initialized");
+    cxxpython::Object *initialized = cxxpython::object_call(init_type, {argument});
+    ASSERT_NE(initialized, nullptr);
+    EXPECT_EQ(initialized->type(), init_type);
+    EXPECT_EQ(cxxpython::object_get_attr(initialized, "value"), argument);
+
+    auto *list = dynamic_cast<cxxpython::ListObject *>(cxxpython::object_call(runtime.list_type(), {}));
+    ASSERT_NE(list, nullptr);
+    EXPECT_EQ(list->type(), runtime.list_type());
+    EXPECT_EQ(list->size(), 0U);
+
+    try
+    {
+        (void)cxxpython::object_call(runtime.list_type(), {runtime.new_int(1)});
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "list() takes no arguments");
+    }
+
+    try
+    {
+        (void)cxxpython::object_call(runtime.object_type(), {runtime.new_int(1)});
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "object() takes no arguments");
+    }
 }
 
 TEST(CoreObjects, RuntimeVisitsRootsAndContainerChildren)

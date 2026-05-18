@@ -73,6 +73,8 @@ namespace cxxpython
     using ContainsSlot = bool (*)(Object &, Object *);
     using DescrGetSlot = Object *(*)(Object &, Object *, TypeObject *);
     using DescrSetSlot = void (*)(Object &, Object *, Object *);
+    using NewSlot = Object *(*)(TypeObject &, const std::vector<Object *> &);
+    using InitSlot = void (*)(Object &, const std::vector<Object *> &);
 
     struct TypeSlots
     {
@@ -93,6 +95,8 @@ namespace cxxpython
         ContainsSlot contains = nullptr;
         DescrGetSlot descr_get = nullptr;
         DescrSetSlot descr_set = nullptr;
+        NewSlot new_object = nullptr;
+        InitSlot init = nullptr;
     };
 
     using TypeFlags = std::uint32_t;

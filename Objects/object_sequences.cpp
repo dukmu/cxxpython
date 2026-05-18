@@ -1,4 +1,5 @@
 #include "cxxpython/object.hpp"
+#include "cxxpython/runtime.hpp"
 
 #include <sstream>
 
@@ -89,6 +90,13 @@ namespace cxxpython
                     return true;
             }
             return false;
+        }
+
+        Object *list_new(TypeObject &type, const std::vector<Object *> &args)
+        {
+            if (!args.empty())
+                raise_type_error(type.runtime(), "list() takes no arguments");
+            return type.runtime()->allocate<ListObject>(&type, std::vector<Object *>{});
         }
 
         std::string tuple_repr(const Object &object)
@@ -250,6 +258,7 @@ namespace cxxpython
             .getitem = list_getitem,
             .setitem = list_setitem,
             .contains = list_contains,
+            .new_object = list_new,
         };
     }
 

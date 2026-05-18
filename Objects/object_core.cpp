@@ -54,6 +54,47 @@ namespace cxxpython
                 visitor(type->dict);
         }
 
+        Object *object_new(TypeObject &type, const std::vector<Object *> &args)
+        {
+            (void)args;
+            return type.runtime()->allocate<Object>(&type);
+        }
+
+        void call_init_slot(TypeObject &type, Object *instance, const std::vector<Object *> &args)
+        {
+            if (!is_instance(instance, &type))
+                return;
+            if (type.slots.init)
+            {
+                type.slots.init(*instance, args);
+                return;
+            }
+            if (!args.empty())
+            {
+                std::ostringstream message;
+                message << type_qualified_name(&type) << "() takes no arguments";
+                raise_type_error(type.runtime(), message.str());
+            }
+        }
+
+        Object *type_call(Object &object, const std::vector<Object *> &args)
+        {
+            auto *type = dynamic_cast<TypeObject *>(&object);
+            if (!type)
+                raise_type_error(object.runtime(), "type call target has invalid layout");
+            if (!type->slots.new_object)
+            {
+                std::ostringstream message;
+                message << "cannot create '" << type_qualified_name(type) << "' instances";
+                raise_type_error(type->runtime(), message.str());
+            }
+            Object *instance = type->slots.new_object(*type, args);
+            if (!instance)
+                raise_type_error(type->runtime(), "__new__ returned null");
+            call_init_slot(*type, instance, args);
+            return instance;
+        }
+
         bool is_not_implemented(Object *object)
         {
             return object && object->runtime() && object == object->runtime()->not_implemented();
@@ -600,6 +641,7 @@ namespace cxxpython
             .equal = default_equal,
             .truth = default_truth,
             .traverse = default_traverse,
+            .new_object = object_new,
         };
     }
 
@@ -611,6 +653,7 @@ namespace cxxpython
             .equal = default_equal,
             .truth = default_truth,
             .traverse = type_traverse,
+            .call = type_call,
         };
     }
 
