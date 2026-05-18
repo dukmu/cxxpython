@@ -62,6 +62,36 @@ namespace cxxpython
             return static_cast<const IntObject *>(&object)->value != 0;
         }
 
+        Object *bool_result(Runtime *runtime, bool value)
+        {
+            return value ? runtime->true_value() : runtime->false_value();
+        }
+
+        Object *int_rich_compare(const Object &left, const Object &right, RichCompareOp op)
+        {
+            auto *right_int = dynamic_cast<const IntObject *>(&right);
+            if (!right_int)
+                return left.runtime()->not_implemented();
+            const std::int64_t left_value = static_cast<const IntObject *>(&left)->value;
+            const std::int64_t right_value = right_int->value;
+            switch (op)
+            {
+            case RichCompareOp::Equal:
+                return bool_result(left.runtime(), left_value == right_value);
+            case RichCompareOp::NotEqual:
+                return bool_result(left.runtime(), left_value != right_value);
+            case RichCompareOp::Less:
+                return bool_result(left.runtime(), left_value < right_value);
+            case RichCompareOp::LessEqual:
+                return bool_result(left.runtime(), left_value <= right_value);
+            case RichCompareOp::Greater:
+                return bool_result(left.runtime(), left_value > right_value);
+            case RichCompareOp::GreaterEqual:
+                return bool_result(left.runtime(), left_value >= right_value);
+            }
+            return left.runtime()->not_implemented();
+        }
+
         [[noreturn]] void raise_unsupported_unary_op(const Object &operand, UnaryOp op)
         {
             raise_type_error(operand.runtime(), unsupported_unary_op_message(op, &operand));
@@ -131,6 +161,31 @@ namespace cxxpython
             return !static_cast<const StrObject *>(&object)->value.empty();
         }
 
+        Object *str_rich_compare(const Object &left, const Object &right, RichCompareOp op)
+        {
+            auto *right_str = dynamic_cast<const StrObject *>(&right);
+            if (!right_str)
+                return left.runtime()->not_implemented();
+            const std::string &left_value = static_cast<const StrObject *>(&left)->value;
+            const std::string &right_value = right_str->value;
+            switch (op)
+            {
+            case RichCompareOp::Equal:
+                return bool_result(left.runtime(), left_value == right_value);
+            case RichCompareOp::NotEqual:
+                return bool_result(left.runtime(), left_value != right_value);
+            case RichCompareOp::Less:
+                return bool_result(left.runtime(), left_value < right_value);
+            case RichCompareOp::LessEqual:
+                return bool_result(left.runtime(), left_value <= right_value);
+            case RichCompareOp::Greater:
+                return bool_result(left.runtime(), left_value > right_value);
+            case RichCompareOp::GreaterEqual:
+                return bool_result(left.runtime(), left_value >= right_value);
+            }
+            return left.runtime()->not_implemented();
+        }
+
         Object *str_binary_op(const Object &left, const Object &right, BinaryOp op)
         {
             auto *right_str = dynamic_cast<const StrObject *>(&right);
@@ -194,6 +249,7 @@ namespace cxxpython
             .repr = int_repr,
             .hash = int_hash,
             .equal = int_equal,
+            .rich_compare = int_rich_compare,
             .truth = int_truth,
             .traverse = default_traverse,
             .binary_op = int_binary_op,
@@ -207,6 +263,7 @@ namespace cxxpython
             .repr = bool_repr,
             .hash = int_hash,
             .equal = int_equal,
+            .rich_compare = int_rich_compare,
             .truth = int_truth,
             .traverse = default_traverse,
             .binary_op = int_binary_op,
@@ -220,6 +277,7 @@ namespace cxxpython
             .repr = str_repr,
             .hash = str_hash,
             .equal = str_equal,
+            .rich_compare = str_rich_compare,
             .truth = str_truth,
             .traverse = default_traverse,
             .binary_op = str_binary_op,

@@ -45,6 +45,39 @@ TEST(CoreObjects, BinaryOperatorProtocolDispatchesBuiltinTypes)
     EXPECT_EQ(text->value, "python");
 }
 
+TEST(CoreObjects, RichCompareProtocolDispatchesBuiltinOrdering)
+{
+    cxxpython::Runtime runtime;
+
+    EXPECT_EQ(cxxpython::object_rich_compare(runtime.new_int(1), runtime.new_int(2),
+                                             cxxpython::RichCompareOp::Less),
+              runtime.true_value());
+    EXPECT_EQ(cxxpython::object_rich_compare(runtime.new_int(2), runtime.new_int(2),
+                                             cxxpython::RichCompareOp::LessEqual),
+              runtime.true_value());
+    EXPECT_EQ(cxxpython::object_rich_compare(runtime.new_int(3), runtime.new_int(2),
+                                             cxxpython::RichCompareOp::Greater),
+              runtime.true_value());
+    EXPECT_EQ(cxxpython::object_rich_compare(runtime.new_int(3), runtime.new_int(3),
+                                             cxxpython::RichCompareOp::GreaterEqual),
+              runtime.true_value());
+    EXPECT_EQ(cxxpython::object_rich_compare(runtime.new_str("ant"), runtime.new_str("bee"),
+                                             cxxpython::RichCompareOp::Less),
+              runtime.true_value());
+
+    try
+    {
+        (void)cxxpython::object_rich_compare(runtime.new_int(1), runtime.new_str("x"),
+                                             cxxpython::RichCompareOp::Less);
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "comparison not supported between instances of 'int' and 'str'");
+    }
+}
+
 TEST(CoreObjects, BinaryOperatorProtocolUsesNotImplementedFallbacks)
 {
     cxxpython::Runtime runtime;

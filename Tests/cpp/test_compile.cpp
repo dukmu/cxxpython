@@ -142,6 +142,27 @@ TEST(Compile, CompilesEqualityAndInequality)
     EXPECT_EQ(vm.execute(*not_equal), runtime.true_value());
 }
 
+TEST(Compile, CompilesOrderingComparisons)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+
+    cxxpython::CodeObject *less = cxxpython::compile_eval_input(runtime, "1 + 1 < 3", "script.py");
+    ASSERT_NE(less, nullptr);
+    ASSERT_EQ(less->instructions().size(), 6U);
+    EXPECT_EQ(less->instructions()[4].opcode, cxxpython::Opcode::CompareOp);
+    EXPECT_EQ(less->instructions()[4].operand, static_cast<std::uint32_t>(cxxpython::RichCompareOp::Less));
+    EXPECT_EQ(vm.execute(*less), runtime.true_value());
+
+    cxxpython::CodeObject *greater_equal =
+        cxxpython::compile_eval_input(runtime, "'bee' >= 'ant'", "script.py");
+    ASSERT_NE(greater_equal, nullptr);
+    EXPECT_EQ(greater_equal->instructions()[2].opcode, cxxpython::Opcode::CompareOp);
+    EXPECT_EQ(greater_equal->instructions()[2].operand,
+              static_cast<std::uint32_t>(cxxpython::RichCompareOp::GreaterEqual));
+    EXPECT_EQ(vm.execute(*greater_equal), runtime.true_value());
+}
+
 TEST(Compile, CompilesIfElseStatements)
 {
     cxxpython::Runtime runtime;
@@ -201,13 +222,13 @@ TEST(Compile, RejectsChainedComparisonsUntilJumpSemanticsExist)
 
     try
     {
-        (void)cxxpython::compile_eval_input(runtime, "1 == 1 == 1", "broken.py");
+        (void)cxxpython::compile_eval_input(runtime, "1 < 2 < 3", "broken.py");
         FAIL() << "expected PythonError";
     }
     catch (const cxxpython::PythonError &error)
     {
         EXPECT_EQ(error.type_name(), "SyntaxError");
-        EXPECT_STREQ(error.what(), "broken.py:1:8: chained comparisons are not implemented");
+        EXPECT_STREQ(error.what(), "broken.py:1:7: chained comparisons are not implemented");
     }
 }
 

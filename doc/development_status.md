@@ -1,5 +1,60 @@
 # Development Status
 
+## 2026-05-18 Ordering Comparisons
+
+Pre-change review:
+
+- `RichCompareOp` and `COMPARE_OP` already supported ordering operands, and
+  rich-compare `NotImplemented` dispatch is now complete, but parser/compiler
+  syntax was still limited to `==` and `!=`.
+- Exposing `<`, `<=`, `>`, and `>=` without builtin ordering slots would make
+  normal script comparisons fail despite the VM path being present.
+- Chained comparisons still require dedicated short-circuit lowering. Compiling
+  `1 < x < 3` as two independent comparisons would be incorrect, so this slice
+  keeps explicit rejection.
+
+Debt addressed:
+
+- Added lexer tokens for `<`, `<=`, `>`, and `>=`.
+- Parser comparison handling now maps all six comparison operators to
+  `RichCompareOp`.
+- Parser rejects chained comparisons for all comparison operators, not only
+  equality.
+- Builtin `int`/`bool` and `str` now provide `rich_compare` slots for equality
+  and ordering, returning `NotImplemented` for unsupported operand types.
+
+Completed:
+
+- Added tests proving:
+  - `int` and `str` ordering dispatch through `object_rich_compare`
+  - mixed unsupported ordering raises one central Python `TypeError`
+  - compiler emits `COMPARE_OP` operands for ordering syntax
+  - chained ordering comparisons are rejected with `SyntaxError`
+  - Python golden scripts cover script-visible ordering results
+
+Design notes:
+
+- Equality still has the low-level `EqualSlot` fallback after rich-compare slots
+  decline. Ordering has no default fallback and raises `TypeError`.
+- Chained comparisons should land as their own control-flow lowering slice,
+  using jumps and stack preservation rather than a parser shortcut.
+
+Next:
+
+- Implement chained comparison lowering with short-circuit semantics.
+- Consider `is`, `is not`, `in`, and `not in` as separate comparison-family
+  syntax after identity and containment opcodes are designed.
+- Keep arbitrary-precision `int` deferred per current instruction.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects '--gtest_filter=CoreObjects.RichCompareProtocolDispatchesBuiltinOrdering:CoreObjects.RichCompareProtocolUsesNotImplementedFallbacks:CoreObjects.RichCompareNotImplementedFallsBackToDefaultResults:Compile.CompilesOrderingComparisons:Compile.CompilesEqualityAndInequality:Compile.RejectsChainedComparisonsUntilJumpSemanticsExist:PythonScripts.RunsGoldenFiles'`
+- `ctest --test-dir build --output-on-failure`
+- `git diff --check`
+
+Result: all tests pass.
+
 ## 2026-05-18 Rich Compare NotImplemented Dispatch
 
 Pre-change review:
@@ -40,16 +95,13 @@ Design notes:
 - Rich comparison and binary arithmetic now share the same protocol shape:
   slots return a Python object for handled cases, `NotImplemented` for
   unsupported operand combinations, and raise only for real errors.
-- Ordering syntax remains intentionally unavailable until parser/compiler tests
-  include ordering precedence, chained-comparison rejection or lowering, and
-  script-level TypeError behavior.
+- Ordering syntax lands in the next status entry above; chained comparison
+  lowering remains intentionally separate.
 
 Next:
 
-- Add parser/compiler support for `<`, `<=`, `>`, `>=` only with complete
-  bytecode and Python golden tests.
-- Then revisit comparison chaining with control-flow lowering rather than
-  compiling it incorrectly.
+- Revisit comparison chaining with control-flow lowering rather than compiling
+  it incorrectly.
 - Keep arbitrary-precision `int` deferred per current instruction.
 
 Verification:

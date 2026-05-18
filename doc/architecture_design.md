@@ -95,7 +95,8 @@ doc/            design docs and milestone plans
   `NotImplemented`、subclass priority、reflected/in-place fallback 已接入
   `object_binary_op`/`object_inplace_binary_op`，不能散落在各个内置类型中。
 - Rich compare: `object_rich_compare` 支持 `NotImplemented`、reverse/subclass
-  dispatch 和 equality fallback；`lt/le/gt/ge` 语法与比较链 lowering 仍需补齐。
+  dispatch 和 equality fallback；`==`、`!=`、`<`、`<=`、`>`、`>=` 语法降级到
+  `COMPARE_OP`。比较链 lowering 仍需补齐，不能用普通二元比较串联代替。
 - Sequence/mapping: length, getitem, setitem, contains, iterator。
 - Attribute/descriptor: getattro/setattro, descr_get/descr_set。
 - Call/construction: call, new, init。

@@ -159,18 +159,18 @@ namespace cxxpython::compiler_internal
             std::unique_ptr<Expr> parse_comparison()
             {
                 std::unique_ptr<Expr> left = parse_sum();
-                if (peek().kind != TokenKind::EqualEqual && peek().kind != TokenKind::BangEqual)
+                if (!is_comparison(peek().kind))
                     return left;
 
                 const Token &op_token = advance();
                 std::unique_ptr<Expr> right = parse_sum();
-                if (peek().kind == TokenKind::EqualEqual || peek().kind == TokenKind::BangEqual)
+                if (is_comparison(peek().kind))
                     raise_at(peek(), "chained comparisons are not implemented");
 
-                const RichCompareOp op = op_token.kind == TokenKind::EqualEqual
-                                             ? RichCompareOp::Equal
-                                             : RichCompareOp::NotEqual;
-                return std::make_unique<CompareExpr>(std::move(left), op, std::move(right));
+                return std::make_unique<CompareExpr>(
+                    std::move(left),
+                    rich_compare_op_for(op_token),
+                    std::move(right));
             }
 
             std::unique_ptr<Expr> parse_sum()
@@ -287,6 +287,10 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Equal:
                 case TokenKind::EqualEqual:
                 case TokenKind::BangEqual:
+                case TokenKind::Less:
+                case TokenKind::LessEqual:
+                case TokenKind::Greater:
+                case TokenKind::GreaterEqual:
                 case TokenKind::If:
                 case TokenKind::Else:
                 case TokenKind::Indent:
@@ -322,6 +326,58 @@ namespace cxxpython::compiler_internal
             const Token &previous() const
             {
                 return tokens_[index_ - 1];
+            }
+
+            bool is_comparison(TokenKind kind) const
+            {
+                return kind == TokenKind::EqualEqual ||
+                       kind == TokenKind::BangEqual ||
+                       kind == TokenKind::Less ||
+                       kind == TokenKind::LessEqual ||
+                       kind == TokenKind::Greater ||
+                       kind == TokenKind::GreaterEqual;
+            }
+
+            RichCompareOp rich_compare_op_for(const Token &token) const
+            {
+                switch (token.kind)
+                {
+                case TokenKind::EqualEqual:
+                    return RichCompareOp::Equal;
+                case TokenKind::BangEqual:
+                    return RichCompareOp::NotEqual;
+                case TokenKind::Less:
+                    return RichCompareOp::Less;
+                case TokenKind::LessEqual:
+                    return RichCompareOp::LessEqual;
+                case TokenKind::Greater:
+                    return RichCompareOp::Greater;
+                case TokenKind::GreaterEqual:
+                    return RichCompareOp::GreaterEqual;
+                case TokenKind::Integer:
+                case TokenKind::String:
+                case TokenKind::Identifier:
+                case TokenKind::Plus:
+                case TokenKind::Minus:
+                case TokenKind::Star:
+                case TokenKind::Tilde:
+                case TokenKind::LeftParen:
+                case TokenKind::RightParen:
+                case TokenKind::Comma:
+                case TokenKind::Dot:
+                case TokenKind::LeftBracket:
+                case TokenKind::RightBracket:
+                case TokenKind::Colon:
+                case TokenKind::Equal:
+                case TokenKind::If:
+                case TokenKind::Else:
+                case TokenKind::Indent:
+                case TokenKind::Dedent:
+                case TokenKind::Newline:
+                case TokenKind::End:
+                    break;
+                }
+                raise_at(token, "expected comparison operator");
             }
 
             [[noreturn]] void raise_at(const Token &token, const std::string &message) const

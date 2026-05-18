@@ -317,6 +317,40 @@ namespace cxxpython::compiler_internal
                 continue;
             }
 
+            if (ch == '<')
+            {
+                if (index + 1 < source.size() && source[index + 1] == '=')
+                {
+                    tokens.push_back(Token{TokenKind::LessEqual, "<=", 0, line, column});
+                    index += 2;
+                    column += 2;
+                }
+                else
+                {
+                    tokens.push_back(Token{TokenKind::Less, "<", 0, line, column});
+                    ++index;
+                    ++column;
+                }
+                continue;
+            }
+
+            if (ch == '>')
+            {
+                if (index + 1 < source.size() && source[index + 1] == '=')
+                {
+                    tokens.push_back(Token{TokenKind::GreaterEqual, ">=", 0, line, column});
+                    index += 2;
+                    column += 2;
+                }
+                else
+                {
+                    tokens.push_back(Token{TokenKind::Greater, ">", 0, line, column});
+                    ++index;
+                    ++column;
+                }
+                continue;
+            }
+
             raise_at(runtime, filename, line, column, "unexpected character");
         }
 
