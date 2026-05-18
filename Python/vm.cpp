@@ -194,7 +194,7 @@ namespace cxxpython
         for (Frame *frame : frames_)
         {
             if (frame)
-                frame->visit_stack(visitor);
+                visitor(frame);
         }
     }
 

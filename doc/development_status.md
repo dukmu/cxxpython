@@ -1,5 +1,47 @@
 # Development Status
 
+## 2026-05-18 Active Frame Root Traversal
+
+Pre-change review:
+
+- Architecture docs require active frames to be GC-visible roots. The previous
+  `ThreadState::visit_frames` implementation only visited value-stack entries,
+  which made the frame object, code, locals, globals, and builtins reachable
+  only by accident or not at all.
+- This would become a serious GC and traceback bug once collection can run
+  during bytecode execution.
+
+Completed:
+
+- Changed `ThreadState::visit_frames` to visit active `Frame` objects as the
+  first-level roots.
+- Kept `Frame::visit_children` responsible for code, locals, globals,
+  builtins, and value stack traversal.
+- Added a focused VM test proving active frame root traversal reaches the frame
+  first and then reaches all frame children through normal object traversal.
+
+Design notes:
+
+- `ThreadState` still owns only an execution stack, not object lifetime. The
+  eventual GC integration should ask each active thread state for roots and
+  then traverse object children through the regular object protocol.
+- This does not yet solve multi-thread registration, inactive frame cleanup,
+  block stack traversal, exception state traversal, or traceback retention.
+
+Next:
+
+- Add block stack and exception-state objects before implementing `try`/`except`
+  or `with`.
+- Design the runtime/thread registry that lets GC discover every active
+  `ThreadState`, including future OS-thread-backed execution.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter=Bytecode.ThreadStateVisitsActiveFramesAsRoots`
+
+Result: focused test passes.
+
 ## 2026-05-18 Builtins Module And Callable Protocol
 
 Pre-change review:

@@ -269,6 +269,43 @@ TEST(Bytecode, RaisesPythonTypeErrorForNonCallable)
     }
 }
 
+TEST(Bytecode, ThreadStateVisitsActiveFramesAsRoots)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::IntObject *value = runtime.new_int(11);
+    cxxpython::DictObject *locals = runtime.new_dict();
+    cxxpython::DictObject *globals = runtime.new_dict();
+    cxxpython::DictObject *builtins = runtime.builtins_dict();
+    cxxpython::CodeObject *code = runtime.new_code({value},
+                                                   {{cxxpython::Opcode::LoadConst, 0},
+                                                    {cxxpython::Opcode::ReturnValue, 0}});
+    cxxpython::Frame *frame = runtime.new_frame(code, locals, globals, builtins);
+    frame->push(value);
+
+    vm.thread_state().push_frame(frame);
+
+    std::vector<cxxpython::Object *> active_roots;
+    vm.thread_state().visit_frames([&active_roots](cxxpython::Object *object)
+                                   { active_roots.push_back(object); });
+
+    ASSERT_EQ(active_roots.size(), 1U);
+    EXPECT_EQ(active_roots[0], frame);
+
+    std::vector<cxxpython::Object *> frame_children;
+    active_roots[0]->visit_children([&frame_children](cxxpython::Object *object)
+                                    { frame_children.push_back(object); });
+    ASSERT_EQ(frame_children.size(), 5U);
+    EXPECT_EQ(frame_children[0], code);
+    EXPECT_EQ(frame_children[1], locals);
+    EXPECT_EQ(frame_children[2], globals);
+    EXPECT_EQ(frame_children[3], builtins);
+    EXPECT_EQ(frame_children[4], value);
+
+    vm.thread_state().pop_frame(frame);
+    EXPECT_EQ(vm.thread_state().frame_depth(), 0U);
+}
+
 TEST(Bytecode, RejectsMalformedBytecode)
 {
     cxxpython::Runtime runtime;
