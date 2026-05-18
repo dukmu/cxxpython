@@ -213,9 +213,26 @@ namespace cxxpython::compiler_internal
 
             if (ch == '=')
             {
-                tokens.push_back(Token{TokenKind::Equal, "=", 0, line, column});
-                ++index;
-                ++column;
+                if (index + 1 < source.size() && source[index + 1] == '=')
+                {
+                    tokens.push_back(Token{TokenKind::EqualEqual, "==", 0, line, column});
+                    index += 2;
+                    column += 2;
+                }
+                else
+                {
+                    tokens.push_back(Token{TokenKind::Equal, "=", 0, line, column});
+                    ++index;
+                    ++column;
+                }
+                continue;
+            }
+
+            if (ch == '!' && index + 1 < source.size() && source[index + 1] == '=')
+            {
+                tokens.push_back(Token{TokenKind::BangEqual, "!=", 0, line, column});
+                index += 2;
+                column += 2;
                 continue;
             }
 

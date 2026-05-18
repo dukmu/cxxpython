@@ -21,6 +21,7 @@ namespace cxxpython
         BinaryAdd,
         BinarySubscr,
         StoreSubscr,
+        CompareOp,
         Call,
         ReturnValue,
     };

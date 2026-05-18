@@ -132,6 +132,8 @@ namespace cxxpython
             return "BINARY_SUBSCR";
         case Opcode::StoreSubscr:
             return "STORE_SUBSCR";
+        case Opcode::CompareOp:
+            return "COMPARE_OP";
         case Opcode::Call:
             return "CALL";
         case Opcode::ReturnValue:
@@ -156,6 +158,7 @@ namespace cxxpython
             return -2;
         case Opcode::BinaryAdd:
         case Opcode::BinarySubscr:
+        case Opcode::CompareOp:
             return -1;
         case Opcode::StoreSubscr:
             return -3;

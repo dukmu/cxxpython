@@ -198,6 +198,37 @@ namespace cxxpython
         return left->equals(*right);
     }
 
+    Object *object_rich_compare(Object *left, Object *right, RichCompareOp op)
+    {
+        Runtime *runtime = left ? left->runtime() : (right ? right->runtime() : nullptr);
+        if (!left || !right)
+            raise_type_error(runtime, "rich comparison operands cannot be null");
+
+        if (left->type() && left->type()->slots.rich_compare)
+        {
+            Object *result = left->type()->slots.rich_compare(*left, *right, op);
+            if (!result)
+                raise_type_error(left->runtime(), "rich comparison returned null");
+            return result;
+        }
+
+        if (op == RichCompareOp::Equal || op == RichCompareOp::NotEqual)
+        {
+            const bool equal = object_equal(left, right);
+            return equal == (op == RichCompareOp::Equal)
+                       ? left->runtime()->true_value()
+                       : left->runtime()->false_value();
+        }
+
+        std::ostringstream message;
+        message << "comparison not supported between instances of '"
+                << type_qualified_name(left->type())
+                << "' and '"
+                << type_qualified_name(right->type())
+                << "'";
+        raise_type_error(left->runtime(), message.str());
+    }
+
     Object *object_binary_add(Object *left, Object *right)
     {
         if (!left || !right)

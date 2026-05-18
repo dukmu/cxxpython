@@ -12,6 +12,7 @@
 | --- | --- |
 | `None`, `bool`, `int`, `str`, `bytes` | P0 |
 | `tuple`, `list`, `dict`, `set`, `frozenset` | P0/P1 |
+| `==`, `!=`, rich comparison protocol | P0 |
 | 切片、负索引、迭代协议 | P0 |
 | 函数、默认参数、`*args`, `**kwargs` | P0 |
 | 闭包、`nonlocal`, `global` | P1 |
@@ -76,4 +77,3 @@
 | disassembler | P1 |
 | test runner integration | P1 |
 | debug flags, GC stats, trace flags | P1/P2 |
-

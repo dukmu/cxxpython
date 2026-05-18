@@ -112,6 +112,8 @@ namespace cxxpython
             inherited.hash = slots.hash;
         if (slots.equal)
             inherited.equal = slots.equal;
+        if (slots.rich_compare)
+            inherited.rich_compare = slots.rich_compare;
         if (slots.truth)
             inherited.truth = slots.truth;
         if (slots.traverse)

@@ -317,6 +317,16 @@ namespace cxxpython
                 object_set_item(object, key, value);
                 break;
             }
+            case Opcode::CompareOp:
+            {
+                if (instruction.operand > static_cast<std::uint32_t>(RichCompareOp::GreaterEqual))
+                    throw BytecodeError("COMPARE_OP operand out of range");
+                const auto op = static_cast<RichCompareOp>(instruction.operand);
+                Object *right = frame->pop();
+                Object *left = frame->pop();
+                frame->push(object_rich_compare(left, right, op));
+                break;
+            }
             case Opcode::Call:
             {
                 std::vector<Object *> args(instruction.operand);

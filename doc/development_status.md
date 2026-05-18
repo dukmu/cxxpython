@@ -1,5 +1,68 @@
 # Development Status
 
+## 2026-05-18 Rich Compare Equality
+
+Pre-change review:
+
+- Control flow should not land before comparison semantics have an object
+  protocol. Otherwise `if`, `while`, and boolean-oriented opcodes would be
+  tempted to call `object_equal` or concrete type logic directly.
+- The runtime already had a low-level `EqualSlot` used by dict and hashing.
+  Script-level comparison needs a separate protocol that returns Python
+  objects, while preserving `EqualSlot` as the internal equality fast path.
+- Parser/compiler had no comparison AST. Adding `==` as another binary add-like
+  special case would make later comparison chaining and ordering operators
+  awkward.
+
+Debt addressed:
+
+- Added `RichCompareOp` and `RichCompareSlot`.
+- Added `object_rich_compare(...)` as the central script-level comparison API.
+- Added heap-type inheritance for `rich_compare`.
+- Added `COMPARE_OP` bytecode metadata, stack effect, and VM dispatch.
+- Added lexer/parser/compiler support for `==` and `!=`.
+- Added `CompareExpr` so comparison syntax is explicit in the AST.
+
+Completed:
+
+- Added tests proving:
+  - heap types inherit low-level `equal` behavior into `object_rich_compare`
+    fallback
+  - custom `rich_compare` slots dispatch and inherit correctly
+  - `COMPARE_OP` dispatches through `object_rich_compare`
+  - malformed `COMPARE_OP` operands raise `BytecodeError`
+  - compiler emits `COMPARE_OP` for `==` and `!=`
+  - Python golden scripts print comparison results through the real CLI path
+
+Design notes:
+
+- `EqualSlot` remains the internal bool equality contract for dict and hash
+  behavior. `RichCompareSlot` is the Python-visible comparison contract and
+  returns Python objects.
+- `object_rich_compare` currently falls back to `object_equal` for `==` and
+  `!=` when a type has no rich compare slot. Ordering operators are deliberately
+  not exposed by syntax yet.
+- Chained comparisons are rejected with `SyntaxError` rather than compiled
+  incorrectly. Proper Python chaining requires stack preservation and
+  short-circuit jump semantics, so it should land with the next comparison and
+  jump-control slice.
+
+Next:
+
+- Add ordering operators only with a complete rich-compare plan for
+  `NotImplemented`, reverse/subclass dispatch, and TypeError messages.
+- Add jump opcodes and truth conversion before `if`/`while`.
+- Continue enriching `Tests/python/` for every script-visible feature.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects '--gtest_filter=CoreObjects.HeapTypesUseAndInheritSlots:Bytecode.MetadataNamesAndStackEffects:Bytecode.DispatchesCompareOpThroughRichCompareProtocol:Bytecode.RejectsMalformedBytecode:Compile.CompilesEqualityAndInequality:Compile.RejectsChainedComparisonsUntilJumpSemanticsExist:PythonScripts.RunsGoldenFiles'`
+- `ctest --test-dir build --output-on-failure`
+- `git diff --check`
+
+Result: all tests pass.
+
 ## 2026-05-18 Python Golden Script Tests
 
 Pre-change review:

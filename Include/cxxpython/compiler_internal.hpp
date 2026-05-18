@@ -16,6 +16,7 @@ namespace cxxpython::compiler_internal
     struct IntegerExpr;
     struct StringExpr;
     struct BinaryAddExpr;
+    struct CompareExpr;
     struct NameExpr;
     struct AttributeExpr;
     struct SubscriptExpr;
@@ -32,6 +33,7 @@ namespace cxxpython::compiler_internal
         virtual void visit(const IntegerExpr &expression) = 0;
         virtual void visit(const StringExpr &expression) = 0;
         virtual void visit(const BinaryAddExpr &expression) = 0;
+        virtual void visit(const CompareExpr &expression) = 0;
         virtual void visit(const NameExpr &expression) = 0;
         virtual void visit(const AttributeExpr &expression) = 0;
         virtual void visit(const SubscriptExpr &expression) = 0;
@@ -66,6 +68,8 @@ namespace cxxpython::compiler_internal
         LeftBracket,
         RightBracket,
         Equal,
+        EqualEqual,
+        BangEqual,
         Newline,
         End,
     };
@@ -125,6 +129,23 @@ namespace cxxpython::compiler_internal
         }
 
         std::unique_ptr<Expr> left;
+        std::unique_ptr<Expr> right;
+
+        void accept(ExprVisitor &visitor) const override
+        {
+            visitor.visit(*this);
+        }
+    };
+
+    struct CompareExpr final : Expr
+    {
+        CompareExpr(std::unique_ptr<Expr> left_in, RichCompareOp op_in, std::unique_ptr<Expr> right_in)
+            : left(std::move(left_in)), op(op_in), right(std::move(right_in))
+        {
+        }
+
+        std::unique_ptr<Expr> left;
+        RichCompareOp op;
         std::unique_ptr<Expr> right;
 
         void accept(ExprVisitor &visitor) const override

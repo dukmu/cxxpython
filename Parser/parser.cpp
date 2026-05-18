@@ -80,6 +80,28 @@ namespace cxxpython::compiler_internal
 
             std::unique_ptr<Expr> parse_expression_only()
             {
+                return parse_comparison();
+            }
+
+            std::unique_ptr<Expr> parse_comparison()
+            {
+                std::unique_ptr<Expr> left = parse_sum();
+                if (peek().kind != TokenKind::EqualEqual && peek().kind != TokenKind::BangEqual)
+                    return left;
+
+                const Token &op_token = advance();
+                std::unique_ptr<Expr> right = parse_sum();
+                if (peek().kind == TokenKind::EqualEqual || peek().kind == TokenKind::BangEqual)
+                    raise_at(peek(), "chained comparisons are not implemented");
+
+                const RichCompareOp op = op_token.kind == TokenKind::EqualEqual
+                                             ? RichCompareOp::Equal
+                                             : RichCompareOp::NotEqual;
+                return std::make_unique<CompareExpr>(std::move(left), op, std::move(right));
+            }
+
+            std::unique_ptr<Expr> parse_sum()
+            {
                 std::unique_ptr<Expr> left = parse_postfix();
                 while (peek().kind == TokenKind::Plus)
                 {
@@ -156,6 +178,8 @@ namespace cxxpython::compiler_internal
                 case TokenKind::LeftBracket:
                 case TokenKind::RightBracket:
                 case TokenKind::Equal:
+                case TokenKind::EqualEqual:
+                case TokenKind::BangEqual:
                     raise_at(token, "expected expression");
                 }
                 raise_at(token, "expected expression");

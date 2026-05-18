@@ -28,9 +28,21 @@ namespace cxxpython
         std::function<Object *(Runtime &, Object *, ObjectSpan)>;
     using GetSetGetter = std::function<Object *(Runtime &, Object *, TypeObject *)>;
     using GetSetSetter = std::function<void(Runtime &, Object *, Object *)>;
+
+    enum class RichCompareOp : std::uint8_t
+    {
+        Equal,
+        NotEqual,
+        Less,
+        LessEqual,
+        Greater,
+        GreaterEqual,
+    };
+
     using ReprSlot = std::string (*)(const Object &);
     using HashSlot = std::int64_t (*)(const Object &);
     using EqualSlot = bool (*)(const Object &, const Object &);
+    using RichCompareSlot = Object *(*)(const Object &, const Object &, RichCompareOp);
     using TruthSlot = bool (*)(const Object &);
     using TraverseSlot = void (*)(const Object &, const VisitChildren &);
     using BinarySlot = Object *(*)(const Object &, const Object &);
@@ -47,6 +59,7 @@ namespace cxxpython
         ReprSlot repr = nullptr;
         HashSlot hash = nullptr;
         EqualSlot equal = nullptr;
+        RichCompareSlot rich_compare = nullptr;
         TruthSlot truth = nullptr;
         TraverseSlot traverse = nullptr;
         BinarySlot binary_add = nullptr;
@@ -321,6 +334,7 @@ namespace cxxpython
 
     std::int64_t object_hash(const Object *object);
     bool object_equal(const Object *left, const Object *right);
+    Object *object_rich_compare(Object *left, Object *right, RichCompareOp op);
     Object *object_binary_add(Object *left, Object *right);
     Object *object_call(Object *callable, const std::vector<Object *> &args);
     std::size_t object_length(Object *object);

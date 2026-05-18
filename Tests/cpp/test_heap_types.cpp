@@ -28,6 +28,10 @@ TEST(CoreObjects, HeapTypesUseAndInheritSlots)
     EXPECT_EQ(cxxpython::object_repr(custom_a), "<custom>");
     EXPECT_EQ(cxxpython::object_hash(custom_a), 42);
     EXPECT_TRUE(cxxpython::object_equal(custom_a, custom_b));
+    EXPECT_EQ(cxxpython::object_rich_compare(custom_a, custom_b, cxxpython::RichCompareOp::Equal),
+              runtime.true_value());
+    EXPECT_EQ(cxxpython::object_rich_compare(custom_a, custom_b, cxxpython::RichCompareOp::NotEqual),
+              runtime.false_value());
     EXPECT_FALSE(cxxpython::is_true(custom_a));
     EXPECT_EQ(cxxpython::object_length(custom_a), 7U);
     EXPECT_EQ(cxxpython::object_get_item(custom_a, custom_b), custom_b);
@@ -39,12 +43,30 @@ TEST(CoreObjects, HeapTypesUseAndInheritSlots)
     cxxpython::TypeObject *repr_only_type =
         runtime.new_heap_type("ReprOnly", custom_type, cxxpython::TypeSlots{.repr = test_support::custom_repr});
     cxxpython::Object *repr_only = runtime.allocate<cxxpython::Object>(repr_only_type);
+    cxxpython::Object *repr_only_peer = runtime.allocate<cxxpython::Object>(repr_only_type);
     EXPECT_EQ(cxxpython::object_repr(repr_only), "<custom>");
     EXPECT_EQ(cxxpython::object_hash(repr_only), 42);
+    EXPECT_EQ(cxxpython::object_rich_compare(repr_only, repr_only_peer, cxxpython::RichCompareOp::Equal),
+              runtime.true_value());
     EXPECT_FALSE(cxxpython::is_true(repr_only));
     EXPECT_EQ(cxxpython::object_length(repr_only), 7U);
     EXPECT_EQ(cxxpython::object_get_item(repr_only, custom_a), custom_a);
     EXPECT_TRUE(cxxpython::object_contains(repr_only, custom_a));
+
+    cxxpython::TypeSlots rich_slots;
+    rich_slots.rich_compare = test_support::custom_rich_compare;
+    cxxpython::TypeObject *rich_type = runtime.new_heap_type("Rich", runtime.object_type(), rich_slots);
+    cxxpython::Object *rich_a = runtime.allocate<cxxpython::Object>(rich_type);
+    cxxpython::Object *rich_b = runtime.allocate<cxxpython::Object>(rich_type);
+    EXPECT_FALSE(cxxpython::object_equal(rich_a, rich_b));
+    EXPECT_EQ(cxxpython::object_rich_compare(rich_a, rich_b, cxxpython::RichCompareOp::Equal),
+              runtime.true_value());
+
+    cxxpython::TypeObject *rich_child_type = runtime.new_heap_type("RichChild", rich_type);
+    cxxpython::Object *rich_child_a = runtime.allocate<cxxpython::Object>(rich_child_type);
+    cxxpython::Object *rich_child_b = runtime.allocate<cxxpython::Object>(rich_child_type);
+    EXPECT_EQ(cxxpython::object_rich_compare(rich_child_a, rich_child_b, cxxpython::RichCompareOp::Equal),
+              runtime.true_value());
 }
 
 TEST(CoreObjects, TypeFlagsSeparateCompactBuiltinsFromHeapInstances)

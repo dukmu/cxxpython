@@ -15,6 +15,7 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::BinaryAdd), "BINARY_ADD");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::BinarySubscr), "BINARY_SUBSCR");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::StoreSubscr), "STORE_SUBSCR");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::CompareOp), "COMPARE_OP");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::Call), "CALL");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::ReturnValue), "RETURN_VALUE");
 
@@ -27,9 +28,32 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BinaryAdd, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BinarySubscr, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::StoreSubscr, 0}), -3);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::CompareOp, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::Call, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::Call, 2}), -2);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::ReturnValue, 0}), -1);
+}
+
+TEST(Bytecode, DispatchesCompareOpThroughRichCompareProtocol)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+
+    cxxpython::CodeObject *equal = runtime.new_code(
+        {runtime.new_int(4), runtime.new_int(4)},
+        {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::LoadConst, 1},
+         {cxxpython::Opcode::CompareOp, static_cast<std::uint32_t>(cxxpython::RichCompareOp::Equal)},
+         {cxxpython::Opcode::ReturnValue, 0}});
+    EXPECT_EQ(vm.execute(*equal), runtime.true_value());
+
+    cxxpython::CodeObject *not_equal = runtime.new_code(
+        {runtime.new_str("left"), runtime.new_str("right")},
+        {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::LoadConst, 1},
+         {cxxpython::Opcode::CompareOp, static_cast<std::uint32_t>(cxxpython::RichCompareOp::NotEqual)},
+         {cxxpython::Opcode::ReturnValue, 0}});
+    EXPECT_EQ(vm.execute(*not_equal), runtime.true_value());
 }
 
 TEST(Bytecode, DispatchesSubscriptOpcodesThroughObjectProtocol)
@@ -445,6 +469,15 @@ TEST(Bytecode, RejectsMalformedBytecode)
 
     EXPECT_THROW((void)cxxpython::stack_effect({static_cast<cxxpython::Opcode>(255), 0}),
                  cxxpython::BytecodeError);
+
+    EXPECT_THROW((void)vm.execute(*runtime.new_code(
+                     {runtime.new_int(1), runtime.new_int(1)},
+                     {{cxxpython::Opcode::LoadConst, 0},
+                      {cxxpython::Opcode::LoadConst, 1},
+                      {cxxpython::Opcode::CompareOp, 255},
+                      {cxxpython::Opcode::ReturnValue, 0}})),
+                 cxxpython::BytecodeError);
+    EXPECT_EQ(vm.thread_state().frame_depth(), 0U);
 
     EXPECT_THROW((void)vm.execute(*runtime.new_code({}, {{static_cast<cxxpython::Opcode>(255), 0}})),
                  cxxpython::BytecodeError);

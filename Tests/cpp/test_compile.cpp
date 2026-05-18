@@ -63,6 +63,45 @@ TEST(Compile, CompilesStringLiteralAndAddition)
     EXPECT_EQ(result->value, "python");
 }
 
+TEST(Compile, CompilesEqualityAndInequality)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+
+    cxxpython::CodeObject *equal = cxxpython::compile_eval_input(runtime, "1 + 1 == 2", "script.py");
+    ASSERT_NE(equal, nullptr);
+    ASSERT_EQ(equal->instructions().size(), 6U);
+    EXPECT_EQ(equal->instructions()[0].opcode, cxxpython::Opcode::LoadConst);
+    EXPECT_EQ(equal->instructions()[1].opcode, cxxpython::Opcode::LoadConst);
+    EXPECT_EQ(equal->instructions()[2].opcode, cxxpython::Opcode::BinaryAdd);
+    EXPECT_EQ(equal->instructions()[3].opcode, cxxpython::Opcode::LoadConst);
+    EXPECT_EQ(equal->instructions()[4].opcode, cxxpython::Opcode::CompareOp);
+    EXPECT_EQ(equal->instructions()[4].operand, static_cast<std::uint32_t>(cxxpython::RichCompareOp::Equal));
+    EXPECT_EQ(vm.execute(*equal), runtime.true_value());
+
+    cxxpython::CodeObject *not_equal = cxxpython::compile_eval_input(runtime, "'a' != 'b'", "script.py");
+    ASSERT_NE(not_equal, nullptr);
+    EXPECT_EQ(not_equal->instructions()[2].opcode, cxxpython::Opcode::CompareOp);
+    EXPECT_EQ(not_equal->instructions()[2].operand, static_cast<std::uint32_t>(cxxpython::RichCompareOp::NotEqual));
+    EXPECT_EQ(vm.execute(*not_equal), runtime.true_value());
+}
+
+TEST(Compile, RejectsChainedComparisonsUntilJumpSemanticsExist)
+{
+    cxxpython::Runtime runtime;
+
+    try
+    {
+        (void)cxxpython::compile_eval_input(runtime, "1 == 1 == 1", "broken.py");
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type_name(), "SyntaxError");
+        EXPECT_STREQ(error.what(), "broken.py:1:8: chained comparisons are not implemented");
+    }
+}
+
 TEST(Compile, CompilesNameLoadsThroughSymbolTable)
 {
     cxxpython::Runtime runtime;

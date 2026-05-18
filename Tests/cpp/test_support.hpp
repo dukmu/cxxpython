@@ -24,6 +24,18 @@ namespace test_support
         return left.type() == right.type();
     }
 
+    inline cxxpython::Object *custom_rich_compare(const cxxpython::Object &left,
+                                                  const cxxpython::Object &right,
+                                                  cxxpython::RichCompareOp op)
+    {
+        (void)right;
+        if (op == cxxpython::RichCompareOp::Equal)
+            return left.runtime()->true_value();
+        if (op == cxxpython::RichCompareOp::NotEqual)
+            return left.runtime()->false_value();
+        cxxpython::raise_type_error(left.runtime(), "custom rich comparison does not support ordering");
+    }
+
     inline bool custom_false(const cxxpython::Object &object)
     {
         (void)object;

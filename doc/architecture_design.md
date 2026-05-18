@@ -84,12 +84,13 @@ doc/            design docs and milestone plans
 
 ## Slot 扩展路线
 
-当前 slot 覆盖第一批对象协议：`repr`、`hash`、`equal`、`truth`、
+当前 slot 覆盖第一批对象协议：`repr`、`hash`、`equal`、`rich_compare`、`truth`、
 `traverse`、`binary_add`、`call`、`length`、`getitem`、`setitem`、
 `contains`、`descr_get`、`descr_set`。后续扩展顺序：
 
 - Numeric: add/sub/mul/div/mod/pow, unary, in-place, reflected operators.
-- Rich compare: eq/ne/lt/le/gt/ge 返回 Python bool/NotImplemented 语义。
+- Rich compare: `==`/`!=` 已走 `object_rich_compare`；`lt/le/gt/ge`、`NotImplemented`
+  和 reverse/subclass dispatch 需要在控制流前继续补齐。
 - Sequence/mapping: length, getitem, setitem, contains, iterator。
 - Attribute/descriptor: getattro/setattro, descr_get/descr_set。
 - Call/construction: call, new, init。
@@ -113,6 +114,9 @@ doc/            design docs and milestone plans
 - VM opcode 只负责调度和栈效果，类型语义由 object/type slots 或统一 runtime
   API 完成。新增 opcode 必须同时更新 stack effect、disassembly/metadata、
   compiler emission、VM execution 和测试。
+- `COMPARE_OP` 的职责是弹出左右操作数，解码比较 operator，调用
+  `object_rich_compare`，再把 Python bool/object 结果压栈。比较语义不能在
+  VM 中直接调用 `object_equal` 或识别 `int`/`str` 等具体类型。
 - `CALL` 的职责是栈调度：弹出 positional arguments 和 callable，调用统一
   `object_call`/type call slot，再把返回值压栈。函数对象、native function、
   type construction、bound method 后续都必须接入这条协议，而不是让 opcode

@@ -59,6 +59,12 @@ namespace cxxpython
                 expression.right->accept(*this);
             }
 
+            void visit(const compiler_internal::CompareExpr &expression) override
+            {
+                expression.left->accept(*this);
+                expression.right->accept(*this);
+            }
+
             void visit(const compiler_internal::NameExpr &expression) override
             {
                 (void)symbols_.add_name(expression.value);
@@ -164,6 +170,16 @@ namespace cxxpython
                 expression.left->accept(*this);
                 expression.right->accept(*this);
                 instructions_.push_back(Instruction{Opcode::BinaryAdd, 0});
+            }
+
+            void visit(const compiler_internal::CompareExpr &expression) override
+            {
+                expression.left->accept(*this);
+                expression.right->accept(*this);
+                instructions_.push_back(Instruction{
+                    Opcode::CompareOp,
+                    static_cast<std::uint32_t>(expression.op),
+                });
             }
 
             void visit(const compiler_internal::NameExpr &expression) override
