@@ -70,6 +70,22 @@ namespace cxxpython
         return allocate<NativeFunctionObject>(native_function_type_, std::move(name), std::move(callback));
     }
 
+    PythonFunctionObject *Runtime::new_function(std::string name, CodeObject *code, DictObject *globals)
+    {
+        if (!code)
+            raise_type_error(this, "function requires a code object");
+        if (!globals)
+            raise_type_error(this, "function requires globals");
+        return allocate<PythonFunctionObject>(function_type_, std::move(name), code, globals);
+    }
+
+    PythonMethodObject *Runtime::new_method(PythonFunctionObject *function, Object *self)
+    {
+        if (!function || !self)
+            raise_type_error(this, "method requires function and self");
+        return allocate<PythonMethodObject>(method_type_, function, self);
+    }
+
     MethodDescriptorObject *Runtime::new_method_descriptor(std::string name,
                                                            TypeObject *owner,
                                                            MethodDescriptorCallback callback)

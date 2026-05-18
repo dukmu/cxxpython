@@ -249,6 +249,10 @@ doc/            design docs and milestone plans
 - Python 函数对象应持有 `CodeObject`、globals、defaults、kwdefaults、
   annotations、closure 和 `__qualname__`。函数作为类属性读取时通过 descriptor
   返回 bound method；作为模块变量或普通值调用时直接走 call slot。
+- Python function call must reuse the currently active VM when called from
+  bytecode, so nested frames remain in one `ThreadState` for GC roots,
+  traceback, tracing, and future generators. Host-side calls may create a VM
+  entrypoint, but opcode calls must not silently fork execution state.
 - `type.__call__` 是对象构造唯一入口：选择 `__new__`，再在返回对象是目标
   类型实例时调用 `__init__`。内建类型构造和 Python 类构造都必须复用这条
   call/new/init 协议。

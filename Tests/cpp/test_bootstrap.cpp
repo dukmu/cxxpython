@@ -18,6 +18,8 @@ TEST(CoreObjects, RuntimeBootstrapsBuiltinTypes)
 
     EXPECT_EQ(runtime.list_type()->base, runtime.object_type());
     EXPECT_EQ(runtime.module_type()->base, runtime.object_type());
+    EXPECT_EQ(runtime.function_type()->base, runtime.object_type());
+    EXPECT_EQ(runtime.method_type()->base, runtime.object_type());
     EXPECT_TRUE(cxxpython::is_subclass(runtime.bool_type(), runtime.int_type()));
     EXPECT_TRUE(cxxpython::is_subclass(runtime.bool_type(), runtime.object_type()));
     EXPECT_TRUE(cxxpython::is_instance(runtime.true_value(), runtime.int_type()));

@@ -14,6 +14,7 @@ namespace cxxpython
     class Runtime;
     class Object;
     class TypeObject;
+    class CodeObject;
     class NotImplementedObject;
     class ListObject;
     class DictObject;
@@ -21,6 +22,7 @@ namespace cxxpython
     class ExceptionObject;
     class MethodDescriptorObject;
     class GetSetDescriptorObject;
+    class PythonFunctionObject;
 
     using VisitChildren = std::function<void(Object *)>;
     using ObjectSpan = std::span<Object *const>;
@@ -295,6 +297,22 @@ namespace cxxpython
         NativeFunctionCallback callback_;
     };
 
+    class PythonFunctionObject final : public Object
+    {
+    public:
+        PythonFunctionObject(TypeObject *type, std::string name, CodeObject *code, DictObject *globals);
+
+        const std::string &name() const noexcept;
+        CodeObject *code() const noexcept;
+        DictObject *globals() const noexcept;
+        Object *call(const std::vector<Object *> &args);
+
+    private:
+        std::string name_;
+        CodeObject *code_;
+        DictObject *globals_;
+    };
+
     class MethodDescriptorObject final : public Object
     {
     public:
@@ -312,6 +330,19 @@ namespace cxxpython
         std::string name_;
         TypeObject *owner_;
         MethodDescriptorCallback callback_;
+    };
+
+    class PythonMethodObject final : public Object
+    {
+    public:
+        PythonMethodObject(TypeObject *type, PythonFunctionObject *function, Object *self);
+
+        PythonFunctionObject *function() const noexcept;
+        Object *self() const noexcept;
+
+    private:
+        PythonFunctionObject *function_;
+        Object *self_;
     };
 
     class BoundMethodObject final : public Object
@@ -397,6 +428,8 @@ namespace cxxpython
     TypeSlots make_mappingproxy_slots();
     TypeSlots make_module_slots();
     TypeSlots make_native_function_slots();
+    TypeSlots make_function_slots();
+    TypeSlots make_method_slots();
     TypeSlots make_method_descriptor_slots();
     TypeSlots make_getset_descriptor_slots();
     TypeSlots make_exception_slots();

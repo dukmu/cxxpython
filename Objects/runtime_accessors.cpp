@@ -67,6 +67,16 @@ namespace cxxpython
         return native_function_type_;
     }
 
+    TypeObject *Runtime::function_type() const noexcept
+    {
+        return function_type_;
+    }
+
+    TypeObject *Runtime::method_type() const noexcept
+    {
+        return method_type_;
+    }
+
     TypeObject *Runtime::method_descriptor_type() const noexcept
     {
         return method_descriptor_type_;
@@ -165,5 +175,15 @@ namespace cxxpython
     void Runtime::set_stdout(std::ostream &stream) noexcept
     {
         stdout_ = &stream;
+    }
+
+    VirtualMachine *Runtime::active_vm() const noexcept
+    {
+        return active_vm_;
+    }
+
+    void Runtime::set_active_vm(VirtualMachine *vm) noexcept
+    {
+        active_vm_ = vm;
     }
 }

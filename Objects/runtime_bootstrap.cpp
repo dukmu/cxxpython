@@ -21,6 +21,8 @@ namespace cxxpython
         mappingproxy_type_ = allocate_type("mappingproxy");
         module_type_ = allocate_type("module");
         native_function_type_ = allocate_type("builtin_function_or_method");
+        function_type_ = allocate_type("function");
+        method_type_ = allocate_type("method");
         method_descriptor_type_ = allocate_type("method_descriptor");
         getset_descriptor_type_ = allocate_type("getset_descriptor");
         code_type_ = allocate_type("code");
@@ -47,6 +49,8 @@ namespace cxxpython
         mappingproxy_type_->slots = make_mappingproxy_slots();
         module_type_->slots = make_module_slots();
         native_function_type_->slots = make_native_function_slots();
+        function_type_->slots = make_function_slots();
+        method_type_->slots = make_method_slots();
         method_descriptor_type_->slots = make_method_descriptor_slots();
         getset_descriptor_type_->slots = make_getset_descriptor_slots();
         code_type_->slots = make_code_slots();
@@ -73,6 +77,8 @@ namespace cxxpython
         mappingproxy_type_->set_type(type_type_);
         module_type_->set_type(type_type_);
         native_function_type_->set_type(type_type_);
+        function_type_->set_type(type_type_);
+        method_type_->set_type(type_type_);
         method_descriptor_type_->set_type(type_type_);
         getset_descriptor_type_->set_type(type_type_);
         code_type_->set_type(type_type_);
@@ -102,6 +108,8 @@ namespace cxxpython
         initialize_type(mappingproxy_type_, object_type_);
         initialize_type(module_type_, object_type_);
         initialize_type(native_function_type_, object_type_);
+        initialize_type(function_type_, object_type_);
+        initialize_type(method_type_, object_type_);
         initialize_type(method_descriptor_type_, object_type_);
         initialize_type(getset_descriptor_type_, object_type_);
         initialize_type(code_type_, object_type_);
@@ -133,6 +141,8 @@ namespace cxxpython
         add_root(mappingproxy_type_);
         add_root(module_type_);
         add_root(native_function_type_);
+        add_root(function_type_);
+        add_root(method_type_);
         add_root(method_descriptor_type_);
         add_root(getset_descriptor_type_);
         add_root(code_type_);

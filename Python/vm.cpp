@@ -89,6 +89,29 @@ namespace cxxpython
             ThreadState &thread_;
             Frame &frame_;
         };
+
+        class ActiveVirtualMachine final
+        {
+        public:
+            explicit ActiveVirtualMachine(VirtualMachine &vm)
+                : runtime_(vm.interpreter_state().runtime()),
+                  previous_(runtime_.active_vm())
+            {
+                runtime_.set_active_vm(&vm);
+            }
+
+            ~ActiveVirtualMachine()
+            {
+                runtime_.set_active_vm(previous_);
+            }
+
+            ActiveVirtualMachine(const ActiveVirtualMachine &) = delete;
+            ActiveVirtualMachine &operator=(const ActiveVirtualMachine &) = delete;
+
+        private:
+            Runtime &runtime_;
+            VirtualMachine *previous_;
+        };
     }
 
     Frame::Frame(TypeObject *type, CodeObject *code, DictObject *locals, DictObject *globals, DictObject *builtins)
@@ -252,6 +275,7 @@ namespace cxxpython
 
     Object *VirtualMachine::execute(CodeObject &code, DictObject &locals, DictObject &globals, DictObject &builtins)
     {
+        ActiveVirtualMachine active_vm(*this);
         Frame *frame = runtime_.new_frame(&code, &locals, &globals, &builtins);
         ActiveFrame active_frame(thread_, *frame);
         while (frame->instruction_pointer() < code.instructions().size())

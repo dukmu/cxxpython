@@ -17,6 +17,9 @@ namespace cxxpython
     class Frame;
     class ModuleObject;
     class NativeFunctionObject;
+    class PythonFunctionObject;
+    class PythonMethodObject;
+    class VirtualMachine;
 
     class Runtime final
     {
@@ -38,6 +41,8 @@ namespace cxxpython
         TypeObject *mappingproxy_type() const noexcept;
         TypeObject *module_type() const noexcept;
         TypeObject *native_function_type() const noexcept;
+        TypeObject *function_type() const noexcept;
+        TypeObject *method_type() const noexcept;
         TypeObject *method_descriptor_type() const noexcept;
         TypeObject *getset_descriptor_type() const noexcept;
         TypeObject *code_type() const noexcept;
@@ -59,6 +64,8 @@ namespace cxxpython
         DictObject *builtins_dict() const noexcept;
         std::ostream &stdout_stream() const noexcept;
         void set_stdout(std::ostream &stream) noexcept;
+        VirtualMachine *active_vm() const noexcept;
+        void set_active_vm(VirtualMachine *vm) noexcept;
 
         IntObject *new_int(std::int64_t value);
         StrObject *new_str(std::string value);
@@ -68,6 +75,8 @@ namespace cxxpython
         MappingProxyObject *new_mappingproxy(DictObject *mapping);
         ModuleObject *new_module(std::string name, std::string filename);
         NativeFunctionObject *new_native_function(std::string name, NativeFunctionCallback callback);
+        PythonFunctionObject *new_function(std::string name, CodeObject *code, DictObject *globals);
+        PythonMethodObject *new_method(PythonFunctionObject *function, Object *self);
         MethodDescriptorObject *new_method_descriptor(std::string name,
                                                        TypeObject *owner,
                                                        MethodDescriptorCallback callback);
@@ -132,6 +141,8 @@ namespace cxxpython
         TypeSlots inherit_slots(TypeObject *base, TypeSlots slots) const;
         void initialize_builtins();
 
+        friend class VirtualMachine;
+
         std::vector<std::unique_ptr<Object>> heap_;
         std::vector<Object *> roots_;
 
@@ -148,6 +159,8 @@ namespace cxxpython
         TypeObject *mappingproxy_type_ = nullptr;
         TypeObject *module_type_ = nullptr;
         TypeObject *native_function_type_ = nullptr;
+        TypeObject *function_type_ = nullptr;
+        TypeObject *method_type_ = nullptr;
         TypeObject *method_descriptor_type_ = nullptr;
         TypeObject *getset_descriptor_type_ = nullptr;
         TypeObject *code_type_ = nullptr;
@@ -167,5 +180,6 @@ namespace cxxpython
         BoolObject *false_ = nullptr;
         ModuleObject *builtins_module_ = nullptr;
         std::ostream *stdout_ = nullptr;
+        VirtualMachine *active_vm_ = nullptr;
     };
 }

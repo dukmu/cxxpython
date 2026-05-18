@@ -1,0 +1,131 @@
+#include <gtest/gtest.h>
+
+#include "cxxpython/bytecode.hpp"
+#include "cxxpython/runtime.hpp"
+#include "cxxpython/vm.hpp"
+
+TEST(Functions, CallsPythonFunctionObjectsWithCapturedGlobals)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::DictObject *globals = runtime.new_dict();
+    cxxpython::Object *answer = runtime.new_str("from-globals");
+    globals->set(runtime.new_str("answer"), answer);
+
+    cxxpython::CodeObject *code = runtime.new_code(
+        "f",
+        "test.py",
+        {},
+        {runtime.new_str("answer")},
+        {{cxxpython::Opcode::LoadName, 0},
+         {cxxpython::Opcode::ReturnValue, 0}});
+    cxxpython::PythonFunctionObject *function = runtime.new_function("f", code, globals);
+
+    EXPECT_EQ(function->type(), runtime.function_type());
+    EXPECT_EQ(cxxpython::object_repr(function), "<function f>");
+    EXPECT_EQ(cxxpython::object_call(function, {}), answer);
+
+    std::vector<cxxpython::Object *> children;
+    function->visit_children([&children](cxxpython::Object *object)
+                             { children.push_back(object); });
+    ASSERT_EQ(children.size(), 2U);
+    EXPECT_EQ(children[0], code);
+    EXPECT_EQ(children[1], globals);
+
+    try
+    {
+        (void)cxxpython::object_call(function, {runtime.new_int(1)});
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "f() takes 0 positional arguments but 1 argument was given");
+    }
+}
+
+TEST(Functions, PythonFunctionsBindAsMethodsThroughDescriptorProtocol)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::DictObject *globals = runtime.new_dict();
+    cxxpython::CodeObject *code = runtime.new_code(
+        "method",
+        "test.py",
+        {runtime.none()},
+        {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::ReturnValue, 0}});
+    cxxpython::PythonFunctionObject *function = runtime.new_function("method", code, globals);
+    cxxpython::TypeObject *owner_type = runtime.new_heap_type("Owner", runtime.object_type());
+    owner_type->dict->set(runtime.new_str("method"), function);
+    cxxpython::Object *instance = runtime.allocate<cxxpython::Object>(owner_type);
+
+    EXPECT_EQ(cxxpython::object_get_attr(owner_type, "method"), function);
+
+    cxxpython::Object *bound = cxxpython::object_get_attr(instance, "method");
+    ASSERT_NE(bound, nullptr);
+    EXPECT_EQ(bound->type(), runtime.method_type());
+    EXPECT_TRUE(cxxpython::object_repr(bound).starts_with("<bound method method of <Owner object at "));
+
+    std::vector<cxxpython::Object *> children;
+    bound->visit_children([&children](cxxpython::Object *object)
+                          { children.push_back(object); });
+    ASSERT_EQ(children.size(), 2U);
+    EXPECT_EQ(children[0], function);
+    EXPECT_EQ(children[1], instance);
+
+    try
+    {
+        (void)cxxpython::object_call(bound, {});
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "method() takes 0 positional arguments but 1 argument was given");
+    }
+}
+
+TEST(Functions, PythonFunctionCallsReuseActiveVirtualMachineFrames)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::DictObject *globals = runtime.new_dict();
+    globals->set(runtime.new_str("probe"),
+                 runtime.new_native_function("probe", [](cxxpython::Runtime &runtime,
+                                                          const std::vector<cxxpython::Object *> &args)
+                                             {
+                                                 if (!args.empty())
+                                                     cxxpython::raise_type_error(&runtime, "probe() takes no arguments");
+                                                 cxxpython::VirtualMachine *vm = runtime.active_vm();
+                                                 if (!vm)
+                                                     cxxpython::raise_type_error(&runtime, "probe() requires an active VM");
+                                                 return runtime.new_int(static_cast<std::int64_t>(
+                                                     vm->thread_state().frame_depth()));
+                                             }));
+
+    cxxpython::CodeObject *function_code = runtime.new_code(
+        "f",
+        "test.py",
+        {},
+        {runtime.new_str("probe")},
+        {{cxxpython::Opcode::LoadName, 0},
+         {cxxpython::Opcode::Call, 0},
+         {cxxpython::Opcode::ReturnValue, 0}});
+    cxxpython::PythonFunctionObject *function = runtime.new_function("f", function_code, globals);
+    globals->set(runtime.new_str("f"), function);
+
+    auto *host_depth = dynamic_cast<cxxpython::IntObject *>(cxxpython::object_call(function, {}));
+    ASSERT_NE(host_depth, nullptr);
+    EXPECT_EQ(host_depth->value, 1);
+
+    cxxpython::CodeObject *caller_code = runtime.new_code(
+        "caller",
+        "test.py",
+        {},
+        {runtime.new_str("f")},
+        {{cxxpython::Opcode::LoadName, 0},
+         {cxxpython::Opcode::Call, 0},
+         {cxxpython::Opcode::ReturnValue, 0}});
+    cxxpython::VirtualMachine vm(runtime);
+    auto *nested_depth = dynamic_cast<cxxpython::IntObject *>(vm.execute(*caller_code, *globals));
+    ASSERT_NE(nested_depth, nullptr);
+    EXPECT_EQ(nested_depth->value, 2);
+}

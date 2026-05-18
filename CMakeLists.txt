@@ -25,6 +25,7 @@ add_library(cxxpython_core
     Objects/object_mapping.cpp
     Objects/object_module.cpp
     Objects/object_native_function.cpp
+    Objects/object_function.cpp
     Objects/object_descriptor.cpp
     Objects/object_method.cpp
     Objects/object_exception.cpp
@@ -61,6 +62,7 @@ add_executable(test_core_objects
     Tests/cpp/test_sequences.cpp
     Tests/cpp/test_mapping.cpp
     Tests/cpp/test_heap_types.cpp
+    Tests/cpp/test_functions.cpp
     Tests/cpp/test_attributes.cpp
     Tests/cpp/test_module.cpp
     Tests/cpp/test_bytecode.cpp

@@ -1,5 +1,71 @@
 # Development Status
 
+## 2026-05-18 Python Function And Method Objects
+
+Pre-change review:
+
+- The runtime had native functions and builtin method descriptors, but no
+  Python `function` object and no Python bound `method` object. Without these,
+  class methods would either need parser/VM shortcuts or would have to reuse
+  builtin method objects incorrectly.
+- Function calls must preserve the active VM/thread frame chain. Creating an
+  unrelated VM for every Python function call would break future traceback,
+  tracing, generators, and GC root expectations.
+- Builtin bound methods should remain `builtin_function_or_method`-typed to
+  match CPython. The missing type is Python's separate `method` object.
+
+Debt addressed:
+
+- Added runtime `function` and `method` types with normal type dictionaries,
+  roots, accessors, factories, and slot tables.
+- Added `PythonFunctionObject` holding name, `CodeObject`, and captured globals.
+- Added `PythonMethodObject` holding function and receiver.
+- Python functions are non-data descriptors:
+  - class/type access returns the function unchanged
+  - instance access returns a bound Python method
+- Python function calls reuse `Runtime::active_vm()` when bytecode is already
+  executing, preserving nested frame depth in the same `ThreadState`.
+- Host-side calls still create a VM entrypoint when no VM is active.
+
+Completed:
+
+- Added tests proving:
+  - Python function objects call code using captured globals
+  - function objects traverse code and globals
+  - function descriptor binding creates a Python `method`
+  - bound methods traverse function and receiver
+  - bound method calls prepend `self` through the same function call path
+  - nested calls from VM bytecode reuse the active VM and show frame depth 2
+- Kept builtin `list.append` bound access as `builtin_function_or_method`.
+
+Design notes:
+
+- This slice intentionally supports only zero-argument code objects because the
+  compiler has no function definition syntax, argcount, or varnames yet.
+  Argument binding must be added with function definition parsing and
+  `CodeObject` metadata, not by inventing ad hoc local-name conventions.
+- `Runtime::active_vm()` is execution infrastructure for preserving frame
+  continuity; it should not become a script-visible runtime object.
+
+Next:
+
+- Extend `CodeObject` metadata with argcount and varnames before exposing
+  `def` syntax.
+- Add function definition parser/compiler support as a vertical slice:
+  `def f(): ...`, `MAKE_FUNCTION` or equivalent, `STORE_NAME`, then script
+  golden tests.
+- Then add class body namespace execution and route methods through these
+  function/method descriptor objects.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects '--gtest_filter=Functions.*:CoreObjects.RuntimeBootstrapsBuiltinTypes:CoreObjects.RuntimeVisitsRootsAndContainerChildren:CoreObjects.ListAppendIsExposedAsMethodDescriptor'`
+- `ctest --test-dir build --output-on-failure`
+- `git diff --check`
+
+Result: all tests pass.
+
 ## 2026-05-18 Type Introspection Builtin
 
 Pre-change review:
