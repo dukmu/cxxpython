@@ -51,9 +51,9 @@ int main(int argc, char **argv)
         try
         {
             cxxpython::VirtualMachine vm(runtime);
-            cxxpython::DictObject *globals = runtime.new_dict();
+            cxxpython::ModuleObject *module = runtime.new_module("__main__", argv[1]);
             cxxpython::CodeObject *code = cxxpython::compile_exec_input(runtime, source);
-            (void)vm.execute(*code, *globals);
+            (void)vm.execute(*code, *module->dict());
             return 0;
         }
         catch (const cxxpython::PythonError &error)

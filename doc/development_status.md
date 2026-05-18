@@ -53,6 +53,54 @@ Verification:
 
 Result: all tests pass.
 
+## 2026-05-18 Module Object And Script Globals
+
+Completed:
+
+- Added runtime-owned `module` type and `ModuleObject`.
+- Added `Runtime::module_type()` and `Runtime::new_module(name, filename)`.
+- Added module globals initialization:
+  - `__name__`
+  - `__file__`
+- Added module repr and traversal of module dictionary.
+- Changed `cxxpython file.py` to execute inside a `ModuleObject` globals dict
+  instead of a raw standalone dict.
+- Added GTest coverage for:
+  - module type bootstrap
+  - module globals initialization
+  - module repr
+  - executing code against module globals
+  - module traversal
+  - CLI scripts using initialized `__name__` and `__file__`
+
+Design notes:
+
+- This removes the raw-dict module execution shortcut from the CLI path.
+- The module object is still minimal: no import spec, package, loader,
+  `sys.modules`, builtins linkage, or attribute access proxying to module
+  dictionary.
+- Module metadata is currently stored both as C++ fields and Python globals.
+  That is acceptable for this bootstrap layer, but future module attribute
+  access should make the dict the Python-visible source of truth.
+- `ModuleObject` construction keeps allocation lifecycle clean: dictionary
+  setup happens in the runtime factory, while the object constructor only
+  stores already-created references.
+
+Next:
+
+- Add `Frame` locals/builtins separation and make name resolution walk
+  locals -> globals -> builtins.
+- Add a minimal builtins module before implementing `print`.
+- Replace compiler AST `dynamic_cast` passes with a visitor once statement
+  variety grows beyond this initial assignment/expression subset.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all tests pass.
+
 ## 2026-05-18 Module Execution And CLI File Entry
 
 Pre-change review:

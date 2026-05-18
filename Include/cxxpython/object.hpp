@@ -14,6 +14,7 @@ namespace cxxpython
     class Object;
     class TypeObject;
     class ListObject;
+    class DictObject;
     class ExceptionObject;
 
     using VisitChildren = std::function<void(Object *)>;
@@ -175,6 +176,21 @@ namespace cxxpython
         std::vector<std::size_t> indices_;
     };
 
+    class ModuleObject final : public Object
+    {
+    public:
+        ModuleObject(TypeObject *type, std::string name, std::string filename, DictObject *dict);
+
+        const std::string &name() const noexcept;
+        const std::string &filename() const noexcept;
+        DictObject *dict() const noexcept;
+
+    private:
+        std::string name_;
+        std::string filename_;
+        DictObject *dict_;
+    };
+
     class ExceptionObject final : public Object
     {
     public:
@@ -207,6 +223,7 @@ namespace cxxpython
     TypeSlots make_list_slots();
     TypeSlots make_tuple_slots();
     TypeSlots make_dict_slots();
+    TypeSlots make_module_slots();
     TypeSlots make_exception_slots();
     TypeSlots make_code_slots();
     TypeSlots make_frame_slots();

@@ -56,7 +56,10 @@ namespace
 
 TEST(Cli, ExecutesScriptFile)
 {
-    const std::filesystem::path script = write_script("cxxpython_cli_success.py", "x = 40 + 2\n");
+    const std::filesystem::path script = write_script(
+        "cxxpython_cli_success.py",
+        "x = __name__ + ':' + __file__\n"
+        "y = x + ':ok'\n");
 
     const CommandResult result = run_command(std::string(CXXPYTHON_PROGRAM_PATH) + " " + shell_quote(script));
 

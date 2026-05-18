@@ -14,6 +14,7 @@ namespace cxxpython
     struct Instruction;
     class CodeObject;
     class Frame;
+    class ModuleObject;
 
     class Runtime final
     {
@@ -31,6 +32,7 @@ namespace cxxpython
         TypeObject *list_type() const noexcept;
         TypeObject *tuple_type() const noexcept;
         TypeObject *dict_type() const noexcept;
+        TypeObject *module_type() const noexcept;
         TypeObject *code_type() const noexcept;
         TypeObject *frame_type() const noexcept;
         TypeObject *base_exception_type() const noexcept;
@@ -49,6 +51,7 @@ namespace cxxpython
         ListObject *new_list(std::vector<Object *> items);
         TupleObject *new_tuple(std::vector<Object *> items);
         DictObject *new_dict();
+        ModuleObject *new_module(std::string name, std::string filename);
         CodeObject *new_code(std::vector<Object *> constants,
                               std::vector<Instruction> instructions);
         CodeObject *new_code(std::vector<Object *> constants,
@@ -98,6 +101,7 @@ namespace cxxpython
         TypeObject *list_type_ = nullptr;
         TypeObject *tuple_type_ = nullptr;
         TypeObject *dict_type_ = nullptr;
+        TypeObject *module_type_ = nullptr;
         TypeObject *code_type_ = nullptr;
         TypeObject *frame_type_ = nullptr;
         TypeObject *base_exception_type_ = nullptr;

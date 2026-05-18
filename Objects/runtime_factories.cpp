@@ -46,6 +46,16 @@ namespace cxxpython
         return allocate<DictObject>(dict_type_);
     }
 
+    ModuleObject *Runtime::new_module(std::string name, std::string filename)
+    {
+        DictObject *dict = new_dict();
+        if (!dict)
+            raise_type_error(this, "module dict cannot be null");
+        dict->set(new_str("__name__"), new_str(name));
+        dict->set(new_str("__file__"), new_str(filename));
+        return allocate<ModuleObject>(module_type_, std::move(name), std::move(filename), dict);
+    }
+
     CodeObject *Runtime::new_code(std::vector<Object *> constants, std::vector<Instruction> instructions)
     {
         return new_code(std::move(constants), {}, std::move(instructions));
