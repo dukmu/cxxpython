@@ -41,6 +41,8 @@ namespace cxxpython
             auto *type = static_cast<const TypeObject *>(&object);
             if (type->base)
                 visitor(type->base);
+            if (type->solid_base && type->solid_base != type->base)
+                visitor(type->solid_base);
             for (TypeObject *item : type->bases)
             {
                 if (item)

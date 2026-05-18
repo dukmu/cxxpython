@@ -22,6 +22,7 @@ namespace cxxpython::compiler_internal
     struct NameExpr;
     struct AttributeExpr;
     struct SubscriptExpr;
+    struct ListExpr;
     struct TupleExpr;
     struct DictExpr;
     struct CallExpr;
@@ -47,6 +48,7 @@ namespace cxxpython::compiler_internal
         virtual void visit(const NameExpr &expression) = 0;
         virtual void visit(const AttributeExpr &expression) = 0;
         virtual void visit(const SubscriptExpr &expression) = 0;
+        virtual void visit(const ListExpr &expression) = 0;
         virtual void visit(const TupleExpr &expression) = 0;
         virtual void visit(const DictExpr &expression) = 0;
         virtual void visit(const CallExpr &expression) = 0;
@@ -305,6 +307,21 @@ namespace cxxpython::compiler_internal
     struct TupleExpr final : Expr
     {
         explicit TupleExpr(std::vector<std::unique_ptr<Expr>> items_in)
+            : items(std::move(items_in))
+        {
+        }
+
+        std::vector<std::unique_ptr<Expr>> items;
+
+        void accept(ExprVisitor &visitor) const override
+        {
+            visitor.visit(*this);
+        }
+    };
+
+    struct ListExpr final : Expr
+    {
+        explicit ListExpr(std::vector<std::unique_ptr<Expr>> items_in)
             : items(std::move(items_in))
         {
         }

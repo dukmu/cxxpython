@@ -123,6 +123,34 @@ namespace cxxpython
         initialize_type(name_error_type_, exception_type_);
         initialize_type(attribute_error_type_, exception_type_);
 
+        object_type_->solid_base = object_type_;
+        type_type_->solid_base = type_type_;
+        none_type_->solid_base = none_type_;
+        not_implemented_type_->solid_base = not_implemented_type_;
+        int_type_->solid_base = int_type_;
+        bool_type_->solid_base = int_type_;
+        str_type_->solid_base = str_type_;
+        list_type_->solid_base = list_type_;
+        tuple_type_->solid_base = tuple_type_;
+        dict_type_->solid_base = dict_type_;
+        mappingproxy_type_->solid_base = mappingproxy_type_;
+        module_type_->solid_base = module_type_;
+        native_function_type_->solid_base = native_function_type_;
+        function_type_->solid_base = function_type_;
+        method_type_->solid_base = method_type_;
+        method_descriptor_type_->solid_base = method_descriptor_type_;
+        getset_descriptor_type_->solid_base = getset_descriptor_type_;
+        code_type_->solid_base = code_type_;
+        frame_type_->solid_base = frame_type_;
+        base_exception_type_->solid_base = base_exception_type_;
+        exception_type_->solid_base = base_exception_type_;
+        type_error_type_->solid_base = base_exception_type_;
+        index_error_type_->solid_base = base_exception_type_;
+        key_error_type_->solid_base = base_exception_type_;
+        syntax_error_type_->solid_base = base_exception_type_;
+        name_error_type_->solid_base = base_exception_type_;
+        attribute_error_type_->solid_base = base_exception_type_;
+
         none_ = allocate<NoneObject>(none_type_);
         not_implemented_ = allocate<NotImplementedObject>(not_implemented_type_);
         true_ = allocate<BoolObject>(bool_type_, true);

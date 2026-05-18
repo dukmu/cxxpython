@@ -629,6 +629,47 @@ TEST(Compile, CompilesTupleAndDictLiterals)
     EXPECT_EQ(static_cast<cxxpython::StrObject *>(globals->get(runtime.new_str("result")))->value, "value");
 }
 
+TEST(Compile, CompilesListLiterals)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(
+        runtime,
+        "xs = [1, 'x', False]\n"
+        "empty = []\n"
+        "picked = xs[1]\n"
+        "xs[1] = 'y'\n",
+        "script.py");
+    ASSERT_NE(code, nullptr);
+
+    bool saw_build_list = false;
+    for (const cxxpython::Instruction &instruction : code->instructions())
+    {
+        if (instruction.opcode == cxxpython::Opcode::BuildList)
+            saw_build_list = true;
+    }
+    EXPECT_TRUE(saw_build_list);
+
+    EXPECT_EQ(vm.execute(*code, *globals), runtime.none());
+
+    auto *list = dynamic_cast<cxxpython::ListObject *>(globals->get(runtime.new_str("xs")));
+    ASSERT_NE(list, nullptr);
+    ASSERT_EQ(list->size(), 3U);
+    EXPECT_EQ(static_cast<cxxpython::IntObject *>(list->items()[0])->value, 1);
+    EXPECT_EQ(static_cast<cxxpython::StrObject *>(list->items()[1])->value, "y");
+    EXPECT_EQ(list->items()[2], runtime.false_value());
+
+    auto *empty = dynamic_cast<cxxpython::ListObject *>(globals->get(runtime.new_str("empty")));
+    ASSERT_NE(empty, nullptr);
+    EXPECT_EQ(empty->size(), 0U);
+
+    auto *picked = dynamic_cast<cxxpython::StrObject *>(globals->get(runtime.new_str("picked")));
+    ASSERT_NE(picked, nullptr);
+    EXPECT_EQ(picked->value, "x");
+}
+
 TEST(Compile, CompilesSingletonLiteralsWithoutNameLookup)
 {
     cxxpython::Runtime runtime;

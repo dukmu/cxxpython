@@ -192,6 +192,7 @@ namespace cxxpython
         TypeObject *resolved_base = base ? base : object_type_;
         type->slots = inherit_slots(resolved_base, slots);
         initialize_type(type, resolved_base);
+        type->solid_base = resolved_base->solid_base ? resolved_base->solid_base : resolved_base;
         initialize_type_dict(type);
         return type;
     }
@@ -211,12 +212,16 @@ namespace cxxpython
                 raise_type_error(this, "class bases cannot contain null");
         }
 
+        validate_base_layouts(bases);
+        TypeObject *best_base = best_base_for_layout(bases);
         auto *namespace_module = dynamic_cast<StrObject *>(namespace_dict->get(new_str("__module__")));
         TypeObject *type = allocate_type(std::move(name));
         type->set_type(type_type_);
         type->flags = TypeFlagHeapType | TypeFlagHasInstanceDict;
-        type->slots = inherit_slots(bases[0], {});
+        type->slots = inherit_slots(best_base, {});
         initialize_type(type, bases);
+        type->base = best_base;
+        type->solid_base = best_base && best_base->solid_base ? best_base->solid_base : object_type_;
         initialize_type_dict(type);
         for (const DictObject::Entry &entry : namespace_dict->entries())
         {

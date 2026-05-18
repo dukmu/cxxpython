@@ -407,6 +407,14 @@ namespace cxxpython
                 object_set_item(object, key, value);
                 break;
             }
+            case Opcode::BuildList:
+            {
+                std::vector<Object *> items(instruction.operand);
+                for (std::size_t index = items.size(); index > 0; --index)
+                    items[index - 1] = frame->pop();
+                frame->push(runtime_.new_list(std::move(items)));
+                break;
+            }
             case Opcode::BuildTuple:
             {
                 std::vector<Object *> items(instruction.operand);

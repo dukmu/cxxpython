@@ -1,5 +1,119 @@
 # Development Status
 
+## 2026-05-18 Risk Ledger And Immediate Fix Queue
+
+Review scope:
+
+- Audited current AST, slot, type, CodeObject, Frame, Runtime, VM, module, and
+  script-test paths before continuing feature work.
+- The following risks are active fix items, not background notes. Each stable
+  slice should update this ledger before commit.
+
+Seven tracked risks:
+
+1. High, fixed in current slice: multiple inheritance lacked explicit layout
+   compatibility checks.
+   `Runtime::new_class` inherited slots from the primary base only, so
+   arbitrary combinations such as `list` plus `dict` could create a type whose
+   C++ object layout could not be allocated or safely operated on.
+2. High: class creation still bypasses metaclass selection and `__prepare__`.
+   `MAKE_CLASS` builds a raw dict namespace and calls `Runtime::new_class`;
+   three-argument `type(...)` reaches the same factory directly.
+3. High: function scope is not Python semantics yet. The current symbol table
+   is a name list and `LOAD_NAME` resolves locals -> globals -> builtins, so
+   local/global/free/cell analysis, `global`, `nonlocal`, and
+   `UnboundLocalError` remain missing.
+4. Medium/high: `CodeObject` and `Frame` still lack line table, flags,
+   traceback integration, and script-visible debugging metadata. CLI errors
+   currently print only exception type and message.
+5. Medium: there is no RAII root guard model for the future GC. VM operations
+   still hold raw `Object *` temporaries across allocation sites.
+6. Medium: builtins remain bootstrap-minimal. `print` has string-specific
+   display behavior, `list()` accepts no iterable, and the shared argument
+   parser / `str()` / iterator protocol path is not in place.
+7. Medium: descriptor and type-attribute protocol is incomplete. Lookup is
+   centralized, but `property`, `staticmethod`, `classmethod`, slot wrappers,
+   `__getattribute__`, and `__getattr__` are still absent.
+
+Immediate order:
+
+- Done in current slice: type layout compatibility now protects later heap
+  type, builtin subclass, and C/C++ extension type work.
+- Done in current slice: list literal syntax and `BUILD_LIST` now provide
+  Python-level list coverage without C++ wrapper setup.
+- Next: continue through metaclass/class creation, function scope analysis,
+  traceback metadata, root guards, builtin protocol cleanup, and descriptor
+  completeness.
+
+## 2026-05-18 Type Layout Compatibility And List Literal
+
+Pre-change review:
+
+- Heap class creation could combine builtin compact layouts without a solid
+  base check. That was unsafe because `list` and `dict` instances require
+  different C++ layouts, while the old code inherited only the primary base's
+  slots.
+- Script tests still could not construct list literals directly, forcing list
+  behavior to be covered through C++ setup or `list()` only.
+
+Debt addressed:
+
+- Added `TypeObject::solid_base` as the runtime's explicit layout root, modeled
+  after CPython's solid-base compatibility rule.
+- Bootstrap now marks each builtin type's layout root. Heap classes inherit the
+  selected base's layout root; pure object-layout heap classes keep
+  `object` as their solid base.
+- `Runtime::new_class` validates all bases before allocation and rejects
+  incompatible native layouts with a Python `TypeError`.
+- Class creation now chooses the best layout base for slot inheritance instead
+  of blindly copying slots from `bases[0]`.
+- Added `ListExpr`, parser support for `[]` and `[expr, ...]`, `BUILD_LIST`
+  opcode metadata, VM execution, compiler lowering, and Python golden coverage.
+
+Completed:
+
+- Added C++ tests proving `type("Bad", (list, dict), {})` and derived
+  list/dict layout combinations fail early.
+- Added bytecode tests for `BUILD_LIST` name, stack effect, and dispatch.
+- Added compiler tests for list literals, empty lists, list subscript load, and
+  list subscript store.
+- Added `Tests/python/lists.py` covering list literal repr, indexing, item
+  assignment, `len`, and `append`.
+
+Design review:
+
+- `solid_base` is deliberately stored on `TypeObject`, not inferred from slots,
+  because slots are behavior protocol entries while layout compatibility is an
+  allocation and memory-safety property.
+- This does not implement extension layout declaration yet. The next C/C++
+  extension type API must make native layout roots explicit rather than letting
+  callers smuggle layout through arbitrary `new_object` slots.
+- `BUILD_LIST` mirrors `BUILD_TUPLE`: item expressions are evaluated in source
+  order, pushed on the stack, popped into a vector preserving order, and passed
+  to `Runtime::new_list`.
+
+Known debt and next risk:
+
+- `list()` still accepts no iterable and there is no iterator protocol path.
+- No list comprehension or starred list literal unpacking yet.
+- Metaclass selection and `__prepare__` remain the next high-risk class-system
+  debt after layout safety.
+
+Next:
+
+- Start metaclass-aware class construction design, keeping `MAKE_CLASS` and
+  three-argument `type(...)` on one construction path.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects '--gtest_filter=CoreObjects.TypeFlagsSeparateCompactBuiltinsFromHeapInstances:CoreObjects.ClassCreationRejectsIncompatibleNativeLayouts:CoreObjects.TypeCallCreatesHeapTypesFromNameBasesNamespace:CoreObjects.TypeCallValidatesThreeArgumentClassCreation'`
+- `build/test_core_objects '--gtest_filter=Bytecode.MetadataNamesAndStackEffects:Bytecode.DispatchesBuildCollectionLiterals:Compile.CompilesListLiterals:PythonScripts.RunsGoldenFiles'`
+- `ctest --test-dir build --output-on-failure`
+- `git diff --check`
+
+Result: all tests pass.
+
 ## 2026-05-18 Singleton Literal Keywords
 
 Pre-change review:

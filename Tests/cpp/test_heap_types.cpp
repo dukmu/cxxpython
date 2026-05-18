@@ -101,11 +101,68 @@ TEST(CoreObjects, TypeFlagsSeparateCompactBuiltinsFromHeapInstances)
 {
     cxxpython::Runtime runtime;
     cxxpython::TypeObject *heap_type = runtime.new_heap_type("HeapObject", runtime.object_type());
+    cxxpython::TypeObject *int_child = runtime.new_heap_type("IntChild", runtime.int_type());
 
     EXPECT_EQ(runtime.object_type()->flags & cxxpython::TypeFlagHasInstanceDict, 0U);
     EXPECT_EQ(runtime.list_type()->flags & cxxpython::TypeFlagHasInstanceDict, 0U);
     EXPECT_NE(heap_type->flags & cxxpython::TypeFlagHeapType, 0U);
     EXPECT_NE(heap_type->flags & cxxpython::TypeFlagHasInstanceDict, 0U);
+    EXPECT_EQ(runtime.object_type()->solid_base, runtime.object_type());
+    EXPECT_EQ(runtime.list_type()->solid_base, runtime.list_type());
+    EXPECT_EQ(runtime.dict_type()->solid_base, runtime.dict_type());
+    EXPECT_EQ(heap_type->solid_base, runtime.object_type());
+    EXPECT_EQ(int_child->solid_base, runtime.int_type());
+}
+
+TEST(CoreObjects, ClassCreationRejectsIncompatibleNativeLayouts)
+{
+    cxxpython::Runtime runtime;
+
+    auto *list_child = dynamic_cast<cxxpython::TypeObject *>(cxxpython::object_call(
+        runtime.type_type(),
+        {runtime.new_str("ListChild"), runtime.new_tuple({runtime.list_type()}), runtime.new_dict()}));
+    ASSERT_NE(list_child, nullptr);
+    EXPECT_EQ(list_child->base, runtime.list_type());
+    EXPECT_EQ(list_child->solid_base, runtime.list_type());
+    auto *list_child_instance = dynamic_cast<cxxpython::ListObject *>(cxxpython::object_call(list_child, {}));
+    ASSERT_NE(list_child_instance, nullptr);
+    EXPECT_EQ(list_child_instance->type(), list_child);
+
+    try
+    {
+        (void)cxxpython::object_call(
+            runtime.type_type(),
+            {runtime.new_str("Bad"),
+             runtime.new_tuple({runtime.list_type(), runtime.dict_type()}),
+             runtime.new_dict()});
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "multiple bases have instance lay-out conflict");
+    }
+
+    auto *dict_child = dynamic_cast<cxxpython::TypeObject *>(cxxpython::object_call(
+        runtime.type_type(),
+        {runtime.new_str("DictChild"), runtime.new_tuple({runtime.dict_type()}), runtime.new_dict()}));
+    ASSERT_NE(dict_child, nullptr);
+    EXPECT_EQ(dict_child->solid_base, runtime.dict_type());
+
+    try
+    {
+        (void)cxxpython::object_call(
+            runtime.type_type(),
+            {runtime.new_str("BadDerived"),
+             runtime.new_tuple({list_child, dict_child}),
+             runtime.new_dict()});
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "multiple bases have instance lay-out conflict");
+    }
 }
 
 TEST(CoreObjects, TypeCallConstructsObjectsThroughNewInitProtocol)

@@ -25,6 +25,7 @@ namespace cxxpython
         BinaryOp,
         BinarySubscr,
         StoreSubscr,
+        BuildList,
         BuildTuple,
         BuildMap,
         CompareOp,

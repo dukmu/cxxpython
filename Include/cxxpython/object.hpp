@@ -152,6 +152,7 @@ namespace cxxpython
         std::string name;
         std::string module = "builtins";
         TypeObject *base = nullptr;
+        TypeObject *solid_base = nullptr;
         std::vector<TypeObject *> bases;
         std::vector<TypeObject *> mro;
         DictObject *dict = nullptr;

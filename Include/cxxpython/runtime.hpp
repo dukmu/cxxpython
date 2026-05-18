@@ -155,6 +155,8 @@ namespace cxxpython
         void initialize_type_descriptors();
         void initialize_type_methods();
         TypeSlots inherit_slots(TypeObject *base, TypeSlots slots) const;
+        TypeObject *best_base_for_layout(const std::vector<TypeObject *> &bases) const;
+        void validate_base_layouts(const std::vector<TypeObject *> &bases);
         void initialize_builtins();
 
         friend class VirtualMachine;

@@ -20,6 +20,7 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::BinaryOp), "BINARY_OP");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::BinarySubscr), "BINARY_SUBSCR");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::StoreSubscr), "STORE_SUBSCR");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::BuildList), "BUILD_LIST");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::BuildTuple), "BUILD_TUPLE");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::BuildMap), "BUILD_MAP");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::CompareOp), "COMPARE_OP");
@@ -45,6 +46,8 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BinaryOp, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BinarySubscr, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::StoreSubscr, 0}), -3);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BuildList, 0}), 1);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BuildList, 3}), -2);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BuildTuple, 0}), 1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BuildTuple, 3}), -2);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BuildMap, 0}), 1);
@@ -320,6 +323,19 @@ TEST(Bytecode, DispatchesBuildCollectionLiterals)
 {
     cxxpython::Runtime runtime;
     cxxpython::VirtualMachine vm(runtime);
+
+    auto *list = dynamic_cast<cxxpython::ListObject *>(vm.execute(*runtime.new_code(
+        {runtime.new_int(1), runtime.new_str("x"), runtime.false_value()},
+        {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::LoadConst, 1},
+         {cxxpython::Opcode::LoadConst, 2},
+         {cxxpython::Opcode::BuildList, 3},
+         {cxxpython::Opcode::ReturnValue, 0}})));
+    ASSERT_NE(list, nullptr);
+    ASSERT_EQ(list->size(), 3U);
+    EXPECT_EQ(static_cast<cxxpython::IntObject *>(list->items()[0])->value, 1);
+    EXPECT_EQ(static_cast<cxxpython::StrObject *>(list->items()[1])->value, "x");
+    EXPECT_EQ(list->items()[2], runtime.false_value());
 
     auto *tuple = dynamic_cast<cxxpython::TupleObject *>(vm.execute(*runtime.new_code(
         {runtime.new_int(1), runtime.new_str("x"), runtime.true_value()},

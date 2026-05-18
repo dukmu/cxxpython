@@ -215,4 +215,38 @@ namespace cxxpython
             inherited.init = slots.init;
         return inherited;
     }
+
+    TypeObject *Runtime::best_base_for_layout(const std::vector<TypeObject *> &bases) const
+    {
+        if (bases.empty())
+            return nullptr;
+
+        for (TypeObject *base : bases)
+        {
+            TypeObject *solid = base && base->solid_base ? base->solid_base : base;
+            if (solid && solid != object_type_)
+                return base;
+        }
+        return bases[0];
+    }
+
+    void Runtime::validate_base_layouts(const std::vector<TypeObject *> &bases)
+    {
+        TypeObject *solid_base = nullptr;
+        for (TypeObject *base : bases)
+        {
+            if (!base)
+                raise_type_error(this, "class bases cannot contain null");
+            TypeObject *candidate = base->solid_base ? base->solid_base : base;
+            if (!candidate || candidate == object_type_)
+                continue;
+            if (!solid_base)
+            {
+                solid_base = candidate;
+                continue;
+            }
+            if (solid_base != candidate)
+                raise_type_error(this, "multiple bases have instance lay-out conflict");
+        }
+    }
 }

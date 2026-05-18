@@ -93,6 +93,12 @@ namespace cxxpython
                 expression.key->accept(*this);
             }
 
+            void visit(const compiler_internal::ListExpr &expression) override
+            {
+                for (const auto &item : expression.items)
+                    item->accept(*this);
+            }
+
             void visit(const compiler_internal::TupleExpr &expression) override
             {
                 for (const auto &item : expression.items)
@@ -338,6 +344,16 @@ namespace cxxpython
                 expression.object->accept(*this);
                 expression.key->accept(*this);
                 instructions_.push_back(Instruction{Opcode::BinarySubscr, 0});
+            }
+
+            void visit(const compiler_internal::ListExpr &expression) override
+            {
+                for (const auto &item : expression.items)
+                    item->accept(*this);
+                instructions_.push_back(Instruction{
+                    Opcode::BuildList,
+                    static_cast<std::uint32_t>(expression.items.size()),
+                });
             }
 
             void visit(const compiler_internal::TupleExpr &expression) override

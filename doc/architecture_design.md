@@ -209,6 +209,16 @@ doc/            design docs and milestone plans
   dict；heap type 默认带 `HasInstanceDict`，普通用户对象属性写入才会懒建
   `Object::instance_dict`。模块对象和类型对象有自己的 namespace 路径，不依赖
   普通实例字典。
+- `TypeObject::solid_base` 记录实例内存布局根。普通 heap/object-layout 类的
+  solid base 是 `object`；`list`、`dict`、`tuple`、`str` 等紧凑内建类型的
+  solid base 是对应内建类型；共享同一 C++ layout 的异常层级共享
+  `BaseException` solid base。多继承创建类型前必须验证所有非 `object`
+  solid base 相同，否则抛 `TypeError`，不能先创建一个 slots/布局不一致的
+  半合法类型。
+- `TypeObject::base` 是 layout/slot inheritance 的 best base cache，不等于
+  源码 `__bases__` 的完整语义；`bases` 和 `mro` 仍是继承和属性查找的语义
+  来源。选择 best base 时优先选有非 `object` solid base 的基类，保证
+  `object` 与紧凑内建混排时不会继承错误 slots。
 - Builtin method binding follows CPython's split: class access such as
   `list.append` returns a `method_descriptor`; instance access such as
   `[].append` returns a `builtin_function_or_method`-typed callable carrying

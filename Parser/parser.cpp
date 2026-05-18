@@ -430,6 +430,29 @@ namespace cxxpython::compiler_internal
                 return std::make_unique<DictExpr>(std::move(items));
             }
 
+            std::unique_ptr<Expr> parse_list_expression()
+            {
+                advance();
+                std::vector<std::unique_ptr<Expr>> items;
+                if (peek().kind == TokenKind::RightBracket)
+                {
+                    advance();
+                    return std::make_unique<ListExpr>(std::move(items));
+                }
+
+                while (true)
+                {
+                    items.push_back(parse_expression_only());
+                    if (peek().kind != TokenKind::Comma)
+                        break;
+                    advance();
+                    if (peek().kind == TokenKind::RightBracket)
+                        break;
+                }
+                consume(TokenKind::RightBracket, "expected ']' after list literal");
+                return std::make_unique<ListExpr>(std::move(items));
+            }
+
             std::unique_ptr<Expr> parse_primary()
             {
                 const Token &token = peek();
@@ -452,6 +475,8 @@ namespace cxxpython::compiler_internal
                     return std::make_unique<NameExpr>(advance().lexeme);
                 case TokenKind::LeftParen:
                     return parse_parenthesized_expression();
+                case TokenKind::LeftBracket:
+                    return parse_list_expression();
                 case TokenKind::LeftBrace:
                     return parse_dict_expression();
                 case TokenKind::End:
@@ -463,7 +488,6 @@ namespace cxxpython::compiler_internal
                 case TokenKind::RightParen:
                 case TokenKind::Comma:
                 case TokenKind::Dot:
-                case TokenKind::LeftBracket:
                 case TokenKind::RightBracket:
                 case TokenKind::RightBrace:
                 case TokenKind::Colon:
