@@ -68,9 +68,12 @@ namespace cxxpython
         return allocate<CodeObject>(code_type_, std::move(constants), std::move(names), std::move(instructions));
     }
 
-    Frame *Runtime::new_frame(CodeObject *code, DictObject *globals)
+    Frame *Runtime::new_frame(CodeObject *code, DictObject *locals, DictObject *globals, DictObject *builtins)
     {
-        return allocate<Frame>(frame_type_, code, globals ? globals : new_dict());
+        DictObject *resolved_globals = globals ? globals : new_dict();
+        DictObject *resolved_locals = locals ? locals : resolved_globals;
+        DictObject *resolved_builtins = builtins ? builtins : new_dict();
+        return allocate<Frame>(frame_type_, code, resolved_locals, resolved_globals, resolved_builtins);
     }
 
     TypeObject *Runtime::new_heap_type(std::string name, TypeObject *base, TypeSlots slots)

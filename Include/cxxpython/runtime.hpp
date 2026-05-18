@@ -57,7 +57,10 @@ namespace cxxpython
         CodeObject *new_code(std::vector<Object *> constants,
                               std::vector<Object *> names,
                               std::vector<Instruction> instructions);
-        Frame *new_frame(CodeObject *code, DictObject *globals = nullptr);
+        Frame *new_frame(CodeObject *code,
+                         DictObject *locals = nullptr,
+                         DictObject *globals = nullptr,
+                         DictObject *builtins = nullptr);
         TypeObject *new_heap_type(std::string name, TypeObject *base, TypeSlots slots = {});
         ExceptionObject *new_exception(TypeObject *type, std::string message);
         ExceptionObject *new_exception(TypeObject *type, std::vector<Object *> args);

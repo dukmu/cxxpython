@@ -11,10 +11,12 @@ namespace cxxpython
     class Frame final : public Object
     {
     public:
-        Frame(TypeObject *type, CodeObject *code, DictObject *globals);
+        Frame(TypeObject *type, CodeObject *code, DictObject *locals, DictObject *globals, DictObject *builtins);
 
         CodeObject *code() const noexcept;
+        DictObject *locals() const noexcept;
         DictObject *globals() const noexcept;
+        DictObject *builtins() const noexcept;
         std::size_t instruction_pointer() const noexcept;
         void advance() noexcept;
 
@@ -25,7 +27,9 @@ namespace cxxpython
 
     private:
         CodeObject *code_;
+        DictObject *locals_;
         DictObject *globals_;
+        DictObject *builtins_;
         std::size_t ip_ = 0;
         std::vector<Object *> stack_;
     };
@@ -67,6 +71,7 @@ namespace cxxpython
         ThreadState &thread_state() noexcept;
         Object *execute(CodeObject &code);
         Object *execute(CodeObject &code, DictObject &globals);
+        Object *execute(CodeObject &code, DictObject &locals, DictObject &globals, DictObject &builtins);
 
     private:
         Object *binary_add(Object *left, Object *right);

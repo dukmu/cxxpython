@@ -157,16 +157,20 @@ TEST(Bytecode, FrameObjectsTrackCodeAndStackReferences)
 {
     cxxpython::Runtime runtime;
     cxxpython::IntObject *value = runtime.new_int(9);
+    cxxpython::DictObject *locals = runtime.new_dict();
     cxxpython::DictObject *globals = runtime.new_dict();
+    cxxpython::DictObject *builtins = runtime.new_dict();
     cxxpython::CodeObject *code = runtime.new_code({value},
                                                    {{cxxpython::Opcode::LoadConst, 0},
                                                     {cxxpython::Opcode::ReturnValue, 0}});
-    cxxpython::Frame *frame = runtime.new_frame(code, globals);
+    cxxpython::Frame *frame = runtime.new_frame(code, locals, globals, builtins);
     frame->push(value);
 
     EXPECT_EQ(frame->type(), runtime.frame_type());
     EXPECT_EQ(frame->code(), code);
+    EXPECT_EQ(frame->locals(), locals);
     EXPECT_EQ(frame->globals(), globals);
+    EXPECT_EQ(frame->builtins(), builtins);
     EXPECT_EQ(frame->stack_size(), 1U);
     EXPECT_EQ(frame->repr().find("<frame at "), 0U);
 
@@ -174,10 +178,43 @@ TEST(Bytecode, FrameObjectsTrackCodeAndStackReferences)
     frame->visit_children([&visited](cxxpython::Object *object)
                           { visited.push_back(object); });
 
-    ASSERT_EQ(visited.size(), 3U);
+    ASSERT_EQ(visited.size(), 5U);
     EXPECT_EQ(visited[0], code);
-    EXPECT_EQ(visited[1], globals);
-    EXPECT_EQ(visited[2], value);
+    EXPECT_EQ(visited[1], locals);
+    EXPECT_EQ(visited[2], globals);
+    EXPECT_EQ(visited[3], builtins);
+    EXPECT_EQ(visited[4], value);
+}
+
+TEST(Bytecode, LoadNameResolvesLocalsGlobalsThenBuiltins)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::StrObject *name = runtime.new_str("x");
+    cxxpython::CodeObject *code = runtime.new_code({},
+                                                   {name},
+                                                   {{cxxpython::Opcode::LoadName, 0},
+                                                    {cxxpython::Opcode::ReturnValue, 0}});
+    cxxpython::DictObject *locals = runtime.new_dict();
+    cxxpython::DictObject *globals = runtime.new_dict();
+    cxxpython::DictObject *builtins = runtime.new_dict();
+    builtins->set(runtime.new_str("x"), runtime.new_int(1));
+    globals->set(runtime.new_str("x"), runtime.new_int(2));
+    locals->set(runtime.new_str("x"), runtime.new_int(3));
+
+    auto *local_result = dynamic_cast<cxxpython::IntObject *>(vm.execute(*code, *locals, *globals, *builtins));
+    ASSERT_NE(local_result, nullptr);
+    EXPECT_EQ(local_result->value, 3);
+
+    locals = runtime.new_dict();
+    auto *global_result = dynamic_cast<cxxpython::IntObject *>(vm.execute(*code, *locals, *globals, *builtins));
+    ASSERT_NE(global_result, nullptr);
+    EXPECT_EQ(global_result->value, 2);
+
+    globals = runtime.new_dict();
+    auto *builtin_result = dynamic_cast<cxxpython::IntObject *>(vm.execute(*code, *locals, *globals, *builtins));
+    ASSERT_NE(builtin_result, nullptr);
+    EXPECT_EQ(builtin_result->value, 1);
 }
 
 TEST(Bytecode, RejectsMalformedBytecode)

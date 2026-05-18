@@ -22,8 +22,12 @@ namespace cxxpython
             auto *frame = static_cast<const Frame *>(&object);
             if (frame->code())
                 visitor(frame->code());
+            if (frame->locals())
+                visitor(frame->locals());
             if (frame->globals())
                 visitor(frame->globals());
+            if (frame->builtins())
+                visitor(frame->builtins());
             frame->visit_stack(visitor);
         }
 
@@ -66,13 +70,17 @@ namespace cxxpython
         };
     }
 
-    Frame::Frame(TypeObject *type, CodeObject *code, DictObject *globals)
-        : Object(type), code_(code), globals_(globals)
+    Frame::Frame(TypeObject *type, CodeObject *code, DictObject *locals, DictObject *globals, DictObject *builtins)
+        : Object(type), code_(code), locals_(locals), globals_(globals), builtins_(builtins)
     {
         if (!code_)
             throw BytecodeError("frame requires a code object");
+        if (!locals_)
+            throw BytecodeError("frame requires locals");
         if (!globals_)
             throw BytecodeError("frame requires globals");
+        if (!builtins_)
+            throw BytecodeError("frame requires builtins");
     }
 
     CodeObject *Frame::code() const noexcept
@@ -80,9 +88,19 @@ namespace cxxpython
         return code_;
     }
 
+    DictObject *Frame::locals() const noexcept
+    {
+        return locals_;
+    }
+
     DictObject *Frame::globals() const noexcept
     {
         return globals_;
+    }
+
+    DictObject *Frame::builtins() const noexcept
+    {
+        return builtins_;
     }
 
     std::size_t Frame::instruction_pointer() const noexcept
@@ -203,7 +221,13 @@ namespace cxxpython
 
     Object *VirtualMachine::execute(CodeObject &code, DictObject &globals)
     {
-        Frame *frame = runtime_.new_frame(&code, &globals);
+        DictObject *builtins = runtime_.new_dict();
+        return execute(code, globals, globals, *builtins);
+    }
+
+    Object *VirtualMachine::execute(CodeObject &code, DictObject &locals, DictObject &globals, DictObject &builtins)
+    {
+        Frame *frame = runtime_.new_frame(&code, &locals, &globals, &builtins);
         ActiveFrame active_frame(thread_, *frame);
         while (frame->instruction_pointer() < code.instructions().size())
         {
@@ -225,7 +249,11 @@ namespace cxxpython
                 auto *name = dynamic_cast<StrObject *>(code.names()[instruction.operand]);
                 if (!name)
                     throw BytecodeError("LOAD_NAME requires a str name");
-                Object *value = globals.get(name);
+                Object *value = locals.get(name);
+                if (!value)
+                    value = globals.get(name);
+                if (!value)
+                    value = builtins.get(name);
                 if (!value)
                     raise_name_error(&runtime_, "name '" + name->value + "' is not defined");
                 frame->push(value);
@@ -239,7 +267,7 @@ namespace cxxpython
                 if (!name)
                     throw BytecodeError("STORE_NAME requires a str name");
                 Object *value = frame->pop();
-                globals.set(name, value);
+                locals.set(name, value);
                 break;
             }
             case Opcode::PopTop:

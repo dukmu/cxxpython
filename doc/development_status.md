@@ -53,6 +53,49 @@ Verification:
 
 Result: all tests pass.
 
+## 2026-05-18 Frame Name Resolution Hardening
+
+Debt addressed:
+
+- Historical status entries noted that `Frame` had globals only and that
+  `LOAD_NAME` resolved only against globals. That would make builtins, locals,
+  functions, and module execution semantics diverge quickly.
+
+Completed:
+
+- Extended `Frame` with explicit:
+  - locals
+  - globals
+  - builtins
+- Changed frame traversal to visit code, locals, globals, builtins, then stack
+  references.
+- Added `VirtualMachine::execute(code, locals, globals, builtins)`.
+- Kept `execute(code, globals)` as the module convenience path where
+  locals and globals are the same dictionary and builtins is currently empty.
+- Changed `LOAD_NAME` resolution to search:
+  - locals
+  - globals
+  - builtins
+- Changed `STORE_NAME` to write to locals, matching the frame namespace model.
+- Added tests for traversal and locals -> globals -> builtins resolution order.
+
+Design notes:
+
+- This is a deliberate bridge toward CPython-like frame semantics without yet
+  introducing fast locals, closure cells, or builtins module wiring.
+- Builtins is currently an explicit dict supplied by callers or an empty dict
+  allocated by the VM convenience path. A real builtins module should replace
+  that empty dict before builtin functions are added.
+- Module execution remains correct for the current subset because module frames
+  pass the same dictionary for locals and globals.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all tests pass.
+
 ## 2026-05-18 Module Object And Script Globals
 
 Completed:
