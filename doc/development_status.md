@@ -1,5 +1,78 @@
 # Development Status
 
+## 2026-05-18 Compiler Subscript And Assignment Targets
+
+Pre-change review:
+
+- Parser/compiler assignment handling had split statement nodes for name
+  assignment and attribute assignment. Adding subscript assignment directly to
+  that model would grow another ad hoc branch and make later destructuring,
+  slice assignment, and augmented assignment harder to design cleanly.
+- Subscript bytecode was already tested at the VM level, so the remaining work
+  belonged in lexer/parser/AST/compiler integration. The compiler must keep
+  dispatching through `BINARY_SUBSCR` and `STORE_SUBSCR`, not concrete list or
+  dict checks.
+- Syntax errors for invalid assignment targets were reported after parsing the
+  right-hand side. That made diagnostics less precise and reflected the old
+  parser-level target check.
+
+Debt addressed:
+
+- Replaced `AssignAttrStmt` with a unified `AssignStmt` carrying an
+  `AssignTarget`.
+- Added assignment target nodes:
+  - `NameTarget`
+  - `AttributeTarget`
+  - `SubscriptTarget`
+- Added `TargetVisitor` so symbol collection and bytecode emission no longer
+  need separate statement classes for each assignment shape.
+- Added `SubscriptExpr` and bracket tokens.
+- Parser now converts expression syntax to assignment targets in one explicit
+  helper, with invalid targets reported at the assignment operator.
+- Bytecode emission now supports:
+  - `obj[key]` -> `BINARY_SUBSCR`
+  - `obj[key] = value` -> `STORE_SUBSCR`
+
+Completed:
+
+- Added compiler tests proving:
+  - list subscript load compiles and executes
+  - list subscript store compiles and mutates through object protocol
+  - dict subscript load compiles and executes
+  - invalid assignment targets raise `SyntaxError` at `=`
+  - missing `]` raises a precise `SyntaxError`
+- Preserved existing assignment behavior for names and attributes.
+
+Design notes:
+
+- Assignment target compilation preserves the current VM stack contract:
+  attribute and subscript targets emit target parts before the value, while
+  simple name assignment emits only the value before `STORE_NAME`.
+- `AssignTarget` is intentionally separate from `Expr`; an expression can be
+  parsed first and then accepted or rejected as a store target. This gives
+  future destructuring, slice targets, and augmented assignment a stable place
+  to attach without adding more statement variants.
+- The compiler uses a scoped pending-value guard while emitting store targets,
+  so target compilation cannot leave stale state if a Python error interrupts
+  bytecode generation.
+
+Next:
+
+- Add a `len` builtin backed by `object_length`.
+- Continue reviewing compiler architecture: AST source locations, symbol table
+  roles, and a clean path for comparisons/calls before user functions land.
+- Start planning slice objects and slice subscript semantics before extending
+  `SubscriptExpr` beyond a single key expression.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects '--gtest_filter=Compile.CompilesSubscriptLoadAndStore:Compile.CompilesDictSubscriptThroughObjectProtocol:Compile.RaisesSyntaxErrorForInvalidAssignmentTarget:Compile.RaisesSyntaxErrorForUnclosedSubscript:Compile.CompilesAttributeLoadAndStore:Compile.CompilesAssignmentModuleAndStoresGlobals'`
+- `ctest --test-dir build --output-on-failure`
+- `git diff --check`
+
+Result: all tests pass.
+
 ## 2026-05-18 Subscript Bytecode Integration
 
 Pre-change review:

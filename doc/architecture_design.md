@@ -125,6 +125,24 @@ doc/            design docs and milestone plans
   `object_get_item`/`object_set_item`/`object_contains`/`object_length`, not
   direct `list`/`dict` checks in the VM.
 
+## 编译器 AST 和赋值目标路线
+
+- Parser 可以先按表达式语法解析左侧，再把表达式显式转换为
+  `AssignTarget`。合法 target 和普通表达式必须在 AST 中分离，避免每新增
+  一种赋值形式就新增一个 statement 节点或 VM 特判。
+- 当前 assignment target family 包括 `NameTarget`、`AttributeTarget` 和
+  `SubscriptTarget`。后续 destructuring、slice target、starred target、augmented
+  assignment 都应扩展这条 target 层，而不是绕回 parser 分支。
+- Symbol table 和 bytecode builder 都通过 `TargetVisitor` 处理赋值目标。目标
+  子表达式、目标名称和值表达式的收集/发射顺序必须由这条 visitor 明确表达。
+- Store bytecode 的栈契约要保持集中记录并由测试锁住。当前 `STORE_ATTR`
+  使用 object + value；`STORE_SUBSCR` 使用 object + key + value。未来若对齐
+  CPython 调整求值顺序，必须同时更新 compiler、VM、stack effect 和测试。
+- Subscript expression 是普通表达式，编译为 target object、key expression、
+  `BINARY_SUBSCR`。Subscript assignment 使用同一个语法节点转换出的
+  `SubscriptTarget`，编译为 target object、key expression、value expression、
+  `STORE_SUBSCR`。
+
 ## 模块系统路线
 
 - 模块是 typed runtime object，模块 dict 是脚本层可见 namespace。CLI、

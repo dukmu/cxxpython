@@ -34,6 +34,7 @@ namespace cxxpython
         };
 
         class SymbolCollector final : public compiler_internal::ExprVisitor,
+                                      public compiler_internal::TargetVisitor,
                                       public compiler_internal::StmtVisitor
         {
         public:
@@ -69,11 +70,34 @@ namespace cxxpython
                 (void)symbols_.add_name(expression.name);
             }
 
+            void visit(const compiler_internal::SubscriptExpr &expression) override
+            {
+                expression.object->accept(*this);
+                expression.key->accept(*this);
+            }
+
             void visit(const compiler_internal::CallExpr &expression) override
             {
                 expression.callee->accept(*this);
                 for (const auto &arg : expression.args)
                     arg->accept(*this);
+            }
+
+            void visit(const compiler_internal::NameTarget &target) override
+            {
+                (void)symbols_.add_name(target.name);
+            }
+
+            void visit(const compiler_internal::AttributeTarget &target) override
+            {
+                target.object->accept(*this);
+                (void)symbols_.add_name(target.name);
+            }
+
+            void visit(const compiler_internal::SubscriptTarget &target) override
+            {
+                target.object->accept(*this);
+                target.key->accept(*this);
             }
 
             void visit(const compiler_internal::ExprStmt &statement) override
@@ -83,14 +107,7 @@ namespace cxxpython
 
             void visit(const compiler_internal::AssignStmt &statement) override
             {
-                (void)symbols_.add_name(statement.target);
-                statement.value->accept(*this);
-            }
-
-            void visit(const compiler_internal::AssignAttrStmt &statement) override
-            {
-                statement.object->accept(*this);
-                (void)symbols_.add_name(statement.name);
+                statement.target->accept(*this);
                 statement.value->accept(*this);
             }
 
@@ -99,6 +116,7 @@ namespace cxxpython
         };
 
         class BytecodeBuilder final : public compiler_internal::ExprVisitor,
+                                      public compiler_internal::TargetVisitor,
                                       public compiler_internal::StmtVisitor
         {
         public:
@@ -165,6 +183,13 @@ namespace cxxpython
                 });
             }
 
+            void visit(const compiler_internal::SubscriptExpr &expression) override
+            {
+                expression.object->accept(*this);
+                expression.key->accept(*this);
+                instructions_.push_back(Instruction{Opcode::BinarySubscr, 0});
+            }
+
             void visit(const compiler_internal::CallExpr &expression) override
             {
                 expression.callee->accept(*this);
@@ -176,6 +201,33 @@ namespace cxxpython
                 });
             }
 
+            void visit(const compiler_internal::NameTarget &target) override
+            {
+                emit_pending_assignment_value();
+                instructions_.push_back(Instruction{
+                    Opcode::StoreName,
+                    static_cast<std::uint32_t>(name_index(target.name)),
+                });
+            }
+
+            void visit(const compiler_internal::AttributeTarget &target) override
+            {
+                target.object->accept(*this);
+                emit_pending_assignment_value();
+                instructions_.push_back(Instruction{
+                    Opcode::StoreAttr,
+                    static_cast<std::uint32_t>(name_index(target.name)),
+                });
+            }
+
+            void visit(const compiler_internal::SubscriptTarget &target) override
+            {
+                target.object->accept(*this);
+                target.key->accept(*this);
+                emit_pending_assignment_value();
+                instructions_.push_back(Instruction{Opcode::StoreSubscr, 0});
+            }
+
             void visit(const compiler_internal::ExprStmt &statement) override
             {
                 statement.expression->accept(*this);
@@ -184,24 +236,40 @@ namespace cxxpython
 
             void visit(const compiler_internal::AssignStmt &statement) override
             {
-                statement.value->accept(*this);
-                instructions_.push_back(Instruction{
-                    Opcode::StoreName,
-                    static_cast<std::uint32_t>(name_index(statement.target)),
-                });
-            }
-
-            void visit(const compiler_internal::AssignAttrStmt &statement) override
-            {
-                statement.object->accept(*this);
-                statement.value->accept(*this);
-                instructions_.push_back(Instruction{
-                    Opcode::StoreAttr,
-                    static_cast<std::uint32_t>(name_index(statement.name)),
-                });
+                PendingAssignmentValue pending(*this, *statement.value);
+                statement.target->accept(*this);
             }
 
         private:
+            class PendingAssignmentValue final
+            {
+            public:
+                PendingAssignmentValue(BytecodeBuilder &builder, const compiler_internal::Expr &value)
+                    : builder_(builder), previous_(builder.pending_assignment_value_)
+                {
+                    builder_.pending_assignment_value_ = &value;
+                }
+
+                ~PendingAssignmentValue()
+                {
+                    builder_.pending_assignment_value_ = previous_;
+                }
+
+                PendingAssignmentValue(const PendingAssignmentValue &) = delete;
+                PendingAssignmentValue &operator=(const PendingAssignmentValue &) = delete;
+
+            private:
+                BytecodeBuilder &builder_;
+                const compiler_internal::Expr *previous_;
+            };
+
+            void emit_pending_assignment_value()
+            {
+                if (!pending_assignment_value_)
+                    raise_syntax_error(&runtime_, "assignment target emitted without value");
+                pending_assignment_value_->accept(*this);
+            }
+
             void emit_constant(Object *constant)
             {
                 constants_.push_back(constant);
@@ -226,6 +294,7 @@ namespace cxxpython
             std::vector<Object *> names_;
             std::vector<Object *> constants_;
             std::vector<Instruction> instructions_;
+            const compiler_internal::Expr *pending_assignment_value_ = nullptr;
         };
 
         SymbolTable collect_symbols(const compiler_internal::Expr &expression)

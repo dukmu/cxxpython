@@ -253,6 +253,88 @@ TEST(Compile, CompilesAttributeLoadAndStore)
     EXPECT_EQ(vm.execute(*load, *globals), stored);
 }
 
+TEST(Compile, CompilesSubscriptLoadAndStore)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+    cxxpython::ListObject *list = runtime.new_list({runtime.new_str("zero"), runtime.new_str("one")});
+    globals->set(runtime.new_str("xs"), list);
+
+    cxxpython::CodeObject *load = cxxpython::compile_eval_input(runtime, "xs[1]", "script.py");
+    ASSERT_NE(load, nullptr);
+    EXPECT_EQ(load->instructions()[0].opcode, cxxpython::Opcode::LoadName);
+    EXPECT_EQ(load->instructions()[1].opcode, cxxpython::Opcode::LoadConst);
+    EXPECT_EQ(load->instructions()[2].opcode, cxxpython::Opcode::BinarySubscr);
+
+    auto *loaded = dynamic_cast<cxxpython::StrObject *>(vm.execute(*load, *globals));
+    ASSERT_NE(loaded, nullptr);
+    EXPECT_EQ(loaded->value, "one");
+
+    cxxpython::CodeObject *store =
+        cxxpython::compile_exec_input(runtime, "xs[1] = 'updated'\n", "script.py");
+    ASSERT_NE(store, nullptr);
+    EXPECT_EQ(store->instructions()[0].opcode, cxxpython::Opcode::LoadName);
+    EXPECT_EQ(store->instructions()[1].opcode, cxxpython::Opcode::LoadConst);
+    EXPECT_EQ(store->instructions()[2].opcode, cxxpython::Opcode::LoadConst);
+    EXPECT_EQ(store->instructions()[3].opcode, cxxpython::Opcode::StoreSubscr);
+
+    EXPECT_EQ(vm.execute(*store, *globals), runtime.none());
+    auto *stored = dynamic_cast<cxxpython::StrObject *>(list->get(1));
+    ASSERT_NE(stored, nullptr);
+    EXPECT_EQ(stored->value, "updated");
+}
+
+TEST(Compile, CompilesDictSubscriptThroughObjectProtocol)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+    cxxpython::DictObject *dict = runtime.new_dict();
+    dict->set(runtime.new_str("answer"), runtime.new_int(42));
+    globals->set(runtime.new_str("d"), dict);
+
+    cxxpython::CodeObject *code = cxxpython::compile_eval_input(runtime, "d['answer']", "script.py");
+    ASSERT_NE(code, nullptr);
+    EXPECT_EQ(code->instructions()[2].opcode, cxxpython::Opcode::BinarySubscr);
+
+    auto *result = dynamic_cast<cxxpython::IntObject *>(vm.execute(*code, *globals));
+    ASSERT_NE(result, nullptr);
+    EXPECT_EQ(result->value, 42);
+}
+
+TEST(Compile, RaisesSyntaxErrorForInvalidAssignmentTarget)
+{
+    cxxpython::Runtime runtime;
+
+    try
+    {
+        (void)cxxpython::compile_exec_input(runtime, "1 = 2\n", "broken.py");
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type_name(), "SyntaxError");
+        EXPECT_STREQ(error.what(), "broken.py:1:3: invalid assignment target");
+    }
+}
+
+TEST(Compile, RaisesSyntaxErrorForUnclosedSubscript)
+{
+    cxxpython::Runtime runtime;
+
+    try
+    {
+        (void)cxxpython::compile_eval_input(runtime, "xs[1", "broken.py");
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type_name(), "SyntaxError");
+        EXPECT_STREQ(error.what(), "broken.py:1:5: expected ']' after subscript");
+    }
+}
+
 TEST(Compile, CallsNonCallableThroughNormalTypeErrorPath)
 {
     cxxpython::Runtime runtime;

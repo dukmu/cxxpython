@@ -49,20 +49,33 @@ namespace cxxpython::compiler_internal
                 std::unique_ptr<Expr> target_or_expression = parse_expression_only();
                 if (peek().kind == TokenKind::Equal)
                 {
-                    advance();
+                    const Token &equals = advance();
                     std::unique_ptr<Expr> value = parse_expression_only();
-                    if (auto *target = dynamic_cast<NameExpr *>(target_or_expression.get()))
-                        return std::make_unique<AssignStmt>(target->value, std::move(value));
-                    if (auto *target = dynamic_cast<AttributeExpr *>(target_or_expression.get()))
-                    {
-                        return std::make_unique<AssignAttrStmt>(
-                            std::move(target->object),
-                            target->name,
-                            std::move(value));
-                    }
-                    raise_at(previous(), "invalid assignment target");
+                    std::unique_ptr<AssignTarget> target =
+                        make_assignment_target(std::move(target_or_expression), equals);
+                    return std::make_unique<AssignStmt>(std::move(target), std::move(value));
                 }
                 return std::make_unique<ExprStmt>(std::move(target_or_expression));
+            }
+
+            std::unique_ptr<AssignTarget> make_assignment_target(std::unique_ptr<Expr> expression,
+                                                                 const Token &equals) const
+            {
+                if (auto *target = dynamic_cast<NameExpr *>(expression.get()))
+                    return std::make_unique<NameTarget>(target->value);
+                if (auto *target = dynamic_cast<AttributeExpr *>(expression.get()))
+                {
+                    return std::make_unique<AttributeTarget>(
+                        std::move(target->object),
+                        target->name);
+                }
+                if (auto *target = dynamic_cast<SubscriptExpr *>(expression.get()))
+                {
+                    return std::make_unique<SubscriptTarget>(
+                        std::move(target->object),
+                        std::move(target->key));
+                }
+                raise_at(equals, "invalid assignment target");
             }
 
             std::unique_ptr<Expr> parse_expression_only()
@@ -80,7 +93,9 @@ namespace cxxpython::compiler_internal
             std::unique_ptr<Expr> parse_postfix()
             {
                 std::unique_ptr<Expr> expression = parse_primary();
-                while (peek().kind == TokenKind::LeftParen || peek().kind == TokenKind::Dot)
+                while (peek().kind == TokenKind::LeftParen ||
+                       peek().kind == TokenKind::Dot ||
+                       peek().kind == TokenKind::LeftBracket)
                 {
                     if (peek().kind == TokenKind::LeftParen)
                     {
@@ -100,6 +115,15 @@ namespace cxxpython::compiler_internal
                         }
                         consume(TokenKind::RightParen, "expected ')' after arguments");
                         expression = std::make_unique<CallExpr>(std::move(expression), std::move(args));
+                        continue;
+                    }
+
+                    if (peek().kind == TokenKind::LeftBracket)
+                    {
+                        advance();
+                        std::unique_ptr<Expr> key = parse_expression_only();
+                        consume(TokenKind::RightBracket, "expected ']' after subscript");
+                        expression = std::make_unique<SubscriptExpr>(std::move(expression), std::move(key));
                         continue;
                     }
 
@@ -129,6 +153,8 @@ namespace cxxpython::compiler_internal
                 case TokenKind::RightParen:
                 case TokenKind::Comma:
                 case TokenKind::Dot:
+                case TokenKind::LeftBracket:
+                case TokenKind::RightBracket:
                 case TokenKind::Equal:
                     raise_at(token, "expected expression");
                 }
@@ -151,13 +177,6 @@ namespace cxxpython::compiler_internal
             const Token &peek() const
             {
                 return tokens_[index_];
-            }
-
-            const Token &peek_next() const
-            {
-                if (index_ + 1 >= tokens_.size())
-                    return tokens_.back();
-                return tokens_[index_ + 1];
             }
 
             const Token &advance()
