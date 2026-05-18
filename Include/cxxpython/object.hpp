@@ -16,6 +16,7 @@ namespace cxxpython
     class TypeObject;
     class ListObject;
     class DictObject;
+    class MappingProxyObject;
     class ExceptionObject;
     class MethodDescriptorObject;
     class GetSetDescriptorObject;
@@ -200,6 +201,18 @@ namespace cxxpython
         std::vector<std::size_t> indices_;
     };
 
+    class MappingProxyObject final : public Object
+    {
+    public:
+        MappingProxyObject(TypeObject *type, DictObject *mapping);
+
+        const DictObject *mapping() const noexcept;
+        DictObject *referenced_mapping() const noexcept;
+
+    private:
+        DictObject *mapping_;
+    };
+
     class ModuleObject final : public Object
     {
     public:
@@ -319,6 +332,7 @@ namespace cxxpython
     TypeSlots make_list_slots();
     TypeSlots make_tuple_slots();
     TypeSlots make_dict_slots();
+    TypeSlots make_mappingproxy_slots();
     TypeSlots make_module_slots();
     TypeSlots make_native_function_slots();
     TypeSlots make_method_descriptor_slots();

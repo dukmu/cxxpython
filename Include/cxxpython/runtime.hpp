@@ -34,6 +34,7 @@ namespace cxxpython
         TypeObject *list_type() const noexcept;
         TypeObject *tuple_type() const noexcept;
         TypeObject *dict_type() const noexcept;
+        TypeObject *mappingproxy_type() const noexcept;
         TypeObject *module_type() const noexcept;
         TypeObject *native_function_type() const noexcept;
         TypeObject *method_descriptor_type() const noexcept;
@@ -61,6 +62,7 @@ namespace cxxpython
         ListObject *new_list(std::vector<Object *> items);
         TupleObject *new_tuple(std::vector<Object *> items);
         DictObject *new_dict();
+        MappingProxyObject *new_mappingproxy(DictObject *mapping);
         ModuleObject *new_module(std::string name, std::string filename);
         NativeFunctionObject *new_native_function(std::string name, NativeFunctionCallback callback);
         MethodDescriptorObject *new_method_descriptor(std::string name,
@@ -138,6 +140,7 @@ namespace cxxpython
         TypeObject *list_type_ = nullptr;
         TypeObject *tuple_type_ = nullptr;
         TypeObject *dict_type_ = nullptr;
+        TypeObject *mappingproxy_type_ = nullptr;
         TypeObject *module_type_ = nullptr;
         TypeObject *native_function_type_ = nullptr;
         TypeObject *method_descriptor_type_ = nullptr;

@@ -58,6 +58,38 @@ namespace cxxpython
                     visitor(entry.value);
             }
         }
+
+        std::string mappingproxy_repr(const Object &object)
+        {
+            auto *proxy = static_cast<const MappingProxyObject *>(&object);
+            return "mappingproxy(" + object_repr(proxy->mapping()) + ")";
+        }
+
+        std::int64_t mappingproxy_hash(const Object &object)
+        {
+            raise_type_error(object.runtime(), "unhashable type: 'mappingproxy'");
+        }
+
+        bool mappingproxy_equal(const Object &left, const Object &right)
+        {
+            auto *left_proxy = static_cast<const MappingProxyObject *>(&left);
+            if (auto *right_proxy = dynamic_cast<const MappingProxyObject *>(&right))
+                return object_equal(left_proxy->mapping(), right_proxy->mapping());
+            return object_equal(left_proxy->mapping(), &right);
+        }
+
+        bool mappingproxy_truth(const Object &object)
+        {
+            auto *proxy = static_cast<const MappingProxyObject *>(&object);
+            return proxy->mapping() && proxy->mapping()->size() != 0;
+        }
+
+        void mappingproxy_traverse(const Object &object, const VisitChildren &visitor)
+        {
+            auto *proxy = static_cast<const MappingProxyObject *>(&object);
+            if (proxy->referenced_mapping())
+                visitor(proxy->referenced_mapping());
+        }
     }
 
     DictObject::DictObject(TypeObject *type)
@@ -114,6 +146,21 @@ namespace cxxpython
         return entries_;
     }
 
+    MappingProxyObject::MappingProxyObject(TypeObject *type, DictObject *mapping)
+        : Object(type), mapping_(mapping)
+    {
+    }
+
+    const DictObject *MappingProxyObject::mapping() const noexcept
+    {
+        return mapping_;
+    }
+
+    DictObject *MappingProxyObject::referenced_mapping() const noexcept
+    {
+        return mapping_;
+    }
+
     DictObject::SlotSearch DictObject::find_slot(Object *key, std::int64_t hash) const
     {
         const std::size_t mask = indices_.size() - 1;
@@ -166,6 +213,17 @@ namespace cxxpython
             .equal = dict_equal,
             .truth = dict_truth,
             .traverse = dict_traverse,
+        };
+    }
+
+    TypeSlots make_mappingproxy_slots()
+    {
+        return TypeSlots{
+            .repr = mappingproxy_repr,
+            .hash = mappingproxy_hash,
+            .equal = mappingproxy_equal,
+            .truth = mappingproxy_truth,
+            .traverse = mappingproxy_traverse,
         };
     }
 }

@@ -1,5 +1,77 @@
 # Development Status
 
+## 2026-05-18 `__dict__` And MappingProxy
+
+Pre-change review:
+
+- `TypeObject::dict` was the correct internal storage for type namespaces, but
+  exposing it directly to script-level attribute lookup would make class
+  dictionaries freely mutable through `type.__dict__`, unlike CPython.
+- Heap instances had lazy instance dictionaries, but no `__dict__` descriptor;
+  future user classes would either need a second lookup path or expose attrs
+  inconsistently.
+- Module dictionaries are typed runtime state and should be visible through
+  normal attribute lookup, not by module-specific host-side shortcuts.
+
+Debt addressed:
+
+- Added a typed `mappingproxy` object:
+  - wraps a `DictObject`
+  - renders as `mappingproxy(<dict repr>)`
+  - is truthy when the wrapped mapping is non-empty
+  - is unhashable
+  - traverses the wrapped dict for GC
+- Added `Runtime::new_mappingproxy(...)` and runtime-owned
+  `mappingproxy_type`.
+- Extended the existing `__dict__` getset descriptor:
+  - type objects return a fresh mappingproxy over their type dict
+  - heap instances return and lazily create their mutable instance dict
+  - modules return their module dict
+  - compact builtin instances without `HasInstanceDict` raise `AttributeError`
+
+Completed:
+
+- Added tests proving:
+  - `list.__dict__` is a `mappingproxy`
+  - mappingproxy reflects later type-dict mutations
+  - mappingproxy traverses the wrapped dict
+  - mappingproxy is unhashable and does not accept arbitrary attributes
+  - heap instance `__dict__` is a mutable dict connected to attribute lookup
+  - module `__dict__` returns the module dict
+  - `list().__dict__` raises Python `AttributeError`
+
+Design notes:
+
+- Mappingproxy currently exposes C++ inspection of the wrapped dict for tests
+  and internals. Script-level write protection remains enforced because no
+  item-assignment protocol is exposed on mappingproxy.
+- Type dict mutation through `object_set_attr(type, name, value)` is still
+  intentionally available as the internal/class-mutation path. Once user class
+  syntax lands, metaclass assignment rules and mappingproxy visibility need
+  additional tests.
+- `__dict__` assignment is read-only for now. Supporting replacement for heap
+  instances should wait until dict layout, slot layout, and descriptor
+  invariants are designed together.
+
+Next:
+
+- Add a sequence/mapping slot family (`length`, `getitem`, `setitem`,
+  `contains`) before implementing script-visible mappingproxy reads such as
+  `C.__dict__['x']`.
+- Add Python function objects and function descriptors so user-defined methods
+  can share the descriptor and call path with builtin methods.
+- Start a dedicated review of assignment-target AST design before adding
+  subscript assignment or destructuring.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects '--gtest_filter=Attributes.TypeDictIsExposedAsMappingProxy:Attributes.InstanceAndModuleDictDescriptorsExposeMutableDicts:Attributes.CompactBuiltinInstancesDoNotExposeDict'`
+- `ctest --test-dir build --output-on-failure`
+- `git diff --check`
+
+Result: all tests pass.
+
 ## 2026-05-18 `__class__` Getset Descriptor
 
 Pre-change review:
@@ -50,7 +122,8 @@ Design notes:
   future `__dict__`, `__name__`, frame/code fields, and mappingproxy-facing
   attributes should build on this rather than adding bespoke lookup paths.
 - Type-object lookup is still incomplete: metaclass conflict rules, C3 MRO,
-  metaclass `__getattribute__`, and mappingproxy behavior remain future work.
+  metaclass `__getattribute__`, and fuller mappingproxy item access remain
+  future work.
 
 Next:
 

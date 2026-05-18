@@ -84,6 +84,7 @@ namespace cxxpython
         initialize_type_dict(list_type_);
         initialize_type_dict(tuple_type_);
         initialize_type_dict(dict_type_);
+        initialize_type_dict(mappingproxy_type_);
         initialize_type_dict(module_type_);
         initialize_type_dict(native_function_type_);
         initialize_type_dict(method_descriptor_type_);

@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <string>
+#include <vector>
+
 #include "cxxpython/runtime.hpp"
 
 namespace
@@ -128,6 +131,89 @@ TEST(Attributes, ClassDescriptorCannotBeShadowedByInstanceOrTypeAttributes)
     {
         EXPECT_EQ(error.type(), runtime.type_error_type());
         EXPECT_EQ(cxxpython::object_get_attr(runtime.list_type(), "__class__"), runtime.type_type());
+    }
+}
+
+TEST(Attributes, TypeDictIsExposedAsMappingProxy)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::Object *proxy_object = cxxpython::object_get_attr(runtime.list_type(), "__dict__");
+    auto *proxy = dynamic_cast<cxxpython::MappingProxyObject *>(proxy_object);
+
+    ASSERT_NE(proxy, nullptr);
+    EXPECT_EQ(proxy->type(), runtime.mappingproxy_type());
+    EXPECT_EQ(proxy->mapping(), runtime.list_type()->dict);
+    EXPECT_EQ(proxy->mapping()->get(runtime.new_str("__name__")),
+              runtime.list_type()->dict->get(runtime.new_str("__name__")));
+
+    cxxpython::Object *marker = runtime.new_str("visible");
+    cxxpython::object_set_attr(runtime.list_type(), "marker", marker);
+    EXPECT_EQ(proxy->mapping()->get(runtime.new_str("marker")), marker);
+    const std::string repr = cxxpython::object_repr(proxy);
+    EXPECT_TRUE(repr.starts_with("mappingproxy({"));
+    EXPECT_NE(repr.find("'marker': 'visible'"), std::string::npos);
+
+    std::vector<cxxpython::Object *> children;
+    proxy->visit_children([&children](cxxpython::Object *object)
+                          { children.push_back(object); });
+    ASSERT_EQ(children.size(), 1U);
+    EXPECT_EQ(children[0], runtime.list_type()->dict);
+
+    try
+    {
+        cxxpython::object_set_attr(proxy, "marker", runtime.new_str("no"));
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.attribute_error_type());
+        EXPECT_STREQ(error.what(), "'mappingproxy' object has no attribute 'marker'");
+    }
+
+    try
+    {
+        (void)cxxpython::object_hash(proxy);
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "unhashable type: 'mappingproxy'");
+    }
+}
+
+TEST(Attributes, InstanceAndModuleDictDescriptorsExposeMutableDicts)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::TypeObject *custom_type = runtime.new_heap_type("Custom", runtime.object_type());
+    cxxpython::Object *instance = runtime.allocate<cxxpython::Object>(custom_type);
+    cxxpython::DictObject *instance_dict =
+        dynamic_cast<cxxpython::DictObject *>(cxxpython::object_get_attr(instance, "__dict__"));
+    cxxpython::Object *value = runtime.new_str("value");
+
+    ASSERT_NE(instance_dict, nullptr);
+    EXPECT_EQ(instance->instance_dict(), instance_dict);
+    instance_dict->set(runtime.new_str("field"), value);
+    EXPECT_EQ(cxxpython::object_get_attr(instance, "field"), value);
+
+    cxxpython::ModuleObject *module = runtime.new_module("sample", "sample.py");
+    EXPECT_EQ(cxxpython::object_get_attr(module, "__dict__"), module->dict());
+}
+
+TEST(Attributes, CompactBuiltinInstancesDoNotExposeDict)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::ListObject *list = runtime.new_list({});
+
+    try
+    {
+        (void)cxxpython::object_get_attr(list, "__dict__");
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.attribute_error_type());
+        EXPECT_STREQ(error.what(), "'list' object has no attribute '__dict__'");
     }
 }
 

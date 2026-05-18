@@ -160,6 +160,10 @@ doc/            design docs and milestone plans
   They are ordinary descriptor objects in type dictionaries, with readable and
   settable behavior expressed through `descr_get`/`descr_set`; special
   attributes must not be implemented as VM or opcode shortcuts.
+- `__dict__` visibility is also descriptor-driven. Type objects expose their
+  runtime dictionaries through `mappingproxy`, not raw mutable dict objects;
+  heap instances expose their own mutable instance dict; compact builtins
+  without `HasInstanceDict` report no `__dict__`.
 - Attribute lookup 的入口是统一 `object_get_attr` API。当前最小顺序是：
   module dict -> data descriptor -> instance dict -> non-data descriptor/type
   attribute -> metatype MRO dict。后续 `__getattr__`、slot wrappers 和

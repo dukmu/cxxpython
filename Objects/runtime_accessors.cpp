@@ -47,6 +47,11 @@ namespace cxxpython
         return dict_type_;
     }
 
+    TypeObject *Runtime::mappingproxy_type() const noexcept
+    {
+        return mappingproxy_type_;
+    }
+
     TypeObject *Runtime::module_type() const noexcept
     {
         return module_type_;

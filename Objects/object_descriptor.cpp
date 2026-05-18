@@ -60,6 +60,28 @@ namespace cxxpython
         {
             raise_type_error(&runtime, "__class__ assignment only supported for mutable types or ModuleType subclasses");
         }
+
+        Object *dict_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            if (auto *type = dynamic_cast<TypeObject *>(instance))
+                return runtime.new_mappingproxy(type->dict);
+            if (auto *module = dynamic_cast<ModuleObject *>(instance))
+                return module->dict();
+            if ((instance->type()->flags & TypeFlagHasInstanceDict) == 0)
+            {
+                raise_attribute_error(&runtime,
+                                      "'" + type_qualified_name(instance->type()) +
+                                          "' object has no attribute '__dict__'");
+            }
+            if (!instance->instance_dict())
+                instance->set_instance_dict(runtime.new_dict());
+            return instance->instance_dict();
+        }
+
+        void dict_setter(Runtime &runtime, Object *, Object *)
+        {
+            raise_attribute_error(&runtime, "attribute '__dict__' is read-only");
+        }
     }
 
     GetSetDescriptorObject::GetSetDescriptorObject(TypeObject *type,
@@ -122,5 +144,10 @@ namespace cxxpython
                                                       object_type_,
                                                       class_getter,
                                                       class_setter));
+        object_type_->dict->set(new_str("__dict__"),
+                                new_getset_descriptor("__dict__",
+                                                      object_type_,
+                                                      dict_getter,
+                                                      dict_setter));
     }
 }

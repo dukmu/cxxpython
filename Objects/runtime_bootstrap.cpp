@@ -17,6 +17,7 @@ namespace cxxpython
         list_type_ = allocate_type("list");
         tuple_type_ = allocate_type("tuple");
         dict_type_ = allocate_type("dict");
+        mappingproxy_type_ = allocate_type("mappingproxy");
         module_type_ = allocate_type("module");
         native_function_type_ = allocate_type("builtin_function_or_method");
         method_descriptor_type_ = allocate_type("method_descriptor");
@@ -40,6 +41,7 @@ namespace cxxpython
         list_type_->slots = make_list_slots();
         tuple_type_->slots = make_tuple_slots();
         dict_type_->slots = make_dict_slots();
+        mappingproxy_type_->slots = make_mappingproxy_slots();
         module_type_->slots = make_module_slots();
         native_function_type_->slots = make_native_function_slots();
         method_descriptor_type_->slots = make_method_descriptor_slots();
@@ -63,6 +65,7 @@ namespace cxxpython
         list_type_->set_type(type_type_);
         tuple_type_->set_type(type_type_);
         dict_type_->set_type(type_type_);
+        mappingproxy_type_->set_type(type_type_);
         module_type_->set_type(type_type_);
         native_function_type_->set_type(type_type_);
         method_descriptor_type_->set_type(type_type_);
@@ -89,6 +92,7 @@ namespace cxxpython
         initialize_type(list_type_, object_type_);
         initialize_type(tuple_type_, object_type_);
         initialize_type(dict_type_, object_type_);
+        initialize_type(mappingproxy_type_, object_type_);
         initialize_type(module_type_, object_type_);
         initialize_type(native_function_type_, object_type_);
         initialize_type(method_descriptor_type_, object_type_);
@@ -116,6 +120,7 @@ namespace cxxpython
         add_root(list_type_);
         add_root(tuple_type_);
         add_root(dict_type_);
+        add_root(mappingproxy_type_);
         add_root(module_type_);
         add_root(native_function_type_);
         add_root(method_descriptor_type_);

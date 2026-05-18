@@ -46,6 +46,13 @@ namespace cxxpython
         return allocate<DictObject>(dict_type_);
     }
 
+    MappingProxyObject *Runtime::new_mappingproxy(DictObject *mapping)
+    {
+        if (!mapping)
+            raise_type_error(this, "mappingproxy mapping cannot be null");
+        return allocate<MappingProxyObject>(mappingproxy_type_, mapping);
+    }
+
     ModuleObject *Runtime::new_module(std::string name, std::string filename)
     {
         DictObject *dict = new_dict();
