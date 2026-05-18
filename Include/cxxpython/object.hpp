@@ -22,6 +22,7 @@ namespace cxxpython
     using EqualSlot = bool (*)(const Object &, const Object &);
     using TruthSlot = bool (*)(const Object &);
     using TraverseSlot = void (*)(const Object &, const VisitChildren &);
+    using BinarySlot = Object *(*)(const Object &, const Object &);
 
     struct TypeSlots
     {
@@ -30,6 +31,7 @@ namespace cxxpython
         EqualSlot equal = nullptr;
         TruthSlot truth = nullptr;
         TraverseSlot traverse = nullptr;
+        BinarySlot binary_add = nullptr;
     };
 
     class PythonError final : public std::exception
@@ -192,6 +194,7 @@ namespace cxxpython
 
     std::int64_t object_hash(const Object *object);
     bool object_equal(const Object *left, const Object *right);
+    Object *object_binary_add(Object *left, Object *right);
     std::string object_repr(const Object *object);
     std::string type_qualified_name(const TypeObject *type);
 
@@ -205,6 +208,8 @@ namespace cxxpython
     TypeSlots make_tuple_slots();
     TypeSlots make_dict_slots();
     TypeSlots make_exception_slots();
+    TypeSlots make_code_slots();
+    TypeSlots make_frame_slots();
 
     [[noreturn]] void raise_type_error(Runtime *runtime, std::string message);
     [[noreturn]] void raise_index_error(Runtime *runtime, std::string message);

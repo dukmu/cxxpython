@@ -78,6 +78,8 @@ namespace cxxpython
             inherited.truth = slots.truth;
         if (slots.traverse)
             inherited.traverse = slots.traverse;
+        if (slots.binary_add)
+            inherited.binary_add = slots.binary_add;
         return inherited;
     }
 }

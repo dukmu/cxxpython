@@ -34,10 +34,10 @@ namespace cxxpython
         std::string message_;
     };
 
-    class CodeObject final
+    class CodeObject final : public Object
     {
     public:
-        CodeObject(std::vector<Object *> constants, std::vector<Instruction> instructions);
+        CodeObject(TypeObject *type, std::vector<Object *> constants, std::vector<Instruction> instructions);
 
         const std::vector<Object *> &constants() const noexcept;
         const std::vector<Instruction> &instructions() const noexcept;

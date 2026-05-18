@@ -47,6 +47,16 @@ namespace cxxpython
         return dict_type_;
     }
 
+    TypeObject *Runtime::code_type() const noexcept
+    {
+        return code_type_;
+    }
+
+    TypeObject *Runtime::frame_type() const noexcept
+    {
+        return frame_type_;
+    }
+
     TypeObject *Runtime::base_exception_type() const noexcept
     {
         return base_exception_type_;

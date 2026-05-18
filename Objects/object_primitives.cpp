@@ -1,6 +1,9 @@
 #include "cxxpython/object.hpp"
+#include "cxxpython/runtime.hpp"
 
 #include "object_utils.hpp"
+
+#include <sstream>
 
 namespace cxxpython
 {
@@ -50,6 +53,23 @@ namespace cxxpython
             return static_cast<const IntObject *>(&object)->value != 0;
         }
 
+        Object *int_binary_add(const Object &left, const Object &right)
+        {
+            auto *right_int = dynamic_cast<const IntObject *>(&right);
+            if (!right_int)
+            {
+                std::ostringstream message;
+                message << "unsupported operand type(s) for +: '"
+                        << type_qualified_name(left.type())
+                        << "' and '"
+                        << type_qualified_name(right.type())
+                        << "'";
+                raise_type_error(left.runtime(), message.str());
+            }
+            auto *left_int = static_cast<const IntObject *>(&left);
+            return left.runtime()->new_int(left_int->value + right_int->value);
+        }
+
         std::string bool_repr(const Object &object)
         {
             return static_cast<const IntObject *>(&object)->value != 0 ? "True" : "False";
@@ -74,6 +94,23 @@ namespace cxxpython
         bool str_truth(const Object &object)
         {
             return !static_cast<const StrObject *>(&object)->value.empty();
+        }
+
+        Object *str_binary_add(const Object &left, const Object &right)
+        {
+            auto *right_str = dynamic_cast<const StrObject *>(&right);
+            if (!right_str)
+            {
+                std::ostringstream message;
+                message << "unsupported operand type(s) for +: '"
+                        << type_qualified_name(left.type())
+                        << "' and '"
+                        << type_qualified_name(right.type())
+                        << "'";
+                raise_type_error(left.runtime(), message.str());
+            }
+            auto *left_str = static_cast<const StrObject *>(&left);
+            return left.runtime()->new_str(left_str->value + right_str->value);
         }
     }
 
@@ -104,16 +141,16 @@ namespace cxxpython
 
     TypeSlots make_int_slots()
     {
-        return TypeSlots{int_repr, int_hash, int_equal, int_truth, default_traverse};
+        return TypeSlots{int_repr, int_hash, int_equal, int_truth, default_traverse, int_binary_add};
     }
 
     TypeSlots make_bool_slots()
     {
-        return TypeSlots{bool_repr, int_hash, int_equal, int_truth, default_traverse};
+        return TypeSlots{bool_repr, int_hash, int_equal, int_truth, default_traverse, int_binary_add};
     }
 
     TypeSlots make_str_slots()
     {
-        return TypeSlots{str_repr, str_hash, str_equal, str_truth, default_traverse};
+        return TypeSlots{str_repr, str_hash, str_equal, str_truth, default_traverse, str_binary_add};
     }
 }

@@ -8,12 +8,12 @@
 
 namespace cxxpython
 {
-    class Frame final
+    class Frame final : public Object
     {
     public:
-        explicit Frame(const CodeObject *code);
+        Frame(TypeObject *type, CodeObject *code);
 
-        const CodeObject *code() const noexcept;
+        CodeObject *code() const noexcept;
         std::size_t instruction_pointer() const noexcept;
         void advance() noexcept;
 
@@ -23,7 +23,7 @@ namespace cxxpython
         void visit_stack(const VisitChildren &visitor) const;
 
     private:
-        const CodeObject *code_;
+        CodeObject *code_;
         std::size_t ip_ = 0;
         std::vector<Object *> stack_;
     };
@@ -63,7 +63,7 @@ namespace cxxpython
 
         InterpreterState &interpreter_state() noexcept;
         ThreadState &thread_state() noexcept;
-        Object *execute(const CodeObject &code);
+        Object *execute(CodeObject &code);
 
     private:
         Object *binary_add(Object *left, Object *right);

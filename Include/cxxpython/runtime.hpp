@@ -11,6 +11,10 @@
 
 namespace cxxpython
 {
+    struct Instruction;
+    class CodeObject;
+    class Frame;
+
     class Runtime final
     {
     public:
@@ -27,6 +31,8 @@ namespace cxxpython
         TypeObject *list_type() const noexcept;
         TypeObject *tuple_type() const noexcept;
         TypeObject *dict_type() const noexcept;
+        TypeObject *code_type() const noexcept;
+        TypeObject *frame_type() const noexcept;
         TypeObject *base_exception_type() const noexcept;
         TypeObject *exception_type() const noexcept;
         TypeObject *type_error_type() const noexcept;
@@ -41,6 +47,8 @@ namespace cxxpython
         ListObject *new_list(std::vector<Object *> items);
         TupleObject *new_tuple(std::vector<Object *> items);
         DictObject *new_dict();
+        CodeObject *new_code(std::vector<Object *> constants, std::vector<Instruction> instructions);
+        Frame *new_frame(CodeObject *code);
         TypeObject *new_heap_type(std::string name, TypeObject *base, TypeSlots slots = {});
         ExceptionObject *new_exception(TypeObject *type, std::string message);
         ExceptionObject *new_exception(TypeObject *type, std::vector<Object *> args);
@@ -82,6 +90,8 @@ namespace cxxpython
         TypeObject *list_type_ = nullptr;
         TypeObject *tuple_type_ = nullptr;
         TypeObject *dict_type_ = nullptr;
+        TypeObject *code_type_ = nullptr;
+        TypeObject *frame_type_ = nullptr;
         TypeObject *base_exception_type_ = nullptr;
         TypeObject *exception_type_ = nullptr;
         TypeObject *type_error_type_ = nullptr;

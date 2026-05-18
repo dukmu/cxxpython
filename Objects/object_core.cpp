@@ -3,6 +3,7 @@
 
 #include "object_utils.hpp"
 
+#include <sstream>
 #include <stdexcept>
 
 namespace cxxpython
@@ -161,6 +162,24 @@ namespace cxxpython
         if (!left || !right)
             return false;
         return left->equals(*right);
+    }
+
+    Object *object_binary_add(Object *left, Object *right)
+    {
+        if (!left || !right)
+            raise_type_error(left ? left->runtime() : (right ? right->runtime() : nullptr),
+                             "unsupported operand type(s) for +: '<null>' and '<null>'");
+
+        if (left->type() && left->type()->slots.binary_add)
+            return left->type()->slots.binary_add(*left, *right);
+
+        std::ostringstream message;
+        message << "unsupported operand type(s) for +: '"
+                << type_qualified_name(left->type())
+                << "' and '"
+                << type_qualified_name(right->type())
+                << "'";
+        raise_type_error(left->runtime(), message.str());
     }
 
     std::string type_qualified_name(const TypeObject *type)

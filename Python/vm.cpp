@@ -6,6 +6,41 @@ namespace cxxpython
 {
     namespace
     {
+        std::string frame_repr(const Object &object)
+        {
+            auto *frame = static_cast<const Frame *>(&object);
+            std::ostringstream out;
+            out << "<frame at " << &object;
+            if (frame->code())
+                out << ", code=" << frame->code()->repr();
+            out << ">";
+            return out.str();
+        }
+
+        void frame_traverse(const Object &object, const VisitChildren &visitor)
+        {
+            auto *frame = static_cast<const Frame *>(&object);
+            if (frame->code())
+                visitor(frame->code());
+            frame->visit_stack(visitor);
+        }
+
+        std::int64_t frame_hash(const Object &object)
+        {
+            return reinterpret_cast<std::intptr_t>(&object);
+        }
+
+        bool frame_equal(const Object &left, const Object &right)
+        {
+            return &left == &right;
+        }
+
+        bool frame_truth(const Object &object)
+        {
+            (void)object;
+            return true;
+        }
+
         class ActiveFrame final
         {
         public:
@@ -29,14 +64,14 @@ namespace cxxpython
         };
     }
 
-    Frame::Frame(const CodeObject *code)
-        : code_(code)
+    Frame::Frame(TypeObject *type, CodeObject *code)
+        : Object(type), code_(code)
     {
         if (!code_)
             throw BytecodeError("frame requires a code object");
     }
 
-    const CodeObject *Frame::code() const noexcept
+    CodeObject *Frame::code() const noexcept
     {
         return code_;
     }
@@ -151,32 +186,32 @@ namespace cxxpython
         return thread_;
     }
 
-    Object *VirtualMachine::execute(const CodeObject &code)
+    Object *VirtualMachine::execute(CodeObject &code)
     {
-        Frame frame(&code);
-        ActiveFrame active_frame(thread_, frame);
-        while (frame.instruction_pointer() < code.instructions().size())
+        Frame *frame = runtime_.new_frame(&code);
+        ActiveFrame active_frame(thread_, *frame);
+        while (frame->instruction_pointer() < code.instructions().size())
         {
-            const Instruction instruction = code.instructions()[frame.instruction_pointer()];
-            frame.advance();
+            const Instruction instruction = code.instructions()[frame->instruction_pointer()];
+            frame->advance();
             switch (instruction.opcode)
             {
             case Opcode::LoadConst:
             {
                 if (instruction.operand >= code.constants().size())
                     throw BytecodeError("LOAD_CONST operand out of range");
-                frame.push(code.constants()[instruction.operand]);
+                frame->push(code.constants()[instruction.operand]);
                 break;
             }
             case Opcode::BinaryAdd:
             {
-                Object *right = frame.pop();
-                Object *left = frame.pop();
-                frame.push(binary_add(left, right));
+                Object *right = frame->pop();
+                Object *left = frame->pop();
+                frame->push(binary_add(left, right));
                 break;
             }
             case Opcode::ReturnValue:
-                return frame.pop();
+                return frame->pop();
             default:
                 throw BytecodeError("invalid opcode");
             }
@@ -186,24 +221,11 @@ namespace cxxpython
 
     Object *VirtualMachine::binary_add(Object *left, Object *right)
     {
-        if (auto *left_int = dynamic_cast<IntObject *>(left))
-        {
-            if (auto *right_int = dynamic_cast<IntObject *>(right))
-                return runtime_.new_int(left_int->value + right_int->value);
-        }
+        return object_binary_add(left, right);
+    }
 
-        if (auto *left_str = dynamic_cast<StrObject *>(left))
-        {
-            if (auto *right_str = dynamic_cast<StrObject *>(right))
-                return runtime_.new_str(left_str->value + right_str->value);
-        }
-
-        std::ostringstream message;
-        message << "unsupported operand type(s) for +: '"
-                << type_qualified_name(left ? left->type() : nullptr)
-                << "' and '"
-                << type_qualified_name(right ? right->type() : nullptr)
-                << "'";
-        raise_type_error(&runtime_, message.str());
+    TypeSlots make_frame_slots()
+    {
+        return TypeSlots{frame_repr, frame_hash, frame_equal, frame_truth, frame_traverse, nullptr};
     }
 }

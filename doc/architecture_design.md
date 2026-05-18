@@ -68,3 +68,28 @@ doc/            design docs and milestone plans
 - bytecode 可先自定义，但 opcode 文档必须完整；后期再评估 CPython bytecode 兼容。
 - C API 先支持高价值子集，不承诺一开始完整兼容。
 - 标准库优先 pure Python 子集，性能敏感模块再 native 化。
+
+## 执行对象暴露边界
+
+- `code` 和 `frame` 必须是运行时对象，而不是永久停留在 C++ helper
+  层。原因是函数对象、traceback、调试钩子、`sys._getframe`、异常栈和
+  自举后的脚本反射都会依赖它们的 Python 身份、类型、repr 和 GC
+  traversal。
+- `VirtualMachine`、`InterpreterState`、`ThreadState` 当前保持为宿主执行
+  基础设施，不直接作为普通脚本对象暴露。未来脚本层需要观察它们时，应
+  通过 `sys`、`threading`、trace/profile API 或专门 runtime facade，而不是
+  把内部调度器裸露进对象空间。
+- VM opcode 不直接复制类型语义。算术、比较、调用、属性访问、下标访问
+  都应走对象协议 slot 或统一 runtime API，再由类型实现具体行为。
+
+## Slot 扩展路线
+
+当前 slot 只覆盖第一批对象协议：`repr`、`hash`、`equal`、`truth`、
+`traverse`、`binary_add`。后续扩展顺序：
+
+- Numeric: add/sub/mul/div/mod/pow, unary, in-place, reflected operators.
+- Rich compare: eq/ne/lt/le/gt/ge 返回 Python bool/NotImplemented 语义。
+- Sequence/mapping: length, getitem, setitem, contains, iterator。
+- Attribute/descriptor: getattro/setattro, descr_get/descr_set。
+- Call/construction: call, new, init。
+- Buffer/extension hooks: buffer protocol 和 C/C++ extension 需要的稳定边界。

@@ -53,6 +53,61 @@ Verification:
 
 Result: all tests pass.
 
+## 2026-05-18 Code/Frame Objectization And Slot-Driven Binary Add
+
+Completed:
+
+- Promoted `CodeObject` into the runtime object model:
+  - added builtin `code` type
+  - added `Runtime::code_type()`
+  - added `Runtime::new_code(...)`
+  - added code repr/hash/equality/traversal slots
+- Promoted `Frame` into the runtime object model:
+  - added builtin `frame` type
+  - added `Runtime::frame_type()`
+  - added `Runtime::new_frame(...)`
+  - made VM execution allocate typed frame objects
+  - added frame repr and traversal of code + value stack
+- Added a first execution-protocol slot:
+  - `TypeSlots::binary_add`
+  - centralized `object_binary_add(...)`
+  - moved `int`/`bool`/`str` `+` behavior out of VM opcode internals
+- Changed `BINARY_ADD` to dispatch through the object protocol instead of
+  duplicating type checks inside `VirtualMachine`.
+- Added bytecode tests covering:
+  - runtime-owned code objects
+  - custom heap-type `binary_add` slot dispatch through the VM
+  - code object traversal of constants
+  - frame object typing, repr, stack/code traversal
+
+Design notes:
+
+- `code` and `frame` are worth objectizing early because traceback, debug
+  hooks, future function objects, and self-bootstrap reflection need them to be
+  typed runtime objects rather than permanently hidden C++ helpers.
+- `VirtualMachine`, `InterpreterState`, and `ThreadState` should remain host
+  execution infrastructure for now. Exposing them directly to script space this
+  early would leak unstable scheduler internals into the object model.
+- The heap-type slot inheritance path initially dropped newly added slots. The
+  new bytecode test caught that immediately, and `inherit_slots(...)` now
+  carries `binary_add` too. This is exactly the class of debt each slot
+  addition must review.
+- There is still an important follow-up debt: frame allocation currently grows
+  runtime heap monotonically because there is no GC or frame freelist yet.
+  Before deep recursion, traceback retention, or long-running execution become
+  common, GC/root integration for active and dead frames must be designed.
+- `binary_add` is only the first arithmetic protocol entry. The next operator
+  expansion should be designed as a coherent numeric/sequence protocol family,
+  not as one-off opcode patches.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+- `git diff --check`
+
+Result: all tests pass.
+
 ## 2026-05-17 TypeObject Slot Dispatch
 
 Completed:

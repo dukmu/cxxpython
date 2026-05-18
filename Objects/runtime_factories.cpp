@@ -1,5 +1,8 @@
 #include "cxxpython/runtime.hpp"
 
+#include "cxxpython/bytecode.hpp"
+#include "cxxpython/vm.hpp"
+
 namespace cxxpython
 {
     namespace
@@ -41,6 +44,16 @@ namespace cxxpython
     DictObject *Runtime::new_dict()
     {
         return allocate<DictObject>(dict_type_);
+    }
+
+    CodeObject *Runtime::new_code(std::vector<Object *> constants, std::vector<Instruction> instructions)
+    {
+        return allocate<CodeObject>(code_type_, std::move(constants), std::move(instructions));
+    }
+
+    Frame *Runtime::new_frame(CodeObject *code)
+    {
+        return allocate<Frame>(frame_type_, code);
     }
 
     TypeObject *Runtime::new_heap_type(std::string name, TypeObject *base, TypeSlots slots)

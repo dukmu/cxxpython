@@ -13,6 +13,8 @@ namespace cxxpython
         list_type_ = allocate_type("list");
         tuple_type_ = allocate_type("tuple");
         dict_type_ = allocate_type("dict");
+        code_type_ = allocate_type("code");
+        frame_type_ = allocate_type("frame");
         base_exception_type_ = allocate_type("BaseException");
         exception_type_ = allocate_type("Exception");
         type_error_type_ = allocate_type("TypeError");
@@ -27,6 +29,8 @@ namespace cxxpython
         list_type_->slots = make_list_slots();
         tuple_type_->slots = make_tuple_slots();
         dict_type_->slots = make_dict_slots();
+        code_type_->slots = make_code_slots();
+        frame_type_->slots = make_frame_slots();
         base_exception_type_->slots = make_exception_slots();
         exception_type_->slots = make_exception_slots();
         type_error_type_->slots = make_exception_slots();
@@ -41,6 +45,8 @@ namespace cxxpython
         list_type_->set_type(type_type_);
         tuple_type_->set_type(type_type_);
         dict_type_->set_type(type_type_);
+        code_type_->set_type(type_type_);
+        frame_type_->set_type(type_type_);
         base_exception_type_->set_type(type_type_);
         exception_type_->set_type(type_type_);
         type_error_type_->set_type(type_type_);
@@ -58,6 +64,8 @@ namespace cxxpython
         initialize_type(list_type_, object_type_);
         initialize_type(tuple_type_, object_type_);
         initialize_type(dict_type_, object_type_);
+        initialize_type(code_type_, object_type_);
+        initialize_type(frame_type_, object_type_);
         initialize_type(base_exception_type_, object_type_);
         initialize_type(exception_type_, base_exception_type_);
         initialize_type(type_error_type_, exception_type_);
@@ -76,6 +84,8 @@ namespace cxxpython
         add_root(list_type_);
         add_root(tuple_type_);
         add_root(dict_type_);
+        add_root(code_type_);
+        add_root(frame_type_);
         add_root(base_exception_type_);
         add_root(exception_type_);
         add_root(type_error_type_);
