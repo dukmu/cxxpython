@@ -58,8 +58,12 @@ add_executable(test_core_objects
     Tests/cpp/test_heap_types.cpp
     Tests/cpp/test_bytecode.cpp
     Tests/cpp/test_compile.cpp
+    Tests/cpp/test_cli.cpp
 )
 target_link_libraries(test_core_objects PRIVATE cxxpython_core GTest::gtest_main)
+target_compile_definitions(test_core_objects PRIVATE
+    CXXPYTHON_PROGRAM_PATH=\"$<TARGET_FILE:cxxpython>\"
+)
 target_compile_options(test_core_objects PRIVATE
     -Wall
     -Wextra

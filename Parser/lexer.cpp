@@ -7,9 +7,9 @@ namespace cxxpython::compiler_internal
 {
     namespace
     {
-        bool is_space(char ch)
+        bool is_inline_space(char ch)
         {
-            return ch == ' ' || ch == '\t' || ch == '\n' || ch == '\r' || ch == '\f' || ch == '\v';
+            return ch == ' ' || ch == '\t' || ch == '\f' || ch == '\v';
         }
 
         std::int64_t parse_integer(Runtime &runtime, std::string_view digits)
@@ -31,8 +31,24 @@ namespace cxxpython::compiler_internal
         while (index < source.size())
         {
             const char ch = source[index];
-            if (is_space(ch))
+            if (is_inline_space(ch))
             {
+                ++index;
+                continue;
+            }
+
+            if (ch == '\n')
+            {
+                tokens.push_back(Token{TokenKind::Newline, "\n"});
+                ++index;
+                continue;
+            }
+
+            if (ch == '\r')
+            {
+                if (index + 1 < source.size() && source[index + 1] == '\n')
+                    ++index;
+                tokens.push_back(Token{TokenKind::Newline, "\n"});
                 ++index;
                 continue;
             }
@@ -108,6 +124,13 @@ namespace cxxpython::compiler_internal
             if (ch == '+')
             {
                 tokens.push_back(Token{TokenKind::Plus, "+"});
+                ++index;
+                continue;
+            }
+
+            if (ch == '=')
+            {
+                tokens.push_back(Token{TokenKind::Equal, "="});
                 ++index;
                 continue;
             }

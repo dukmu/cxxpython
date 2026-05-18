@@ -144,3 +144,56 @@ TEST(Compile, RaisesSyntaxErrorForUnexpectedToken)
         EXPECT_STREQ(error.what(), "unexpected token after expression");
     }
 }
+
+TEST(Compile, CompilesAssignmentModuleAndStoresGlobals)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(runtime, "x = 40 + 2\n");
+    ASSERT_NE(code, nullptr);
+    ASSERT_EQ(code->names().size(), 1U);
+    auto *name = dynamic_cast<cxxpython::StrObject *>(code->names()[0]);
+    ASSERT_NE(name, nullptr);
+    EXPECT_EQ(name->value, "x");
+    EXPECT_EQ(code->instructions()[0].opcode, cxxpython::Opcode::LoadConst);
+    EXPECT_EQ(code->instructions()[1].opcode, cxxpython::Opcode::LoadConst);
+    EXPECT_EQ(code->instructions()[2].opcode, cxxpython::Opcode::BinaryAdd);
+    EXPECT_EQ(code->instructions()[3].opcode, cxxpython::Opcode::StoreName);
+
+    EXPECT_EQ(vm.execute(*code, *globals), runtime.none());
+    auto *value = dynamic_cast<cxxpython::IntObject *>(globals->get(runtime.new_str("x")));
+    ASSERT_NE(value, nullptr);
+    EXPECT_EQ(value->value, 42);
+}
+
+TEST(Compile, ExecutesModuleStatementsInOrder)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(runtime, "x = 1\ny = x + 2\n");
+    ASSERT_NE(code, nullptr);
+    EXPECT_EQ(vm.execute(*code, *globals), runtime.none());
+
+    auto *x = dynamic_cast<cxxpython::IntObject *>(globals->get(runtime.new_str("x")));
+    auto *y = dynamic_cast<cxxpython::IntObject *>(globals->get(runtime.new_str("y")));
+    ASSERT_NE(x, nullptr);
+    ASSERT_NE(y, nullptr);
+    EXPECT_EQ(x->value, 1);
+    EXPECT_EQ(y->value, 3);
+}
+
+TEST(Compile, ModuleExpressionStatementsAreDiscarded)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(runtime, "1 + 2\n");
+    ASSERT_NE(code, nullptr);
+    EXPECT_EQ(code->instructions()[2].opcode, cxxpython::Opcode::BinaryAdd);
+    EXPECT_EQ(code->instructions()[3].opcode, cxxpython::Opcode::PopTop);
+    EXPECT_EQ(vm.execute(*code), runtime.none());
+}

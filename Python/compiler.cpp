@@ -20,11 +20,6 @@ namespace cxxpython
                 return names_.size() - 1;
             }
 
-            const std::vector<std::string> &names() const noexcept
-            {
-                return names_;
-            }
-
             std::vector<Object *> make_name_objects(Runtime &runtime) const
             {
                 std::vector<Object *> names;
@@ -58,22 +53,67 @@ namespace cxxpython
             raise_syntax_error(&runtime, "unsupported expression");
         }
 
+        void collect_names(Runtime &runtime, const compiler_internal::Stmt &statement, SymbolTable &symbols)
+        {
+            if (auto *expr_stmt = dynamic_cast<const compiler_internal::ExprStmt *>(&statement))
+            {
+                collect_names(runtime, *expr_stmt->expression, symbols);
+                return;
+            }
+            if (auto *assign_stmt = dynamic_cast<const compiler_internal::AssignStmt *>(&statement))
+            {
+                (void)symbols.add_name(assign_stmt->target);
+                collect_names(runtime, *assign_stmt->value, symbols);
+                return;
+            }
+            raise_syntax_error(&runtime, "unsupported statement");
+        }
+
         class BytecodeBuilder final
         {
         public:
             BytecodeBuilder(Runtime &runtime, const SymbolTable &symbols)
-                : runtime_(runtime), symbols_(symbols)
+                : runtime_(runtime), names_(symbols.make_name_objects(runtime))
             {
             }
 
-            CodeObject *build(const compiler_internal::Expr &expression)
+            CodeObject *build_eval(const compiler_internal::Expr &expression)
             {
                 emit_expression(expression);
                 instructions_.push_back(Instruction{Opcode::ReturnValue, 0});
-                return runtime_.new_code(std::move(constants_), symbols_.make_name_objects(runtime_), std::move(instructions_));
+                return runtime_.new_code(std::move(constants_), std::move(names_), std::move(instructions_));
+            }
+
+            CodeObject *build_exec(const compiler_internal::Module &module)
+            {
+                for (const auto &statement : module.statements)
+                    emit_statement(*statement);
+                emit_constant(runtime_.none());
+                instructions_.push_back(Instruction{Opcode::ReturnValue, 0});
+                return runtime_.new_code(std::move(constants_), std::move(names_), std::move(instructions_));
             }
 
         private:
+            void emit_statement(const compiler_internal::Stmt &statement)
+            {
+                if (auto *expr_stmt = dynamic_cast<const compiler_internal::ExprStmt *>(&statement))
+                {
+                    emit_expression(*expr_stmt->expression);
+                    instructions_.push_back(Instruction{Opcode::PopTop, 0});
+                    return;
+                }
+                if (auto *assign_stmt = dynamic_cast<const compiler_internal::AssignStmt *>(&statement))
+                {
+                    emit_expression(*assign_stmt->value);
+                    instructions_.push_back(Instruction{
+                        Opcode::StoreName,
+                        static_cast<std::uint32_t>(name_index(assign_stmt->target)),
+                    });
+                    return;
+                }
+                raise_syntax_error(&runtime_, "unsupported statement");
+            }
+
             void emit_expression(const compiler_internal::Expr &expression)
             {
                 if (auto *integer = dynamic_cast<const compiler_internal::IntegerExpr *>(&expression))
@@ -88,7 +128,10 @@ namespace cxxpython
                 }
                 if (auto *name = dynamic_cast<const compiler_internal::NameExpr *>(&expression))
                 {
-                    emit_name(name->value);
+                    instructions_.push_back(Instruction{
+                        Opcode::LoadName,
+                        static_cast<std::uint32_t>(name_index(name->value)),
+                    });
                     return;
                 }
                 if (auto *binary_add = dynamic_cast<const compiler_internal::BinaryAddExpr *>(&expression))
@@ -110,24 +153,19 @@ namespace cxxpython
                 });
             }
 
-            void emit_name(const std::string &name)
+            std::size_t name_index(const std::string &name) const
             {
-                for (std::size_t index = 0; index < symbols_.names().size(); ++index)
+                for (std::size_t index = 0; index < names_.size(); ++index)
                 {
-                    if (symbols_.names()[index] == name)
-                    {
-                        instructions_.push_back(Instruction{
-                            Opcode::LoadName,
-                            static_cast<std::uint32_t>(index),
-                        });
-                        return;
-                    }
+                    auto *entry = dynamic_cast<StrObject *>(names_[index]);
+                    if (entry && entry->value == name)
+                        return index;
                 }
                 raise_syntax_error(&runtime_, "unknown symbol table entry");
             }
 
             Runtime &runtime_;
-            const SymbolTable &symbols_;
+            std::vector<Object *> names_;
             std::vector<Object *> constants_;
             std::vector<Instruction> instructions_;
         };
@@ -141,6 +179,17 @@ namespace cxxpython
         SymbolTable symbols;
         collect_names(runtime, *expression, symbols);
         BytecodeBuilder builder(runtime, symbols);
-        return builder.build(*expression);
+        return builder.build_eval(*expression);
+    }
+
+    CodeObject *compile_exec_input(Runtime &runtime, std::string_view source)
+    {
+        const std::vector<compiler_internal::Token> tokens = compiler_internal::lex_source(runtime, source);
+        compiler_internal::Module module = compiler_internal::parse_module(runtime, tokens);
+        SymbolTable symbols;
+        for (const auto &statement : module.statements)
+            collect_names(runtime, *statement, symbols);
+        BytecodeBuilder builder(runtime, symbols);
+        return builder.build_exec(module);
     }
 }

@@ -231,6 +231,20 @@ namespace cxxpython
                 frame->push(value);
                 break;
             }
+            case Opcode::StoreName:
+            {
+                if (instruction.operand >= code.names().size())
+                    throw BytecodeError("STORE_NAME operand out of range");
+                auto *name = dynamic_cast<StrObject *>(code.names()[instruction.operand]);
+                if (!name)
+                    throw BytecodeError("STORE_NAME requires a str name");
+                Object *value = frame->pop();
+                globals.set(name, value);
+                break;
+            }
+            case Opcode::PopTop:
+                (void)frame->pop();
+                break;
             case Opcode::BinaryAdd:
             {
                 Object *right = frame->pop();

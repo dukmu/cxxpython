@@ -18,6 +18,8 @@ namespace cxxpython::compiler_internal
         String,
         Identifier,
         Plus,
+        Equal,
+        Newline,
         End,
     };
 
@@ -77,4 +79,37 @@ namespace cxxpython::compiler_internal
     };
 
     std::unique_ptr<Expr> parse_expression(Runtime &runtime, const std::vector<Token> &tokens);
+
+    struct Stmt
+    {
+        virtual ~Stmt() = default;
+    };
+
+    struct ExprStmt final : Stmt
+    {
+        explicit ExprStmt(std::unique_ptr<Expr> expression_in)
+            : expression(std::move(expression_in))
+        {
+        }
+
+        std::unique_ptr<Expr> expression;
+    };
+
+    struct AssignStmt final : Stmt
+    {
+        AssignStmt(std::string target_in, std::unique_ptr<Expr> value_in)
+            : target(std::move(target_in)), value(std::move(value_in))
+        {
+        }
+
+        std::string target;
+        std::unique_ptr<Expr> value;
+    };
+
+    struct Module final
+    {
+        std::vector<std::unique_ptr<Stmt>> statements;
+    };
+
+    Module parse_module(Runtime &runtime, const std::vector<Token> &tokens);
 }

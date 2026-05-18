@@ -95,6 +95,10 @@ namespace cxxpython
             return "LOAD_CONST";
         case Opcode::LoadName:
             return "LOAD_NAME";
+        case Opcode::StoreName:
+            return "STORE_NAME";
+        case Opcode::PopTop:
+            return "POP_TOP";
         case Opcode::BinaryAdd:
             return "BINARY_ADD";
         case Opcode::ReturnValue:
@@ -110,6 +114,9 @@ namespace cxxpython
         case Opcode::LoadConst:
         case Opcode::LoadName:
             return 1;
+        case Opcode::StoreName:
+        case Opcode::PopTop:
+            return -1;
         case Opcode::BinaryAdd:
             return -1;
         case Opcode::ReturnValue:

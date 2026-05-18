@@ -14,6 +14,8 @@ namespace cxxpython
     {
         LoadConst,
         LoadName,
+        StoreName,
+        PopTop,
         BinaryAdd,
         ReturnValue,
     };

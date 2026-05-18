@@ -53,6 +53,82 @@ Verification:
 
 Result: all tests pass.
 
+## 2026-05-18 Module Execution And CLI File Entry
+
+Pre-change review:
+
+- GTest is already integrated and remains the default C++ test layer.
+- AST risk: expression-only AST was becoming a dead end for module execution.
+  This cycle split `Expr`, `Stmt`, and `Module` instead of bolting assignment
+  onto `compile_eval_input`.
+- Slot risk: arithmetic is still only `binary_add`; no new slot was added this
+  cycle, but the next operator work should be protocol-family based.
+- `CodeObject` risk: constants/names/instructions are still enough for the
+  current subset, but line table, filename/name metadata, varnames, and flags
+  must arrive before tracebacks and functions.
+- `Frame` risk: frame state now has globals but still lacks locals, builtins,
+  block stack, exception state, and line tracking.
+- `Runtime` risk: module execution currently uses a raw globals dict because
+  there is no `module` object or import system yet.
+
+Completed:
+
+- Added `STORE_NAME` and `POP_TOP` bytecode.
+- Added statement parsing and a module AST:
+  - expression statements
+  - assignment statements
+  - newline-separated file input
+- Added `compile_exec_input(Runtime&, std::string_view)` for module/script
+  input, keeping it separate from `compile_eval_input`.
+- Extended compiler emission:
+  - expression statements discard results with `POP_TOP`
+  - assignments store into frame globals with `STORE_NAME`
+  - module execution returns `None`
+- Extended VM execution for `STORE_NAME` and `POP_TOP`.
+- Added `cxxpython file.py` execution:
+  - reads source from disk
+  - compiles as exec input
+  - executes with a module globals dict
+  - reports Python errors to stderr with exit code 1
+- Added GTest coverage for:
+  - `STORE_NAME`/`POP_TOP` metadata and stack effects
+  - assignment storing globals
+  - multi-statement module execution order
+  - expression statement result discard
+  - CLI successful script execution
+  - CLI Python error reporting
+
+Design notes:
+
+- The CLI is now a real script entrypoint, but still intentionally minimal:
+  there is no `print`, `sys.argv`, `__name__`, `__file__`, builtins dict,
+  import machinery, or stdout-visible user behavior beyond error reporting.
+- CLI tests currently use POSIX `popen` against the built executable. This is
+  useful for proving the actual binary works, but should later be moved behind
+  a reusable subprocess test helper before the CLI matrix expands.
+- The current symbol table records names for module storage/load but still does
+  not classify local/global/free/cell namespaces. Functions must not build on
+  this as-is; they need real scope analysis first.
+- Parser errors still lack source location and filename. Add this before
+  expanding grammar materially, otherwise diagnostics and traceback design will
+  have to be retrofitted.
+
+Next:
+
+- Add a minimal `module` object and script globals initialization
+  (`__name__`, `__file__`) before importing or richer CLI behavior.
+- Add builtin `print` only after callable/function protocol is designed rather
+  than special-casing it in the CLI or VM.
+- Introduce line/filename metadata in `CodeObject` and `SyntaxError`.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+- `git diff --check`
+
+Result: all tests pass.
+
 ## 2026-05-18 Name Loading And Symbol Table Slice
 
 Completed:
