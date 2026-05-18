@@ -18,12 +18,15 @@ namespace cxxpython
     class DictObject;
     class ExceptionObject;
     class MethodDescriptorObject;
+    class GetSetDescriptorObject;
 
     using VisitChildren = std::function<void(Object *)>;
     using ObjectSpan = std::span<Object *const>;
     using NativeFunctionCallback = std::function<Object *(Runtime &, const std::vector<Object *> &)>;
     using MethodDescriptorCallback =
         std::function<Object *(Runtime &, Object *, ObjectSpan)>;
+    using GetSetGetter = std::function<Object *(Runtime &, Object *, TypeObject *)>;
+    using GetSetSetter = std::function<void(Runtime &, Object *, Object *)>;
     using ReprSlot = std::string (*)(const Object &);
     using HashSlot = std::int64_t (*)(const Object &);
     using EqualSlot = bool (*)(const Object &, const Object &);
@@ -257,6 +260,27 @@ namespace cxxpython
         Object *self_;
     };
 
+    class GetSetDescriptorObject final : public Object
+    {
+    public:
+        GetSetDescriptorObject(TypeObject *type,
+                               std::string name,
+                               TypeObject *owner,
+                               GetSetGetter getter,
+                               GetSetSetter setter = {});
+
+        const std::string &name() const noexcept;
+        TypeObject *owner() const noexcept;
+        Object *get(Object *instance, TypeObject *owner);
+        void set(Object *instance, Object *value);
+
+    private:
+        std::string name_;
+        TypeObject *owner_;
+        GetSetGetter getter_;
+        GetSetSetter setter_;
+    };
+
     class ExceptionObject final : public Object
     {
     public:
@@ -298,6 +322,7 @@ namespace cxxpython
     TypeSlots make_module_slots();
     TypeSlots make_native_function_slots();
     TypeSlots make_method_descriptor_slots();
+    TypeSlots make_getset_descriptor_slots();
     TypeSlots make_exception_slots();
     TypeSlots make_code_slots();
     TypeSlots make_frame_slots();

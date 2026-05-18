@@ -156,10 +156,19 @@ doc/            design docs and milestone plans
   `list.append` returns a `method_descriptor`; instance access such as
   `[].append` returns a `builtin_function_or_method`-typed callable carrying
   both descriptor and receiver, and it must traverse both references for GC.
+- Get/set descriptors represent typed runtime attributes such as `__class__`.
+  They are ordinary descriptor objects in type dictionaries, with readable and
+  settable behavior expressed through `descr_get`/`descr_set`; special
+  attributes must not be implemented as VM or opcode shortcuts.
 - Attribute lookup 的入口是统一 `object_get_attr` API。当前最小顺序是：
   module dict -> data descriptor -> instance dict -> non-data descriptor/type
   attribute -> metatype MRO dict。后续 `__getattr__`、slot wrappers 和
   mappingproxy 必须扩展这条 API，而不是在 opcode 或 builtin 中另开查找路径。
+- Type-object lookup follows the same descriptor model with the metatype data
+  descriptor priority CPython requires: metatype data descriptor -> class MRO
+  attribute -> metatype non-data attribute. This is what makes
+  `list.__class__` resolve to `type` while `list.append` still comes from the
+  `list` type dictionary.
 - Descriptor access is also centralized through `object_get_attr`: values found
   in type/class dictionaries with a `descr_get` slot are invoked with
   `(descriptor, instance, owner)`. Module namespace entries are direct values;

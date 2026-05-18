@@ -37,6 +37,7 @@ namespace cxxpython
         TypeObject *module_type() const noexcept;
         TypeObject *native_function_type() const noexcept;
         TypeObject *method_descriptor_type() const noexcept;
+        TypeObject *getset_descriptor_type() const noexcept;
         TypeObject *code_type() const noexcept;
         TypeObject *frame_type() const noexcept;
         TypeObject *base_exception_type() const noexcept;
@@ -66,6 +67,10 @@ namespace cxxpython
                                                        TypeObject *owner,
                                                        MethodDescriptorCallback callback);
         BoundMethodObject *new_bound_method(MethodDescriptorObject *method, Object *self);
+        GetSetDescriptorObject *new_getset_descriptor(std::string name,
+                                                       TypeObject *owner,
+                                                       GetSetGetter getter,
+                                                       GetSetSetter setter = {});
         CodeObject *new_code(std::vector<Object *> constants,
                               std::vector<Instruction> instructions);
         CodeObject *new_code(std::string name,
@@ -116,6 +121,7 @@ namespace cxxpython
         void initialize_type(TypeObject *type, TypeObject *base);
         void initialize_type_dict(TypeObject *type);
         void initialize_type_dicts();
+        void initialize_type_descriptors();
         void initialize_type_methods();
         TypeSlots inherit_slots(TypeObject *base, TypeSlots slots) const;
         void initialize_builtins();
@@ -135,6 +141,7 @@ namespace cxxpython
         TypeObject *module_type_ = nullptr;
         TypeObject *native_function_type_ = nullptr;
         TypeObject *method_descriptor_type_ = nullptr;
+        TypeObject *getset_descriptor_type_ = nullptr;
         TypeObject *code_type_ = nullptr;
         TypeObject *frame_type_ = nullptr;
         TypeObject *base_exception_type_ = nullptr;

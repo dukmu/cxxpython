@@ -257,13 +257,13 @@ namespace cxxpython
 
         if (auto *type = dynamic_cast<TypeObject *>(object))
         {
+            Object *metatype_value = type->type() ? type_lookup_attribute(type->type(), name) : nullptr;
+            if (is_data_descriptor(metatype_value))
+                return apply_descriptor(metatype_value, object, type->type());
             if (Object *value = type_lookup_attribute(type, name))
                 return apply_descriptor(value, nullptr, type);
-            if (type->type() && type->type() != type)
-            {
-                if (Object *value = type_lookup_attribute(type->type(), name))
-                    return apply_descriptor(value, object, type->type());
-            }
+            if (metatype_value)
+                return apply_descriptor(metatype_value, object, type->type());
         }
         else
         {
@@ -308,6 +308,12 @@ namespace cxxpython
 
         if (auto *type = dynamic_cast<TypeObject *>(object))
         {
+            Object *metatype_value = type->type() ? type_lookup_attribute(type->type(), name) : nullptr;
+            if (metatype_value && metatype_value->type() && metatype_value->type()->slots.descr_set)
+            {
+                metatype_value->type()->slots.descr_set(*metatype_value, object, value);
+                return;
+            }
             type->dict->set(name, value);
             return;
         }

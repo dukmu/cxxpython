@@ -82,6 +82,22 @@ namespace cxxpython
         return allocate<BoundMethodObject>(native_function_type_, method, self);
     }
 
+    GetSetDescriptorObject *Runtime::new_getset_descriptor(std::string name,
+                                                           TypeObject *owner,
+                                                           GetSetGetter getter,
+                                                           GetSetSetter setter)
+    {
+        if (!owner)
+            raise_type_error(this, "getset descriptor owner cannot be null");
+        if (!getter)
+            raise_type_error(this, "getset descriptor getter cannot be null");
+        return allocate<GetSetDescriptorObject>(getset_descriptor_type_,
+                                                std::move(name),
+                                                owner,
+                                                std::move(getter),
+                                                std::move(setter));
+    }
+
     CodeObject *Runtime::new_code(std::vector<Object *> constants, std::vector<Instruction> instructions)
     {
         return new_code("<module>", "<string>", std::move(constants), {}, std::move(instructions));

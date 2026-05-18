@@ -80,6 +80,57 @@ TEST(Attributes, ReadsTypeDictionariesAndMro)
     EXPECT_EQ(cxxpython::object_get_attr(runtime.bool_type(), "meta_marker"), from_metatype);
 }
 
+TEST(Attributes, ReadsClassThroughDataDescriptor)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::ListObject *list = runtime.new_list({});
+    cxxpython::TypeObject *custom_type = runtime.new_heap_type("Custom", runtime.object_type());
+    cxxpython::Object *instance = runtime.allocate<cxxpython::Object>(custom_type);
+    cxxpython::Object *descriptor = runtime.object_type()->dict->get(runtime.new_str("__class__"));
+
+    ASSERT_NE(descriptor, nullptr);
+    EXPECT_EQ(descriptor->type(), runtime.getset_descriptor_type());
+    EXPECT_EQ(cxxpython::object_repr(descriptor), "<attribute '__class__' of 'object' objects>");
+    EXPECT_EQ(cxxpython::object_get_attr(list, "__class__"), runtime.list_type());
+    EXPECT_EQ(cxxpython::object_get_attr(instance, "__class__"), custom_type);
+    EXPECT_EQ(cxxpython::object_get_attr(runtime.list_type(), "__class__"), runtime.type_type());
+    EXPECT_EQ(cxxpython::object_get_attr(runtime.object_type(), "__class__"), runtime.type_type());
+}
+
+TEST(Attributes, ClassDescriptorCannotBeShadowedByInstanceOrTypeAttributes)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::TypeObject *custom_type = runtime.new_heap_type("Custom", runtime.object_type());
+    cxxpython::Object *instance = runtime.allocate<cxxpython::Object>(custom_type);
+    runtime.list_type()->dict->set(runtime.new_str("__class__"), runtime.new_str("shadow"));
+
+    EXPECT_EQ(cxxpython::object_get_attr(runtime.list_type(), "__class__"), runtime.type_type());
+
+    try
+    {
+        cxxpython::object_set_attr(instance, "__class__", runtime.int_type());
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "__class__ assignment only supported for mutable types or ModuleType subclasses");
+        EXPECT_EQ(instance->instance_dict(), nullptr);
+        EXPECT_EQ(cxxpython::object_get_attr(instance, "__class__"), custom_type);
+    }
+
+    try
+    {
+        cxxpython::object_set_attr(runtime.list_type(), "__class__", runtime.int_type());
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_EQ(cxxpython::object_get_attr(runtime.list_type(), "__class__"), runtime.type_type());
+    }
+}
+
 TEST(Attributes, ReadsInstanceAttributesFromTypeMro)
 {
     cxxpython::Runtime runtime;

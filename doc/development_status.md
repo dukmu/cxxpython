@@ -1,5 +1,75 @@
 # Development Status
 
+## 2026-05-18 `__class__` Getset Descriptor
+
+Pre-change review:
+
+- The previous attribute path treated type-object lookup as class MRO first,
+  then metatype lookup. That would make data descriptors inherited by the
+  metatype, especially `object.__class__`, lose priority for expressions such
+  as `list.__class__`.
+- `__class__` must not be a magic case in the VM or a value copied into every
+  instance dict. It is a data descriptor rooted in the normal object/type
+  attribute model.
+- Heap instances now have instance dictionaries, so `__class__` must be a data
+  descriptor before user code can shadow it accidentally through normal
+  attribute assignment.
+
+Debt addressed:
+
+- Added a typed `getset_descriptor` object with:
+  - descriptor get slot
+  - descriptor set slot
+  - owner traversal for GC
+  - CPython-like repr for attributes
+- Installed `object.__class__` as a getset descriptor.
+- Updated type-object lookup order to respect metatype data descriptor
+  priority before class MRO attributes, while preserving class-MRO lookup for
+  normal type attributes such as `list.append`.
+- Updated type-object assignment to route metatype data descriptor writes
+  through `descr_set` before mutating the type dictionary.
+
+Completed:
+
+- Added tests proving:
+  - `obj.__class__` returns the object's type
+  - heap instances report their heap type
+  - `list.__class__` and `object.__class__` return `type`
+  - the descriptor stored on `object` has `getset_descriptor` type and
+    attribute repr
+  - direct type-dict shadowing cannot beat metatype data descriptor priority
+  - instance and type assignment to `__class__` go through the descriptor and
+    raise Python `TypeError`
+
+Design notes:
+
+- `__class__` assignment currently raises the CPython-style TypeError for all
+  objects. Later heap-type reassignment can be opened only after layout
+  compatibility checks exist.
+- Getset descriptors are now the correct home for typed reflective attributes;
+  future `__dict__`, `__name__`, frame/code fields, and mappingproxy-facing
+  attributes should build on this rather than adding bespoke lookup paths.
+- Type-object lookup is still incomplete: metaclass conflict rules, C3 MRO,
+  metaclass `__getattribute__`, and mappingproxy behavior remain future work.
+
+Next:
+
+- Add `__dict__` visibility through getset/mappingproxy instead of exposing
+  raw mutable type dictionaries directly.
+- Add sequence/mapping slots as a planned family before exposing more list and
+  dict special methods.
+- Start planning Python function objects and function descriptors so user
+  methods can use the same descriptor/call path as builtin methods.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects '--gtest_filter=Attributes.ReadsClassThroughDataDescriptor:Attributes.ClassDescriptorCannotBeShadowedByInstanceOrTypeAttributes'`
+- `ctest --test-dir build --output-on-failure`
+- `git diff --check`
+
+Result: all tests pass.
+
 ## 2026-05-18 Type Layout Flags And List Method Descriptor
 
 Pre-change review:
