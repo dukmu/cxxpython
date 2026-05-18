@@ -5,10 +5,12 @@
 TEST(Bytecode, MetadataNamesAndStackEffects)
 {
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::LoadConst), "LOAD_CONST");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::LoadName), "LOAD_NAME");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::BinaryAdd), "BINARY_ADD");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::ReturnValue), "RETURN_VALUE");
 
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::LoadConst, 0}), 1);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::LoadName, 0}), 1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BinaryAdd, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::ReturnValue, 0}), -1);
 }
@@ -151,14 +153,16 @@ TEST(Bytecode, FrameObjectsTrackCodeAndStackReferences)
 {
     cxxpython::Runtime runtime;
     cxxpython::IntObject *value = runtime.new_int(9);
+    cxxpython::DictObject *globals = runtime.new_dict();
     cxxpython::CodeObject *code = runtime.new_code({value},
                                                    {{cxxpython::Opcode::LoadConst, 0},
                                                     {cxxpython::Opcode::ReturnValue, 0}});
-    cxxpython::Frame *frame = runtime.new_frame(code);
+    cxxpython::Frame *frame = runtime.new_frame(code, globals);
     frame->push(value);
 
     EXPECT_EQ(frame->type(), runtime.frame_type());
     EXPECT_EQ(frame->code(), code);
+    EXPECT_EQ(frame->globals(), globals);
     EXPECT_EQ(frame->stack_size(), 1U);
     EXPECT_EQ(frame->repr().find("<frame at "), 0U);
 
@@ -166,9 +170,10 @@ TEST(Bytecode, FrameObjectsTrackCodeAndStackReferences)
     frame->visit_children([&visited](cxxpython::Object *object)
                           { visited.push_back(object); });
 
-    ASSERT_EQ(visited.size(), 2U);
+    ASSERT_EQ(visited.size(), 3U);
     EXPECT_EQ(visited[0], code);
-    EXPECT_EQ(visited[1], value);
+    EXPECT_EQ(visited[1], globals);
+    EXPECT_EQ(visited[2], value);
 }
 
 TEST(Bytecode, RejectsMalformedBytecode)

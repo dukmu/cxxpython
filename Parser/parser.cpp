@@ -36,6 +36,8 @@ namespace cxxpython::compiler_internal
                     return parse_integer();
                 case TokenKind::String:
                     return parse_string();
+                case TokenKind::Identifier:
+                    return parse_name();
                 case TokenKind::End:
                     raise_syntax_error(&runtime_, "expected expression");
                 case TokenKind::Plus:
@@ -52,6 +54,11 @@ namespace cxxpython::compiler_internal
             std::unique_ptr<Expr> parse_string()
             {
                 return std::make_unique<StringExpr>(advance().lexeme);
+            }
+
+            std::unique_ptr<Expr> parse_name()
+            {
+                return std::make_unique<NameExpr>(advance().lexeme);
             }
 
             const Token &peek() const

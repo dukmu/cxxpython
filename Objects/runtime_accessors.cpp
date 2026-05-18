@@ -82,6 +82,11 @@ namespace cxxpython
         return syntax_error_type_;
     }
 
+    TypeObject *Runtime::name_error_type() const noexcept
+    {
+        return name_error_type_;
+    }
+
     NoneObject *Runtime::none() const noexcept
     {
         return none_;

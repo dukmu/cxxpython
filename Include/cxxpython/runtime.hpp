@@ -38,6 +38,7 @@ namespace cxxpython
         TypeObject *type_error_type() const noexcept;
         TypeObject *index_error_type() const noexcept;
         TypeObject *syntax_error_type() const noexcept;
+        TypeObject *name_error_type() const noexcept;
 
         NoneObject *none() const noexcept;
         BoolObject *true_value() const noexcept;
@@ -48,14 +49,19 @@ namespace cxxpython
         ListObject *new_list(std::vector<Object *> items);
         TupleObject *new_tuple(std::vector<Object *> items);
         DictObject *new_dict();
-        CodeObject *new_code(std::vector<Object *> constants, std::vector<Instruction> instructions);
-        Frame *new_frame(CodeObject *code);
+        CodeObject *new_code(std::vector<Object *> constants,
+                              std::vector<Instruction> instructions);
+        CodeObject *new_code(std::vector<Object *> constants,
+                              std::vector<Object *> names,
+                              std::vector<Instruction> instructions);
+        Frame *new_frame(CodeObject *code, DictObject *globals = nullptr);
         TypeObject *new_heap_type(std::string name, TypeObject *base, TypeSlots slots = {});
         ExceptionObject *new_exception(TypeObject *type, std::string message);
         ExceptionObject *new_exception(TypeObject *type, std::vector<Object *> args);
         ExceptionObject *new_type_error(std::string message);
         ExceptionObject *new_index_error(std::string message);
         ExceptionObject *new_syntax_error(std::string message);
+        ExceptionObject *new_name_error(std::string message);
 
         void add_root(Object *object);
         void remove_root(Object *object);
@@ -99,6 +105,7 @@ namespace cxxpython
         TypeObject *type_error_type_ = nullptr;
         TypeObject *index_error_type_ = nullptr;
         TypeObject *syntax_error_type_ = nullptr;
+        TypeObject *name_error_type_ = nullptr;
 
         NoneObject *none_ = nullptr;
         BoolObject *true_ = nullptr;

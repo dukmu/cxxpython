@@ -53,6 +53,49 @@ Verification:
 
 Result: all tests pass.
 
+## 2026-05-18 Name Loading And Symbol Table Slice
+
+Completed:
+
+- Added runtime-owned `NameError` to the exception hierarchy.
+- Extended bytecode with `LOAD_NAME`.
+- Extended `CodeObject` with a names table.
+- Extended `Frame` with explicit globals namespace storage and traversal.
+- Added identifier lexing/parsing and `NameExpr` AST support.
+- Added a first explicit symbol-table pass that interns referenced names before
+  bytecode emission.
+- Added VM name loading from frame globals with Python `NameError` on missing
+  names.
+- Added tests covering:
+  - opcode metadata for `LOAD_NAME`
+  - frame traversal including globals
+  - compiled name loads through globals
+  - symbol-table entry reuse for repeated names
+  - missing-name `NameError`
+
+Design notes:
+
+- `CodeObject.names` is stored as runtime string objects rather than host
+  strings, to avoid introducing stringly typed runtime state into executable
+  artifacts.
+- This is still expression-scope name loading only. There is no assignment,
+  local-fast slot layout, closure analysis, or statement/module scope yet.
+- The current symbol-table pass records referenced names but does not classify
+  them into local/global/free/cell namespaces. The first assignment/function
+  milestone must replace this with a real scope analysis phase instead of
+  layering ad hoc flags onto the current table.
+- `LOAD_NAME` currently resolves only against frame globals. Builtins fallback,
+  locals-vs-globals precedence, and closure environments should be added
+  together as a coherent name-resolution model.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+- `git diff --check`
+
+Result: all tests pass.
+
 ## 2026-05-18 Eval Compiler Bootstrap Slice
 
 Completed:

@@ -59,6 +59,60 @@ TEST(Compile, CompilesStringLiteralAndAddition)
     EXPECT_EQ(result->value, "python");
 }
 
+TEST(Compile, CompilesNameLoadsThroughSymbolTable)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+    globals->set(runtime.new_str("x"), runtime.new_int(40));
+
+    cxxpython::CodeObject *code = cxxpython::compile_eval_input(runtime, "x + 2");
+    ASSERT_NE(code, nullptr);
+    ASSERT_EQ(code->names().size(), 1U);
+    auto *first_name = dynamic_cast<cxxpython::StrObject *>(code->names()[0]);
+    ASSERT_NE(first_name, nullptr);
+    EXPECT_EQ(first_name->value, "x");
+    EXPECT_EQ(code->instructions()[0].opcode, cxxpython::Opcode::LoadName);
+    EXPECT_EQ(code->instructions()[0].operand, 0U);
+
+    auto *result = dynamic_cast<cxxpython::IntObject *>(vm.execute(*code, *globals));
+    ASSERT_NE(result, nullptr);
+    EXPECT_EQ(result->value, 42);
+}
+
+TEST(Compile, ReusesSymbolTableEntries)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::CodeObject *code = cxxpython::compile_eval_input(runtime, "x + x");
+    ASSERT_NE(code, nullptr);
+    ASSERT_EQ(code->names().size(), 1U);
+    auto *first_name = dynamic_cast<cxxpython::StrObject *>(code->names()[0]);
+    ASSERT_NE(first_name, nullptr);
+    EXPECT_EQ(first_name->value, "x");
+    EXPECT_EQ(code->instructions()[0].opcode, cxxpython::Opcode::LoadName);
+    EXPECT_EQ(code->instructions()[1].opcode, cxxpython::Opcode::LoadName);
+    EXPECT_EQ(code->instructions()[0].operand, 0U);
+    EXPECT_EQ(code->instructions()[1].operand, 0U);
+}
+
+TEST(Compile, RaisesNameErrorForMissingName)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::CodeObject *code = cxxpython::compile_eval_input(runtime, "missing");
+
+    try
+    {
+        (void)vm.execute(*code);
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type_name(), "NameError");
+        EXPECT_STREQ(error.what(), "name 'missing' is not defined");
+    }
+}
+
 TEST(Compile, RaisesSyntaxErrorForMalformedSource)
 {
     cxxpython::Runtime runtime;

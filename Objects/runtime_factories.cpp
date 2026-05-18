@@ -48,12 +48,19 @@ namespace cxxpython
 
     CodeObject *Runtime::new_code(std::vector<Object *> constants, std::vector<Instruction> instructions)
     {
-        return allocate<CodeObject>(code_type_, std::move(constants), std::move(instructions));
+        return new_code(std::move(constants), {}, std::move(instructions));
     }
 
-    Frame *Runtime::new_frame(CodeObject *code)
+    CodeObject *Runtime::new_code(std::vector<Object *> constants,
+                                  std::vector<Object *> names,
+                                  std::vector<Instruction> instructions)
     {
-        return allocate<Frame>(frame_type_, code);
+        return allocate<CodeObject>(code_type_, std::move(constants), std::move(names), std::move(instructions));
+    }
+
+    Frame *Runtime::new_frame(CodeObject *code, DictObject *globals)
+    {
+        return allocate<Frame>(frame_type_, code, globals ? globals : new_dict());
     }
 
     TypeObject *Runtime::new_heap_type(std::string name, TypeObject *base, TypeSlots slots)
@@ -91,5 +98,10 @@ namespace cxxpython
     ExceptionObject *Runtime::new_syntax_error(std::string message)
     {
         return new_exception(syntax_error_type_, std::move(message));
+    }
+
+    ExceptionObject *Runtime::new_name_error(std::string message)
+    {
+        return new_exception(name_error_type_, std::move(message));
     }
 }

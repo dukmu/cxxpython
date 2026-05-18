@@ -20,6 +20,7 @@ namespace cxxpython
         type_error_type_ = allocate_type("TypeError");
         index_error_type_ = allocate_type("IndexError");
         syntax_error_type_ = allocate_type("SyntaxError");
+        name_error_type_ = allocate_type("NameError");
 
         object_type_->slots = make_object_slots();
         type_type_->slots = make_type_slots();
@@ -37,6 +38,7 @@ namespace cxxpython
         type_error_type_->slots = make_exception_slots();
         index_error_type_->slots = make_exception_slots();
         syntax_error_type_->slots = make_exception_slots();
+        name_error_type_->slots = make_exception_slots();
 
         object_type_->set_type(type_type_);
         type_type_->set_type(type_type_);
@@ -54,6 +56,7 @@ namespace cxxpython
         type_error_type_->set_type(type_type_);
         index_error_type_->set_type(type_type_);
         syntax_error_type_->set_type(type_type_);
+        name_error_type_->set_type(type_type_);
 
         object_type_->base = nullptr;
         object_type_->bases = {};
@@ -74,6 +77,7 @@ namespace cxxpython
         initialize_type(type_error_type_, exception_type_);
         initialize_type(index_error_type_, exception_type_);
         initialize_type(syntax_error_type_, exception_type_);
+        initialize_type(name_error_type_, exception_type_);
 
         none_ = allocate<NoneObject>(none_type_);
         true_ = allocate<BoolObject>(bool_type_, true);
@@ -95,6 +99,7 @@ namespace cxxpython
         add_root(type_error_type_);
         add_root(index_error_type_);
         add_root(syntax_error_type_);
+        add_root(name_error_type_);
         add_root(none_);
         add_root(true_);
         add_root(false_);

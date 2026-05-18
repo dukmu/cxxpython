@@ -22,6 +22,8 @@ namespace cxxpython
             auto *frame = static_cast<const Frame *>(&object);
             if (frame->code())
                 visitor(frame->code());
+            if (frame->globals())
+                visitor(frame->globals());
             frame->visit_stack(visitor);
         }
 
@@ -64,16 +66,23 @@ namespace cxxpython
         };
     }
 
-    Frame::Frame(TypeObject *type, CodeObject *code)
-        : Object(type), code_(code)
+    Frame::Frame(TypeObject *type, CodeObject *code, DictObject *globals)
+        : Object(type), code_(code), globals_(globals)
     {
         if (!code_)
             throw BytecodeError("frame requires a code object");
+        if (!globals_)
+            throw BytecodeError("frame requires globals");
     }
 
     CodeObject *Frame::code() const noexcept
     {
         return code_;
+    }
+
+    DictObject *Frame::globals() const noexcept
+    {
+        return globals_;
     }
 
     std::size_t Frame::instruction_pointer() const noexcept
@@ -188,7 +197,13 @@ namespace cxxpython
 
     Object *VirtualMachine::execute(CodeObject &code)
     {
-        Frame *frame = runtime_.new_frame(&code);
+        DictObject *globals = runtime_.new_dict();
+        return execute(code, *globals);
+    }
+
+    Object *VirtualMachine::execute(CodeObject &code, DictObject &globals)
+    {
+        Frame *frame = runtime_.new_frame(&code, &globals);
         ActiveFrame active_frame(thread_, *frame);
         while (frame->instruction_pointer() < code.instructions().size())
         {
@@ -201,6 +216,19 @@ namespace cxxpython
                 if (instruction.operand >= code.constants().size())
                     throw BytecodeError("LOAD_CONST operand out of range");
                 frame->push(code.constants()[instruction.operand]);
+                break;
+            }
+            case Opcode::LoadName:
+            {
+                if (instruction.operand >= code.names().size())
+                    throw BytecodeError("LOAD_NAME operand out of range");
+                auto *name = dynamic_cast<StrObject *>(code.names()[instruction.operand]);
+                if (!name)
+                    throw BytecodeError("LOAD_NAME requires a str name");
+                Object *value = globals.get(name);
+                if (!value)
+                    raise_name_error(&runtime_, "name '" + name->value + "' is not defined");
+                frame->push(value);
                 break;
             }
             case Opcode::BinaryAdd:

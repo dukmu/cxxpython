@@ -16,6 +16,7 @@ namespace cxxpython::compiler_internal
     {
         Integer,
         String,
+        Identifier,
         Plus,
         End,
     };
@@ -63,6 +64,16 @@ namespace cxxpython::compiler_internal
 
         std::unique_ptr<Expr> left;
         std::unique_ptr<Expr> right;
+    };
+
+    struct NameExpr final : Expr
+    {
+        explicit NameExpr(std::string value_in)
+            : value(std::move(value_in))
+        {
+        }
+
+        std::string value;
     };
 
     std::unique_ptr<Expr> parse_expression(Runtime &runtime, const std::vector<Token> &tokens);

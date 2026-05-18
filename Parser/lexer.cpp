@@ -47,6 +47,20 @@ namespace cxxpython::compiler_internal
                 continue;
             }
 
+            if (std::isalpha(static_cast<unsigned char>(ch)) != 0 || ch == '_')
+            {
+                const std::size_t start = index;
+                while (index < source.size())
+                {
+                    const char current = source[index];
+                    if (std::isalnum(static_cast<unsigned char>(current)) == 0 && current != '_')
+                        break;
+                    ++index;
+                }
+                tokens.push_back(Token{TokenKind::Identifier, std::string(source.substr(start, index - start))});
+                continue;
+            }
+
             if (ch == '\'')
             {
                 ++index;

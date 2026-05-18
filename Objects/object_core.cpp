@@ -228,4 +228,11 @@ namespace cxxpython
             throw std::logic_error("cannot raise Python SyntaxError without a runtime");
         throw PythonError(runtime->new_syntax_error(std::move(message)));
     }
+
+    void raise_name_error(Runtime *runtime, std::string message)
+    {
+        if (!runtime)
+            throw std::logic_error("cannot raise Python NameError without a runtime");
+        throw PythonError(runtime->new_name_error(std::move(message)));
+    }
 }

@@ -13,6 +13,7 @@ namespace cxxpython
     enum class Opcode : std::uint8_t
     {
         LoadConst,
+        LoadName,
         BinaryAdd,
         ReturnValue,
     };
@@ -37,13 +38,18 @@ namespace cxxpython
     class CodeObject final : public Object
     {
     public:
-        CodeObject(TypeObject *type, std::vector<Object *> constants, std::vector<Instruction> instructions);
+        CodeObject(TypeObject *type,
+                   std::vector<Object *> constants,
+                   std::vector<Object *> names,
+                   std::vector<Instruction> instructions);
 
         const std::vector<Object *> &constants() const noexcept;
+        const std::vector<Object *> &names() const noexcept;
         const std::vector<Instruction> &instructions() const noexcept;
 
     private:
         std::vector<Object *> constants_;
+        std::vector<Object *> names_;
         std::vector<Instruction> instructions_;
     };
 

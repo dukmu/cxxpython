@@ -48,17 +48,33 @@ namespace cxxpython
                 if (constant)
                     visitor(constant);
             }
+            for (Object *name : code->names())
+            {
+                if (name)
+                    visitor(name);
+            }
         }
     }
 
-    CodeObject::CodeObject(TypeObject *type, std::vector<Object *> constants, std::vector<Instruction> instructions)
-        : Object(type), constants_(std::move(constants)), instructions_(std::move(instructions))
+    CodeObject::CodeObject(TypeObject *type,
+                           std::vector<Object *> constants,
+                           std::vector<Object *> names,
+                           std::vector<Instruction> instructions)
+        : Object(type),
+          constants_(std::move(constants)),
+          names_(std::move(names)),
+          instructions_(std::move(instructions))
     {
     }
 
     const std::vector<Object *> &CodeObject::constants() const noexcept
     {
         return constants_;
+    }
+
+    const std::vector<Object *> &CodeObject::names() const noexcept
+    {
+        return names_;
     }
 
     const std::vector<Instruction> &CodeObject::instructions() const noexcept
@@ -77,6 +93,8 @@ namespace cxxpython
         {
         case Opcode::LoadConst:
             return "LOAD_CONST";
+        case Opcode::LoadName:
+            return "LOAD_NAME";
         case Opcode::BinaryAdd:
             return "BINARY_ADD";
         case Opcode::ReturnValue:
@@ -90,6 +108,7 @@ namespace cxxpython
         switch (instruction.opcode)
         {
         case Opcode::LoadConst:
+        case Opcode::LoadName:
             return 1;
         case Opcode::BinaryAdd:
             return -1;
