@@ -193,6 +193,17 @@ namespace cxxpython
                     (void)symbols_.add_name(alias.binding);
             }
 
+            void visit(const compiler_internal::FromImportStmt &statement) override
+            {
+                (void)symbols_.add_name("__import__");
+                (void)symbols_.add_name(statement.module);
+                for (const compiler_internal::ImportAlias &alias : statement.aliases)
+                {
+                    (void)symbols_.add_name(alias.name);
+                    (void)symbols_.add_name(alias.binding);
+                }
+            }
+
             void visit(const compiler_internal::TryStmt &statement) override
             {
                 for (const auto &item : statement.body)
@@ -320,6 +331,16 @@ namespace cxxpython
                 }
             }
 
+            void visit(const compiler_internal::FromImportStmt &statement) override
+            {
+                for (const compiler_internal::ImportAlias &alias : statement.aliases)
+                {
+                    if (symbols_.is_global(alias.binding) || symbols_.is_nonlocal(alias.binding))
+                        continue;
+                    (void)symbols_.add_local(alias.binding);
+                }
+            }
+
             void visit(const compiler_internal::TryStmt &statement) override
             {
                 for (const auto &item : statement.body)
@@ -421,6 +442,11 @@ namespace cxxpython
             }
 
             void visit(const compiler_internal::ImportStmt &statement) override
+            {
+                (void)statement;
+            }
+
+            void visit(const compiler_internal::FromImportStmt &statement) override
             {
                 (void)statement;
             }
@@ -638,6 +664,12 @@ namespace cxxpython
                 (void)statement;
             }
 
+            void visit(const compiler_internal::FromImportStmt &statement) override
+            {
+                for (const compiler_internal::ImportAlias &alias : statement.aliases)
+                    add_reference(alias.name);
+            }
+
             void visit(const compiler_internal::TryStmt &statement) override
             {
                 for (const auto &item : statement.body)
@@ -732,6 +764,11 @@ namespace cxxpython
             }
 
             void visit(const compiler_internal::ImportStmt &statement) override
+            {
+                (void)statement;
+            }
+
+            void visit(const compiler_internal::FromImportStmt &statement) override
             {
                 (void)statement;
             }

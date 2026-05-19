@@ -569,6 +569,28 @@ namespace cxxpython
                 }
             }
 
+            void visit(const compiler_internal::FromImportStmt &statement) override
+            {
+                StatementLineGuard line(*this, statement);
+                emit({
+                    Opcode::LoadName,
+                    static_cast<std::uint32_t>(name_index("__import__")),
+                });
+                emit_constant(runtime_.new_str(statement.module));
+                emit({Opcode::Call, 1});
+
+                for (const compiler_internal::ImportAlias &alias : statement.aliases)
+                {
+                    emit({Opcode::DupTop, 0});
+                    emit({
+                        Opcode::LoadAttr,
+                        static_cast<std::uint32_t>(name_index(alias.name)),
+                    });
+                    emit_binding_store(alias.binding);
+                }
+                emit({Opcode::PopTop, 0});
+            }
+
             void visit(const compiler_internal::TryStmt &statement) override
             {
                 StatementLineGuard line(*this, statement);

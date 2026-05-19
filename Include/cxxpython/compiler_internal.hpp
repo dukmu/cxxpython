@@ -42,6 +42,7 @@ namespace cxxpython::compiler_internal
     struct GlobalStmt;
     struct NonlocalStmt;
     struct ImportStmt;
+    struct FromImportStmt;
     struct TryStmt;
     struct FunctionDefStmt;
     struct ClassDefStmt;
@@ -87,6 +88,7 @@ namespace cxxpython::compiler_internal
         virtual void visit(const GlobalStmt &statement) = 0;
         virtual void visit(const NonlocalStmt &statement) = 0;
         virtual void visit(const ImportStmt &statement) = 0;
+        virtual void visit(const FromImportStmt &statement) = 0;
         virtual void visit(const TryStmt &statement) = 0;
         virtual void visit(const FunctionDefStmt &statement) = 0;
         virtual void visit(const ClassDefStmt &statement) = 0;
@@ -127,6 +129,7 @@ namespace cxxpython::compiler_internal
         Return,
         Raise,
         Import,
+        From,
         Global,
         Nonlocal,
         Try,
@@ -707,6 +710,22 @@ namespace cxxpython::compiler_internal
         {
         }
 
+        std::vector<ImportAlias> aliases;
+
+        void accept(StmtVisitor &visitor) const override
+        {
+            visitor.visit(*this);
+        }
+    };
+
+    struct FromImportStmt final : Stmt
+    {
+        FromImportStmt(std::string module_in, std::vector<ImportAlias> aliases_in)
+            : module(std::move(module_in)), aliases(std::move(aliases_in))
+        {
+        }
+
+        std::string module;
         std::vector<ImportAlias> aliases;
 
         void accept(StmtVisitor &visitor) const override

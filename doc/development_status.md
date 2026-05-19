@@ -1,5 +1,45 @@
 # Development Status
 
+## 2026-05-19 From-Import Statement Slice
+
+Review focus:
+
+- Extend import syntax without bypassing the existing runtime import/cache
+  substrate.
+- Keep from-import lowering explicit in compiler bytecode so symbol analysis
+  and scope behavior stay consistent.
+- Reject dotted module paths for now to avoid pretending package semantics
+  before importer architecture is widened.
+
+Completed:
+
+- Added `from` token support.
+- Added `FromImportStmt` AST and parser lowering for:
+  - `from module import name`
+  - `from module import name as alias`
+  - comma-separated imported names
+- Lowered `from` imports through existing `__import__` then attribute loads.
+- Integrated from-import targets with symbol collection and function-local
+  analysis.
+- Added Python golden coverage for module-level and function-local from-import.
+- Added syntax coverage for unsupported dotted module paths.
+
+Known debt and next risk:
+
+- `from pkg import submod` package semantics are not complete until package
+  importer support exists (`__path__`, `__spec__`, and top-level import return
+  behavior alignment).
+- `from module import *` is intentionally unsupported and should be added only
+  with symbol-table and module export policy work.
+- Current from-import error mapping still reflects attribute lookup behavior;
+  CPython-level `ImportError` normalization can be added in runtime import APIs.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter='Compile.RaisesSyntaxErrorForUnsupportedDottedFromImport:PythonScripts.RunsGoldenFiles:Compile.CompilesAndExecutesBasicFString'`
+- `ctest --test-dir build --output-on-failure`
+
 ## 2026-05-19 F-String Foundation Slice
 
 Review focus:

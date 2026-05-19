@@ -107,6 +107,8 @@ namespace cxxpython::compiler_internal
                     return parse_raise_statement();
                 if (peek().kind == TokenKind::Import)
                     return parse_import_statement();
+                if (peek().kind == TokenKind::From)
+                    return parse_from_import_statement();
                 if (peek().kind == TokenKind::Global)
                     return parse_global_statement();
                 if (peek().kind == TokenKind::Nonlocal)
@@ -251,6 +253,48 @@ namespace cxxpython::compiler_internal
                 }
                 auto statement = std::make_unique<ImportStmt>(std::move(aliases));
                 statement->line = import_token.line;
+                return ParsedStatement{
+                    std::move(statement),
+                    false,
+                };
+            }
+
+            ParsedStatement parse_from_import_statement()
+            {
+                const Token &from_token = advance();
+                if (peek().kind != TokenKind::Identifier)
+                    raise_at(peek(), "expected module name after from");
+                std::string module = advance().lexeme;
+                if (peek().kind == TokenKind::Dot)
+                    raise_at(peek(), "dotted imports are not supported yet");
+                consume(TokenKind::Import, "expected import after from module name");
+
+                std::vector<ImportAlias> aliases;
+                while (true)
+                {
+                    if (peek().kind != TokenKind::Identifier)
+                        raise_at(peek(), "expected name in from import statement");
+                    std::string name = advance().lexeme;
+                    std::string binding = name;
+                    if (peek().kind == TokenKind::As)
+                    {
+                        advance();
+                        if (peek().kind != TokenKind::Identifier)
+                            raise_at(peek(), "expected name after import alias");
+                        binding = advance().lexeme;
+                    }
+                    for (const ImportAlias &existing : aliases)
+                    {
+                        if (existing.binding == binding)
+                            raise_at(previous(), "duplicate binding in from import statement");
+                    }
+                    aliases.emplace_back(std::move(name), std::move(binding));
+                    if (peek().kind != TokenKind::Comma)
+                        break;
+                    advance();
+                }
+                auto statement = std::make_unique<FromImportStmt>(std::move(module), std::move(aliases));
+                statement->line = from_token.line;
                 return ParsedStatement{
                     std::move(statement),
                     false,
@@ -987,6 +1031,7 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Return:
                 case TokenKind::Raise:
                 case TokenKind::Import:
+                case TokenKind::From:
                 case TokenKind::Global:
                 case TokenKind::Nonlocal:
                 case TokenKind::Try:
@@ -1112,6 +1157,7 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Return:
                 case TokenKind::Raise:
                 case TokenKind::Import:
+                case TokenKind::From:
                 case TokenKind::Global:
                 case TokenKind::Nonlocal:
                 case TokenKind::Try:

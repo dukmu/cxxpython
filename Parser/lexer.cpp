@@ -271,6 +271,8 @@ namespace cxxpython::compiler_internal
                     kind = TokenKind::Raise;
                 else if (lexeme == "import")
                     kind = TokenKind::Import;
+                else if (lexeme == "from")
+                    kind = TokenKind::From;
                 else if (lexeme == "global")
                     kind = TokenKind::Global;
                 else if (lexeme == "nonlocal")
