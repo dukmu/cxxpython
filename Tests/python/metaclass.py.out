@@ -4,3 +4,7 @@
 (<class '__main__.Base'>,)
 base
 child
+['prepare:PreparedClass']
+yes
+<class '__main__.PreparedMeta'>
+True

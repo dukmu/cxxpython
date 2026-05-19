@@ -27,6 +27,7 @@ print(vars(sample))
 print(vars(sample)['a'])
 print(vars()['sample'] == sample)
 print(dir(__builtins__).__contains__('__name__'))
+print(dir(__builtins__).__contains__('__build_class__'))
 print(dir(__builtins__).__contains__('sum'))
 
 print(dir(type).__contains__('__call__'))
@@ -108,3 +109,9 @@ print(eval('3 + 4'))
 scope = {}
 exec('answer = 42', scope)
 print(scope['answer'])
+
+def build_body():
+    value = 'from-build-class'
+
+BuiltByBuiltin = __build_class__(build_body, 'BuiltByBuiltin')
+print(BuiltByBuiltin.value)

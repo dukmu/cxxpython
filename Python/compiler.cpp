@@ -261,8 +261,11 @@ namespace cxxpython
             {
                 for (const auto &decorator : statement.decorators)
                     decorator->accept(*this);
+                (void)symbols_.add_name("__build_class__");
                 for (const auto &base : statement.bases)
                     base->accept(*this);
+                for (const auto &keyword : statement.keywords)
+                    keyword.value->accept(*this);
                 (void)symbols_.add_name(statement.name);
             }
 
@@ -829,12 +832,7 @@ namespace cxxpython
             {
                 StatementLineGuard line(*this, statement);
                 emit_decorators(statement.decorators);
-                for (const auto &base : statement.bases)
-                    base->accept(*this);
-                emit({
-                    Opcode::BuildTuple,
-                    static_cast<std::uint32_t>(statement.bases.size()),
-                });
+                emit({Opcode::LoadName, static_cast<std::uint32_t>(name_index("__build_class__"))});
                 SymbolTable class_symbols = collect_class_symbols(statement);
                 BytecodeBuilder class_builder(
                     runtime_,
@@ -843,10 +841,29 @@ namespace cxxpython
                     static_cast<std::uint32_t>(statement.line));
                 CodeObject *code = class_builder.build_class(statement);
                 emit_constant(code);
-                emit({
-                    Opcode::MakeClass,
-                    static_cast<std::uint32_t>(name_index(statement.name)),
-                });
+                emit({Opcode::MakeFunction, 0});
+                emit_constant(runtime_.new_str(statement.name));
+                for (const auto &base : statement.bases)
+                    base->accept(*this);
+                for (const auto &keyword : statement.keywords)
+                {
+                    emit_constant(runtime_.new_str(keyword.keyword));
+                    keyword.value->accept(*this);
+                }
+                const std::uint32_t positional_count =
+                    static_cast<std::uint32_t>(2 + statement.bases.size());
+                if (!statement.keywords.empty())
+                {
+                    emit({
+                        Opcode::BuildMap,
+                        static_cast<std::uint32_t>(statement.keywords.size()),
+                    });
+                    emit({Opcode::CallKw, positional_count});
+                }
+                else
+                {
+                    emit({Opcode::Call, positional_count});
+                }
                 apply_decorators(statement.decorators.size());
                 emit_binding_store(statement.name);
             }

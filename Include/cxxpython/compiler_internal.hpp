@@ -634,10 +634,12 @@ namespace cxxpython::compiler_internal
     {
         ClassDefStmt(std::string name_in,
                      std::vector<std::unique_ptr<Expr>> bases_in,
+                     std::vector<CallArgument> keywords_in,
                      std::vector<std::unique_ptr<Stmt>> body_in,
                      std::vector<std::unique_ptr<Expr>> decorators_in = {})
             : name(std::move(name_in)),
               bases(std::move(bases_in)),
+              keywords(std::move(keywords_in)),
               body(std::move(body_in)),
               decorators(std::move(decorators_in))
         {
@@ -645,6 +647,7 @@ namespace cxxpython::compiler_internal
 
         std::string name;
         std::vector<std::unique_ptr<Expr>> bases;
+        std::vector<CallArgument> keywords;
         std::vector<std::unique_ptr<Stmt>> body;
         std::vector<std::unique_ptr<Expr>> decorators;
 

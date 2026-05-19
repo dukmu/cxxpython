@@ -7,6 +7,11 @@ namespace cxxpython
 {
     namespace
     {
+        bool is_attribute_error(Runtime &runtime, const PythonError &error)
+        {
+            return error.type() == runtime.attribute_error_type();
+        }
+
         std::string exception_message_from_args(const TupleObject *args)
         {
             if (!args || args->size() == 0)
@@ -18,6 +23,61 @@ namespace cxxpython
                 return object_repr(args->items()[0]);
             }
             return object_repr(args);
+        }
+
+        void validate_class_keywords(Runtime &runtime, DictObject *keywords)
+        {
+            if (!keywords)
+                return;
+            for (const DictObject::Entry &entry : keywords->entries())
+            {
+                auto *name = dynamic_cast<StrObject *>(entry.key);
+                if (!name)
+                    raise_type_error(&runtime, "class keyword names must be strings");
+                if (name->value != "metaclass")
+                {
+                    raise_type_error(&runtime,
+                                     "class creation got an unexpected keyword argument '" +
+                                         name->value + "'");
+                }
+            }
+        }
+
+        TypeObject *explicit_metaclass_from_keywords(Runtime &runtime, DictObject *keywords)
+        {
+            if (!keywords)
+                return nullptr;
+            Object *metaclass = keywords->get(runtime.new_str("metaclass"));
+            if (!metaclass)
+                return nullptr;
+            auto *type = dynamic_cast<TypeObject *>(metaclass);
+            if (!type)
+                raise_type_error(&runtime, "metaclass must be a type");
+            return type;
+        }
+
+        Object *call_prepare(Runtime &runtime,
+                             TypeObject *metaclass,
+                             StrObject *name,
+                             TupleObject *bases)
+        {
+            Object *prepare = nullptr;
+            try
+            {
+                prepare = object_get_attr(metaclass, "__prepare__");
+            }
+            catch (const PythonError &error)
+            {
+                if (!is_attribute_error(runtime, error))
+                    throw;
+            }
+            if (!prepare)
+                return runtime.new_dict();
+
+            auto prepare_root = runtime.root(prepare);
+            if (dynamic_cast<MethodDescriptorObject *>(prepare_root.get()))
+                return object_call(prepare_root.get(), {metaclass, name, bases});
+            return object_call(prepare_root.get(), {name, bases});
         }
     }
 
@@ -416,6 +476,71 @@ namespace cxxpython
         if (base)
             bases.push_back(base);
         return new_class(std::move(name), std::move(bases), namespace_dict, std::move(module_fallback));
+    }
+
+    TypeObject *Runtime::build_class(const ClassBuildRequest &request)
+    {
+        if (!request.body_code)
+            raise_type_error(this, "__build_class__ requires a class body code object");
+        if (!request.bases)
+            raise_type_error(this, "__build_class__ requires a bases tuple");
+        if (!request.globals)
+            raise_type_error(this, "__build_class__ requires globals");
+        if (!request.builtins)
+            raise_type_error(this, "__build_class__ requires builtins");
+        VirtualMachine *vm = active_vm();
+        if (!vm)
+            raise_type_error(this, "__build_class__ requires an active virtual machine");
+
+        validate_class_keywords(*this, request.keywords);
+        auto bases_root = root(request.bases);
+        auto code_root = root(request.body_code);
+        auto globals_root = root(request.globals);
+        auto builtins_root = root(request.builtins);
+
+        std::vector<TypeObject *> base_types;
+        base_types.reserve(bases_root->size());
+        for (Object *base : bases_root->items())
+        {
+            auto *base_type = dynamic_cast<TypeObject *>(base);
+            if (!base_type)
+                raise_type_error(this, "class bases must be types");
+            base_types.push_back(base_type);
+        }
+
+        TypeObject *explicit_metaclass = explicit_metaclass_from_keywords(*this, request.keywords);
+        TypeObject *metaclass = select_metaclass(explicit_metaclass, base_types);
+        StrObject *name = new_str(request.name);
+        auto name_root = root(name);
+        Object *prepared = call_prepare(*this, metaclass, name_root.get(), bases_root.get());
+        auto prepared_root = root(prepared);
+        auto *namespace_dict = dynamic_cast<DictObject *>(prepared_root.get());
+        if (!namespace_dict)
+            raise_type_error(this, "__prepare__() must return a dict");
+
+        ClassConstructionRequest namespace_request;
+        namespace_request.name = request.name;
+        namespace_request.bases = base_types;
+        namespace_request.namespace_dict = namespace_dict;
+        namespace_request.module_fallback = request.module_fallback;
+        namespace_request.qualname = request.qualname.empty() ? request.name : request.qualname;
+        namespace_request.explicit_metaclass = metaclass;
+        prepare_class_namespace(namespace_request);
+
+        (void)vm->execute(ExecutionRequest{
+            .code = code_root.get(),
+            .locals = namespace_dict,
+            .globals = globals_root.get(),
+            .builtins = builtins_root.get(),
+            .mode = ExecutionMode::ClassBody,
+        });
+
+        Object *result = object_call(metaclass, {name_root.get(), bases_root.get(), namespace_dict});
+        auto result_root = root(result);
+        auto *type = dynamic_cast<TypeObject *>(result_root.get());
+        if (!type)
+            raise_type_error(this, "__build_class__() must return a type");
+        return type;
     }
 
     ExceptionObject *Runtime::new_exception(TypeObject *type, std::string message)

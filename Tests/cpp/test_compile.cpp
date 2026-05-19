@@ -1105,12 +1105,20 @@ TEST(Compile, CompilesMinimalClassDefinitions)
     ASSERT_NE(code, nullptr);
 
     bool saw_make_class = false;
+    bool saw_build_class_name = false;
     for (const cxxpython::Instruction &instruction : code->instructions())
     {
         if (instruction.opcode == cxxpython::Opcode::MakeClass)
             saw_make_class = true;
+        if (instruction.opcode == cxxpython::Opcode::LoadName)
+        {
+            auto *name = dynamic_cast<cxxpython::StrObject *>(code->names()[instruction.operand]);
+            if (name && name->value == "__build_class__")
+                saw_build_class_name = true;
+        }
     }
-    EXPECT_TRUE(saw_make_class);
+    EXPECT_FALSE(saw_make_class);
+    EXPECT_TRUE(saw_build_class_name);
 
     EXPECT_EQ(vm.execute(*code, *globals), runtime.none());
     auto *type = dynamic_cast<cxxpython::TypeObject *>(globals->get(runtime.new_str("A")));

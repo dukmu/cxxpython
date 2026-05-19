@@ -1,5 +1,55 @@
 # Development Status
 
+## 2026-05-19 Class Construction Substrate Slice
+
+Review focus:
+
+- Remove the VM-owned class construction policy before metaclass, import, and
+  descriptor work grow on top of it.
+- Make class statements use a Python-visible `__build_class__` path rather
+  than the old direct `MAKE_CLASS` lowering.
+- Keep `Runtime::new_class` as the low-level type allocator used by
+  `type(...)` / `type.__new__`.
+
+Completed:
+
+- Added `ClassBuildRequest` and `Runtime::build_class`.
+- Added `builtins.__build_class__` for Python function bodies.
+- Lowered class statements to load `__build_class__`, create a class-body
+  function, and call it with the class name, evaluated bases, and class
+  keywords.
+- Added parser/AST/compiler support for class keyword arguments, including
+  `metaclass=`.
+- Moved class-body namespace preparation, metaclass selection,
+  `__prepare__`, class-body execution, and final metaclass call behind the
+  runtime class-build API.
+- Kept `MAKE_CLASS` as a thin legacy bytecode dispatch that delegates to the
+  same runtime API.
+- Added Python golden coverage for `metaclass=`, `__prepare__` ordering, and
+  direct `__build_class__` use.
+
+Known debt and next risk:
+
+- `__prepare__` currently must return a `dict`. Full Python semantics require
+  accepting mapping objects once the mapping protocol can back `STORE_NAME`.
+- Class keywords are validated instead of silently ignored, but only
+  `metaclass=` is supported. Arbitrary class keywords should be forwarded to
+  custom metaclasses after `type.__new__` / `type.__init__` keyword handling is
+  designed.
+- Non-type callable metaclasses are intentionally rejected until class result
+  validation, call protocol, and layout guarantees are ready for them.
+- Class body lowering now uses a function object, but `__class__` cells,
+  zero-argument `super()`, and closure-aware class scopes remain in the
+  closure/cell substrate slice.
+- `MAKE_CLASS` remains only for bytecode compatibility tests. New compiler
+  output should continue through `__build_class__`.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter='Bytecode.DispatchesMakeClass:Bytecode.MakeClassUsesEvaluatedBases:Bytecode.RejectsMalformedBytecode:Compile.*Class*:PythonScripts.RunsGoldenFiles'`
+- `ctest --test-dir build --output-on-failure`
+
 ## 2026-05-19 Execution Request Substrate Slice
 
 Review focus:

@@ -33,6 +33,18 @@ namespace cxxpython
         TypeObject *explicit_metaclass = nullptr;
     };
 
+    struct ClassBuildRequest
+    {
+        std::string name;
+        CodeObject *body_code = nullptr;
+        TupleObject *bases = nullptr;
+        DictObject *keywords = nullptr;
+        DictObject *globals = nullptr;
+        DictObject *builtins = nullptr;
+        std::string module_fallback = "builtins";
+        std::string qualname;
+    };
+
     class Runtime final
     {
     public:
@@ -182,6 +194,7 @@ namespace cxxpython
                               TypeObject *base,
                               DictObject *namespace_dict,
                               std::string module_fallback = "builtins");
+        TypeObject *build_class(const ClassBuildRequest &request);
         ExceptionObject *new_exception(TypeObject *type, std::string message);
         ExceptionObject *new_exception(TypeObject *type, std::vector<Object *> args);
         ExceptionObject *new_type_error(std::string message);

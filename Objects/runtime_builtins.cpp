@@ -505,6 +505,47 @@ namespace cxxpython
             });
             return runtime.none();
         }
+
+        std::string module_name_from_globals(Runtime &runtime, DictObject *globals)
+        {
+            if (globals)
+            {
+                if (auto *name = dynamic_cast<StrObject *>(globals->get(runtime.new_str("__name__"))))
+                    return name->value;
+            }
+            return "__main__";
+        }
+
+        Object *builtin_build_class(Runtime &runtime, const CallArguments &args)
+        {
+            if (args.positional.size() < 2)
+                raise_type_error(&runtime, "__build_class__() missing function or name");
+            auto *function = dynamic_cast<PythonFunctionObject *>(args.positional[0]);
+            if (!function)
+                raise_type_error(&runtime, "__build_class__() argument 1 must be a function");
+            auto *name = dynamic_cast<StrObject *>(args.positional[1]);
+            if (!name)
+                raise_type_error(&runtime, "__build_class__() argument 2 must be a str");
+
+            std::vector<Object *> bases;
+            bases.reserve(args.positional.size() - 2);
+            for (std::size_t index = 2; index < args.positional.size(); ++index)
+                bases.push_back(args.positional[index]);
+            TupleObject *bases_tuple = runtime.new_tuple(std::move(bases));
+            auto bases_root = runtime.root(bases_tuple);
+
+            Frame *frame = current_frame_or_error(runtime, "__build_class__");
+            return runtime.build_class(ClassBuildRequest{
+                .name = name->value,
+                .body_code = function->code(),
+                .bases = bases_root.get(),
+                .keywords = args.keywords,
+                .globals = function->globals(),
+                .builtins = frame->builtins(),
+                .module_fallback = module_name_from_globals(runtime, function->globals()),
+                .qualname = name->value,
+            });
+        }
     }
 
     void Runtime::initialize_builtins()
@@ -570,5 +611,6 @@ namespace cxxpython
         dict->set(new_str("compile"), new_native_function("compile", builtin_compile));
         dict->set(new_str("eval"), new_native_function("eval", builtin_eval));
         dict->set(new_str("exec"), new_native_function("exec", builtin_exec));
+        dict->set(new_str("__build_class__"), new_native_function("__build_class__", builtin_build_class));
     }
 }

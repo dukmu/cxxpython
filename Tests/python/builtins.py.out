@@ -1,4 +1,4 @@
-['AttributeError', 'BaseException', 'Exception', 'False', 'IndexError', 'KeyError', 'NameError', 'None', 'NotImplemented', 'StopIteration', 'SyntaxError', 'True', 'TypeError', 'UnboundLocalError', 'ValueError', '__builtins__', '__file__', '__name__', 'all', 'any', 'bool', 'callable', 'classmethod', 'compile', 'dict', 'dir', 'enumerate', 'eval', 'exec', 'filter', 'format', 'globals', 'hash', 'id', 'int', 'isinstance', 'issubclass', 'iter', 'len', 'list', 'locals', 'map', 'max', 'min', 'next', 'object', 'print', 'property', 'range', 'repr', 'sorted', 'staticmethod', 'str', 'sum', 'tuple', 'type', 'vars', 'zip']
+['AttributeError', 'BaseException', 'Exception', 'False', 'IndexError', 'KeyError', 'NameError', 'None', 'NotImplemented', 'StopIteration', 'SyntaxError', 'True', 'TypeError', 'UnboundLocalError', 'ValueError', '__build_class__', '__builtins__', '__file__', '__name__', 'all', 'any', 'bool', 'callable', 'classmethod', 'compile', 'dict', 'dir', 'enumerate', 'eval', 'exec', 'filter', 'format', 'globals', 'hash', 'id', 'int', 'isinstance', 'issubclass', 'iter', 'len', 'list', 'locals', 'map', 'max', 'min', 'next', 'object', 'print', 'property', 'range', 'repr', 'sorted', 'staticmethod', 'str', 'sum', 'tuple', 'type', 'vars', 'zip']
 builtins
 <class 'module'>
 True
@@ -16,6 +16,7 @@ cat
 ['ant', 'bee', 'cat']
 {'b': 2, 'a': 1}
 1
+True
 True
 True
 True
@@ -78,3 +79,4 @@ abc
 3
 7
 42
+from-build-class

@@ -282,7 +282,7 @@ namespace cxxpython
         case Opcode::MakeFunction:
             return 0;
         case Opcode::MakeClass:
-            return -1;
+            return -2;
         case Opcode::DupTop:
             return 1;
         case Opcode::StoreName:

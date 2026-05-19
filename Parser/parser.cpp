@@ -346,6 +346,9 @@ namespace cxxpython::compiler_internal
                     raise_at(peek(), "expected class name");
                 std::string name = advance().lexeme;
                 std::vector<std::unique_ptr<Expr>> bases;
+                std::vector<CallArgument> keywords;
+                std::vector<std::string> keyword_names;
+                bool seen_keyword = false;
                 if (peek().kind == TokenKind::LeftParen)
                 {
                     advance();
@@ -353,7 +356,25 @@ namespace cxxpython::compiler_internal
                     {
                         while (true)
                         {
-                            bases.push_back(parse_expression_only());
+                            if (peek().kind == TokenKind::Identifier && peek_next().kind == TokenKind::Equal)
+                            {
+                                seen_keyword = true;
+                                std::string keyword = advance().lexeme;
+                                advance();
+                                for (const std::string &existing : keyword_names)
+                                {
+                                    if (existing == keyword)
+                                        raise_at(previous(), "class keyword repeated");
+                                }
+                                keyword_names.push_back(keyword);
+                                keywords.emplace_back(std::move(keyword), parse_expression_only());
+                            }
+                            else
+                            {
+                                if (seen_keyword)
+                                    raise_at(peek(), "positional base follows class keyword");
+                                bases.push_back(parse_expression_only());
+                            }
                             if (peek().kind != TokenKind::Comma)
                                 break;
                             advance();
@@ -369,6 +390,7 @@ namespace cxxpython::compiler_internal
                 auto statement = std::make_unique<ClassDefStmt>(
                     std::move(name),
                     std::move(bases),
+                    std::move(keywords),
                     std::move(body),
                     std::move(decorators));
                 statement->line = class_token.line;

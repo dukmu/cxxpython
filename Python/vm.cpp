@@ -807,37 +807,27 @@ namespace cxxpython
                 auto *class_code = dynamic_cast<CodeObject *>(code_object);
                 if (!class_code)
                     throw BytecodeError("MAKE_CLASS requires a code object");
+                Object *keywords_object = frame->pop();
+                auto *keywords = dynamic_cast<DictObject *>(keywords_object);
+                if (!keywords)
+                    throw BytecodeError("MAKE_CLASS requires a keyword dict");
                 Object *bases_object = frame->pop();
                 auto *bases_tuple = dynamic_cast<TupleObject *>(bases_object);
                 if (!bases_tuple)
                     throw BytecodeError("MAKE_CLASS requires a tuple of bases");
                 auto class_code_root = runtime_.root(class_code);
+                auto keywords_root = runtime_.root(keywords);
                 auto bases_tuple_root = runtime_.root(bases_tuple);
-                std::vector<TypeObject *> bases;
-                bases.reserve(bases_tuple->size());
-                for (Object *base : bases_tuple->items())
-                {
-                    auto *base_type = dynamic_cast<TypeObject *>(base);
-                    if (!base_type)
-                        raise_type_error(&runtime_, "class bases must be types");
-                    bases.push_back(base_type);
-                }
-                ClassConstructionRequest request;
-                request.name = class_name->value;
-                request.bases = std::move(bases);
-                request.module_fallback = module_name_from_globals(runtime_, globals);
-                request.qualname = class_name->value;
-                DictObject *namespace_dict = runtime_.prepare_class_namespace(request);
-                auto namespace_root = runtime_.root(namespace_dict);
-                (void)execute(ExecutionRequest{
-                    .code = class_code,
-                    .locals = namespace_dict,
+                TypeObject *type = runtime_.build_class(ClassBuildRequest{
+                    .name = class_name->value,
+                    .body_code = class_code_root.get(),
+                    .bases = bases_tuple_root.get(),
+                    .keywords = keywords_root.get(),
                     .globals = &globals,
                     .builtins = &builtins,
-                    .mode = ExecutionMode::ClassBody,
+                    .module_fallback = module_name_from_globals(runtime_, globals),
+                    .qualname = class_name->value,
                 });
-                request.namespace_dict = namespace_dict;
-                TypeObject *type = runtime_.new_class(std::move(request));
                 auto type_root = runtime_.root(type);
                 frame->push(type);
                 break;
