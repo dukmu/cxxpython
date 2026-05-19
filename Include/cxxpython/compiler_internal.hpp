@@ -23,6 +23,7 @@ namespace cxxpython::compiler_internal
     struct NameExpr;
     struct AttributeExpr;
     struct SubscriptExpr;
+    struct SliceExpr;
     struct ListExpr;
     struct TupleExpr;
     struct DictExpr;
@@ -54,6 +55,7 @@ namespace cxxpython::compiler_internal
         virtual void visit(const NameExpr &expression) = 0;
         virtual void visit(const AttributeExpr &expression) = 0;
         virtual void visit(const SubscriptExpr &expression) = 0;
+        virtual void visit(const SliceExpr &expression) = 0;
         virtual void visit(const ListExpr &expression) = 0;
         virtual void visit(const TupleExpr &expression) = 0;
         virtual void visit(const DictExpr &expression) = 0;
@@ -346,6 +348,27 @@ namespace cxxpython::compiler_internal
 
         std::unique_ptr<Expr> object;
         std::unique_ptr<Expr> key;
+
+        void accept(ExprVisitor &visitor) const override
+        {
+            visitor.visit(*this);
+        }
+    };
+
+    struct SliceExpr final : Expr
+    {
+        SliceExpr(std::unique_ptr<Expr> start_in,
+                  std::unique_ptr<Expr> stop_in,
+                  std::unique_ptr<Expr> step_in)
+            : start(std::move(start_in)),
+              stop(std::move(stop_in)),
+              step(std::move(step_in))
+        {
+        }
+
+        std::unique_ptr<Expr> start;
+        std::unique_ptr<Expr> stop;
+        std::unique_ptr<Expr> step;
 
         void accept(ExprVisitor &visitor) const override
         {

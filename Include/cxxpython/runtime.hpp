@@ -61,6 +61,7 @@ namespace cxxpython
         TypeObject *str_type() const noexcept;
         TypeObject *list_type() const noexcept;
         TypeObject *tuple_type() const noexcept;
+        TypeObject *slice_type() const noexcept;
         TypeObject *dict_type() const noexcept;
         TypeObject *mappingproxy_type() const noexcept;
         TypeObject *sequence_iterator_type() const noexcept;
@@ -116,6 +117,7 @@ namespace cxxpython
         StrObject *new_str(std::string value);
         ListObject *new_list(std::vector<Object *> items);
         TupleObject *new_tuple(std::vector<Object *> items);
+        SliceObject *new_slice(Object *start, Object *stop, Object *step);
         DictObject *new_dict();
         MappingProxyObject *new_mappingproxy(DictObject *mapping);
         SequenceIteratorObject *new_sequence_iterator(Object *sequence);
@@ -281,6 +283,7 @@ namespace cxxpython
         TypeObject *str_type_ = nullptr;
         TypeObject *list_type_ = nullptr;
         TypeObject *tuple_type_ = nullptr;
+        TypeObject *slice_type_ = nullptr;
         TypeObject *dict_type_ = nullptr;
         TypeObject *mappingproxy_type_ = nullptr;
         TypeObject *sequence_iterator_type_ = nullptr;

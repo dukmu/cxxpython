@@ -827,6 +827,21 @@ namespace cxxpython
                 frame->push(dict);
                 break;
             }
+            case Opcode::BuildSlice:
+            {
+                if (instruction.operand != 3)
+                    throw BytecodeError("BUILD_SLICE operand must be 3");
+                Object *step = frame->pop();
+                Object *stop = frame->pop();
+                Object *start = frame->pop();
+                auto step_root = runtime_.root(step);
+                auto stop_root = runtime_.root(stop);
+                auto start_root = runtime_.root(start);
+                SliceObject *slice = runtime_.new_slice(start, stop, step);
+                auto slice_root = runtime_.root(slice);
+                frame->push(slice);
+                break;
+            }
             case Opcode::CompareOp:
             {
                 const ComparisonOp op = decode_comparison_op(instruction.operand);

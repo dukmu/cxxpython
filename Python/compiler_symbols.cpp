@@ -66,6 +66,16 @@ namespace cxxpython
                 expression.key->accept(*this);
             }
 
+            void visit(const compiler_internal::SliceExpr &expression) override
+            {
+                if (expression.start)
+                    expression.start->accept(*this);
+                if (expression.stop)
+                    expression.stop->accept(*this);
+                if (expression.step)
+                    expression.step->accept(*this);
+            }
+
             void visit(const compiler_internal::ListExpr &expression) override
             {
                 for (const auto &item : expression.items)
@@ -447,6 +457,16 @@ namespace cxxpython
             {
                 expression.object->accept(*this);
                 expression.key->accept(*this);
+            }
+
+            void visit(const compiler_internal::SliceExpr &expression) override
+            {
+                if (expression.start)
+                    expression.start->accept(*this);
+                if (expression.stop)
+                    expression.stop->accept(*this);
+                if (expression.step)
+                    expression.step->accept(*this);
             }
 
             void visit(const compiler_internal::ListExpr &expression) override

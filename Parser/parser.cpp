@@ -632,7 +632,7 @@ namespace cxxpython::compiler_internal
                     if (peek().kind == TokenKind::LeftBracket)
                     {
                         advance();
-                        std::unique_ptr<Expr> key = parse_expression_only();
+                        std::unique_ptr<Expr> key = parse_subscript_key();
                         consume(TokenKind::RightBracket, "expected ']' after subscript");
                         expression = std::make_unique<SubscriptExpr>(std::move(expression), std::move(key));
                         continue;
@@ -644,6 +644,42 @@ namespace cxxpython::compiler_internal
                     expression = std::make_unique<AttributeExpr>(std::move(expression), advance().lexeme);
                 }
                 return expression;
+            }
+
+            std::unique_ptr<Expr> parse_subscript_key()
+            {
+                if (peek().kind == TokenKind::Colon)
+                {
+                    advance();
+                    std::unique_ptr<Expr> stop;
+                    std::unique_ptr<Expr> step;
+                    if (peek().kind != TokenKind::Colon && peek().kind != TokenKind::RightBracket)
+                        stop = parse_expression_only();
+                    if (peek().kind == TokenKind::Colon)
+                    {
+                        advance();
+                        if (peek().kind != TokenKind::RightBracket)
+                            step = parse_expression_only();
+                    }
+                    return std::make_unique<SliceExpr>(nullptr, std::move(stop), std::move(step));
+                }
+
+                std::unique_ptr<Expr> first = parse_expression_only();
+                if (peek().kind != TokenKind::Colon)
+                    return first;
+
+                advance();
+                std::unique_ptr<Expr> stop;
+                std::unique_ptr<Expr> step;
+                if (peek().kind != TokenKind::Colon && peek().kind != TokenKind::RightBracket)
+                    stop = parse_expression_only();
+                if (peek().kind == TokenKind::Colon)
+                {
+                    advance();
+                    if (peek().kind != TokenKind::RightBracket)
+                        step = parse_expression_only();
+                }
+                return std::make_unique<SliceExpr>(std::move(first), std::move(stop), std::move(step));
             }
 
             std::unique_ptr<Expr> parse_parenthesized_expression()

@@ -47,6 +47,11 @@ namespace cxxpython
         return tuple_type_;
     }
 
+    TypeObject *Runtime::slice_type() const noexcept
+    {
+        return slice_type_;
+    }
+
     TypeObject *Runtime::dict_type() const noexcept
     {
         return dict_type_;

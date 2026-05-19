@@ -17,6 +17,7 @@ namespace cxxpython
     class CodeObject;
     class NotImplementedObject;
     class ListObject;
+    class SliceObject;
     class DictObject;
     class MappingProxyObject;
     class SequenceIteratorObject;
@@ -164,6 +165,14 @@ namespace cxxpython
         InitSlot init = nullptr;
     };
 
+    struct SliceRange
+    {
+        std::int64_t start;
+        std::int64_t stop;
+        std::int64_t step;
+        std::size_t length;
+    };
+
     using TypeFlags = std::uint32_t;
     constexpr TypeFlags TypeFlagHeapType = 1U << 0;
     constexpr TypeFlags TypeFlagHasInstanceDict = 1U << 1;
@@ -285,6 +294,21 @@ namespace cxxpython
 
     private:
         std::vector<Object *> items_;
+    };
+
+    class SliceObject final : public Object
+    {
+    public:
+        SliceObject(TypeObject *type, Object *start, Object *stop, Object *step);
+
+        Object *start() const noexcept;
+        Object *stop() const noexcept;
+        Object *step() const noexcept;
+
+    private:
+        Object *start_;
+        Object *stop_;
+        Object *step_;
     };
 
     class DictObject final : public Object
@@ -718,6 +742,7 @@ namespace cxxpython
     bool object_contains(Object *object, Object *key);
     Object *object_iter(Object *object);
     Object *object_next(Object *iterator);
+    SliceRange normalize_slice(Runtime &runtime, const SliceObject &slice, std::int64_t sequence_length);
     Object *super_get_attr_default(SuperObject *super, StrObject *name);
     Object *object_get_attr_default(Object *object, StrObject *name);
     Object *object_get_attr(Object *object, StrObject *name);
@@ -742,6 +767,7 @@ namespace cxxpython
     TypeSlots make_str_slots();
     TypeSlots make_list_slots();
     TypeSlots make_tuple_slots();
+    TypeSlots make_slice_slots();
     TypeSlots make_dict_slots();
     TypeSlots make_mappingproxy_slots();
     TypeSlots make_sequence_iterator_slots();

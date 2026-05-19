@@ -91,6 +91,7 @@ TEST(Module, BootstrapsBuiltinsModule)
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("str")), runtime.str_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("list")), runtime.list_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("tuple")), runtime.tuple_type());
+    EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("slice")), runtime.slice_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("dict")), runtime.dict_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("range")), runtime.range_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("enumerate")), runtime.enumerate_type());

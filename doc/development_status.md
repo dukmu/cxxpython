@@ -1,5 +1,44 @@
 # Development Status
 
+## 2026-05-19 Slice Substrate Slice
+
+Review focus:
+
+- Add slicing as a normal object-space substrate, not as parser-only list
+  special casing.
+- Keep slice syntax lowering, VM dispatch, builtin `slice`, and sequence
+  `__getitem__` on one coherent path.
+- Cover negative-step defaults because that is where slice implementations
+  most often drift from Python semantics.
+
+Completed:
+
+- Added `SliceObject`, `slice` builtin type, runtime factory/accessor/rooting,
+  repr, traversal, and constructor semantics.
+- Added `slice.indices(length)` with CPython-style default adjustment for
+  positive and negative steps.
+- Added `BUILD_SLICE` bytecode and VM dispatch.
+- Added parser/AST/compiler support for `a[start:stop:step]`, including
+  omitted start/stop/step components.
+- Added list, tuple, and str slicing through the existing `getitem` slot path.
+- Added Python golden coverage for `slice()`, `indices()`, list/tuple/str
+  slicing, and reverse slicing.
+
+Known debt and next risk:
+
+- Slice assignment and deletion remain intentionally deferred until list
+  mutation semantics are widened beyond single-index operations.
+- Range slicing should return a range object later; currently this slice
+  substrate is wired for list, tuple, and str.
+- Slice components currently accept `int` or `None`; future `__index__`
+  support should be centralized across indexing and slicing.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter='PythonScripts.RunsGoldenFiles:Bytecode.MetadataNamesAndStackEffects:Module.BootstrapsBuiltinsModule'`
+- `ctest --test-dir build --output-on-failure`
+
 ## 2026-05-19 Symbol Analysis Module Slice
 
 Review focus:

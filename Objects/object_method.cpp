@@ -73,6 +73,30 @@ namespace cxxpython
             return runtime.none();
         }
 
+        Object *slice_indices_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (args.size() != 1)
+            {
+                std::ostringstream message;
+                message << "slice.indices() takes exactly one argument ("
+                        << args.size() << " given)";
+                raise_type_error(&runtime, message.str());
+            }
+            auto *slice = dynamic_cast<SliceObject *>(self);
+            if (!slice)
+                raise_type_error(&runtime, "slice.indices() receiver does not have slice layout");
+            auto *length = dynamic_cast<IntObject *>(args[0]);
+            if (!length)
+                raise_type_error(&runtime, "slice.indices() argument must be int");
+
+            SliceRange range = normalize_slice(runtime, *slice, length->value);
+            return runtime.new_tuple({
+                runtime.new_int(range.start),
+                runtime.new_int(range.stop),
+                runtime.new_int(range.step),
+            });
+        }
+
         Object *object_getattribute_method(Runtime &runtime, Object *self, ObjectSpan args)
         {
             if (args.size() != 1)
@@ -539,6 +563,8 @@ namespace cxxpython
                              new_method_descriptor("__index__", int_type_, int_identity_method));
         list_type_->dict->set(new_str("append"),
                               new_method_descriptor("append", list_type_, list_append_method));
+        slice_type_->dict->set(new_str("indices"),
+                               new_method_descriptor("indices", slice_type_, slice_indices_method));
         property_type_->dict->set(new_str("getter"),
                                   new_method_descriptor("getter", property_type_, property_getter_method));
         property_type_->dict->set(new_str("setter"),

@@ -442,6 +442,8 @@ namespace cxxpython
         add_common_object_wrappers(tuple_type_, true);
         add_sequence_wrappers(tuple_type_, false);
 
+        add_common_object_wrappers(slice_type_, true);
+
         add_common_object_wrappers(dict_type_, false);
         add_sequence_wrappers(dict_type_, true);
 

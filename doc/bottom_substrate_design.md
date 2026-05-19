@@ -199,23 +199,26 @@ Acceptance tests:
 Current state:
 
 - Negative integer indexing exists for list/tuple and str getitem.
-- There is no `slice` object, slice syntax, or sequence slicing protocol.
+- `SliceObject` exists as the builtin `slice` type.
+- `slice(start, stop, step)` and `slice.indices(length)` are implemented for
+  integer/None components.
+- Parser, AST, compiler, bytecode, and VM support `a[start:stop:step]` through
+  `BUILD_SLICE`.
+- List, tuple, and str slicing use the ordinary `getitem` slot path.
 
 Target design:
 
-- Add `SliceObject` with `start`, `stop`, `step`, each nullable/None.
-- Add `slice` builtin type and `indices(length)` method.
-- Parser lowers `a[b:c:d]` to a `SliceExpr` key object before subscript
-  dispatch.
-- Sequence slots should accept either integer keys or `slice` keys through the
-  normal `getitem` path.
-- List/tuple/str slicing should return the same sequence family.
+- Add slice assignment/deletion only after list mutation semantics are designed
+  for ranged replacement.
+- Add `__index__` integration so slice components share the same conversion
+  path as integer indexing.
+- Add range slicing so `range(...)[slice]` returns a compact range object.
 
 Acceptance tests:
 
-- `slice(1, 5, 2).indices(10)`
-- `[0, 1, 2, 3][1:3]`
-- `'abcd'[::-1]`
+- `slice(1, 5, 2).indices(10)`. Done.
+- `[0, 1, 2, 3][1:3]`. Done.
+- `'abcd'[::-1]`. Done.
 - slice assignment is deferred until list mutation semantics are designed.
 
 ## Byte And Buffer Substrate

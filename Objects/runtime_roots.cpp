@@ -151,6 +151,7 @@ namespace cxxpython
         initialize_type_dict(str_type_);
         initialize_type_dict(list_type_);
         initialize_type_dict(tuple_type_);
+        initialize_type_dict(slice_type_);
         initialize_type_dict(dict_type_);
         initialize_type_dict(mappingproxy_type_);
         initialize_type_dict(sequence_iterator_type_);

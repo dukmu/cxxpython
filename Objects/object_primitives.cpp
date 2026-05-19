@@ -4,6 +4,7 @@
 #include "object_utils.hpp"
 
 #include <charconv>
+#include <utility>
 
 namespace cxxpython
 {
@@ -267,6 +268,19 @@ namespace cxxpython
         Object *str_getitem(Object &object, Object *key)
         {
             auto &text = static_cast<StrObject &>(object);
+            if (auto *slice = dynamic_cast<SliceObject *>(key))
+            {
+                SliceRange range = normalize_slice(*object.runtime(), *slice, static_cast<std::int64_t>(text.value.size()));
+                std::string result;
+                result.reserve(range.length);
+                std::int64_t index = range.start;
+                for (std::size_t count = 0; count < range.length; ++count)
+                {
+                    result.push_back(text.value[static_cast<std::size_t>(index)]);
+                    index += range.step;
+                }
+                return object.runtime()->new_str(std::move(result));
+            }
             const std::int64_t size = static_cast<std::int64_t>(text.value.size());
             const std::int64_t index = str_index(object, key);
             const std::int64_t resolved = index < 0 ? size + index : index;

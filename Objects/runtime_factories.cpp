@@ -101,6 +101,15 @@ namespace cxxpython
         return allocate<TupleObject>(tuple_type_, std::move(items));
     }
 
+    SliceObject *Runtime::new_slice(Object *start, Object *stop, Object *step)
+    {
+        return allocate<SliceObject>(
+            slice_type_,
+            start ? start : none_,
+            stop ? stop : none_,
+            step ? step : none_);
+    }
+
     DictObject *Runtime::new_dict()
     {
         return allocate<DictObject>(dict_type_);

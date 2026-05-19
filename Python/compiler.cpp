@@ -240,6 +240,23 @@ namespace cxxpython
                 emit({Opcode::BinarySubscr, 0});
             }
 
+            void visit(const compiler_internal::SliceExpr &expression) override
+            {
+                if (expression.start)
+                    expression.start->accept(*this);
+                else
+                    emit_constant(runtime_.none());
+                if (expression.stop)
+                    expression.stop->accept(*this);
+                else
+                    emit_constant(runtime_.none());
+                if (expression.step)
+                    expression.step->accept(*this);
+                else
+                    emit_constant(runtime_.none());
+                emit({Opcode::BuildSlice, 3});
+            }
+
             void visit(const compiler_internal::ListExpr &expression) override
             {
                 for (const auto &item : expression.items)

@@ -600,6 +600,7 @@ namespace cxxpython
         dict->set(new_str("str"), str_type_);
         dict->set(new_str("list"), list_type_);
         dict->set(new_str("tuple"), tuple_type_);
+        dict->set(new_str("slice"), slice_type_);
         dict->set(new_str("dict"), dict_type_);
         dict->set(new_str("range"), range_type_);
         dict->set(new_str("enumerate"), enumerate_type_);

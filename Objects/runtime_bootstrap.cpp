@@ -17,6 +17,7 @@ namespace cxxpython
         str_type_ = allocate_type("str");
         list_type_ = allocate_type("list");
         tuple_type_ = allocate_type("tuple");
+        slice_type_ = allocate_type("slice");
         dict_type_ = allocate_type("dict");
         mappingproxy_type_ = allocate_type("mappingproxy");
         sequence_iterator_type_ = allocate_type("iterator");
@@ -64,6 +65,7 @@ namespace cxxpython
         str_type_->slots = make_str_slots();
         list_type_->slots = make_list_slots();
         tuple_type_->slots = make_tuple_slots();
+        slice_type_->slots = make_slice_slots();
         dict_type_->slots = make_dict_slots();
         mappingproxy_type_->slots = make_mappingproxy_slots();
         sequence_iterator_type_->slots = make_sequence_iterator_slots();
@@ -111,6 +113,7 @@ namespace cxxpython
         str_type_->set_type(type_type_);
         list_type_->set_type(type_type_);
         tuple_type_->set_type(type_type_);
+        slice_type_->set_type(type_type_);
         dict_type_->set_type(type_type_);
         mappingproxy_type_->set_type(type_type_);
         sequence_iterator_type_->set_type(type_type_);
@@ -161,6 +164,7 @@ namespace cxxpython
         initialize_type(str_type_, object_type_);
         initialize_type(list_type_, object_type_);
         initialize_type(tuple_type_, object_type_);
+        initialize_type(slice_type_, object_type_);
         initialize_type(dict_type_, object_type_);
         initialize_type(mappingproxy_type_, object_type_);
         initialize_type(sequence_iterator_type_, object_type_);
@@ -208,6 +212,7 @@ namespace cxxpython
         str_type_->solid_base = str_type_;
         list_type_->solid_base = list_type_;
         tuple_type_->solid_base = tuple_type_;
+        slice_type_->solid_base = slice_type_;
         dict_type_->solid_base = dict_type_;
         mappingproxy_type_->solid_base = mappingproxy_type_;
         sequence_iterator_type_->solid_base = sequence_iterator_type_;
@@ -260,6 +265,7 @@ namespace cxxpython
         add_root(str_type_);
         add_root(list_type_);
         add_root(tuple_type_);
+        add_root(slice_type_);
         add_root(dict_type_);
         add_root(mappingproxy_type_);
         add_root(sequence_iterator_type_);

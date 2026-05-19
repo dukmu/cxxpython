@@ -41,6 +41,7 @@ namespace cxxpython
         BuildList,
         BuildTuple,
         BuildMap,
+        BuildSlice,
         CompareOp,
         JumpAbsolute,
         PopJumpIfFalse,

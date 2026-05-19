@@ -258,6 +258,8 @@ namespace cxxpython
             return "BUILD_TUPLE";
         case Opcode::BuildMap:
             return "BUILD_MAP";
+        case Opcode::BuildSlice:
+            return "BUILD_SLICE";
         case Opcode::CompareOp:
             return "COMPARE_OP";
         case Opcode::JumpAbsolute:
@@ -355,6 +357,8 @@ namespace cxxpython
             return 1 - static_cast<int>(instruction.operand);
         case Opcode::BuildMap:
             return 1 - 2 * static_cast<int>(instruction.operand);
+        case Opcode::BuildSlice:
+            return 1 - static_cast<int>(instruction.operand);
         case Opcode::Call:
             return -static_cast<int>(instruction.operand);
         case Opcode::CallKw:

@@ -5,6 +5,7 @@
 
 #include <cstddef>
 #include <sstream>
+#include <utility>
 
 namespace cxxpython
 {
@@ -67,6 +68,22 @@ namespace cxxpython
             return index->value;
         }
 
+        std::vector<Object *> slice_items(Runtime &runtime,
+                                          const std::vector<Object *> &items,
+                                          const SliceObject &slice)
+        {
+            SliceRange range = normalize_slice(runtime, slice, static_cast<std::int64_t>(items.size()));
+            std::vector<Object *> result;
+            result.reserve(range.length);
+            std::int64_t index = range.start;
+            for (std::size_t count = 0; count < range.length; ++count)
+            {
+                result.push_back(items[static_cast<std::size_t>(index)]);
+                index += range.step;
+            }
+            return result;
+        }
+
         std::size_t list_length(const Object &object)
         {
             return static_cast<const ListObject *>(&object)->size();
@@ -75,6 +92,8 @@ namespace cxxpython
         Object *list_getitem(Object &object, Object *key)
         {
             auto &list = static_cast<ListObject &>(object);
+            if (auto *slice = dynamic_cast<SliceObject *>(key))
+                return object.runtime()->new_list(slice_items(*object.runtime(), list.items(), *slice));
             return list.get(sequence_index(object, key, "list"));
         }
 
@@ -187,6 +206,8 @@ namespace cxxpython
         Object *tuple_getitem(Object &object, Object *key)
         {
             auto &tuple = static_cast<TupleObject &>(object);
+            if (auto *slice = dynamic_cast<SliceObject *>(key))
+                return object.runtime()->new_tuple(slice_items(*object.runtime(), tuple.items(), *slice));
             const std::int64_t size = static_cast<std::int64_t>(tuple.size());
             const std::int64_t index = sequence_index(object, key, "tuple");
             const std::int64_t resolved = index < 0 ? size + index : index;
