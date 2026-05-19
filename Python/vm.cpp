@@ -113,11 +113,11 @@ namespace cxxpython
         void attach_source_location(const PythonError &error, const CodeObject &code, std::size_t instruction_index)
         {
             ExceptionObject *value = error.value();
-            if (!value || value->has_source_location())
+            if (!value)
                 return;
             const std::uint32_t line = code.line_for_instruction(instruction_index);
             if (line != 0)
-                value->set_source_location(code.filename(), line, code.name());
+                value->add_traceback_entry(code.filename(), line, code.name());
         }
 
         void add_temporary_root(Runtime &runtime, std::vector<Rooted<Object>> &roots, Object *object)

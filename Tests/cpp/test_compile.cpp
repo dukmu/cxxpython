@@ -420,6 +420,10 @@ TEST(Compile, EmitsLineTableAndAttachesRuntimeErrorLocation)
         EXPECT_EQ(error.value()->source_filename(), "script.py");
         EXPECT_EQ(error.value()->source_name(), "<module>");
         EXPECT_EQ(error.value()->source_line(), 2U);
+        ASSERT_EQ(error.value()->traceback_entries().size(), 1U);
+        EXPECT_EQ(error.value()->traceback_entries()[0].filename, "script.py");
+        EXPECT_EQ(error.value()->traceback_entries()[0].name, "<module>");
+        EXPECT_EQ(error.value()->traceback_entries()[0].line, 2U);
     }
 }
 
@@ -448,6 +452,13 @@ TEST(Compile, KeepsInnerFunctionRuntimeErrorLocation)
         EXPECT_EQ(error.value()->source_filename(), "script.py");
         EXPECT_EQ(error.value()->source_name(), "fail");
         EXPECT_EQ(error.value()->source_line(), 3U);
+        ASSERT_EQ(error.value()->traceback_entries().size(), 2U);
+        EXPECT_EQ(error.value()->traceback_entries()[0].filename, "script.py");
+        EXPECT_EQ(error.value()->traceback_entries()[0].name, "fail");
+        EXPECT_EQ(error.value()->traceback_entries()[0].line, 3U);
+        EXPECT_EQ(error.value()->traceback_entries()[1].filename, "script.py");
+        EXPECT_EQ(error.value()->traceback_entries()[1].name, "<module>");
+        EXPECT_EQ(error.value()->traceback_entries()[1].line, 4U);
     }
 }
 

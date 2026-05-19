@@ -88,6 +88,30 @@ namespace cxxpython
         source_line_ = line;
     }
 
+    void ExceptionObject::add_traceback_entry(std::string filename, std::uint32_t line, std::string name)
+    {
+        if (line == 0)
+            return;
+        if (!traceback_.empty())
+        {
+            const TracebackEntry &last = traceback_.back();
+            if (last.filename == filename && last.line == line && last.name == name)
+                return;
+        }
+        if (!has_source_location())
+            set_source_location(filename, line, name);
+        traceback_.push_back(TracebackEntry{
+            .filename = std::move(filename),
+            .line = line,
+            .name = std::move(name),
+        });
+    }
+
+    const std::vector<ExceptionObject::TracebackEntry> &ExceptionObject::traceback_entries() const noexcept
+    {
+        return traceback_;
+    }
+
     TypeSlots make_exception_slots()
     {
         return TypeSlots{

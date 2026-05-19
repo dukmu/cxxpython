@@ -705,6 +705,13 @@ namespace cxxpython
     class ExceptionObject final : public Object
     {
     public:
+        struct TracebackEntry
+        {
+            std::string filename;
+            std::uint32_t line = 0;
+            std::string name;
+        };
+
         ExceptionObject(TypeObject *type, TupleObject *args, std::string message);
 
         TupleObject *args() const noexcept;
@@ -714,6 +721,8 @@ namespace cxxpython
         const std::string &source_name() const noexcept;
         std::uint32_t source_line() const noexcept;
         void set_source_location(std::string filename, std::uint32_t line, std::string name);
+        void add_traceback_entry(std::string filename, std::uint32_t line, std::string name);
+        const std::vector<TracebackEntry> &traceback_entries() const noexcept;
 
     private:
         TupleObject *args_;
@@ -721,6 +730,7 @@ namespace cxxpython
         std::string source_filename_;
         std::string source_name_;
         std::uint32_t source_line_ = 0;
+        std::vector<TracebackEntry> traceback_;
     };
 
     bool is_subclass(const TypeObject *derived, const TypeObject *base) noexcept;

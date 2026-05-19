@@ -1,5 +1,43 @@
 # Development Status
 
+## 2026-05-19 Traceback Chain Seed Slice
+
+Review focus:
+
+- Move beyond a single source-location seed so nested function failures are
+  diagnosable from the CLI.
+- Keep traceback data attached to the Python exception object, not to CLI-only
+  formatting state.
+- Preserve the existing first-error source accessors while adding a growable
+  frame chain for future traceback objects.
+
+Completed:
+
+- Added `ExceptionObject::TracebackEntry` storage and accessors.
+- Changed VM exception annotation to append frame entries as exceptions
+  propagate across frames.
+- Kept `source_filename/source_line/source_name` as the innermost frame for
+  existing callers and tests.
+- Updated CLI error rendering to print the traceback chain in
+  "most recent call last" order.
+- Added C++ coverage for single-frame and nested-frame traceback entries.
+- Added CLI coverage for nested Python tracebacks and updated Python golden
+  output for function-scope errors.
+
+Known debt and next risk:
+
+- Traceback entries are still structured C++ data on `ExceptionObject`, not a
+  script-visible `traceback` object with `tb_next`, `tb_frame`, and `tb_lineno`.
+- Exception chaining (`__cause__`, `__context__`, `__suppress_context__`) is
+  still absent.
+- `Frame` objects are script-visible seeds, but traceback frames should become
+  ordinary GC-managed objects before debugger/sys APIs expand.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter='Compile.EmitsLineTableAndAttachesRuntimeErrorLocation:Compile.KeepsInnerFunctionRuntimeErrorLocation:Cli.ReportsNestedPythonTracebacks:PythonScripts.RunsGoldenFiles'`
+
 ## 2026-05-19 VM Depth Guard Slice
 
 Review focus:

@@ -69,6 +69,26 @@ TEST(Cli, ReportsPythonErrors)
     std::filesystem::remove(script);
 }
 
+TEST(Cli, ReportsNestedPythonTracebacks)
+{
+    const std::filesystem::path script =
+        test_process::write_script("cxxpython_cli_nested_name_error.py",
+                                   "def fail():\n"
+                                   "    missing\n"
+                                   "fail()\n");
+
+    const test_process::CommandResult result =
+        test_process::run_command(std::string(CXXPYTHON_PROGRAM_PATH) + " " + test_process::shell_quote(script));
+
+    EXPECT_EQ(result.exit_code, 1);
+    EXPECT_EQ(result.output,
+              "Traceback (most recent call last):\n"
+              "  File \"" + script.string() + "\", line 3, in <module>\n"
+              "  File \"" + script.string() + "\", line 2, in fail\n"
+              "NameError: name 'missing' is not defined\n");
+    std::filesystem::remove(script);
+}
+
 TEST(Cli, ReportsSyntaxErrorsWithLocation)
 {
     const std::filesystem::path script =
