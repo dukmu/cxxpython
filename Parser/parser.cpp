@@ -79,12 +79,22 @@ namespace cxxpython::compiler_internal
 
             ParsedStatement parse_statement()
             {
+                std::vector<std::unique_ptr<Expr>> decorators = parse_decorators();
+                if (!decorators.empty())
+                {
+                    if (peek().kind == TokenKind::Def)
+                        return parse_function_def_statement(std::move(decorators));
+                    if (peek().kind == TokenKind::Class)
+                        return parse_class_def_statement(std::move(decorators));
+                    raise_at(peek(), "expected function or class definition after decorator");
+                }
+
                 if (peek().kind == TokenKind::If)
                     return parse_if_statement();
                 if (peek().kind == TokenKind::Def)
-                    return parse_function_def_statement();
+                    return parse_function_def_statement({});
                 if (peek().kind == TokenKind::Class)
-                    return parse_class_def_statement();
+                    return parse_class_def_statement({});
                 if (peek().kind == TokenKind::Return)
                     return parse_return_statement();
 
@@ -109,6 +119,18 @@ namespace cxxpython::compiler_internal
                     std::move(statement),
                     false,
                 };
+            }
+
+            std::vector<std::unique_ptr<Expr>> parse_decorators()
+            {
+                std::vector<std::unique_ptr<Expr>> decorators;
+                while (peek().kind == TokenKind::At)
+                {
+                    advance();
+                    decorators.push_back(parse_expression_only());
+                    consume(TokenKind::Newline, "expected newline after decorator");
+                }
+                return decorators;
             }
 
             ParsedStatement parse_return_statement()
@@ -157,7 +179,7 @@ namespace cxxpython::compiler_internal
                 };
             }
 
-            ParsedStatement parse_function_def_statement()
+            ParsedStatement parse_function_def_statement(std::vector<std::unique_ptr<Expr>> decorators)
             {
                 const Token &def_token = advance();
                 if (peek().kind != TokenKind::Identifier)
@@ -218,7 +240,11 @@ namespace cxxpython::compiler_internal
 
                 FunctionDepthGuard guard(function_depth_);
                 std::vector<std::unique_ptr<Stmt>> body = parse_block();
-                auto statement = std::make_unique<FunctionDefStmt>(std::move(name), std::move(params), std::move(body));
+                auto statement = std::make_unique<FunctionDefStmt>(
+                    std::move(name),
+                    std::move(params),
+                    std::move(body),
+                    std::move(decorators));
                 statement->line = def_token.line;
                 return ParsedStatement{
                     std::move(statement),
@@ -226,7 +252,7 @@ namespace cxxpython::compiler_internal
                 };
             }
 
-            ParsedStatement parse_class_def_statement()
+            ParsedStatement parse_class_def_statement(std::vector<std::unique_ptr<Expr>> decorators)
             {
                 const Token &class_token = advance();
                 if (peek().kind != TokenKind::Identifier)
@@ -253,7 +279,11 @@ namespace cxxpython::compiler_internal
                 consume(TokenKind::Colon, "expected ':' after class name");
                 consume(TokenKind::Newline, "expected newline after class definition");
                 std::vector<std::unique_ptr<Stmt>> body = parse_block();
-                auto statement = std::make_unique<ClassDefStmt>(std::move(name), std::move(bases), std::move(body));
+                auto statement = std::make_unique<ClassDefStmt>(
+                    std::move(name),
+                    std::move(bases),
+                    std::move(body),
+                    std::move(decorators));
                 statement->line = class_token.line;
                 return ParsedStatement{
                     std::move(statement),
@@ -560,6 +590,7 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Minus:
                 case TokenKind::Star:
                 case TokenKind::DoubleStar:
+                case TokenKind::At:
                 case TokenKind::Tilde:
                 case TokenKind::RightParen:
                 case TokenKind::Comma:
@@ -652,6 +683,7 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Minus:
                 case TokenKind::Star:
                 case TokenKind::DoubleStar:
+                case TokenKind::At:
                 case TokenKind::Tilde:
                 case TokenKind::LeftParen:
                 case TokenKind::RightParen:

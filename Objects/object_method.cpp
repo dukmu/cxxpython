@@ -71,6 +71,68 @@ namespace cxxpython
             list->append(args[0]);
             return runtime.none();
         }
+
+        PropertyObject *as_property(Runtime &runtime, Object *self)
+        {
+            auto *property = dynamic_cast<PropertyObject *>(self);
+            if (!property)
+                raise_type_error(&runtime, "property descriptor receiver does not have property layout");
+            return property;
+        }
+
+        Object *property_getter_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (args.size() != 1)
+            {
+                std::ostringstream message;
+                message << "property.getter() takes exactly one argument ("
+                        << args.size() << " given)";
+                raise_type_error(&runtime, message.str());
+            }
+            PropertyObject *property = as_property(runtime, self);
+            return runtime.allocate<PropertyObject>(
+                property->type(),
+                args[0],
+                property->setter(),
+                property->deleter(),
+                property->doc());
+        }
+
+        Object *property_setter_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (args.size() != 1)
+            {
+                std::ostringstream message;
+                message << "property.setter() takes exactly one argument ("
+                        << args.size() << " given)";
+                raise_type_error(&runtime, message.str());
+            }
+            PropertyObject *property = as_property(runtime, self);
+            return runtime.allocate<PropertyObject>(
+                property->type(),
+                property->getter(),
+                args[0],
+                property->deleter(),
+                property->doc());
+        }
+
+        Object *property_deleter_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (args.size() != 1)
+            {
+                std::ostringstream message;
+                message << "property.deleter() takes exactly one argument ("
+                        << args.size() << " given)";
+                raise_type_error(&runtime, message.str());
+            }
+            PropertyObject *property = as_property(runtime, self);
+            return runtime.allocate<PropertyObject>(
+                property->type(),
+                property->getter(),
+                property->setter(),
+                args[0],
+                property->doc());
+        }
     }
 
     MethodDescriptorObject::MethodDescriptorObject(TypeObject *type,
@@ -165,5 +227,11 @@ namespace cxxpython
     {
         list_type_->dict->set(new_str("append"),
                               new_method_descriptor("append", list_type_, list_append_method));
+        property_type_->dict->set(new_str("getter"),
+                                  new_method_descriptor("getter", property_type_, property_getter_method));
+        property_type_->dict->set(new_str("setter"),
+                                  new_method_descriptor("setter", property_type_, property_setter_method));
+        property_type_->dict->set(new_str("deleter"),
+                                  new_method_descriptor("deleter", property_type_, property_deleter_method));
     }
 }

@@ -412,6 +412,67 @@ TEST(Attributes, ReadOnlyPropertyRejectsAssignment)
     }
 }
 
+TEST(Attributes, PropertyHelperMethodsCreateUpdatedDescriptors)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::Object *first = runtime.new_str("first");
+    cxxpython::Object *second = runtime.new_str("second");
+    cxxpython::Object *deleted = runtime.new_str("deleted");
+    cxxpython::NativeFunctionObject *getter = runtime.new_native_function(
+        "get_first",
+        [first](cxxpython::Runtime &, const cxxpython::CallArguments &)
+        {
+            return first;
+        });
+    cxxpython::NativeFunctionObject *replacement_getter = runtime.new_native_function(
+        "get_second",
+        [second](cxxpython::Runtime &, const cxxpython::CallArguments &)
+        {
+            return second;
+        });
+    cxxpython::NativeFunctionObject *setter = runtime.new_native_function(
+        "set_value",
+        [](cxxpython::Runtime &runtime, const cxxpython::CallArguments &)
+        {
+            return runtime.none();
+        });
+    cxxpython::NativeFunctionObject *deleter = runtime.new_native_function(
+        "delete_value",
+        [deleted](cxxpython::Runtime &, const cxxpython::CallArguments &)
+        {
+            return deleted;
+        });
+
+    cxxpython::PropertyObject *property = runtime.new_property(getter);
+    cxxpython::Object *getter_method = cxxpython::object_get_attr(property, "getter");
+    cxxpython::Object *setter_method = cxxpython::object_get_attr(property, "setter");
+    cxxpython::Object *deleter_method = cxxpython::object_get_attr(property, "deleter");
+    ASSERT_NE(getter_method, nullptr);
+    ASSERT_NE(setter_method, nullptr);
+    ASSERT_NE(deleter_method, nullptr);
+    EXPECT_EQ(getter_method->type(), runtime.native_function_type());
+    EXPECT_EQ(setter_method->type(), runtime.native_function_type());
+    EXPECT_EQ(deleter_method->type(), runtime.native_function_type());
+
+    auto *with_getter = dynamic_cast<cxxpython::PropertyObject *>(
+        cxxpython::object_call(getter_method, {replacement_getter}));
+    ASSERT_NE(with_getter, nullptr);
+    EXPECT_EQ(with_getter->getter(), replacement_getter);
+    EXPECT_EQ(with_getter->setter(), nullptr);
+
+    auto *with_setter = dynamic_cast<cxxpython::PropertyObject *>(
+        cxxpython::object_call(setter_method, {setter}));
+    ASSERT_NE(with_setter, nullptr);
+    EXPECT_EQ(with_setter->getter(), getter);
+    EXPECT_EQ(with_setter->setter(), setter);
+
+    auto *with_deleter = dynamic_cast<cxxpython::PropertyObject *>(
+        cxxpython::object_call(deleter_method, {deleter}));
+    ASSERT_NE(with_deleter, nullptr);
+    EXPECT_EQ(with_deleter->getter(), getter);
+    EXPECT_EQ(with_deleter->deleter(), deleter);
+}
+
 TEST(Attributes, StaticMethodObjectsReturnWrappedCallable)
 {
     cxxpython::Runtime runtime;

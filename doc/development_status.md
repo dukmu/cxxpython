@@ -46,14 +46,16 @@ Eight tracked risks:
    parser / iterator protocol path is not in place.
 7. Medium, partially fixed: descriptor and type-attribute protocol is
    incomplete. Lookup is centralized; `property` works as a data descriptor;
-   `staticmethod` and `classmethod` are typed builtin descriptors with
-   script-level coverage. Slot wrappers, `__getattribute__`, `__getattr__`,
-   descriptor decorator helpers, and delete semantics remain absent.
+   `property.getter`/`setter`/`deleter`, `staticmethod`, and `classmethod` are
+   typed builtin descriptors with decorator-script coverage. Slot wrappers,
+   `__getattribute__`, `__getattr__`, and descriptor delete semantics remain
+   absent.
 8. Medium, first slice fixed: Python functions now support positional
    varargs, keyword dictionaries, and keyword calls through `CodeObject` flags,
    `CALL_KW`, and unified `CallArguments`. Remaining call-family work includes
    `*iterable` / `**mapping` call expansion, keyword-only parameters, default
-   arguments, annotations, decorators, and a reusable native argument parser.
+   arguments, annotations, `*iterable` / `**mapping` call expansion, and a
+   reusable native argument parser.
 
 Immediate order:
 
@@ -85,10 +87,71 @@ Immediate order:
 - Done in current slice: VM opcode dispatch now uses scoped root guards around
   popped operands, aggregate construction, function calls, and class creation
   temporaries.
+- Done in current slice: decorator syntax lowers to normal calls for functions
+  and classes; `property.getter`/`setter`/`deleter` return updated property
+  descriptors and Python golden tests cover `@property`, `@staticmethod`, and
+  `@classmethod`.
 - Next: continue through `global`/`nonlocal`/closures, `__prepare__`,
   syntax-level `metaclass=`,
-  full traceback objects, root guards, builtin protocol cleanup, call expansion,
-  defaults/keyword-only arguments, and descriptor completeness.
+  full traceback objects, runtime factory root audits, builtin protocol
+  cleanup, iterator protocol, call expansion, defaults/keyword-only arguments,
+  and descriptor completeness.
+
+## 2026-05-19 Decorator Syntax And Property Helper Methods
+
+Pre-change review:
+
+- Descriptor runtime objects existed for `property`, `staticmethod`, and
+  `classmethod`, but Python class bodies still had to assign them manually.
+  That left real decorator syntax untested and encouraged future parser or VM
+  special cases.
+- `property` lacked its standard helper methods, so the idiomatic
+  `@name.setter` class-body rebinding path could not share the same descriptor
+  object model as direct construction.
+
+Debt addressed:
+
+- Added lexer/parser support for decorator lines before `def` and `class`.
+- Stored decorators on function/class AST nodes and included them in symbol
+  collection.
+- Lowered decorators in the compiler as ordinary expression evaluation plus
+  repeated `CALL 1`, applying the bottom-most decorator first and rebinding the
+  decorated result through the existing name-store path.
+- Added `property.getter`, `property.setter`, and `property.deleter` as normal
+  method descriptors on the `property` type. Each helper returns a fresh
+  `PropertyObject` preserving the other accessor slots and doc object.
+
+Completed:
+
+- Added C++ coverage for property helper methods returning updated descriptor
+  objects.
+- Added `Tests/python/decorators.py` golden coverage for function decorators,
+  class decorators, `@property`, `@value.setter`, `@staticmethod`, and
+  `@classmethod`.
+
+Design review:
+
+- Decorator syntax remains purely compile-time lowering to the callable
+  protocol. The VM does not know about decorator semantics, and descriptors
+  continue to work through ordinary class namespace rebinding and attribute
+  lookup.
+- Property helper methods are descriptors in `property.__dict__`; they do not
+  require parser/compiler knowledge of `property`.
+
+Known debt and next risk:
+
+- Descriptor delete semantics, `__getattribute__`, `__getattr__`, and slot
+  wrappers remain open.
+- The next builtin cleanup should add an iterator protocol foundation so
+  `list(iterable)` can be implemented through protocol dispatch instead of a
+  type-specific shortcut.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all 143 tests pass.
 
 ## 2026-05-19 VM Temporary Root Guard Adoption
 

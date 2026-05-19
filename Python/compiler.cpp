@@ -225,11 +225,15 @@ namespace cxxpython
 
             void visit(const compiler_internal::FunctionDefStmt &statement) override
             {
+                for (const auto &decorator : statement.decorators)
+                    decorator->accept(*this);
                 (void)symbols_.add_name(statement.name);
             }
 
             void visit(const compiler_internal::ClassDefStmt &statement) override
             {
+                for (const auto &decorator : statement.decorators)
+                    decorator->accept(*this);
                 for (const auto &base : statement.bases)
                     base->accept(*this);
                 (void)symbols_.add_name(statement.name);
@@ -640,6 +644,7 @@ namespace cxxpython
             void visit(const compiler_internal::FunctionDefStmt &statement) override
             {
                 StatementLineGuard line(*this, statement);
+                emit_decorators(statement.decorators);
                 SymbolTable function_symbols = collect_function_symbols(statement);
                 BytecodeBuilder function_builder(
                     runtime_,
@@ -649,12 +654,14 @@ namespace cxxpython
                 CodeObject *code = function_builder.build_function(statement);
                 emit_constant(code);
                 emit({Opcode::MakeFunction, 0});
+                apply_decorators(statement.decorators.size());
                 emit_binding_store(statement.name);
             }
 
             void visit(const compiler_internal::ClassDefStmt &statement) override
             {
                 StatementLineGuard line(*this, statement);
+                emit_decorators(statement.decorators);
                 for (const auto &base : statement.bases)
                     base->accept(*this);
                 emit({
@@ -673,6 +680,7 @@ namespace cxxpython
                     Opcode::MakeClass,
                     static_cast<std::uint32_t>(name_index(statement.name)),
                 });
+                apply_decorators(statement.decorators.size());
                 emit_binding_store(statement.name);
             }
 
@@ -735,6 +743,23 @@ namespace cxxpython
                     Opcode::LoadConst,
                     static_cast<std::uint32_t>(constants_.size() - 1),
                 });
+            }
+
+            void emit_decorators(const std::vector<std::unique_ptr<compiler_internal::Expr>> &decorators)
+            {
+                for (const auto &decorator : decorators)
+                    decorator->accept(*this);
+            }
+
+            void apply_decorators(std::size_t count)
+            {
+                for (std::size_t index = 0; index < count; ++index)
+                {
+                    emit({
+                        Opcode::Call,
+                        1,
+                    });
+                }
             }
 
             void emit(Instruction instruction)

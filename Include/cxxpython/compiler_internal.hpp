@@ -83,6 +83,7 @@ namespace cxxpython::compiler_internal
         Minus,
         Star,
         DoubleStar,
+        At,
         Tilde,
         LeftParen,
         RightParen,
@@ -529,14 +530,19 @@ namespace cxxpython::compiler_internal
     {
         FunctionDefStmt(std::string name_in,
                         FunctionParameters params_in,
-                        std::vector<std::unique_ptr<Stmt>> body_in)
-            : name(std::move(name_in)), params(std::move(params_in)), body(std::move(body_in))
+                        std::vector<std::unique_ptr<Stmt>> body_in,
+                        std::vector<std::unique_ptr<Expr>> decorators_in = {})
+            : name(std::move(name_in)),
+              params(std::move(params_in)),
+              body(std::move(body_in)),
+              decorators(std::move(decorators_in))
         {
         }
 
         std::string name;
         FunctionParameters params;
         std::vector<std::unique_ptr<Stmt>> body;
+        std::vector<std::unique_ptr<Expr>> decorators;
 
         void accept(StmtVisitor &visitor) const override
         {
@@ -548,14 +554,19 @@ namespace cxxpython::compiler_internal
     {
         ClassDefStmt(std::string name_in,
                      std::vector<std::unique_ptr<Expr>> bases_in,
-                     std::vector<std::unique_ptr<Stmt>> body_in)
-            : name(std::move(name_in)), bases(std::move(bases_in)), body(std::move(body_in))
+                     std::vector<std::unique_ptr<Stmt>> body_in,
+                     std::vector<std::unique_ptr<Expr>> decorators_in = {})
+            : name(std::move(name_in)),
+              bases(std::move(bases_in)),
+              body(std::move(body_in)),
+              decorators(std::move(decorators_in))
         {
         }
 
         std::string name;
         std::vector<std::unique_ptr<Expr>> bases;
         std::vector<std::unique_ptr<Stmt>> body;
+        std::vector<std::unique_ptr<Expr>> decorators;
 
         void accept(StmtVisitor &visitor) const override
         {

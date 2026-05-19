@@ -351,15 +351,23 @@ doc/            design docs and milestone plans
   必须允许以后区分 dict-backed instance、slot-only instance 和二者并存的实例。
 - `super`、`classmethod`、`staticmethod`、`property` 都应作为 descriptor
   协议的自然结果实现。`property`、`staticmethod` 和 `classmethod` 当前已经是
-  typed descriptor objects；后续 decorator syntax 只应编译为普通函数创建和
-  class-body rebinding，不应绕过 descriptor/type attribute engine。
+  typed descriptor objects；decorator syntax 编译为普通 callable application
+  和 class-body rebinding，不绕过 descriptor/type attribute engine。
 - `property` is a typed data descriptor stored in a class dictionary. Class
   access returns the descriptor; instance access calls the getter with the
   instance; assignment calls the setter or raises `AttributeError` for a
-  read-only property. Future descriptor-family builtins must follow this
-  object/type-slot path rather than adding VM or compiler cases.
+  read-only property. `property.getter`、`property.setter` 和
+  `property.deleter` 是 `property` 类型字典中的普通 method descriptors；它们
+  返回新的 property descriptor 并保留未替换的 accessor/doc slot。Future
+  descriptor-family builtins must follow this object/type-slot path rather
+  than adding VM or compiler cases.
 - `staticmethod` is a non-data descriptor that returns its wrapped callable for
   both class and instance access. `classmethod` binds the owner type as the
   method self for class and instance access. Runtime method objects therefore
   bind generic callable/self pairs instead of assuming every bound callable is
   a Python function.
+- Function and class decorators are not a descriptor special case. Parser
+  records decorator expressions, the compiler emits them in source order, then
+  applies them through repeated one-argument calls after `MAKE_FUNCTION` or
+  `MAKE_CLASS`; the resulting object is stored through the same binding path as
+  an undecorated definition.
