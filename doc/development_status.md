@@ -1,5 +1,46 @@
 # Development Status
 
+## 2026-05-19 Lexer String And Comment Slice
+
+Review focus:
+
+- Remove the single-quote-only lexer debt before adding more Python golden
+  tests.
+- Keep comments and blank/comment-only lines from disturbing indentation
+  semantics.
+- Make unsupported f-strings fail at the lexical boundary with a clear
+  `SyntaxError` instead of being parsed as accidental adjacent tokens.
+
+Completed:
+
+- Added double-quoted string literals on the same string token path as
+  single-quoted literals.
+- Added triple-quoted single and double string literals with multiline line
+  tracking.
+- Added `#` trailing and full-line comments.
+- Allowed blank/comment-only lines between a compound statement header and the
+  first indented statement.
+- Added an explicit f-string unsupported diagnostic to reserve the future AST
+  path for `JoinedStr`/`FormattedValue` rather than adding lexer shortcuts.
+- Added Python golden coverage for double quotes, mixed quotes, escapes,
+  triple-quoted strings, trailing comments, and comments inside blocks.
+- Added C++ compile coverage for the f-string diagnostic.
+
+Known debt and next risk:
+
+- Real f-strings still need a parser/compiler design: `JoinedStr` and
+  `FormattedValue` AST nodes, expression parsing inside braces, conversion
+  flags, format specs, and lowering through `format()`/string concatenation.
+- The lexer still intentionally supports only the currently modeled escape
+  subset; raw/bytes prefixes should land together with bytes and buffer types.
+- `import` statements, `for` lowering, traceback objects, and VM stack/depth
+  guards remain the next high-value infrastructure work.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter='Compile.RaisesSyntaxErrorForUnsupportedFString:PythonScripts.RunsGoldenFiles'`
+
 ## 2026-05-19 Slice Substrate Slice
 
 Review focus:

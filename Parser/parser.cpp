@@ -459,6 +459,7 @@ namespace cxxpython::compiler_internal
 
             std::vector<std::unique_ptr<Stmt>> parse_block()
             {
+                skip_newlines();
                 if (peek().kind != TokenKind::Indent)
                     raise_at(peek(), "expected indented block");
                 advance();

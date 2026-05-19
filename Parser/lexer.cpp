@@ -44,6 +44,100 @@ namespace cxxpython::compiler_internal
         std::size_t line = 1;
         std::size_t column = 1;
         bool at_line_start = true;
+        auto is_quote = [](char value) {
+            return value == '\'' || value == '"';
+        };
+        auto advance_one = [&]() {
+            const char value = source[index++];
+            if (value == '\n')
+            {
+                ++line;
+                column = 1;
+            }
+            else
+            {
+                ++column;
+            }
+            return value;
+        };
+        auto skip_comment = [&]() {
+            while (index < source.size() && source[index] != '\n' && source[index] != '\r')
+                advance_one();
+        };
+        auto scan_string = [&](char quote, std::size_t start_line, std::size_t start_column) {
+            const bool triple = index + 2 < source.size() && source[index] == quote &&
+                                source[index + 1] == quote && source[index + 2] == quote;
+            if (triple)
+            {
+                advance_one();
+                advance_one();
+                advance_one();
+            }
+            else
+            {
+                advance_one();
+            }
+
+            std::string value;
+            while (index < source.size())
+            {
+                if (triple)
+                {
+                    if (index + 2 < source.size() && source[index] == quote &&
+                        source[index + 1] == quote && source[index + 2] == quote)
+                    {
+                        advance_one();
+                        advance_one();
+                        advance_one();
+                        return value;
+                    }
+                }
+                else if (source[index] == quote)
+                {
+                    advance_one();
+                    return value;
+                }
+
+                if (!triple && (source[index] == '\n' || source[index] == '\r'))
+                    raise_at(runtime, filename, start_line, start_column, "unterminated string literal");
+
+                if (source[index] == '\\')
+                {
+                    advance_one();
+                    if (index >= source.size())
+                        raise_at(runtime, filename, start_line, start_column, "unterminated string literal");
+                    switch (source[index])
+                    {
+                    case '\\':
+                        value.push_back('\\');
+                        break;
+                    case '\'':
+                        value.push_back('\'');
+                        break;
+                    case '"':
+                        value.push_back('"');
+                        break;
+                    case 'n':
+                        value.push_back('\n');
+                        break;
+                    case 't':
+                        value.push_back('\t');
+                        break;
+                    case 'r':
+                        value.push_back('\r');
+                        break;
+                    default:
+                        raise_at(runtime, filename, line, column, "unsupported string escape");
+                    }
+                    advance_one();
+                    continue;
+                }
+
+                value.push_back(advance_one());
+            }
+            raise_at(runtime, filename, start_line, start_column, "unterminated string literal");
+        };
+
         while (index < source.size())
         {
             if (at_line_start)
@@ -63,6 +157,11 @@ namespace cxxpython::compiler_internal
 
                 if (index >= source.size())
                     break;
+                if (source[index] == '#')
+                {
+                    skip_comment();
+                    continue;
+                }
                 if (source[index] != '\n' && source[index] != '\r')
                 {
                     const std::size_t current = indent_stack.back();
@@ -93,12 +192,16 @@ namespace cxxpython::compiler_internal
                 continue;
             }
 
+            if (ch == '#')
+            {
+                skip_comment();
+                continue;
+            }
+
             if (ch == '\n')
             {
                 tokens.push_back(Token{TokenKind::Newline, "\n", 0, line, column});
-                ++index;
-                ++line;
-                column = 1;
+                advance_one();
                 at_line_start = true;
                 continue;
             }
@@ -108,9 +211,7 @@ namespace cxxpython::compiler_internal
                 if (index + 1 < source.size() && source[index + 1] == '\n')
                     ++index;
                 tokens.push_back(Token{TokenKind::Newline, "\n", 0, line, column});
-                ++index;
-                ++line;
-                column = 1;
+                advance_one();
                 at_line_start = true;
                 continue;
             }
@@ -128,6 +229,9 @@ namespace cxxpython::compiler_internal
                 tokens.push_back(Token{TokenKind::Integer, lexeme, parse_integer(runtime, lexeme), line, start_column});
                 continue;
             }
+
+            if ((ch == 'f' || ch == 'F') && index + 1 < source.size() && is_quote(source[index + 1]))
+                raise_at(runtime, filename, line, column, "f-string literals are not supported yet");
 
             if (std::isalpha(static_cast<unsigned char>(ch)) != 0 || ch == '_')
             {
@@ -185,56 +289,11 @@ namespace cxxpython::compiler_internal
                 continue;
             }
 
-            if (ch == '\'')
+            if (is_quote(ch))
             {
                 const std::size_t start_line = line;
                 const std::size_t start_column = column;
-                ++index;
-                ++column;
-                std::string value;
-                while (index < source.size() && source[index] != '\'')
-                {
-                    if (source[index] == '\\')
-                    {
-                        ++index;
-                        ++column;
-                        if (index >= source.size())
-                            raise_at(runtime, filename, start_line, start_column, "unterminated string literal");
-                        switch (source[index])
-                        {
-                        case '\\':
-                            value.push_back('\\');
-                            break;
-                        case '\'':
-                            value.push_back('\'');
-                            break;
-                        case 'n':
-                            value.push_back('\n');
-                            break;
-                        case 't':
-                            value.push_back('\t');
-                            break;
-                        case 'r':
-                            value.push_back('\r');
-                            break;
-                        default:
-                            raise_at(runtime, filename, line, column, "unsupported string escape");
-                        }
-                        ++index;
-                        ++column;
-                        continue;
-                    }
-                    if (source[index] == '\n' || source[index] == '\r')
-                        raise_at(runtime, filename, start_line, start_column, "unterminated string literal");
-                    value.push_back(source[index]);
-                    ++index;
-                    ++column;
-                }
-                if (index >= source.size())
-                    raise_at(runtime, filename, start_line, start_column, "unterminated string literal");
-                ++index;
-                ++column;
-                tokens.push_back(Token{TokenKind::String, std::move(value), 0, start_line, start_column});
+                tokens.push_back(Token{TokenKind::String, scan_string(ch, start_line, start_column), 0, start_line, start_column});
                 continue;
             }
 

@@ -1694,6 +1694,22 @@ TEST(Compile, RaisesSyntaxErrorForUnclosedSubscript)
     }
 }
 
+TEST(Compile, RaisesSyntaxErrorForUnsupportedFString)
+{
+    cxxpython::Runtime runtime;
+
+    try
+    {
+        (void)cxxpython::compile_eval_input(runtime, "f\"value={name}\"", "broken.py");
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type_name(), "SyntaxError");
+        EXPECT_STREQ(error.what(), "broken.py:1:1: f-string literals are not supported yet");
+    }
+}
+
 TEST(Compile, CallsNonCallableThroughNormalTypeErrorPath)
 {
     cxxpython::Runtime runtime;
