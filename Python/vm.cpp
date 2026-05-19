@@ -543,6 +543,44 @@ namespace cxxpython
                     raise_name_error(&runtime_, "name '" + name->value + "' is not defined");
                 break;
             }
+            case Opcode::LoadGlobal:
+            {
+                if (instruction.operand >= code.names().size())
+                    throw BytecodeError("LOAD_GLOBAL operand out of range");
+                auto *name = dynamic_cast<StrObject *>(code.names()[instruction.operand]);
+                if (!name)
+                    throw BytecodeError("LOAD_GLOBAL requires a str name");
+                Object *value = globals.get(name);
+                if (!value)
+                    value = builtins.get(name);
+                if (!value)
+                    raise_name_error(&runtime_, "name '" + name->value + "' is not defined");
+                frame->push(value);
+                break;
+            }
+            case Opcode::StoreGlobal:
+            {
+                if (instruction.operand >= code.names().size())
+                    throw BytecodeError("STORE_GLOBAL operand out of range");
+                auto *name = dynamic_cast<StrObject *>(code.names()[instruction.operand]);
+                if (!name)
+                    throw BytecodeError("STORE_GLOBAL requires a str name");
+                Object *value = frame->pop();
+                auto value_root = runtime_.root(value);
+                globals.set(name, value);
+                break;
+            }
+            case Opcode::DeleteGlobal:
+            {
+                if (instruction.operand >= code.names().size())
+                    throw BytecodeError("DELETE_GLOBAL operand out of range");
+                auto *name = dynamic_cast<StrObject *>(code.names()[instruction.operand]);
+                if (!name)
+                    throw BytecodeError("DELETE_GLOBAL requires a str name");
+                if (!globals.erase(name))
+                    raise_name_error(&runtime_, "name '" + name->value + "' is not defined");
+                break;
+            }
             case Opcode::LoadFast:
             {
                 if (instruction.operand >= code.varnames().size())

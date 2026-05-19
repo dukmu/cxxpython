@@ -103,6 +103,10 @@ namespace cxxpython::compiler_internal
                     return parse_return_statement();
                 if (peek().kind == TokenKind::Raise)
                     return parse_raise_statement();
+                if (peek().kind == TokenKind::Global)
+                    return parse_global_statement();
+                if (peek().kind == TokenKind::Nonlocal)
+                    return parse_nonlocal_statement();
 
                 const std::size_t line = peek().line;
                 std::unique_ptr<Expr> target_or_expression = parse_expression_only();
@@ -184,6 +188,59 @@ namespace cxxpython::compiler_internal
                     std::move(statement),
                     false,
                 };
+            }
+
+            ParsedStatement parse_global_statement()
+            {
+                const Token &global_token = advance();
+                auto statement = std::make_unique<GlobalStmt>(parse_name_list("global"));
+                statement->line = global_token.line;
+                return ParsedStatement{
+                    std::move(statement),
+                    false,
+                };
+            }
+
+            ParsedStatement parse_nonlocal_statement()
+            {
+                const Token &nonlocal_token = advance();
+                if (function_depth_ == 0)
+                    raise_at(nonlocal_token, "nonlocal declaration not allowed at module level");
+                auto statement = std::make_unique<NonlocalStmt>(parse_name_list("nonlocal"));
+                statement->line = nonlocal_token.line;
+                return ParsedStatement{
+                    std::move(statement),
+                    false,
+                };
+            }
+
+            std::vector<std::string> parse_name_list(const char *statement_name)
+            {
+                std::vector<std::string> names;
+                while (true)
+                {
+                    if (peek().kind != TokenKind::Identifier)
+                    {
+                        std::ostringstream message;
+                        message << "expected name after " << statement_name;
+                        raise_at(peek(), message.str());
+                    }
+                    std::string name = advance().lexeme;
+                    for (const std::string &existing : names)
+                    {
+                        if (existing == name)
+                        {
+                            std::ostringstream message;
+                            message << "duplicate name in " << statement_name << " statement";
+                            raise_at(previous(), message.str());
+                        }
+                    }
+                    names.push_back(std::move(name));
+                    if (peek().kind != TokenKind::Comma)
+                        break;
+                    advance();
+                }
+                return names;
             }
 
             ParsedStatement parse_try_statement()
@@ -719,6 +776,8 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Def:
                 case TokenKind::Return:
                 case TokenKind::Raise:
+                case TokenKind::Global:
+                case TokenKind::Nonlocal:
                 case TokenKind::Try:
                 case TokenKind::Except:
                 case TokenKind::Finally:
@@ -839,6 +898,8 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Def:
                 case TokenKind::Return:
                 case TokenKind::Raise:
+                case TokenKind::Global:
+                case TokenKind::Nonlocal:
                 case TokenKind::Try:
                 case TokenKind::Except:
                 case TokenKind::Finally:

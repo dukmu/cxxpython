@@ -11,6 +11,9 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::LoadName), "LOAD_NAME");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::StoreName), "STORE_NAME");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::DeleteName), "DELETE_NAME");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::LoadGlobal), "LOAD_GLOBAL");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::StoreGlobal), "STORE_GLOBAL");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::DeleteGlobal), "DELETE_GLOBAL");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::LoadFast), "LOAD_FAST");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::StoreFast), "STORE_FAST");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::DeleteFast), "DELETE_FAST");
@@ -55,6 +58,9 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::LoadName, 0}), 1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::StoreName, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::DeleteName, 0}), 0);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::LoadGlobal, 0}), 1);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::StoreGlobal, 0}), -1);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::DeleteGlobal, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::LoadFast, 0}), 1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::StoreFast, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::DeleteFast, 0}), 0);

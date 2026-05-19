@@ -153,6 +153,10 @@ namespace cxxpython::compiler_internal
                     kind = TokenKind::Return;
                 else if (lexeme == "raise")
                     kind = TokenKind::Raise;
+                else if (lexeme == "global")
+                    kind = TokenKind::Global;
+                else if (lexeme == "nonlocal")
+                    kind = TokenKind::Nonlocal;
                 else if (lexeme == "try")
                     kind = TokenKind::Try;
                 else if (lexeme == "except")

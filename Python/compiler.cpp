@@ -148,7 +148,7 @@ namespace cxxpython
 
             bool resolves_lexically(const std::string &name) const
             {
-                return is_local(name) || is_cellvar(name) || is_freevar(name);
+                return !is_global(name) && (is_local(name) || is_cellvar(name) || is_freevar(name));
             }
 
             std::size_t deref_index(const std::string &name) const
@@ -170,6 +170,43 @@ namespace cxxpython
             const std::vector<std::string> &cellvars() const noexcept
             {
                 return cellvars_;
+            }
+
+            void add_global(const std::string &name)
+            {
+                if (!is_global(name))
+                    globals_.push_back(name);
+            }
+
+            bool is_global(const std::string &name) const
+            {
+                for (const std::string &entry : globals_)
+                {
+                    if (entry == name)
+                        return true;
+                }
+                return false;
+            }
+
+            void add_nonlocal(const std::string &name)
+            {
+                if (!is_nonlocal(name))
+                    nonlocals_.push_back(name);
+            }
+
+            bool is_nonlocal(const std::string &name) const
+            {
+                for (const std::string &entry : nonlocals_)
+                {
+                    if (entry == name)
+                        return true;
+                }
+                return false;
+            }
+
+            const std::vector<std::string> &nonlocals() const noexcept
+            {
+                return nonlocals_;
             }
 
             std::vector<Object *> make_varname_objects(Runtime &runtime) const
@@ -205,6 +242,8 @@ namespace cxxpython
             std::vector<std::string> varnames_;
             std::vector<std::string> cellvars_;
             std::vector<std::string> freevars_;
+            std::vector<std::string> globals_;
+            std::vector<std::string> nonlocals_;
         };
 
         class SymbolCollector final : public compiler_internal::ExprVisitor,
@@ -348,6 +387,18 @@ namespace cxxpython
                 statement.value->accept(*this);
             }
 
+            void visit(const compiler_internal::GlobalStmt &statement) override
+            {
+                for (const std::string &name : statement.names)
+                    (void)symbols_.add_name(name);
+            }
+
+            void visit(const compiler_internal::NonlocalStmt &statement) override
+            {
+                for (const std::string &name : statement.names)
+                    (void)symbols_.add_name(name);
+            }
+
             void visit(const compiler_internal::TryStmt &statement) override
             {
                 for (const auto &item : statement.body)
@@ -399,6 +450,8 @@ namespace cxxpython
 
             void visit(const compiler_internal::NameTarget &target) override
             {
+                if (symbols_.is_global(target.name) || symbols_.is_nonlocal(target.name))
+                    return;
                 (void)symbols_.add_local(target.name);
             }
 
@@ -445,6 +498,16 @@ namespace cxxpython
                 (void)statement;
             }
 
+            void visit(const compiler_internal::GlobalStmt &statement) override
+            {
+                (void)statement;
+            }
+
+            void visit(const compiler_internal::NonlocalStmt &statement) override
+            {
+                (void)statement;
+            }
+
             void visit(const compiler_internal::TryStmt &statement) override
             {
                 for (const auto &item : statement.body)
@@ -462,15 +525,108 @@ namespace cxxpython
 
             void visit(const compiler_internal::FunctionDefStmt &statement) override
             {
+                if (symbols_.is_global(statement.name) || symbols_.is_nonlocal(statement.name))
+                    return;
                 (void)symbols_.add_local(statement.name);
             }
 
             void visit(const compiler_internal::ClassDefStmt &statement) override
             {
+                if (symbols_.is_global(statement.name) || symbols_.is_nonlocal(statement.name))
+                    return;
                 (void)symbols_.add_local(statement.name);
             }
 
         private:
+            SymbolTable &symbols_;
+        };
+
+        class DirectiveCollector final : public compiler_internal::StmtVisitor
+        {
+        public:
+            DirectiveCollector(Runtime &runtime, SymbolTable &symbols)
+                : runtime_(runtime), symbols_(symbols)
+            {
+            }
+
+            void visit(const compiler_internal::ExprStmt &statement) override
+            {
+                (void)statement;
+            }
+
+            void visit(const compiler_internal::AssignStmt &statement) override
+            {
+                (void)statement;
+            }
+
+            void visit(const compiler_internal::DeleteStmt &statement) override
+            {
+                (void)statement;
+            }
+
+            void visit(const compiler_internal::IfStmt &statement) override
+            {
+                for (const auto &item : statement.then_body)
+                    item->accept(*this);
+                for (const auto &item : statement.else_body)
+                    item->accept(*this);
+            }
+
+            void visit(const compiler_internal::ReturnStmt &statement) override
+            {
+                (void)statement;
+            }
+
+            void visit(const compiler_internal::RaiseStmt &statement) override
+            {
+                (void)statement;
+            }
+
+            void visit(const compiler_internal::GlobalStmt &statement) override
+            {
+                for (const std::string &name : statement.names)
+                {
+                    if (symbols_.is_nonlocal(name))
+                        raise_syntax_error(&runtime_, "name '" + name + "' is nonlocal and global");
+                    symbols_.add_global(name);
+                }
+            }
+
+            void visit(const compiler_internal::NonlocalStmt &statement) override
+            {
+                for (const std::string &name : statement.names)
+                {
+                    if (symbols_.is_global(name))
+                        raise_syntax_error(&runtime_, "name '" + name + "' is nonlocal and global");
+                    symbols_.add_nonlocal(name);
+                }
+            }
+
+            void visit(const compiler_internal::TryStmt &statement) override
+            {
+                for (const auto &item : statement.body)
+                    item->accept(*this);
+                for (const compiler_internal::ExceptHandler &handler : statement.handlers)
+                {
+                    for (const auto &item : handler.body)
+                        item->accept(*this);
+                }
+                for (const auto &item : statement.finally_body)
+                    item->accept(*this);
+            }
+
+            void visit(const compiler_internal::FunctionDefStmt &statement) override
+            {
+                (void)statement;
+            }
+
+            void visit(const compiler_internal::ClassDefStmt &statement) override
+            {
+                (void)statement;
+            }
+
+        private:
+            Runtime &runtime_;
             SymbolTable &symbols_;
         };
 
@@ -613,6 +769,16 @@ namespace cxxpython
                 statement.value->accept(*this);
             }
 
+            void visit(const compiler_internal::GlobalStmt &statement) override
+            {
+                (void)statement;
+            }
+
+            void visit(const compiler_internal::NonlocalStmt &statement) override
+            {
+                (void)statement;
+            }
+
             void visit(const compiler_internal::TryStmt &statement) override
             {
                 for (const auto &item : statement.body)
@@ -690,6 +856,16 @@ namespace cxxpython
                 (void)statement;
             }
 
+            void visit(const compiler_internal::GlobalStmt &statement) override
+            {
+                (void)statement;
+            }
+
+            void visit(const compiler_internal::NonlocalStmt &statement) override
+            {
+                (void)statement;
+            }
+
             void visit(const compiler_internal::TryStmt &statement) override
             {
                 for (const auto &item : statement.body)
@@ -727,16 +903,33 @@ namespace cxxpython
             return nullptr;
         }
 
-        SymbolTable analyze_function_symbols(const compiler_internal::FunctionDefStmt &function,
+        SymbolTable analyze_function_symbols(Runtime &runtime,
+                                             const compiler_internal::FunctionDefStmt &function,
                                              const std::vector<const SymbolTable *> &enclosing)
         {
             SymbolTable symbols(SymbolScope::Function);
+            DirectiveCollector directives(runtime, symbols);
+            for (const auto &statement : function.body)
+                statement->accept(directives);
+
             for (const std::string &param : function.params.positional)
+            {
+                if (symbols.is_global(param) || symbols.is_nonlocal(param))
+                    raise_syntax_error(&runtime, "name '" + param + "' is parameter and nonlocal/global");
                 (void)symbols.add_local(param);
+            }
             if (function.params.varargs)
+            {
+                if (symbols.is_global(*function.params.varargs) || symbols.is_nonlocal(*function.params.varargs))
+                    raise_syntax_error(&runtime, "name '" + *function.params.varargs + "' is parameter and nonlocal/global");
                 (void)symbols.add_local(*function.params.varargs);
+            }
             if (function.params.varkeywords)
+            {
+                if (symbols.is_global(*function.params.varkeywords) || symbols.is_nonlocal(*function.params.varkeywords))
+                    raise_syntax_error(&runtime, "name '" + *function.params.varkeywords + "' is parameter and nonlocal/global");
                 (void)symbols.add_local(*function.params.varkeywords);
+            }
 
             FunctionLocalCollector locals(symbols);
             for (const auto &statement : function.body)
@@ -753,9 +946,18 @@ namespace cxxpython
             {
                 for (const std::string &name : references.references())
                 {
-                    if (!symbols.is_local(name) && find_enclosing_scope(enclosing, name))
+                    if (!symbols.is_local(name) &&
+                        !symbols.is_global(name) &&
+                        find_enclosing_scope(enclosing, name))
                         (void)symbols.add_freevar(name);
                 }
+            }
+
+            for (const std::string &name : symbols.nonlocals())
+            {
+                if (!find_enclosing_scope(enclosing, name))
+                    raise_syntax_error(&runtime, "no binding for nonlocal '" + name + "' found");
+                (void)symbols.add_freevar(name);
             }
 
             NestedFunctionCollector nested_functions;
@@ -767,7 +969,7 @@ namespace cxxpython
             nested_enclosing.insert(nested_enclosing.end(), enclosing.begin(), enclosing.end());
             for (const compiler_internal::FunctionDefStmt *nested : nested_functions.functions)
             {
-                SymbolTable nested_symbols = analyze_function_symbols(*nested, nested_enclosing);
+                SymbolTable nested_symbols = analyze_function_symbols(runtime, *nested, nested_enclosing);
                 for (const std::string &freevar : nested_symbols.freevars())
                 {
                     if (symbols.is_local(freevar))
@@ -941,6 +1143,14 @@ namespace cxxpython
 
             void visit(const compiler_internal::NameExpr &expression) override
             {
+                if (symbols_.scope() == SymbolScope::Function && symbols_.is_global(expression.value))
+                {
+                    emit({
+                        Opcode::LoadGlobal,
+                        static_cast<std::uint32_t>(name_index(expression.value)),
+                    });
+                    return;
+                }
                 if (symbols_.scope() == SymbolScope::Function && symbols_.is_cellvar(expression.value))
                 {
                     emit({
@@ -1061,6 +1271,14 @@ namespace cxxpython
             {
                 if (deleting_target_)
                 {
+                    if (symbols_.scope() == SymbolScope::Function && symbols_.is_global(target.name))
+                    {
+                        emit({
+                            Opcode::DeleteGlobal,
+                            static_cast<std::uint32_t>(name_index(target.name)),
+                        });
+                        return;
+                    }
                     if (symbols_.scope() == SymbolScope::Function && symbols_.is_cellvar(target.name))
                     {
                         emit({
@@ -1092,6 +1310,14 @@ namespace cxxpython
                     return;
                 }
                 emit_pending_assignment_value();
+                if (symbols_.scope() == SymbolScope::Function && symbols_.is_global(target.name))
+                {
+                    emit({
+                        Opcode::StoreGlobal,
+                        static_cast<std::uint32_t>(name_index(target.name)),
+                    });
+                    return;
+                }
                 if (symbols_.scope() == SymbolScope::Function && symbols_.is_cellvar(target.name))
                 {
                     emit({
@@ -1210,6 +1436,16 @@ namespace cxxpython
                 StatementLineGuard line(*this, statement);
                 statement.value->accept(*this);
                 emit({Opcode::RaiseValue, 0});
+            }
+
+            void visit(const compiler_internal::GlobalStmt &statement) override
+            {
+                (void)statement;
+            }
+
+            void visit(const compiler_internal::NonlocalStmt &statement) override
+            {
+                (void)statement;
             }
 
             void visit(const compiler_internal::TryStmt &statement) override
@@ -1466,6 +1702,14 @@ namespace cxxpython
 
             void emit_binding_store(const std::string &name)
             {
+                if (symbols_.scope() == SymbolScope::Function && symbols_.is_global(name))
+                {
+                    emit({
+                        Opcode::StoreGlobal,
+                        static_cast<std::uint32_t>(name_index(name)),
+                    });
+                    return;
+                }
                 if (symbols_.scope() == SymbolScope::Function && symbols_.is_cellvar(name))
                 {
                     emit({
@@ -1498,6 +1742,14 @@ namespace cxxpython
 
             void emit_store_name(const std::string &name)
             {
+                if (symbols_.scope() == SymbolScope::Function && symbols_.is_global(name))
+                {
+                    emit({
+                        Opcode::StoreGlobal,
+                        static_cast<std::uint32_t>(name_index(name)),
+                    });
+                    return;
+                }
                 if (symbols_.scope() == SymbolScope::Function && symbols_.is_cellvar(name))
                 {
                     emit({
@@ -1541,7 +1793,7 @@ namespace cxxpython
 
             SymbolTable collect_function_symbols(const compiler_internal::FunctionDefStmt &function) const
             {
-                return analyze_function_symbols(function, {&symbols_});
+                return analyze_function_symbols(runtime_, function, {&symbols_});
             }
 
             CodeObject::Flags function_flags(const compiler_internal::FunctionParameters &params) const

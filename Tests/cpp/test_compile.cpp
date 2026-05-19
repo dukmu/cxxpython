@@ -1040,6 +1040,86 @@ TEST(Compile, PassesFreeVariablesThroughIntermediateFunctions)
     EXPECT_EQ(result->value, "deep");
 }
 
+TEST(Compile, CompilesGlobalAndNonlocalDeclarations)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(
+        runtime,
+        "value = 'old'\n"
+        "def update_global():\n"
+        "    global value\n"
+        "    value = 'new'\n"
+        "def outer():\n"
+        "    item = 'outer'\n"
+        "    def update_nonlocal():\n"
+        "        nonlocal item\n"
+        "        item = 'inner'\n"
+        "    update_nonlocal()\n"
+        "    return item\n"
+        "update_global()\n"
+        "result = value + ':' + outer()\n",
+        "script.py");
+    ASSERT_NE(code, nullptr);
+
+    cxxpython::CodeObject *update_global_code = nullptr;
+    cxxpython::CodeObject *update_nonlocal_code = nullptr;
+    for (cxxpython::Object *constant : code->constants())
+    {
+        auto *candidate = dynamic_cast<cxxpython::CodeObject *>(constant);
+        if (candidate && candidate->name() == "update_global")
+            update_global_code = candidate;
+    }
+    ASSERT_NE(update_global_code, nullptr);
+    bool saw_store_global = false;
+    for (const cxxpython::Instruction &instruction : update_global_code->instructions())
+    {
+        if (instruction.opcode == cxxpython::Opcode::StoreGlobal)
+            saw_store_global = true;
+    }
+    EXPECT_TRUE(saw_store_global);
+
+    auto *result = dynamic_cast<cxxpython::StrObject *>(vm.execute(*code, *globals));
+    EXPECT_EQ(result, nullptr);
+    auto *stored = dynamic_cast<cxxpython::StrObject *>(globals->get(runtime.new_str("result")));
+    ASSERT_NE(stored, nullptr);
+    EXPECT_EQ(stored->value, "new:inner");
+
+    auto *outer = dynamic_cast<cxxpython::PythonFunctionObject *>(globals->get(runtime.new_str("outer")));
+    ASSERT_NE(outer, nullptr);
+    for (cxxpython::Object *constant : outer->code()->constants())
+    {
+        auto *candidate = dynamic_cast<cxxpython::CodeObject *>(constant);
+        if (candidate && candidate->name() == "update_nonlocal")
+            update_nonlocal_code = candidate;
+    }
+    ASSERT_NE(update_nonlocal_code, nullptr);
+    ASSERT_EQ(update_nonlocal_code->freevars().size(), 1U);
+}
+
+TEST(Compile, RejectsInvalidNonlocalDeclaration)
+{
+    cxxpython::Runtime runtime;
+
+    try
+    {
+        (void)cxxpython::compile_exec_input(
+            runtime,
+            "def broken():\n"
+            "    nonlocal missing\n"
+            "    return missing\n",
+            "script.py");
+        FAIL() << "expected SyntaxError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.syntax_error_type());
+        EXPECT_STREQ(error.what(), "no binding for nonlocal 'missing' found");
+    }
+}
+
 TEST(Compile, FunctionsUseFastLocalsForAssignedNames)
 {
     cxxpython::Runtime runtime;

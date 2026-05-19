@@ -208,6 +208,12 @@ namespace cxxpython
             return "STORE_NAME";
         case Opcode::DeleteName:
             return "DELETE_NAME";
+        case Opcode::LoadGlobal:
+            return "LOAD_GLOBAL";
+        case Opcode::StoreGlobal:
+            return "STORE_GLOBAL";
+        case Opcode::DeleteGlobal:
+            return "DELETE_GLOBAL";
         case Opcode::LoadFast:
             return "LOAD_FAST";
         case Opcode::StoreFast:
@@ -296,12 +302,14 @@ namespace cxxpython
         {
         case Opcode::LoadConst:
         case Opcode::LoadName:
+        case Opcode::LoadGlobal:
         case Opcode::LoadFast:
         case Opcode::LoadDeref:
         case Opcode::LoadClosure:
             return 1;
         case Opcode::LoadAttr:
         case Opcode::DeleteName:
+        case Opcode::DeleteGlobal:
         case Opcode::DeleteFast:
         case Opcode::DeleteDeref:
         case Opcode::JumpAbsolute:
@@ -322,6 +330,7 @@ namespace cxxpython
         case Opcode::DupTop:
             return 1;
         case Opcode::StoreName:
+        case Opcode::StoreGlobal:
         case Opcode::StoreFast:
         case Opcode::StoreDeref:
         case Opcode::PopTop:

@@ -36,6 +36,8 @@ namespace cxxpython::compiler_internal
     struct IfStmt;
     struct ReturnStmt;
     struct RaiseStmt;
+    struct GlobalStmt;
+    struct NonlocalStmt;
     struct TryStmt;
     struct FunctionDefStmt;
     struct ClassDefStmt;
@@ -75,6 +77,8 @@ namespace cxxpython::compiler_internal
         virtual void visit(const IfStmt &statement) = 0;
         virtual void visit(const ReturnStmt &statement) = 0;
         virtual void visit(const RaiseStmt &statement) = 0;
+        virtual void visit(const GlobalStmt &statement) = 0;
+        virtual void visit(const NonlocalStmt &statement) = 0;
         virtual void visit(const TryStmt &statement) = 0;
         virtual void visit(const FunctionDefStmt &statement) = 0;
         virtual void visit(const ClassDefStmt &statement) = 0;
@@ -112,6 +116,8 @@ namespace cxxpython::compiler_internal
         Def,
         Return,
         Raise,
+        Global,
+        Nonlocal,
         Try,
         Except,
         Finally,
@@ -557,6 +563,36 @@ namespace cxxpython::compiler_internal
         }
 
         std::unique_ptr<Expr> value;
+
+        void accept(StmtVisitor &visitor) const override
+        {
+            visitor.visit(*this);
+        }
+    };
+
+    struct GlobalStmt final : Stmt
+    {
+        explicit GlobalStmt(std::vector<std::string> names_in)
+            : names(std::move(names_in))
+        {
+        }
+
+        std::vector<std::string> names;
+
+        void accept(StmtVisitor &visitor) const override
+        {
+            visitor.visit(*this);
+        }
+    };
+
+    struct NonlocalStmt final : Stmt
+    {
+        explicit NonlocalStmt(std::vector<std::string> names_in)
+            : names(std::move(names_in))
+        {
+        }
+
+        std::vector<std::string> names;
 
         void accept(StmtVisitor &visitor) const override
         {

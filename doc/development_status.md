@@ -1,5 +1,44 @@
 # Development Status
 
+## 2026-05-19 Global And Nonlocal Symbol Slice
+
+Review focus:
+
+- Tighten the symbol-analysis debt left after closure cells.
+- Avoid treating `global` as a runtime locals hack; function global writes need
+  explicit global opcodes.
+- Keep `nonlocal` on the same closure-cell path as ordinary free variables.
+
+Completed:
+
+- Added lexer/parser/AST support for `global` and `nonlocal` statements.
+- Added `LOAD_GLOBAL`, `STORE_GLOBAL`, and `DELETE_GLOBAL` bytecode.
+- Extended VM global opcodes to read globals/builtins and mutate globals.
+- Added function-scope directive collection before local analysis so global
+  and nonlocal assignment targets do not become fast locals.
+- Validated `nonlocal` bindings against enclosing lexical scopes.
+- Lowered `nonlocal` reads/writes through existing deref/cell machinery.
+- Added C++ and Python golden coverage for global mutation, nonlocal mutation,
+  freevar pass-through with `nonlocal`, and invalid missing nonlocal bindings.
+
+Known debt and next risk:
+
+- CPython's ordering diagnostics such as "used prior to global declaration"
+  are not enforced yet. The current implementation applies declarations to
+  the whole function block, which is correct for successful programs but still
+  too permissive for malformed source.
+- Class-body directive semantics still need a deliberate design when class
+  `__class__` cells are added.
+- Symbol analysis is now large enough that the next structural cleanup should
+  move it out of `compiler.cpp` before default arguments, comprehensions, or
+  class closure semantics expand it further.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter='Bytecode.MetadataNamesAndStackEffects:Compile.CompilesGlobalAndNonlocalDeclarations:Compile.RejectsInvalidNonlocalDeclaration:PythonScripts.RunsGoldenFiles'`
+- `ctest --test-dir build --output-on-failure`
+
 ## 2026-05-19 Closure Cell Foundation Slice
 
 Review focus:
@@ -32,7 +71,6 @@ Completed:
 
 Known debt and next risk:
 
-- `global` and `nonlocal` statements are still not parsed or analyzed.
 - Class-body closure semantics remain incomplete: no `__class__` cell,
   `LOAD_CLASSDEREF`, or zero-argument `super()` yet.
 - Empty-cell error messages are intentionally minimal and need CPython-style
