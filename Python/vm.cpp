@@ -86,6 +86,12 @@ namespace cxxpython
                 value->set_source_location(code.filename(), line, code.name());
         }
 
+        void add_temporary_root(Runtime &runtime, std::vector<Rooted<Object>> &roots, Object *object)
+        {
+            if (object)
+                roots.push_back(runtime.root(object));
+        }
+
         class ActiveFrame final
         {
         public:
@@ -342,6 +348,7 @@ namespace cxxpython
                 if (!name)
                     throw BytecodeError("STORE_NAME requires a str name");
                 Object *value = frame->pop();
+                auto value_root = runtime_.root(value);
                 locals.set(name, value);
                 break;
             }
@@ -369,6 +376,7 @@ namespace cxxpython
                 if (!name)
                     throw BytecodeError("STORE_FAST requires a str varname");
                 Object *value = frame->pop();
+                auto value_root = runtime_.root(value);
                 locals.set(name, value);
                 break;
             }
@@ -380,6 +388,7 @@ namespace cxxpython
                 if (!name)
                     throw BytecodeError("LOAD_ATTR requires a str name");
                 Object *object = frame->pop();
+                auto object_root = runtime_.root(object);
                 frame->push(object_get_attr(object, name));
                 break;
             }
@@ -392,6 +401,8 @@ namespace cxxpython
                     throw BytecodeError("STORE_ATTR requires a str name");
                 Object *value = frame->pop();
                 Object *object = frame->pop();
+                auto value_root = runtime_.root(value);
+                auto object_root = runtime_.root(object);
                 object_set_attr(object, name, value);
                 break;
             }
@@ -427,6 +438,7 @@ namespace cxxpython
             {
                 const UnaryOp op = decode_unary_op(instruction.operand);
                 Object *operand = frame->pop();
+                auto operand_root = runtime_.root(operand);
                 frame->push(object_unary_op(operand, op));
                 break;
             }
@@ -435,6 +447,8 @@ namespace cxxpython
                 const BinaryOp op = decode_binary_op(instruction.operand);
                 Object *right = frame->pop();
                 Object *left = frame->pop();
+                auto right_root = runtime_.root(right);
+                auto left_root = runtime_.root(left);
                 frame->push(object_binary_op(left, right, op));
                 break;
             }
@@ -442,6 +456,8 @@ namespace cxxpython
             {
                 Object *key = frame->pop();
                 Object *object = frame->pop();
+                auto key_root = runtime_.root(key);
+                auto object_root = runtime_.root(object);
                 frame->push(object_get_item(object, key));
                 break;
             }
@@ -450,35 +466,57 @@ namespace cxxpython
                 Object *value = frame->pop();
                 Object *key = frame->pop();
                 Object *object = frame->pop();
+                auto value_root = runtime_.root(value);
+                auto key_root = runtime_.root(key);
+                auto object_root = runtime_.root(object);
                 object_set_item(object, key, value);
                 break;
             }
             case Opcode::BuildList:
             {
                 std::vector<Object *> items(instruction.operand);
+                std::vector<Rooted<Object>> roots;
+                roots.reserve(items.size());
                 for (std::size_t index = items.size(); index > 0; --index)
+                {
                     items[index - 1] = frame->pop();
-                frame->push(runtime_.new_list(std::move(items)));
+                    add_temporary_root(runtime_, roots, items[index - 1]);
+                }
+                ListObject *list = runtime_.new_list(std::move(items));
+                auto list_root = runtime_.root(list);
+                frame->push(list);
                 break;
             }
             case Opcode::BuildTuple:
             {
                 std::vector<Object *> items(instruction.operand);
+                std::vector<Rooted<Object>> roots;
+                roots.reserve(items.size());
                 for (std::size_t index = items.size(); index > 0; --index)
+                {
                     items[index - 1] = frame->pop();
-                frame->push(runtime_.new_tuple(std::move(items)));
+                    add_temporary_root(runtime_, roots, items[index - 1]);
+                }
+                TupleObject *tuple = runtime_.new_tuple(std::move(items));
+                auto tuple_root = runtime_.root(tuple);
+                frame->push(tuple);
                 break;
             }
             case Opcode::BuildMap:
             {
                 std::vector<Object *> keys(instruction.operand);
                 std::vector<Object *> values(instruction.operand);
+                std::vector<Rooted<Object>> roots;
+                roots.reserve(keys.size() * 2);
                 for (std::size_t index = keys.size(); index > 0; --index)
                 {
                     values[index - 1] = frame->pop();
                     keys[index - 1] = frame->pop();
+                    add_temporary_root(runtime_, roots, values[index - 1]);
+                    add_temporary_root(runtime_, roots, keys[index - 1]);
                 }
                 DictObject *dict = runtime_.new_dict();
+                auto dict_root = runtime_.root(dict);
                 for (std::size_t index = 0; index < keys.size(); ++index)
                     dict->set(keys[index], values[index]);
                 frame->push(dict);
@@ -491,6 +529,8 @@ namespace cxxpython
                 const auto op = static_cast<RichCompareOp>(instruction.operand);
                 Object *right = frame->pop();
                 Object *left = frame->pop();
+                auto right_root = runtime_.root(right);
+                auto left_root = runtime_.root(left);
                 frame->push(object_rich_compare(left, right, op));
                 break;
             }
@@ -502,6 +542,7 @@ namespace cxxpython
             case Opcode::PopJumpIfFalse:
             {
                 Object *condition = frame->pop();
+                auto condition_root = runtime_.root(condition);
                 if (!is_true(condition))
                     jump_to(*frame, code, instruction.operand);
                 break;
@@ -509,6 +550,7 @@ namespace cxxpython
             case Opcode::PopJumpIfTrue:
             {
                 Object *condition = frame->pop();
+                auto condition_root = runtime_.root(condition);
                 if (is_true(condition))
                     jump_to(*frame, code, instruction.operand);
                 break;
@@ -516,6 +558,7 @@ namespace cxxpython
             case Opcode::JumpIfFalseOrPop:
             {
                 Object *condition = frame->pop();
+                auto condition_root = runtime_.root(condition);
                 if (!is_true(condition))
                 {
                     frame->push(condition);
@@ -529,7 +572,10 @@ namespace cxxpython
                 auto *function_code = dynamic_cast<CodeObject *>(code_object);
                 if (!function_code)
                     throw BytecodeError("MAKE_FUNCTION requires a code object");
-                frame->push(runtime_.new_function(function_code->name(), function_code, &globals));
+                auto code_root = runtime_.root(function_code);
+                PythonFunctionObject *function = runtime_.new_function(function_code->name(), function_code, &globals);
+                auto function_root = runtime_.root(function);
+                frame->push(function);
                 break;
             }
             case Opcode::MakeClass:
@@ -547,6 +593,8 @@ namespace cxxpython
                 auto *bases_tuple = dynamic_cast<TupleObject *>(bases_object);
                 if (!bases_tuple)
                     throw BytecodeError("MAKE_CLASS requires a tuple of bases");
+                auto class_code_root = runtime_.root(class_code);
+                auto bases_tuple_root = runtime_.root(bases_tuple);
                 std::vector<TypeObject *> bases;
                 bases.reserve(bases_tuple->size());
                 for (Object *base : bases_tuple->items())
@@ -562,17 +610,26 @@ namespace cxxpython
                 request.module_fallback = module_name_from_globals(runtime_, globals);
                 request.qualname = class_name->value;
                 DictObject *namespace_dict = runtime_.prepare_class_namespace(request);
+                auto namespace_root = runtime_.root(namespace_dict);
                 (void)execute(*class_code, *namespace_dict, globals, builtins);
                 request.namespace_dict = namespace_dict;
-                frame->push(runtime_.new_class(std::move(request)));
+                TypeObject *type = runtime_.new_class(std::move(request));
+                auto type_root = runtime_.root(type);
+                frame->push(type);
                 break;
             }
             case Opcode::Call:
             {
                 std::vector<Object *> args(instruction.operand);
+                std::vector<Rooted<Object>> roots;
+                roots.reserve(args.size());
                 for (std::size_t index = args.size(); index > 0; --index)
+                {
                     args[index - 1] = frame->pop();
+                    add_temporary_root(runtime_, roots, args[index - 1]);
+                }
                 Object *callable = frame->pop();
+                auto callable_root = runtime_.root(callable);
                 frame->push(object_call(callable, args));
                 break;
             }
@@ -582,10 +639,17 @@ namespace cxxpython
                 auto *keywords = dynamic_cast<DictObject *>(keywords_object);
                 if (!keywords)
                     throw BytecodeError("CALL_KW requires keyword dict");
+                auto keywords_root = runtime_.root(keywords);
                 std::vector<Object *> args(instruction.operand);
+                std::vector<Rooted<Object>> roots;
+                roots.reserve(args.size());
                 for (std::size_t index = args.size(); index > 0; --index)
+                {
                     args[index - 1] = frame->pop();
+                    add_temporary_root(runtime_, roots, args[index - 1]);
+                }
                 Object *callable = frame->pop();
+                auto callable_root = runtime_.root(callable);
                 frame->push(object_call(callable, CallArguments{std::move(args), keywords}));
                 break;
             }

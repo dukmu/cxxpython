@@ -831,6 +831,36 @@ TEST(Bytecode, CallsCallableObjectsThroughTypeSlot)
     EXPECT_EQ(output.str(), "answer 42\n");
 }
 
+TEST(Bytecode, CallOpcodeRootsCallableAndArgumentsAcrossDispatch)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    const std::size_t baseline_roots = runtime.root_count();
+    bool observed_roots = false;
+    cxxpython::Object *result = runtime.new_str("called");
+    cxxpython::NativeFunctionObject *callable = runtime.new_native_function(
+        "observe_roots",
+        [baseline_roots, &observed_roots, result](cxxpython::Runtime &runtime,
+                                                  const cxxpython::CallArguments &args)
+        {
+            EXPECT_EQ(args.positional.size(), 2U);
+            EXPECT_GE(runtime.root_count(), baseline_roots + 3U);
+            observed_roots = true;
+            return result;
+        });
+    cxxpython::CodeObject *code = runtime.new_code(
+        {callable, runtime.new_str("left"), runtime.new_str("right")},
+        {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::LoadConst, 1},
+         {cxxpython::Opcode::LoadConst, 2},
+         {cxxpython::Opcode::Call, 2},
+         {cxxpython::Opcode::ReturnValue, 0}});
+
+    EXPECT_EQ(vm.execute(*code), result);
+    EXPECT_TRUE(observed_roots);
+    EXPECT_EQ(runtime.root_count(), baseline_roots);
+}
+
 TEST(Bytecode, RaisesPythonTypeErrorForNonCallable)
 {
     cxxpython::Runtime runtime;

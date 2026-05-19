@@ -134,6 +134,12 @@ doc/            design docs and milestone plans
   roots 是 counted entries，允许同一对象被嵌套 guard 多次保护；guard 析构
   只移除自己对应的一层根。不要依赖手写成对 `add_root/remove_root` 作为长期
   模型。
+- VM opcode handlers are responsible for rooting values after they are popped
+  from the frame value stack and before they are passed to object protocols or
+  allocation-heavy constructors. This includes aggregate literal elements,
+  call operands, class creation temporaries, attribute/subscript operands, and
+  truth/comparison operands. Values should remain rooted until the result is
+  pushed back onto the active frame or moved into a traversable runtime object.
 - Name resolution 必须区分编译期 fast locals 和动态 namespace lookup。函数
   scope 中编译期判定为 local 的名字使用 `LOAD_FAST`/`STORE_FAST`，只访问
   frame locals，缺失时抛 `UnboundLocalError`；模块和 class body 的动态名字

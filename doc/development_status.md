@@ -31,10 +31,13 @@ Eight tracked risks:
    minimal traceback frame. Full traceback objects, exception chaining,
    stacksize, freevars/cellvars, and script-visible debugging metadata remain
    open.
-5. Medium, foundation fixed: `Rooted<T>` now provides scoped RAII roots and the
-   runtime root list supports nested counted roots. VM operations still need to
-   adopt root guards around allocation-heavy temporary vectors before a
-   collecting or moving GC is enabled.
+5. Medium, second slice fixed: `Rooted<T>` now provides scoped RAII roots and
+   the runtime root list supports nested counted roots. VM dispatch now guards
+   popped operands, collection literal elements, call arguments, class
+   namespace temporaries, and newly allocated aggregate results across protocol
+   calls and allocation-heavy opcode paths. Runtime factories and Python
+   function argument binding still need a wider audit before a collecting or
+   moving GC is enabled.
 6. Medium, partially fixed: builtins remain bootstrap-minimal. Calls now enter
    through shared `CallArguments`, keyword rejection is centralized at the
    callable boundary, `str()` is exposed, `print` uses `object_str`, and
@@ -79,10 +82,70 @@ Immediate order:
   and Python golden tests cover class and instance access.
 - Done in current slice: native/builtin positional and keyword validation now
   uses shared helper APIs instead of repeated local string-building branches.
+- Done in current slice: VM opcode dispatch now uses scoped root guards around
+  popped operands, aggregate construction, function calls, and class creation
+  temporaries.
 - Next: continue through `global`/`nonlocal`/closures, `__prepare__`,
   syntax-level `metaclass=`,
   full traceback objects, root guards, builtin protocol cleanup, call expansion,
   defaults/keyword-only arguments, and descriptor completeness.
+
+## 2026-05-19 VM Temporary Root Guard Adoption
+
+Pre-change review:
+
+- Active frames already participate in traversal, but several opcodes popped
+  objects off the frame value stack before calling object protocols or
+  allocating aggregate results.
+- Paths such as `BUILD_LIST`, `BUILD_MAP`, `CALL`, `CALL_KW`, attribute access,
+  subscript access, comparisons, truth tests, and class creation could therefore
+  leave live operands only in C++ local variables. That is harmless with the
+  current non-collecting heap, but unsafe once allocation can trigger GC.
+
+Debt addressed:
+
+- Added scoped `Rooted<Object>` guards in VM dispatch for popped operands before
+  protocol calls such as attr/subscript/binary/unary/compare/truth operations.
+- Rooted collection literal elements while constructing list/tuple/dict
+  objects, and rooted newly allocated aggregate objects until pushed back onto
+  the frame stack.
+- Rooted callable, positional args, and keyword dict across `CALL`/`CALL_KW`
+  dispatch.
+- Rooted class body code, bases tuple, prepared namespace, and created type
+  across `MAKE_CLASS`.
+- Rooted function code and function object across `MAKE_FUNCTION`.
+
+Completed:
+
+- Added bytecode coverage that observes root guards from inside a native
+  callable during `CALL`, proving callable and positional args are runtime
+  roots while dispatch is in progress and are released afterwards.
+- Re-ran the full suite.
+
+Design review:
+
+- The VM now treats “popped from frame stack but still semantically live” as an
+  explicit root lifetime. This is the correct boundary for a future tracing or
+  moving collector because opcode handlers remain responsible for their own C++
+  temporaries.
+- This does not claim the whole runtime is GC-safe yet. Python function
+  argument binding, runtime factories, descriptor calls, and class construction
+  internals still need the same scrutiny.
+
+Known debt and next risk:
+
+- Audit `PythonFunctionObject::call`, `Runtime::new_class`, and builtin
+  descriptor constructors for temporary containers that allocate while holding
+  unrooted objects outside active frames.
+- Introduce collector stress tests once the GC machinery can run during
+  allocation.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all 142 tests pass.
 
 ## 2026-05-19 Shared Native Argument Validation
 
