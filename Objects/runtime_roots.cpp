@@ -153,6 +153,8 @@ namespace cxxpython
         initialize_type_dict(tuple_type_);
         initialize_type_dict(dict_type_);
         initialize_type_dict(mappingproxy_type_);
+        initialize_type_dict(sequence_iterator_type_);
+        initialize_type_dict(dict_key_iterator_type_);
         initialize_type_dict(module_type_);
         initialize_type_dict(native_function_type_);
         initialize_type_dict(function_type_);
@@ -173,6 +175,7 @@ namespace cxxpython
         initialize_type_dict(name_error_type_);
         initialize_type_dict(unbound_local_error_type_);
         initialize_type_dict(attribute_error_type_);
+        initialize_type_dict(stop_iteration_type_);
     }
 
     TypeSlots Runtime::inherit_slots(TypeObject *base, TypeSlots slots) const
@@ -210,6 +213,10 @@ namespace cxxpython
             inherited.setitem = slots.setitem;
         if (slots.contains)
             inherited.contains = slots.contains;
+        if (slots.iter)
+            inherited.iter = slots.iter;
+        if (slots.iternext)
+            inherited.iternext = slots.iternext;
         if (slots.descr_get)
             inherited.descr_get = slots.descr_get;
         if (slots.descr_set)

@@ -408,6 +408,74 @@ TEST(CoreObjects, SequenceSlotsReadAndWriteListAndTupleItems)
     }
 }
 
+TEST(CoreObjects, IteratesSequencesAndRaisesStopIterationAtEnd)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::Object *first = runtime.new_str("first");
+    cxxpython::Object *second = runtime.new_str("second");
+    cxxpython::ListObject *list = runtime.new_list({first, second});
+
+    cxxpython::Object *iterator = cxxpython::object_iter(list);
+    ASSERT_NE(iterator, nullptr);
+    EXPECT_EQ(iterator->type(), runtime.sequence_iterator_type());
+    EXPECT_EQ(cxxpython::object_iter(iterator), iterator);
+    EXPECT_EQ(cxxpython::object_next(iterator), first);
+    EXPECT_EQ(cxxpython::object_next(iterator), second);
+
+    try
+    {
+        (void)cxxpython::object_next(iterator);
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.stop_iteration_type());
+        ASSERT_NE(error.value(), nullptr);
+        EXPECT_EQ(error.value()->args()->size(), 0U);
+    }
+
+    std::vector<cxxpython::Object *> visited;
+    iterator->visit_children([&visited](cxxpython::Object *object)
+                             { visited.push_back(object); });
+    ASSERT_EQ(visited.size(), 1U);
+    EXPECT_EQ(visited[0], list);
+}
+
+TEST(CoreObjects, ListConstructorConsumesIterableProtocol)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::Object *first = runtime.new_str("first");
+    cxxpython::Object *second = runtime.new_str("second");
+
+    auto *from_tuple = dynamic_cast<cxxpython::ListObject *>(
+        cxxpython::object_call(runtime.list_type(), {runtime.new_tuple({first, second})}));
+    ASSERT_NE(from_tuple, nullptr);
+    ASSERT_EQ(from_tuple->size(), 2U);
+    EXPECT_EQ(from_tuple->get(0), first);
+    EXPECT_EQ(from_tuple->get(1), second);
+
+    cxxpython::DictObject *dict = runtime.new_dict();
+    dict->set(first, runtime.new_int(1));
+    dict->set(second, runtime.new_int(2));
+    auto *from_dict = dynamic_cast<cxxpython::ListObject *>(
+        cxxpython::object_call(runtime.list_type(), {dict}));
+    ASSERT_NE(from_dict, nullptr);
+    ASSERT_EQ(from_dict->size(), 2U);
+    EXPECT_EQ(from_dict->get(0), first);
+    EXPECT_EQ(from_dict->get(1), second);
+
+    try
+    {
+        (void)cxxpython::object_call(runtime.list_type(), {runtime.new_int(1)});
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "'int' object is not iterable");
+    }
+}
+
 TEST(CoreObjects, ListRaisesPythonErrors)
 {
     cxxpython::Runtime runtime;

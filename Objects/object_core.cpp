@@ -563,6 +563,44 @@ namespace cxxpython
         raise_type_error(object->runtime(), message.str());
     }
 
+    Object *object_iter(Object *object)
+    {
+        if (!object)
+            raise_type_error(nullptr, "'<null>' object is not iterable");
+        if (object->type() && object->type()->slots.iter)
+        {
+            Object *iterator = object->type()->slots.iter(*object);
+            if (!iterator)
+                raise_type_error(object->runtime(), "__iter__ returned null");
+            if (!iterator->type() || !iterator->type()->slots.iternext)
+                raise_type_error(object->runtime(), "iter() returned non-iterator");
+            return iterator;
+        }
+
+        std::ostringstream message;
+        message << "'" << type_qualified_name(object->type())
+                << "' object is not iterable";
+        raise_type_error(object->runtime(), message.str());
+    }
+
+    Object *object_next(Object *iterator)
+    {
+        if (!iterator)
+            raise_type_error(nullptr, "'<null>' object is not an iterator");
+        if (iterator->type() && iterator->type()->slots.iternext)
+        {
+            Object *item = iterator->type()->slots.iternext(*iterator);
+            if (!item)
+                raise_type_error(iterator->runtime(), "__next__ returned null");
+            return item;
+        }
+
+        std::ostringstream message;
+        message << "'" << type_qualified_name(iterator->type())
+                << "' object is not an iterator";
+        raise_type_error(iterator->runtime(), message.str());
+    }
+
     Object *type_lookup_attribute(TypeObject *type, StrObject *name)
     {
         if (!type || !name)

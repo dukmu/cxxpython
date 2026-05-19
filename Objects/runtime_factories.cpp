@@ -53,6 +53,20 @@ namespace cxxpython
         return allocate<MappingProxyObject>(mappingproxy_type_, mapping);
     }
 
+    SequenceIteratorObject *Runtime::new_sequence_iterator(Object *sequence)
+    {
+        if (!sequence)
+            raise_type_error(this, "sequence iterator requires a sequence");
+        return allocate<SequenceIteratorObject>(sequence_iterator_type_, sequence);
+    }
+
+    DictKeyIteratorObject *Runtime::new_dict_key_iterator(DictObject *dict)
+    {
+        if (!dict)
+            raise_type_error(this, "dict key iterator requires a dict");
+        return allocate<DictKeyIteratorObject>(dict_key_iterator_type_, dict);
+    }
+
     ModuleObject *Runtime::new_module(std::string name, std::string filename)
     {
         DictObject *dict = new_dict();
@@ -386,5 +400,10 @@ namespace cxxpython
     ExceptionObject *Runtime::new_attribute_error(std::string message)
     {
         return new_exception(attribute_error_type_, std::move(message));
+    }
+
+    ExceptionObject *Runtime::new_stop_iteration()
+    {
+        return new_exception(stop_iteration_type_, std::vector<Object *>{});
     }
 }

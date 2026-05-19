@@ -51,6 +51,8 @@ namespace cxxpython
         TypeObject *tuple_type() const noexcept;
         TypeObject *dict_type() const noexcept;
         TypeObject *mappingproxy_type() const noexcept;
+        TypeObject *sequence_iterator_type() const noexcept;
+        TypeObject *dict_key_iterator_type() const noexcept;
         TypeObject *module_type() const noexcept;
         TypeObject *native_function_type() const noexcept;
         TypeObject *function_type() const noexcept;
@@ -71,6 +73,7 @@ namespace cxxpython
         TypeObject *name_error_type() const noexcept;
         TypeObject *unbound_local_error_type() const noexcept;
         TypeObject *attribute_error_type() const noexcept;
+        TypeObject *stop_iteration_type() const noexcept;
 
         NoneObject *none() const noexcept;
         NotImplementedObject *not_implemented() const noexcept;
@@ -89,6 +92,8 @@ namespace cxxpython
         TupleObject *new_tuple(std::vector<Object *> items);
         DictObject *new_dict();
         MappingProxyObject *new_mappingproxy(DictObject *mapping);
+        SequenceIteratorObject *new_sequence_iterator(Object *sequence);
+        DictKeyIteratorObject *new_dict_key_iterator(DictObject *dict);
         ModuleObject *new_module(std::string name, std::string filename);
         NativeFunctionObject *new_native_function(std::string name, NativeFunctionCallback callback);
         PythonFunctionObject *new_function(std::string name, CodeObject *code, DictObject *globals);
@@ -162,6 +167,7 @@ namespace cxxpython
         ExceptionObject *new_name_error(std::string message);
         ExceptionObject *new_unbound_local_error(std::string message);
         ExceptionObject *new_attribute_error(std::string message);
+        ExceptionObject *new_stop_iteration();
 
         void add_root(Object *object);
         void remove_root(Object *object);
@@ -214,6 +220,8 @@ namespace cxxpython
         TypeObject *tuple_type_ = nullptr;
         TypeObject *dict_type_ = nullptr;
         TypeObject *mappingproxy_type_ = nullptr;
+        TypeObject *sequence_iterator_type_ = nullptr;
+        TypeObject *dict_key_iterator_type_ = nullptr;
         TypeObject *module_type_ = nullptr;
         TypeObject *native_function_type_ = nullptr;
         TypeObject *function_type_ = nullptr;
@@ -234,6 +242,7 @@ namespace cxxpython
         TypeObject *name_error_type_ = nullptr;
         TypeObject *unbound_local_error_type_ = nullptr;
         TypeObject *attribute_error_type_ = nullptr;
+        TypeObject *stop_iteration_type_ = nullptr;
 
         NoneObject *none_ = nullptr;
         NotImplementedObject *not_implemented_ = nullptr;

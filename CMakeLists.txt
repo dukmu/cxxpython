@@ -23,6 +23,7 @@ add_library(cxxpython_core
     Objects/object_primitives.cpp
     Objects/object_sequences.cpp
     Objects/object_mapping.cpp
+    Objects/object_iterator.cpp
     Objects/object_module.cpp
     Objects/object_native_function.cpp
     Objects/object_function.cpp

@@ -1,4 +1,5 @@
 #include "cxxpython/object.hpp"
+#include "cxxpython/runtime.hpp"
 
 #include "object_utils.hpp"
 
@@ -87,4 +88,8 @@ namespace cxxpython
         };
     }
 
+    void raise_stop_iteration(Runtime *runtime)
+    {
+        throw PythonError(runtime ? runtime->new_stop_iteration() : nullptr);
+    }
 }

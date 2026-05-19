@@ -19,6 +19,8 @@ namespace cxxpython
     class ListObject;
     class DictObject;
     class MappingProxyObject;
+    class SequenceIteratorObject;
+    class DictKeyIteratorObject;
     class ExceptionObject;
     class MethodDescriptorObject;
     class GetSetDescriptorObject;
@@ -88,6 +90,8 @@ namespace cxxpython
     using GetItemSlot = Object *(*)(Object &, Object *);
     using SetItemSlot = void (*)(Object &, Object *, Object *);
     using ContainsSlot = bool (*)(Object &, Object *);
+    using IterSlot = Object *(*)(Object &);
+    using IterNextSlot = Object *(*)(Object &);
     using DescrGetSlot = Object *(*)(Object &, Object *, TypeObject *);
     using DescrSetSlot = void (*)(Object &, Object *, Object *);
     using NewSlot = Object *(*)(TypeObject &, const CallArguments &);
@@ -110,6 +114,8 @@ namespace cxxpython
         GetItemSlot getitem = nullptr;
         SetItemSlot setitem = nullptr;
         ContainsSlot contains = nullptr;
+        IterSlot iter = nullptr;
+        IterNextSlot iternext = nullptr;
         DescrGetSlot descr_get = nullptr;
         DescrSetSlot descr_set = nullptr;
         NewSlot new_object = nullptr;
@@ -283,6 +289,34 @@ namespace cxxpython
 
     private:
         DictObject *mapping_;
+    };
+
+    class SequenceIteratorObject final : public Object
+    {
+    public:
+        SequenceIteratorObject(TypeObject *type, Object *sequence);
+
+        Object *sequence() const noexcept;
+        std::size_t index() const noexcept;
+        std::size_t consume_index() noexcept;
+
+    private:
+        Object *sequence_;
+        std::size_t index_ = 0;
+    };
+
+    class DictKeyIteratorObject final : public Object
+    {
+    public:
+        DictKeyIteratorObject(TypeObject *type, DictObject *dict);
+
+        DictObject *dict() const noexcept;
+        std::size_t index() const noexcept;
+        std::size_t consume_index() noexcept;
+
+    private:
+        DictObject *dict_;
+        std::size_t index_ = 0;
     };
 
     class ModuleObject final : public Object
@@ -473,6 +507,8 @@ namespace cxxpython
     Object *object_get_item(Object *object, Object *key);
     void object_set_item(Object *object, Object *key, Object *value);
     bool object_contains(Object *object, Object *key);
+    Object *object_iter(Object *object);
+    Object *object_next(Object *iterator);
     Object *object_get_attr(Object *object, StrObject *name);
     Object *object_get_attr(Object *object, const std::string &name);
     void object_set_attr(Object *object, StrObject *name, Object *value);
@@ -493,6 +529,8 @@ namespace cxxpython
     TypeSlots make_tuple_slots();
     TypeSlots make_dict_slots();
     TypeSlots make_mappingproxy_slots();
+    TypeSlots make_sequence_iterator_slots();
+    TypeSlots make_dict_key_iterator_slots();
     TypeSlots make_module_slots();
     TypeSlots make_native_function_slots();
     TypeSlots make_function_slots();
@@ -513,4 +551,5 @@ namespace cxxpython
     [[noreturn]] void raise_name_error(Runtime *runtime, std::string message);
     [[noreturn]] void raise_unbound_local_error(Runtime *runtime, std::string message);
     [[noreturn]] void raise_attribute_error(Runtime *runtime, std::string message);
+    [[noreturn]] void raise_stop_iteration(Runtime *runtime);
 }

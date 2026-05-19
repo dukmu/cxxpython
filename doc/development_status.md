@@ -41,9 +41,11 @@ Eight tracked risks:
 6. Medium, partially fixed: builtins remain bootstrap-minimal. Calls now enter
    through shared `CallArguments`, keyword rejection is centralized at the
    callable boundary, `str()` is exposed, `print` uses `object_str`, and
-   native/builtin constructor argument count checks now share helper APIs.
-   `list()` still accepts no iterable, and the full CPython-style argument
-   parser / iterator protocol path is not in place.
+   native/builtin constructor argument count checks now share helper APIs. The
+   core iterator protocol now has `iter`/`iternext` slots, `iter()`/`next()`,
+   `StopIteration`, sequence and dict-key iterators, and `list(iterable)`.
+   Remaining builtin debt is the richer CPython-style argument parser plus
+   protocol users such as `for`, `*iterable`, and `**mapping`.
 7. Medium, partially fixed: descriptor and type-attribute protocol is
    incomplete. Lookup is centralized; `property` works as a data descriptor;
    `property.getter`/`setter`/`deleter`, `staticmethod`, and `classmethod` are
@@ -54,8 +56,7 @@ Eight tracked risks:
    varargs, keyword dictionaries, and keyword calls through `CodeObject` flags,
    `CALL_KW`, and unified `CallArguments`. Remaining call-family work includes
    `*iterable` / `**mapping` call expansion, keyword-only parameters, default
-   arguments, annotations, `*iterable` / `**mapping` call expansion, and a
-   reusable native argument parser.
+   arguments, annotations, and a reusable native argument parser.
 
 Immediate order:
 
@@ -91,11 +92,75 @@ Immediate order:
   and classes; `property.getter`/`setter`/`deleter` return updated property
   descriptors and Python golden tests cover `@property`, `@staticmethod`, and
   `@classmethod`.
+- Done in current slice: iterator protocol foundation is now slot-based;
+  `StopIteration`, `iter`, `next`, sequence iterators, dict-key iterators, and
+  `list(iterable)` all use object protocol dispatch.
 - Next: continue through `global`/`nonlocal`/closures, `__prepare__`,
   syntax-level `metaclass=`,
   full traceback objects, runtime factory root audits, builtin protocol
-  cleanup, iterator protocol, call expansion, defaults/keyword-only arguments,
-  and descriptor completeness.
+  cleanup, `for`/call expansion, defaults/keyword-only arguments, and
+  descriptor completeness.
+
+## 2026-05-19 Iterator Protocol Foundation And `list(iterable)`
+
+Pre-change review:
+
+- `list()` was still an empty-constructor-only bootstrap builtin. That was
+  becoming a lasting API smell because every future iterable consumer would
+  either need its own container-specific branch or wait for a proper protocol.
+- Sequence and mapping slots had length/getitem/setitem/contains, but no
+  iteration protocol. That blocked clean implementations of `for`,
+  `list(iterable)`, `*args`, and eventually generator/async iteration routes.
+
+Debt addressed:
+
+- Added `TypeSlots::iter` and `TypeSlots::iternext`, plus centralized
+  `object_iter` and `object_next` APIs.
+- Added typed iterator runtime objects:
+  - `iterator` for index-based sequence iteration over list/tuple-like
+    objects.
+  - `dict_keyiterator` for dict and mappingproxy key iteration.
+- Added `StopIteration` as a real exception type and exposed it in builtins.
+- Exposed `iter()` and `next()` through normal native builtin callables.
+- Changed `list.__new__` to accept zero or one positional argument and consume
+  the argument through `object_iter`/`object_next`. `list.__init__` now accepts
+  the same signature so the normal `type.__call__` new/init path remains intact.
+
+Completed:
+
+- Added C++ tests for sequence iterator identity, traversal, `StopIteration`,
+  `list(tuple)`, `list(dict)`, and non-iterable TypeError.
+- Extended builtins-module tests for `iter`, `next`, and `StopIteration`.
+- Added `Tests/python/iterator_protocol.py` golden coverage for script-level
+  `iter`, `next`, `list(list)`, `list(tuple)`, and dict key iteration.
+
+Design review:
+
+- `list(iterable)` does not inspect concrete list/tuple/dict layouts. It only
+  asks for an iterator and consumes it until `StopIteration`, keeping future
+  user-defined iterators, `for`, unpacking, and call expansion on the same
+  protocol path.
+- Popped or locally held objects during construction are rooted across
+  allocation and protocol calls: the iterable, iterator, and collected items
+  remain runtime roots until the resulting list owns the items.
+- Iterator types are ordinary typed objects with traversal, `iter`, and
+  `iternext` slots. They are bootstrap seeds because `for` and call expansion
+  need a stable C++ protocol before Python-level iterator classes exist.
+
+Known debt and next risk:
+
+- `for`/`FOR_ITER` lowering should use `object_iter` and `object_next`, not
+  direct sequence indexing.
+- Call expansion must consume `*iterable` through this iterator protocol and
+  validate `**mapping` through mapping APIs.
+- Native argument parsing still needs optional/default/keyword-only support.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all 145 tests pass.
 
 ## 2026-05-19 Decorator Syntax And Property Helper Methods
 

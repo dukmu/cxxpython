@@ -94,11 +94,48 @@ namespace cxxpython
             return false;
         }
 
+        Object *sequence_iter(Object &object)
+        {
+            return object.runtime()->new_sequence_iterator(&object);
+        }
+
         Object *list_new(TypeObject &type, const CallArguments &args)
         {
             require_no_keywords(type.runtime(), "list", args);
-            require_no_positional(type.runtime(), "list", args);
-            return type.runtime()->allocate<ListObject>(&type, std::vector<Object *>{});
+            require_positional_at_most(type.runtime(), "list", args, 1);
+            if (args.positional.empty())
+                return type.runtime()->allocate<ListObject>(&type, std::vector<Object *>{});
+
+            Runtime *runtime = type.runtime();
+            Object *iterable = args.positional[0];
+            auto iterable_root = runtime->root(iterable);
+            Object *iterator = object_iter(iterable_root.get());
+            auto iterator_root = runtime->root(iterator);
+
+            std::vector<Object *> items;
+            std::vector<Rooted<Object>> item_roots;
+            while (true)
+            {
+                try
+                {
+                    Object *item = object_next(iterator_root.get());
+                    items.push_back(item);
+                    item_roots.push_back(runtime->root(item));
+                }
+                catch (const PythonError &error)
+                {
+                    if (error.type() == runtime->stop_iteration_type())
+                        break;
+                    throw;
+                }
+            }
+            return type.runtime()->allocate<ListObject>(&type, std::move(items));
+        }
+
+        void list_init(Object &object, const CallArguments &args)
+        {
+            require_no_keywords(object.runtime(), "list", args);
+            require_positional_at_most(object.runtime(), "list", args, 1);
         }
 
         std::string tuple_repr(const Object &object)
@@ -260,7 +297,9 @@ namespace cxxpython
             .getitem = list_getitem,
             .setitem = list_setitem,
             .contains = list_contains,
+            .iter = sequence_iter,
             .new_object = list_new,
+            .init = list_init,
         };
     }
 
@@ -276,6 +315,7 @@ namespace cxxpython
             .getitem = tuple_getitem,
             .setitem = tuple_setitem,
             .contains = tuple_contains,
+            .iter = sequence_iter,
         };
     }
 }

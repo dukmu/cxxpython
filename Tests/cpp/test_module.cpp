@@ -46,6 +46,17 @@ TEST(Module, BootstrapsBuiltinsModule)
     EXPECT_EQ(len->type(), runtime.native_function_type());
     EXPECT_EQ(cxxpython::object_repr(len), "<built-in function len>");
 
+    cxxpython::Object *iter = runtime.builtins_dict()->get(runtime.new_str("iter"));
+    ASSERT_NE(iter, nullptr);
+    EXPECT_EQ(iter->type(), runtime.native_function_type());
+    EXPECT_EQ(cxxpython::object_repr(iter), "<built-in function iter>");
+
+    cxxpython::Object *next = runtime.builtins_dict()->get(runtime.new_str("next"));
+    ASSERT_NE(next, nullptr);
+    EXPECT_EQ(next->type(), runtime.native_function_type());
+    EXPECT_EQ(cxxpython::object_repr(next), "<built-in function next>");
+
+    EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("StopIteration")), runtime.stop_iteration_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("object")), runtime.object_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("type")), runtime.type_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("str")), runtime.str_type());

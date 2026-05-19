@@ -19,6 +19,8 @@ namespace cxxpython
         tuple_type_ = allocate_type("tuple");
         dict_type_ = allocate_type("dict");
         mappingproxy_type_ = allocate_type("mappingproxy");
+        sequence_iterator_type_ = allocate_type("iterator");
+        dict_key_iterator_type_ = allocate_type("dict_keyiterator");
         module_type_ = allocate_type("module");
         native_function_type_ = allocate_type("builtin_function_or_method");
         function_type_ = allocate_type("function");
@@ -39,6 +41,7 @@ namespace cxxpython
         name_error_type_ = allocate_type("NameError");
         unbound_local_error_type_ = allocate_type("UnboundLocalError");
         attribute_error_type_ = allocate_type("AttributeError");
+        stop_iteration_type_ = allocate_type("StopIteration");
 
         object_type_->slots = make_object_slots();
         type_type_->slots = make_type_slots();
@@ -51,6 +54,8 @@ namespace cxxpython
         tuple_type_->slots = make_tuple_slots();
         dict_type_->slots = make_dict_slots();
         mappingproxy_type_->slots = make_mappingproxy_slots();
+        sequence_iterator_type_->slots = make_sequence_iterator_slots();
+        dict_key_iterator_type_->slots = make_dict_key_iterator_slots();
         module_type_->slots = make_module_slots();
         native_function_type_->slots = make_native_function_slots();
         function_type_->slots = make_function_slots();
@@ -71,6 +76,7 @@ namespace cxxpython
         name_error_type_->slots = make_exception_slots();
         unbound_local_error_type_->slots = make_exception_slots();
         attribute_error_type_->slots = make_exception_slots();
+        stop_iteration_type_->slots = make_exception_slots();
 
         object_type_->set_type(type_type_);
         type_type_->set_type(type_type_);
@@ -83,6 +89,8 @@ namespace cxxpython
         tuple_type_->set_type(type_type_);
         dict_type_->set_type(type_type_);
         mappingproxy_type_->set_type(type_type_);
+        sequence_iterator_type_->set_type(type_type_);
+        dict_key_iterator_type_->set_type(type_type_);
         module_type_->set_type(type_type_);
         native_function_type_->set_type(type_type_);
         function_type_->set_type(type_type_);
@@ -103,6 +111,7 @@ namespace cxxpython
         name_error_type_->set_type(type_type_);
         unbound_local_error_type_->set_type(type_type_);
         attribute_error_type_->set_type(type_type_);
+        stop_iteration_type_->set_type(type_type_);
 
         object_type_->base = nullptr;
         object_type_->bases = {};
@@ -118,6 +127,8 @@ namespace cxxpython
         initialize_type(tuple_type_, object_type_);
         initialize_type(dict_type_, object_type_);
         initialize_type(mappingproxy_type_, object_type_);
+        initialize_type(sequence_iterator_type_, object_type_);
+        initialize_type(dict_key_iterator_type_, object_type_);
         initialize_type(module_type_, object_type_);
         initialize_type(native_function_type_, object_type_);
         initialize_type(function_type_, object_type_);
@@ -138,6 +149,7 @@ namespace cxxpython
         initialize_type(name_error_type_, exception_type_);
         initialize_type(unbound_local_error_type_, name_error_type_);
         initialize_type(attribute_error_type_, exception_type_);
+        initialize_type(stop_iteration_type_, exception_type_);
 
         object_type_->solid_base = object_type_;
         type_type_->solid_base = type_type_;
@@ -150,6 +162,8 @@ namespace cxxpython
         tuple_type_->solid_base = tuple_type_;
         dict_type_->solid_base = dict_type_;
         mappingproxy_type_->solid_base = mappingproxy_type_;
+        sequence_iterator_type_->solid_base = sequence_iterator_type_;
+        dict_key_iterator_type_->solid_base = dict_key_iterator_type_;
         module_type_->solid_base = module_type_;
         native_function_type_->solid_base = native_function_type_;
         function_type_->solid_base = function_type_;
@@ -170,6 +184,7 @@ namespace cxxpython
         name_error_type_->solid_base = base_exception_type_;
         unbound_local_error_type_->solid_base = base_exception_type_;
         attribute_error_type_->solid_base = base_exception_type_;
+        stop_iteration_type_->solid_base = base_exception_type_;
 
         none_ = allocate<NoneObject>(none_type_);
         not_implemented_ = allocate<NotImplementedObject>(not_implemented_type_);
@@ -187,6 +202,8 @@ namespace cxxpython
         add_root(tuple_type_);
         add_root(dict_type_);
         add_root(mappingproxy_type_);
+        add_root(sequence_iterator_type_);
+        add_root(dict_key_iterator_type_);
         add_root(module_type_);
         add_root(native_function_type_);
         add_root(function_type_);
@@ -207,6 +224,7 @@ namespace cxxpython
         add_root(name_error_type_);
         add_root(unbound_local_error_type_);
         add_root(attribute_error_type_);
+        add_root(stop_iteration_type_);
         add_root(none_);
         add_root(not_implemented_);
         add_root(true_);

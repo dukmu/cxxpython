@@ -57,6 +57,16 @@ namespace cxxpython
         return mappingproxy_type_;
     }
 
+    TypeObject *Runtime::sequence_iterator_type() const noexcept
+    {
+        return sequence_iterator_type_;
+    }
+
+    TypeObject *Runtime::dict_key_iterator_type() const noexcept
+    {
+        return dict_key_iterator_type_;
+    }
+
     TypeObject *Runtime::module_type() const noexcept
     {
         return module_type_;
@@ -155,6 +165,11 @@ namespace cxxpython
     TypeObject *Runtime::attribute_error_type() const noexcept
     {
         return attribute_error_type_;
+    }
+
+    TypeObject *Runtime::stop_iteration_type() const noexcept
+    {
+        return stop_iteration_type_;
     }
 
     NoneObject *Runtime::none() const noexcept

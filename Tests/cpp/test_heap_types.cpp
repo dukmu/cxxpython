@@ -204,17 +204,6 @@ TEST(CoreObjects, TypeCallConstructsObjectsThroughNewInitProtocol)
 
     try
     {
-        (void)cxxpython::object_call(runtime.list_type(), {runtime.new_int(1)});
-        FAIL() << "expected PythonError";
-    }
-    catch (const cxxpython::PythonError &error)
-    {
-        EXPECT_EQ(error.type(), runtime.type_error_type());
-        EXPECT_STREQ(error.what(), "list() takes no arguments");
-    }
-
-    try
-    {
         (void)cxxpython::object_call(runtime.object_type(), {runtime.new_int(1)});
         FAIL() << "expected PythonError";
     }

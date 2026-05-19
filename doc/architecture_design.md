@@ -99,7 +99,11 @@ doc/            design docs and milestone plans
   dispatch 和 equality fallback；`==`、`!=`、`<`、`<=`、`>`、`>=` 语法降级到
   `COMPARE_OP`。比较链由 compiler lowering 成显式栈操作和短路跳转，保持
   CPython 语义：中间 operand 只求值一次，失败后不继续求后续 operand。
-- Sequence/mapping: length, getitem, setitem, contains, iterator。
+- Sequence/mapping: length, getitem, setitem, contains, iter, iternext。
+  `object_iter`/`object_next` are the only runtime entrypoints for consuming
+  iterable objects. `list(iterable)`, future `for` lowering, call `*args`
+  expansion, and generator protocol work must use these APIs rather than
+  recognizing concrete container layouts.
 - Attribute/descriptor: getattro/setattro, descr_get/descr_set。
 - Call/construction: `type` 的 call slot 统一调度目标 type 的 `new_object` 和
   `init` slots。Python 类、heap type 和内建类型构造都必须接这条路径；
@@ -223,6 +227,10 @@ doc/            design docs and milestone plans
   每个 builtin 中手写字符串拼接。当前 helper 覆盖 keyword rejection 以及
   no/exact/at-most positional checks；后续 C/C++ extension argument parsing
   应在这一层扩展 optional、keyword-only、default 和 conversion support。
+- Iterable-consuming builtins must use the iterator protocol. `list(iterable)`
+  consumes `object_iter`/`object_next` until `StopIteration`; future builtins
+  such as `tuple`, `dict`, `sum`, `any`, `all`, and call expansion must follow
+  the same path rather than branching on list/tuple/dict concrete layouts.
 - Import core 引入前，CLI file execution 可以创建 `__main__` module，但一旦
   `sys.modules` 存在，`__main__` 必须通过同一模块注册/清理路径。
 

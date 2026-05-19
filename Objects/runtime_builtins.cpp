@@ -28,6 +28,20 @@ namespace cxxpython
             require_positional_count(&runtime, "len", args, 1);
             return runtime.new_int(static_cast<std::int64_t>(object_length(args.positional[0])));
         }
+
+        Object *builtin_iter(Runtime &runtime, const CallArguments &args)
+        {
+            require_no_keywords(&runtime, "iter", args);
+            require_positional_count(&runtime, "iter", args, 1);
+            return object_iter(args.positional[0]);
+        }
+
+        Object *builtin_next(Runtime &runtime, const CallArguments &args)
+        {
+            require_no_keywords(&runtime, "next", args);
+            require_positional_count(&runtime, "next", args, 1);
+            return object_next(args.positional[0]);
+        }
     }
 
     void Runtime::initialize_builtins()
@@ -39,6 +53,7 @@ namespace cxxpython
         builtins_module_ = allocate<ModuleObject>(module_type_, "builtins", "", dict);
         dict->set(new_str("__builtins__"), builtins_module_);
         dict->set(new_str("NotImplemented"), not_implemented_);
+        dict->set(new_str("StopIteration"), stop_iteration_type_);
         dict->set(new_str("object"), object_type_);
         dict->set(new_str("type"), type_type_);
         dict->set(new_str("str"), str_type_);
@@ -48,5 +63,7 @@ namespace cxxpython
         dict->set(new_str("classmethod"), classmethod_type_);
         dict->set(new_str("print"), new_native_function("print", builtin_print));
         dict->set(new_str("len"), new_native_function("len", builtin_len));
+        dict->set(new_str("iter"), new_native_function("iter", builtin_iter));
+        dict->set(new_str("next"), new_native_function("next", builtin_next));
     }
 }

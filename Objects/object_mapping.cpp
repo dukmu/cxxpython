@@ -1,4 +1,5 @@
 #include "cxxpython/object.hpp"
+#include "cxxpython/runtime.hpp"
 
 #include <sstream>
 
@@ -84,6 +85,11 @@ namespace cxxpython
             return dict.contains(key);
         }
 
+        Object *dict_iter(Object &object)
+        {
+            return object.runtime()->new_dict_key_iterator(static_cast<DictObject *>(&object));
+        }
+
         std::string mappingproxy_repr(const Object &object)
         {
             auto *proxy = static_cast<const MappingProxyObject *>(&object);
@@ -139,6 +145,12 @@ namespace cxxpython
         {
             auto &proxy = static_cast<MappingProxyObject &>(object);
             return proxy.referenced_mapping()->contains(key);
+        }
+
+        Object *mappingproxy_iter(Object &object)
+        {
+            auto &proxy = static_cast<MappingProxyObject &>(object);
+            return object.runtime()->new_dict_key_iterator(proxy.referenced_mapping());
         }
     }
 
@@ -267,6 +279,7 @@ namespace cxxpython
             .getitem = dict_getitem,
             .setitem = dict_setitem,
             .contains = dict_contains,
+            .iter = dict_iter,
         };
     }
 
@@ -282,6 +295,7 @@ namespace cxxpython
             .getitem = mappingproxy_getitem,
             .setitem = mappingproxy_setitem,
             .contains = mappingproxy_contains,
+            .iter = mappingproxy_iter,
         };
     }
 }
