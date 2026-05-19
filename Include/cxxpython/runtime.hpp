@@ -20,6 +20,8 @@ namespace cxxpython
     class PythonFunctionObject;
     class PythonMethodObject;
     class VirtualMachine;
+    template <class T>
+    class Rooted;
 
     struct ClassConstructionRequest
     {
@@ -152,6 +154,8 @@ namespace cxxpython
 
         void add_root(Object *object);
         void remove_root(Object *object);
+        template <class T>
+        Rooted<T> root(T *object);
         void visit_roots(const std::function<void(Object *)> &visitor) const;
         void visit_heap(const std::function<void(Object *)> &visitor) const;
         std::size_t heap_size() const noexcept;
@@ -225,4 +229,82 @@ namespace cxxpython
         std::ostream *stdout_ = nullptr;
         VirtualMachine *active_vm_ = nullptr;
     };
+
+    template <class T>
+    class Rooted final
+    {
+    public:
+        Rooted(Runtime &runtime, T *object)
+            : runtime_(&runtime), object_(object)
+        {
+            static_assert(std::is_base_of_v<Object, T>);
+            runtime_->add_root(object_);
+        }
+
+        ~Rooted()
+        {
+            reset();
+        }
+
+        Rooted(const Rooted &) = delete;
+        Rooted &operator=(const Rooted &) = delete;
+
+        Rooted(Rooted &&other) noexcept
+            : runtime_(other.runtime_), object_(other.object_)
+        {
+            other.runtime_ = nullptr;
+            other.object_ = nullptr;
+        }
+
+        Rooted &operator=(Rooted &&other) noexcept
+        {
+            if (this != &other)
+            {
+                reset();
+                runtime_ = other.runtime_;
+                object_ = other.object_;
+                other.runtime_ = nullptr;
+                other.object_ = nullptr;
+            }
+            return *this;
+        }
+
+        T *get() const noexcept
+        {
+            return object_;
+        }
+
+        T &operator*() const noexcept
+        {
+            return *object_;
+        }
+
+        T *operator->() const noexcept
+        {
+            return object_;
+        }
+
+        explicit operator bool() const noexcept
+        {
+            return object_ != nullptr;
+        }
+
+        void reset() noexcept
+        {
+            if (runtime_ && object_)
+                runtime_->remove_root(object_);
+            runtime_ = nullptr;
+            object_ = nullptr;
+        }
+
+    private:
+        Runtime *runtime_;
+        T *object_;
+    };
+
+    template <class T>
+    Rooted<T> Runtime::root(T *object)
+    {
+        return Rooted<T>(*this, object);
+    }
 }

@@ -28,8 +28,10 @@ Eight tracked risks:
    varargs/varkeywords function shape, but `CodeObject` and `Frame` still lack
    line table, traceback integration, and script-visible debugging metadata.
    CLI errors currently print only exception type and message.
-5. Medium: there is no RAII root guard model for the future GC. VM operations
-   still hold raw `Object *` temporaries across allocation sites.
+5. Medium, foundation fixed: `Rooted<T>` now provides scoped RAII roots and the
+   runtime root list supports nested counted roots. VM operations still need to
+   adopt root guards around allocation-heavy temporary vectors before a
+   collecting or moving GC is enabled.
 6. Medium, partially fixed: builtins remain bootstrap-minimal. Calls now enter
    through shared `CallArguments`, so keyword rejection is centralized at the
    callable boundary, but `print` still has string-specific display behavior,
@@ -57,6 +59,8 @@ Immediate order:
 - Done in current slice: `CallArguments`, `CALL_KW`, function flags, and
   parser/compiler/runtime support for `def f(a, *args, **kwargs)` plus keyword
   calls.
+- Done in current slice: `Rooted<T>` introduces scoped root guards and counted
+  root entries, making nested guards safe.
 - Next: continue through `global`/`nonlocal`/closures, `__prepare__`,
   syntax-level `metaclass=`,
   traceback metadata, root guards, builtin protocol cleanup, call expansion,
@@ -136,6 +140,54 @@ Verification:
 - `ctest --test-dir build --output-on-failure`
 
 Result: all 132 tests pass.
+
+## 2026-05-19 Scoped Root Guard Foundation
+
+Pre-change review:
+
+- The runtime exposed manual `add_root` and `remove_root`, but no RAII guard.
+  Future GC work would therefore depend on every allocation path remembering
+  paired root operations by hand.
+- The root vector de-duplicated roots and `remove_root` erased all matching
+  entries. That is unsafe for scoped guards because nested guards for the same
+  object must behave like counted roots.
+
+Debt addressed:
+
+- Added `Rooted<T>` as a non-copyable, movable RAII guard.
+- Added `Runtime::root(T *)` convenience construction.
+- Changed runtime roots to counted entries: `add_root` pushes a root entry and
+  `remove_root` removes one matching entry.
+
+Completed:
+
+- Added C++ coverage proving scoped roots increment/decrement root count,
+  nested roots for the same object are counted independently, and move
+  construction does not double-remove.
+
+Design review:
+
+- This is the root model foundation, not a finished GC safety pass. VM and
+  runtime code still need targeted adoption around temporary objects that live
+  outside active frames while allocations occur.
+- The counted root model is deliberately simple and compatible with the
+  existing traversal API. A future collector can visit duplicate roots without
+  semantic harm; correctness matters more than root-list deduplication here.
+
+Known debt and next risk:
+
+- Apply `Rooted<T>` to allocation-heavy VM paths such as tuple/list/map
+  building, function call argument binding, class creation, and exception
+  construction before enabling any collector that can run during allocation.
+- Traceback/line-table metadata remains open and is the next best risk to
+  reduce for debugging larger Python golden tests.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all tests pass.
 
 ## 2026-05-18 Function Fast Locals And UnboundLocalError
 

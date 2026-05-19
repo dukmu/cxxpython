@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <utility>
 
 #include "cxxpython/runtime.hpp"
 #include "test_support.hpp"
@@ -526,4 +527,31 @@ TEST(CoreObjects, RuntimeVisitsRootsAndContainerChildren)
                                  ++dict_children;
                          });
     EXPECT_EQ(dict_children, dict->size() * 2);
+}
+
+TEST(CoreObjects, ScopedRootGuardsProtectTemporaries)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::StrObject *value = runtime.new_str("temporary");
+    const std::size_t baseline = runtime.root_count();
+
+    {
+        auto first = runtime.root(value);
+        EXPECT_EQ(first.get(), value);
+        EXPECT_EQ(runtime.root_count(), baseline + 1);
+
+        {
+            auto second = runtime.root(value);
+            EXPECT_EQ(runtime.root_count(), baseline + 2);
+            auto moved = std::move(second);
+            EXPECT_EQ(moved.get(), value);
+            EXPECT_EQ(runtime.root_count(), baseline + 2);
+        }
+
+        EXPECT_EQ(runtime.root_count(), baseline + 1);
+        first.reset();
+        EXPECT_EQ(runtime.root_count(), baseline);
+    }
+
+    EXPECT_EQ(runtime.root_count(), baseline);
 }

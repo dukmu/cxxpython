@@ -9,13 +9,14 @@ namespace cxxpython
     {
         if (!object)
             return;
-        if (std::find(roots_.begin(), roots_.end(), object) == roots_.end())
-            roots_.push_back(object);
+        roots_.push_back(object);
     }
 
     void Runtime::remove_root(Object *object)
     {
-        roots_.erase(std::remove(roots_.begin(), roots_.end(), object), roots_.end());
+        const auto found = std::find(roots_.begin(), roots_.end(), object);
+        if (found != roots_.end())
+            roots_.erase(found);
     }
 
     void Runtime::visit_roots(const std::function<void(Object *)> &visitor) const

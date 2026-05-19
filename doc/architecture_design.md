@@ -120,6 +120,10 @@ doc/            design docs and milestone plans
 - Value stack 只保存 `Object*`，所有跨 GC/分配边界的活跃对象必须能从
   active frames traversal 访问到。后续引入 GC 时，active frame stack、
   block stack、exception state 都必须成为根。
+- C++ 临时对象必须使用 `Rooted<T>` 跨越可能分配或触发 GC 的代码段。Runtime
+  roots 是 counted entries，允许同一对象被嵌套 guard 多次保护；guard 析构
+  只移除自己对应的一层根。不要依赖手写成对 `add_root/remove_root` 作为长期
+  模型。
 - Name resolution 必须区分编译期 fast locals 和动态 namespace lookup。函数
   scope 中编译期判定为 local 的名字使用 `LOAD_FAST`/`STORE_FAST`，只访问
   frame locals，缺失时抛 `UnboundLocalError`；模块和 class body 的动态名字
