@@ -308,6 +308,14 @@ namespace cxxpython
                 collect_dict_names(names, item ? item->dict : nullptr);
         }
 
+        void filter_inaccessible_instance_names(std::set<std::string> &names, Object *object)
+        {
+            if (!object || dynamic_cast<TypeObject *>(object) || dynamic_cast<ModuleObject *>(object))
+                return;
+            if ((object->type()->flags & TypeFlagHasInstanceDict) == 0)
+                names.erase("__dict__");
+        }
+
         std::vector<Object *> names_as_sorted_str_objects(Runtime &runtime, const std::set<std::string> &names)
         {
             std::vector<Object *> result;
@@ -347,6 +355,7 @@ namespace cxxpython
                 {
                     collect_dict_names(names, object ? object->instance_dict() : nullptr);
                     collect_type_names(names, object ? object->type() : nullptr);
+                    filter_inaccessible_instance_names(names, object);
                 }
             }
             return runtime.new_list(names_as_sorted_str_objects(runtime, names));

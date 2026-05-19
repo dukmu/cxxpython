@@ -82,6 +82,64 @@ namespace cxxpython
         {
             raise_attribute_error(&runtime, "attribute '__dict__' is read-only");
         }
+
+        TypeObject *require_type_instance(Runtime &runtime, Object *instance, const char *name)
+        {
+            auto *type = dynamic_cast<TypeObject *>(instance);
+            if (!type)
+                raise_type_error(&runtime, std::string(name) + " descriptor receiver does not have type layout");
+            return type;
+        }
+
+        Object *type_base_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            TypeObject *type = require_type_instance(runtime, instance, "__base__");
+            return type->base ? static_cast<Object *>(type->base) : static_cast<Object *>(runtime.none());
+        }
+
+        Object *type_bases_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            TypeObject *type = require_type_instance(runtime, instance, "__bases__");
+            std::vector<Object *> bases;
+            bases.reserve(type->bases.size());
+            for (TypeObject *base : type->bases)
+                bases.push_back(base);
+            return runtime.new_tuple(std::move(bases));
+        }
+
+        Object *type_mro_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            TypeObject *type = require_type_instance(runtime, instance, "__mro__");
+            std::vector<Object *> mro;
+            mro.reserve(type->mro.size());
+            for (TypeObject *item : type->mro)
+                mro.push_back(item);
+            return runtime.new_tuple(std::move(mro));
+        }
+
+        Object *type_qualname_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            TypeObject *type = require_type_instance(runtime, instance, "__qualname__");
+            if (type->dict)
+            {
+                if (auto *qualname = dynamic_cast<StrObject *>(type->dict->get(runtime.new_str("__qualname__"))))
+                    return qualname;
+            }
+            return runtime.new_str(type->name);
+        }
+
+        Object *doc_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            if (auto *type = dynamic_cast<TypeObject *>(instance))
+            {
+                if (type->dict)
+                {
+                    if (Object *doc = type->dict->get(runtime.new_str("__doc__")))
+                        return doc;
+                }
+            }
+            return runtime.none();
+        }
     }
 
     GetSetDescriptorObject::GetSetDescriptorObject(TypeObject *type,
@@ -149,5 +207,30 @@ namespace cxxpython
                                                       object_type_,
                                                       dict_getter,
                                                       dict_setter));
+        object_type_->dict->set(new_str("__doc__"),
+                                new_getset_descriptor("__doc__",
+                                                      object_type_,
+                                                      doc_getter,
+                                                      nullptr));
+        type_type_->dict->set(new_str("__base__"),
+                              new_getset_descriptor("__base__",
+                                                    type_type_,
+                                                    type_base_getter,
+                                                    nullptr));
+        type_type_->dict->set(new_str("__bases__"),
+                              new_getset_descriptor("__bases__",
+                                                    type_type_,
+                                                    type_bases_getter,
+                                                    nullptr));
+        type_type_->dict->set(new_str("__mro__"),
+                              new_getset_descriptor("__mro__",
+                                                    type_type_,
+                                                    type_mro_getter,
+                                                    nullptr));
+        type_type_->dict->set(new_str("__qualname__"),
+                              new_getset_descriptor("__qualname__",
+                                                    type_type_,
+                                                    type_qualname_getter,
+                                                    nullptr));
     }
 }

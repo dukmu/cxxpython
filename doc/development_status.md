@@ -1,5 +1,39 @@
 # Development Status
 
+## 2026-05-19 Foundation Str Sequence Slice
+
+Review focus:
+
+- The base object protocol should not stop at `int`; `str` now needs to behave
+  like a real sequence before higher syntax grows on top of it.
+- Reflection and protocol coverage must be backed by real slots, not just
+  names in `dir()`.
+
+Completed:
+
+- `str` now exposes sequence slots for `__len__`, `__getitem__`,
+  `__contains__`, and `__iter__`.
+- `dir(str)` and `dir('abc')` now surface the corresponding slot wrappers.
+- Python-level coverage now fixes `len('abc')`, string indexing,
+  `.__contains__`, and `list('abc')`.
+- Added a focused C++ test that exercises the string sequence protocol
+  through the shared object protocol APIs.
+
+Known debt and next risk:
+
+- `in` / `not in` syntax is still not lowered by the parser, so membership is
+  currently exercised through `__contains__` and `list(iterable)` instead of
+  expression syntax. That is the next natural parser/VM slice, not a builtin
+  shortcut.
+- `str` is still only a basic sequence slice. Repetition, slicing, and a wider
+  string method table remain open.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter='CoreObjects.StringProvidesSequenceProtocol:PythonScripts.RunsGoldenFiles'`
+- `build/cxxpython Tests/python/builtins.py`
+
 ## 2026-05-19 Init, Exception Syntax, REPL, And Builtins Slice
 
 Review focus:

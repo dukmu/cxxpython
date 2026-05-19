@@ -45,6 +45,27 @@ TEST(CoreObjects, BinaryOperatorProtocolDispatchesBuiltinTypes)
     EXPECT_EQ(text->value, "python");
 }
 
+TEST(CoreObjects, StringProvidesSequenceProtocol)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::Object *text = runtime.new_str("abc");
+
+    EXPECT_EQ(cxxpython::object_length(text), 3U);
+
+    auto *middle = dynamic_cast<cxxpython::StrObject *>(cxxpython::object_get_item(text, runtime.new_int(1)));
+    ASSERT_NE(middle, nullptr);
+    EXPECT_EQ(middle->value, "b");
+
+    EXPECT_TRUE(cxxpython::object_contains(text, runtime.new_str("bc")));
+    EXPECT_FALSE(cxxpython::object_contains(text, runtime.new_str("zz")));
+
+    cxxpython::Object *length = cxxpython::object_get_attr(text, "__len__");
+    ASSERT_EQ(length->type(), runtime.bound_slot_wrapper_type());
+    auto *length_value = dynamic_cast<cxxpython::IntObject *>(cxxpython::object_call(length, {}));
+    ASSERT_NE(length_value, nullptr);
+    EXPECT_EQ(length_value->value, 3);
+}
+
 TEST(CoreObjects, RichCompareProtocolDispatchesBuiltinOrdering)
 {
     cxxpython::Runtime runtime;

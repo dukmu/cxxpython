@@ -251,6 +251,45 @@ namespace cxxpython
             return left.runtime()->new_str(left_str->value + right_str->value);
         }
 
+        std::size_t str_length(const Object &object)
+        {
+            return static_cast<const StrObject *>(&object)->value.size();
+        }
+
+        std::int64_t str_index(Object &object, Object *key)
+        {
+            auto *index = dynamic_cast<IntObject *>(key);
+            if (!index)
+                raise_type_error(object.runtime(), "string indices must be integers");
+            return index->value;
+        }
+
+        Object *str_getitem(Object &object, Object *key)
+        {
+            auto &text = static_cast<StrObject &>(object);
+            const std::int64_t size = static_cast<std::int64_t>(text.value.size());
+            const std::int64_t index = str_index(object, key);
+            const std::int64_t resolved = index < 0 ? size + index : index;
+            if (resolved < 0 || resolved >= size)
+                raise_index_error(object.runtime(), "string index out of range");
+            return object.runtime()->new_str(std::string(1, text.value[static_cast<std::size_t>(resolved)]));
+        }
+
+        bool str_contains(Object &object, Object *key)
+        {
+            auto *needle = dynamic_cast<StrObject *>(key);
+            if (!needle)
+                raise_type_error(object.runtime(), "'in <string>' requires string as left operand, not " +
+                                                   type_qualified_name(key ? key->type() : nullptr));
+            const std::string &haystack = static_cast<StrObject *>(&object)->value;
+            return haystack.find(needle->value) != std::string::npos;
+        }
+
+        Object *str_iter(Object &object)
+        {
+            return object.runtime()->new_sequence_iterator(&object);
+        }
+
         void validate_str_constructor_args(Runtime *runtime, const CallArguments &args)
         {
             require_no_keywords(runtime, "str", args);
@@ -360,6 +399,10 @@ namespace cxxpython
             .truth = str_truth,
             .traverse = default_traverse,
             .binary_op = str_binary_op,
+            .length = str_length,
+            .getitem = str_getitem,
+            .contains = str_contains,
+            .iter = str_iter,
             .new_object = str_new,
             .init = str_init,
         };

@@ -88,6 +88,12 @@ namespace cxxpython
             if ((type.flags & TypeFlagHeapType) != 0)
             {
                 Object *init_descriptor = type_lookup_attribute(&type, type.runtime()->new_str("__init__"));
+                Object *default_init = type.runtime()->object_type()->dict->get(type.runtime()->new_str("__init__"));
+                if (type.slots.init && (!init_descriptor || init_descriptor == default_init))
+                {
+                    type.slots.init(*instance, args);
+                    return;
+                }
                 if (init_descriptor)
                 {
                     Object *init = apply_descriptor(init_descriptor, instance, &type);

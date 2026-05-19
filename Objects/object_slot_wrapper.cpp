@@ -434,6 +434,7 @@ namespace cxxpython
         add_common_object_wrappers(str_type_, true);
         add_order_wrappers(str_type_);
         add_slot_wrapper(str_type_, "__add__", SlotWrapperKind::BinaryOp, BinaryOp::Add);
+        add_sequence_wrappers(str_type_, false);
 
         add_common_object_wrappers(list_type_, false);
         add_sequence_wrappers(list_type_, true);
