@@ -182,6 +182,7 @@ namespace cxxpython
         initialize_type_dict(name_error_type_);
         initialize_type_dict(unbound_local_error_type_);
         initialize_type_dict(attribute_error_type_);
+        initialize_type_dict(import_error_type_);
         initialize_type_dict(stop_iteration_type_);
     }
 

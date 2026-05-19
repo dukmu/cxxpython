@@ -28,6 +28,7 @@ print(vars(sample)['a'])
 print(vars()['sample'] == sample)
 print(dir(__builtins__).__contains__('__name__'))
 print(dir(__builtins__).__contains__('__build_class__'))
+print(dir(__builtins__).__contains__('__import__'))
 print(dir(__builtins__).__contains__('sum'))
 
 print(dir(type).__contains__('__call__'))

@@ -18,6 +18,7 @@ add_library(cxxpython_core
     Objects/runtime_builtins.cpp
     Objects/runtime_accessors.cpp
     Objects/runtime_factories.cpp
+    Objects/runtime_import.cpp
     Objects/runtime_roots.cpp
     Objects/object_core.cpp
     Objects/object_primitives.cpp

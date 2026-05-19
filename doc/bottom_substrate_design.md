@@ -59,12 +59,12 @@ Acceptance tests:
 
 Current state:
 
-- `MAKE_CLASS` directly executes the class code object with a prepared dict and
-  calls `Runtime::new_class`.
-- Three-argument `type(...)` and metaclass calls share
-  `ClassConstructionRequest`.
-- `type.__prepare__` exists as a method descriptor, but class statements do not
-  call metaclass `__prepare__`.
+- Class statements now lower through visible `builtins.__build_class__`.
+- `Runtime::build_class` owns metaclass selection, `__prepare__`, class-body
+  execution, and final metaclass call.
+- `Runtime::new_class` remains the low-level allocator used by `type(...)` and
+  `type.__new__`.
+- `MAKE_CLASS` remains only as a legacy thin bytecode dispatch.
 
 Target design:
 
@@ -101,8 +101,14 @@ Acceptance tests:
 Current state:
 
 - `ModuleObject` exists and has `__name__`, `__file__`, and `__builtins__`.
-- There is no `sys.modules`, module cache, module spec, or filesystem importer.
-- `__import__` is not exposed because a stub would become technical debt.
+- Runtime owns a module registry and search-path list.
+- `__import__` is exposed for simple `.py` module names. It searches runtime
+  paths, inserts modules into the cache before execution, reuses cached
+  modules, and removes failed imports.
+- CLI script execution adds the script directory to the search path; REPL adds
+  the current working directory.
+- There is no script-visible `sys.modules`, package metadata, module spec, or
+  package importer yet.
 
 Target design:
 

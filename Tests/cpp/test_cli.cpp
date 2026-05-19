@@ -34,6 +34,25 @@ TEST(Cli, ExecutesBuiltinPrintThroughScriptPath)
     std::filesystem::remove(script);
 }
 
+TEST(Cli, ImportsSiblingPythonModule)
+{
+    const std::filesystem::path helper = test_process::write_script(
+        "cxxpython_cli_import_helper.py",
+        "value = 'from-helper'\n");
+    const std::filesystem::path script = test_process::write_script(
+        "cxxpython_cli_import_main.py",
+        "helper = __import__('cxxpython_cli_import_helper')\n"
+        "print(helper.value)\n");
+
+    const test_process::CommandResult result =
+        test_process::run_command(std::string(CXXPYTHON_PROGRAM_PATH) + " " + test_process::shell_quote(script));
+
+    EXPECT_EQ(result.exit_code, 0);
+    EXPECT_EQ(result.output, "from-helper\n");
+    std::filesystem::remove(script);
+    std::filesystem::remove(helper);
+}
+
 TEST(Cli, ReportsPythonErrors)
 {
     const std::filesystem::path script =

@@ -1076,4 +1076,11 @@ namespace cxxpython
             throw std::logic_error("cannot raise Python AttributeError without a runtime");
         throw PythonError(runtime->new_attribute_error(std::move(message)));
     }
+
+    void raise_import_error(Runtime *runtime, std::string message)
+    {
+        if (!runtime)
+            throw std::logic_error("cannot raise Python ImportError without a runtime");
+        throw PythonError(runtime->new_import_error(std::move(message)));
+    }
 }

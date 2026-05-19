@@ -94,6 +94,7 @@ namespace cxxpython
         TypeObject *name_error_type() const noexcept;
         TypeObject *unbound_local_error_type() const noexcept;
         TypeObject *attribute_error_type() const noexcept;
+        TypeObject *import_error_type() const noexcept;
         TypeObject *stop_iteration_type() const noexcept;
 
         NoneObject *none() const noexcept;
@@ -102,6 +103,8 @@ namespace cxxpython
         BoolObject *false_value() const noexcept;
         ModuleObject *builtins_module() const noexcept;
         DictObject *builtins_dict() const noexcept;
+        DictObject *modules_dict() const noexcept;
+        void add_module_search_path(std::string path);
         std::ostream &stdout_stream() const noexcept;
         void set_stdout(std::ostream &stream) noexcept;
         VirtualMachine *active_vm() const noexcept;
@@ -195,6 +198,7 @@ namespace cxxpython
                               DictObject *namespace_dict,
                               std::string module_fallback = "builtins");
         TypeObject *build_class(const ClassBuildRequest &request);
+        ModuleObject *import_module(std::string name);
         ExceptionObject *new_exception(TypeObject *type, std::string message);
         ExceptionObject *new_exception(TypeObject *type, std::vector<Object *> args);
         ExceptionObject *new_type_error(std::string message);
@@ -205,6 +209,7 @@ namespace cxxpython
         ExceptionObject *new_name_error(std::string message);
         ExceptionObject *new_unbound_local_error(std::string message);
         ExceptionObject *new_attribute_error(std::string message);
+        ExceptionObject *new_import_error(std::string message);
         ExceptionObject *new_stop_iteration();
 
         void add_root(Object *object);
@@ -290,6 +295,7 @@ namespace cxxpython
         TypeObject *name_error_type_ = nullptr;
         TypeObject *unbound_local_error_type_ = nullptr;
         TypeObject *attribute_error_type_ = nullptr;
+        TypeObject *import_error_type_ = nullptr;
         TypeObject *stop_iteration_type_ = nullptr;
 
         NoneObject *none_ = nullptr;
@@ -297,6 +303,8 @@ namespace cxxpython
         BoolObject *true_ = nullptr;
         BoolObject *false_ = nullptr;
         ModuleObject *builtins_module_ = nullptr;
+        DictObject *modules_ = nullptr;
+        std::vector<std::string> module_search_paths_;
         std::ostream *stdout_ = nullptr;
         VirtualMachine *active_vm_ = nullptr;
     };

@@ -546,6 +546,25 @@ namespace cxxpython
                 .qualname = name->value,
             });
         }
+
+        Object *builtin_import(Runtime &runtime, const CallArguments &args)
+        {
+            require_no_keywords(&runtime, "__import__", args);
+            if (args.positional.empty() || args.positional.size() > 5)
+                raise_type_error(&runtime, "__import__() expected 1 to 5 arguments");
+            auto *name = dynamic_cast<StrObject *>(args.positional[0]);
+            if (!name)
+                raise_type_error(&runtime, "__import__() name must be str");
+            if (args.positional.size() >= 5 && args.positional[4] != runtime.none())
+            {
+                auto *level = dynamic_cast<IntObject *>(args.positional[4]);
+                if (!level)
+                    raise_type_error(&runtime, "__import__() level must be int");
+                if (level->value != 0)
+                    raise_import_error(&runtime, "relative imports are not supported yet");
+            }
+            return runtime.import_module(name->value);
+        }
     }
 
     void Runtime::initialize_builtins()
@@ -567,6 +586,7 @@ namespace cxxpython
         dict->set(new_str("NameError"), name_error_type_);
         dict->set(new_str("UnboundLocalError"), unbound_local_error_type_);
         dict->set(new_str("AttributeError"), attribute_error_type_);
+        dict->set(new_str("ImportError"), import_error_type_);
         dict->set(new_str("StopIteration"), stop_iteration_type_);
         dict->set(new_str("None"), none_);
         dict->set(new_str("True"), true_);
@@ -612,5 +632,6 @@ namespace cxxpython
         dict->set(new_str("eval"), new_native_function("eval", builtin_eval));
         dict->set(new_str("exec"), new_native_function("exec", builtin_exec));
         dict->set(new_str("__build_class__"), new_native_function("__build_class__", builtin_build_class));
+        dict->set(new_str("__import__"), new_native_function("__import__", builtin_import));
     }
 }

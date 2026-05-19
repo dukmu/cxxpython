@@ -1,5 +1,54 @@
 # Development Status
 
+## 2026-05-19 Module Registry And Import Substrate Slice
+
+Review focus:
+
+- Expose `__import__` only after runtime-owned module cache, search paths, and
+  failed-import cleanup exist.
+- Keep import execution on the same compiler/VM/module dictionary path used by
+  CLI scripts rather than adding a builtin-side shortcut.
+- Avoid pretending package import is supported before package metadata and
+  top-level return semantics are designed.
+
+Completed:
+
+- Added `ImportError` to the exception hierarchy and builtins.
+- Added runtime-owned `modules` registry and module search path state.
+- Registered newly-created modules in the runtime registry, including
+  `__main__` and imported modules.
+- Added `Runtime::import_module` for simple `.py` module loading:
+  - searches explicit runtime paths
+  - inserts the module in the cache before execution
+  - executes with module globals, runtime builtins, and `ExecutionRequest`
+  - returns cached modules on repeated import
+  - removes failed imports from the registry
+- Added `builtins.__import__` as a thin wrapper over the runtime import API.
+- CLI script execution now adds the script directory to the import search path;
+  REPL adds the current working directory.
+- Added C++ coverage for cache reuse, failure cleanup, missing module
+  `ImportError`, and CLI sibling-module import.
+- Added Python golden coverage for direct `__import__` and cache identity.
+
+Known debt and next risk:
+
+- This slice intentionally supports only simple module names. Dotted package
+  imports remain blocked until package objects, `__package__`, `__path__`,
+  `__spec__`, and CPython-compatible top-level return semantics exist.
+- There is still no `import` statement parser/lowering; Python code must call
+  `__import__` directly for now.
+- Search paths are runtime-owned but there is no script-visible `sys.path` or
+  `sys.modules` module yet.
+- Import execution has no module lock or per-interpreter import stack beyond
+  early cache insertion. Circular simple imports can observe partial modules,
+  but package-level diagnostics need a richer import state object.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter='Module.*:Cli.ImportsSiblingPythonModule:PythonScripts.RunsGoldenFiles'`
+- `ctest --test-dir build --output-on-failure`
+
 ## 2026-05-19 Class Construction Substrate Slice
 
 Review focus:

@@ -212,6 +212,11 @@ namespace cxxpython
         return attribute_error_type_;
     }
 
+    TypeObject *Runtime::import_error_type() const noexcept
+    {
+        return import_error_type_;
+    }
+
     TypeObject *Runtime::stop_iteration_type() const noexcept
     {
         return stop_iteration_type_;
@@ -245,6 +250,16 @@ namespace cxxpython
     DictObject *Runtime::builtins_dict() const noexcept
     {
         return builtins_module_ ? builtins_module_->dict() : nullptr;
+    }
+
+    DictObject *Runtime::modules_dict() const noexcept
+    {
+        return modules_;
+    }
+
+    void Runtime::add_module_search_path(std::string path)
+    {
+        module_search_paths_.insert(module_search_paths_.begin(), std::move(path));
     }
 
     std::ostream &Runtime::stdout_stream() const noexcept

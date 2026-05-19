@@ -1,6 +1,7 @@
 #include <iostream>
 #include <fstream>
 #include <cstdlib>
+#include <filesystem>
 #include <optional>
 #include <sstream>
 #include <string_view>
@@ -83,6 +84,7 @@ namespace
     int run_repl(cxxpython::Runtime &runtime)
     {
         std::cout << "cxxpython 0.1.0-dev\n";
+        runtime.add_module_search_path(std::filesystem::current_path().string());
         cxxpython::VirtualMachine vm(runtime);
         cxxpython::ModuleObject *module = runtime.new_module("__main__", "<stdin>");
         std::string pending_source;
@@ -217,6 +219,7 @@ int main(int argc, char **argv)
         try
         {
             cxxpython::VirtualMachine vm(runtime);
+            runtime.add_module_search_path(std::filesystem::path(argv[1]).parent_path().string());
             cxxpython::ModuleObject *module = runtime.new_module("__main__", argv[1]);
             cxxpython::CodeObject *code = cxxpython::compile_exec_input(runtime, source, argv[1]);
             (void)vm.execute(cxxpython::ExecutionRequest{

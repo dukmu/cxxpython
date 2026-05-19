@@ -176,7 +176,10 @@ namespace cxxpython
         dict->set(new_str("__file__"), new_str(filename));
         if (builtins_module_)
             dict->set(new_str("__builtins__"), builtins_module_);
-        return allocate<ModuleObject>(module_type_, std::move(name), std::move(filename), dict);
+        ModuleObject *module = allocate<ModuleObject>(module_type_, name, std::move(filename), dict);
+        if (modules_)
+            modules_->set(new_str(name), module);
+        return module;
     }
 
     NativeFunctionObject *Runtime::new_native_function(std::string name, NativeFunctionCallback callback)
@@ -595,6 +598,11 @@ namespace cxxpython
     ExceptionObject *Runtime::new_attribute_error(std::string message)
     {
         return new_exception(attribute_error_type_, std::move(message));
+    }
+
+    ExceptionObject *Runtime::new_import_error(std::string message)
+    {
+        return new_exception(import_error_type_, std::move(message));
     }
 
     ExceptionObject *Runtime::new_stop_iteration()

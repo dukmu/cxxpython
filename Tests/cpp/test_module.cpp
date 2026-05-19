@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
 
+#include <filesystem>
+#include <fstream>
+
 #include "cxxpython/compiler.hpp"
 #include "cxxpython/vm.hpp"
 
@@ -58,7 +61,7 @@ TEST(Module, BootstrapsBuiltinsModule)
 
     for (const char *name : {"all", "any", "sum", "min", "max", "sorted", "dir", "vars",
                              "isinstance", "issubclass", "callable", "id", "globals", "locals",
-                             "format", "compile", "eval", "exec"})
+                             "format", "compile", "eval", "exec", "__build_class__", "__import__"})
     {
         cxxpython::Object *function = runtime.builtins_dict()->get(runtime.new_str(name));
         ASSERT_NE(function, nullptr) << name;
@@ -77,6 +80,7 @@ TEST(Module, BootstrapsBuiltinsModule)
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("UnboundLocalError")),
               runtime.unbound_local_error_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("AttributeError")), runtime.attribute_error_type());
+    EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("ImportError")), runtime.import_error_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("None")), runtime.none());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("True")), runtime.true_value());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("False")), runtime.false_value());
@@ -96,6 +100,72 @@ TEST(Module, BootstrapsBuiltinsModule)
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("property")), runtime.property_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("staticmethod")), runtime.staticmethod_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("classmethod")), runtime.classmethod_type());
+}
+
+TEST(Module, ImportsPythonModulesThroughRuntimeRegistry)
+{
+    cxxpython::Runtime runtime;
+    const std::filesystem::path directory = std::filesystem::temp_directory_path();
+    const std::filesystem::path module_path = directory / "cxxpython_import_runtime_module.py";
+    {
+        std::ofstream file(module_path, std::ios::binary);
+        file << "value = 'loaded:' + __name__ + ':' + __file__\n";
+    }
+
+    runtime.add_module_search_path(directory.string());
+    cxxpython::ModuleObject *module = runtime.import_module("cxxpython_import_runtime_module");
+    ASSERT_NE(module, nullptr);
+    EXPECT_EQ(module->name(), "cxxpython_import_runtime_module");
+    EXPECT_EQ(runtime.modules_dict()->get(runtime.new_str("cxxpython_import_runtime_module")), module);
+
+    auto *value = dynamic_cast<cxxpython::StrObject *>(module->dict()->get(runtime.new_str("value")));
+    ASSERT_NE(value, nullptr);
+    EXPECT_EQ(value->value, "loaded:cxxpython_import_runtime_module:" + module_path.string());
+    EXPECT_EQ(runtime.import_module("cxxpython_import_runtime_module"), module);
+
+    std::filesystem::remove(module_path);
+}
+
+TEST(Module, FailedImportsDoNotPoisonModuleRegistry)
+{
+    cxxpython::Runtime runtime;
+    const std::filesystem::path directory = std::filesystem::temp_directory_path();
+    const std::filesystem::path module_path = directory / "cxxpython_import_failing_module.py";
+    {
+        std::ofstream file(module_path, std::ios::binary);
+        file << "ready = 'yes'\nmissing_name\n";
+    }
+
+    runtime.add_module_search_path(directory.string());
+    try
+    {
+        (void)runtime.import_module("cxxpython_import_failing_module");
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.name_error_type());
+    }
+
+    EXPECT_EQ(runtime.modules_dict()->get(runtime.new_str("cxxpython_import_failing_module")), nullptr);
+    std::filesystem::remove(module_path);
+}
+
+TEST(Module, MissingImportRaisesImportError)
+{
+    cxxpython::Runtime runtime;
+    runtime.add_module_search_path(std::filesystem::temp_directory_path().string());
+
+    try
+    {
+        (void)runtime.import_module("cxxpython_import_missing_module");
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.import_error_type());
+        EXPECT_STREQ(error.what(), "No module named 'cxxpython_import_missing_module'");
+    }
 }
 
 TEST(Module, BuiltinConstructorsUseSharedNativeArgumentValidation)

@@ -50,6 +50,7 @@ namespace cxxpython
         name_error_type_ = allocate_type("NameError");
         unbound_local_error_type_ = allocate_type("UnboundLocalError");
         attribute_error_type_ = allocate_type("AttributeError");
+        import_error_type_ = allocate_type("ImportError");
         stop_iteration_type_ = allocate_type("StopIteration");
 
         object_type_->slots = make_object_slots();
@@ -94,6 +95,7 @@ namespace cxxpython
         name_error_type_->slots = make_exception_slots();
         unbound_local_error_type_->slots = make_exception_slots();
         attribute_error_type_->slots = make_exception_slots();
+        import_error_type_->slots = make_exception_slots();
         stop_iteration_type_->slots = make_exception_slots();
 
         object_type_->set_type(type_type_);
@@ -138,6 +140,7 @@ namespace cxxpython
         name_error_type_->set_type(type_type_);
         unbound_local_error_type_->set_type(type_type_);
         attribute_error_type_->set_type(type_type_);
+        import_error_type_->set_type(type_type_);
         stop_iteration_type_->set_type(type_type_);
 
         object_type_->base = nullptr;
@@ -185,6 +188,7 @@ namespace cxxpython
         initialize_type(name_error_type_, exception_type_);
         initialize_type(unbound_local_error_type_, name_error_type_);
         initialize_type(attribute_error_type_, exception_type_);
+        initialize_type(import_error_type_, exception_type_);
         initialize_type(stop_iteration_type_, exception_type_);
 
         object_type_->solid_base = object_type_;
@@ -229,6 +233,7 @@ namespace cxxpython
         name_error_type_->solid_base = base_exception_type_;
         unbound_local_error_type_->solid_base = base_exception_type_;
         attribute_error_type_->solid_base = base_exception_type_;
+        import_error_type_->solid_base = base_exception_type_;
         stop_iteration_type_->solid_base = base_exception_type_;
 
         none_ = allocate<NoneObject>(none_type_);
@@ -278,6 +283,7 @@ namespace cxxpython
         add_root(name_error_type_);
         add_root(unbound_local_error_type_);
         add_root(attribute_error_type_);
+        add_root(import_error_type_);
         add_root(stop_iteration_type_);
         add_root(none_);
         add_root(not_implemented_);
@@ -290,5 +296,9 @@ namespace cxxpython
         initialize_slot_wrappers();
         initialize_builtins();
         add_root(builtins_module_);
+        modules_ = new_dict();
+        modules_->set(new_str("builtins"), builtins_module_);
+        add_root(modules_);
+        module_search_paths_.push_back(".");
     }
 }
