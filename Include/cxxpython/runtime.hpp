@@ -105,22 +105,26 @@ namespace cxxpython
         CodeObject *new_code(std::string name,
                               std::string filename,
                               std::vector<Object *> constants,
-                              std::vector<Instruction> instructions);
+                              std::vector<Instruction> instructions,
+                              std::vector<std::uint32_t> lines = {});
         CodeObject *new_code(std::vector<Object *> constants,
                               std::vector<Object *> names,
-                              std::vector<Instruction> instructions);
+                              std::vector<Instruction> instructions,
+                              std::vector<std::uint32_t> lines = {});
         CodeObject *new_code(std::string name,
                               std::string filename,
                               std::vector<Object *> constants,
                               std::vector<Object *> names,
-                              std::vector<Instruction> instructions);
+                              std::vector<Instruction> instructions,
+                              std::vector<std::uint32_t> lines = {});
         CodeObject *new_code(std::string name,
                               std::string filename,
                               std::uint32_t arg_count,
                               std::vector<Object *> varnames,
                               std::vector<Object *> constants,
                               std::vector<Object *> names,
-                              std::vector<Instruction> instructions);
+                              std::vector<Instruction> instructions,
+                              std::vector<std::uint32_t> lines = {});
         CodeObject *new_code(std::string name,
                               std::string filename,
                               std::uint32_t arg_count,
@@ -128,7 +132,8 @@ namespace cxxpython
                               std::vector<Object *> varnames,
                               std::vector<Object *> constants,
                               std::vector<Object *> names,
-                              std::vector<Instruction> instructions);
+                              std::vector<Instruction> instructions,
+                              std::vector<std::uint32_t> lines = {});
         Frame *new_frame(CodeObject *code,
                          DictObject *locals = nullptr,
                          DictObject *globals = nullptr,

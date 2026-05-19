@@ -43,7 +43,10 @@ TEST(Cli, ReportsPythonErrors)
         test_process::run_command(std::string(CXXPYTHON_PROGRAM_PATH) + " " + test_process::shell_quote(script));
 
     EXPECT_EQ(result.exit_code, 1);
-    EXPECT_EQ(result.output, "NameError: name 'missing' is not defined\n");
+    EXPECT_EQ(result.output,
+              "Traceback (most recent call last):\n"
+              "  File \"" + script.string() + "\", line 1, in <module>\n"
+              "NameError: name 'missing' is not defined\n");
     std::filesystem::remove(script);
 }
 

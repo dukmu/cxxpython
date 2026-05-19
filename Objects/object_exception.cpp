@@ -49,6 +49,33 @@ namespace cxxpython
         return message_;
     }
 
+    bool ExceptionObject::has_source_location() const noexcept
+    {
+        return !source_filename_.empty() && source_line_ != 0;
+    }
+
+    const std::string &ExceptionObject::source_filename() const noexcept
+    {
+        return source_filename_;
+    }
+
+    const std::string &ExceptionObject::source_name() const noexcept
+    {
+        return source_name_;
+    }
+
+    std::uint32_t ExceptionObject::source_line() const noexcept
+    {
+        return source_line_;
+    }
+
+    void ExceptionObject::set_source_location(std::string filename, std::uint32_t line, std::string name)
+    {
+        source_filename_ = std::move(filename);
+        source_name_ = std::move(name);
+        source_line_ = line;
+    }
+
     TypeSlots make_exception_slots()
     {
         return TypeSlots{

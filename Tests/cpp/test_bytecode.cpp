@@ -691,6 +691,31 @@ TEST(Bytecode, CodeObjectsExposeArgumentMetadata)
     EXPECT_EQ(visited[3], value_name);
 }
 
+TEST(Bytecode, CodeObjectsExposeInstructionLineTable)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::CodeObject *code = runtime.new_code(
+        "line_test",
+        "test.py",
+        {},
+        {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::ReturnValue, 0}},
+        {12, 13});
+
+    ASSERT_EQ(code->lines().size(), 2U);
+    EXPECT_EQ(code->line_for_instruction(0), 12U);
+    EXPECT_EQ(code->line_for_instruction(1), 13U);
+    EXPECT_EQ(code->line_for_instruction(2), 0U);
+
+    EXPECT_THROW((void)runtime.new_code(
+                     "bad_lines",
+                     "test.py",
+                     {},
+                     {{cxxpython::Opcode::ReturnValue, 0}},
+                     {1, 2}),
+                 cxxpython::BytecodeError);
+}
+
 TEST(Bytecode, FrameObjectsTrackCodeAndStackReferences)
 {
     cxxpython::Runtime runtime;

@@ -42,7 +42,15 @@ namespace
 
     std::string expected_output(const std::filesystem::path &script)
     {
-        return test_process::read_text_file(output_file_for(script));
+        std::string output = test_process::read_text_file(output_file_for(script));
+        const std::string marker = "{{script}}";
+        std::size_t position = 0;
+        while ((position = output.find(marker, position)) != std::string::npos)
+        {
+            output.replace(position, marker.size(), script.string());
+            position += script.string().size();
+        }
+        return output;
     }
 }
 

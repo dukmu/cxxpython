@@ -75,7 +75,8 @@ namespace cxxpython
                    std::vector<Object *> varnames,
                    std::vector<Object *> constants,
                    std::vector<Object *> names,
-                   std::vector<Instruction> instructions);
+                   std::vector<Instruction> instructions,
+                   std::vector<std::uint32_t> lines = {});
 
         const std::string &name() const noexcept;
         const std::string &filename() const noexcept;
@@ -89,6 +90,8 @@ namespace cxxpython
         const std::vector<Object *> &constants() const noexcept;
         const std::vector<Object *> &names() const noexcept;
         const std::vector<Instruction> &instructions() const noexcept;
+        const std::vector<std::uint32_t> &lines() const noexcept;
+        std::uint32_t line_for_instruction(std::size_t instruction_index) const noexcept;
 
     private:
         std::string name_;
@@ -99,6 +102,7 @@ namespace cxxpython
         std::vector<Object *> constants_;
         std::vector<Object *> names_;
         std::vector<Instruction> instructions_;
+        std::vector<std::uint32_t> lines_;
     };
 
     const char *opcode_name(Opcode opcode);

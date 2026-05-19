@@ -448,6 +448,7 @@ namespace cxxpython::compiler_internal
     {
         virtual ~Stmt() = default;
         virtual void accept(StmtVisitor &visitor) const = 0;
+        std::size_t line = 1;
     };
 
     struct ExprStmt final : Stmt

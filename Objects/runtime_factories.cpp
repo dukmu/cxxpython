@@ -134,23 +134,36 @@ namespace cxxpython
     CodeObject *Runtime::new_code(std::string name,
                                   std::string filename,
                                   std::vector<Object *> constants,
-                                  std::vector<Instruction> instructions)
+                                  std::vector<Instruction> instructions,
+                                  std::vector<std::uint32_t> lines)
     {
-        return new_code(std::move(name), std::move(filename), std::move(constants), {}, std::move(instructions));
+        return new_code(std::move(name),
+                        std::move(filename),
+                        std::move(constants),
+                        {},
+                        std::move(instructions),
+                        std::move(lines));
     }
 
     CodeObject *Runtime::new_code(std::vector<Object *> constants,
                                   std::vector<Object *> names,
-                                  std::vector<Instruction> instructions)
+                                  std::vector<Instruction> instructions,
+                                  std::vector<std::uint32_t> lines)
     {
-        return new_code("<module>", "<string>", std::move(constants), std::move(names), std::move(instructions));
+        return new_code("<module>",
+                        "<string>",
+                        std::move(constants),
+                        std::move(names),
+                        std::move(instructions),
+                        std::move(lines));
     }
 
     CodeObject *Runtime::new_code(std::string name,
                                   std::string filename,
                                   std::vector<Object *> constants,
                                   std::vector<Object *> names,
-                                  std::vector<Instruction> instructions)
+                                  std::vector<Instruction> instructions,
+                                  std::vector<std::uint32_t> lines)
     {
         return new_code(std::move(name),
                         std::move(filename),
@@ -159,7 +172,8 @@ namespace cxxpython
                         {},
                         std::move(constants),
                         std::move(names),
-                        std::move(instructions));
+                        std::move(instructions),
+                        std::move(lines));
     }
 
     CodeObject *Runtime::new_code(std::string name,
@@ -168,7 +182,8 @@ namespace cxxpython
                                   std::vector<Object *> varnames,
                                   std::vector<Object *> constants,
                                   std::vector<Object *> names,
-                                  std::vector<Instruction> instructions)
+                                  std::vector<Instruction> instructions,
+                                  std::vector<std::uint32_t> lines)
     {
         return new_code(std::move(name),
                         std::move(filename),
@@ -177,7 +192,8 @@ namespace cxxpython
                         std::move(varnames),
                         std::move(constants),
                         std::move(names),
-                        std::move(instructions));
+                        std::move(instructions),
+                        std::move(lines));
     }
 
     CodeObject *Runtime::new_code(std::string name,
@@ -187,7 +203,8 @@ namespace cxxpython
                                   std::vector<Object *> varnames,
                                   std::vector<Object *> constants,
                                   std::vector<Object *> names,
-                                  std::vector<Instruction> instructions)
+                                  std::vector<Instruction> instructions,
+                                  std::vector<std::uint32_t> lines)
     {
         return allocate<CodeObject>(code_type_,
                                     std::move(name),
@@ -197,7 +214,8 @@ namespace cxxpython
                                     std::move(varnames),
                                     std::move(constants),
                                     std::move(names),
-                                    std::move(instructions));
+                                    std::move(instructions),
+                                    std::move(lines));
     }
 
     Frame *Runtime::new_frame(CodeObject *code, DictObject *locals, DictObject *globals, DictObject *builtins)

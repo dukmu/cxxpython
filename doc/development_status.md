@@ -24,10 +24,13 @@ Eight tracked risks:
    be dynamic `LOAD_NAME` lookup. Function locals are now compiler-discovered
    fast locals with `LOAD_FAST`/`STORE_FAST` and `UnboundLocalError`; `global`,
    `nonlocal`, free/cell analysis, and closures remain open.
-4. Medium/high, partially fixed: `CodeObject` now carries execution flags for
-   varargs/varkeywords function shape, but `CodeObject` and `Frame` still lack
-   line table, traceback integration, and script-visible debugging metadata.
-   CLI errors currently print only exception type and message.
+4. Medium/high, second slice fixed: `CodeObject` now carries execution flags
+   for varargs/varkeywords function shape and a per-instruction source line
+   table. `Frame` tracks the last executed instruction, VM errors attach
+   filename/name/line to exception objects, and CLI script errors print a
+   minimal traceback frame. Full traceback objects, exception chaining,
+   stacksize, freevars/cellvars, and script-visible debugging metadata remain
+   open.
 5. Medium, foundation fixed: `Rooted<T>` now provides scoped RAII roots and the
    runtime root list supports nested counted roots. VM operations still need to
    adopt root guards around allocation-heavy temporary vectors before a
@@ -66,10 +69,79 @@ Immediate order:
   and `print` now uses `object_str` instead of string-only branching.
 - Done in current slice: `property` is now a typed builtin descriptor with
   getter/setter behavior and read-only assignment errors.
+- Done in current slice: `CodeObject` line tables, parser statement line
+  capture, compiler line emission, VM source-location attachment, and minimal
+  CLI traceback output now cover module and nested function runtime errors.
 - Next: continue through `global`/`nonlocal`/closures, `__prepare__`,
   syntax-level `metaclass=`,
-  traceback metadata, root guards, builtin protocol cleanup, call expansion,
+  full traceback objects, root guards, builtin protocol cleanup, call expansion,
   defaults/keyword-only arguments, and descriptor completeness.
+
+## 2026-05-19 CodeObject Line Table And Traceback Seed
+
+Pre-change review:
+
+- `CodeObject` had `name` and `filename`, but no instruction-to-source mapping.
+  As Python script tests expanded, runtime failures could only report
+  `TypeError: ...` or `NameError: ...` with no line information.
+- `Frame` tracked the next instruction pointer but not the instruction that had
+  just failed. That made it awkward to attach source location at the VM
+  boundary without guessing from the advanced instruction pointer.
+- Compiler instruction emission was open-coded through direct
+  `instructions_.push_back(...)`, so adding line metadata without a central
+  helper would have created a high-risk invariant: instruction count and line
+  count could silently diverge.
+
+Debt addressed:
+
+- Added a `CodeObject` line table whose size must match instruction count when
+  present, plus `line_for_instruction`.
+- Parser statements now capture their starting line, and the compiler routes
+  every bytecode emission through `emit()` so the line table and instruction
+  stream are always updated together.
+- VM frames track the last executed instruction index. When a Python exception
+  leaves an opcode, the VM attaches filename, code name, and source line to the
+  exception if it does not already have one.
+- CLI script execution now prints a minimal traceback frame before the final
+  exception line. Nested function failures keep their inner function location
+  instead of being overwritten by the caller.
+- Function and class definition bindings now reuse the same fast-local aware
+  binding path as assignment targets, removing a small semantic hole in nested
+  function scopes.
+
+Completed:
+
+- Added C++ tests for `CodeObject` line-table metadata and malformed line-table
+  validation.
+- Added compiler/VM tests for module-level and nested-function runtime error
+  source locations.
+- Updated CLI and Python golden tests to expect the new minimal traceback
+  output, using script-path placeholders for portable golden files.
+
+Design review:
+
+- This is deliberately a traceback seed, not a fake complete traceback system.
+  The exception object holds the first failing frame's source location so users
+  can debug script tests now, while the architecture still leaves room for a
+  real traceback object chain.
+- Line metadata belongs to `CodeObject`; CLI and VM do not maintain side
+  tables. The compiler emission invariant is local and test-covered.
+
+Known debt and next risk:
+
+- Add real traceback objects and a frame chain once block stack / exception
+  propagation semantics are richer.
+- `CodeObject` still needs stacksize, freevars/cellvars, code flags beyond
+  call shape, and script-visible `code`/`frame` attributes.
+- Root guards around allocation-heavy VM paths remain the next runtime-safety
+  debt before a collecting GC can be enabled.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all 138 tests pass.
 
 ## 2026-05-19 Unified Call Arguments And Varargs/Kwargs
 

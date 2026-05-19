@@ -113,10 +113,20 @@ doc/            design docs and milestone plans
   `name`、`filename`、line table、constants、names、varnames、freevars、
   cellvars、flags。任何 CLI、traceback、function object、debug API 都不应
   绕过 `CodeObject` 私下保存这些执行信息。
+- 当前 `CodeObject` line table 使用与 instruction stream 等长的
+  per-instruction line vector。Compiler 必须通过统一 `emit()` 写入指令和行号；
+  `CodeObject` 构造时验证二者长度一致。缺失 line table 仅允许在手写 bytecode
+  测试或 bootstrap seed 中出现，parser/compiler 生成的脚本 code 必须携带
+  source line。
 - `Frame` 是运行时可观察对象，不是临时 C++ stack helper。Frame 必须明确
   持有 code、locals、globals、builtins、value stack、block stack、last
   instruction/line。当前 VM 可以保留宿主执行器，但脚本层观察执行状态时
   应通过 frame/code/module 对象，而不是暴露 `VirtualMachine` 内部结构。
+- Python exception object may temporarily carry the first failing frame's
+  filename/code-name/line as a traceback seed. This is only the minimum CLI
+  debugging surface; full traceback objects must later be modeled as ordinary
+  runtime objects linked from exceptions, with frame/code traversal and
+  script-visible attributes.
 - Value stack 只保存 `Object*`，所有跨 GC/分配边界的活跃对象必须能从
   active frames traversal 访问到。后续引入 GC 时，active frame stack、
   block stack、exception state 都必须成为根。

@@ -72,7 +72,8 @@ namespace cxxpython
                            std::vector<Object *> varnames,
                            std::vector<Object *> constants,
                            std::vector<Object *> names,
-                           std::vector<Instruction> instructions)
+                           std::vector<Instruction> instructions,
+                           std::vector<std::uint32_t> lines)
         : Object(type),
           name_(std::move(name)),
           filename_(std::move(filename)),
@@ -81,8 +82,11 @@ namespace cxxpython
           varnames_(std::move(varnames)),
           constants_(std::move(constants)),
           names_(std::move(names)),
-          instructions_(std::move(instructions))
+          instructions_(std::move(instructions)),
+          lines_(std::move(lines))
     {
+        if (!lines_.empty() && lines_.size() != instructions_.size())
+            throw BytecodeError("code object line table must match instruction count");
     }
 
     const std::string &CodeObject::name() const noexcept
@@ -143,6 +147,18 @@ namespace cxxpython
     const std::vector<Instruction> &CodeObject::instructions() const noexcept
     {
         return instructions_;
+    }
+
+    const std::vector<std::uint32_t> &CodeObject::lines() const noexcept
+    {
+        return lines_;
+    }
+
+    std::uint32_t CodeObject::line_for_instruction(std::size_t instruction_index) const noexcept
+    {
+        if (instruction_index >= lines_.size())
+            return 0;
+        return lines_[instruction_index];
     }
 
     TypeSlots make_code_slots()

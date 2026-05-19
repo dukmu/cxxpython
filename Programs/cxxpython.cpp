@@ -58,6 +58,13 @@ int main(int argc, char **argv)
         }
         catch (const cxxpython::PythonError &error)
         {
+            if (error.value() && error.value()->has_source_location())
+            {
+                std::cerr << "Traceback (most recent call last):\n"
+                          << "  File \"" << error.value()->source_filename()
+                          << "\", line " << error.value()->source_line()
+                          << ", in " << error.value()->source_name() << "\n";
+            }
             std::cerr << error.type_name() << ": " << error.what() << "\n";
             return 1;
         }

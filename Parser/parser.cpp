@@ -88,6 +88,7 @@ namespace cxxpython::compiler_internal
                 if (peek().kind == TokenKind::Return)
                     return parse_return_statement();
 
+                const std::size_t line = peek().line;
                 std::unique_ptr<Expr> target_or_expression = parse_expression_only();
                 if (peek().kind == TokenKind::Equal)
                 {
@@ -95,13 +96,17 @@ namespace cxxpython::compiler_internal
                     std::unique_ptr<Expr> value = parse_expression_only();
                     std::unique_ptr<AssignTarget> target =
                         make_assignment_target(std::move(target_or_expression), equals);
+                    auto statement = std::make_unique<AssignStmt>(std::move(target), std::move(value));
+                    statement->line = line;
                     return ParsedStatement{
-                        std::make_unique<AssignStmt>(std::move(target), std::move(value)),
+                        std::move(statement),
                         false,
                     };
                 }
+                auto statement = std::make_unique<ExprStmt>(std::move(target_or_expression));
+                statement->line = line;
                 return ParsedStatement{
-                    std::make_unique<ExprStmt>(std::move(target_or_expression)),
+                    std::move(statement),
                     false,
                 };
             }
@@ -116,15 +121,17 @@ namespace cxxpython::compiler_internal
                     peek().kind != TokenKind::Dedent &&
                     peek().kind != TokenKind::End)
                     value = parse_expression_only();
+                auto statement = std::make_unique<ReturnStmt>(std::move(value));
+                statement->line = return_token.line;
                 return ParsedStatement{
-                    std::make_unique<ReturnStmt>(std::move(value)),
+                    std::move(statement),
                     false,
                 };
             }
 
             ParsedStatement parse_if_statement()
             {
-                advance();
+                const Token &if_token = advance();
                 std::unique_ptr<Expr> condition = parse_expression_only();
                 consume(TokenKind::Colon, "expected ':' after if condition");
                 consume(TokenKind::Newline, "expected newline after if condition");
@@ -139,18 +146,20 @@ namespace cxxpython::compiler_internal
                     else_body = parse_block();
                 }
 
-                return ParsedStatement{
-                    std::make_unique<IfStmt>(
+                auto statement = std::make_unique<IfStmt>(
                         std::move(condition),
                         std::move(then_body),
-                        std::move(else_body)),
+                        std::move(else_body));
+                statement->line = if_token.line;
+                return ParsedStatement{
+                    std::move(statement),
                     true,
                 };
             }
 
             ParsedStatement parse_function_def_statement()
             {
-                advance();
+                const Token &def_token = advance();
                 if (peek().kind != TokenKind::Identifier)
                     raise_at(peek(), "expected function name");
                 std::string name = advance().lexeme;
@@ -209,15 +218,17 @@ namespace cxxpython::compiler_internal
 
                 FunctionDepthGuard guard(function_depth_);
                 std::vector<std::unique_ptr<Stmt>> body = parse_block();
+                auto statement = std::make_unique<FunctionDefStmt>(std::move(name), std::move(params), std::move(body));
+                statement->line = def_token.line;
                 return ParsedStatement{
-                    std::make_unique<FunctionDefStmt>(std::move(name), std::move(params), std::move(body)),
+                    std::move(statement),
                     true,
                 };
             }
 
             ParsedStatement parse_class_def_statement()
             {
-                advance();
+                const Token &class_token = advance();
                 if (peek().kind != TokenKind::Identifier)
                     raise_at(peek(), "expected class name");
                 std::string name = advance().lexeme;
@@ -242,8 +253,10 @@ namespace cxxpython::compiler_internal
                 consume(TokenKind::Colon, "expected ':' after class name");
                 consume(TokenKind::Newline, "expected newline after class definition");
                 std::vector<std::unique_ptr<Stmt>> body = parse_block();
+                auto statement = std::make_unique<ClassDefStmt>(std::move(name), std::move(bases), std::move(body));
+                statement->line = class_token.line;
                 return ParsedStatement{
-                    std::make_unique<ClassDefStmt>(std::move(name), std::move(bases), std::move(body)),
+                    std::move(statement),
                     true,
                 };
             }

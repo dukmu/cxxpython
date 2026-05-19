@@ -418,10 +418,18 @@ namespace cxxpython
 
         TupleObject *args() const noexcept;
         const std::string &message() const noexcept;
+        bool has_source_location() const noexcept;
+        const std::string &source_filename() const noexcept;
+        const std::string &source_name() const noexcept;
+        std::uint32_t source_line() const noexcept;
+        void set_source_location(std::string filename, std::uint32_t line, std::string name);
 
     private:
         TupleObject *args_;
         std::string message_;
+        std::string source_filename_;
+        std::string source_name_;
+        std::uint32_t source_line_ = 0;
     };
 
     bool is_subclass(const TypeObject *derived, const TypeObject *base) noexcept;

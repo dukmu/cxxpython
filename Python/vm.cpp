@@ -76,6 +76,16 @@ namespace cxxpython
             return "__main__";
         }
 
+        void attach_source_location(const PythonError &error, const CodeObject &code, std::size_t instruction_index)
+        {
+            ExceptionObject *value = error.value();
+            if (!value || value->has_source_location())
+                return;
+            const std::uint32_t line = code.line_for_instruction(instruction_index);
+            if (line != 0)
+                value->set_source_location(code.filename(), line, code.name());
+        }
+
         class ActiveFrame final
         {
         public:
@@ -160,8 +170,14 @@ namespace cxxpython
         return ip_;
     }
 
+    std::size_t Frame::last_instruction_index() const noexcept
+    {
+        return last_ip_;
+    }
+
     void Frame::advance() noexcept
     {
+        last_ip_ = ip_;
         ++ip_;
     }
 
@@ -290,6 +306,8 @@ namespace cxxpython
         {
             const Instruction instruction = code.instructions()[frame->instruction_pointer()];
             frame->advance();
+            try
+            {
             switch (instruction.opcode)
             {
             case Opcode::LoadConst:
@@ -575,6 +593,12 @@ namespace cxxpython
                 return frame->pop();
             default:
                 throw BytecodeError("invalid opcode");
+            }
+            }
+            catch (const PythonError &error)
+            {
+                attach_source_location(error, code, frame->last_instruction_index());
+                throw;
             }
         }
         throw BytecodeError("code object terminated without RETURN_VALUE");

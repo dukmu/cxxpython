@@ -18,6 +18,7 @@ namespace cxxpython
         DictObject *globals() const noexcept;
         DictObject *builtins() const noexcept;
         std::size_t instruction_pointer() const noexcept;
+        std::size_t last_instruction_index() const noexcept;
         void advance() noexcept;
         void jump_to(std::size_t target) noexcept;
 
@@ -32,6 +33,7 @@ namespace cxxpython
         DictObject *globals_;
         DictObject *builtins_;
         std::size_t ip_ = 0;
+        std::size_t last_ip_ = 0;
         std::vector<Object *> stack_;
     };
 

@@ -335,6 +335,80 @@ TEST(Compile, RaisesNameErrorForMissingName)
     }
 }
 
+TEST(Compile, EmitsLineTableAndAttachesRuntimeErrorLocation)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(
+        runtime,
+        "x = 1\n"
+        "missing\n",
+        "script.py");
+
+    ASSERT_EQ(code->lines().size(), code->instructions().size());
+    ASSERT_GE(code->instructions().size(), 5U);
+    EXPECT_EQ(code->line_for_instruction(0), 1U);
+
+    bool found_missing_load = false;
+    for (std::size_t index = 0; index < code->instructions().size(); ++index)
+    {
+        const cxxpython::Instruction instruction = code->instructions()[index];
+        if (instruction.opcode != cxxpython::Opcode::LoadName)
+            continue;
+        auto *name = dynamic_cast<cxxpython::StrObject *>(code->names()[instruction.operand]);
+        ASSERT_NE(name, nullptr);
+        if (name->value == "missing")
+        {
+            found_missing_load = true;
+            EXPECT_EQ(code->line_for_instruction(index), 2U);
+        }
+    }
+    EXPECT_TRUE(found_missing_load);
+
+    try
+    {
+        (void)vm.execute(*code);
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        ASSERT_NE(error.value(), nullptr);
+        EXPECT_EQ(error.type_name(), "NameError");
+        EXPECT_TRUE(error.value()->has_source_location());
+        EXPECT_EQ(error.value()->source_filename(), "script.py");
+        EXPECT_EQ(error.value()->source_name(), "<module>");
+        EXPECT_EQ(error.value()->source_line(), 2U);
+    }
+}
+
+TEST(Compile, KeepsInnerFunctionRuntimeErrorLocation)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(
+        runtime,
+        "def fail():\n"
+        "    value = 1\n"
+        "    missing\n"
+        "fail()\n",
+        "script.py");
+
+    try
+    {
+        (void)vm.execute(*code);
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        ASSERT_NE(error.value(), nullptr);
+        EXPECT_EQ(error.type_name(), "NameError");
+        EXPECT_TRUE(error.value()->has_source_location());
+        EXPECT_EQ(error.value()->source_filename(), "script.py");
+        EXPECT_EQ(error.value()->source_name(), "fail");
+        EXPECT_EQ(error.value()->source_line(), 3U);
+    }
+}
+
 TEST(Compile, RaisesSyntaxErrorForMalformedSource)
 {
     cxxpython::Runtime runtime;

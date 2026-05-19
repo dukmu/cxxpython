@@ -1,4 +1,6 @@
 <property getter=set, setter=none, deleter=none>
 A.a
 <class 'str'>
+Traceback (most recent call last):
+  File "{{script}}", line 10, in <module>
 AttributeError: can't set attribute

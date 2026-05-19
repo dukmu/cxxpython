@@ -305,24 +305,29 @@ namespace cxxpython
                                       public compiler_internal::StmtVisitor
         {
         public:
-            BytecodeBuilder(Runtime &runtime, const SymbolTable &symbols, std::string filename)
+            BytecodeBuilder(Runtime &runtime,
+                            const SymbolTable &symbols,
+                            std::string filename,
+                            std::uint32_t initial_line = 1)
                 : runtime_(runtime),
                   symbols_(symbols),
                   filename_(std::move(filename)),
                   names_(symbols.make_name_objects(runtime)),
-                  varnames_(symbols.make_varname_objects(runtime))
+                  varnames_(symbols.make_varname_objects(runtime)),
+                  current_line_(initial_line)
             {
             }
 
             CodeObject *build_eval(const compiler_internal::Expr &expression)
             {
                 expression.accept(*this);
-                instructions_.push_back(Instruction{Opcode::ReturnValue, 0});
+                emit({Opcode::ReturnValue, 0});
                 return runtime_.new_code("<eval>",
                                          filename_,
                                          std::move(constants_),
                                          std::move(names_),
-                                         std::move(instructions_));
+                                         std::move(instructions_),
+                                         std::move(lines_));
             }
 
             CodeObject *build_exec(const compiler_internal::Module &module)
@@ -330,12 +335,13 @@ namespace cxxpython
                 for (const auto &statement : module.statements)
                     statement->accept(*this);
                 emit_constant(runtime_.none());
-                instructions_.push_back(Instruction{Opcode::ReturnValue, 0});
+                emit({Opcode::ReturnValue, 0});
                 return runtime_.new_code("<module>",
                                          filename_,
                                          std::move(constants_),
                                          std::move(names_),
-                                         std::move(instructions_));
+                                         std::move(instructions_),
+                                         std::move(lines_));
             }
 
             CodeObject *build_function(const compiler_internal::FunctionDefStmt &function)
@@ -343,7 +349,7 @@ namespace cxxpython
                 for (const auto &statement : function.body)
                     statement->accept(*this);
                 emit_constant(runtime_.none());
-                instructions_.push_back(Instruction{Opcode::ReturnValue, 0});
+                emit({Opcode::ReturnValue, 0});
                 return runtime_.new_code(function.name,
                                          filename_,
                                          static_cast<std::uint32_t>(function.params.positional.size()),
@@ -351,7 +357,8 @@ namespace cxxpython
                                          std::move(varnames_),
                                          std::move(constants_),
                                          std::move(names_),
-                                         std::move(instructions_));
+                                         std::move(instructions_),
+                                         std::move(lines_));
             }
 
             CodeObject *build_class(const compiler_internal::ClassDefStmt &klass)
@@ -359,12 +366,13 @@ namespace cxxpython
                 for (const auto &statement : klass.body)
                     statement->accept(*this);
                 emit_constant(runtime_.none());
-                instructions_.push_back(Instruction{Opcode::ReturnValue, 0});
+                emit({Opcode::ReturnValue, 0});
                 return runtime_.new_code(klass.name,
                                          filename_,
                                          std::move(constants_),
                                          std::move(names_),
-                                         std::move(instructions_));
+                                         std::move(instructions_),
+                                         std::move(lines_));
             }
 
             void visit(const compiler_internal::IntegerExpr &expression) override
@@ -380,7 +388,7 @@ namespace cxxpython
             void visit(const compiler_internal::UnaryExpr &expression) override
             {
                 expression.operand->accept(*this);
-                instructions_.push_back(Instruction{
+                emit({
                     Opcode::UnaryOp,
                     static_cast<std::uint32_t>(expression.op),
                 });
@@ -390,7 +398,7 @@ namespace cxxpython
             {
                 expression.left->accept(*this);
                 expression.right->accept(*this);
-                instructions_.push_back(Instruction{
+                emit({
                     Opcode::BinaryOp,
                     static_cast<std::uint32_t>(expression.op),
                 });
@@ -407,10 +415,10 @@ namespace cxxpython
                     comparison.right->accept(*this);
                     if (!last)
                     {
-                        instructions_.push_back(Instruction{Opcode::DupTop, 0});
-                        instructions_.push_back(Instruction{Opcode::RotThree, 0});
+                        emit({Opcode::DupTop, 0});
+                        emit({Opcode::RotThree, 0});
                     }
-                    instructions_.push_back(Instruction{
+                    emit({
                         Opcode::CompareOp,
                         static_cast<std::uint32_t>(comparison.op),
                     });
@@ -422,8 +430,8 @@ namespace cxxpython
                 {
                     const std::size_t end_jump = emit_jump(Opcode::JumpAbsolute);
                     const std::size_t cleanup_target = instructions_.size();
-                    instructions_.push_back(Instruction{Opcode::RotTwo, 0});
-                    instructions_.push_back(Instruction{Opcode::PopTop, 0});
+                    emit({Opcode::RotTwo, 0});
+                    emit({Opcode::PopTop, 0});
                     for (std::size_t jump : cleanup_jumps)
                         patch_jump(jump, cleanup_target);
                     patch_jump(end_jump, instructions_.size());
@@ -451,13 +459,13 @@ namespace cxxpython
             {
                 if (symbols_.scope() == SymbolScope::Function && symbols_.is_local(expression.value))
                 {
-                    instructions_.push_back(Instruction{
+                    emit({
                         Opcode::LoadFast,
                         static_cast<std::uint32_t>(local_index(expression.value)),
                     });
                     return;
                 }
-                instructions_.push_back(Instruction{
+                emit({
                     Opcode::LoadName,
                     static_cast<std::uint32_t>(name_index(expression.value)),
                 });
@@ -466,7 +474,7 @@ namespace cxxpython
             void visit(const compiler_internal::AttributeExpr &expression) override
             {
                 expression.object->accept(*this);
-                instructions_.push_back(Instruction{
+                emit({
                     Opcode::LoadAttr,
                     static_cast<std::uint32_t>(name_index(expression.name)),
                 });
@@ -476,14 +484,14 @@ namespace cxxpython
             {
                 expression.object->accept(*this);
                 expression.key->accept(*this);
-                instructions_.push_back(Instruction{Opcode::BinarySubscr, 0});
+                emit({Opcode::BinarySubscr, 0});
             }
 
             void visit(const compiler_internal::ListExpr &expression) override
             {
                 for (const auto &item : expression.items)
                     item->accept(*this);
-                instructions_.push_back(Instruction{
+                emit({
                     Opcode::BuildList,
                     static_cast<std::uint32_t>(expression.items.size()),
                 });
@@ -493,7 +501,7 @@ namespace cxxpython
             {
                 for (const auto &item : expression.items)
                     item->accept(*this);
-                instructions_.push_back(Instruction{
+                emit({
                     Opcode::BuildTuple,
                     static_cast<std::uint32_t>(expression.items.size()),
                 });
@@ -506,7 +514,7 @@ namespace cxxpython
                     item.key->accept(*this);
                     item.value->accept(*this);
                 }
-                instructions_.push_back(Instruction{
+                emit({
                     Opcode::BuildMap,
                     static_cast<std::uint32_t>(expression.items.size()),
                 });
@@ -533,17 +541,17 @@ namespace cxxpython
                 }
                 if (keyword_count != 0)
                 {
-                    instructions_.push_back(Instruction{
+                    emit({
                         Opcode::BuildMap,
                         static_cast<std::uint32_t>(keyword_count),
                     });
-                    instructions_.push_back(Instruction{
+                    emit({
                         Opcode::CallKw,
                         static_cast<std::uint32_t>(positional_count),
                     });
                     return;
                 }
-                instructions_.push_back(Instruction{
+                emit({
                     Opcode::Call,
                     static_cast<std::uint32_t>(positional_count),
                 });
@@ -554,13 +562,13 @@ namespace cxxpython
                 emit_pending_assignment_value();
                 if (symbols_.scope() == SymbolScope::Function && symbols_.is_local(target.name))
                 {
-                    instructions_.push_back(Instruction{
+                    emit({
                         Opcode::StoreFast,
                         static_cast<std::uint32_t>(local_index(target.name)),
                     });
                     return;
                 }
-                instructions_.push_back(Instruction{
+                emit({
                     Opcode::StoreName,
                     static_cast<std::uint32_t>(name_index(target.name)),
                 });
@@ -570,7 +578,7 @@ namespace cxxpython
             {
                 target.object->accept(*this);
                 emit_pending_assignment_value();
-                instructions_.push_back(Instruction{
+                emit({
                     Opcode::StoreAttr,
                     static_cast<std::uint32_t>(name_index(target.name)),
                 });
@@ -581,23 +589,26 @@ namespace cxxpython
                 target.object->accept(*this);
                 target.key->accept(*this);
                 emit_pending_assignment_value();
-                instructions_.push_back(Instruction{Opcode::StoreSubscr, 0});
+                emit({Opcode::StoreSubscr, 0});
             }
 
             void visit(const compiler_internal::ExprStmt &statement) override
             {
+                StatementLineGuard line(*this, statement);
                 statement.expression->accept(*this);
-                instructions_.push_back(Instruction{Opcode::PopTop, 0});
+                emit({Opcode::PopTop, 0});
             }
 
             void visit(const compiler_internal::AssignStmt &statement) override
             {
+                StatementLineGuard line(*this, statement);
                 PendingAssignmentValue pending(*this, *statement.value);
                 statement.target->accept(*this);
             }
 
             void visit(const compiler_internal::IfStmt &statement) override
             {
+                StatementLineGuard line(*this, statement);
                 statement.condition->accept(*this);
                 const std::size_t false_jump = emit_jump(Opcode::PopJumpIfFalse);
                 for (const auto &item : statement.then_body)
@@ -618,49 +629,76 @@ namespace cxxpython
 
             void visit(const compiler_internal::ReturnStmt &statement) override
             {
+                StatementLineGuard line(*this, statement);
                 if (statement.value)
                     statement.value->accept(*this);
                 else
                     emit_constant(runtime_.none());
-                instructions_.push_back(Instruction{Opcode::ReturnValue, 0});
+                emit({Opcode::ReturnValue, 0});
             }
 
             void visit(const compiler_internal::FunctionDefStmt &statement) override
             {
+                StatementLineGuard line(*this, statement);
                 SymbolTable function_symbols = collect_function_symbols(statement);
-                BytecodeBuilder function_builder(runtime_, function_symbols, filename_);
+                BytecodeBuilder function_builder(
+                    runtime_,
+                    function_symbols,
+                    filename_,
+                    static_cast<std::uint32_t>(statement.line));
                 CodeObject *code = function_builder.build_function(statement);
                 emit_constant(code);
-                instructions_.push_back(Instruction{Opcode::MakeFunction, 0});
-                instructions_.push_back(Instruction{
-                    Opcode::StoreName,
-                    static_cast<std::uint32_t>(name_index(statement.name)),
-                });
+                emit({Opcode::MakeFunction, 0});
+                emit_binding_store(statement.name);
             }
 
             void visit(const compiler_internal::ClassDefStmt &statement) override
             {
+                StatementLineGuard line(*this, statement);
                 for (const auto &base : statement.bases)
                     base->accept(*this);
-                instructions_.push_back(Instruction{
+                emit({
                     Opcode::BuildTuple,
                     static_cast<std::uint32_t>(statement.bases.size()),
                 });
                 SymbolTable class_symbols = collect_class_symbols(statement);
-                BytecodeBuilder class_builder(runtime_, class_symbols, filename_);
+                BytecodeBuilder class_builder(
+                    runtime_,
+                    class_symbols,
+                    filename_,
+                    static_cast<std::uint32_t>(statement.line));
                 CodeObject *code = class_builder.build_class(statement);
                 emit_constant(code);
-                instructions_.push_back(Instruction{
+                emit({
                     Opcode::MakeClass,
                     static_cast<std::uint32_t>(name_index(statement.name)),
                 });
-                instructions_.push_back(Instruction{
-                    Opcode::StoreName,
-                    static_cast<std::uint32_t>(name_index(statement.name)),
-                });
+                emit_binding_store(statement.name);
             }
 
         private:
+            class StatementLineGuard final
+            {
+            public:
+                StatementLineGuard(BytecodeBuilder &builder, const compiler_internal::Stmt &statement)
+                    : builder_(builder), previous_(builder.current_line_)
+                {
+                    builder_.current_line_ = static_cast<std::uint32_t>(statement.line);
+                }
+
+                ~StatementLineGuard()
+                {
+                    builder_.current_line_ = previous_;
+                }
+
+                StatementLineGuard(const StatementLineGuard &) = delete;
+                StatementLineGuard &operator=(const StatementLineGuard &) = delete;
+
+            private:
+                BytecodeBuilder &builder_;
+                std::uint32_t previous_;
+            };
+
             class PendingAssignmentValue final
             {
             public:
@@ -693,15 +731,37 @@ namespace cxxpython
             void emit_constant(Object *constant)
             {
                 constants_.push_back(constant);
-                instructions_.push_back(Instruction{
+                emit({
                     Opcode::LoadConst,
                     static_cast<std::uint32_t>(constants_.size() - 1),
                 });
             }
 
+            void emit(Instruction instruction)
+            {
+                instructions_.push_back(instruction);
+                lines_.push_back(current_line_);
+            }
+
+            void emit_binding_store(const std::string &name)
+            {
+                if (symbols_.scope() == SymbolScope::Function && symbols_.is_local(name))
+                {
+                    emit({
+                        Opcode::StoreFast,
+                        static_cast<std::uint32_t>(local_index(name)),
+                    });
+                    return;
+                }
+                emit({
+                    Opcode::StoreName,
+                    static_cast<std::uint32_t>(name_index(name)),
+                });
+            }
+
             std::size_t emit_jump(Opcode opcode)
             {
-                instructions_.push_back(Instruction{opcode, 0});
+                emit({opcode, 0});
                 return instructions_.size() - 1;
             }
 
@@ -773,6 +833,8 @@ namespace cxxpython
             std::vector<Object *> varnames_;
             std::vector<Object *> constants_;
             std::vector<Instruction> instructions_;
+            std::vector<std::uint32_t> lines_;
+            std::uint32_t current_line_ = 1;
             const compiler_internal::Expr *pending_assignment_value_ = nullptr;
         };
 
