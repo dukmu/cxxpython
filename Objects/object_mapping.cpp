@@ -1,6 +1,8 @@
 #include "cxxpython/object.hpp"
 #include "cxxpython/runtime.hpp"
 
+#include "object_utils.hpp"
+
 #include <cstddef>
 #include <sstream>
 
@@ -96,6 +98,19 @@ namespace cxxpython
         Object *dict_iter(Object &object)
         {
             return object.runtime()->new_dict_key_iterator(static_cast<DictObject *>(&object));
+        }
+
+        Object *dict_new(TypeObject &type, const CallArguments &args)
+        {
+            require_no_keywords(type.runtime(), "dict", args);
+            require_no_positional(type.runtime(), "dict", args);
+            return type.runtime()->allocate<DictObject>(&type);
+        }
+
+        void dict_init(Object &object, const CallArguments &args)
+        {
+            require_no_keywords(object.runtime(), "dict", args);
+            require_no_positional(object.runtime(), "dict", args);
         }
 
         std::string mappingproxy_repr(const Object &object)
@@ -309,6 +324,8 @@ namespace cxxpython
             .delitem = dict_delitem,
             .contains = dict_contains,
             .iter = dict_iter,
+            .new_object = dict_new,
+            .init = dict_init,
         };
     }
 

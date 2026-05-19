@@ -67,6 +67,16 @@ namespace cxxpython
         builtins_module_ = allocate<ModuleObject>(module_type_, "builtins", "", dict);
         dict->set(new_str("__builtins__"), builtins_module_);
         dict->set(new_str("NotImplemented"), not_implemented_);
+        dict->set(new_str("BaseException"), base_exception_type_);
+        dict->set(new_str("Exception"), exception_type_);
+        dict->set(new_str("TypeError"), type_error_type_);
+        dict->set(new_str("ValueError"), value_error_type_);
+        dict->set(new_str("IndexError"), index_error_type_);
+        dict->set(new_str("KeyError"), key_error_type_);
+        dict->set(new_str("SyntaxError"), syntax_error_type_);
+        dict->set(new_str("NameError"), name_error_type_);
+        dict->set(new_str("UnboundLocalError"), unbound_local_error_type_);
+        dict->set(new_str("AttributeError"), attribute_error_type_);
         dict->set(new_str("StopIteration"), stop_iteration_type_);
         dict->set(new_str("None"), none_);
         dict->set(new_str("True"), true_);

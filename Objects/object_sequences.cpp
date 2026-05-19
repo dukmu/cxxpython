@@ -106,15 +106,8 @@ namespace cxxpython
             return object.runtime()->new_sequence_iterator(&object);
         }
 
-        Object *list_new(TypeObject &type, const CallArguments &args)
+        std::vector<Object *> collect_iterable_items(Runtime *runtime, Object *iterable)
         {
-            require_no_keywords(type.runtime(), "list", args);
-            require_positional_at_most(type.runtime(), "list", args, 1);
-            if (args.positional.empty())
-                return type.runtime()->allocate<ListObject>(&type, std::vector<Object *>{});
-
-            Runtime *runtime = type.runtime();
-            Object *iterable = args.positional[0];
             auto iterable_root = runtime->root(iterable);
             Object *iterator = object_iter(iterable_root.get());
             auto iterator_root = runtime->root(iterator);
@@ -136,7 +129,18 @@ namespace cxxpython
                     throw;
                 }
             }
-            return type.runtime()->allocate<ListObject>(&type, std::move(items));
+            return items;
+        }
+
+        Object *list_new(TypeObject &type, const CallArguments &args)
+        {
+            require_no_keywords(type.runtime(), "list", args);
+            require_positional_at_most(type.runtime(), "list", args, 1);
+            if (args.positional.empty())
+                return type.runtime()->allocate<ListObject>(&type, std::vector<Object *>{});
+
+            Runtime *runtime = type.runtime();
+            return runtime->allocate<ListObject>(&type, collect_iterable_items(runtime, args.positional[0]));
         }
 
         void list_init(Object &object, const CallArguments &args)
@@ -237,6 +241,23 @@ namespace cxxpython
             }
             return false;
         }
+
+        Object *tuple_new(TypeObject &type, const CallArguments &args)
+        {
+            require_no_keywords(type.runtime(), "tuple", args);
+            require_positional_at_most(type.runtime(), "tuple", args, 1);
+            if (args.positional.empty())
+                return type.runtime()->allocate<TupleObject>(&type, std::vector<Object *>{});
+
+            Runtime *runtime = type.runtime();
+            return runtime->allocate<TupleObject>(&type, collect_iterable_items(runtime, args.positional[0]));
+        }
+
+        void tuple_init(Object &object, const CallArguments &args)
+        {
+            require_no_keywords(object.runtime(), "tuple", args);
+            require_positional_at_most(object.runtime(), "tuple", args, 1);
+        }
     }
 
     ListObject::ListObject(TypeObject *type, std::vector<Object *> items)
@@ -335,6 +356,8 @@ namespace cxxpython
             .delitem = tuple_delitem,
             .contains = tuple_contains,
             .iter = sequence_iter,
+            .new_object = tuple_new,
+            .init = tuple_init,
         };
     }
 }

@@ -37,6 +37,7 @@ namespace cxxpython
         base_exception_type_ = allocate_type("BaseException");
         exception_type_ = allocate_type("Exception");
         type_error_type_ = allocate_type("TypeError");
+        value_error_type_ = allocate_type("ValueError");
         index_error_type_ = allocate_type("IndexError");
         key_error_type_ = allocate_type("KeyError");
         syntax_error_type_ = allocate_type("SyntaxError");
@@ -74,6 +75,7 @@ namespace cxxpython
         base_exception_type_->slots = make_exception_slots();
         exception_type_->slots = make_exception_slots();
         type_error_type_->slots = make_exception_slots();
+        value_error_type_->slots = make_exception_slots();
         index_error_type_->slots = make_exception_slots();
         key_error_type_->slots = make_exception_slots();
         syntax_error_type_->slots = make_exception_slots();
@@ -111,6 +113,7 @@ namespace cxxpython
         base_exception_type_->set_type(type_type_);
         exception_type_->set_type(type_type_);
         type_error_type_->set_type(type_type_);
+        value_error_type_->set_type(type_type_);
         index_error_type_->set_type(type_type_);
         key_error_type_->set_type(type_type_);
         syntax_error_type_->set_type(type_type_);
@@ -151,6 +154,7 @@ namespace cxxpython
         initialize_type(base_exception_type_, object_type_);
         initialize_type(exception_type_, base_exception_type_);
         initialize_type(type_error_type_, exception_type_);
+        initialize_type(value_error_type_, exception_type_);
         initialize_type(index_error_type_, exception_type_);
         initialize_type(key_error_type_, exception_type_);
         initialize_type(syntax_error_type_, exception_type_);
@@ -188,6 +192,7 @@ namespace cxxpython
         base_exception_type_->solid_base = base_exception_type_;
         exception_type_->solid_base = base_exception_type_;
         type_error_type_->solid_base = base_exception_type_;
+        value_error_type_->solid_base = base_exception_type_;
         index_error_type_->solid_base = base_exception_type_;
         key_error_type_->solid_base = base_exception_type_;
         syntax_error_type_->solid_base = base_exception_type_;
@@ -230,6 +235,7 @@ namespace cxxpython
         add_root(base_exception_type_);
         add_root(exception_type_);
         add_root(type_error_type_);
+        add_root(value_error_type_);
         add_root(index_error_type_);
         add_root(key_error_type_);
         add_root(syntax_error_type_);

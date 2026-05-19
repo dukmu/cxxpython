@@ -395,6 +395,11 @@ namespace cxxpython
         return new_exception(type_error_type_, std::move(message));
     }
 
+    ExceptionObject *Runtime::new_value_error(std::string message)
+    {
+        return new_exception(value_error_type_, std::move(message));
+    }
+
     ExceptionObject *Runtime::new_index_error(std::string message)
     {
         return new_exception(index_error_type_, std::move(message));

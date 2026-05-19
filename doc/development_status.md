@@ -45,7 +45,9 @@ Eight tracked risks:
    core iterator protocol now has `iter`/`iternext` slots, `iter()`/`next()`,
    `StopIteration`, sequence and dict-key iterators, and `list(iterable)`.
    `repr()` and `hash()` now dispatch through the same object protocol, and
-   core singleton/type names live in the builtins module dict.
+   core singleton/type names live in the builtins module dict. Core
+   constructor types now include basic `int()`, `bool()`, `tuple(iterable)`,
+   and `dict()` support through type `new_object`/`init` slots.
    Remaining builtin debt is the richer CPython-style argument parser plus
    protocol users such as `for`, `*iterable`, and `**mapping`.
 7. Medium, partially fixed: descriptor and type-attribute protocol is
@@ -127,11 +129,61 @@ Immediate order:
   method descriptors; public attribute mutation checks user overrides before
   default descriptor/dict behavior, and VM `STORE_ATTR`/`DELETE_ATTR` inherit
   the hook semantics without opcode changes.
+- Done in current slice: exposed exception types in builtins and added basic
+  type-call constructors for `int`, `bool`, `tuple`, and `dict`; `tuple`
+  reuses the iterator protocol collector shared with `list`.
 - Next: continue through `global`/`nonlocal`/closures, `__prepare__`,
   syntax-level `metaclass=`,
   full traceback objects, runtime factory root audits, builtin protocol
   cleanup, `for`/call expansion, defaults/keyword-only arguments, and
   descriptor/metaclass completeness.
+
+## 2026-05-19 Core Builtin Constructors
+
+Pre-change review:
+
+- After exposing core type names in builtins, `int`, `bool`, `tuple`, and
+  `dict` needed real type-call construction paths. Leaving them present but
+  not constructible would turn the builtins module into a misleading partial
+  API and force scripts back to literal-only tests.
+
+Completed:
+
+- Added `int()` construction for empty, integer/bool, and decimal string
+  inputs. Invalid decimal strings now raise `ValueError`.
+- Added `bool()` construction through truth protocol dispatch and singleton
+  return values.
+- Added `tuple()` and `tuple(iterable)` construction. Tuple now shares the
+  iterator-consumption helper used by `list(iterable)`.
+- Added empty `dict()` construction through the dict type `new_object`/`init`
+  slots.
+- Added `ValueError` to the exception hierarchy and exposed the core exception
+  names in builtins alongside `StopIteration`.
+- Added C++ and Python golden coverage for constructor calls and builtins
+  namespace entries.
+
+Design review:
+
+- Constructors are implemented as type `new_object`/`init` slots, not as
+  native functions named `int` or `dict`. This preserves the type-call path as
+  the single construction protocol for builtin and future heap/extension
+  types.
+- Iterable constructor behavior is protocol-based: the shared collector uses
+  `object_iter` and `object_next`, so future `for` lowering and call expansion
+  can reuse the same assumptions.
+
+Known debt and next risk:
+
+- `dict(mapping_or_iterable, **kwargs)`, keyword-aware argument parsing,
+  `tuple` exact-object fast return, and richer numeric conversion protocols
+  remain open.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all 160 tests pass.
 
 ## 2026-05-19 Attribute Mutation Hooks
 

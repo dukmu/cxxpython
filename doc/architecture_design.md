@@ -235,6 +235,16 @@ doc/            design docs and milestone plans
   protocol helpers. They are not CLI formatting shortcuts. `None`、`True`、
   `False` and core type objects live in the builtins module dict so script
   execution and host tests observe the same namespace shape.
+- Core builtin constructors must be type calls wherever possible. `int()`,
+  `bool()`, `str()`, `list()`, `tuple()`, and `dict()` use type
+  `new_object`/`init` slots, not native function stand-ins. Iterable
+  constructors such as `list(iterable)` and `tuple(iterable)` consume
+  `object_iter`/`object_next`; they must not branch on concrete container
+  layouts.
+- Builtin exception types are normal type objects in the builtins module. New
+  semantic error categories such as `ValueError` should be added to the
+  exception hierarchy before APIs start faking them with unrelated exception
+  classes.
 - Import core 引入前，CLI file execution 可以创建 `__main__` module，但一旦
   `sys.modules` 存在，`__main__` 必须通过同一模块注册/清理路径。
 

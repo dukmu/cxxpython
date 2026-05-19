@@ -618,6 +618,7 @@ namespace cxxpython
     TypeSlots make_frame_slots();
 
     [[noreturn]] void raise_type_error(Runtime *runtime, std::string message);
+    [[noreturn]] void raise_value_error(Runtime *runtime, std::string message);
     [[noreturn]] void raise_index_error(Runtime *runtime, std::string message);
     [[noreturn]] void raise_key_error(Runtime *runtime, Object *key);
     [[noreturn]] void raise_syntax_error(Runtime *runtime, std::string message);

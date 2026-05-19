@@ -57,10 +57,28 @@ TEST(Module, BootstrapsBuiltinsModule)
     EXPECT_EQ(cxxpython::object_repr(next), "<built-in function next>");
 
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("StopIteration")), runtime.stop_iteration_type());
+    EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("BaseException")), runtime.base_exception_type());
+    EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("Exception")), runtime.exception_type());
+    EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("TypeError")), runtime.type_error_type());
+    EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("ValueError")), runtime.value_error_type());
+    EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("IndexError")), runtime.index_error_type());
+    EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("KeyError")), runtime.key_error_type());
+    EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("SyntaxError")), runtime.syntax_error_type());
+    EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("NameError")), runtime.name_error_type());
+    EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("UnboundLocalError")),
+              runtime.unbound_local_error_type());
+    EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("AttributeError")), runtime.attribute_error_type());
+    EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("None")), runtime.none());
+    EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("True")), runtime.true_value());
+    EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("False")), runtime.false_value());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("object")), runtime.object_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("type")), runtime.type_type());
+    EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("int")), runtime.int_type());
+    EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("bool")), runtime.bool_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("str")), runtime.str_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("list")), runtime.list_type());
+    EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("tuple")), runtime.tuple_type());
+    EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("dict")), runtime.dict_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("property")), runtime.property_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("staticmethod")), runtime.staticmethod_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("classmethod")), runtime.classmethod_type());
@@ -108,6 +126,55 @@ TEST(Module, BuiltinConstructorsUseSharedNativeArgumentValidation)
     {
         EXPECT_EQ(error.type(), runtime.type_error_type());
         EXPECT_STREQ(error.what(), "staticmethod() takes exactly one argument (0 given)");
+    }
+}
+
+TEST(Module, BuiltinCoreConstructorsCreateProtocolObjects)
+{
+    cxxpython::Runtime runtime;
+
+    auto *zero = dynamic_cast<cxxpython::IntObject *>(cxxpython::object_call(runtime.int_type(), {}));
+    ASSERT_NE(zero, nullptr);
+    EXPECT_EQ(zero->type(), runtime.int_type());
+    EXPECT_EQ(zero->value, 0);
+
+    auto *from_bool =
+        dynamic_cast<cxxpython::IntObject *>(cxxpython::object_call(runtime.int_type(), {runtime.true_value()}));
+    ASSERT_NE(from_bool, nullptr);
+    EXPECT_EQ(from_bool->type(), runtime.int_type());
+    EXPECT_EQ(from_bool->value, 1);
+
+    auto *from_str =
+        dynamic_cast<cxxpython::IntObject *>(cxxpython::object_call(runtime.int_type(), {runtime.new_str("-42")}));
+    ASSERT_NE(from_str, nullptr);
+    EXPECT_EQ(from_str->value, -42);
+
+    EXPECT_EQ(cxxpython::object_call(runtime.bool_type(), {}), runtime.false_value());
+    EXPECT_EQ(cxxpython::object_call(runtime.bool_type(), {runtime.new_list({runtime.new_int(1)})}),
+              runtime.true_value());
+    EXPECT_EQ(cxxpython::object_call(runtime.bool_type(), {runtime.new_list({})}),
+              runtime.false_value());
+
+    auto *tuple = dynamic_cast<cxxpython::TupleObject *>(
+        cxxpython::object_call(runtime.tuple_type(), {runtime.new_list({runtime.new_int(1), runtime.new_int(2)})}));
+    ASSERT_NE(tuple, nullptr);
+    EXPECT_EQ(tuple->type(), runtime.tuple_type());
+    EXPECT_EQ(tuple->size(), 2U);
+
+    auto *dict = dynamic_cast<cxxpython::DictObject *>(cxxpython::object_call(runtime.dict_type(), {}));
+    ASSERT_NE(dict, nullptr);
+    EXPECT_EQ(dict->type(), runtime.dict_type());
+    EXPECT_EQ(dict->size(), 0U);
+
+    try
+    {
+        (void)cxxpython::object_call(runtime.int_type(), {runtime.new_str("not-an-int")});
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.value_error_type());
+        EXPECT_STREQ(error.what(), "invalid literal for int() with base 10: 'not-an-int'");
     }
 }
 

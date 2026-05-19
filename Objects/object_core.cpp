@@ -1009,6 +1009,13 @@ namespace cxxpython
         throw PythonError(runtime->new_type_error(std::move(message)));
     }
 
+    void raise_value_error(Runtime *runtime, std::string message)
+    {
+        if (!runtime)
+            throw std::logic_error("cannot raise Python ValueError without a runtime");
+        throw PythonError(runtime->new_value_error(std::move(message)));
+    }
+
     void raise_index_error(Runtime *runtime, std::string message)
     {
         if (!runtime)

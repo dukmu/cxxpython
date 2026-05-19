@@ -147,6 +147,11 @@ namespace cxxpython
         return type_error_type_;
     }
 
+    TypeObject *Runtime::value_error_type() const noexcept
+    {
+        return value_error_type_;
+    }
+
     TypeObject *Runtime::index_error_type() const noexcept
     {
         return index_error_type_;

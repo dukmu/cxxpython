@@ -3,6 +3,8 @@
 
 #include "object_utils.hpp"
 
+#include <charconv>
+
 namespace cxxpython
 {
     namespace
@@ -135,9 +137,63 @@ namespace cxxpython
             raise_unsupported_unary_op(operand, op);
         }
 
+        std::int64_t parse_int_literal(Runtime *runtime, const StrObject *text)
+        {
+            std::int64_t value = 0;
+            const char *begin = text->value.data();
+            const char *end = begin + text->value.size();
+            const auto [position, error] = std::from_chars(begin, end, value);
+            if (error == std::errc{} && position == end)
+                return value;
+            raise_value_error(runtime, "invalid literal for int() with base 10: '" + text->value + "'");
+        }
+
+        std::int64_t int_constructor_value(Runtime *runtime, Object *object)
+        {
+            if (auto *integer = dynamic_cast<IntObject *>(object))
+                return integer->value;
+            if (auto *text = dynamic_cast<StrObject *>(object))
+                return parse_int_literal(runtime, text);
+            raise_type_error(runtime,
+                             "int() argument must be a string, a bytes-like object or a real number");
+        }
+
+        Object *int_new(TypeObject &type, const CallArguments &args)
+        {
+            require_no_keywords(type.runtime(), "int", args);
+            require_positional_at_most(type.runtime(), "int", args, 1);
+            const std::int64_t value = args.positional.empty()
+                                           ? 0
+                                           : int_constructor_value(type.runtime(), args.positional[0]);
+            return type.runtime()->allocate<IntObject>(&type, value);
+        }
+
+        void int_init(Object &object, const CallArguments &args)
+        {
+            require_no_keywords(object.runtime(), "int", args);
+            require_positional_at_most(object.runtime(), "int", args, 1);
+        }
+
         std::string bool_repr(const Object &object)
         {
             return static_cast<const IntObject *>(&object)->value != 0 ? "True" : "False";
+        }
+
+        Object *bool_new(TypeObject &type, const CallArguments &args)
+        {
+            require_no_keywords(type.runtime(), "bool", args);
+            require_positional_at_most(type.runtime(), "bool", args, 1);
+            if (args.positional.empty())
+                return type.runtime()->false_value();
+            return is_true(args.positional[0])
+                       ? type.runtime()->true_value()
+                       : type.runtime()->false_value();
+        }
+
+        void bool_init(Object &object, const CallArguments &args)
+        {
+            require_no_keywords(object.runtime(), "bool", args);
+            require_positional_at_most(object.runtime(), "bool", args, 1);
         }
 
         std::string str_repr(const Object &object)
@@ -273,6 +329,8 @@ namespace cxxpython
             .traverse = default_traverse,
             .binary_op = int_binary_op,
             .unary_op = int_unary_op,
+            .new_object = int_new,
+            .init = int_init,
         };
     }
 
@@ -287,6 +345,8 @@ namespace cxxpython
             .traverse = default_traverse,
             .binary_op = int_binary_op,
             .unary_op = int_unary_op,
+            .new_object = bool_new,
+            .init = bool_init,
         };
     }
 
