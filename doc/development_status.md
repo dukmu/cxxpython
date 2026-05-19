@@ -51,8 +51,9 @@ Eight tracked risks:
    `property.getter`/`setter`/`deleter`, `staticmethod`, and `classmethod` are
    typed builtin descriptors with decorator-script coverage. Attribute delete
    now routes through data descriptors and `property.deleter` at the object API
-   layer. Slot wrappers, `__getattribute__`, `__getattr__`, and parser/VM `del`
-   statement lowering remain absent.
+   layer. `__getattr__` fallback now runs after normal module, metatype, type,
+   descriptor, and instance-dict lookup fails. Slot wrappers,
+   `__getattribute__`, and parser/VM `del` statement lowering remain absent.
 8. Medium, first slice fixed: Python functions now support positional
    varargs, keyword dictionaries, and keyword calls through `CodeObject` flags,
    `CALL_KW`, and unified `CallArguments`. Remaining call-family work includes
@@ -99,11 +100,65 @@ Immediate order:
 - Done in current slice: `object_delete_attr` now deletes module/type/instance
   attributes and dispatches data descriptor deletion; `property.deleter` uses
   the same descriptor path.
+- Done in current slice: `__getattr__` fallback is centralized in
+  `object_get_attr` for instances, types/metatypes, and modules.
 - Next: continue through `global`/`nonlocal`/closures, `__prepare__`,
   syntax-level `metaclass=`,
   full traceback objects, runtime factory root audits, builtin protocol
   cleanup, `for`/call expansion, defaults/keyword-only arguments, and
   descriptor completeness.
+
+## 2026-05-19 `__getattr__` Fallback
+
+Pre-change review:
+
+- Attribute lookup had a clean descriptor priority path but ended directly in
+  `AttributeError`. That forced dynamic user attributes to wait for either VM
+  special cases or duplicated lookup logic.
+- Python methods already bind through descriptors, so `__getattr__` could be
+  implemented at the object API boundary without changing opcode behavior.
+
+Debt addressed:
+
+- Added final `__getattr__` fallback inside `object_get_attr`.
+- Instance lookup now tries `type.__getattr__` only after data descriptors,
+  instance dictionaries, and normal type attributes fail.
+- Type-object lookup can fall back to metatype `__getattr__` after normal
+  metatype/class lookup fails.
+- Module objects can call a module dictionary `__getattr__(name)` when a module
+  attribute is absent, matching the same centralized API shape.
+
+Completed:
+
+- Added C++ tests proving instance fallback runs after normal lookup fails and
+  module fallback works without descriptor binding.
+- Added `Tests/python/getattr_fallback.py` golden coverage for a Python class
+  method `__getattr__`, including normal instance attributes taking priority.
+
+Design review:
+
+- `LOAD_ATTR` still calls only `object_get_attr`; it does not know about
+  `__getattr__`. This keeps future `__getattribute__`, slot wrappers, and
+  metaclass behavior concentrated in the attribute engine.
+- The implementation performs special lookup directly through type dictionaries
+  to avoid recursively invoking the fallback while looking up `__getattr__`
+  itself.
+
+Known debt and next risk:
+
+- `__getattribute__` must wrap the whole normal lookup path and needs careful
+  recursion protection.
+- Slot wrappers remain absent, so special methods like `__len__` are not yet
+  script-visible descriptors for builtins.
+- Parser/VM delete statement lowering remains open despite the object-level
+  delete API now existing.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all 149 tests pass.
 
 ## 2026-05-19 Descriptor Delete Protocol
 

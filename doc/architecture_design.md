@@ -274,8 +274,9 @@ doc/            design docs and milestone plans
   without `HasInstanceDict` report no `__dict__`.
 - Attribute lookup 的入口是统一 `object_get_attr` API。当前最小顺序是：
   module dict -> data descriptor -> instance dict -> non-data descriptor/type
-  attribute -> metatype MRO dict。后续 `__getattr__`、slot wrappers 和
-  mappingproxy 必须扩展这条 API，而不是在 opcode 或 builtin 中另开查找路径。
+  attribute -> metatype MRO dict -> `__getattr__` fallback。后续
+  `__getattribute__`、slot wrappers 和 mappingproxy 必须扩展这条 API，而不是在
+  opcode 或 builtin 中另开查找路径。
 - Type-object lookup follows the same descriptor model with the metatype data
   descriptor priority CPython requires: metatype data descriptor -> class MRO
   attribute -> metatype non-data attribute. This is what makes
@@ -285,6 +286,10 @@ doc/            design docs and milestone plans
   in type/class dictionaries with a `descr_get` slot are invoked with
   `(descriptor, instance, owner)`. Module namespace entries are direct values;
   module type descriptors still flow through type lookup.
+- `__getattr__` is a final fallback in `object_get_attr`, not an opcode
+  behavior. Instance fallback uses direct special lookup on the owner type and
+  then calls the bound result with the missing attribute name. Module fallback
+  calls a module dictionary `__getattr__` directly, without descriptor binding.
 - Descriptor assignment and deletion are centralized through `object_set_attr`
   and `object_delete_attr`. Data descriptors receive normal assignment with a
   non-null value and deletion as `descr_set(..., value=nullptr)`. Future

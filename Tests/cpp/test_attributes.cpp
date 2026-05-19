@@ -300,6 +300,56 @@ TEST(Attributes, InvokesDescriptorsFromTypeDictionaries)
     EXPECT_EQ(derived_descriptor->last_owner, owner_type);
 }
 
+TEST(Attributes, CallsGetAttrFallbackAfterNormalLookupFails)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::TypeObject *owner_type = runtime.new_heap_type("Owner", runtime.object_type());
+    cxxpython::MethodDescriptorObject *getattr = runtime.new_method_descriptor(
+        "__getattr__",
+        owner_type,
+        [](cxxpython::Runtime &runtime, cxxpython::Object *, cxxpython::ObjectSpan args)
+        {
+            if (args.size() != 1)
+                cxxpython::raise_type_error(&runtime, "__getattr__ expected name");
+            auto *name = dynamic_cast<cxxpython::StrObject *>(args[0]);
+            if (!name)
+                cxxpython::raise_type_error(&runtime, "__getattr__ expected str name");
+            return runtime.new_str("dynamic:" + name->value);
+        });
+    owner_type->dict->set(runtime.new_str("__getattr__"), getattr);
+    cxxpython::Object *instance = runtime.allocate<cxxpython::Object>(owner_type);
+
+    auto *computed = dynamic_cast<cxxpython::StrObject *>(cxxpython::object_get_attr(instance, "missing"));
+    ASSERT_NE(computed, nullptr);
+    EXPECT_EQ(computed->value, "dynamic:missing");
+
+    cxxpython::Object *stored = runtime.new_str("stored");
+    cxxpython::object_set_attr(instance, "present", stored);
+    EXPECT_EQ(cxxpython::object_get_attr(instance, "present"), stored);
+}
+
+TEST(Attributes, CallsModuleGetAttrFallback)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::ModuleObject *module = runtime.new_module("mod", "mod.py");
+    cxxpython::NativeFunctionObject *getattr = runtime.new_native_function(
+        "__getattr__",
+        [](cxxpython::Runtime &runtime, const cxxpython::CallArguments &args)
+        {
+            if (args.positional.size() != 1 || (args.keywords && args.keywords->size() != 0))
+                cxxpython::raise_type_error(&runtime, "__getattr__ expected name");
+            auto *name = dynamic_cast<cxxpython::StrObject *>(args.positional[0]);
+            if (!name)
+                cxxpython::raise_type_error(&runtime, "__getattr__ expected str name");
+            return runtime.new_str("module:" + name->value);
+        });
+    module->dict()->set(runtime.new_str("__getattr__"), getattr);
+
+    auto *computed = dynamic_cast<cxxpython::StrObject *>(cxxpython::object_get_attr(module, "missing"));
+    ASSERT_NE(computed, nullptr);
+    EXPECT_EQ(computed->value, "module:missing");
+}
+
 TEST(Attributes, DataDescriptorsOverrideInstanceDictionaries)
 {
     cxxpython::Runtime runtime;

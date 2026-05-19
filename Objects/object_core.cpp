@@ -31,6 +31,14 @@ namespace cxxpython
             return result;
         }
 
+        Object *call_getattr_hook(Object *hook, Object *instance, TypeObject *owner, StrObject *name)
+        {
+            if (!hook)
+                return nullptr;
+            Object *callable = apply_descriptor(hook, instance, owner);
+            return object_call(callable, {name});
+        }
+
         std::string type_repr(const Object &object)
         {
             return "<class '" + type_qualified_name(static_cast<const TypeObject *>(&object)) + "'>";
@@ -625,6 +633,8 @@ namespace cxxpython
         {
             if (Object *value = module->dict()->get(name))
                 return value;
+            if (Object *hook = module->dict()->get(object->runtime()->new_str("__getattr__")))
+                return object_call(hook, {name});
         }
 
         if (auto *type = dynamic_cast<TypeObject *>(object))
@@ -636,6 +646,12 @@ namespace cxxpython
                 return apply_descriptor(value, nullptr, type);
             if (metatype_value)
                 return apply_descriptor(metatype_value, object, type->type());
+            if (Object *result = call_getattr_hook(
+                    type->type() ? type_lookup_attribute(type->type(), object->runtime()->new_str("__getattr__")) : nullptr,
+                    object,
+                    type->type(),
+                    name))
+                return result;
         }
         else
         {
@@ -649,6 +665,12 @@ namespace cxxpython
             }
             if (type_value)
                 return apply_descriptor(type_value, object, object->type());
+            if (Object *result = call_getattr_hook(
+                    type_lookup_attribute(object->type(), object->runtime()->new_str("__getattr__")),
+                    object,
+                    object->type(),
+                    name))
+                return result;
         }
 
         std::ostringstream message;
