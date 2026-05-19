@@ -46,7 +46,8 @@ namespace
             return false;
         const std::string message = error.what();
         return message.find("expected indented block") != std::string::npos ||
-               message.find("expected except after try block") != std::string::npos;
+               message.find("expected except after try block") != std::string::npos ||
+               message.find("expected except or finally after try block") != std::string::npos;
     }
 
     bool should_use_readline() noexcept

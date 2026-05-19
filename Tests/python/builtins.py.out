@@ -37,9 +37,14 @@ True
 True
 3
 True
+True
+True
 3
 b
 ['a', 'b', 'c']
+True
+False
+True
 True
 True
 True

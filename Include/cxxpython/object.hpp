@@ -61,6 +61,20 @@ namespace cxxpython
         GreaterEqual,
     };
 
+    enum class ComparisonOp : std::uint8_t
+    {
+        Equal,
+        NotEqual,
+        Less,
+        LessEqual,
+        Greater,
+        GreaterEqual,
+        Is,
+        IsNot,
+        In,
+        NotIn,
+    };
+
     enum class BinaryOp : std::uint8_t
     {
         Add,

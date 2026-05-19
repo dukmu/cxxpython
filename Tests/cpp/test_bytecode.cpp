@@ -39,9 +39,12 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::Call), "CALL");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::CallKw), "CALL_KW");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::SetupExcept), "SETUP_EXCEPT");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::SetupFinally), "SETUP_FINALLY");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::PopExcept), "POP_EXCEPT");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::PopFinally), "POP_FINALLY");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::CheckExceptionMatch), "CHECK_EXCEPTION_MATCH");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::RaiseValue), "RAISE_VALUE");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::EndFinally), "END_FINALLY");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::ReturnValue), "RETURN_VALUE");
 
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::LoadConst, 0}), 1);
@@ -81,9 +84,12 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::CallKw, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::CallKw, 2}), -3);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::SetupExcept, 0}), 0);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::SetupFinally, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::PopExcept, 0}), 0);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::PopFinally, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::CheckExceptionMatch, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::RaiseValue, 0}), -1);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::EndFinally, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::ReturnValue, 0}), -1);
 }
 

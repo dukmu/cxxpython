@@ -47,10 +47,17 @@ print(object.__str__(object()).__contains__('object at'))
 print(dir(str).__contains__('__len__'))
 print(dir(str).__contains__('__contains__'))
 print(len('abc'))
+print('b' in 'abc')
+print('z' not in 'abc')
 print('abc'.__contains__('b'))
 print('abc'.__len__())
 print('abc'.__getitem__(1))
 print(list('abc'))
+x = []
+same = x
+print(x is same)
+print(x is [])
+print(x is not [])
 
 print(dir(int).__contains__('__bool__'))
 print(dir(int).__contains__('__int__'))

@@ -44,9 +44,12 @@ namespace cxxpython
         Call,
         CallKw,
         SetupExcept,
+        SetupFinally,
         PopExcept,
+        PopFinally,
         CheckExceptionMatch,
         RaiseValue,
+        EndFinally,
         ReturnValue,
     };
 

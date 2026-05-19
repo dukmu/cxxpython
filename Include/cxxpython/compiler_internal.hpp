@@ -114,7 +114,11 @@ namespace cxxpython::compiler_internal
         Raise,
         Try,
         Except,
+        Finally,
         As,
+        In,
+        Is,
+        Not,
         Class,
         Del,
         TrueLiteral,
@@ -208,12 +212,12 @@ namespace cxxpython::compiler_internal
 
     struct Comparison final
     {
-        Comparison(RichCompareOp op_in, std::unique_ptr<Expr> right_in)
+        Comparison(ComparisonOp op_in, std::unique_ptr<Expr> right_in)
             : op(op_in), right(std::move(right_in))
         {
         }
 
-        RichCompareOp op;
+        ComparisonOp op;
         std::unique_ptr<Expr> right;
     };
 
@@ -577,13 +581,17 @@ namespace cxxpython::compiler_internal
     struct TryStmt final : Stmt
     {
         TryStmt(std::vector<std::unique_ptr<Stmt>> body_in,
-                std::vector<ExceptHandler> handlers_in)
-            : body(std::move(body_in)), handlers(std::move(handlers_in))
+                std::vector<ExceptHandler> handlers_in,
+                std::vector<std::unique_ptr<Stmt>> finally_body_in = {})
+            : body(std::move(body_in)),
+              handlers(std::move(handlers_in)),
+              finally_body(std::move(finally_body_in))
         {
         }
 
         std::vector<std::unique_ptr<Stmt>> body;
         std::vector<ExceptHandler> handlers;
+        std::vector<std::unique_ptr<Stmt>> finally_body;
 
         void accept(StmtVisitor &visitor) const override
         {

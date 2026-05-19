@@ -246,6 +246,8 @@ namespace cxxpython
                     for (const auto &item : handler.body)
                         item->accept(*this);
                 }
+                for (const auto &item : statement.finally_body)
+                    item->accept(*this);
             }
 
             void visit(const compiler_internal::FunctionDefStmt &statement) override
@@ -336,6 +338,8 @@ namespace cxxpython
                     for (const auto &item : handler.body)
                         item->accept(*this);
                 }
+                for (const auto &item : statement.finally_body)
+                    item->accept(*this);
             }
 
             void visit(const compiler_internal::FunctionDefStmt &statement) override
@@ -735,46 +739,73 @@ namespace cxxpython
             void visit(const compiler_internal::TryStmt &statement) override
             {
                 StatementLineGuard line(*this, statement);
-                const std::size_t handler_jump = emit_jump(Opcode::SetupExcept);
+                const bool has_except = !statement.handlers.empty();
+                const bool has_finally = !statement.finally_body.empty();
+                const std::size_t setup_finally = has_finally ? emit_jump(Opcode::SetupFinally) : 0;
+                const std::size_t setup_except = has_except ? emit_jump(Opcode::SetupExcept) : 0;
+
                 for (const auto &item : statement.body)
                     item->accept(*this);
-                emit({Opcode::PopExcept, 0});
-                const std::size_t end_jump = emit_jump(Opcode::JumpAbsolute);
 
-                patch_jump(handler_jump, instructions_.size());
-                std::vector<std::size_t> next_handler_jumps;
-                std::vector<std::size_t> handled_jumps;
-                for (const compiler_internal::ExceptHandler &handler : statement.handlers)
+                if (has_except)
+                    emit({Opcode::PopExcept, 0});
+                if (has_finally)
+                    emit({Opcode::PopFinally, 0});
+                const std::size_t exit_jump = emit_jump(Opcode::JumpAbsolute);
+
+                std::vector<std::size_t> handler_exit_jumps;
+                if (has_except)
                 {
+                    const std::size_t handlers_start = instructions_.size();
+                    patch_jump(setup_except, handlers_start);
+                    std::vector<std::size_t> next_handler_jumps;
+                    for (const compiler_internal::ExceptHandler &handler : statement.handlers)
+                    {
+                        for (std::size_t jump : next_handler_jumps)
+                            patch_jump(jump, instructions_.size());
+                        next_handler_jumps.clear();
+
+                        if (handler.type)
+                        {
+                            handler.type->accept(*this);
+                            emit({Opcode::CheckExceptionMatch, 0});
+                            next_handler_jumps.push_back(emit_jump(Opcode::PopJumpIfFalse));
+                        }
+
+                        if (handler.name)
+                        {
+                            emit({Opcode::DupTop, 0});
+                            emit_store_name(*handler.name);
+                        }
+                        emit({Opcode::PopTop, 0});
+                        for (const auto &item : handler.body)
+                            item->accept(*this);
+                        if (has_finally)
+                            emit({Opcode::PopFinally, 0});
+                        handler_exit_jumps.push_back(emit_jump(Opcode::JumpAbsolute));
+                    }
                     for (std::size_t jump : next_handler_jumps)
                         patch_jump(jump, instructions_.size());
-                    next_handler_jumps.clear();
-
-                    if (handler.type)
-                    {
-                        handler.type->accept(*this);
-                        emit({Opcode::CheckExceptionMatch, 0});
-                        next_handler_jumps.push_back(emit_jump(Opcode::PopJumpIfFalse));
-                    }
-
-                    if (handler.name)
-                    {
-                        emit({Opcode::DupTop, 0});
-                        emit_store_name(*handler.name);
-                    }
-                    emit({Opcode::PopTop, 0});
-                    for (const auto &item : handler.body)
-                        item->accept(*this);
-                    handled_jumps.push_back(emit_jump(Opcode::JumpAbsolute));
+                    emit({Opcode::RaiseValue, 0});
                 }
 
-                for (std::size_t jump : next_handler_jumps)
-                    patch_jump(jump, instructions_.size());
-                emit({Opcode::RaiseValue, 0});
-                const std::size_t end_target = instructions_.size();
-                patch_jump(end_jump, end_target);
-                for (std::size_t jump : handled_jumps)
-                    patch_jump(jump, end_target);
+                const std::size_t finally_start = instructions_.size();
+                if (has_finally)
+                {
+                    patch_jump(setup_finally, finally_start);
+                    patch_jump(exit_jump, finally_start);
+                    for (std::size_t jump : handler_exit_jumps)
+                        patch_jump(jump, finally_start);
+                    for (const auto &item : statement.finally_body)
+                        item->accept(*this);
+                    emit({Opcode::EndFinally, 0});
+                }
+                else
+                {
+                    patch_jump(exit_jump, finally_start);
+                    for (std::size_t jump : handler_exit_jumps)
+                        patch_jump(jump, finally_start);
+                }
             }
 
             void visit(const compiler_internal::FunctionDefStmt &statement) override

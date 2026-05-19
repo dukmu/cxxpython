@@ -193,11 +193,10 @@ namespace cxxpython::compiler_internal
                 consume(TokenKind::Newline, "expected newline after try");
                 std::vector<std::unique_ptr<Stmt>> body = parse_block();
                 std::vector<ExceptHandler> handlers;
+                std::vector<std::unique_ptr<Stmt>> finally_body;
 
-                do
+                while (peek().kind == TokenKind::Except)
                 {
-                    if (peek().kind != TokenKind::Except)
-                        raise_at(peek(), "expected except after try block");
                     advance();
                     std::unique_ptr<Expr> exception_type;
                     std::optional<std::string> exception_name;
@@ -215,9 +214,23 @@ namespace cxxpython::compiler_internal
                     consume(TokenKind::Colon, "expected ':' after except");
                     consume(TokenKind::Newline, "expected newline after except");
                     handlers.emplace_back(std::move(exception_type), std::move(exception_name), parse_block());
-                } while (peek().kind == TokenKind::Except);
+                }
 
-                auto statement = std::make_unique<TryStmt>(std::move(body), std::move(handlers));
+                if (peek().kind == TokenKind::Finally)
+                {
+                    advance();
+                    consume(TokenKind::Colon, "expected ':' after finally");
+                    consume(TokenKind::Newline, "expected newline after finally");
+                    finally_body = parse_block();
+                }
+
+                if (handlers.empty() && finally_body.empty())
+                    raise_at(peek(), "expected except or finally after try block");
+
+                auto statement = std::make_unique<TryStmt>(
+                    std::move(body),
+                    std::move(handlers),
+                    std::move(finally_body));
                 statement->line = try_token.line;
                 return ParsedStatement{
                     std::move(statement),
@@ -434,14 +447,14 @@ namespace cxxpython::compiler_internal
             std::unique_ptr<Expr> parse_comparison()
             {
                 std::unique_ptr<Expr> left = parse_sum();
-                if (!is_comparison(peek().kind))
+                if (!starts_comparison())
                     return left;
 
                 std::vector<Comparison> comparisons;
-                while (is_comparison(peek().kind))
+                while (starts_comparison())
                 {
-                    const Token &op_token = advance();
-                    comparisons.emplace_back(rich_compare_op_for(op_token), parse_sum());
+                    ComparisonOp op = comparison_op();
+                    comparisons.emplace_back(op, parse_sum());
                 }
 
                 return std::make_unique<CompareExpr>(std::move(left), std::move(comparisons));
@@ -686,7 +699,11 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Raise:
                 case TokenKind::Try:
                 case TokenKind::Except:
+                case TokenKind::Finally:
                 case TokenKind::As:
+                case TokenKind::In:
+                case TokenKind::Is:
+                case TokenKind::Not:
                 case TokenKind::Class:
                 case TokenKind::Del:
                 case TokenKind::Indent:
@@ -729,32 +746,53 @@ namespace cxxpython::compiler_internal
                 return tokens_[index_ - 1];
             }
 
-            bool is_comparison(TokenKind kind) const
+            bool starts_comparison() const
             {
+                const TokenKind kind = peek().kind;
                 return kind == TokenKind::EqualEqual ||
                        kind == TokenKind::BangEqual ||
                        kind == TokenKind::Less ||
                        kind == TokenKind::LessEqual ||
                        kind == TokenKind::Greater ||
-                       kind == TokenKind::GreaterEqual;
+                       kind == TokenKind::GreaterEqual ||
+                       kind == TokenKind::In ||
+                       kind == TokenKind::Is ||
+                       (kind == TokenKind::Not && peek_next().kind == TokenKind::In);
             }
 
-            RichCompareOp rich_compare_op_for(const Token &token) const
+            ComparisonOp comparison_op()
             {
+                const Token &token = advance();
                 switch (token.kind)
                 {
                 case TokenKind::EqualEqual:
-                    return RichCompareOp::Equal;
+                    return ComparisonOp::Equal;
                 case TokenKind::BangEqual:
-                    return RichCompareOp::NotEqual;
+                    return ComparisonOp::NotEqual;
                 case TokenKind::Less:
-                    return RichCompareOp::Less;
+                    return ComparisonOp::Less;
                 case TokenKind::LessEqual:
-                    return RichCompareOp::LessEqual;
+                    return ComparisonOp::LessEqual;
                 case TokenKind::Greater:
-                    return RichCompareOp::Greater;
+                    return ComparisonOp::Greater;
                 case TokenKind::GreaterEqual:
-                    return RichCompareOp::GreaterEqual;
+                    return ComparisonOp::GreaterEqual;
+                case TokenKind::In:
+                    return ComparisonOp::In;
+                case TokenKind::Is:
+                    if (peek().kind == TokenKind::Not)
+                    {
+                        advance();
+                        return ComparisonOp::IsNot;
+                    }
+                    return ComparisonOp::Is;
+                case TokenKind::Not:
+                    if (peek().kind == TokenKind::In)
+                    {
+                        advance();
+                        return ComparisonOp::NotIn;
+                    }
+                    break;
                 case TokenKind::Integer:
                 case TokenKind::String:
                 case TokenKind::Identifier:
@@ -781,6 +819,7 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Raise:
                 case TokenKind::Try:
                 case TokenKind::Except:
+                case TokenKind::Finally:
                 case TokenKind::As:
                 case TokenKind::Class:
                 case TokenKind::Del:

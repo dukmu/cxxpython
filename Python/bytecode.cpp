@@ -240,12 +240,18 @@ namespace cxxpython
             return "CALL_KW";
         case Opcode::SetupExcept:
             return "SETUP_EXCEPT";
+        case Opcode::SetupFinally:
+            return "SETUP_FINALLY";
         case Opcode::PopExcept:
             return "POP_EXCEPT";
+        case Opcode::PopFinally:
+            return "POP_FINALLY";
         case Opcode::CheckExceptionMatch:
             return "CHECK_EXCEPTION_MATCH";
         case Opcode::RaiseValue:
             return "RAISE_VALUE";
+        case Opcode::EndFinally:
+            return "END_FINALLY";
         case Opcode::ReturnValue:
             return "RETURN_VALUE";
         }
@@ -265,8 +271,11 @@ namespace cxxpython
         case Opcode::DeleteFast:
         case Opcode::JumpAbsolute:
         case Opcode::SetupExcept:
+        case Opcode::SetupFinally:
         case Opcode::PopExcept:
+        case Opcode::PopFinally:
         case Opcode::CheckExceptionMatch:
+        case Opcode::EndFinally:
         case Opcode::RotTwo:
         case Opcode::RotThree:
         case Opcode::UnaryOp:

@@ -28,6 +28,13 @@ namespace cxxpython
             return static_cast<UnaryOp>(operand);
         }
 
+        ComparisonOp decode_comparison_op(std::uint32_t operand)
+        {
+            if (operand > static_cast<std::uint32_t>(ComparisonOp::NotIn))
+                throw BytecodeError("COMPARE_OP operand out of range");
+            return static_cast<ComparisonOp>(operand);
+        }
+
         Object *exception_instance_from_value(Runtime &runtime, Object *value)
         {
             if (!value)
@@ -74,6 +81,8 @@ namespace cxxpython
             if (frame->builtins())
                 visitor(frame->builtins());
             frame->visit_stack(visitor);
+            if (frame->pending_control_value())
+                visitor(frame->pending_control_value());
         }
 
         std::int64_t frame_hash(const Object &object)
@@ -243,21 +252,21 @@ namespace cxxpython
 
     void Frame::push_exception_handler(std::size_t target)
     {
-        exception_handlers_.push_back(target);
+        push_block_handler(FrameBlockKind::Except, target);
     }
 
     std::size_t Frame::pop_exception_handler()
     {
-        if (exception_handlers_.empty())
+        if (block_handlers_.empty() || block_handlers_.back().kind != FrameBlockKind::Except)
             throw BytecodeError("exception handler stack underflow");
-        const std::size_t target = exception_handlers_.back();
-        exception_handlers_.pop_back();
+        const std::size_t target = block_handlers_.back().target;
+        block_handlers_.pop_back();
         return target;
     }
 
     bool Frame::has_exception_handler() const noexcept
     {
-        return !exception_handlers_.empty();
+        return !block_handlers_.empty() && block_handlers_.back().kind == FrameBlockKind::Except;
     }
 
     void Frame::visit_stack(const VisitChildren &visitor) const
@@ -267,6 +276,72 @@ namespace cxxpython
             if (object)
                 visitor(object);
         }
+    }
+
+    void Frame::push_finally_handler(std::size_t target)
+    {
+        push_block_handler(FrameBlockKind::Finally, target);
+    }
+
+    std::size_t Frame::pop_finally_handler()
+    {
+        if (block_handlers_.empty() || block_handlers_.back().kind != FrameBlockKind::Finally)
+            throw BytecodeError("finally handler stack underflow");
+        const std::size_t target = block_handlers_.back().target;
+        block_handlers_.pop_back();
+        return target;
+    }
+
+    bool Frame::has_finally_handler() const noexcept
+    {
+        return !block_handlers_.empty() && block_handlers_.back().kind == FrameBlockKind::Finally;
+    }
+
+    void Frame::push_block_handler(FrameBlockKind kind, std::size_t target)
+    {
+        block_handlers_.push_back(FrameBlockHandler{kind, target});
+    }
+
+    FrameBlockHandler Frame::pop_block_handler()
+    {
+        if (block_handlers_.empty())
+            throw BytecodeError("block handler stack underflow");
+        const FrameBlockHandler handler = block_handlers_.back();
+        block_handlers_.pop_back();
+        return handler;
+    }
+
+    bool Frame::has_block_handler() const noexcept
+    {
+        return !block_handlers_.empty();
+    }
+
+    void Frame::set_pending_return(Object *value)
+    {
+        pending_control_kind_ = PendingControlKind::Return;
+        pending_control_value_ = value;
+    }
+
+    void Frame::set_pending_exception(ExceptionObject *value)
+    {
+        pending_control_kind_ = PendingControlKind::Exception;
+        pending_control_value_ = value;
+    }
+
+    PendingControlKind Frame::pending_control_kind() const noexcept
+    {
+        return pending_control_kind_;
+    }
+
+    Object *Frame::pending_control_value() const noexcept
+    {
+        return pending_control_value_;
+    }
+
+    void Frame::clear_pending_control() noexcept
+    {
+        pending_control_kind_ = PendingControlKind::None;
+        pending_control_value_ = nullptr;
     }
 
     InterpreterState::InterpreterState(Runtime &runtime)
@@ -617,14 +692,34 @@ namespace cxxpython
             }
             case Opcode::CompareOp:
             {
-                if (instruction.operand > static_cast<std::uint32_t>(RichCompareOp::GreaterEqual))
-                    throw BytecodeError("COMPARE_OP operand out of range");
-                const auto op = static_cast<RichCompareOp>(instruction.operand);
+                const ComparisonOp op = decode_comparison_op(instruction.operand);
                 Object *right = frame->pop();
                 Object *left = frame->pop();
                 auto right_root = runtime_.root(right);
                 auto left_root = runtime_.root(left);
-                frame->push(object_rich_compare(left, right, op));
+                switch (op)
+                {
+                case ComparisonOp::Equal:
+                case ComparisonOp::NotEqual:
+                case ComparisonOp::Less:
+                case ComparisonOp::LessEqual:
+                case ComparisonOp::Greater:
+                case ComparisonOp::GreaterEqual:
+                    frame->push(object_rich_compare(left, right, static_cast<RichCompareOp>(op)));
+                    break;
+                case ComparisonOp::Is:
+                    frame->push(left == right ? runtime_.true_value() : runtime_.false_value());
+                    break;
+                case ComparisonOp::IsNot:
+                    frame->push(left != right ? runtime_.true_value() : runtime_.false_value());
+                    break;
+                case ComparisonOp::In:
+                    frame->push(object_contains(right, left) ? runtime_.true_value() : runtime_.false_value());
+                    break;
+                case ComparisonOp::NotIn:
+                    frame->push(object_contains(right, left) ? runtime_.false_value() : runtime_.true_value());
+                    break;
+                }
                 break;
             }
             case Opcode::JumpAbsolute:
@@ -753,9 +848,21 @@ namespace cxxpython
                 frame->push_exception_handler(instruction.operand);
                 break;
             }
+            case Opcode::SetupFinally:
+            {
+                if (instruction.operand >= code.instructions().size())
+                    throw BytecodeError("SETUP_FINALLY target out of range");
+                frame->push_finally_handler(instruction.operand);
+                break;
+            }
             case Opcode::PopExcept:
             {
                 (void)frame->pop_exception_handler();
+                break;
+            }
+            case Opcode::PopFinally:
+            {
+                (void)frame->pop_finally_handler();
                 break;
             }
             case Opcode::CheckExceptionMatch:
@@ -781,8 +888,50 @@ namespace cxxpython
                     raise_type_error(&runtime_, "exceptions must derive from BaseException");
                 throw PythonError(exception_object);
             }
+            case Opcode::EndFinally:
+            {
+                switch (frame->pending_control_kind())
+                {
+                case PendingControlKind::None:
+                    break;
+                case PendingControlKind::Return:
+                {
+                    Object *value = frame->pending_control_value();
+                    frame->clear_pending_control();
+                    return value;
+                }
+                case PendingControlKind::Exception:
+                {
+                    Object *value = frame->pending_control_value();
+                    auto *exception = dynamic_cast<ExceptionObject *>(value);
+                    frame->clear_pending_control();
+                    if (!exception)
+                        raise_type_error(&runtime_, "finally handler stored non-exception pending state");
+                    throw PythonError(exception);
+                }
+                }
+                break;
+            }
             case Opcode::ReturnValue:
-                return frame->pop();
+            {
+                Object *value = frame->pop();
+                auto value_root = runtime_.root(value);
+                bool jumped_to_finally = false;
+                while (frame->has_block_handler())
+                {
+                    const FrameBlockHandler handler = frame->pop_block_handler();
+                    if (handler.kind == FrameBlockKind::Except)
+                        continue;
+                    frame->clear_stack();
+                    frame->set_pending_return(value);
+                    jump_to(*frame, code, static_cast<std::uint32_t>(handler.target));
+                    jumped_to_finally = true;
+                    break;
+                }
+                if (jumped_to_finally)
+                    continue;
+                return value;
+            }
             default:
                 throw BytecodeError("invalid opcode");
             }
@@ -798,6 +947,17 @@ namespace cxxpython
                         frame->push(error.value());
                     else
                         frame->push(runtime_.new_exception(runtime_.exception_type(), "unknown exception"));
+                    jump_to(*frame, code, static_cast<std::uint32_t>(target));
+                    continue;
+                }
+                if (frame->has_finally_handler())
+                {
+                    const std::size_t target = frame->pop_finally_handler();
+                    frame->clear_stack();
+                    ExceptionObject *pending_exception = error.value();
+                    if (!pending_exception)
+                        pending_exception = runtime_.new_exception(runtime_.exception_type(), "unknown exception");
+                    frame->set_pending_exception(pending_exception);
                     jump_to(*frame, code, static_cast<std::uint32_t>(target));
                     continue;
                 }

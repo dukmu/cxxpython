@@ -8,6 +8,25 @@
 
 namespace cxxpython
 {
+    enum class PendingControlKind : std::uint8_t
+    {
+        None,
+        Return,
+        Exception,
+    };
+
+    enum class FrameBlockKind : std::uint8_t
+    {
+        Except,
+        Finally,
+    };
+
+    struct FrameBlockHandler
+    {
+        FrameBlockKind kind;
+        std::size_t target;
+    };
+
     class Frame final : public Object
     {
     public:
@@ -30,6 +49,17 @@ namespace cxxpython
         void push_exception_handler(std::size_t target);
         std::size_t pop_exception_handler();
         bool has_exception_handler() const noexcept;
+        void push_finally_handler(std::size_t target);
+        std::size_t pop_finally_handler();
+        bool has_finally_handler() const noexcept;
+        void push_block_handler(FrameBlockKind kind, std::size_t target);
+        FrameBlockHandler pop_block_handler();
+        bool has_block_handler() const noexcept;
+        void set_pending_return(Object *value);
+        void set_pending_exception(ExceptionObject *value);
+        PendingControlKind pending_control_kind() const noexcept;
+        Object *pending_control_value() const noexcept;
+        void clear_pending_control() noexcept;
 
     private:
         CodeObject *code_;
@@ -39,7 +69,9 @@ namespace cxxpython
         std::size_t ip_ = 0;
         std::size_t last_ip_ = 0;
         std::vector<Object *> stack_;
-        std::vector<std::size_t> exception_handlers_;
+        std::vector<FrameBlockHandler> block_handlers_;
+        PendingControlKind pending_control_kind_ = PendingControlKind::None;
+        Object *pending_control_value_ = nullptr;
     };
 
     class InterpreterState final

@@ -163,6 +163,48 @@ TEST(Compile, CompilesOrderingComparisons)
     EXPECT_EQ(vm.execute(*greater_equal), runtime.true_value());
 }
 
+TEST(Compile, CompilesIdentityAndMembershipComparisons)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(
+        runtime,
+        "x = []\n"
+        "same = x\n"
+        "identity = x is same\n"
+        "not_identity = x is []\n"
+        "is_not_identity = x is not []\n"
+        "contains = 'b' in 'abc'\n"
+        "missing = 'z' not in 'abc'\n"
+        "list_contains = 2 in [1, 2]\n",
+        "script.py");
+    ASSERT_NE(code, nullptr);
+
+    bool saw_is = false;
+    bool saw_in = false;
+    for (const cxxpython::Instruction &instruction : code->instructions())
+    {
+        if (instruction.opcode == cxxpython::Opcode::CompareOp &&
+            instruction.operand == static_cast<std::uint32_t>(cxxpython::ComparisonOp::Is))
+            saw_is = true;
+        if (instruction.opcode == cxxpython::Opcode::CompareOp &&
+            instruction.operand == static_cast<std::uint32_t>(cxxpython::ComparisonOp::In))
+            saw_in = true;
+    }
+    EXPECT_TRUE(saw_is);
+    EXPECT_TRUE(saw_in);
+
+    EXPECT_EQ(vm.execute(*code, *globals), runtime.none());
+    EXPECT_EQ(globals->get(runtime.new_str("identity")), runtime.true_value());
+    EXPECT_EQ(globals->get(runtime.new_str("not_identity")), runtime.false_value());
+    EXPECT_EQ(globals->get(runtime.new_str("is_not_identity")), runtime.true_value());
+    EXPECT_EQ(globals->get(runtime.new_str("contains")), runtime.true_value());
+    EXPECT_EQ(globals->get(runtime.new_str("missing")), runtime.true_value());
+    EXPECT_EQ(globals->get(runtime.new_str("list_contains")), runtime.true_value());
+}
+
 TEST(Compile, CompilesChainedComparisonsWithShortCircuit)
 {
     cxxpython::Runtime runtime;
@@ -1258,6 +1300,129 @@ TEST(Compile, TryExceptReraisesUnmatchedException)
         EXPECT_EQ(error.type(), runtime.type_error_type());
         EXPECT_STREQ(error.what(), "boom");
     }
+}
+
+TEST(Compile, CompilesAndExecutesTryFinallyControlFlow)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+
+    cxxpython::CodeObject *normal = cxxpython::compile_exec_input(
+        runtime,
+        "result = 'start'\n"
+        "try:\n"
+        "    result = result + '-body'\n"
+        "finally:\n"
+        "    result = result + '-finally'\n",
+        "script.py");
+    ASSERT_NE(normal, nullptr);
+
+    bool saw_setup_finally = false;
+    bool saw_pop_finally = false;
+    bool saw_end_finally = false;
+    for (const cxxpython::Instruction &instruction : normal->instructions())
+    {
+        if (instruction.opcode == cxxpython::Opcode::SetupFinally)
+            saw_setup_finally = true;
+        if (instruction.opcode == cxxpython::Opcode::PopFinally)
+            saw_pop_finally = true;
+        if (instruction.opcode == cxxpython::Opcode::EndFinally)
+            saw_end_finally = true;
+    }
+    EXPECT_TRUE(saw_setup_finally);
+    EXPECT_TRUE(saw_pop_finally);
+    EXPECT_TRUE(saw_end_finally);
+
+    EXPECT_EQ(vm.execute(*normal, *globals), runtime.none());
+    auto *normal_result = dynamic_cast<cxxpython::StrObject *>(globals->get(runtime.new_str("result")));
+    ASSERT_NE(normal_result, nullptr);
+    EXPECT_EQ(normal_result->value, "start-body-finally");
+
+    cxxpython::CodeObject *exceptional = cxxpython::compile_exec_input(
+        runtime,
+        "result = 'body'\n"
+        "try:\n"
+        "    raise TypeError('boom')\n"
+        "finally:\n"
+        "    result = result + '-finally'\n",
+        "script.py");
+    ASSERT_NE(exceptional, nullptr);
+    try
+    {
+        (void)vm.execute(*exceptional, *globals);
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "boom");
+    }
+    auto *exceptional_result = dynamic_cast<cxxpython::StrObject *>(globals->get(runtime.new_str("result")));
+    ASSERT_NE(exceptional_result, nullptr);
+    EXPECT_EQ(exceptional_result->value, "body-finally");
+
+    cxxpython::CodeObject *returning = cxxpython::compile_exec_input(
+        runtime,
+        "events = []\n"
+        "def f():\n"
+        "    try:\n"
+        "        return 'body'\n"
+        "    finally:\n"
+        "        events.append('finally')\n"
+        "result = f()\n",
+        "script.py");
+    ASSERT_NE(returning, nullptr);
+    EXPECT_EQ(vm.execute(*returning, *globals), runtime.none());
+    auto *returned = dynamic_cast<cxxpython::StrObject *>(globals->get(runtime.new_str("result")));
+    ASSERT_NE(returned, nullptr);
+    EXPECT_EQ(returned->value, "body");
+    auto *events = dynamic_cast<cxxpython::ListObject *>(globals->get(runtime.new_str("events")));
+    ASSERT_NE(events, nullptr);
+    ASSERT_EQ(events->size(), 1U);
+    EXPECT_EQ(dynamic_cast<cxxpython::StrObject *>(events->get(0))->value, "finally");
+}
+
+TEST(Compile, TryExceptFinallyUsesNearestBlockDuringUnwind)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+
+    cxxpython::CodeObject *handled = cxxpython::compile_exec_input(
+        runtime,
+        "events = []\n"
+        "try:\n"
+        "    raise TypeError('boom')\n"
+        "except TypeError:\n"
+        "    events.append('except')\n"
+        "finally:\n"
+        "    events.append('finally')\n",
+        "script.py");
+    ASSERT_NE(handled, nullptr);
+    EXPECT_EQ(vm.execute(*handled, *globals), runtime.none());
+    auto *events = dynamic_cast<cxxpython::ListObject *>(globals->get(runtime.new_str("events")));
+    ASSERT_NE(events, nullptr);
+    ASSERT_EQ(events->size(), 2U);
+    EXPECT_EQ(dynamic_cast<cxxpython::StrObject *>(events->get(0))->value, "except");
+    EXPECT_EQ(dynamic_cast<cxxpython::StrObject *>(events->get(1))->value, "finally");
+
+    cxxpython::CodeObject *overridden = cxxpython::compile_exec_input(
+        runtime,
+        "try:\n"
+        "    try:\n"
+        "        raise TypeError('body')\n"
+        "    finally:\n"
+        "        raise ValueError('finally')\n"
+        "except ValueError as e:\n"
+        "    saved = e\n",
+        "script.py");
+    ASSERT_NE(overridden, nullptr);
+    EXPECT_EQ(vm.execute(*overridden, *globals), runtime.none());
+    auto *saved = dynamic_cast<cxxpython::ExceptionObject *>(globals->get(runtime.new_str("saved")));
+    ASSERT_NE(saved, nullptr);
+    EXPECT_EQ(saved->type(), runtime.value_error_type());
+    EXPECT_EQ(saved->message(), "finally");
 }
 
 TEST(Compile, ClassDefinitionsSelectInheritedMetaclass)

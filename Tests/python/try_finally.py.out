@@ -1,0 +1,7 @@
+['body', 'finally']
+TypeError('boom')
+['body', 'finally', 'cleanup']
+['except', 'finally']
+body
+['finally']
+ValueError('finally')

@@ -157,8 +157,16 @@ namespace cxxpython::compiler_internal
                     kind = TokenKind::Try;
                 else if (lexeme == "except")
                     kind = TokenKind::Except;
+                else if (lexeme == "finally")
+                    kind = TokenKind::Finally;
                 else if (lexeme == "as")
                     kind = TokenKind::As;
+                else if (lexeme == "in")
+                    kind = TokenKind::In;
+                else if (lexeme == "is")
+                    kind = TokenKind::Is;
+                else if (lexeme == "not")
+                    kind = TokenKind::Not;
                 else if (lexeme == "class")
                     kind = TokenKind::Class;
                 else if (lexeme == "del")

@@ -1,5 +1,78 @@
 # Development Status
 
+## 2026-05-19 Try Finally And Comparison Foundation Slice
+
+Review focus:
+
+- `try/finally` must be VM control-flow infrastructure, not a compiler-only
+  jump trick. It has to preserve pending returns, propagate exceptions after
+  cleanup, and let a finally-raised exception replace the earlier pending
+  control flow.
+- `is` and `in` are language-level comparisons, not builtins. `is` belongs to
+  object identity and `in` belongs to the object containment protocol.
+- The requested builtin list should be staged by missing substrate instead of
+  faking surface names.
+
+Completed:
+
+- Added `finally` token/parser support and extended `TryStmt` with
+  `finally_body`.
+- Added VM block handlers for nearest-block unwinding across `except` and
+  `finally`.
+- Added `SETUP_FINALLY`, `POP_FINALLY`, and `END_FINALLY`.
+- `return` now records pending return state and runs active finally handlers
+  before returning.
+- Unhandled exceptions now run active finally handlers before propagation.
+- A new exception raised inside finally overrides the pending return/exception.
+- Added language-level `is`, `is not`, `in`, and `not in` comparison support.
+  Membership dispatches through `object_contains`.
+- Added C++ and Python golden coverage for normal finally, exceptional
+  finally, try/except/finally ordering, return-through-finally, and finally
+  exception override.
+
+Builtins/substrate analysis:
+
+- Ready for near-term implementation on existing substrate:
+  - `range`: needs a compact `range` object, integer argument parsing, length,
+    getitem, containment, iteration.
+  - `map`, `filter`, `zip`, `enumerate`: need iterator object families and
+    StopIteration-safe composition over `object_iter` / `object_next`.
+  - `format`: can start from `object.__format__`, then grow through type slots.
+  - `__import__`: can start as a bootstrap module loader once module search
+    path and module cache are explicit runtime state.
+  - `__build_class__`: should replace the VM-only class construction path so
+    class statements become script-visible and metaclass-aware.
+- Requires parser/compiler/runtime expansion first:
+  - `compile`, `eval`, `exec`: need mode-aware parser entry objects, code
+    object flags, explicit globals/locals argument handling, and safer source
+    diagnostics.
+  - `super`: needs full descriptor/MRO binding semantics and class/function
+    context cells.
+  - `slice`: useful only after slice syntax and sequence slicing are designed.
+- Requires byte/buffer/io substrate first:
+  - `bytes`, `bytearray`, `memoryview`: require byte storage types, buffer
+    protocol, integer-byte validation, and repr/sequence semantics.
+  - `open`, `input`: require an IO layer, text encoding decisions, error
+    handling, and runtime-managed stdin/stdout/stderr.
+- Introspection/help:
+  - `dir` exists but remains a simplified merge. `help` should wait for
+    docstrings, module metadata, and paging/output policy.
+
+Known debt and next risk:
+
+- `finally` now handles normal, return, and exception control flow. It does
+  not yet cover `break`/`continue` because those statements do not exist yet.
+- Bare `raise`, exception chaining, traceback objects, `except (...)`, and
+  `try/else` remain open.
+- The new comparison opcode operand is now `ComparisonOp`, while rich compare
+  still owns the first six values. Keep that invariant documented if new
+  comparison forms are added.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter='Bytecode.MetadataNamesAndStackEffects:Compile.CompilesIdentityAndMembershipComparisons:Compile.CompilesAndExecutesTryFinallyControlFlow:Compile.TryExceptFinallyUsesNearestBlockDuringUnwind:PythonScripts.RunsGoldenFiles'`
+
 ## 2026-05-19 Foundation Str Sequence Slice
 
 Review focus:
