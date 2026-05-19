@@ -157,6 +157,8 @@ Current state:
 - `super` is now a real builtin type backed by descriptor and MRO lookup.
 - Class bodies can carry `__class__` cells and backfill `__classcell__` so
   zero-argument `super()` and direct `__class__` use inside methods work.
+- Symbol analysis now lives in `Python/compiler_symbols.cpp` instead of being
+  embedded in bytecode emission.
 
 Target design:
 
@@ -179,8 +181,8 @@ Target design:
   comprehensions expand the scope surface.
 - Keep descriptor/type attribute policy centralized so `super`, property,
   classmethod, staticmethod, and slot wrappers all share one object-space path.
-- Move symbol analysis out of `compiler.cpp` before more scope rules and class
-  semantics land.
+- Extend `compiler_symbols.cpp` with stricter declaration ordering diagnostics
+  before more scope rules and class semantics land.
 
 Acceptance tests:
 

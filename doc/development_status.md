@@ -1,5 +1,44 @@
 # Development Status
 
+## 2026-05-19 Symbol Analysis Module Slice
+
+Review focus:
+
+- Pay down the compiler structure debt left by closure, global/nonlocal, and
+  class `__class__` work.
+- Keep symbol analysis as a first-class compiler phase instead of burying it
+  inside bytecode emission.
+- Preserve existing scope semantics exactly while preparing for default
+  arguments, comprehensions, and richer class scope rules.
+
+Completed:
+
+- Extracted `SymbolTable`, function/class symbol analysis, lexical reference
+  collection, directive collection, and module/eval symbol collection into
+  `Python/compiler_symbols.cpp` / `Python/compiler_symbols.hpp`.
+- Kept `Python/compiler.cpp` focused on bytecode emission and public compile
+  entrypoints.
+- Moved class-body `__class__` cell analysis behind the same symbol module as
+  normal function closure analysis.
+- Removed the old in-file symbol-analysis implementation rather than leaving
+  a disabled duplicate.
+
+Known debt and next risk:
+
+- Declaration ordering diagnostics such as "used prior to global declaration"
+  remain incomplete and now belong naturally in `compiler_symbols.cpp`.
+- `compiler_symbols.cpp` is intentionally phase-local but still duplicates
+  visitor traversal patterns between name collection and lexical-reference
+  collection. That should be simplified once comprehensions/default arguments
+  define the next scope surface.
+- The next bottom substrate slice can proceed to `slice` and sequence slicing
+  with less risk of growing `compiler.cpp` into another monolith.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter='Compile.*:Module.*:Cli.*:PythonScripts.RunsGoldenFiles'`
+
 ## 2026-05-19 Closure Cell And Super Slice
 
 Review focus:

@@ -12,6 +12,7 @@ add_library(cxxpython_core
     Parser/lexer.cpp
     Parser/parser.cpp
     Python/bytecode.cpp
+    Python/compiler_symbols.cpp
     Python/compiler.cpp
     Python/vm.cpp
     Objects/runtime_bootstrap.cpp
