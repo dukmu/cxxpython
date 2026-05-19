@@ -427,6 +427,7 @@ namespace cxxpython
     void object_set_attr(Object *object, StrObject *name, Object *value);
     void object_set_attr(Object *object, const std::string &name, Object *value);
     Object *type_lookup_attribute(TypeObject *type, StrObject *name);
+    std::string object_str(const Object *object);
     std::string object_repr(const Object *object);
     std::string type_qualified_name(const TypeObject *type);
 

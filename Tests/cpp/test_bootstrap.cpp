@@ -92,6 +92,8 @@ TEST(CoreObjects, ReprAndExceptionObjects)
               "'it\\'s\\\\ok\\n\\t'");
     EXPECT_EQ(cxxpython::object_repr(runtime.new_str(std::string("a") + std::string(1, '\x01') + "z")),
               "'a\\x01z'");
+    EXPECT_EQ(cxxpython::object_str(runtime.new_str("hello")), "hello");
+    EXPECT_EQ(cxxpython::object_str(runtime.new_int(7)), "7");
     EXPECT_EQ(cxxpython::object_repr(runtime.type_type()), "<class 'type'>");
 
     cxxpython::ExceptionObject *manual_error =

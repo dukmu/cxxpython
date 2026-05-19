@@ -33,9 +33,9 @@ Eight tracked risks:
    adopt root guards around allocation-heavy temporary vectors before a
    collecting or moving GC is enabled.
 6. Medium, partially fixed: builtins remain bootstrap-minimal. Calls now enter
-   through shared `CallArguments`, so keyword rejection is centralized at the
-   callable boundary, but `print` still has string-specific display behavior,
-   `list()` accepts no iterable, and the full shared argument parser / `str()` /
+   through shared `CallArguments`, keyword rejection is centralized at the
+   callable boundary, `str()` is exposed, and `print` uses `object_str`.
+   `list()` still accepts no iterable, and the full shared argument parser /
    iterator protocol path is not in place.
 7. Medium: descriptor and type-attribute protocol is incomplete. Lookup is
    centralized, but `property`, `staticmethod`, `classmethod`, slot wrappers,
@@ -61,6 +61,8 @@ Immediate order:
   calls.
 - Done in current slice: `Rooted<T>` introduces scoped root guards and counted
   root entries, making nested guards safe.
+- Done in current slice: `str()` is exposed through the normal type call path
+  and `print` now uses `object_str` instead of string-only branching.
 - Next: continue through `global`/`nonlocal`/closures, `__prepare__`,
   syntax-level `metaclass=`,
   traceback metadata, root guards, builtin protocol cleanup, call expansion,
@@ -181,6 +183,53 @@ Known debt and next risk:
   construction before enabling any collector that can run during allocation.
 - Traceback/line-table metadata remains open and is the next best risk to
   reduce for debugging larger Python golden tests.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all tests pass.
+
+## 2026-05-19 Str Builtin And Object String Conversion
+
+Pre-change review:
+
+- `print` had a local `StrObject` branch and otherwise fell back to repr. That
+  was a small bootstrap shortcut, but keeping display behavior inside `print`
+  would make every text-facing builtin grow its own conversion rules.
+- The `str` type existed but was not exposed in builtins and had no constructor
+  path.
+
+Debt addressed:
+
+- Added `object_str` as the shared string conversion helper for the current
+  runtime stage: exact strings return their contained text; other objects fall
+  back to repr until `__str__`/`tp_str` exists.
+- Added `str()` construction through the normal type call path.
+- Exposed `str` in the builtins module.
+- Changed `print` to call `object_str` instead of branching on `StrObject`.
+
+Completed:
+
+- Added C++ coverage for `object_str` and builtins exposure of `str`.
+- Added Python golden coverage for `str()`, `str('text')`, `str(42)`, and
+  `str([1, 'x'])`.
+
+Design review:
+
+- This is a deliberate protocol seam: when `__str__` / `tp_str` lands,
+  `object_str` is the single place to extend. `print`, future formatting, and
+  builtin conversion should not inspect concrete types directly.
+- `str()` now uses the existing construction protocol, so VM and parser do not
+  special-case the name.
+
+Known debt and next risk:
+
+- `object_str` still falls back to repr because there is no `__str__` slot or
+  descriptor-level special method lookup yet.
+- `list(iterable)`, iterator protocol, and reusable native argument parsing
+  remain open builtin debts.
 
 Verification:
 

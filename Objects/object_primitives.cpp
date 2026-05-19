@@ -194,6 +194,27 @@ namespace cxxpython
             auto *left_str = static_cast<const StrObject *>(&left);
             return left.runtime()->new_str(left_str->value + right_str->value);
         }
+
+        void validate_str_constructor_args(Runtime *runtime, const CallArguments &args)
+        {
+            if (args.keywords && args.keywords->size() != 0)
+                raise_type_error(runtime, "str() takes no keyword arguments");
+            if (args.positional.size() > 1)
+                raise_type_error(runtime, "str() takes at most one argument");
+        }
+
+        Object *str_new(TypeObject &type, const CallArguments &args)
+        {
+            validate_str_constructor_args(type.runtime(), args);
+            if (args.positional.empty())
+                return type.runtime()->allocate<StrObject>(&type, "");
+            return type.runtime()->allocate<StrObject>(&type, object_str(args.positional[0]));
+        }
+
+        void str_init(Object &object, const CallArguments &args)
+        {
+            validate_str_constructor_args(object.runtime(), args);
+        }
     }
 
     NoneObject::NoneObject(TypeObject *type)
@@ -281,6 +302,8 @@ namespace cxxpython
             .truth = str_truth,
             .traverse = default_traverse,
             .binary_op = str_binary_op,
+            .new_object = str_new,
+            .init = str_init,
         };
     }
 }

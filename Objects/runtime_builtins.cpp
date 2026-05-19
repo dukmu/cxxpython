@@ -7,13 +7,6 @@ namespace cxxpython
 {
     namespace
     {
-        std::string print_text(Object *object)
-        {
-            if (auto *text = dynamic_cast<StrObject *>(object))
-                return text->value;
-            return object_repr(object);
-        }
-
         void reject_keywords(Runtime &runtime, const std::string &name, const CallArguments &args)
         {
             if (args.keywords && args.keywords->size() != 0)
@@ -28,7 +21,7 @@ namespace cxxpython
             {
                 if (index != 0)
                     out << ' ';
-                out << print_text(args.positional[index]);
+                out << object_str(args.positional[index]);
             }
             out << '\n';
             return runtime.none();
@@ -58,6 +51,7 @@ namespace cxxpython
         dict->set(new_str("NotImplemented"), not_implemented_);
         dict->set(new_str("object"), object_type_);
         dict->set(new_str("type"), type_type_);
+        dict->set(new_str("str"), str_type_);
         dict->set(new_str("list"), list_type_);
         dict->set(new_str("print"), new_native_function("print", builtin_print));
         dict->set(new_str("len"), new_native_function("len", builtin_len));

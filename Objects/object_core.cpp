@@ -716,6 +716,15 @@ namespace cxxpython
         return object->repr();
     }
 
+    std::string object_str(const Object *object)
+    {
+        if (!object)
+            return "<null>";
+        if (auto *text = dynamic_cast<const StrObject *>(object))
+            return text->value;
+        return object_repr(object);
+    }
+
     TypeSlots make_object_slots()
     {
         return TypeSlots{
