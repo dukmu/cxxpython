@@ -58,6 +58,8 @@ namespace cxxpython
         TypeObject *function_type() const noexcept;
         TypeObject *method_type() const noexcept;
         TypeObject *method_descriptor_type() const noexcept;
+        TypeObject *slot_wrapper_type() const noexcept;
+        TypeObject *bound_slot_wrapper_type() const noexcept;
         TypeObject *getset_descriptor_type() const noexcept;
         TypeObject *property_type() const noexcept;
         TypeObject *staticmethod_type() const noexcept;
@@ -102,6 +104,13 @@ namespace cxxpython
                                                        TypeObject *owner,
                                                        MethodDescriptorCallback callback);
         BoundMethodObject *new_bound_method(MethodDescriptorObject *method, Object *self);
+        SlotWrapperObject *new_slot_wrapper(std::string name,
+                                            TypeObject *owner,
+                                            SlotWrapperKind kind,
+                                            BinaryOp binary_op = BinaryOp::Add,
+                                            UnaryOp unary_op = UnaryOp::Positive,
+                                            RichCompareOp rich_compare_op = RichCompareOp::Equal);
+        BoundSlotWrapperObject *new_bound_slot_wrapper(SlotWrapperObject *wrapper, Object *self);
         GetSetDescriptorObject *new_getset_descriptor(std::string name,
                                                        TypeObject *owner,
                                                        GetSetGetter getter,
@@ -197,6 +206,7 @@ namespace cxxpython
         void initialize_type_dicts();
         void initialize_type_descriptors();
         void initialize_type_methods();
+        void initialize_slot_wrappers();
         TypeSlots inherit_slots(TypeObject *base, TypeSlots slots) const;
         TypeObject *best_base_for_layout(const std::vector<TypeObject *> &bases) const;
         void validate_base_layouts(const std::vector<TypeObject *> &bases);
@@ -227,6 +237,8 @@ namespace cxxpython
         TypeObject *function_type_ = nullptr;
         TypeObject *method_type_ = nullptr;
         TypeObject *method_descriptor_type_ = nullptr;
+        TypeObject *slot_wrapper_type_ = nullptr;
+        TypeObject *bound_slot_wrapper_type_ = nullptr;
         TypeObject *getset_descriptor_type_ = nullptr;
         TypeObject *property_type_ = nullptr;
         TypeObject *staticmethod_type_ = nullptr;

@@ -31,6 +31,7 @@ add_library(cxxpython_core
     Objects/object_descriptor_family.cpp
     Objects/object_property.cpp
     Objects/object_method.cpp
+    Objects/object_slot_wrapper.cpp
     Objects/object_exception.cpp
     Objects/object_utils.cpp
 )

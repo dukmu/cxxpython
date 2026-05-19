@@ -44,6 +44,8 @@ Eight tracked risks:
    native/builtin constructor argument count checks now share helper APIs. The
    core iterator protocol now has `iter`/`iternext` slots, `iter()`/`next()`,
    `StopIteration`, sequence and dict-key iterators, and `list(iterable)`.
+   `repr()` and `hash()` now dispatch through the same object protocol, and
+   core singleton/type names live in the builtins module dict.
    Remaining builtin debt is the richer CPython-style argument parser plus
    protocol users such as `for`, `*iterable`, and `**mapping`.
 7. Medium, partially fixed: descriptor and type-attribute protocol is
@@ -55,7 +57,12 @@ Eight tracked risks:
    descriptor, and instance-dict lookup fails. Parser/VM `del` statement
    lowering is now implemented for names, fast locals, attributes, and
    subscripts. `__getattribute__` now wraps the normal lookup path with
-   `AttributeError` fallback to `__getattr__`. Slot wrappers remain absent.
+   `AttributeError` fallback to `__getattr__`. Slot wrappers now expose
+   sequence, mapping, iterator, repr/hash, numeric, and comparison protocol
+   dunders as `wrapper_descriptor` / `method-wrapper` objects. Remaining
+   descriptor debt is deeper CPython parity around slot replacement from
+   Python-defined special methods, member descriptors, and `__setattr__` /
+   `__delattr__` hooks.
 8. Medium, first slice fixed: Python functions now support positional
    varargs, keyword dictionaries, and keyword calls through `CodeObject` flags,
    `CALL_KW`, and unified `CallArguments`. Remaining call-family work includes
@@ -110,11 +117,74 @@ Immediate order:
   the same descriptor path.
 - Done in current slice: `__getattr__` fallback is centralized in
   `object_get_attr` for instances, types/metatypes, and modules.
+- Done in current slice: slot wrappers are script-visible descriptors for the
+  current slot families; class access returns `wrapper_descriptor`, instance
+  access returns `method-wrapper`, and script golden tests cover sequence,
+  mapping, iterator, numeric, comparison, `repr`, and `hash` behavior.
+- Done in current slice: `repr()` and `hash()` are native builtins using shared
+  protocol helpers, and core singleton/type names are present in builtins.
 - Next: continue through `global`/`nonlocal`/closures, `__prepare__`,
   syntax-level `metaclass=`,
   full traceback objects, runtime factory root audits, builtin protocol
   cleanup, `for`/call expansion, defaults/keyword-only arguments, and
-  descriptor completeness.
+  descriptor/metaclass completeness.
+
+## 2026-05-19 Slot Wrapper Descriptors And Builtin Surface
+
+Pre-change review:
+
+- `TypeSlots` had become the single C++ dispatch table, but script-visible
+  dunder methods were still absent for builtin protocols. This left `len(x)`
+  and `x[i]` on the correct object API while `x.__len__()` and
+  `list.__len__(x)` had no coherent descriptor representation.
+- Adding these methods as scattered native lambdas in each type dict would have
+  duplicated protocol logic and made future C/C++ extension slots harder to
+  expose consistently.
+
+Completed:
+
+- Added `wrapper_descriptor` and `method-wrapper` runtime types.
+- Added `SlotWrapperObject` and `BoundSlotWrapperObject` with traversal,
+  receiver validation, keyword rejection, class access, and instance binding.
+- Exposed the current slot families as descriptors: repr/hash, sequence and
+  mapping length/get/set/delete/contains/iter, iterator next, int/str numeric
+  dunders, and rich comparison dunders.
+- Added `repr()` and `hash()` builtins through normal native function objects,
+  and exposed `None`, `True`, `False`, `int`, `bool`, `tuple`, and `dict` in
+  the builtins module dict.
+- Added C++ tests for descriptor binding, unbound calls, receiver validation,
+  keyword rejection, iterator wrappers, and numeric/comparison wrappers.
+- Added `Tests/python/slot_wrappers.py` golden coverage for script-level
+  sequence, dict, iterator, numeric, comparison, `repr`, and `hash` paths.
+
+Design review:
+
+- Slot wrappers invoke the owner type's raw slot after descriptor receiver
+  validation. VM opcodes still dispatch through `object_length`,
+  `object_get_item`, `object_set_item`, `object_delete_item`, `object_iter`,
+  `object_next`, `object_binary_op`, and `object_rich_compare`; no concrete
+  type logic moved into VM or builtins.
+- Builtins remain ordinary module dictionary entries. `repr` and `hash` are
+  native callables, not CLI output helpers, and therefore use the same call and
+  argument validation path as `len`, `iter`, and `next`.
+
+Known debt and next risk:
+
+- Python-defined special methods do not yet refresh inherited C++ slots, so a
+  heap class that defines `__len__` still needs the future type-ready slot
+  population path.
+- `__setattr__` and `__delattr__` hooks remain absent; attribute assignment
+  and deletion currently run descriptors and dictionaries directly through the
+  object API.
+- Builtins still need a richer argument parser and protocol users such as
+  `for`, `*iterable`, and `**mapping`.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all 157 tests pass.
 
 ## 2026-05-19 `__getattr__` Fallback
 

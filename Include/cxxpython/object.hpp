@@ -23,6 +23,8 @@ namespace cxxpython
     class DictKeyIteratorObject;
     class ExceptionObject;
     class MethodDescriptorObject;
+    class SlotWrapperObject;
+    class BoundSlotWrapperObject;
     class GetSetDescriptorObject;
     class PropertyObject;
     class StaticMethodObject;
@@ -75,6 +77,22 @@ namespace cxxpython
         Positive,
         Negative,
         Invert,
+    };
+
+    enum class SlotWrapperKind : std::uint8_t
+    {
+        Repr,
+        Hash,
+        Length,
+        GetItem,
+        SetItem,
+        DeleteItem,
+        Contains,
+        Iter,
+        Next,
+        BinaryOp,
+        UnaryOp,
+        RichCompare,
     };
 
     using ReprSlot = std::string (*)(const Object &);
@@ -414,6 +432,49 @@ namespace cxxpython
         Object *self_;
     };
 
+    class SlotWrapperObject final : public Object
+    {
+    public:
+        SlotWrapperObject(TypeObject *type,
+                          std::string name,
+                          TypeObject *owner,
+                          SlotWrapperKind kind,
+                          BinaryOp binary_op = BinaryOp::Add,
+                          UnaryOp unary_op = UnaryOp::Positive,
+                          RichCompareOp rich_compare_op = RichCompareOp::Equal);
+
+        const std::string &name() const noexcept;
+        TypeObject *owner() const noexcept;
+        SlotWrapperKind kind() const noexcept;
+        BinaryOp binary_op() const noexcept;
+        UnaryOp unary_op() const noexcept;
+        RichCompareOp rich_compare_op() const noexcept;
+        Object *call_unbound(const CallArguments &args);
+        Object *call_bound(Object *self, const CallArguments &args);
+        Object *call_bound(Object *self, ObjectSpan args);
+
+    private:
+        std::string name_;
+        TypeObject *owner_;
+        SlotWrapperKind kind_;
+        BinaryOp binary_op_;
+        UnaryOp unary_op_;
+        RichCompareOp rich_compare_op_;
+    };
+
+    class BoundSlotWrapperObject final : public Object
+    {
+    public:
+        BoundSlotWrapperObject(TypeObject *type, SlotWrapperObject *wrapper, Object *self);
+
+        SlotWrapperObject *wrapper() const noexcept;
+        Object *self() const noexcept;
+
+    private:
+        SlotWrapperObject *wrapper_;
+        Object *self_;
+    };
+
     class GetSetDescriptorObject final : public Object
     {
     public:
@@ -544,6 +605,8 @@ namespace cxxpython
     TypeSlots make_function_slots();
     TypeSlots make_method_slots();
     TypeSlots make_method_descriptor_slots();
+    TypeSlots make_slot_wrapper_slots();
+    TypeSlots make_bound_slot_wrapper_slots();
     TypeSlots make_getset_descriptor_slots();
     TypeSlots make_property_slots();
     TypeSlots make_staticmethod_slots();

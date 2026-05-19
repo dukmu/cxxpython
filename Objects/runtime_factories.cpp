@@ -119,6 +119,31 @@ namespace cxxpython
         return allocate<BoundMethodObject>(native_function_type_, method, self);
     }
 
+    SlotWrapperObject *Runtime::new_slot_wrapper(std::string name,
+                                                 TypeObject *owner,
+                                                 SlotWrapperKind kind,
+                                                 BinaryOp binary_op,
+                                                 UnaryOp unary_op,
+                                                 RichCompareOp rich_compare_op)
+    {
+        if (!owner)
+            raise_type_error(this, "slot wrapper owner cannot be null");
+        return allocate<SlotWrapperObject>(slot_wrapper_type_,
+                                           std::move(name),
+                                           owner,
+                                           kind,
+                                           binary_op,
+                                           unary_op,
+                                           rich_compare_op);
+    }
+
+    BoundSlotWrapperObject *Runtime::new_bound_slot_wrapper(SlotWrapperObject *wrapper, Object *self)
+    {
+        if (!wrapper || !self)
+            raise_type_error(this, "bound slot wrapper requires wrapper and self");
+        return allocate<BoundSlotWrapperObject>(bound_slot_wrapper_type_, wrapper, self);
+    }
+
     GetSetDescriptorObject *Runtime::new_getset_descriptor(std::string name,
                                                            TypeObject *owner,
                                                            GetSetGetter getter,

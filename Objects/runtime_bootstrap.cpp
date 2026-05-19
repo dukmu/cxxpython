@@ -26,6 +26,8 @@ namespace cxxpython
         function_type_ = allocate_type("function");
         method_type_ = allocate_type("method");
         method_descriptor_type_ = allocate_type("method_descriptor");
+        slot_wrapper_type_ = allocate_type("wrapper_descriptor");
+        bound_slot_wrapper_type_ = allocate_type("method-wrapper");
         getset_descriptor_type_ = allocate_type("getset_descriptor");
         property_type_ = allocate_type("property");
         staticmethod_type_ = allocate_type("staticmethod");
@@ -61,6 +63,8 @@ namespace cxxpython
         function_type_->slots = make_function_slots();
         method_type_->slots = make_method_slots();
         method_descriptor_type_->slots = make_method_descriptor_slots();
+        slot_wrapper_type_->slots = make_slot_wrapper_slots();
+        bound_slot_wrapper_type_->slots = make_bound_slot_wrapper_slots();
         getset_descriptor_type_->slots = make_getset_descriptor_slots();
         property_type_->slots = make_property_slots();
         staticmethod_type_->slots = make_staticmethod_slots();
@@ -96,6 +100,8 @@ namespace cxxpython
         function_type_->set_type(type_type_);
         method_type_->set_type(type_type_);
         method_descriptor_type_->set_type(type_type_);
+        slot_wrapper_type_->set_type(type_type_);
+        bound_slot_wrapper_type_->set_type(type_type_);
         getset_descriptor_type_->set_type(type_type_);
         property_type_->set_type(type_type_);
         staticmethod_type_->set_type(type_type_);
@@ -134,6 +140,8 @@ namespace cxxpython
         initialize_type(function_type_, object_type_);
         initialize_type(method_type_, object_type_);
         initialize_type(method_descriptor_type_, object_type_);
+        initialize_type(slot_wrapper_type_, object_type_);
+        initialize_type(bound_slot_wrapper_type_, object_type_);
         initialize_type(getset_descriptor_type_, object_type_);
         initialize_type(property_type_, object_type_);
         initialize_type(staticmethod_type_, object_type_);
@@ -169,6 +177,8 @@ namespace cxxpython
         function_type_->solid_base = function_type_;
         method_type_->solid_base = method_type_;
         method_descriptor_type_->solid_base = method_descriptor_type_;
+        slot_wrapper_type_->solid_base = slot_wrapper_type_;
+        bound_slot_wrapper_type_->solid_base = bound_slot_wrapper_type_;
         getset_descriptor_type_->solid_base = getset_descriptor_type_;
         property_type_->solid_base = property_type_;
         staticmethod_type_->solid_base = staticmethod_type_;
@@ -209,6 +219,8 @@ namespace cxxpython
         add_root(function_type_);
         add_root(method_type_);
         add_root(method_descriptor_type_);
+        add_root(slot_wrapper_type_);
+        add_root(bound_slot_wrapper_type_);
         add_root(getset_descriptor_type_);
         add_root(property_type_);
         add_root(staticmethod_type_);
@@ -233,6 +245,7 @@ namespace cxxpython
         initialize_type_dicts();
         initialize_type_descriptors();
         initialize_type_methods();
+        initialize_slot_wrappers();
         initialize_builtins();
         add_root(builtins_module_);
     }

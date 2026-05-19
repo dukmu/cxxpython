@@ -405,6 +405,94 @@ TEST(Attributes, GetAttributeAttributeErrorFallsBackToGetAttr)
     }
 }
 
+TEST(Attributes, SlotWrappersExposeSequenceProtocolsAsDescriptors)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::ListObject *list = runtime.new_list({runtime.new_int(1), runtime.new_int(2)});
+
+    cxxpython::Object *descriptor = cxxpython::object_get_attr(runtime.list_type(), "__len__");
+    ASSERT_NE(descriptor, nullptr);
+    EXPECT_EQ(descriptor->type(), runtime.slot_wrapper_type());
+
+    cxxpython::Object *bound = cxxpython::object_get_attr(list, "__len__");
+    ASSERT_NE(bound, nullptr);
+    EXPECT_EQ(bound->type(), runtime.bound_slot_wrapper_type());
+
+    auto *bound_length = dynamic_cast<cxxpython::IntObject *>(cxxpython::object_call(bound, {}));
+    ASSERT_NE(bound_length, nullptr);
+    EXPECT_EQ(bound_length->value, 2);
+
+    auto *unbound_length = dynamic_cast<cxxpython::IntObject *>(cxxpython::object_call(descriptor, {list}));
+    ASSERT_NE(unbound_length, nullptr);
+    EXPECT_EQ(unbound_length->value, 2);
+
+    cxxpython::Object *setitem = cxxpython::object_get_attr(list, "__setitem__");
+    EXPECT_EQ(cxxpython::object_call(setitem, {runtime.new_int(1), runtime.new_int(9)}), runtime.none());
+    EXPECT_EQ(dynamic_cast<cxxpython::IntObject *>(list->get(1))->value, 9);
+
+    cxxpython::Object *getitem = cxxpython::object_get_attr(list, "__getitem__");
+    EXPECT_EQ(cxxpython::object_call(getitem, {runtime.new_int(1)}), list->get(1));
+
+    cxxpython::Object *contains = cxxpython::object_get_attr(list, "__contains__");
+    EXPECT_EQ(cxxpython::object_call(contains, {runtime.new_int(9)}), runtime.true_value());
+
+    cxxpython::Object *delitem = cxxpython::object_get_attr(list, "__delitem__");
+    EXPECT_EQ(cxxpython::object_call(delitem, {runtime.new_int(0)}), runtime.none());
+    EXPECT_EQ(list->size(), 1U);
+    EXPECT_EQ(dynamic_cast<cxxpython::IntObject *>(list->get(0))->value, 9);
+}
+
+TEST(Attributes, SlotWrappersExposeIteratorAndOperatorProtocols)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::ListObject *list = runtime.new_list({runtime.new_int(4)});
+
+    cxxpython::Object *iterator = cxxpython::object_call(cxxpython::object_get_attr(list, "__iter__"), {});
+    ASSERT_NE(iterator, nullptr);
+    EXPECT_EQ(iterator->type(), runtime.sequence_iterator_type());
+    EXPECT_EQ(cxxpython::object_call(cxxpython::object_get_attr(iterator, "__iter__"), {}), iterator);
+    EXPECT_EQ(cxxpython::object_call(cxxpython::object_get_attr(iterator, "__next__"), {}), list->get(0));
+
+    cxxpython::Object *add = cxxpython::object_get_attr(runtime.new_int(2), "__add__");
+    auto *sum = dynamic_cast<cxxpython::IntObject *>(cxxpython::object_call(add, {runtime.new_int(5)}));
+    ASSERT_NE(sum, nullptr);
+    EXPECT_EQ(sum->value, 7);
+
+    cxxpython::Object *lt = cxxpython::object_get_attr(runtime.new_str("a"), "__lt__");
+    EXPECT_EQ(cxxpython::object_call(lt, {runtime.new_str("b")}), runtime.true_value());
+}
+
+TEST(Attributes, SlotWrappersRejectWrongReceiversAndKeywords)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::Object *descriptor = cxxpython::object_get_attr(runtime.list_type(), "__len__");
+
+    try
+    {
+        (void)cxxpython::object_call(descriptor, {runtime.new_dict()});
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "descriptor '__len__' for 'list' objects doesn't apply to a 'dict' object");
+    }
+
+    cxxpython::DictObject *keywords = runtime.new_dict();
+    keywords->set(runtime.new_str("x"), runtime.new_int(1));
+    try
+    {
+        (void)cxxpython::object_call(cxxpython::object_get_attr(runtime.new_list({}), "__len__"),
+                                     cxxpython::CallArguments{{}, keywords});
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "__len__() takes no keyword arguments");
+    }
+}
+
 TEST(Attributes, CallsModuleGetAttrFallback)
 {
     cxxpython::Runtime runtime;

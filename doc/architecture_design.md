@@ -231,6 +231,10 @@ doc/            design docs and milestone plans
   consumes `object_iter`/`object_next` until `StopIteration`; future builtins
   such as `tuple`, `dict`, `sum`, `any`, `all`, and call expansion must follow
   the same path rather than branching on list/tuple/dict concrete layouts.
+- `repr()` and `hash()` are ordinary native builtins that dispatch to object
+  protocol helpers. They are not CLI formatting shortcuts. `None`、`True`、
+  `False` and core type objects live in the builtins module dict so script
+  execution and host tests observe the same namespace shape.
 - Import core 引入前，CLI file execution 可以创建 `__main__` module，但一旦
   `sys.modules` 存在，`__main__` 必须通过同一模块注册/清理路径。
 
@@ -264,6 +268,15 @@ doc/            design docs and milestone plans
   `list.append` returns a `method_descriptor`; instance access such as
   `[].append` returns a `builtin_function_or_method`-typed callable carrying
   both descriptor and receiver, and it must traverse both references for GC.
+- Slot wrappers follow the same descriptor rule. Low-level `TypeSlots` remain
+  the C++ protocol table; script-visible special methods such as `__len__`,
+  `__getitem__`, `__setitem__`, `__delitem__`, `__contains__`, `__iter__`,
+  `__next__`, numeric dunders, and comparison dunders are represented by
+  `wrapper_descriptor` objects in type dictionaries. Instance access returns a
+  `method-wrapper` object carrying the wrapper and receiver; direct class calls
+  validate the receiver against the wrapper owner before invoking the owner's
+  raw slot. This keeps opcode dispatch, builtins, and script-visible dunders on
+  one protocol surface without teaching the VM about concrete layouts.
 - Get/set descriptors represent typed runtime attributes such as `__class__`.
   They are ordinary descriptor objects in type dictionaries, with readable and
   settable behavior expressed through `descr_get`/`descr_set`; special

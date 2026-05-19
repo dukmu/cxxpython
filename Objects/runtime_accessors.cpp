@@ -92,6 +92,16 @@ namespace cxxpython
         return method_descriptor_type_;
     }
 
+    TypeObject *Runtime::slot_wrapper_type() const noexcept
+    {
+        return slot_wrapper_type_;
+    }
+
+    TypeObject *Runtime::bound_slot_wrapper_type() const noexcept
+    {
+        return bound_slot_wrapper_type_;
+    }
+
     TypeObject *Runtime::getset_descriptor_type() const noexcept
     {
         return getset_descriptor_type_;
