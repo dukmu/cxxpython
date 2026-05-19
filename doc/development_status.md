@@ -37,9 +37,10 @@ Eight tracked risks:
    collecting or moving GC is enabled.
 6. Medium, partially fixed: builtins remain bootstrap-minimal. Calls now enter
    through shared `CallArguments`, keyword rejection is centralized at the
-   callable boundary, `str()` is exposed, and `print` uses `object_str`.
-   `list()` still accepts no iterable, and the full shared argument parser /
-   iterator protocol path is not in place.
+   callable boundary, `str()` is exposed, `print` uses `object_str`, and
+   native/builtin constructor argument count checks now share helper APIs.
+   `list()` still accepts no iterable, and the full CPython-style argument
+   parser / iterator protocol path is not in place.
 7. Medium, partially fixed: descriptor and type-attribute protocol is
    incomplete. Lookup is centralized; `property` works as a data descriptor;
    `staticmethod` and `classmethod` are typed builtin descriptors with
@@ -76,10 +77,67 @@ Immediate order:
 - Done in current slice: `staticmethod` and `classmethod` now live as typed
   descriptor objects, method binding now supports generic callable/self pairs,
   and Python golden tests cover class and instance access.
+- Done in current slice: native/builtin positional and keyword validation now
+  uses shared helper APIs instead of repeated local string-building branches.
 - Next: continue through `global`/`nonlocal`/closures, `__prepare__`,
   syntax-level `metaclass=`,
   full traceback objects, root guards, builtin protocol cleanup, call expansion,
   defaults/keyword-only arguments, and descriptor completeness.
+
+## 2026-05-19 Shared Native Argument Validation
+
+Pre-change review:
+
+- `print`, `len`, `str`, `list`, `property`, `staticmethod`, `classmethod`,
+  `type.__call__`, and default object initialization each carried their own
+  small argument-count and keyword-rejection branches.
+- The duplicated logic was not catastrophic, but it was the wrong shape for
+  the next milestones: keyword-only parameters, default values, C/C++
+  extension call helpers, and CPython-like diagnostics need one reusable
+  validation layer.
+
+Debt addressed:
+
+- Added internal `object_utils` helpers:
+  - `has_keyword_arguments`
+  - `require_no_keywords`
+  - `require_no_positional`
+  - `require_positional_count`
+  - `require_positional_at_most`
+- Replaced local validation branches in builtins, builtin constructors,
+  descriptor constructors, and default object initialization.
+- Kept existing script-visible error messages stable while concentrating their
+  formatting in one place.
+
+Completed:
+
+- Added C++ coverage proving `str`, `property`, and `staticmethod` preserve
+  their argument validation messages through the shared helpers.
+- Re-ran all C++ and Python golden tests.
+
+Design review:
+
+- This is intentionally a foundation, not the final CPython argument parser.
+  The helpers cover current exact/no/at-most positional checks and keyword
+  rejection without introducing an overbuilt parser before defaults and
+  keyword-only parameters exist.
+- Future native argument parsing should extend this layer rather than adding
+  per-builtin local branches.
+
+Known debt and next risk:
+
+- Add optional positional, named keyword, keyword-only, default, and conversion
+  helpers when builtins start accepting richer signatures.
+- `list(iterable)` and iterator protocol remain separate semantic work.
+- Root guards around allocation-heavy VM/runtime paths remain the next
+  runtime-safety debt.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all 141 tests pass.
 
 ## 2026-05-19 StaticMethod And ClassMethod Descriptors
 

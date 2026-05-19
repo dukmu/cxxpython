@@ -3,8 +3,6 @@
 
 #include "object_utils.hpp"
 
-#include <sstream>
-
 namespace cxxpython
 {
     namespace
@@ -13,15 +11,8 @@ namespace cxxpython
                                             const std::string &name,
                                             const CallArguments &args)
         {
-            if (args.keywords && args.keywords->size() != 0)
-                raise_type_error(runtime, name + "() takes no keyword arguments");
-            if (args.positional.size() != 1)
-            {
-                std::ostringstream message;
-                message << name << "() takes exactly one argument ("
-                        << args.positional.size() << " given)";
-                raise_type_error(runtime, message.str());
-            }
+            require_no_keywords(runtime, name, args);
+            require_positional_count(runtime, name, args, 1);
         }
 
         std::int64_t identity_hash(const Object &object)

@@ -197,10 +197,8 @@ namespace cxxpython
 
         void validate_str_constructor_args(Runtime *runtime, const CallArguments &args)
         {
-            if (args.keywords && args.keywords->size() != 0)
-                raise_type_error(runtime, "str() takes no keyword arguments");
-            if (args.positional.size() > 1)
-                raise_type_error(runtime, "str() takes at most one argument");
+            require_no_keywords(runtime, "str", args);
+            require_positional_at_most(runtime, "str", args, 1);
         }
 
         Object *str_new(TypeObject &type, const CallArguments &args)

@@ -59,20 +59,6 @@ namespace cxxpython
                 visitor(type->dict);
         }
 
-        bool has_keywords(const CallArguments &args)
-        {
-            return args.keywords && args.keywords->size() != 0;
-        }
-
-        void reject_keywords(Runtime *runtime, const std::string &callable, const CallArguments &args)
-        {
-            if (!has_keywords(args))
-                return;
-            std::ostringstream message;
-            message << callable << "() takes no keyword arguments";
-            raise_type_error(runtime, message.str());
-        }
-
         Object *object_new(TypeObject &type, const CallArguments &args)
         {
             (void)args;
@@ -88,13 +74,8 @@ namespace cxxpython
                 type.slots.init(*instance, args);
                 return;
             }
-            reject_keywords(type.runtime(), type_qualified_name(&type), args);
-            if (!args.positional.empty())
-            {
-                std::ostringstream message;
-                message << type_qualified_name(&type) << "() takes no arguments";
-                raise_type_error(type.runtime(), message.str());
-            }
+            require_no_keywords(type.runtime(), type_qualified_name(&type), args);
+            require_no_positional(type.runtime(), type_qualified_name(&type), args);
         }
 
         std::string active_module_name(Runtime &runtime)
@@ -149,7 +130,7 @@ namespace cxxpython
                 raise_type_error(object.runtime(), "type call target has invalid layout");
             if (is_subclass(type, type->runtime()->type_type()))
             {
-                reject_keywords(type->runtime(), "type", args);
+                require_no_keywords(type->runtime(), "type", args);
                 if (type == type->runtime()->type_type() && args.positional.size() == 1)
                 {
                     if (!args.positional[0])

@@ -213,6 +213,10 @@ doc/            design docs and milestone plans
   objects，放入 `builtins` module dict，并通过 `LOAD_NAME`/`CALL` 访问。标准
   行为扩展时优先补通用协议，例如 `str()`、keyword arguments、stdout/file
   对象，而不是继续扩展 `print` 的内部特例。
+- Native builtin 和 constructor 的参数校验必须走共享 helper/API，而不是在
+  每个 builtin 中手写字符串拼接。当前 helper 覆盖 keyword rejection 以及
+  no/exact/at-most positional checks；后续 C/C++ extension argument parsing
+  应在这一层扩展 optional、keyword-only、default 和 conversion support。
 - Import core 引入前，CLI file execution 可以创建 `__main__` module，但一旦
   `sys.modules` 存在，`__main__` 必须通过同一模块注册/清理路径。
 

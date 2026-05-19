@@ -31,6 +31,69 @@ namespace cxxpython
         (void)visitor;
     }
 
+    bool has_keyword_arguments(const CallArguments &args) noexcept
+    {
+        return args.keywords && args.keywords->size() != 0;
+    }
+
+    namespace
+    {
+        std::string callable_name(std::string_view callable)
+        {
+            return std::string(callable) + "()";
+        }
+
+        std::string argument_count_phrase(std::size_t count)
+        {
+            if (count == 1)
+                return "one argument";
+            std::ostringstream message;
+            message << count << " arguments";
+            return message.str();
+        }
+    }
+
+    void require_no_keywords(Runtime *runtime, std::string_view callable, const CallArguments &args)
+    {
+        if (!has_keyword_arguments(args))
+            return;
+        raise_type_error(runtime, callable_name(callable) + " takes no keyword arguments");
+    }
+
+    void require_no_positional(Runtime *runtime, std::string_view callable, const CallArguments &args)
+    {
+        if (args.positional.empty())
+            return;
+        raise_type_error(runtime, callable_name(callable) + " takes no arguments");
+    }
+
+    void require_positional_count(Runtime *runtime,
+                                  std::string_view callable,
+                                  const CallArguments &args,
+                                  std::size_t expected)
+    {
+        if (args.positional.size() == expected)
+            return;
+        std::ostringstream message;
+        message << callable_name(callable) << " takes exactly "
+                << argument_count_phrase(expected)
+                << " (" << args.positional.size() << " given)";
+        raise_type_error(runtime, message.str());
+    }
+
+    void require_positional_at_most(Runtime *runtime,
+                                    std::string_view callable,
+                                    const CallArguments &args,
+                                    std::size_t maximum)
+    {
+        if (args.positional.size() <= maximum)
+            return;
+        std::ostringstream message;
+        message << callable_name(callable) << " takes at most "
+                << argument_count_phrase(maximum);
+        raise_type_error(runtime, message.str());
+    }
+
     const char *binary_op_symbol(BinaryOp op)
     {
         switch (op)

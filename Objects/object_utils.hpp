@@ -15,6 +15,17 @@ namespace cxxpython
     bool default_equal(const Object &left, const Object &right);
     bool default_truth(const Object &object);
     void default_traverse(const Object &object, const VisitChildren &visitor);
+    bool has_keyword_arguments(const CallArguments &args) noexcept;
+    void require_no_keywords(Runtime *runtime, std::string_view callable, const CallArguments &args);
+    void require_no_positional(Runtime *runtime, std::string_view callable, const CallArguments &args);
+    void require_positional_count(Runtime *runtime,
+                                  std::string_view callable,
+                                  const CallArguments &args,
+                                  std::size_t expected);
+    void require_positional_at_most(Runtime *runtime,
+                                    std::string_view callable,
+                                    const CallArguments &args,
+                                    std::size_t maximum);
     const char *binary_op_symbol(BinaryOp op);
     std::string unsupported_binary_op_message(BinaryOp op, const Object *left, const Object *right);
     const char *unary_op_symbol(UnaryOp op);

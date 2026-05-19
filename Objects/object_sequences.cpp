@@ -1,6 +1,8 @@
 #include "cxxpython/object.hpp"
 #include "cxxpython/runtime.hpp"
 
+#include "object_utils.hpp"
+
 #include <sstream>
 
 namespace cxxpython
@@ -94,10 +96,8 @@ namespace cxxpython
 
         Object *list_new(TypeObject &type, const CallArguments &args)
         {
-            if (args.keywords && args.keywords->size() != 0)
-                raise_type_error(type.runtime(), "list() takes no keyword arguments");
-            if (!args.positional.empty())
-                raise_type_error(type.runtime(), "list() takes no arguments");
+            require_no_keywords(type.runtime(), "list", args);
+            require_no_positional(type.runtime(), "list", args);
             return type.runtime()->allocate<ListObject>(&type, std::vector<Object *>{});
         }
 

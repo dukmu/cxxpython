@@ -20,10 +20,8 @@ namespace cxxpython
 
         void validate_property_args(Runtime *runtime, const CallArguments &args)
         {
-            if (args.keywords && args.keywords->size() != 0)
-                raise_type_error(runtime, "property() takes no keyword arguments");
-            if (args.positional.size() > 4)
-                raise_type_error(runtime, "property() takes at most 4 arguments");
+            require_no_keywords(runtime, "property", args);
+            require_positional_at_most(runtime, "property", args, 4);
         }
 
         std::string property_state(Object *object)

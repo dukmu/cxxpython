@@ -1,21 +1,16 @@
 #include "cxxpython/runtime.hpp"
 
+#include "object_utils.hpp"
+
 #include <ostream>
-#include <sstream>
 
 namespace cxxpython
 {
     namespace
     {
-        void reject_keywords(Runtime &runtime, const std::string &name, const CallArguments &args)
-        {
-            if (args.keywords && args.keywords->size() != 0)
-                raise_type_error(&runtime, name + "() takes no keyword arguments");
-        }
-
         Object *builtin_print(Runtime &runtime, const CallArguments &args)
         {
-            reject_keywords(runtime, "print", args);
+            require_no_keywords(&runtime, "print", args);
             std::ostream &out = runtime.stdout_stream();
             for (std::size_t index = 0; index < args.positional.size(); ++index)
             {
@@ -29,13 +24,8 @@ namespace cxxpython
 
         Object *builtin_len(Runtime &runtime, const CallArguments &args)
         {
-            reject_keywords(runtime, "len", args);
-            if (args.positional.size() != 1)
-            {
-                std::ostringstream message;
-                message << "len() takes exactly one argument (" << args.positional.size() << " given)";
-                raise_type_error(&runtime, message.str());
-            }
+            require_no_keywords(&runtime, "len", args);
+            require_positional_count(&runtime, "len", args, 1);
             return runtime.new_int(static_cast<std::int64_t>(object_length(args.positional[0])));
         }
     }

@@ -55,6 +55,51 @@ TEST(Module, BootstrapsBuiltinsModule)
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("classmethod")), runtime.classmethod_type());
 }
 
+TEST(Module, BuiltinConstructorsUseSharedNativeArgumentValidation)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::DictObject *keywords = runtime.new_dict();
+    keywords->set(runtime.new_str("value"), runtime.new_str("x"));
+
+    try
+    {
+        (void)cxxpython::object_call(runtime.str_type(), cxxpython::CallArguments{{}, keywords});
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "str() takes no keyword arguments");
+    }
+
+    try
+    {
+        (void)cxxpython::object_call(runtime.property_type(),
+                                     {runtime.none(),
+                                      runtime.none(),
+                                      runtime.none(),
+                                      runtime.none(),
+                                      runtime.none()});
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "property() takes at most 4 arguments");
+    }
+
+    try
+    {
+        (void)cxxpython::object_call(runtime.staticmethod_type(), {});
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "staticmethod() takes exactly one argument (0 given)");
+    }
+}
+
 TEST(Module, ExecutesCodeUsingModuleGlobals)
 {
     cxxpython::Runtime runtime;
