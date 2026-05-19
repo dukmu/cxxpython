@@ -39,6 +39,14 @@ namespace cxxpython
             return object_call(callable, {name});
         }
 
+        Object *call_attribute_hook(Object *hook, Object *instance, TypeObject *owner, const std::vector<Object *> &args)
+        {
+            if (!hook)
+                return nullptr;
+            Object *callable = apply_descriptor(hook, instance, owner);
+            return object_call(callable, args);
+        }
+
         std::string type_repr(const Object &object)
         {
             return "<class '" + type_qualified_name(static_cast<const TypeObject *>(&object)) + "'>";
@@ -707,6 +715,45 @@ namespace cxxpython
             return object_call(callable, {name});
         }
 
+        Object *lookup_type_special(Object *object, const char *name)
+        {
+            if (!object || !object->type())
+                return nullptr;
+            Runtime *runtime = object->runtime();
+            return type_lookup_attribute(object->type(), runtime->new_str(name));
+        }
+
+        Object *lookup_default_object_special(Runtime *runtime, const char *name)
+        {
+            return runtime->object_type()->dict->get(runtime->new_str(name));
+        }
+
+        Object *call_setattr_override(Object *object, StrObject *name, Object *value)
+        {
+            if (!object || !name || !value)
+                return nullptr;
+
+            Runtime *runtime = object->runtime();
+            Object *default_setattr = lookup_default_object_special(runtime, "__setattr__");
+            Object *hook = lookup_type_special(object, "__setattr__");
+            if (!hook || hook == default_setattr)
+                return nullptr;
+            return call_attribute_hook(hook, object, object->type(), {name, value});
+        }
+
+        Object *call_delattr_override(Object *object, StrObject *name)
+        {
+            if (!object || !name)
+                return nullptr;
+
+            Runtime *runtime = object->runtime();
+            Object *default_delattr = lookup_default_object_special(runtime, "__delattr__");
+            Object *hook = lookup_type_special(object, "__delattr__");
+            if (!hook || hook == default_delattr)
+                return nullptr;
+            return call_attribute_hook(hook, object, object->type(), {name});
+        }
+
         Object *call_getattr_fallback(Object *object, StrObject *name)
         {
             if (!object || !name)
@@ -777,7 +824,7 @@ namespace cxxpython
         return object_get_attr(object, runtime->new_str(name));
     }
 
-    void object_set_attr(Object *object, StrObject *name, Object *value)
+    void object_set_attr_default(Object *object, StrObject *name, Object *value)
     {
         if (!object || !name || !value)
             raise_attribute_error(object ? object->runtime() : nullptr,
@@ -822,6 +869,20 @@ namespace cxxpython
         object->instance_dict()->set(name, value);
     }
 
+    void object_set_attr(Object *object, StrObject *name, Object *value)
+    {
+        if (!object || !name || !value)
+            raise_attribute_error(object ? object->runtime() : nullptr,
+                                  "'<null>' object has no attribute '<null>'");
+        Runtime *runtime = object->runtime();
+        auto object_root = runtime->root(object);
+        auto name_root = runtime->root(name);
+        auto value_root = runtime->root(value);
+        if (call_setattr_override(object_root.get(), name_root.get(), value_root.get()))
+            return;
+        object_set_attr_default(object_root.get(), name_root.get(), value_root.get());
+    }
+
     void object_set_attr(Object *object, const std::string &name, Object *value)
     {
         Runtime *runtime = object ? object->runtime() : nullptr;
@@ -830,7 +891,7 @@ namespace cxxpython
         object_set_attr(object, runtime->new_str(name), value);
     }
 
-    void object_delete_attr(Object *object, StrObject *name)
+    void object_delete_attr_default(Object *object, StrObject *name)
     {
         if (!object || !name)
             raise_attribute_error(object ? object->runtime() : nullptr,
@@ -869,6 +930,19 @@ namespace cxxpython
                 << "' object has no attribute '"
                 << name->value << "'";
         raise_attribute_error(object->runtime(), message.str());
+    }
+
+    void object_delete_attr(Object *object, StrObject *name)
+    {
+        if (!object || !name)
+            raise_attribute_error(object ? object->runtime() : nullptr,
+                                  "'<null>' object has no attribute '<null>'");
+        Runtime *runtime = object->runtime();
+        auto object_root = runtime->root(object);
+        auto name_root = runtime->root(name);
+        if (call_delattr_override(object_root.get(), name_root.get()))
+            return;
+        object_delete_attr_default(object_root.get(), name_root.get());
     }
 
     void object_delete_attr(Object *object, const std::string &name)

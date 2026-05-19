@@ -309,8 +309,12 @@ doc/            design docs and milestone plans
   calls a module dictionary `__getattr__` directly, without descriptor binding.
 - Descriptor assignment and deletion are centralized through `object_set_attr`
   and `object_delete_attr`. Data descriptors receive normal assignment with a
-  non-null value and deletion as `descr_set(..., value=nullptr)`. `DELETE_ATTR`
-  bytecode calls this API rather than deleting from dictionaries directly.
+  non-null value and deletion as `descr_set(..., value=nullptr)`. Public
+  `object_set_attr` and `object_delete_attr` first honor user-defined
+  `__setattr__` / `__delattr__`; `object.__setattr__` and `object.__delattr__`
+  are normal method descriptors that call the default APIs. `STORE_ATTR` and
+  `DELETE_ATTR` bytecodes call the public APIs rather than deleting from
+  dictionaries directly.
 - Item access follows the same protocol family: `object_get_item`,
   `object_set_item`, and `object_delete_item` dispatch through `TypeSlots`
   (`getitem`/`setitem`/`delitem`). `BINARY_SUBSCR`, `STORE_SUBSCR`, and

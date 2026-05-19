@@ -87,6 +87,38 @@ namespace cxxpython
             return object_get_attr_default(self, name);
         }
 
+        Object *object_setattr_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (args.size() != 2)
+            {
+                std::ostringstream message;
+                message << "object.__setattr__() takes exactly two arguments ("
+                        << args.size() << " given)";
+                raise_type_error(&runtime, message.str());
+            }
+            auto *name = dynamic_cast<StrObject *>(args[0]);
+            if (!name)
+                raise_type_error(&runtime, "attribute name must be str");
+            object_set_attr_default(self, name, args[1]);
+            return runtime.none();
+        }
+
+        Object *object_delattr_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (args.size() != 1)
+            {
+                std::ostringstream message;
+                message << "object.__delattr__() takes exactly one argument ("
+                        << args.size() << " given)";
+                raise_type_error(&runtime, message.str());
+            }
+            auto *name = dynamic_cast<StrObject *>(args[0]);
+            if (!name)
+                raise_type_error(&runtime, "attribute name must be str");
+            object_delete_attr_default(self, name);
+            return runtime.none();
+        }
+
         PropertyObject *as_property(Runtime &runtime, Object *self)
         {
             auto *property = dynamic_cast<PropertyObject *>(self);
@@ -242,6 +274,10 @@ namespace cxxpython
     {
         object_type_->dict->set(new_str("__getattribute__"),
                                 new_method_descriptor("__getattribute__", object_type_, object_getattribute_method));
+        object_type_->dict->set(new_str("__setattr__"),
+                                new_method_descriptor("__setattr__", object_type_, object_setattr_method));
+        object_type_->dict->set(new_str("__delattr__"),
+                                new_method_descriptor("__delattr__", object_type_, object_delattr_method));
         list_type_->dict->set(new_str("append"),
                               new_method_descriptor("append", list_type_, list_append_method));
         property_type_->dict->set(new_str("getter"),

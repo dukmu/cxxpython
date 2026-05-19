@@ -405,6 +405,78 @@ TEST(Attributes, GetAttributeAttributeErrorFallsBackToGetAttr)
     }
 }
 
+TEST(Attributes, CallsSetAttrAndDelAttrOverridesBeforeDefaultPath)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::TypeObject *owner_type = runtime.new_heap_type("Owner", runtime.object_type());
+    cxxpython::Object *set_name = nullptr;
+    cxxpython::Object *set_value = nullptr;
+    cxxpython::Object *deleted_name = nullptr;
+    cxxpython::MethodDescriptorObject *setattr = runtime.new_method_descriptor(
+        "__setattr__",
+        owner_type,
+        [&set_name, &set_value](cxxpython::Runtime &runtime, cxxpython::Object *self, cxxpython::ObjectSpan args)
+        {
+            if (args.size() != 2)
+                cxxpython::raise_type_error(&runtime, "__setattr__ expected name and value");
+            set_name = args[0];
+            set_value = args[1];
+            cxxpython::object_set_attr_default(self, runtime.new_str("captured"), args[1]);
+            return runtime.none();
+        });
+    cxxpython::MethodDescriptorObject *delattr = runtime.new_method_descriptor(
+        "__delattr__",
+        owner_type,
+        [&deleted_name](cxxpython::Runtime &runtime, cxxpython::Object *, cxxpython::ObjectSpan args)
+        {
+            if (args.size() != 1)
+                cxxpython::raise_type_error(&runtime, "__delattr__ expected name");
+            deleted_name = args[0];
+            return runtime.none();
+        });
+    owner_type->dict->set(runtime.new_str("__setattr__"), setattr);
+    owner_type->dict->set(runtime.new_str("__delattr__"), delattr);
+    cxxpython::Object *instance = runtime.allocate<cxxpython::Object>(owner_type);
+    cxxpython::Object *value = runtime.new_str("value");
+
+    cxxpython::object_set_attr(instance, "field", value);
+    EXPECT_EQ(set_value, value);
+    ASSERT_NE(dynamic_cast<cxxpython::StrObject *>(set_name), nullptr);
+    EXPECT_EQ(dynamic_cast<cxxpython::StrObject *>(set_name)->value, "field");
+    EXPECT_EQ(cxxpython::object_get_attr(instance, "captured"), value);
+
+    cxxpython::object_delete_attr(instance, "field");
+    ASSERT_NE(dynamic_cast<cxxpython::StrObject *>(deleted_name), nullptr);
+    EXPECT_EQ(dynamic_cast<cxxpython::StrObject *>(deleted_name)->value, "field");
+    EXPECT_EQ(cxxpython::object_get_attr(instance, "captured"), value);
+}
+
+TEST(Attributes, ObjectSetAttrAndDelAttrExposeDefaultImplementations)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::TypeObject *owner_type = runtime.new_heap_type("Owner", runtime.object_type());
+    cxxpython::Object *instance = runtime.allocate<cxxpython::Object>(owner_type);
+    cxxpython::Object *value = runtime.new_str("value");
+
+    cxxpython::Object *setattr = cxxpython::object_get_attr(runtime.object_type(), "__setattr__");
+    cxxpython::Object *delattr = cxxpython::object_get_attr(runtime.object_type(), "__delattr__");
+
+    EXPECT_EQ(cxxpython::object_call(setattr, {instance, runtime.new_str("field"), value}), runtime.none());
+    EXPECT_EQ(cxxpython::object_get_attr(instance, "field"), value);
+    EXPECT_EQ(cxxpython::object_call(delattr, {instance, runtime.new_str("field")}), runtime.none());
+
+    try
+    {
+        (void)cxxpython::object_get_attr(instance, "field");
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.attribute_error_type());
+        EXPECT_STREQ(error.what(), "'Owner' object has no attribute 'field'");
+    }
+}
+
 TEST(Attributes, SlotWrappersExposeSequenceProtocolsAsDescriptors)
 {
     cxxpython::Runtime runtime;

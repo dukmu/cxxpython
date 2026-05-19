@@ -61,8 +61,8 @@ Eight tracked risks:
    sequence, mapping, iterator, repr/hash, numeric, and comparison protocol
    dunders as `wrapper_descriptor` / `method-wrapper` objects. Remaining
    descriptor debt is deeper CPython parity around slot replacement from
-   Python-defined special methods, member descriptors, and `__setattr__` /
-   `__delattr__` hooks.
+   Python-defined special methods and member descriptors; `__setattr__` and
+   `__delattr__` hooks now run through the public attribute mutation APIs.
 8. Medium, first slice fixed: Python functions now support positional
    varargs, keyword dictionaries, and keyword calls through `CodeObject` flags,
    `CALL_KW`, and unified `CallArguments`. Remaining call-family work includes
@@ -123,11 +123,65 @@ Immediate order:
   mapping, iterator, numeric, comparison, `repr`, and `hash` behavior.
 - Done in current slice: `repr()` and `hash()` are native builtins using shared
   protocol helpers, and core singleton/type names are present in builtins.
+- Done in current slice: `__setattr__` and `__delattr__` are normal object
+  method descriptors; public attribute mutation checks user overrides before
+  default descriptor/dict behavior, and VM `STORE_ATTR`/`DELETE_ATTR` inherit
+  the hook semantics without opcode changes.
 - Next: continue through `global`/`nonlocal`/closures, `__prepare__`,
   syntax-level `metaclass=`,
   full traceback objects, runtime factory root audits, builtin protocol
   cleanup, `for`/call expansion, defaults/keyword-only arguments, and
   descriptor/metaclass completeness.
+
+## 2026-05-19 Attribute Mutation Hooks
+
+Pre-change review:
+
+- Reads already had `__getattribute__` and `__getattr__`, but writes and
+  deletes still went straight through descriptor/dict default behavior. Leaving
+  that split in place would make future user classes and metaclasses observe
+  different semantics depending on whether access came from VM opcodes or host
+  helpers.
+
+Completed:
+
+- Split default mutation into `object_set_attr_default` and
+  `object_delete_attr_default`.
+- Added `object.__setattr__` and `object.__delattr__` method descriptors that
+  call the default APIs.
+- Public `object_set_attr` and `object_delete_attr` now check type-level
+  `__setattr__` / `__delattr__` overrides first, with scoped roots around
+  object/name/value operands before hook calls or allocation-heavy default
+  paths.
+- Added C++ tests for override ordering and direct `object.__setattr__` /
+  `object.__delattr__` default behavior.
+- Added `Tests/python/attribute_hooks.py` golden coverage proving script-level
+  assignment and `del obj.attr` run hooks.
+
+Design review:
+
+- `STORE_ATTR` and `DELETE_ATTR` remain thin public object API calls. They do
+  not know about hooks, descriptors, instance dictionaries, modules, or type
+  dictionaries.
+- The default APIs are explicit escape hatches for `object.__setattr__`,
+  `object.__delattr__`, and internal descriptor code. This mirrors the
+  `object_get_attr_default` split and avoids recursion while keeping the
+  public API hook-aware.
+
+Known debt and next risk:
+
+- Metaclass-visible assignment now has the same API shape, but richer
+  `type.__setattr__` behavior and slot refresh from Python-defined special
+  methods still need a dedicated type-ready/update path.
+- The builtin/native argument parser is still minimal; `for` lowering and
+  `*args`/`**kwargs` expansion remain the next protocol consumers.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all 159 tests pass.
 
 ## 2026-05-19 Slot Wrapper Descriptors And Builtin Surface
 
