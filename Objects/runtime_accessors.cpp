@@ -92,6 +92,16 @@ namespace cxxpython
         return property_type_;
     }
 
+    TypeObject *Runtime::staticmethod_type() const noexcept
+    {
+        return staticmethod_type_;
+    }
+
+    TypeObject *Runtime::classmethod_type() const noexcept
+    {
+        return classmethod_type_;
+    }
+
     TypeObject *Runtime::code_type() const noexcept
     {
         return code_type_;

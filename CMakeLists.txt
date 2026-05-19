@@ -27,6 +27,7 @@ add_library(cxxpython_core
     Objects/object_native_function.cpp
     Objects/object_function.cpp
     Objects/object_descriptor.cpp
+    Objects/object_descriptor_family.cpp
     Objects/object_property.cpp
     Objects/object_method.cpp
     Objects/object_exception.cpp

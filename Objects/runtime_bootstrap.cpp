@@ -26,6 +26,8 @@ namespace cxxpython
         method_descriptor_type_ = allocate_type("method_descriptor");
         getset_descriptor_type_ = allocate_type("getset_descriptor");
         property_type_ = allocate_type("property");
+        staticmethod_type_ = allocate_type("staticmethod");
+        classmethod_type_ = allocate_type("classmethod");
         code_type_ = allocate_type("code");
         frame_type_ = allocate_type("frame");
         base_exception_type_ = allocate_type("BaseException");
@@ -56,6 +58,8 @@ namespace cxxpython
         method_descriptor_type_->slots = make_method_descriptor_slots();
         getset_descriptor_type_->slots = make_getset_descriptor_slots();
         property_type_->slots = make_property_slots();
+        staticmethod_type_->slots = make_staticmethod_slots();
+        classmethod_type_->slots = make_classmethod_slots();
         code_type_->slots = make_code_slots();
         frame_type_->slots = make_frame_slots();
         base_exception_type_->slots = make_exception_slots();
@@ -86,6 +90,8 @@ namespace cxxpython
         method_descriptor_type_->set_type(type_type_);
         getset_descriptor_type_->set_type(type_type_);
         property_type_->set_type(type_type_);
+        staticmethod_type_->set_type(type_type_);
+        classmethod_type_->set_type(type_type_);
         code_type_->set_type(type_type_);
         frame_type_->set_type(type_type_);
         base_exception_type_->set_type(type_type_);
@@ -119,6 +125,8 @@ namespace cxxpython
         initialize_type(method_descriptor_type_, object_type_);
         initialize_type(getset_descriptor_type_, object_type_);
         initialize_type(property_type_, object_type_);
+        initialize_type(staticmethod_type_, object_type_);
+        initialize_type(classmethod_type_, object_type_);
         initialize_type(code_type_, object_type_);
         initialize_type(frame_type_, object_type_);
         initialize_type(base_exception_type_, object_type_);
@@ -149,6 +157,8 @@ namespace cxxpython
         method_descriptor_type_->solid_base = method_descriptor_type_;
         getset_descriptor_type_->solid_base = getset_descriptor_type_;
         property_type_->solid_base = property_type_;
+        staticmethod_type_->solid_base = staticmethod_type_;
+        classmethod_type_->solid_base = classmethod_type_;
         code_type_->solid_base = code_type_;
         frame_type_->solid_base = frame_type_;
         base_exception_type_->solid_base = base_exception_type_;
@@ -184,6 +194,8 @@ namespace cxxpython
         add_root(method_descriptor_type_);
         add_root(getset_descriptor_type_);
         add_root(property_type_);
+        add_root(staticmethod_type_);
+        add_root(classmethod_type_);
         add_root(code_type_);
         add_root(frame_type_);
         add_root(base_exception_type_);

@@ -340,9 +340,16 @@ doc/            design docs and milestone plans
 - `__slots__` 后置到 heap type layout 稳定后实现，但现在的 instance dict 设计
   必须允许以后区分 dict-backed instance、slot-only instance 和二者并存的实例。
 - `super`、`classmethod`、`staticmethod`、`property` 都应作为 descriptor
-  协议的自然结果实现。先补 descriptor 行为和绑定对象，再暴露语法和 builtins。
+  协议的自然结果实现。`property`、`staticmethod` 和 `classmethod` 当前已经是
+  typed descriptor objects；后续 decorator syntax 只应编译为普通函数创建和
+  class-body rebinding，不应绕过 descriptor/type attribute engine。
 - `property` is a typed data descriptor stored in a class dictionary. Class
   access returns the descriptor; instance access calls the getter with the
   instance; assignment calls the setter or raises `AttributeError` for a
   read-only property. Future descriptor-family builtins must follow this
   object/type-slot path rather than adding VM or compiler cases.
+- `staticmethod` is a non-data descriptor that returns its wrapped callable for
+  both class and instance access. `classmethod` binds the owner type as the
+  method self for class and instance access. Runtime method objects therefore
+  bind generic callable/self pairs instead of assuming every bound callable is
+  a Python function.

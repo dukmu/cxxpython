@@ -58,6 +58,8 @@ namespace cxxpython
         TypeObject *method_descriptor_type() const noexcept;
         TypeObject *getset_descriptor_type() const noexcept;
         TypeObject *property_type() const noexcept;
+        TypeObject *staticmethod_type() const noexcept;
+        TypeObject *classmethod_type() const noexcept;
         TypeObject *code_type() const noexcept;
         TypeObject *frame_type() const noexcept;
         TypeObject *base_exception_type() const noexcept;
@@ -90,7 +92,7 @@ namespace cxxpython
         ModuleObject *new_module(std::string name, std::string filename);
         NativeFunctionObject *new_native_function(std::string name, NativeFunctionCallback callback);
         PythonFunctionObject *new_function(std::string name, CodeObject *code, DictObject *globals);
-        PythonMethodObject *new_method(PythonFunctionObject *function, Object *self);
+        PythonMethodObject *new_method(Object *callable, Object *self);
         MethodDescriptorObject *new_method_descriptor(std::string name,
                                                        TypeObject *owner,
                                                        MethodDescriptorCallback callback);
@@ -100,6 +102,8 @@ namespace cxxpython
                                                        GetSetGetter getter,
                                                        GetSetSetter setter = {});
         PropertyObject *new_property(Object *getter, Object *setter = nullptr, Object *deleter = nullptr, Object *doc = nullptr);
+        StaticMethodObject *new_staticmethod(Object *callable);
+        ClassMethodObject *new_classmethod(Object *callable);
         CodeObject *new_code(std::vector<Object *> constants,
                               std::vector<Instruction> instructions);
         CodeObject *new_code(std::string name,
@@ -217,6 +221,8 @@ namespace cxxpython
         TypeObject *method_descriptor_type_ = nullptr;
         TypeObject *getset_descriptor_type_ = nullptr;
         TypeObject *property_type_ = nullptr;
+        TypeObject *staticmethod_type_ = nullptr;
+        TypeObject *classmethod_type_ = nullptr;
         TypeObject *code_type_ = nullptr;
         TypeObject *frame_type_ = nullptr;
         TypeObject *base_exception_type_ = nullptr;

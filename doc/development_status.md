@@ -41,9 +41,10 @@ Eight tracked risks:
    `list()` still accepts no iterable, and the full shared argument parser /
    iterator protocol path is not in place.
 7. Medium, partially fixed: descriptor and type-attribute protocol is
-   incomplete. Lookup is centralized and `property` now works as a data
-   descriptor, but `staticmethod`, `classmethod`, slot wrappers,
-   `__getattribute__`, and `__getattr__` are still absent.
+   incomplete. Lookup is centralized; `property` works as a data descriptor;
+   `staticmethod` and `classmethod` are typed builtin descriptors with
+   script-level coverage. Slot wrappers, `__getattribute__`, `__getattr__`,
+   descriptor decorator helpers, and delete semantics remain absent.
 8. Medium, first slice fixed: Python functions now support positional
    varargs, keyword dictionaries, and keyword calls through `CodeObject` flags,
    `CALL_KW`, and unified `CallArguments`. Remaining call-family work includes
@@ -72,10 +73,69 @@ Immediate order:
 - Done in current slice: `CodeObject` line tables, parser statement line
   capture, compiler line emission, VM source-location attachment, and minimal
   CLI traceback output now cover module and nested function runtime errors.
+- Done in current slice: `staticmethod` and `classmethod` now live as typed
+  descriptor objects, method binding now supports generic callable/self pairs,
+  and Python golden tests cover class and instance access.
 - Next: continue through `global`/`nonlocal`/closures, `__prepare__`,
   syntax-level `metaclass=`,
   full traceback objects, root guards, builtin protocol cleanup, call expansion,
   defaults/keyword-only arguments, and descriptor completeness.
+
+## 2026-05-19 StaticMethod And ClassMethod Descriptors
+
+Pre-change review:
+
+- The descriptor engine had centralized lookup and property support, but the
+  descriptor family was still too narrow. Without `staticmethod` and
+  `classmethod`, Python class tests had to rely only on normal function binding
+  and could not exercise class-level method binding semantics.
+- `PythonMethodObject` was tied to `PythonFunctionObject`, which would have
+  forced `classmethod` to invent a second one-off bound wrapper. That would
+  make later method objects, native descriptors, and C/C++ extension callables
+  drift apart.
+
+Debt addressed:
+
+- Added typed `StaticMethodObject` and `ClassMethodObject` with traversal,
+  repr, descriptor get, construction slots, runtime factories, bootstrap
+  types, and builtins exposure.
+- Generalized the existing method object to bind an arbitrary callable plus
+  `self`; Python functions still expose the same compatibility accessor for
+  tests and current call sites.
+- `staticmethod.__get__` returns its wrapped callable for class and instance
+  access. `classmethod.__get__` returns a bound method whose `self` is the
+  owner type for both class and instance access.
+
+Completed:
+
+- Added C++ descriptor tests for staticmethod/classmethod access, binding,
+  calls, and traversal.
+- Extended builtins-module tests for `staticmethod` and `classmethod`.
+- Added `Tests/python/descriptor_methods.py` golden coverage using class-body
+  assignment forms.
+
+Design review:
+
+- Descriptor behavior remains in object/type slots and `object_get_attr`; no VM
+  or parser special cases were added.
+- Decorator syntax is still a parser/compiler feature for later. The runtime
+  descriptor semantics are now ready for it because class-body assignment
+  already exercises the same object path decorators will produce.
+
+Known debt and next risk:
+
+- `@decorator` syntax, `property.getter`/`setter` helpers, descriptor delete,
+  slot wrappers, `__getattribute__`, and `__getattr__` remain open.
+- A reusable native argument parser would remove repeated small constructor
+  validation helpers across `property`, `staticmethod`, `classmethod`, and
+  builtins.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all 140 tests pass.
 
 ## 2026-05-19 CodeObject Line Table And Traceback Seed
 

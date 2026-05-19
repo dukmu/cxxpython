@@ -51,6 +51,8 @@ TEST(Module, BootstrapsBuiltinsModule)
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("str")), runtime.str_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("list")), runtime.list_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("property")), runtime.property_type());
+    EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("staticmethod")), runtime.staticmethod_type());
+    EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("classmethod")), runtime.classmethod_type());
 }
 
 TEST(Module, ExecutesCodeUsingModuleGlobals)

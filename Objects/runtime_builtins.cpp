@@ -54,6 +54,8 @@ namespace cxxpython
         dict->set(new_str("str"), str_type_);
         dict->set(new_str("list"), list_type_);
         dict->set(new_str("property"), property_type_);
+        dict->set(new_str("staticmethod"), staticmethod_type_);
+        dict->set(new_str("classmethod"), classmethod_type_);
         dict->set(new_str("print"), new_native_function("print", builtin_print));
         dict->set(new_str("len"), new_native_function("len", builtin_len));
     }

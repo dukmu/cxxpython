@@ -23,6 +23,8 @@ namespace cxxpython
     class MethodDescriptorObject;
     class GetSetDescriptorObject;
     class PropertyObject;
+    class StaticMethodObject;
+    class ClassMethodObject;
     class PythonFunctionObject;
 
     using VisitChildren = std::function<void(Object *)>;
@@ -350,13 +352,14 @@ namespace cxxpython
     class PythonMethodObject final : public Object
     {
     public:
-        PythonMethodObject(TypeObject *type, PythonFunctionObject *function, Object *self);
+        PythonMethodObject(TypeObject *type, Object *callable, Object *self);
 
         PythonFunctionObject *function() const noexcept;
+        Object *callable() const noexcept;
         Object *self() const noexcept;
 
     private:
-        PythonFunctionObject *function_;
+        Object *callable_;
         Object *self_;
     };
 
@@ -409,6 +412,28 @@ namespace cxxpython
         Object *setter_;
         Object *deleter_;
         Object *doc_;
+    };
+
+    class StaticMethodObject final : public Object
+    {
+    public:
+        StaticMethodObject(TypeObject *type, Object *callable);
+
+        Object *callable() const noexcept;
+
+    private:
+        Object *callable_;
+    };
+
+    class ClassMethodObject final : public Object
+    {
+    public:
+        ClassMethodObject(TypeObject *type, Object *callable);
+
+        Object *callable() const noexcept;
+
+    private:
+        Object *callable_;
     };
 
     class ExceptionObject final : public Object
@@ -475,6 +500,8 @@ namespace cxxpython
     TypeSlots make_method_descriptor_slots();
     TypeSlots make_getset_descriptor_slots();
     TypeSlots make_property_slots();
+    TypeSlots make_staticmethod_slots();
+    TypeSlots make_classmethod_slots();
     TypeSlots make_exception_slots();
     TypeSlots make_code_slots();
     TypeSlots make_frame_slots();

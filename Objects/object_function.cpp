@@ -20,7 +20,12 @@ namespace cxxpython
         std::string method_repr(const Object &object)
         {
             auto *method = static_cast<const PythonMethodObject *>(&object);
-            return "<bound method " + method->function()->name() + " of " +
+            if (PythonFunctionObject *function = method->function())
+            {
+                return "<bound method " + function->name() + " of " +
+                       object_repr(method->self()) + ">";
+            }
+            return "<bound method " + object_repr(method->callable()) + " of " +
                    object_repr(method->self()) + ">";
         }
 
@@ -52,8 +57,8 @@ namespace cxxpython
         void method_traverse(const Object &object, const VisitChildren &visitor)
         {
             auto *method = static_cast<const PythonMethodObject *>(&object);
-            if (method->function())
-                visitor(method->function());
+            if (method->callable())
+                visitor(method->callable());
             if (method->self())
                 visitor(method->self());
         }
@@ -71,7 +76,7 @@ namespace cxxpython
             bound_args.reserve(args.positional.size() + 1);
             bound_args.push_back(method->self());
             bound_args.insert(bound_args.end(), args.positional.begin(), args.positional.end());
-            return method->function()->call(CallArguments{std::move(bound_args), args.keywords});
+            return object_call(method->callable(), CallArguments{std::move(bound_args), args.keywords});
         }
 
         Object *function_get(Object &object, Object *instance, TypeObject *owner)
@@ -238,14 +243,19 @@ namespace cxxpython
         return vm.execute(*code_, *locals, *globals_, *runtime()->builtins_dict());
     }
 
-    PythonMethodObject::PythonMethodObject(TypeObject *type, PythonFunctionObject *function, Object *self)
-        : Object(type), function_(function), self_(self)
+    PythonMethodObject::PythonMethodObject(TypeObject *type, Object *callable, Object *self)
+        : Object(type), callable_(callable), self_(self)
     {
     }
 
     PythonFunctionObject *PythonMethodObject::function() const noexcept
     {
-        return function_;
+        return dynamic_cast<PythonFunctionObject *>(callable_);
+    }
+
+    Object *PythonMethodObject::callable() const noexcept
+    {
+        return callable_;
     }
 
     Object *PythonMethodObject::self() const noexcept

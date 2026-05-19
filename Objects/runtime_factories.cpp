@@ -79,11 +79,11 @@ namespace cxxpython
         return allocate<PythonFunctionObject>(function_type_, std::move(name), code, globals);
     }
 
-    PythonMethodObject *Runtime::new_method(PythonFunctionObject *function, Object *self)
+    PythonMethodObject *Runtime::new_method(Object *callable, Object *self)
     {
-        if (!function || !self)
-            raise_type_error(this, "method requires function and self");
-        return allocate<PythonMethodObject>(method_type_, function, self);
+        if (!callable || !self)
+            raise_type_error(this, "method requires callable and self");
+        return allocate<PythonMethodObject>(method_type_, callable, self);
     }
 
     MethodDescriptorObject *Runtime::new_method_descriptor(std::string name,
@@ -124,6 +124,20 @@ namespace cxxpython
     PropertyObject *Runtime::new_property(Object *getter, Object *setter, Object *deleter, Object *doc)
     {
         return allocate<PropertyObject>(property_type_, getter, setter, deleter, doc);
+    }
+
+    StaticMethodObject *Runtime::new_staticmethod(Object *callable)
+    {
+        if (!callable)
+            raise_type_error(this, "staticmethod requires callable");
+        return allocate<StaticMethodObject>(staticmethod_type_, callable);
+    }
+
+    ClassMethodObject *Runtime::new_classmethod(Object *callable)
+    {
+        if (!callable)
+            raise_type_error(this, "classmethod requires callable");
+        return allocate<ClassMethodObject>(classmethod_type_, callable);
     }
 
     CodeObject *Runtime::new_code(std::vector<Object *> constants, std::vector<Instruction> instructions)

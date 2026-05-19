@@ -412,6 +412,77 @@ TEST(Attributes, ReadOnlyPropertyRejectsAssignment)
     }
 }
 
+TEST(Attributes, StaticMethodObjectsReturnWrappedCallable)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::TypeObject *owner_type = runtime.new_heap_type("Owner", runtime.object_type());
+    cxxpython::Object *result = runtime.new_str("static-result");
+    cxxpython::NativeFunctionObject *callable = runtime.new_native_function(
+        "utility",
+        [result](cxxpython::Runtime &runtime, const cxxpython::CallArguments &args)
+        {
+            if (args.positional.size() != 1 || (args.keywords && args.keywords->size() != 0))
+                cxxpython::raise_type_error(&runtime, "utility() expected value");
+            return result;
+        });
+    cxxpython::StaticMethodObject *descriptor = runtime.new_staticmethod(callable);
+    owner_type->dict->set(runtime.new_str("utility"), descriptor);
+    cxxpython::Object *instance = runtime.allocate<cxxpython::Object>(owner_type);
+
+    EXPECT_EQ(descriptor->type(), runtime.staticmethod_type());
+    EXPECT_EQ(cxxpython::object_get_attr(owner_type, "utility"), callable);
+    EXPECT_EQ(cxxpython::object_get_attr(instance, "utility"), callable);
+    EXPECT_EQ(cxxpython::object_call(cxxpython::object_get_attr(instance, "utility"),
+                                     {runtime.new_str("arg")}),
+              result);
+
+    std::vector<cxxpython::Object *> children;
+    descriptor->visit_children([&children](cxxpython::Object *object)
+                               { children.push_back(object); });
+    ASSERT_EQ(children.size(), 1U);
+    EXPECT_EQ(children[0], callable);
+}
+
+TEST(Attributes, ClassMethodObjectsBindOwnerType)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::TypeObject *owner_type = runtime.new_heap_type("Owner", runtime.object_type());
+    cxxpython::Object *result = runtime.new_str("class-result");
+    cxxpython::Object *seen_self = nullptr;
+    cxxpython::NativeFunctionObject *callable = runtime.new_native_function(
+        "factory",
+        [&seen_self, result](cxxpython::Runtime &runtime, const cxxpython::CallArguments &args)
+        {
+            if (args.positional.size() != 2 || (args.keywords && args.keywords->size() != 0))
+                cxxpython::raise_type_error(&runtime, "factory() expected cls and value");
+            seen_self = args.positional[0];
+            return result;
+        });
+    cxxpython::ClassMethodObject *descriptor = runtime.new_classmethod(callable);
+    owner_type->dict->set(runtime.new_str("factory"), descriptor);
+    cxxpython::Object *instance = runtime.allocate<cxxpython::Object>(owner_type);
+
+    EXPECT_EQ(descriptor->type(), runtime.classmethod_type());
+    auto *from_type = dynamic_cast<cxxpython::PythonMethodObject *>(cxxpython::object_get_attr(owner_type, "factory"));
+    ASSERT_NE(from_type, nullptr);
+    EXPECT_EQ(from_type->self(), owner_type);
+    EXPECT_EQ(cxxpython::object_call(from_type, {runtime.new_str("arg")}), result);
+    EXPECT_EQ(seen_self, owner_type);
+
+    auto *from_instance =
+        dynamic_cast<cxxpython::PythonMethodObject *>(cxxpython::object_get_attr(instance, "factory"));
+    ASSERT_NE(from_instance, nullptr);
+    EXPECT_EQ(from_instance->self(), owner_type);
+    EXPECT_EQ(cxxpython::object_call(from_instance, {runtime.new_str("arg")}), result);
+    EXPECT_EQ(seen_self, owner_type);
+
+    std::vector<cxxpython::Object *> children;
+    descriptor->visit_children([&children](cxxpython::Object *object)
+                               { children.push_back(object); });
+    ASSERT_EQ(children.size(), 1U);
+    EXPECT_EQ(children[0], callable);
+}
+
 TEST(Attributes, RaisesAttributeErrorForMissingAttribute)
 {
     cxxpython::Runtime runtime;
