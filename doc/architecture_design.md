@@ -272,11 +272,12 @@ doc/            design docs and milestone plans
   runtime dictionaries through `mappingproxy`, not raw mutable dict objects;
   heap instances expose their own mutable instance dict; compact builtins
   without `HasInstanceDict` report no `__dict__`.
-- Attribute lookup 的入口是统一 `object_get_attr` API。当前最小顺序是：
+- Attribute lookup 的入口是统一 `object_get_attr` API。公共入口先检查用户
+  覆盖的 `__getattribute__`；默认路径是 `object_get_attr_default`，顺序是：
   module dict -> data descriptor -> instance dict -> non-data descriptor/type
-  attribute -> metatype MRO dict -> `__getattr__` fallback。后续
-  `__getattribute__`、slot wrappers 和 mappingproxy 必须扩展这条 API，而不是在
-  opcode 或 builtin 中另开查找路径。
+  attribute -> metatype MRO dict。若公共入口捕获到 `AttributeError`，再运行
+  `__getattr__` fallback。后续 slot wrappers 和 mappingproxy 必须扩展这条 API，
+  而不是在 opcode 或 builtin 中另开查找路径。
 - Type-object lookup follows the same descriptor model with the metatype data
   descriptor priority CPython requires: metatype data descriptor -> class MRO
   attribute -> metatype non-data attribute. This is what makes
@@ -286,6 +287,9 @@ doc/            design docs and milestone plans
   in type/class dictionaries with a `descr_get` slot are invoked with
   `(descriptor, instance, owner)`. Module namespace entries are direct values;
   module type descriptors still flow through type lookup.
+- `object.__getattribute__` is a normal method descriptor on `object` and calls
+  `object_get_attr_default`. This deliberately bypasses `__getattr__`, while
+  public `object_get_attr` owns the `AttributeError -> __getattr__` behavior.
 - `__getattr__` is a final fallback in `object_get_attr`, not an opcode
   behavior. Instance fallback uses direct special lookup on the owner type and
   then calls the bound result with the missing attribute name. Module fallback

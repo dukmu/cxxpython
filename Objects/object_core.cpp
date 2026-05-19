@@ -639,7 +639,7 @@ namespace cxxpython
         return nullptr;
     }
 
-    Object *object_get_attr(Object *object, StrObject *name)
+    Object *object_get_attr_default(Object *object, StrObject *name)
     {
         if (!object || !name)
             raise_attribute_error(object ? object->runtime() : (name ? name->runtime() : nullptr),
@@ -649,8 +649,6 @@ namespace cxxpython
         {
             if (Object *value = module->dict()->get(name))
                 return value;
-            if (Object *hook = module->dict()->get(object->runtime()->new_str("__getattr__")))
-                return object_call(hook, {name});
         }
 
         if (auto *type = dynamic_cast<TypeObject *>(object))
@@ -662,12 +660,6 @@ namespace cxxpython
                 return apply_descriptor(value, nullptr, type);
             if (metatype_value)
                 return apply_descriptor(metatype_value, object, type->type());
-            if (Object *result = call_getattr_hook(
-                    type->type() ? type_lookup_attribute(type->type(), object->runtime()->new_str("__getattr__")) : nullptr,
-                    object,
-                    type->type(),
-                    name))
-                return result;
         }
         else
         {
@@ -681,12 +673,6 @@ namespace cxxpython
             }
             if (type_value)
                 return apply_descriptor(type_value, object, object->type());
-            if (Object *result = call_getattr_hook(
-                    type_lookup_attribute(object->type(), object->runtime()->new_str("__getattr__")),
-                    object,
-                    object->type(),
-                    name))
-                return result;
         }
 
         std::ostringstream message;
@@ -694,6 +680,93 @@ namespace cxxpython
                 << "' object has no attribute '"
                 << name->value << "'";
         raise_attribute_error(object->runtime(), message.str());
+    }
+
+    namespace
+    {
+        bool is_attribute_error(const PythonError &error)
+        {
+            return error.type() && error.value() &&
+                   error.type() == error.value()->runtime()->attribute_error_type();
+        }
+
+        Object *call_getattribute_override(Object *object, StrObject *name)
+        {
+            if (!object || !name || !object->type())
+                return nullptr;
+
+            Runtime *runtime = object->runtime();
+            Object *default_getattribute =
+                runtime->object_type()->dict->get(runtime->new_str("__getattribute__"));
+            Object *hook =
+                type_lookup_attribute(object->type(), runtime->new_str("__getattribute__"));
+            if (!hook || hook == default_getattribute)
+                return nullptr;
+
+            Object *callable = apply_descriptor(hook, object, object->type());
+            return object_call(callable, {name});
+        }
+
+        Object *call_getattr_fallback(Object *object, StrObject *name)
+        {
+            if (!object || !name)
+                return nullptr;
+
+            if (auto *module = dynamic_cast<ModuleObject *>(object))
+            {
+                if (Object *hook = module->dict()->get(object->runtime()->new_str("__getattr__")))
+                    return object_call(hook, {name});
+            }
+
+            if (auto *type = dynamic_cast<TypeObject *>(object))
+            {
+                return call_getattr_hook(
+                    type->type() ? type_lookup_attribute(type->type(), object->runtime()->new_str("__getattr__")) : nullptr,
+                    object,
+                    type->type(),
+                    name);
+            }
+
+            return call_getattr_hook(
+                type_lookup_attribute(object->type(), object->runtime()->new_str("__getattr__")),
+                object,
+                object->type(),
+                name);
+        }
+    }
+
+    Object *object_get_attr(Object *object, StrObject *name)
+    {
+        if (!object || !name)
+            raise_attribute_error(object ? object->runtime() : (name ? name->runtime() : nullptr),
+                                  "'<null>' object has no attribute '<null>'");
+
+        try
+        {
+            if (Object *override_result = call_getattribute_override(object, name))
+                return override_result;
+        }
+        catch (const PythonError &error)
+        {
+            if (!is_attribute_error(error))
+                throw;
+            if (Object *fallback_result = call_getattr_fallback(object, name))
+                return fallback_result;
+            throw;
+        }
+
+        try
+        {
+            return object_get_attr_default(object, name);
+        }
+        catch (const PythonError &error)
+        {
+            if (!is_attribute_error(error))
+                throw;
+            if (Object *fallback_result = call_getattr_fallback(object, name))
+                return fallback_result;
+            throw;
+        }
     }
 
     Object *object_get_attr(Object *object, const std::string &name)

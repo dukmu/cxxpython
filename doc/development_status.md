@@ -54,7 +54,8 @@ Eight tracked risks:
    layer. `__getattr__` fallback now runs after normal module, metatype, type,
    descriptor, and instance-dict lookup fails. Parser/VM `del` statement
    lowering is now implemented for names, fast locals, attributes, and
-   subscripts. Slot wrappers and `__getattribute__` remain absent.
+   subscripts. `__getattribute__` now wraps the normal lookup path with
+   `AttributeError` fallback to `__getattr__`. Slot wrappers remain absent.
 8. Medium, first slice fixed: Python functions now support positional
    varargs, keyword dictionaries, and keyword calls through `CodeObject` flags,
    `CALL_KW`, and unified `CallArguments`. Remaining call-family work includes
@@ -89,6 +90,9 @@ Immediate order:
 - Done in current slice: `del` statement lowering now emits VM delete opcodes
   instead of synthetic method calls, and subscript deletion routes through the
   object item protocol.
+- Done in current slice: `__getattribute__` is exposed as an object method
+  descriptor and user overrides run before normal lookup, with
+  `AttributeError` falling through to `__getattr__`.
 - Done in current slice: native/builtin positional and keyword validation now
   uses shared helper APIs instead of repeated local string-building branches.
 - Done in current slice: VM opcode dispatch now uses scoped root guards around
@@ -150,10 +154,9 @@ Design review:
 
 Known debt and next risk:
 
-- `__getattribute__` must wrap the whole normal lookup path and needs careful
-  recursion protection.
-- Slot wrappers remain absent, so special methods like `__len__` are not yet
-  script-visible descriptors for builtins.
+- Slot wrappers remain absent, so special methods like `__len__`, arithmetic
+  dunders, and comparison dunders are not yet script-visible descriptors for
+  builtins.
 - Delete statement support is currently single-target. Multi-target and
   destructuring `del` should extend the same target-family compiler path rather
   than lowering through synthetic method calls.
@@ -212,6 +215,51 @@ Verification:
 - `ctest --test-dir build --output-on-failure`
 
 Result: all 152 tests pass.
+
+## 2026-05-19 `__getattribute__` Protocol
+
+Pre-change review:
+
+- Attribute lookup was centralized, but user-defined `__getattribute__` could
+  not intercept reads. Adding more descriptor families before this would have
+  made lookup ordering harder to stabilize.
+- Directly implementing `__getattribute__` inside `LOAD_ATTR` would have split
+  script-visible lookup from host API lookup and repeated recursion hazards.
+
+Completed:
+
+- Split the attribute engine into:
+  - `object_get_attr_default`, the default normal lookup used by
+    `object.__getattribute__`;
+  - public `object_get_attr`, which checks user overrides first and applies
+    `__getattr__` fallback after `AttributeError`.
+- Added `object.__getattribute__` as a normal method descriptor on `object`.
+- User-defined `__getattribute__` now runs before data descriptors, instance
+  dict lookup, and non-data descriptors.
+- If a user override raises `AttributeError`, public lookup falls through to
+  `__getattr__`, matching Python's high-level hook shape.
+- Added C++ coverage for override priority, direct
+  `object.__getattribute__`, and `AttributeError -> __getattr__` fallback.
+- Added `Tests/python/getattribute_override.py` golden coverage through the
+  real parser, VM, and script runner.
+
+Design notes:
+
+- The override lookup uses direct type-dictionary search and compares against
+  the default `object.__getattribute__` descriptor, so discovering the hook does
+  not recursively call the hook itself.
+- `object.__getattribute__` intentionally calls the default path only. It does
+  not run `__getattr__`; the public lookup wrapper owns that fallback behavior.
+- VM `LOAD_ATTR` still calls only `object_get_attr`, preserving the rule that
+  opcode dispatch is unaware of descriptor, fallback, or hook internals.
+
+Verification:
+
+- `ctest --test-dir build --output-on-failure -R PythonScripts.RunsGoldenFiles`
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all 154 tests pass.
 
 ## 2026-05-19 Descriptor Delete Protocol
 

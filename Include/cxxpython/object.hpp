@@ -514,6 +514,7 @@ namespace cxxpython
     bool object_contains(Object *object, Object *key);
     Object *object_iter(Object *object);
     Object *object_next(Object *iterator);
+    Object *object_get_attr_default(Object *object, StrObject *name);
     Object *object_get_attr(Object *object, StrObject *name);
     Object *object_get_attr(Object *object, const std::string &name);
     void object_set_attr(Object *object, StrObject *name, Object *value);

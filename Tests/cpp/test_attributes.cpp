@@ -328,6 +328,83 @@ TEST(Attributes, CallsGetAttrFallbackAfterNormalLookupFails)
     EXPECT_EQ(cxxpython::object_get_attr(instance, "present"), stored);
 }
 
+TEST(Attributes, CallsGetAttributeOverrideBeforeNormalLookup)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::TypeObject *owner_type = runtime.new_heap_type("Owner", runtime.object_type());
+    cxxpython::MethodDescriptorObject *getattribute = runtime.new_method_descriptor(
+        "__getattribute__",
+        owner_type,
+        [](cxxpython::Runtime &runtime, cxxpython::Object *, cxxpython::ObjectSpan args)
+        {
+            if (args.size() != 1)
+                cxxpython::raise_type_error(&runtime, "__getattribute__ expected name");
+            auto *name = dynamic_cast<cxxpython::StrObject *>(args[0]);
+            if (!name)
+                cxxpython::raise_type_error(&runtime, "__getattribute__ expected str name");
+            return runtime.new_str("intercepted:" + name->value);
+        });
+    owner_type->dict->set(runtime.new_str("__getattribute__"), getattribute);
+    cxxpython::Object *instance = runtime.allocate<cxxpython::Object>(owner_type);
+    cxxpython::Object *stored = runtime.new_str("stored");
+    cxxpython::object_set_attr(instance, "present", stored);
+
+    auto *intercepted = dynamic_cast<cxxpython::StrObject *>(cxxpython::object_get_attr(instance, "present"));
+    ASSERT_NE(intercepted, nullptr);
+    EXPECT_EQ(intercepted->value, "intercepted:present");
+
+    cxxpython::Object *default_getattribute =
+        cxxpython::object_get_attr(runtime.object_type(), "__getattribute__");
+    EXPECT_EQ(cxxpython::object_call(default_getattribute, {instance, runtime.new_str("present")}), stored);
+}
+
+TEST(Attributes, GetAttributeAttributeErrorFallsBackToGetAttr)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::TypeObject *owner_type = runtime.new_heap_type("Owner", runtime.object_type());
+    cxxpython::MethodDescriptorObject *getattribute = runtime.new_method_descriptor(
+        "__getattribute__",
+        owner_type,
+        [](cxxpython::Runtime &runtime, cxxpython::Object *, cxxpython::ObjectSpan args)
+        {
+            auto *name = args.size() == 1 ? dynamic_cast<cxxpython::StrObject *>(args[0]) : nullptr;
+            cxxpython::raise_attribute_error(&runtime, name ? name->value : "missing");
+            return runtime.none();
+        });
+    cxxpython::MethodDescriptorObject *getattr = runtime.new_method_descriptor(
+        "__getattr__",
+        owner_type,
+        [](cxxpython::Runtime &runtime, cxxpython::Object *, cxxpython::ObjectSpan args)
+        {
+            if (args.size() != 1)
+                cxxpython::raise_type_error(&runtime, "__getattr__ expected name");
+            auto *name = dynamic_cast<cxxpython::StrObject *>(args[0]);
+            if (!name)
+                cxxpython::raise_type_error(&runtime, "__getattr__ expected str name");
+            return runtime.new_str("fallback:" + name->value);
+        });
+    owner_type->dict->set(runtime.new_str("__getattribute__"), getattribute);
+    owner_type->dict->set(runtime.new_str("__getattr__"), getattr);
+    cxxpython::Object *instance = runtime.allocate<cxxpython::Object>(owner_type);
+
+    auto *computed = dynamic_cast<cxxpython::StrObject *>(cxxpython::object_get_attr(instance, "missing"));
+    ASSERT_NE(computed, nullptr);
+    EXPECT_EQ(computed->value, "fallback:missing");
+
+    cxxpython::Object *default_getattribute =
+        cxxpython::object_get_attr(runtime.object_type(), "__getattribute__");
+    try
+    {
+        (void)cxxpython::object_call(default_getattribute, {instance, runtime.new_str("missing")});
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.attribute_error_type());
+        EXPECT_STREQ(error.what(), "'Owner' object has no attribute 'missing'");
+    }
+}
+
 TEST(Attributes, CallsModuleGetAttrFallback)
 {
     cxxpython::Runtime runtime;
