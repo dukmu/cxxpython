@@ -146,6 +146,14 @@ namespace cxxpython
                     item->accept(*this);
             }
 
+            void visit(const compiler_internal::ForStmt &statement) override
+            {
+                (void)symbols_.add_name(statement.target);
+                statement.iterable->accept(*this);
+                for (const auto &item : statement.body)
+                    item->accept(*this);
+            }
+
             void visit(const compiler_internal::ReturnStmt &statement) override
             {
                 if (statement.value)
@@ -265,6 +273,14 @@ namespace cxxpython
                     item->accept(*this);
             }
 
+            void visit(const compiler_internal::ForStmt &statement) override
+            {
+                if (!symbols_.is_global(statement.target) && !symbols_.is_nonlocal(statement.target))
+                    (void)symbols_.add_local(statement.target);
+                for (const auto &item : statement.body)
+                    item->accept(*this);
+            }
+
             void visit(const compiler_internal::ReturnStmt &statement) override
             {
                 (void)statement;
@@ -356,6 +372,12 @@ namespace cxxpython
                 for (const auto &item : statement.then_body)
                     item->accept(*this);
                 for (const auto &item : statement.else_body)
+                    item->accept(*this);
+            }
+
+            void visit(const compiler_internal::ForStmt &statement) override
+            {
+                for (const auto &item : statement.body)
                     item->accept(*this);
             }
 
@@ -565,6 +587,13 @@ namespace cxxpython
                     item->accept(*this);
             }
 
+            void visit(const compiler_internal::ForStmt &statement) override
+            {
+                statement.iterable->accept(*this);
+                for (const auto &item : statement.body)
+                    item->accept(*this);
+            }
+
             void visit(const compiler_internal::ReturnStmt &statement) override
             {
                 if (statement.value)
@@ -655,6 +684,12 @@ namespace cxxpython
                 for (const auto &item : statement.then_body)
                     item->accept(*this);
                 for (const auto &item : statement.else_body)
+                    item->accept(*this);
+            }
+
+            void visit(const compiler_internal::ForStmt &statement) override
+            {
+                for (const auto &item : statement.body)
                     item->accept(*this);
             }
 

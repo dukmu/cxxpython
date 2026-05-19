@@ -91,6 +91,8 @@ namespace cxxpython::compiler_internal
 
                 if (peek().kind == TokenKind::If)
                     return parse_if_statement();
+                if (peek().kind == TokenKind::For)
+                    return parse_for_statement();
                 if (peek().kind == TokenKind::Try)
                     return parse_try_statement();
                 if (peek().kind == TokenKind::Def)
@@ -358,6 +360,26 @@ namespace cxxpython::compiler_internal
                         std::move(then_body),
                         std::move(else_body));
                 statement->line = if_token.line;
+                return ParsedStatement{
+                    std::move(statement),
+                    true,
+                };
+            }
+
+            ParsedStatement parse_for_statement()
+            {
+                const Token &for_token = advance();
+                if (peek().kind != TokenKind::Identifier)
+                    raise_at(peek(), "expected name after for");
+                std::string target = advance().lexeme;
+                consume(TokenKind::In, "expected 'in' after for target");
+                std::unique_ptr<Expr> iterable = parse_expression_only();
+                consume(TokenKind::Colon, "expected ':' after for iterable");
+                consume(TokenKind::Newline, "expected newline after for statement");
+                std::vector<std::unique_ptr<Stmt>> body = parse_block();
+                auto statement =
+                    std::make_unique<ForStmt>(std::move(target), std::move(iterable), std::move(body));
+                statement->line = for_token.line;
                 return ParsedStatement{
                     std::move(statement),
                     true,
@@ -851,6 +873,7 @@ namespace cxxpython::compiler_internal
                 case TokenKind::GreaterEqual:
                 case TokenKind::If:
                 case TokenKind::Else:
+                case TokenKind::For:
                 case TokenKind::Def:
                 case TokenKind::Return:
                 case TokenKind::Raise:
@@ -974,6 +997,7 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Equal:
                 case TokenKind::If:
                 case TokenKind::Else:
+                case TokenKind::For:
                 case TokenKind::Def:
                 case TokenKind::Return:
                 case TokenKind::Raise:

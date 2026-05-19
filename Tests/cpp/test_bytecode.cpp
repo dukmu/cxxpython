@@ -38,6 +38,8 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::BuildMap), "BUILD_MAP");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::BuildSlice), "BUILD_SLICE");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::CompareOp), "COMPARE_OP");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::GetIter), "GET_ITER");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::ForIter), "FOR_ITER");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::JumpAbsolute), "JUMP_ABSOLUTE");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::PopJumpIfFalse), "POP_JUMP_IF_FALSE");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::PopJumpIfTrue), "POP_JUMP_IF_TRUE");
@@ -89,6 +91,8 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BuildMap, 2}), -3);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BuildSlice, 3}), -2);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::CompareOp, 0}), -1);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::GetIter, 0}), 0);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::ForIter, 0}), 1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::JumpAbsolute, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::PopJumpIfFalse, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::PopJumpIfTrue, 0}), -1);

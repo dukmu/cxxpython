@@ -35,6 +35,7 @@ namespace cxxpython::compiler_internal
     struct AssignStmt;
     struct DeleteStmt;
     struct IfStmt;
+    struct ForStmt;
     struct ReturnStmt;
     struct RaiseStmt;
     struct GlobalStmt;
@@ -78,6 +79,7 @@ namespace cxxpython::compiler_internal
         virtual void visit(const AssignStmt &statement) = 0;
         virtual void visit(const DeleteStmt &statement) = 0;
         virtual void visit(const IfStmt &statement) = 0;
+        virtual void visit(const ForStmt &statement) = 0;
         virtual void visit(const ReturnStmt &statement) = 0;
         virtual void visit(const RaiseStmt &statement) = 0;
         virtual void visit(const GlobalStmt &statement) = 0;
@@ -117,6 +119,7 @@ namespace cxxpython::compiler_internal
         GreaterEqual,
         If,
         Else,
+        For,
         Def,
         Return,
         Raise,
@@ -559,6 +562,27 @@ namespace cxxpython::compiler_internal
         std::unique_ptr<Expr> condition;
         std::vector<std::unique_ptr<Stmt>> then_body;
         std::vector<std::unique_ptr<Stmt>> else_body;
+
+        void accept(StmtVisitor &visitor) const override
+        {
+            visitor.visit(*this);
+        }
+    };
+
+    struct ForStmt final : Stmt
+    {
+        ForStmt(std::string target_in,
+                std::unique_ptr<Expr> iterable_in,
+                std::vector<std::unique_ptr<Stmt>> body_in)
+            : target(std::move(target_in)),
+              iterable(std::move(iterable_in)),
+              body(std::move(body_in))
+        {
+        }
+
+        std::string target;
+        std::unique_ptr<Expr> iterable;
+        std::vector<std::unique_ptr<Stmt>> body;
 
         void accept(StmtVisitor &visitor) const override
         {

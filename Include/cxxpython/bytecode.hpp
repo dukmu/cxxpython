@@ -43,6 +43,8 @@ namespace cxxpython
         BuildMap,
         BuildSlice,
         CompareOp,
+        GetIter,
+        ForIter,
         JumpAbsolute,
         PopJumpIfFalse,
         PopJumpIfTrue,

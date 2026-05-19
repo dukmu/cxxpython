@@ -1,5 +1,41 @@
 # Development Status
 
+## 2026-05-19 For Iteration Slice
+
+Review focus:
+
+- Add `for` on top of the object iteration protocol instead of lowering only
+  `range()` as a special case.
+- Keep loop execution in VM bytecode so future `break`, `continue`, `else`,
+  and exception unwinding have a single control-flow substrate.
+- Preserve function-scope local analysis for loop targets.
+
+Completed:
+
+- Added `for` tokenization and AST representation.
+- Added parser support for `for name in iterable:` blocks.
+- Added `GET_ITER` and `FOR_ITER` bytecode metadata and stack effects.
+- Added VM dispatch through `object_iter` / `object_next`, with
+  `StopIteration` consumed only by `FOR_ITER`.
+- Lowered loops through normal binding stores, so globals, locals, cells, and
+  future nonlocal loop targets share the existing name machinery.
+- Added Python golden coverage for `range`, string, and list iteration,
+  mutation inside a loop, and function-local loop variables.
+
+Known debt and next risk:
+
+- Loop targets are currently simple names; tuple unpacking, attribute targets,
+  and subscript targets should extend the assignment-target AST rather than
+  adding ad hoc parser branches.
+- `break`, `continue`, and `for ... else` still need block-stack integration.
+- Iterator protocol is now on the VM path, so traceback and stack/depth guards
+  become more important before recursive/user-defined iterators grow.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter='Bytecode.MetadataNamesAndStackEffects:PythonScripts.RunsGoldenFiles'`
+
 ## 2026-05-19 Import Statement Slice
 
 Review focus:

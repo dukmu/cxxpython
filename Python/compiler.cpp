@@ -481,6 +481,23 @@ namespace cxxpython
                 patch_jump(end_jump, instructions_.size());
             }
 
+            void visit(const compiler_internal::ForStmt &statement) override
+            {
+                StatementLineGuard line(*this, statement);
+                statement.iterable->accept(*this);
+                emit({Opcode::GetIter, 0});
+                const std::size_t loop_start = instructions_.size();
+                const std::size_t exit_jump = emit_jump(Opcode::ForIter);
+                emit_binding_store(statement.target);
+                for (const auto &item : statement.body)
+                    item->accept(*this);
+                emit({
+                    Opcode::JumpAbsolute,
+                    static_cast<std::uint32_t>(loop_start),
+                });
+                patch_jump(exit_jump, instructions_.size());
+            }
+
             void visit(const compiler_internal::ReturnStmt &statement) override
             {
                 StatementLineGuard line(*this, statement);

@@ -262,6 +262,10 @@ namespace cxxpython
             return "BUILD_SLICE";
         case Opcode::CompareOp:
             return "COMPARE_OP";
+        case Opcode::GetIter:
+            return "GET_ITER";
+        case Opcode::ForIter:
+            return "FOR_ITER";
         case Opcode::JumpAbsolute:
             return "JUMP_ABSOLUTE";
         case Opcode::PopJumpIfFalse:
@@ -324,7 +328,10 @@ namespace cxxpython
         case Opcode::RotTwo:
         case Opcode::RotThree:
         case Opcode::UnaryOp:
+        case Opcode::GetIter:
             return 0;
+        case Opcode::ForIter:
+            return 1;
         case Opcode::MakeFunction:
             return instruction.operand == 0 ? 0 : -1;
         case Opcode::MakeClass:

@@ -874,6 +874,35 @@ namespace cxxpython
                 }
                 break;
             }
+            case Opcode::GetIter:
+            {
+                Object *iterable = frame->pop();
+                auto iterable_root = runtime_.root(iterable);
+                frame->push(object_iter(iterable_root.get()));
+                break;
+            }
+            case Opcode::ForIter:
+            {
+                Object *iterator = frame->pop();
+                auto iterator_root = runtime_.root(iterator);
+                try
+                {
+                    Object *item = object_next(iterator_root.get());
+                    auto item_root = runtime_.root(item);
+                    frame->push(iterator_root.get());
+                    frame->push(item_root.get());
+                }
+                catch (const PythonError &error)
+                {
+                    if (error.type() && is_subclass(error.type(), runtime_.stop_iteration_type()))
+                    {
+                        jump_to(*frame, code, instruction.operand);
+                        break;
+                    }
+                    throw;
+                }
+                break;
+            }
             case Opcode::JumpAbsolute:
             {
                 jump_to(*frame, code, instruction.operand);
