@@ -7,11 +7,11 @@
 
 namespace
 {
-    void init_sets_value(cxxpython::Object &object, const std::vector<cxxpython::Object *> &args)
+    void init_sets_value(cxxpython::Object &object, const cxxpython::CallArguments &args)
     {
-        if (args.size() != 1)
+        if ((args.keywords && args.keywords->size() != 0) || args.positional.size() != 1)
             cxxpython::raise_type_error(object.runtime(), "InitCarrier() takes exactly one argument");
-        cxxpython::object_set_attr(&object, "value", args[0]);
+        cxxpython::object_set_attr(&object, "value", args.positional[0]);
     }
 }
 

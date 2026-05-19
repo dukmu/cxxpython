@@ -14,28 +14,36 @@ namespace cxxpython
             return object_repr(object);
         }
 
-        Object *builtin_print(Runtime &runtime, const std::vector<Object *> &args)
+        void reject_keywords(Runtime &runtime, const std::string &name, const CallArguments &args)
         {
+            if (args.keywords && args.keywords->size() != 0)
+                raise_type_error(&runtime, name + "() takes no keyword arguments");
+        }
+
+        Object *builtin_print(Runtime &runtime, const CallArguments &args)
+        {
+            reject_keywords(runtime, "print", args);
             std::ostream &out = runtime.stdout_stream();
-            for (std::size_t index = 0; index < args.size(); ++index)
+            for (std::size_t index = 0; index < args.positional.size(); ++index)
             {
                 if (index != 0)
                     out << ' ';
-                out << print_text(args[index]);
+                out << print_text(args.positional[index]);
             }
             out << '\n';
             return runtime.none();
         }
 
-        Object *builtin_len(Runtime &runtime, const std::vector<Object *> &args)
+        Object *builtin_len(Runtime &runtime, const CallArguments &args)
         {
-            if (args.size() != 1)
+            reject_keywords(runtime, "len", args);
+            if (args.positional.size() != 1)
             {
                 std::ostringstream message;
-                message << "len() takes exactly one argument (" << args.size() << " given)";
+                message << "len() takes exactly one argument (" << args.positional.size() << " given)";
                 raise_type_error(&runtime, message.str());
             }
-            return runtime.new_int(static_cast<std::int64_t>(object_length(args[0])));
+            return runtime.new_int(static_cast<std::int64_t>(object_length(args.positional[0])));
         }
     }
 

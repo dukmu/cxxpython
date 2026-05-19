@@ -9,7 +9,7 @@ Review scope:
 - The following risks are active fix items, not background notes. Each stable
   slice should update this ledger before commit.
 
-Seven tracked risks:
+Eight tracked risks:
 
 1. High, fixed in current slice: multiple inheritance lacked explicit layout
    compatibility checks.
@@ -24,17 +24,25 @@ Seven tracked risks:
    be dynamic `LOAD_NAME` lookup. Function locals are now compiler-discovered
    fast locals with `LOAD_FAST`/`STORE_FAST` and `UnboundLocalError`; `global`,
    `nonlocal`, free/cell analysis, and closures remain open.
-4. Medium/high: `CodeObject` and `Frame` still lack line table, flags,
-   traceback integration, and script-visible debugging metadata. CLI errors
-   currently print only exception type and message.
+4. Medium/high, partially fixed: `CodeObject` now carries execution flags for
+   varargs/varkeywords function shape, but `CodeObject` and `Frame` still lack
+   line table, traceback integration, and script-visible debugging metadata.
+   CLI errors currently print only exception type and message.
 5. Medium: there is no RAII root guard model for the future GC. VM operations
    still hold raw `Object *` temporaries across allocation sites.
-6. Medium: builtins remain bootstrap-minimal. `print` has string-specific
-   display behavior, `list()` accepts no iterable, and the shared argument
-   parser / `str()` / iterator protocol path is not in place.
+6. Medium, partially fixed: builtins remain bootstrap-minimal. Calls now enter
+   through shared `CallArguments`, so keyword rejection is centralized at the
+   callable boundary, but `print` still has string-specific display behavior,
+   `list()` accepts no iterable, and the full shared argument parser / `str()` /
+   iterator protocol path is not in place.
 7. Medium: descriptor and type-attribute protocol is incomplete. Lookup is
    centralized, but `property`, `staticmethod`, `classmethod`, slot wrappers,
    `__getattribute__`, and `__getattr__` are still absent.
+8. Medium, first slice fixed: Python functions now support positional
+   varargs, keyword dictionaries, and keyword calls through `CodeObject` flags,
+   `CALL_KW`, and unified `CallArguments`. Remaining call-family work includes
+   `*iterable` / `**mapping` call expansion, keyword-only parameters, default
+   arguments, annotations, decorators, and a reusable native argument parser.
 
 Immediate order:
 
@@ -46,10 +54,88 @@ Immediate order:
   share a metaclass-aware construction request.
 - Done in current slice: function local assignment names now use fast-local
   semantics and raise `UnboundLocalError` instead of falling through to globals.
+- Done in current slice: `CallArguments`, `CALL_KW`, function flags, and
+  parser/compiler/runtime support for `def f(a, *args, **kwargs)` plus keyword
+  calls.
 - Next: continue through `global`/`nonlocal`/closures, `__prepare__`,
   syntax-level `metaclass=`,
-  traceback metadata, root guards, builtin protocol cleanup, and descriptor
-  completeness.
+  traceback metadata, root guards, builtin protocol cleanup, call expansion,
+  defaults/keyword-only arguments, and descriptor completeness.
+
+## 2026-05-19 Unified Call Arguments And Varargs/Kwargs
+
+Pre-change review:
+
+- Runtime calls used `std::vector<Object *>` directly at every boundary:
+  VM `CALL`, `object_call`, Python functions, native functions, method
+  descriptors, `type.__call__`, `new_object`, and `init`.
+- Adding `**kwargs` on top of that vector-only model would have forced
+  keyword handling into each callable family separately and made native
+  argument parsing another long-term special case.
+- `CodeObject` had only `arg_count` and `varnames`; it could not describe
+  whether a function owned `*args` or `**kwargs`.
+
+Debt addressed:
+
+- Added `CallArguments { positional, keywords }` as the shared call carrier.
+  `object_call(callable, vector)` remains a positional-only host convenience,
+  but slot dispatch uses `CallArguments`.
+- Converted call slots, native function calls, Python function calls,
+  method-descriptor calls, `type.__call__`, `new_object`, and `init` to the
+  unified call path.
+- Added `CodeObject` flags for `*args` and `**kwargs`, with stable argument
+  layout: positional parameters first, then varargs, then varkeywords, then
+  ordinary locals.
+- Added `CALL_KW`; the compiler lowers keyword calls by building a keyword dict
+  and sending it through the same object call protocol.
+- Parser now accepts `def f(a, *args, **kwargs)` and keyword call syntax such as
+  `f(a=1)`, rejecting repeated keyword names and positional arguments after a
+  keyword argument.
+- Python function binding now handles missing required arguments, too many
+  positional arguments, duplicate positional/keyword values, unexpected
+  keywords, varargs tuple creation, and varkeywords dict creation.
+
+Completed:
+
+- Added C++ tests for `CodeObject` flag exposure, `CALL_KW` metadata/stack
+  effect, Python function varargs/varkeywords binding, and keyword binding to
+  named parameters.
+- Added compiler/VM coverage for `def collect(first, *args, **kwargs)` called
+  with positional and keyword arguments.
+- Added Python golden coverage in `Tests/python/varargs_kwargs.py`.
+
+Design review:
+
+- Keyword semantics now belong to the call protocol, not to individual VM
+  opcodes or a Python-function-only helper. This is the correct base for a
+  future native argument parser and C/C++ extension call ABI.
+- `CALL_KW` is intentionally structural: it pops a keyword dict and positional
+  arguments, then dispatches through `object_call`. It does not inspect Python
+  function layout.
+- Builtin/native callables currently reject keywords unless they opt in. That
+  is explicit and centralized, but the next quality step is a reusable
+  argument parser with CPython-like messages and support for optional/keyword
+  parameters where the builtin actually accepts them.
+
+Known debt and next risk:
+
+- `*iterable` and `**mapping` call expansion are not implemented yet.
+- Default values, keyword-only parameters, positional-only markers,
+  annotations, decorators, closures, and `global`/`nonlocal` still belong to
+  later function-definition slices.
+- `CodeObject` still needs line table, stacksize, freevars/cellvars, and
+  traceback-facing metadata.
+- RAII root guards remain the highest runtime-safety debt before any moving or
+  collecting GC pressure is introduced.
+- Descriptor family work remains open: `property`, `staticmethod`,
+  `classmethod`, slot wrappers, `__getattribute__`, and `__getattr__`.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all 132 tests pass.
 
 ## 2026-05-18 Function Fast Locals And UnboundLocalError
 

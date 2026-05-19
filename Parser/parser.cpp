@@ -155,25 +155,52 @@ namespace cxxpython::compiler_internal
                     raise_at(peek(), "expected function name");
                 std::string name = advance().lexeme;
                 consume(TokenKind::LeftParen, "expected '(' after function name");
-                std::vector<std::string> params;
+                FunctionParameters params;
                 if (peek().kind != TokenKind::RightParen)
                 {
+                    bool seen_varargs = false;
+                    bool seen_varkeywords = false;
                     while (true)
                     {
+                        bool is_varargs = false;
+                        bool is_varkeywords = false;
+                        if (peek().kind == TokenKind::Star)
+                        {
+                            if (seen_varargs)
+                                raise_at(peek(), "duplicate * parameter");
+                            is_varargs = true;
+                            seen_varargs = true;
+                            advance();
+                        }
+                        else if (peek().kind == TokenKind::DoubleStar)
+                        {
+                            if (seen_varkeywords)
+                                raise_at(peek(), "duplicate ** parameter");
+                            is_varkeywords = true;
+                            seen_varkeywords = true;
+                            advance();
+                        }
+                        else if (seen_varargs)
+                        {
+                            raise_at(peek(), "expected keyword-only or ** parameter");
+                        }
                         if (peek().kind != TokenKind::Identifier)
                             raise_at(peek(), "expected parameter name");
                         std::string param = advance().lexeme;
-                        for (const std::string &existing : params)
-                        {
-                            if (existing == param)
-                                raise_at(previous(), "duplicate parameter name");
-                        }
-                        params.push_back(std::move(param));
+                        ensure_unique_parameter(params, param, previous());
+                        if (is_varkeywords)
+                            params.varkeywords = std::move(param);
+                        else if (is_varargs)
+                            params.varargs = std::move(param);
+                        else
+                            params.positional.push_back(std::move(param));
                         if (peek().kind != TokenKind::Comma)
                             break;
                         advance();
                         if (peek().kind == TokenKind::RightParen)
                             break;
+                        if (seen_varkeywords)
+                            raise_at(peek(), "expected ')' after ** parameter");
                     }
                 }
                 consume(TokenKind::RightParen, "expected ')' after parameters");
@@ -267,6 +294,21 @@ namespace cxxpython::compiler_internal
                 raise_at(equals, "invalid assignment target");
             }
 
+            void ensure_unique_parameter(const FunctionParameters &params,
+                                         const std::string &name,
+                                         const Token &token) const
+            {
+                for (const std::string &existing : params.positional)
+                {
+                    if (existing == name)
+                        raise_at(token, "duplicate parameter name");
+                }
+                if (params.varargs && *params.varargs == name)
+                    raise_at(token, "duplicate parameter name");
+                if (params.varkeywords && *params.varkeywords == name)
+                    raise_at(token, "duplicate parameter name");
+            }
+
             std::unique_ptr<Expr> parse_expression_only()
             {
                 return parse_comparison();
@@ -340,12 +382,32 @@ namespace cxxpython::compiler_internal
                     if (peek().kind == TokenKind::LeftParen)
                     {
                         advance();
-                        std::vector<std::unique_ptr<Expr>> args;
+                        std::vector<CallArgument> args;
+                        std::vector<std::string> keyword_names;
+                        bool seen_keyword = false;
                         if (peek().kind != TokenKind::RightParen)
                         {
                             while (true)
                             {
-                                args.push_back(parse_expression_only());
+                                if (peek().kind == TokenKind::Identifier && peek_next().kind == TokenKind::Equal)
+                                {
+                                    seen_keyword = true;
+                                    std::string keyword = advance().lexeme;
+                                    advance();
+                                    for (const std::string &existing : keyword_names)
+                                    {
+                                        if (existing == keyword)
+                                            raise_at(previous(), "keyword argument repeated");
+                                    }
+                                    keyword_names.push_back(keyword);
+                                    args.emplace_back(std::move(keyword), parse_expression_only());
+                                }
+                                else
+                                {
+                                    if (seen_keyword)
+                                        raise_at(peek(), "positional argument follows keyword argument");
+                                    args.emplace_back(parse_expression_only());
+                                }
                                 if (peek().kind != TokenKind::Comma)
                                     break;
                                 advance();
@@ -484,6 +546,7 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Plus:
                 case TokenKind::Minus:
                 case TokenKind::Star:
+                case TokenKind::DoubleStar:
                 case TokenKind::Tilde:
                 case TokenKind::RightParen:
                 case TokenKind::Comma:
@@ -528,6 +591,11 @@ namespace cxxpython::compiler_internal
                 return tokens_[index_];
             }
 
+            const Token &peek_next() const
+            {
+                return tokens_[index_ + 1];
+            }
+
             const Token &advance()
             {
                 return tokens_[index_++];
@@ -570,6 +638,7 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Plus:
                 case TokenKind::Minus:
                 case TokenKind::Star:
+                case TokenKind::DoubleStar:
                 case TokenKind::Tilde:
                 case TokenKind::LeftParen:
                 case TokenKind::RightParen:

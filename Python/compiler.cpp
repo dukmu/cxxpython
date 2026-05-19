@@ -177,7 +177,7 @@ namespace cxxpython
             {
                 expression.callee->accept(*this);
                 for (const auto &arg : expression.args)
-                    arg->accept(*this);
+                    arg.value->accept(*this);
             }
 
             void visit(const compiler_internal::NameTarget &target) override
@@ -346,7 +346,8 @@ namespace cxxpython
                 instructions_.push_back(Instruction{Opcode::ReturnValue, 0});
                 return runtime_.new_code(function.name,
                                          filename_,
-                                         static_cast<std::uint32_t>(function.params.size()),
+                                         static_cast<std::uint32_t>(function.params.positional.size()),
+                                         function_flags(function.params),
                                          std::move(varnames_),
                                          std::move(constants_),
                                          std::move(names_),
@@ -514,11 +515,37 @@ namespace cxxpython
             void visit(const compiler_internal::CallExpr &expression) override
             {
                 expression.callee->accept(*this);
+                std::size_t positional_count = 0;
+                std::size_t keyword_count = 0;
                 for (const auto &arg : expression.args)
-                    arg->accept(*this);
+                {
+                    if (arg.kind == compiler_internal::CallArgumentKind::Positional)
+                    {
+                        arg.value->accept(*this);
+                        ++positional_count;
+                    }
+                    else
+                    {
+                        emit_constant(runtime_.new_str(arg.keyword));
+                        arg.value->accept(*this);
+                        ++keyword_count;
+                    }
+                }
+                if (keyword_count != 0)
+                {
+                    instructions_.push_back(Instruction{
+                        Opcode::BuildMap,
+                        static_cast<std::uint32_t>(keyword_count),
+                    });
+                    instructions_.push_back(Instruction{
+                        Opcode::CallKw,
+                        static_cast<std::uint32_t>(positional_count),
+                    });
+                    return;
+                }
                 instructions_.push_back(Instruction{
                     Opcode::Call,
-                    static_cast<std::uint32_t>(expression.args.size()),
+                    static_cast<std::uint32_t>(positional_count),
                 });
             }
 
@@ -686,8 +713,12 @@ namespace cxxpython
             SymbolTable collect_function_symbols(const compiler_internal::FunctionDefStmt &function) const
             {
                 SymbolTable symbols(SymbolScope::Function);
-                for (const std::string &param : function.params)
+                for (const std::string &param : function.params.positional)
                     (void)symbols.add_local(param);
+                if (function.params.varargs)
+                    (void)symbols.add_local(*function.params.varargs);
+                if (function.params.varkeywords)
+                    (void)symbols.add_local(*function.params.varkeywords);
                 FunctionLocalCollector locals(symbols);
                 for (const auto &statement : function.body)
                     statement->accept(locals);
@@ -695,6 +726,16 @@ namespace cxxpython
                 for (const auto &statement : function.body)
                     statement->accept(collector);
                 return symbols;
+            }
+
+            CodeObject::Flags function_flags(const compiler_internal::FunctionParameters &params) const
+            {
+                CodeObject::Flags flags = 0;
+                if (params.varargs)
+                    flags |= CodeObject::FlagVarArgs;
+                if (params.varkeywords)
+                    flags |= CodeObject::FlagVarKeywords;
+                return flags;
             }
 
             SymbolTable collect_class_symbols(const compiler_internal::ClassDefStmt &klass) const

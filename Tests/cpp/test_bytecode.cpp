@@ -33,6 +33,7 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::MakeFunction), "MAKE_FUNCTION");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::MakeClass), "MAKE_CLASS");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::Call), "CALL");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::CallKw), "CALL_KW");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::ReturnValue), "RETURN_VALUE");
 
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::LoadConst, 0}), 1);
@@ -65,6 +66,8 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::MakeClass, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::Call, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::Call, 2}), -2);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::CallKw, 0}), -1);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::CallKw, 2}), -3);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::ReturnValue, 0}), -1);
 }
 

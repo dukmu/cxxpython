@@ -234,9 +234,18 @@ namespace cxxpython::compiler_internal
 
             if (ch == '*')
             {
-                tokens.push_back(Token{TokenKind::Star, "*", 0, line, column});
-                ++index;
-                ++column;
+                if (index + 1 < source.size() && source[index + 1] == '*')
+                {
+                    tokens.push_back(Token{TokenKind::DoubleStar, "**", 0, line, column});
+                    index += 2;
+                    column += 2;
+                }
+                else
+                {
+                    tokens.push_back(Token{TokenKind::Star, "*", 0, line, column});
+                    ++index;
+                    ++column;
+                }
                 continue;
             }
 

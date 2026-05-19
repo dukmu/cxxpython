@@ -4,6 +4,7 @@
 
 #include "object_utils.hpp"
 
+#include <algorithm>
 #include <sstream>
 
 namespace cxxpython
@@ -57,20 +58,20 @@ namespace cxxpython
                 visitor(method->self());
         }
 
-        Object *function_call(Object &object, const std::vector<Object *> &args)
+        Object *function_call(Object &object, const CallArguments &args)
         {
             auto *function = static_cast<PythonFunctionObject *>(&object);
             return function->call(args);
         }
 
-        Object *method_call(Object &object, const std::vector<Object *> &args)
+        Object *method_call(Object &object, const CallArguments &args)
         {
             auto *method = static_cast<PythonMethodObject *>(&object);
             std::vector<Object *> bound_args;
-            bound_args.reserve(args.size() + 1);
+            bound_args.reserve(args.positional.size() + 1);
             bound_args.push_back(method->self());
-            bound_args.insert(bound_args.end(), args.begin(), args.end());
-            return method->function()->call(bound_args);
+            bound_args.insert(bound_args.end(), args.positional.begin(), args.positional.end());
+            return method->function()->call(CallArguments{std::move(bound_args), args.keywords});
         }
 
         Object *function_get(Object &object, Object *instance, TypeObject *owner)
@@ -90,6 +91,36 @@ namespace cxxpython
         std::string positional_count_verb(std::size_t count)
         {
             return count == 1 ? "was" : "were";
+        }
+
+        StrObject *varname_at(CodeObject *code, std::uint32_t index)
+        {
+            if (index >= code->varnames().size())
+                throw BytecodeError("function code object argument metadata exceeds varnames");
+            auto *name = dynamic_cast<StrObject *>(code->varnames()[index]);
+            if (!name)
+                throw BytecodeError("function varname must be a str");
+            return name;
+        }
+
+        void raise_positional_count_error(Runtime *runtime,
+                                          const std::string &name,
+                                          std::uint32_t expected,
+                                          std::size_t given)
+        {
+            std::ostringstream message;
+            message << name << "() takes " << expected << " positional "
+                    << positional_count_word(expected) << " but "
+                    << given << " " << positional_count_word(given)
+                    << " " << positional_count_verb(given) << " given";
+            raise_type_error(runtime, message.str());
+        }
+
+        std::uint32_t argument_slot_count(const CodeObject *code)
+        {
+            return code->arg_count() +
+                   (code->has_varargs() ? 1U : 0U) +
+                   (code->has_varkeywords() ? 1U : 0U);
         }
     }
 
@@ -116,28 +147,91 @@ namespace cxxpython
         return globals_;
     }
 
-    Object *PythonFunctionObject::call(const std::vector<Object *> &args)
+    Object *PythonFunctionObject::call(const CallArguments &args)
     {
-        const std::uint32_t expected = code_->arg_count();
-        if (args.size() != expected)
-        {
-            std::ostringstream message;
-            message << name_ << "() takes " << expected << " positional "
-                    << positional_count_word(expected) << " but "
-                    << args.size() << " " << positional_count_word(args.size())
-                    << " " << positional_count_verb(args.size()) << " given";
-            raise_type_error(runtime(), message.str());
-        }
         DictObject *locals = runtime()->new_dict();
-        if (code_->varnames().size() < args.size())
-            throw BytecodeError("function code object argcount exceeds varnames");
-        for (std::size_t index = 0; index < args.size(); ++index)
+        const std::uint32_t expected = code_->arg_count();
+        if (code_->varnames().size() < argument_slot_count(code_))
+            throw BytecodeError("function code object argument metadata exceeds varnames");
+
+        std::vector<bool> bound(expected, false);
+        const std::size_t direct_count = std::min<std::size_t>(args.positional.size(), expected);
+        for (std::size_t index = 0; index < direct_count; ++index)
         {
-            auto *name = dynamic_cast<StrObject *>(code_->varnames()[index]);
-            if (!name)
-                throw BytecodeError("function varname must be a str");
-            locals->set(name, args[index]);
+            locals->set(varname_at(code_, static_cast<std::uint32_t>(index)), args.positional[index]);
+            bound[index] = true;
         }
+
+        if (args.positional.size() > expected)
+        {
+            if (!code_->has_varargs())
+                raise_positional_count_error(runtime(), name_, expected, args.positional.size());
+            std::vector<Object *> extras;
+            extras.reserve(args.positional.size() - expected);
+            for (std::size_t index = expected; index < args.positional.size(); ++index)
+                extras.push_back(args.positional[index]);
+            locals->set(varname_at(code_, code_->varargs_index()), runtime()->new_tuple(std::move(extras)));
+        }
+        else if (code_->has_varargs())
+        {
+            locals->set(varname_at(code_, code_->varargs_index()), runtime()->new_tuple({}));
+        }
+
+        DictObject *keyword_locals = code_->has_varkeywords() ? runtime()->new_dict() : nullptr;
+        if (args.keywords)
+        {
+            for (const DictObject::Entry &entry : args.keywords->entries())
+            {
+                auto *keyword_name = dynamic_cast<StrObject *>(entry.key);
+                if (!keyword_name)
+                    raise_type_error(runtime(), name_ + "() keywords must be strings");
+
+                bool matched = false;
+                for (std::uint32_t index = 0; index < expected; ++index)
+                {
+                    StrObject *parameter = varname_at(code_, index);
+                    if (parameter->value != keyword_name->value)
+                        continue;
+                    if (bound[index])
+                    {
+                        raise_type_error(runtime(),
+                                         name_ + "() got multiple values for argument '" +
+                                             keyword_name->value + "'");
+                    }
+                    locals->set(parameter, entry.value);
+                    bound[index] = true;
+                    matched = true;
+                    break;
+                }
+
+                if (!matched)
+                {
+                    if (!keyword_locals)
+                    {
+                        raise_type_error(runtime(),
+                                         name_ + "() got an unexpected keyword argument '" +
+                                             keyword_name->value + "'");
+                    }
+                    keyword_locals->set(entry.key, entry.value);
+                }
+            }
+        }
+
+        for (std::uint32_t index = 0; index < expected; ++index)
+        {
+            if (bound[index])
+                continue;
+            StrObject *parameter = varname_at(code_, index);
+            raise_type_error(runtime(),
+                             name_ + "() missing required positional argument: '" +
+                                 parameter->value + "'");
+        }
+
+        if (keyword_locals)
+        {
+            locals->set(varname_at(code_, code_->varkeywords_index()), keyword_locals);
+        }
+
         if (VirtualMachine *active_vm = runtime()->active_vm())
             return active_vm->execute(*code_, *locals, *globals_, *runtime()->builtins_dict());
         VirtualMachine vm(*runtime());

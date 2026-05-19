@@ -39,7 +39,7 @@ namespace cxxpython
                 visitor(method->owner());
         }
 
-        Object *method_descriptor_call(Object &object, const std::vector<Object *> &args)
+        Object *method_descriptor_call(Object &object, const CallArguments &args)
         {
             auto *method = static_cast<MethodDescriptorObject *>(&object);
             return method->call_unbound(args);
@@ -91,9 +91,11 @@ namespace cxxpython
         return owner_;
     }
 
-    Object *MethodDescriptorObject::call_unbound(const std::vector<Object *> &args)
+    Object *MethodDescriptorObject::call_unbound(const CallArguments &args)
     {
-        ObjectSpan all_args(args.data(), args.size());
+        if (args.keywords && args.keywords->size() != 0)
+            raise_type_error(runtime(), "method descriptor does not accept keyword arguments");
+        ObjectSpan all_args(args.positional.data(), args.positional.size());
         if (all_args.empty())
         {
             raise_type_error(runtime(),
@@ -102,6 +104,13 @@ namespace cxxpython
                                  "' object needs an argument");
         }
         return call_bound(all_args.front(), all_args.subspan(1));
+    }
+
+    Object *MethodDescriptorObject::call_bound(Object *self, const CallArguments &args)
+    {
+        if (args.keywords && args.keywords->size() != 0)
+            raise_type_error(runtime(), "method descriptor does not accept keyword arguments");
+        return call_bound(self, ObjectSpan(args.positional.data(), args.positional.size()));
     }
 
     Object *MethodDescriptorObject::call_bound(Object *self, ObjectSpan args)

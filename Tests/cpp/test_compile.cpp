@@ -829,6 +829,43 @@ TEST(Compile, FunctionWithoutReturnDefaultsToNone)
     EXPECT_EQ(globals->get(runtime.new_str("result")), runtime.none());
 }
 
+TEST(Compile, CompilesVarargsVarkeywordsAndKeywordCalls)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(
+        runtime,
+        "def collect(first, *args, **kwargs):\n"
+        "    return kwargs\n"
+        "result = collect('a', 'b', extra='value')\n",
+        "script.py");
+    ASSERT_NE(code, nullptr);
+
+    bool saw_call_kw = false;
+    for (const cxxpython::Instruction &instruction : code->instructions())
+    {
+        if (instruction.opcode == cxxpython::Opcode::CallKw)
+            saw_call_kw = true;
+    }
+    EXPECT_TRUE(saw_call_kw);
+
+    EXPECT_EQ(vm.execute(*code, *globals), runtime.none());
+    auto *function = dynamic_cast<cxxpython::PythonFunctionObject *>(globals->get(runtime.new_str("collect")));
+    ASSERT_NE(function, nullptr);
+    EXPECT_EQ(function->code()->arg_count(), 1U);
+    EXPECT_TRUE(function->code()->has_varargs());
+    EXPECT_TRUE(function->code()->has_varkeywords());
+    ASSERT_GE(function->code()->varnames().size(), 3U);
+
+    auto *result = dynamic_cast<cxxpython::DictObject *>(globals->get(runtime.new_str("result")));
+    ASSERT_NE(result, nullptr);
+    auto *extra = dynamic_cast<cxxpython::StrObject *>(result->get(runtime.new_str("extra")));
+    ASSERT_NE(extra, nullptr);
+    EXPECT_EQ(extra->value, "value");
+}
+
 TEST(Compile, CompilesMinimalClassDefinitions)
 {
     cxxpython::Runtime runtime;

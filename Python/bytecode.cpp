@@ -68,6 +68,7 @@ namespace cxxpython
                            std::string name,
                            std::string filename,
                            std::uint32_t arg_count,
+                           CodeObject::Flags flags,
                            std::vector<Object *> varnames,
                            std::vector<Object *> constants,
                            std::vector<Object *> names,
@@ -76,6 +77,7 @@ namespace cxxpython
           name_(std::move(name)),
           filename_(std::move(filename)),
           arg_count_(arg_count),
+          flags_(flags),
           varnames_(std::move(varnames)),
           constants_(std::move(constants)),
           names_(std::move(names)),
@@ -96,6 +98,31 @@ namespace cxxpython
     std::uint32_t CodeObject::arg_count() const noexcept
     {
         return arg_count_;
+    }
+
+    CodeObject::Flags CodeObject::flags() const noexcept
+    {
+        return flags_;
+    }
+
+    bool CodeObject::has_varargs() const noexcept
+    {
+        return (flags_ & FlagVarArgs) != 0;
+    }
+
+    bool CodeObject::has_varkeywords() const noexcept
+    {
+        return (flags_ & FlagVarKeywords) != 0;
+    }
+
+    std::uint32_t CodeObject::varargs_index() const noexcept
+    {
+        return arg_count_;
+    }
+
+    std::uint32_t CodeObject::varkeywords_index() const noexcept
+    {
+        return arg_count_ + (has_varargs() ? 1U : 0U);
     }
 
     const std::vector<Object *> &CodeObject::varnames() const noexcept
@@ -185,6 +212,8 @@ namespace cxxpython
             return "MAKE_CLASS";
         case Opcode::Call:
             return "CALL";
+        case Opcode::CallKw:
+            return "CALL_KW";
         case Opcode::ReturnValue:
             return "RETURN_VALUE";
         }
@@ -233,6 +262,8 @@ namespace cxxpython
             return 1 - 2 * static_cast<int>(instruction.operand);
         case Opcode::Call:
             return -static_cast<int>(instruction.operand);
+        case Opcode::CallKw:
+            return -static_cast<int>(instruction.operand) - 1;
         case Opcode::ReturnValue:
             return -1;
         }

@@ -47,12 +47,12 @@ namespace cxxpython
             }
         }
 
-        Object *native_function_call(Object &object, const std::vector<Object *> &args)
+        Object *native_function_call(Object &object, const CallArguments &args)
         {
             if (auto *function = dynamic_cast<NativeFunctionObject *>(&object))
                 return function->call(*function->runtime(), args);
             if (auto *bound = dynamic_cast<BoundMethodObject *>(&object))
-                return bound->method()->call_bound(bound->self(), ObjectSpan(args.data(), args.size()));
+                return bound->method()->call_bound(bound->self(), args);
             raise_type_error(object.runtime(), "builtin function object has invalid layout");
         }
     }
@@ -69,7 +69,7 @@ namespace cxxpython
         return name_;
     }
 
-    Object *NativeFunctionObject::call(Runtime &runtime, const std::vector<Object *> &args)
+    Object *NativeFunctionObject::call(Runtime &runtime, const CallArguments &args)
     {
         if (!callback_)
             raise_type_error(&runtime, "native function has no implementation");

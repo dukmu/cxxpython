@@ -38,6 +38,7 @@ namespace cxxpython
         MakeFunction,
         MakeClass,
         Call,
+        CallKw,
         ReturnValue,
     };
 
@@ -61,10 +62,16 @@ namespace cxxpython
     class CodeObject final : public Object
     {
     public:
+        using Flags = std::uint32_t;
+
+        static constexpr Flags FlagVarArgs = 1U << 0;
+        static constexpr Flags FlagVarKeywords = 1U << 1;
+
         CodeObject(TypeObject *type,
                    std::string name,
                    std::string filename,
                    std::uint32_t arg_count,
+                   Flags flags,
                    std::vector<Object *> varnames,
                    std::vector<Object *> constants,
                    std::vector<Object *> names,
@@ -73,6 +80,11 @@ namespace cxxpython
         const std::string &name() const noexcept;
         const std::string &filename() const noexcept;
         std::uint32_t arg_count() const noexcept;
+        Flags flags() const noexcept;
+        bool has_varargs() const noexcept;
+        bool has_varkeywords() const noexcept;
+        std::uint32_t varargs_index() const noexcept;
+        std::uint32_t varkeywords_index() const noexcept;
         const std::vector<Object *> &varnames() const noexcept;
         const std::vector<Object *> &constants() const noexcept;
         const std::vector<Object *> &names() const noexcept;
@@ -82,6 +94,7 @@ namespace cxxpython
         std::string name_;
         std::string filename_;
         std::uint32_t arg_count_ = 0;
+        Flags flags_ = 0;
         std::vector<Object *> varnames_;
         std::vector<Object *> constants_;
         std::vector<Object *> names_;

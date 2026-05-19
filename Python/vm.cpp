@@ -1,6 +1,7 @@
 #include "cxxpython/vm.hpp"
 
 #include <sstream>
+#include <utility>
 
 namespace cxxpython
 {
@@ -555,6 +556,19 @@ namespace cxxpython
                     args[index - 1] = frame->pop();
                 Object *callable = frame->pop();
                 frame->push(object_call(callable, args));
+                break;
+            }
+            case Opcode::CallKw:
+            {
+                Object *keywords_object = frame->pop();
+                auto *keywords = dynamic_cast<DictObject *>(keywords_object);
+                if (!keywords)
+                    throw BytecodeError("CALL_KW requires keyword dict");
+                std::vector<Object *> args(instruction.operand);
+                for (std::size_t index = args.size(); index > 0; --index)
+                    args[index - 1] = frame->pop();
+                Object *callable = frame->pop();
+                frame->push(object_call(callable, CallArguments{std::move(args), keywords}));
                 break;
             }
             case Opcode::ReturnValue:

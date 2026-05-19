@@ -2,6 +2,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -81,6 +82,7 @@ namespace cxxpython::compiler_internal
         Plus,
         Minus,
         Star,
+        DoubleStar,
         Tilde,
         LeftParen,
         RightParen,
@@ -256,15 +258,40 @@ namespace cxxpython::compiler_internal
         }
     };
 
+    enum class CallArgumentKind
+    {
+        Positional,
+        Keyword,
+    };
+
+    struct CallArgument final
+    {
+        explicit CallArgument(std::unique_ptr<Expr> value_in)
+            : kind(CallArgumentKind::Positional), value(std::move(value_in))
+        {
+        }
+
+        CallArgument(std::string keyword_in, std::unique_ptr<Expr> value_in)
+            : kind(CallArgumentKind::Keyword),
+              keyword(std::move(keyword_in)),
+              value(std::move(value_in))
+        {
+        }
+
+        CallArgumentKind kind;
+        std::string keyword;
+        std::unique_ptr<Expr> value;
+    };
+
     struct CallExpr final : Expr
     {
-        CallExpr(std::unique_ptr<Expr> callee_in, std::vector<std::unique_ptr<Expr>> args_in)
+        CallExpr(std::unique_ptr<Expr> callee_in, std::vector<CallArgument> args_in)
             : callee(std::move(callee_in)), args(std::move(args_in))
         {
         }
 
         std::unique_ptr<Expr> callee;
-        std::vector<std::unique_ptr<Expr>> args;
+        std::vector<CallArgument> args;
 
         void accept(ExprVisitor &visitor) const override
         {
@@ -490,17 +517,24 @@ namespace cxxpython::compiler_internal
         }
     };
 
+    struct FunctionParameters final
+    {
+        std::vector<std::string> positional;
+        std::optional<std::string> varargs;
+        std::optional<std::string> varkeywords;
+    };
+
     struct FunctionDefStmt final : Stmt
     {
         FunctionDefStmt(std::string name_in,
-                        std::vector<std::string> params_in,
+                        FunctionParameters params_in,
                         std::vector<std::unique_ptr<Stmt>> body_in)
             : name(std::move(name_in)), params(std::move(params_in)), body(std::move(body_in))
         {
         }
 
         std::string name;
-        std::vector<std::string> params;
+        FunctionParameters params;
         std::vector<std::unique_ptr<Stmt>> body;
 
         void accept(StmtVisitor &visitor) const override

@@ -92,9 +92,11 @@ namespace cxxpython
             return false;
         }
 
-        Object *list_new(TypeObject &type, const std::vector<Object *> &args)
+        Object *list_new(TypeObject &type, const CallArguments &args)
         {
-            if (!args.empty())
+            if (args.keywords && args.keywords->size() != 0)
+                raise_type_error(type.runtime(), "list() takes no keyword arguments");
+            if (!args.positional.empty())
                 raise_type_error(type.runtime(), "list() takes no arguments");
             return type.runtime()->allocate<ListObject>(&type, std::vector<Object *>{});
         }

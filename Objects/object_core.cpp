@@ -59,13 +59,27 @@ namespace cxxpython
                 visitor(type->dict);
         }
 
-        Object *object_new(TypeObject &type, const std::vector<Object *> &args)
+        bool has_keywords(const CallArguments &args)
+        {
+            return args.keywords && args.keywords->size() != 0;
+        }
+
+        void reject_keywords(Runtime *runtime, const std::string &callable, const CallArguments &args)
+        {
+            if (!has_keywords(args))
+                return;
+            std::ostringstream message;
+            message << callable << "() takes no keyword arguments";
+            raise_type_error(runtime, message.str());
+        }
+
+        Object *object_new(TypeObject &type, const CallArguments &args)
         {
             (void)args;
             return type.runtime()->allocate<Object>(&type);
         }
 
-        void call_init_slot(TypeObject &type, Object *instance, const std::vector<Object *> &args)
+        void call_init_slot(TypeObject &type, Object *instance, const CallArguments &args)
         {
             if (!is_instance(instance, &type))
                 return;
@@ -74,7 +88,8 @@ namespace cxxpython
                 type.slots.init(*instance, args);
                 return;
             }
-            if (!args.empty())
+            reject_keywords(type.runtime(), type_qualified_name(&type), args);
+            if (!args.positional.empty())
             {
                 std::ostringstream message;
                 message << type_qualified_name(&type) << "() takes no arguments";
@@ -95,16 +110,16 @@ namespace cxxpython
             return "builtins";
         }
 
-        TypeObject *type_new_from_three_args(TypeObject &metaclass, const std::vector<Object *> &args)
+        TypeObject *type_new_from_three_args(TypeObject &metaclass, const CallArguments &args)
         {
             Runtime *runtime = metaclass.runtime();
-            auto *name = dynamic_cast<StrObject *>(args[0]);
+            auto *name = dynamic_cast<StrObject *>(args.positional[0]);
             if (!name)
                 raise_type_error(runtime, "type() name must be a str");
-            auto *bases_tuple = dynamic_cast<TupleObject *>(args[1]);
+            auto *bases_tuple = dynamic_cast<TupleObject *>(args.positional[1]);
             if (!bases_tuple)
                 raise_type_error(runtime, "type() bases must be a tuple");
-            auto *namespace_dict = dynamic_cast<DictObject *>(args[2]);
+            auto *namespace_dict = dynamic_cast<DictObject *>(args.positional[2]);
             if (!namespace_dict)
                 raise_type_error(runtime, "type() namespace must be a dict");
 
@@ -127,20 +142,21 @@ namespace cxxpython
             return runtime->new_class(std::move(request));
         }
 
-        Object *type_call(Object &object, const std::vector<Object *> &args)
+        Object *type_call(Object &object, const CallArguments &args)
         {
             auto *type = dynamic_cast<TypeObject *>(&object);
             if (!type)
                 raise_type_error(object.runtime(), "type call target has invalid layout");
             if (is_subclass(type, type->runtime()->type_type()))
             {
-                if (type == type->runtime()->type_type() && args.size() == 1)
+                reject_keywords(type->runtime(), "type", args);
+                if (type == type->runtime()->type_type() && args.positional.size() == 1)
                 {
-                    if (!args[0])
+                    if (!args.positional[0])
                         raise_type_error(type->runtime(), "type() argument cannot be null");
-                    return args[0]->type();
+                    return args.positional[0]->type();
                 }
-                if (args.size() != 3)
+                if (args.positional.size() != 3)
                     raise_type_error(type->runtime(), "type() takes 1 or 3 arguments");
                 return type_new_from_three_args(*type, args);
             }
@@ -494,6 +510,11 @@ namespace cxxpython
     }
 
     Object *object_call(Object *callable, const std::vector<Object *> &args)
+    {
+        return object_call(callable, CallArguments{args, nullptr});
+    }
+
+    Object *object_call(Object *callable, const CallArguments &args)
     {
         if (!callable)
             raise_type_error(nullptr, "'<null>' object is not callable");

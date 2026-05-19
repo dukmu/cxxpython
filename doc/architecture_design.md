@@ -140,10 +140,16 @@ doc/            design docs and milestone plans
   one Python object and dispatch truth through `is_true`/type truth slots.
   Parser/compiler control-flow syntax must lower to these opcodes instead of
   embedding truth or branch behavior outside the VM.
-- `CALL` 的职责是栈调度：弹出 positional arguments 和 callable，调用统一
-  `object_call`/type call slot，再把返回值压栈。函数对象、native function、
-  type construction、bound method 后续都必须接入这条协议，而不是让 opcode
-  识别具体对象类型。
+- `CALL`/`CALL_KW` 的职责是栈调度：弹出 positional arguments、可选 keyword
+  dict 和 callable，组装 `CallArguments`，调用统一 `object_call`/type call
+  slot，再把返回值压栈。函数对象、native function、type construction、
+  bound method 都必须接入这条协议，而不是让 opcode 识别具体对象类型。
+- Function signature metadata belongs in `CodeObject`, not in ad hoc function
+  side tables. `arg_count` records positional parameters; flags record
+  `*args` and `**kwargs`; `varnames` layout is positional parameters, varargs
+  name, varkeywords name, then ordinary locals. Future defaults,
+  keyword-only parameters, positional-only markers, annotations, freevars, and
+  cellvars must extend this metadata coherently.
 - `LOAD_ATTR`/`STORE_ATTR` 的职责也是栈调度和 name operand 解码；属性语义
   必须继续由 `object_get_attr`/`object_set_attr` 处理。不要在 VM opcode 中
   复制 descriptor、module dict、instance dict 或 type MRO 规则。

@@ -26,7 +26,19 @@ namespace cxxpython
 
     using VisitChildren = std::function<void(Object *)>;
     using ObjectSpan = std::span<Object *const>;
-    using NativeFunctionCallback = std::function<Object *(Runtime &, const std::vector<Object *> &)>;
+
+    struct CallArguments
+    {
+        CallArguments(std::vector<Object *> positional_in, DictObject *keywords_in)
+            : positional(std::move(positional_in)), keywords(keywords_in)
+        {
+        }
+
+        std::vector<Object *> positional;
+        DictObject *keywords = nullptr;
+    };
+
+    using NativeFunctionCallback = std::function<Object *(Runtime &, const CallArguments &)>;
     using MethodDescriptorCallback =
         std::function<Object *(Runtime &, Object *, ObjectSpan)>;
     using GetSetGetter = std::function<Object *(Runtime &, Object *, TypeObject *)>;
@@ -68,15 +80,15 @@ namespace cxxpython
     using TraverseSlot = void (*)(const Object &, const VisitChildren &);
     using BinaryOpSlot = Object *(*)(const Object &, const Object &, BinaryOp);
     using UnaryOpSlot = Object *(*)(const Object &, UnaryOp);
-    using CallSlot = Object *(*)(Object &, const std::vector<Object *> &);
+    using CallSlot = Object *(*)(Object &, const CallArguments &);
     using LengthSlot = std::size_t (*)(const Object &);
     using GetItemSlot = Object *(*)(Object &, Object *);
     using SetItemSlot = void (*)(Object &, Object *, Object *);
     using ContainsSlot = bool (*)(Object &, Object *);
     using DescrGetSlot = Object *(*)(Object &, Object *, TypeObject *);
     using DescrSetSlot = void (*)(Object &, Object *, Object *);
-    using NewSlot = Object *(*)(TypeObject &, const std::vector<Object *> &);
-    using InitSlot = void (*)(Object &, const std::vector<Object *> &);
+    using NewSlot = Object *(*)(TypeObject &, const CallArguments &);
+    using InitSlot = void (*)(Object &, const CallArguments &);
 
     struct TypeSlots
     {
@@ -291,7 +303,7 @@ namespace cxxpython
         NativeFunctionObject(TypeObject *type, std::string name, NativeFunctionCallback callback);
 
         const std::string &name() const noexcept;
-        Object *call(Runtime &runtime, const std::vector<Object *> &args);
+        Object *call(Runtime &runtime, const CallArguments &args);
 
     private:
         std::string name_;
@@ -306,7 +318,7 @@ namespace cxxpython
         const std::string &name() const noexcept;
         CodeObject *code() const noexcept;
         DictObject *globals() const noexcept;
-        Object *call(const std::vector<Object *> &args);
+        Object *call(const CallArguments &args);
 
     private:
         std::string name_;
@@ -324,7 +336,8 @@ namespace cxxpython
 
         const std::string &name() const noexcept;
         TypeObject *owner() const noexcept;
-        Object *call_unbound(const std::vector<Object *> &args);
+        Object *call_unbound(const CallArguments &args);
+        Object *call_bound(Object *self, const CallArguments &args);
         Object *call_bound(Object *self, ObjectSpan args);
 
     private:
@@ -403,6 +416,7 @@ namespace cxxpython
     Object *object_binary_op(Object *left, Object *right, BinaryOp op);
     Object *object_inplace_binary_op(Object *left, Object *right, BinaryOp op);
     Object *object_unary_op(Object *operand, UnaryOp op);
+    Object *object_call(Object *callable, const CallArguments &args);
     Object *object_call(Object *callable, const std::vector<Object *> &args);
     std::size_t object_length(Object *object);
     Object *object_get_item(Object *object, Object *key);

@@ -103,7 +103,7 @@ TEST(Functions, PythonFunctionArgumentBindingUsesCodeObjectVarnames)
     catch (const cxxpython::PythonError &error)
     {
         EXPECT_EQ(error.type(), runtime.type_error_type());
-        EXPECT_STREQ(error.what(), "identity() takes 1 positional argument but 0 arguments were given");
+        EXPECT_STREQ(error.what(), "identity() missing required positional argument: 'value'");
     }
 
     try
@@ -136,15 +136,98 @@ TEST(Functions, RejectsMalformedFunctionCodeObjectMetadata)
     EXPECT_THROW((void)cxxpython::object_call(function, {runtime.none()}), cxxpython::BytecodeError);
 }
 
+TEST(Functions, PythonFunctionBindsVarargsAndVarkeywords)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::DictObject *globals = runtime.new_dict();
+    cxxpython::CodeObject *varargs_code = runtime.new_code(
+        "collect_args",
+        "test.py",
+        1,
+        cxxpython::CodeObject::FlagVarArgs,
+        {runtime.new_str("first"), runtime.new_str("args")},
+        {},
+        {},
+        {{cxxpython::Opcode::LoadFast, 1},
+         {cxxpython::Opcode::ReturnValue, 0}});
+    cxxpython::PythonFunctionObject *collect_args =
+        runtime.new_function("collect_args", varargs_code, globals);
+
+    cxxpython::Object *first = runtime.new_str("first");
+    cxxpython::Object *second = runtime.new_str("second");
+    cxxpython::Object *third = runtime.new_str("third");
+    auto *args_tuple = dynamic_cast<cxxpython::TupleObject *>(
+        cxxpython::object_call(collect_args, {first, second, third}));
+    ASSERT_NE(args_tuple, nullptr);
+    ASSERT_EQ(args_tuple->items().size(), 2U);
+    EXPECT_EQ(args_tuple->items()[0], second);
+    EXPECT_EQ(args_tuple->items()[1], third);
+
+    cxxpython::CodeObject *kwargs_code = runtime.new_code(
+        "collect_kwargs",
+        "test.py",
+        1,
+        cxxpython::CodeObject::FlagVarKeywords,
+        {runtime.new_str("first"), runtime.new_str("kwargs")},
+        {},
+        {},
+        {{cxxpython::Opcode::LoadFast, 1},
+         {cxxpython::Opcode::ReturnValue, 0}});
+    cxxpython::PythonFunctionObject *collect_kwargs =
+        runtime.new_function("collect_kwargs", kwargs_code, globals);
+
+    cxxpython::DictObject *keywords = runtime.new_dict();
+    cxxpython::Object *extra = runtime.new_str("extra");
+    keywords->set(runtime.new_str("extra"), extra);
+    auto *kwargs_dict = dynamic_cast<cxxpython::DictObject *>(
+        cxxpython::object_call(collect_kwargs, cxxpython::CallArguments{{first}, keywords}));
+    ASSERT_NE(kwargs_dict, nullptr);
+    EXPECT_EQ(kwargs_dict->get(runtime.new_str("extra")), extra);
+}
+
+TEST(Functions, PythonFunctionBindsKeywordArgumentsToParameters)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::DictObject *globals = runtime.new_dict();
+    cxxpython::CodeObject *code = runtime.new_code(
+        "identity",
+        "test.py",
+        1,
+        {runtime.new_str("value")},
+        {},
+        {},
+        {{cxxpython::Opcode::LoadFast, 0},
+         {cxxpython::Opcode::ReturnValue, 0}});
+    cxxpython::PythonFunctionObject *function = runtime.new_function("identity", code, globals);
+
+    cxxpython::Object *value = runtime.new_str("kw");
+    cxxpython::DictObject *keywords = runtime.new_dict();
+    keywords->set(runtime.new_str("value"), value);
+    EXPECT_EQ(cxxpython::object_call(function, cxxpython::CallArguments{{}, keywords}), value);
+
+    keywords->set(runtime.new_str("other"), value);
+    try
+    {
+        (void)cxxpython::object_call(function, cxxpython::CallArguments{{}, keywords});
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "identity() got an unexpected keyword argument 'other'");
+    }
+}
+
 TEST(Functions, PythonFunctionCallsReuseActiveVirtualMachineFrames)
 {
     cxxpython::Runtime runtime;
     cxxpython::DictObject *globals = runtime.new_dict();
     globals->set(runtime.new_str("probe"),
                  runtime.new_native_function("probe", [](cxxpython::Runtime &runtime,
-                                                          const std::vector<cxxpython::Object *> &args)
+                                                          const cxxpython::CallArguments &args)
                                              {
-                                                 if (!args.empty())
+                                                 if (!args.positional.empty() ||
+                                                     (args.keywords && args.keywords->size() != 0))
                                                      cxxpython::raise_type_error(&runtime, "probe() takes no arguments");
                                                  cxxpython::VirtualMachine *vm = runtime.active_vm();
                                                  if (!vm)
