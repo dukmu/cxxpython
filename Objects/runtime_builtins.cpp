@@ -474,7 +474,13 @@ namespace cxxpython
             VirtualMachine *vm = runtime.active_vm();
             if (!vm)
                 raise_type_error(&runtime, "eval() requires an active VM");
-            return vm->execute(*code_root.get(), *locals, *globals, *runtime.builtins_dict());
+            return vm->execute(ExecutionRequest{
+                .code = code_root.get(),
+                .locals = locals,
+                .globals = globals,
+                .builtins = runtime.builtins_dict(),
+                .mode = ExecutionMode::Eval,
+            });
         }
 
         Object *builtin_exec(Runtime &runtime, const CallArguments &args)
@@ -490,7 +496,13 @@ namespace cxxpython
             VirtualMachine *vm = runtime.active_vm();
             if (!vm)
                 raise_type_error(&runtime, "exec() requires an active VM");
-            (void)vm->execute(*code_root.get(), *locals, *globals, *runtime.builtins_dict());
+            (void)vm->execute(ExecutionRequest{
+                .code = code_root.get(),
+                .locals = locals,
+                .globals = globals,
+                .builtins = runtime.builtins_dict(),
+                .mode = ExecutionMode::Exec,
+            });
             return runtime.none();
         }
     }

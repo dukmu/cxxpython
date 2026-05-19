@@ -237,10 +237,17 @@ namespace cxxpython
             locals->set(varname_at(code_, code_->varkeywords_index()), keyword_locals);
         }
 
+        ExecutionRequest request{
+            .code = code_,
+            .locals = locals,
+            .globals = globals_,
+            .builtins = runtime()->builtins_dict(),
+            .mode = ExecutionMode::Function,
+        };
         if (VirtualMachine *active_vm = runtime()->active_vm())
-            return active_vm->execute(*code_, *locals, *globals_, *runtime()->builtins_dict());
+            return active_vm->execute(request);
         VirtualMachine vm(*runtime());
-        return vm.execute(*code_, *locals, *globals_, *runtime()->builtins_dict());
+        return vm.execute(request);
     }
 
     PythonMethodObject::PythonMethodObject(TypeObject *type, Object *callable, Object *self)

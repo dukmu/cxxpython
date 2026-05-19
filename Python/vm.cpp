@@ -422,12 +422,42 @@ namespace cxxpython
 
     Object *VirtualMachine::execute(CodeObject &code, DictObject &globals)
     {
-        return execute(code, globals, globals, *runtime_.builtins_dict());
+        return execute(ExecutionRequest{
+            .code = &code,
+            .locals = &globals,
+            .globals = &globals,
+            .builtins = runtime_.builtins_dict(),
+            .mode = ExecutionMode::Exec,
+        });
     }
 
     Object *VirtualMachine::execute(CodeObject &code, DictObject &locals, DictObject &globals, DictObject &builtins)
     {
+        return execute(ExecutionRequest{
+            .code = &code,
+            .locals = &locals,
+            .globals = &globals,
+            .builtins = &builtins,
+            .mode = ExecutionMode::Exec,
+        });
+    }
+
+    Object *VirtualMachine::execute(const ExecutionRequest &request)
+    {
         ActiveVirtualMachine active_vm(*this);
+        if (!request.code)
+            throw BytecodeError("execution request requires a code object");
+        if (!request.locals)
+            throw BytecodeError("execution request requires locals");
+        if (!request.globals)
+            throw BytecodeError("execution request requires globals");
+        DictObject *builtins_dict = request.builtins ? request.builtins : runtime_.builtins_dict();
+        if (!builtins_dict)
+            throw BytecodeError("execution request requires builtins");
+        CodeObject &code = *request.code;
+        DictObject &locals = *request.locals;
+        DictObject &globals = *request.globals;
+        DictObject &builtins = *builtins_dict;
         Frame *frame = runtime_.new_frame(&code, &locals, &globals, &builtins);
         ActiveFrame active_frame(thread_, *frame);
         while (frame->instruction_pointer() < code.instructions().size())
@@ -799,7 +829,13 @@ namespace cxxpython
                 request.qualname = class_name->value;
                 DictObject *namespace_dict = runtime_.prepare_class_namespace(request);
                 auto namespace_root = runtime_.root(namespace_dict);
-                (void)execute(*class_code, *namespace_dict, globals, builtins);
+                (void)execute(ExecutionRequest{
+                    .code = class_code,
+                    .locals = namespace_dict,
+                    .globals = &globals,
+                    .builtins = &builtins,
+                    .mode = ExecutionMode::ClassBody,
+                });
                 request.namespace_dict = namespace_dict;
                 TypeObject *type = runtime_.new_class(std::move(request));
                 auto type_root = runtime_.root(type);

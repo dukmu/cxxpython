@@ -1,5 +1,39 @@
 # Development Status
 
+## 2026-05-19 Execution Request Substrate Slice
+
+Review focus:
+
+- Reduce the direct VM execution-call debt identified in the substrate plan.
+- Keep old public VM overloads for tests and host convenience, but make them
+  delegate to one explicit execution request path.
+
+Completed:
+
+- Added `ExecutionMode` and `ExecutionRequest`.
+- Added `VirtualMachine::execute(const ExecutionRequest &)`.
+- Routed existing VM execute overloads through `ExecutionRequest`.
+- Routed function calls, `eval`, `exec`, REPL execution, script execution, and
+  class-body execution through the new request structure.
+- Added focused C++ coverage that verifies explicit locals/globals/builtins
+  namespaces travel through `ExecutionRequest`.
+
+Known debt and next risk:
+
+- `ExecutionRequest::module` and `ExecutionMode` are now explicit but mostly
+  advisory. The next slices should use them for builtins injection,
+  `__main__` registration, import execution, class-body semantics, and
+  traceback display names.
+- `MAKE_CLASS` still owns policy. With execution requests in place, the next
+  natural code slice is `__build_class__` and metaclass-aware class body
+  execution.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter='Bytecode.ExecutionRequestCarriesExplicitNamespaces:Functions.PythonFunctionCallsReuseActiveVirtualMachineFrames:PythonScripts.RunsGoldenFiles:Cli.ExecutesScriptFile:Cli.RunsInteractiveReplFromStandardInput'`
+- `ctest --test-dir build --output-on-failure`
+
 ## 2026-05-19 Bottom Substrate Planning Slice
 
 Review focus:

@@ -825,6 +825,35 @@ TEST(Bytecode, LoadNameResolvesLocalsGlobalsThenBuiltins)
     EXPECT_EQ(builtin_result->value, 1);
 }
 
+TEST(Bytecode, ExecutionRequestCarriesExplicitNamespaces)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::StrObject *name = runtime.new_str("x");
+    cxxpython::CodeObject *code = runtime.new_code({},
+                                                   {name},
+                                                   {{cxxpython::Opcode::LoadName, 0},
+                                                    {cxxpython::Opcode::ReturnValue, 0}});
+    cxxpython::DictObject *locals = runtime.new_dict();
+    cxxpython::DictObject *globals = runtime.new_dict();
+    cxxpython::DictObject *builtins = runtime.new_dict();
+    cxxpython::ModuleObject *module = runtime.new_module("__main__", "<test>");
+    locals->set(runtime.new_str("x"), runtime.new_int(42));
+    globals->set(runtime.new_str("x"), runtime.new_int(7));
+    builtins->set(runtime.new_str("x"), runtime.new_int(1));
+
+    auto *result = dynamic_cast<cxxpython::IntObject *>(vm.execute(cxxpython::ExecutionRequest{
+        .code = code,
+        .locals = locals,
+        .globals = globals,
+        .builtins = builtins,
+        .module = module,
+        .mode = cxxpython::ExecutionMode::Module,
+    }));
+    ASSERT_NE(result, nullptr);
+    EXPECT_EQ(result->value, 42);
+}
+
 TEST(Bytecode, DispatchesLoadAttrAndStoreAttrThroughObjectApi)
 {
     cxxpython::Runtime runtime;

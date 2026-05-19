@@ -102,6 +102,25 @@ namespace cxxpython
         std::vector<Frame *> frames_;
     };
 
+    enum class ExecutionMode : std::uint8_t
+    {
+        Eval,
+        Exec,
+        Module,
+        Function,
+        ClassBody,
+    };
+
+    struct ExecutionRequest
+    {
+        CodeObject *code = nullptr;
+        DictObject *locals = nullptr;
+        DictObject *globals = nullptr;
+        DictObject *builtins = nullptr;
+        ModuleObject *module = nullptr;
+        ExecutionMode mode = ExecutionMode::Exec;
+    };
+
     class VirtualMachine final
     {
     public:
@@ -112,6 +131,7 @@ namespace cxxpython
         Object *execute(CodeObject &code);
         Object *execute(CodeObject &code, DictObject &globals);
         Object *execute(CodeObject &code, DictObject &locals, DictObject &globals, DictObject &builtins);
+        Object *execute(const ExecutionRequest &request);
 
     private:
         Runtime &runtime_;

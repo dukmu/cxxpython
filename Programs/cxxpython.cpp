@@ -150,7 +150,14 @@ namespace
 
             try
             {
-                cxxpython::Object *result = vm.execute(*code, *module->dict());
+                cxxpython::Object *result = vm.execute(cxxpython::ExecutionRequest{
+                    .code = code,
+                    .locals = module->dict(),
+                    .globals = module->dict(),
+                    .builtins = runtime.builtins_dict(),
+                    .module = module,
+                    .mode = print_result ? cxxpython::ExecutionMode::Eval : cxxpython::ExecutionMode::Exec,
+                });
                 if (print_result && result != runtime.none())
                     std::cout << cxxpython::object_repr(result) << "\n";
             }
@@ -212,7 +219,14 @@ int main(int argc, char **argv)
             cxxpython::VirtualMachine vm(runtime);
             cxxpython::ModuleObject *module = runtime.new_module("__main__", argv[1]);
             cxxpython::CodeObject *code = cxxpython::compile_exec_input(runtime, source, argv[1]);
-            (void)vm.execute(*code, *module->dict());
+            (void)vm.execute(cxxpython::ExecutionRequest{
+                .code = code,
+                .locals = module->dict(),
+                .globals = module->dict(),
+                .builtins = runtime.builtins_dict(),
+                .module = module,
+                .mode = cxxpython::ExecutionMode::Module,
+            });
             return 0;
         }
         catch (const cxxpython::PythonError &error)
