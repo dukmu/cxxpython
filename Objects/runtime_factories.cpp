@@ -187,13 +187,23 @@ namespace cxxpython
         return allocate<NativeFunctionObject>(native_function_type_, std::move(name), std::move(callback));
     }
 
-    PythonFunctionObject *Runtime::new_function(std::string name, CodeObject *code, DictObject *globals)
+    PythonFunctionObject *Runtime::new_function(std::string name,
+                                                CodeObject *code,
+                                                DictObject *globals,
+                                                std::vector<CellObject *> closure)
     {
         if (!code)
             raise_type_error(this, "function requires a code object");
         if (!globals)
             raise_type_error(this, "function requires globals");
-        return allocate<PythonFunctionObject>(function_type_, std::move(name), code, globals);
+        if (closure.size() != code->freevars().size())
+            raise_type_error(this, "function closure size does not match code free variables");
+        return allocate<PythonFunctionObject>(function_type_, std::move(name), code, globals, std::move(closure));
+    }
+
+    CellObject *Runtime::new_cell(Object *value)
+    {
+        return allocate<CellObject>(cell_type_, value);
     }
 
     PythonMethodObject *Runtime::new_method(Object *callable, Object *self)
@@ -348,6 +358,8 @@ namespace cxxpython
                         std::move(varnames),
                         std::move(constants),
                         std::move(names),
+                        {},
+                        {},
                         std::move(instructions),
                         std::move(lines));
     }
@@ -362,6 +374,31 @@ namespace cxxpython
                                   std::vector<Instruction> instructions,
                                   std::vector<std::uint32_t> lines)
     {
+        return new_code(std::move(name),
+                        std::move(filename),
+                        arg_count,
+                        flags,
+                        std::move(varnames),
+                        std::move(constants),
+                        std::move(names),
+                        {},
+                        {},
+                        std::move(instructions),
+                        std::move(lines));
+    }
+
+    CodeObject *Runtime::new_code(std::string name,
+                                  std::string filename,
+                                  std::uint32_t arg_count,
+                                  std::uint32_t flags,
+                                  std::vector<Object *> varnames,
+                                  std::vector<Object *> constants,
+                                  std::vector<Object *> names,
+                                  std::vector<Object *> cellvars,
+                                  std::vector<Object *> freevars,
+                                  std::vector<Instruction> instructions,
+                                  std::vector<std::uint32_t> lines)
+    {
         return allocate<CodeObject>(code_type_,
                                     std::move(name),
                                     std::move(filename),
@@ -370,18 +407,55 @@ namespace cxxpython
                                     std::move(varnames),
                                     std::move(constants),
                                     std::move(names),
+                                    std::move(cellvars),
+                                    std::move(freevars),
                                     std::move(instructions),
                                     std::move(lines));
     }
 
-    Frame *Runtime::new_frame(CodeObject *code, DictObject *locals, DictObject *globals, DictObject *builtins)
+    Frame *Runtime::new_frame(CodeObject *code,
+                              DictObject *locals,
+                              DictObject *globals,
+                              DictObject *builtins,
+                              std::vector<CellObject *> closure)
     {
+        if (!code)
+            throw BytecodeError("frame requires a code object");
+        if (closure.size() != code->freevars().size())
+            throw BytecodeError("frame closure size does not match code free variables");
         DictObject *resolved_globals = globals ? globals : new_dict();
         DictObject *resolved_locals = locals ? locals : resolved_globals;
         DictObject *resolved_builtins = builtins ? builtins : builtins_dict();
         if (!resolved_builtins)
             raise_type_error(this, "runtime builtins are not initialized");
-        return allocate<Frame>(frame_type_, code, resolved_locals, resolved_globals, resolved_builtins);
+
+        std::vector<CellObject *> cells;
+        std::vector<Rooted<CellObject>> cell_roots;
+        cells.reserve(code->cellvars().size() + closure.size());
+        cell_roots.reserve(code->cellvars().size() + closure.size());
+        for (Object *name_object : code->cellvars())
+        {
+            auto *name = dynamic_cast<StrObject *>(name_object);
+            if (!name)
+                throw BytecodeError("cell variable name must be a str");
+            CellObject *cell = new_cell(resolved_locals->get(name));
+            cells.push_back(cell);
+            cell_roots.push_back(root(cell));
+        }
+        for (CellObject *cell : closure)
+        {
+            if (!cell)
+                throw BytecodeError("frame closure cannot contain null cells");
+            cells.push_back(cell);
+            cell_roots.push_back(root(cell));
+        }
+
+        return allocate<Frame>(frame_type_,
+                               code,
+                               resolved_locals,
+                               resolved_globals,
+                               resolved_builtins,
+                               std::move(cells));
     }
 
     TypeObject *Runtime::new_heap_type(std::string name, TypeObject *base, TypeSlots slots)
@@ -535,6 +609,7 @@ namespace cxxpython
             .locals = namespace_dict,
             .globals = globals_root.get(),
             .builtins = builtins_root.get(),
+            .closure = {},
             .mode = ExecutionMode::ClassBody,
         });
 

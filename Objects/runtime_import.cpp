@@ -126,6 +126,7 @@ namespace cxxpython
                 .globals = module_root->dict(),
                 .builtins = builtins_dict(),
                 .module = module_root.get(),
+                .closure = {},
                 .mode = ExecutionMode::Module,
             };
             if (VirtualMachine *vm = active_vm())

@@ -36,6 +36,7 @@ namespace cxxpython
     class StaticMethodObject;
     class ClassMethodObject;
     class PythonFunctionObject;
+    class CellObject;
 
     using VisitChildren = std::function<void(Object *)>;
     using ObjectSpan = std::span<Object *const>;
@@ -479,17 +480,36 @@ namespace cxxpython
     class PythonFunctionObject final : public Object
     {
     public:
-        PythonFunctionObject(TypeObject *type, std::string name, CodeObject *code, DictObject *globals);
+        PythonFunctionObject(TypeObject *type,
+                             std::string name,
+                             CodeObject *code,
+                             DictObject *globals,
+                             std::vector<CellObject *> closure = {});
 
         const std::string &name() const noexcept;
         CodeObject *code() const noexcept;
         DictObject *globals() const noexcept;
+        const std::vector<CellObject *> &closure() const noexcept;
         Object *call(const CallArguments &args);
 
     private:
         std::string name_;
         CodeObject *code_;
         DictObject *globals_;
+        std::vector<CellObject *> closure_;
+    };
+
+    class CellObject final : public Object
+    {
+    public:
+        CellObject(TypeObject *type, Object *value);
+
+        Object *value() const noexcept;
+        void set_value(Object *value) noexcept;
+        bool is_empty() const noexcept;
+
+    private:
+        Object *value_ = nullptr;
     };
 
     class MethodDescriptorObject final : public Object
@@ -729,6 +749,7 @@ namespace cxxpython
     TypeSlots make_exception_slots();
     TypeSlots make_code_slots();
     TypeSlots make_frame_slots();
+    TypeSlots make_cell_slots();
 
     [[noreturn]] void raise_type_error(Runtime *runtime, std::string message);
     [[noreturn]] void raise_value_error(Runtime *runtime, std::string message);

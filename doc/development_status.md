@@ -1,5 +1,52 @@
 # Development Status
 
+## 2026-05-19 Closure Cell Foundation Slice
+
+Review focus:
+
+- Build closures as real object-space cells, not copied values or globals
+  fallback.
+- Keep frame construction GC-ready by allocating cells before the `Frame`
+  object is constructed.
+- Make compiler, CodeObject, function object, and VM agree on one
+  `cellvars/freevars` ordering before `super()` and `__class__` cells build on
+  it.
+
+Completed:
+
+- Added `CellObject` with repr, traversal, runtime type bootstrap, and
+  `Runtime::new_cell`.
+- Extended `CodeObject` with `cellvars` and `freevars` metadata.
+- Added `LOAD_DEREF`, `STORE_DEREF`, `DELETE_DEREF`, and `LOAD_CLOSURE`.
+- Added closure vectors to `PythonFunctionObject`, function traversal, and
+  function execution requests.
+- Moved frame cell creation into `Runtime::new_frame`, with temporary roots
+  for newly allocated cells and a constructor that only validates final frame
+  state.
+- Extended compiler symbol analysis to identify function cell/free variables
+  and pass free variables through intermediate nested functions.
+- Lowered nested function creation to load closure cells, build a closure
+  tuple, and call `MAKE_FUNCTION` with closure metadata.
+- Added C++ and Python golden coverage for shared closure cells, mutation after
+  inner function creation, parameter capture, and freevar pass-through.
+
+Known debt and next risk:
+
+- `global` and `nonlocal` statements are still not parsed or analyzed.
+- Class-body closure semantics remain incomplete: no `__class__` cell,
+  `LOAD_CLASSDEREF`, or zero-argument `super()` yet.
+- Empty-cell error messages are intentionally minimal and need CPython-style
+  local/free-variable wording once traceback objects are richer.
+- Symbol analysis is still local to `compiler.cpp`; as function/class scope
+  semantics grow, it should become a dedicated module with explicit symbol
+  states rather than visitor plumbing embedded beside bytecode emission.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter='Bytecode.MetadataNamesAndStackEffects:Bytecode.DispatchesMakeFunctionWithClosure:Compile.CompilesNestedFunctionClosureCells:Compile.PassesFreeVariablesThroughIntermediateFunctions:PythonScripts.RunsGoldenFiles'`
+- `ctest --test-dir build --output-on-failure`
+
 ## 2026-05-19 Module Registry And Import Substrate Slice
 
 Review focus:

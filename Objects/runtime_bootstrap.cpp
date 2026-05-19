@@ -30,6 +30,7 @@ namespace cxxpython
         module_type_ = allocate_type("module");
         native_function_type_ = allocate_type("builtin_function_or_method");
         function_type_ = allocate_type("function");
+        cell_type_ = allocate_type("cell");
         method_type_ = allocate_type("method");
         method_descriptor_type_ = allocate_type("method_descriptor");
         slot_wrapper_type_ = allocate_type("wrapper_descriptor");
@@ -75,6 +76,7 @@ namespace cxxpython
         module_type_->slots = make_module_slots();
         native_function_type_->slots = make_native_function_slots();
         function_type_->slots = make_function_slots();
+        cell_type_->slots = make_cell_slots();
         method_type_->slots = make_method_slots();
         method_descriptor_type_->slots = make_method_descriptor_slots();
         slot_wrapper_type_->slots = make_slot_wrapper_slots();
@@ -120,6 +122,7 @@ namespace cxxpython
         module_type_->set_type(type_type_);
         native_function_type_->set_type(type_type_);
         function_type_->set_type(type_type_);
+        cell_type_->set_type(type_type_);
         method_type_->set_type(type_type_);
         method_descriptor_type_->set_type(type_type_);
         slot_wrapper_type_->set_type(type_type_);
@@ -168,6 +171,7 @@ namespace cxxpython
         initialize_type(module_type_, object_type_);
         initialize_type(native_function_type_, object_type_);
         initialize_type(function_type_, object_type_);
+        initialize_type(cell_type_, object_type_);
         initialize_type(method_type_, object_type_);
         initialize_type(method_descriptor_type_, object_type_);
         initialize_type(slot_wrapper_type_, object_type_);
@@ -213,6 +217,7 @@ namespace cxxpython
         module_type_->solid_base = module_type_;
         native_function_type_->solid_base = native_function_type_;
         function_type_->solid_base = function_type_;
+        cell_type_->solid_base = cell_type_;
         method_type_->solid_base = method_type_;
         method_descriptor_type_->solid_base = method_descriptor_type_;
         slot_wrapper_type_->solid_base = slot_wrapper_type_;
@@ -263,6 +268,7 @@ namespace cxxpython
         add_root(module_type_);
         add_root(native_function_type_);
         add_root(function_type_);
+        add_root(cell_type_);
         add_root(method_type_);
         add_root(method_descriptor_type_);
         add_root(slot_wrapper_type_);

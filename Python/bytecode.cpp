@@ -61,6 +61,16 @@ namespace cxxpython
                 if (varname)
                     visitor(varname);
             }
+            for (Object *cellvar : code->cellvars())
+            {
+                if (cellvar)
+                    visitor(cellvar);
+            }
+            for (Object *freevar : code->freevars())
+            {
+                if (freevar)
+                    visitor(freevar);
+            }
         }
     }
 
@@ -72,6 +82,8 @@ namespace cxxpython
                            std::vector<Object *> varnames,
                            std::vector<Object *> constants,
                            std::vector<Object *> names,
+                           std::vector<Object *> cellvars,
+                           std::vector<Object *> freevars,
                            std::vector<Instruction> instructions,
                            std::vector<std::uint32_t> lines)
         : Object(type),
@@ -82,6 +94,8 @@ namespace cxxpython
           varnames_(std::move(varnames)),
           constants_(std::move(constants)),
           names_(std::move(names)),
+          cellvars_(std::move(cellvars)),
+          freevars_(std::move(freevars)),
           instructions_(std::move(instructions)),
           lines_(std::move(lines))
     {
@@ -144,6 +158,16 @@ namespace cxxpython
         return names_;
     }
 
+    const std::vector<Object *> &CodeObject::cellvars() const noexcept
+    {
+        return cellvars_;
+    }
+
+    const std::vector<Object *> &CodeObject::freevars() const noexcept
+    {
+        return freevars_;
+    }
+
     const std::vector<Instruction> &CodeObject::instructions() const noexcept
     {
         return instructions_;
@@ -190,6 +214,14 @@ namespace cxxpython
             return "STORE_FAST";
         case Opcode::DeleteFast:
             return "DELETE_FAST";
+        case Opcode::LoadDeref:
+            return "LOAD_DEREF";
+        case Opcode::StoreDeref:
+            return "STORE_DEREF";
+        case Opcode::DeleteDeref:
+            return "DELETE_DEREF";
+        case Opcode::LoadClosure:
+            return "LOAD_CLOSURE";
         case Opcode::LoadAttr:
             return "LOAD_ATTR";
         case Opcode::StoreAttr:
@@ -265,10 +297,13 @@ namespace cxxpython
         case Opcode::LoadConst:
         case Opcode::LoadName:
         case Opcode::LoadFast:
+        case Opcode::LoadDeref:
+        case Opcode::LoadClosure:
             return 1;
         case Opcode::LoadAttr:
         case Opcode::DeleteName:
         case Opcode::DeleteFast:
+        case Opcode::DeleteDeref:
         case Opcode::JumpAbsolute:
         case Opcode::SetupExcept:
         case Opcode::SetupFinally:
@@ -279,14 +314,16 @@ namespace cxxpython
         case Opcode::RotTwo:
         case Opcode::RotThree:
         case Opcode::UnaryOp:
-        case Opcode::MakeFunction:
             return 0;
+        case Opcode::MakeFunction:
+            return instruction.operand == 0 ? 0 : -1;
         case Opcode::MakeClass:
             return -2;
         case Opcode::DupTop:
             return 1;
         case Opcode::StoreName:
         case Opcode::StoreFast:
+        case Opcode::StoreDeref:
         case Opcode::PopTop:
         case Opcode::DeleteAttr:
         case Opcode::PopJumpIfFalse:

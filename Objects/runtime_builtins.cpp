@@ -479,6 +479,7 @@ namespace cxxpython
                 .locals = locals,
                 .globals = globals,
                 .builtins = runtime.builtins_dict(),
+                .closure = {},
                 .mode = ExecutionMode::Eval,
             });
         }
@@ -501,6 +502,7 @@ namespace cxxpython
                 .locals = locals,
                 .globals = globals,
                 .builtins = runtime.builtins_dict(),
+                .closure = {},
                 .mode = ExecutionMode::Exec,
             });
             return runtime.none();

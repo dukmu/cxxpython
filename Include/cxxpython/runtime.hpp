@@ -74,6 +74,7 @@ namespace cxxpython
         TypeObject *module_type() const noexcept;
         TypeObject *native_function_type() const noexcept;
         TypeObject *function_type() const noexcept;
+        TypeObject *cell_type() const noexcept;
         TypeObject *method_type() const noexcept;
         TypeObject *method_descriptor_type() const noexcept;
         TypeObject *slot_wrapper_type() const noexcept;
@@ -128,7 +129,11 @@ namespace cxxpython
         FilterObject *new_filter(Object *callable, Object *iterator);
         ModuleObject *new_module(std::string name, std::string filename);
         NativeFunctionObject *new_native_function(std::string name, NativeFunctionCallback callback);
-        PythonFunctionObject *new_function(std::string name, CodeObject *code, DictObject *globals);
+        PythonFunctionObject *new_function(std::string name,
+                                           CodeObject *code,
+                                           DictObject *globals,
+                                           std::vector<CellObject *> closure = {});
+        CellObject *new_cell(Object *value = nullptr);
         PythonMethodObject *new_method(Object *callable, Object *self);
         MethodDescriptorObject *new_method_descriptor(std::string name,
                                                        TypeObject *owner,
@@ -182,10 +187,22 @@ namespace cxxpython
                               std::vector<Object *> names,
                               std::vector<Instruction> instructions,
                               std::vector<std::uint32_t> lines = {});
+        CodeObject *new_code(std::string name,
+                              std::string filename,
+                              std::uint32_t arg_count,
+                              std::uint32_t flags,
+                              std::vector<Object *> varnames,
+                              std::vector<Object *> constants,
+                              std::vector<Object *> names,
+                              std::vector<Object *> cellvars,
+                              std::vector<Object *> freevars,
+                              std::vector<Instruction> instructions,
+                              std::vector<std::uint32_t> lines = {});
         Frame *new_frame(CodeObject *code,
                          DictObject *locals = nullptr,
                          DictObject *globals = nullptr,
-                         DictObject *builtins = nullptr);
+                         DictObject *builtins = nullptr,
+                         std::vector<CellObject *> closure = {});
         TypeObject *new_heap_type(std::string name, TypeObject *base, TypeSlots slots = {});
         DictObject *prepare_class_namespace(const ClassConstructionRequest &request);
         TypeObject *new_class(ClassConstructionRequest request);
@@ -275,6 +292,7 @@ namespace cxxpython
         TypeObject *module_type_ = nullptr;
         TypeObject *native_function_type_ = nullptr;
         TypeObject *function_type_ = nullptr;
+        TypeObject *cell_type_ = nullptr;
         TypeObject *method_type_ = nullptr;
         TypeObject *method_descriptor_type_ = nullptr;
         TypeObject *slot_wrapper_type_ = nullptr;

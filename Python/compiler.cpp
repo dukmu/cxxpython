@@ -2,6 +2,8 @@
 
 #include "cxxpython/compiler_internal.hpp"
 
+#include <algorithm>
+
 namespace cxxpython
 {
     namespace
@@ -46,6 +48,11 @@ namespace cxxpython
                 return names;
             }
 
+            const std::vector<std::string> &names() const noexcept
+            {
+                return names_;
+            }
+
             std::size_t add_local(const std::string &name)
             {
                 for (std::size_t index = 0; index < varnames_.size(); ++index)
@@ -77,6 +84,94 @@ namespace cxxpython
                 return static_cast<std::size_t>(-1);
             }
 
+            std::size_t add_cellvar(const std::string &name)
+            {
+                for (std::size_t index = 0; index < cellvars_.size(); ++index)
+                {
+                    if (cellvars_[index] == name)
+                        return index;
+                }
+                cellvars_.push_back(name);
+                return cellvars_.size() - 1;
+            }
+
+            bool is_cellvar(const std::string &name) const
+            {
+                for (const std::string &entry : cellvars_)
+                {
+                    if (entry == name)
+                        return true;
+                }
+                return false;
+            }
+
+            std::size_t cell_index(const std::string &name) const
+            {
+                for (std::size_t index = 0; index < cellvars_.size(); ++index)
+                {
+                    if (cellvars_[index] == name)
+                        return index;
+                }
+                return static_cast<std::size_t>(-1);
+            }
+
+            std::size_t add_freevar(const std::string &name)
+            {
+                for (std::size_t index = 0; index < freevars_.size(); ++index)
+                {
+                    if (freevars_[index] == name)
+                        return index;
+                }
+                freevars_.push_back(name);
+                return freevars_.size() - 1;
+            }
+
+            bool is_freevar(const std::string &name) const
+            {
+                for (const std::string &entry : freevars_)
+                {
+                    if (entry == name)
+                        return true;
+                }
+                return false;
+            }
+
+            std::size_t free_index(const std::string &name) const
+            {
+                for (std::size_t index = 0; index < freevars_.size(); ++index)
+                {
+                    if (freevars_[index] == name)
+                        return index;
+                }
+                return static_cast<std::size_t>(-1);
+            }
+
+            bool resolves_lexically(const std::string &name) const
+            {
+                return is_local(name) || is_cellvar(name) || is_freevar(name);
+            }
+
+            std::size_t deref_index(const std::string &name) const
+            {
+                const std::size_t cell = cell_index(name);
+                if (cell != static_cast<std::size_t>(-1))
+                    return cell;
+                const std::size_t free = free_index(name);
+                if (free != static_cast<std::size_t>(-1))
+                    return cellvars_.size() + free;
+                return static_cast<std::size_t>(-1);
+            }
+
+            const std::vector<std::string> &freevars() const noexcept
+            {
+                return freevars_;
+            }
+
+            const std::vector<std::string> &cellvars() const noexcept
+            {
+                return cellvars_;
+            }
+
             std::vector<Object *> make_varname_objects(Runtime &runtime) const
             {
                 std::vector<Object *> varnames;
@@ -86,10 +181,30 @@ namespace cxxpython
                 return varnames;
             }
 
+            std::vector<Object *> make_cellvar_objects(Runtime &runtime) const
+            {
+                std::vector<Object *> cellvars;
+                cellvars.reserve(cellvars_.size());
+                for (const std::string &name : cellvars_)
+                    cellvars.push_back(runtime.new_str(name));
+                return cellvars;
+            }
+
+            std::vector<Object *> make_freevar_objects(Runtime &runtime) const
+            {
+                std::vector<Object *> freevars;
+                freevars.reserve(freevars_.size());
+                for (const std::string &name : freevars_)
+                    freevars.push_back(runtime.new_str(name));
+                return freevars;
+            }
+
         private:
             SymbolScope scope_;
             std::vector<std::string> names_;
             std::vector<std::string> varnames_;
+            std::vector<std::string> cellvars_;
+            std::vector<std::string> freevars_;
         };
 
         class SymbolCollector final : public compiler_internal::ExprVisitor,
@@ -359,6 +474,312 @@ namespace cxxpython
             SymbolTable &symbols_;
         };
 
+        class LexicalReferenceCollector final : public compiler_internal::ExprVisitor,
+                                                public compiler_internal::TargetVisitor,
+                                                public compiler_internal::StmtVisitor
+        {
+        public:
+            const std::vector<std::string> &references() const noexcept
+            {
+                return references_;
+            }
+
+            void visit(const compiler_internal::IntegerExpr &expression) override
+            {
+                (void)expression;
+            }
+
+            void visit(const compiler_internal::StringExpr &expression) override
+            {
+                (void)expression;
+            }
+
+            void visit(const compiler_internal::UnaryExpr &expression) override
+            {
+                expression.operand->accept(*this);
+            }
+
+            void visit(const compiler_internal::BinaryExpr &expression) override
+            {
+                expression.left->accept(*this);
+                expression.right->accept(*this);
+            }
+
+            void visit(const compiler_internal::CompareExpr &expression) override
+            {
+                expression.left->accept(*this);
+                for (const compiler_internal::Comparison &comparison : expression.comparisons)
+                    comparison.right->accept(*this);
+            }
+
+            void visit(const compiler_internal::SingletonExpr &expression) override
+            {
+                (void)expression;
+            }
+
+            void visit(const compiler_internal::NameExpr &expression) override
+            {
+                add_reference(expression.value);
+            }
+
+            void visit(const compiler_internal::AttributeExpr &expression) override
+            {
+                expression.object->accept(*this);
+            }
+
+            void visit(const compiler_internal::SubscriptExpr &expression) override
+            {
+                expression.object->accept(*this);
+                expression.key->accept(*this);
+            }
+
+            void visit(const compiler_internal::ListExpr &expression) override
+            {
+                for (const auto &item : expression.items)
+                    item->accept(*this);
+            }
+
+            void visit(const compiler_internal::TupleExpr &expression) override
+            {
+                for (const auto &item : expression.items)
+                    item->accept(*this);
+            }
+
+            void visit(const compiler_internal::DictExpr &expression) override
+            {
+                for (const compiler_internal::DictItem &item : expression.items)
+                {
+                    item.key->accept(*this);
+                    item.value->accept(*this);
+                }
+            }
+
+            void visit(const compiler_internal::CallExpr &expression) override
+            {
+                expression.callee->accept(*this);
+                for (const auto &arg : expression.args)
+                    arg.value->accept(*this);
+            }
+
+            void visit(const compiler_internal::NameTarget &target) override
+            {
+                (void)target;
+            }
+
+            void visit(const compiler_internal::AttributeTarget &target) override
+            {
+                target.object->accept(*this);
+            }
+
+            void visit(const compiler_internal::SubscriptTarget &target) override
+            {
+                target.object->accept(*this);
+                target.key->accept(*this);
+            }
+
+            void visit(const compiler_internal::ExprStmt &statement) override
+            {
+                statement.expression->accept(*this);
+            }
+
+            void visit(const compiler_internal::AssignStmt &statement) override
+            {
+                statement.value->accept(*this);
+                statement.target->accept(*this);
+            }
+
+            void visit(const compiler_internal::DeleteStmt &statement) override
+            {
+                statement.target->accept(*this);
+            }
+
+            void visit(const compiler_internal::IfStmt &statement) override
+            {
+                statement.condition->accept(*this);
+                for (const auto &item : statement.then_body)
+                    item->accept(*this);
+                for (const auto &item : statement.else_body)
+                    item->accept(*this);
+            }
+
+            void visit(const compiler_internal::ReturnStmt &statement) override
+            {
+                if (statement.value)
+                    statement.value->accept(*this);
+            }
+
+            void visit(const compiler_internal::RaiseStmt &statement) override
+            {
+                statement.value->accept(*this);
+            }
+
+            void visit(const compiler_internal::TryStmt &statement) override
+            {
+                for (const auto &item : statement.body)
+                    item->accept(*this);
+                for (const compiler_internal::ExceptHandler &handler : statement.handlers)
+                {
+                    if (handler.type)
+                        handler.type->accept(*this);
+                    for (const auto &item : handler.body)
+                        item->accept(*this);
+                }
+                for (const auto &item : statement.finally_body)
+                    item->accept(*this);
+            }
+
+            void visit(const compiler_internal::FunctionDefStmt &statement) override
+            {
+                for (const auto &decorator : statement.decorators)
+                    decorator->accept(*this);
+            }
+
+            void visit(const compiler_internal::ClassDefStmt &statement) override
+            {
+                for (const auto &decorator : statement.decorators)
+                    decorator->accept(*this);
+                for (const auto &base : statement.bases)
+                    base->accept(*this);
+                for (const auto &keyword : statement.keywords)
+                    keyword.value->accept(*this);
+            }
+
+        private:
+            void add_reference(const std::string &name)
+            {
+                if (std::find(references_.begin(), references_.end(), name) == references_.end())
+                    references_.push_back(name);
+            }
+
+            std::vector<std::string> references_;
+        };
+
+        class NestedFunctionCollector final : public compiler_internal::StmtVisitor
+        {
+        public:
+            void visit(const compiler_internal::ExprStmt &statement) override
+            {
+                (void)statement;
+            }
+
+            void visit(const compiler_internal::AssignStmt &statement) override
+            {
+                (void)statement;
+            }
+
+            void visit(const compiler_internal::DeleteStmt &statement) override
+            {
+                (void)statement;
+            }
+
+            void visit(const compiler_internal::IfStmt &statement) override
+            {
+                for (const auto &item : statement.then_body)
+                    item->accept(*this);
+                for (const auto &item : statement.else_body)
+                    item->accept(*this);
+            }
+
+            void visit(const compiler_internal::ReturnStmt &statement) override
+            {
+                (void)statement;
+            }
+
+            void visit(const compiler_internal::RaiseStmt &statement) override
+            {
+                (void)statement;
+            }
+
+            void visit(const compiler_internal::TryStmt &statement) override
+            {
+                for (const auto &item : statement.body)
+                    item->accept(*this);
+                for (const compiler_internal::ExceptHandler &handler : statement.handlers)
+                {
+                    for (const auto &item : handler.body)
+                        item->accept(*this);
+                }
+                for (const auto &item : statement.finally_body)
+                    item->accept(*this);
+            }
+
+            void visit(const compiler_internal::FunctionDefStmt &statement) override
+            {
+                functions.push_back(&statement);
+            }
+
+            void visit(const compiler_internal::ClassDefStmt &statement) override
+            {
+                (void)statement;
+            }
+
+            std::vector<const compiler_internal::FunctionDefStmt *> functions;
+        };
+
+        const SymbolTable *find_enclosing_scope(const std::vector<const SymbolTable *> &enclosing,
+                                                const std::string &name)
+        {
+            for (const SymbolTable *symbols : enclosing)
+            {
+                if (symbols && symbols->resolves_lexically(name))
+                    return symbols;
+            }
+            return nullptr;
+        }
+
+        SymbolTable analyze_function_symbols(const compiler_internal::FunctionDefStmt &function,
+                                             const std::vector<const SymbolTable *> &enclosing)
+        {
+            SymbolTable symbols(SymbolScope::Function);
+            for (const std::string &param : function.params.positional)
+                (void)symbols.add_local(param);
+            if (function.params.varargs)
+                (void)symbols.add_local(*function.params.varargs);
+            if (function.params.varkeywords)
+                (void)symbols.add_local(*function.params.varkeywords);
+
+            FunctionLocalCollector locals(symbols);
+            for (const auto &statement : function.body)
+                statement->accept(locals);
+
+            SymbolCollector collector(symbols);
+            for (const auto &statement : function.body)
+                statement->accept(collector);
+
+            LexicalReferenceCollector references;
+            for (const auto &statement : function.body)
+                statement->accept(references);
+            if (!enclosing.empty())
+            {
+                for (const std::string &name : references.references())
+                {
+                    if (!symbols.is_local(name) && find_enclosing_scope(enclosing, name))
+                        (void)symbols.add_freevar(name);
+                }
+            }
+
+            NestedFunctionCollector nested_functions;
+            for (const auto &statement : function.body)
+                statement->accept(nested_functions);
+            std::vector<const SymbolTable *> nested_enclosing;
+            nested_enclosing.reserve(enclosing.size() + 1);
+            nested_enclosing.push_back(&symbols);
+            nested_enclosing.insert(nested_enclosing.end(), enclosing.begin(), enclosing.end());
+            for (const compiler_internal::FunctionDefStmt *nested : nested_functions.functions)
+            {
+                SymbolTable nested_symbols = analyze_function_symbols(*nested, nested_enclosing);
+                for (const std::string &freevar : nested_symbols.freevars())
+                {
+                    if (symbols.is_local(freevar))
+                        (void)symbols.add_cellvar(freevar);
+                    else if (!symbols.is_freevar(freevar) && find_enclosing_scope(enclosing, freevar))
+                        (void)symbols.add_freevar(freevar);
+                }
+            }
+
+            return symbols;
+        }
+
         class BytecodeBuilder final : public compiler_internal::ExprVisitor,
                                       public compiler_internal::TargetVisitor,
                                       public compiler_internal::StmtVisitor
@@ -373,6 +794,8 @@ namespace cxxpython
                   filename_(std::move(filename)),
                   names_(symbols.make_name_objects(runtime)),
                   varnames_(symbols.make_varname_objects(runtime)),
+                  cellvars_(symbols.make_cellvar_objects(runtime)),
+                  freevars_(symbols.make_freevar_objects(runtime)),
                   current_line_(initial_line)
             {
             }
@@ -416,6 +839,8 @@ namespace cxxpython
                                          std::move(varnames_),
                                          std::move(constants_),
                                          std::move(names_),
+                                         std::move(cellvars_),
+                                         std::move(freevars_),
                                          std::move(instructions_),
                                          std::move(lines_));
             }
@@ -516,6 +941,22 @@ namespace cxxpython
 
             void visit(const compiler_internal::NameExpr &expression) override
             {
+                if (symbols_.scope() == SymbolScope::Function && symbols_.is_cellvar(expression.value))
+                {
+                    emit({
+                        Opcode::LoadDeref,
+                        static_cast<std::uint32_t>(deref_index(expression.value)),
+                    });
+                    return;
+                }
+                if (symbols_.scope() == SymbolScope::Function && symbols_.is_freevar(expression.value))
+                {
+                    emit({
+                        Opcode::LoadDeref,
+                        static_cast<std::uint32_t>(deref_index(expression.value)),
+                    });
+                    return;
+                }
                 if (symbols_.scope() == SymbolScope::Function && symbols_.is_local(expression.value))
                 {
                     emit({
@@ -620,6 +1061,22 @@ namespace cxxpython
             {
                 if (deleting_target_)
                 {
+                    if (symbols_.scope() == SymbolScope::Function && symbols_.is_cellvar(target.name))
+                    {
+                        emit({
+                            Opcode::DeleteDeref,
+                            static_cast<std::uint32_t>(deref_index(target.name)),
+                        });
+                        return;
+                    }
+                    if (symbols_.scope() == SymbolScope::Function && symbols_.is_freevar(target.name))
+                    {
+                        emit({
+                            Opcode::DeleteDeref,
+                            static_cast<std::uint32_t>(deref_index(target.name)),
+                        });
+                        return;
+                    }
                     if (symbols_.scope() == SymbolScope::Function && symbols_.is_local(target.name))
                     {
                         emit({
@@ -635,6 +1092,22 @@ namespace cxxpython
                     return;
                 }
                 emit_pending_assignment_value();
+                if (symbols_.scope() == SymbolScope::Function && symbols_.is_cellvar(target.name))
+                {
+                    emit({
+                        Opcode::StoreDeref,
+                        static_cast<std::uint32_t>(deref_index(target.name)),
+                    });
+                    return;
+                }
+                if (symbols_.scope() == SymbolScope::Function && symbols_.is_freevar(target.name))
+                {
+                    emit({
+                        Opcode::StoreDeref,
+                        static_cast<std::uint32_t>(deref_index(target.name)),
+                    });
+                    return;
+                }
                 if (symbols_.scope() == SymbolScope::Function && symbols_.is_local(target.name))
                 {
                     emit({
@@ -816,6 +1289,20 @@ namespace cxxpython
                 StatementLineGuard line(*this, statement);
                 emit_decorators(statement.decorators);
                 SymbolTable function_symbols = collect_function_symbols(statement);
+                for (const std::string &freevar : function_symbols.freevars())
+                {
+                    emit({
+                        Opcode::LoadClosure,
+                        static_cast<std::uint32_t>(deref_index(freevar)),
+                    });
+                }
+                if (!function_symbols.freevars().empty())
+                {
+                    emit({
+                        Opcode::BuildTuple,
+                        static_cast<std::uint32_t>(function_symbols.freevars().size()),
+                    });
+                }
                 BytecodeBuilder function_builder(
                     runtime_,
                     function_symbols,
@@ -823,7 +1310,10 @@ namespace cxxpython
                     static_cast<std::uint32_t>(statement.line));
                 CodeObject *code = function_builder.build_function(statement);
                 emit_constant(code);
-                emit({Opcode::MakeFunction, 0});
+                emit({
+                    Opcode::MakeFunction,
+                    static_cast<std::uint32_t>(function_symbols.freevars().size()),
+                });
                 apply_decorators(statement.decorators.size());
                 emit_binding_store(statement.name);
             }
@@ -976,6 +1466,22 @@ namespace cxxpython
 
             void emit_binding_store(const std::string &name)
             {
+                if (symbols_.scope() == SymbolScope::Function && symbols_.is_cellvar(name))
+                {
+                    emit({
+                        Opcode::StoreDeref,
+                        static_cast<std::uint32_t>(deref_index(name)),
+                    });
+                    return;
+                }
+                if (symbols_.scope() == SymbolScope::Function && symbols_.is_freevar(name))
+                {
+                    emit({
+                        Opcode::StoreDeref,
+                        static_cast<std::uint32_t>(deref_index(name)),
+                    });
+                    return;
+                }
                 if (symbols_.scope() == SymbolScope::Function && symbols_.is_local(name))
                 {
                     emit({
@@ -992,6 +1498,22 @@ namespace cxxpython
 
             void emit_store_name(const std::string &name)
             {
+                if (symbols_.scope() == SymbolScope::Function && symbols_.is_cellvar(name))
+                {
+                    emit({
+                        Opcode::StoreDeref,
+                        static_cast<std::uint32_t>(deref_index(name)),
+                    });
+                    return;
+                }
+                if (symbols_.scope() == SymbolScope::Function && symbols_.is_freevar(name))
+                {
+                    emit({
+                        Opcode::StoreDeref,
+                        static_cast<std::uint32_t>(deref_index(name)),
+                    });
+                    return;
+                }
                 if (symbols_.scope() == SymbolScope::Function && symbols_.is_local(name))
                 {
                     emit({
@@ -1019,20 +1541,7 @@ namespace cxxpython
 
             SymbolTable collect_function_symbols(const compiler_internal::FunctionDefStmt &function) const
             {
-                SymbolTable symbols(SymbolScope::Function);
-                for (const std::string &param : function.params.positional)
-                    (void)symbols.add_local(param);
-                if (function.params.varargs)
-                    (void)symbols.add_local(*function.params.varargs);
-                if (function.params.varkeywords)
-                    (void)symbols.add_local(*function.params.varkeywords);
-                FunctionLocalCollector locals(symbols);
-                for (const auto &statement : function.body)
-                    statement->accept(locals);
-                SymbolCollector collector(symbols);
-                for (const auto &statement : function.body)
-                    statement->accept(collector);
-                return symbols;
+                return analyze_function_symbols(function, {&symbols_});
             }
 
             CodeObject::Flags function_flags(const compiler_internal::FunctionParameters &params) const
@@ -1073,11 +1582,21 @@ namespace cxxpython
                 return index;
             }
 
+            std::size_t deref_index(const std::string &name) const
+            {
+                const std::size_t index = symbols_.deref_index(name);
+                if (index == static_cast<std::size_t>(-1))
+                    raise_syntax_error(&runtime_, "unknown closure variable entry");
+                return index;
+            }
+
             Runtime &runtime_;
             const SymbolTable &symbols_;
             std::string filename_;
             std::vector<Object *> names_;
             std::vector<Object *> varnames_;
+            std::vector<Object *> cellvars_;
+            std::vector<Object *> freevars_;
             std::vector<Object *> constants_;
             std::vector<Instruction> instructions_;
             std::vector<std::uint32_t> lines_;

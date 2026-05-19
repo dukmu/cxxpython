@@ -52,6 +52,11 @@ namespace cxxpython
                 visitor(function->code());
             if (function->globals())
                 visitor(function->globals());
+            for (CellObject *cell : function->closure())
+            {
+                if (cell)
+                    visitor(cell);
+            }
         }
 
         void method_traverse(const Object &object, const VisitChildren &visitor)
@@ -132,8 +137,13 @@ namespace cxxpython
     PythonFunctionObject::PythonFunctionObject(TypeObject *type,
                                                std::string name,
                                                CodeObject *code,
-                                               DictObject *globals)
-        : Object(type), name_(std::move(name)), code_(code), globals_(globals)
+                                               DictObject *globals,
+                                               std::vector<CellObject *> closure)
+        : Object(type),
+          name_(std::move(name)),
+          code_(code),
+          globals_(globals),
+          closure_(std::move(closure))
     {
     }
 
@@ -150,6 +160,11 @@ namespace cxxpython
     DictObject *PythonFunctionObject::globals() const noexcept
     {
         return globals_;
+    }
+
+    const std::vector<CellObject *> &PythonFunctionObject::closure() const noexcept
+    {
+        return closure_;
     }
 
     Object *PythonFunctionObject::call(const CallArguments &args)
@@ -242,6 +257,7 @@ namespace cxxpython
             .locals = locals,
             .globals = globals_,
             .builtins = runtime()->builtins_dict(),
+            .closure = closure_,
             .mode = ExecutionMode::Function,
         };
         if (VirtualMachine *active_vm = runtime()->active_vm())

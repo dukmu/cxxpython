@@ -971,6 +971,75 @@ TEST(Compile, CompilesFunctionDefinitionsAndReturns)
     EXPECT_EQ(second->value, "arg");
 }
 
+TEST(Compile, CompilesNestedFunctionClosureCells)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(
+        runtime,
+        "def outer():\n"
+        "    value = 'before'\n"
+        "    def inner():\n"
+        "        return value\n"
+        "    value = 'after'\n"
+        "    return inner\n"
+        "result = outer()()\n",
+        "script.py");
+    ASSERT_NE(code, nullptr);
+
+    EXPECT_EQ(vm.execute(*code, *globals), runtime.none());
+    auto *result = dynamic_cast<cxxpython::StrObject *>(globals->get(runtime.new_str("result")));
+    ASSERT_NE(result, nullptr);
+    EXPECT_EQ(result->value, "after");
+
+    auto *outer = dynamic_cast<cxxpython::PythonFunctionObject *>(globals->get(runtime.new_str("outer")));
+    ASSERT_NE(outer, nullptr);
+    ASSERT_EQ(outer->code()->cellvars().size(), 1U);
+    auto *cellvar = dynamic_cast<cxxpython::StrObject *>(outer->code()->cellvars()[0]);
+    ASSERT_NE(cellvar, nullptr);
+    EXPECT_EQ(cellvar->value, "value");
+
+    cxxpython::CodeObject *inner_code = nullptr;
+    for (cxxpython::Object *constant : outer->code()->constants())
+    {
+        auto *candidate = dynamic_cast<cxxpython::CodeObject *>(constant);
+        if (candidate && candidate->name() == "inner")
+            inner_code = candidate;
+    }
+    ASSERT_NE(inner_code, nullptr);
+    ASSERT_EQ(inner_code->freevars().size(), 1U);
+    auto *freevar = dynamic_cast<cxxpython::StrObject *>(inner_code->freevars()[0]);
+    ASSERT_NE(freevar, nullptr);
+    EXPECT_EQ(freevar->value, "value");
+}
+
+TEST(Compile, PassesFreeVariablesThroughIntermediateFunctions)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(
+        runtime,
+        "def outer():\n"
+        "    value = 'deep'\n"
+        "    def middle():\n"
+        "        def inner():\n"
+        "            return value\n"
+        "        return inner\n"
+        "    return middle\n"
+        "result = outer()()()\n",
+        "script.py");
+    ASSERT_NE(code, nullptr);
+
+    EXPECT_EQ(vm.execute(*code, *globals), runtime.none());
+    auto *result = dynamic_cast<cxxpython::StrObject *>(globals->get(runtime.new_str("result")));
+    ASSERT_NE(result, nullptr);
+    EXPECT_EQ(result->value, "deep");
+}
+
 TEST(Compile, FunctionsUseFastLocalsForAssignedNames)
 {
     cxxpython::Runtime runtime;

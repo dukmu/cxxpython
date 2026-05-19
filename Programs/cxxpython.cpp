@@ -158,6 +158,7 @@ namespace
                     .globals = module->dict(),
                     .builtins = runtime.builtins_dict(),
                     .module = module,
+                    .closure = {},
                     .mode = print_result ? cxxpython::ExecutionMode::Eval : cxxpython::ExecutionMode::Exec,
                 });
                 if (print_result && result != runtime.none())
@@ -228,6 +229,7 @@ int main(int argc, char **argv)
                 .globals = module->dict(),
                 .builtins = runtime.builtins_dict(),
                 .module = module,
+                .closure = {},
                 .mode = cxxpython::ExecutionMode::Module,
             });
             return 0;

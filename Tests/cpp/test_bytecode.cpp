@@ -14,6 +14,10 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::LoadFast), "LOAD_FAST");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::StoreFast), "STORE_FAST");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::DeleteFast), "DELETE_FAST");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::LoadDeref), "LOAD_DEREF");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::StoreDeref), "STORE_DEREF");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::DeleteDeref), "DELETE_DEREF");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::LoadClosure), "LOAD_CLOSURE");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::LoadAttr), "LOAD_ATTR");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::StoreAttr), "STORE_ATTR");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::DeleteAttr), "DELETE_ATTR");
@@ -54,6 +58,10 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::LoadFast, 0}), 1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::StoreFast, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::DeleteFast, 0}), 0);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::LoadDeref, 0}), 1);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::StoreDeref, 0}), -1);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::DeleteDeref, 0}), 0);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::LoadClosure, 0}), 1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::LoadAttr, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::StoreAttr, 0}), -2);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::DeleteAttr, 0}), -1);
@@ -78,6 +86,7 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::PopJumpIfTrue, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::JumpIfFalseOrPop, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::MakeFunction, 0}), 0);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::MakeFunction, 1}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::MakeClass, 0}), -2);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::Call, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::Call, 2}), -2);
@@ -242,6 +251,40 @@ TEST(Bytecode, DispatchesMakeFunction)
     EXPECT_EQ(function->name(), "made_function");
     EXPECT_EQ(function->globals(), globals);
     EXPECT_EQ(cxxpython::object_call(function, {}), result);
+}
+
+TEST(Bytecode, DispatchesMakeFunctionWithClosure)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+    cxxpython::Object *captured = runtime.new_str("captured");
+    cxxpython::CellObject *cell = runtime.new_cell(captured);
+    cxxpython::CodeObject *function_code = runtime.new_code(
+        "inner",
+        "test.py",
+        0,
+        0,
+        {},
+        {},
+        {},
+        {},
+        {runtime.new_str("value")},
+        {{cxxpython::Opcode::LoadDeref, 0},
+         {cxxpython::Opcode::ReturnValue, 0}});
+    cxxpython::TupleObject *closure = runtime.new_tuple({cell});
+    cxxpython::CodeObject *module_code = runtime.new_code(
+        {closure, function_code},
+        {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::LoadConst, 1},
+         {cxxpython::Opcode::MakeFunction, 1},
+         {cxxpython::Opcode::ReturnValue, 0}});
+
+    auto *function = dynamic_cast<cxxpython::PythonFunctionObject *>(vm.execute(*module_code, *globals));
+    ASSERT_NE(function, nullptr);
+    ASSERT_EQ(function->closure().size(), 1U);
+    EXPECT_EQ(function->closure()[0], cell);
+    EXPECT_EQ(cxxpython::object_call(function, {}), captured);
 }
 
 TEST(Bytecode, DispatchesMakeClass)
@@ -850,6 +893,7 @@ TEST(Bytecode, ExecutionRequestCarriesExplicitNamespaces)
         .globals = globals,
         .builtins = builtins,
         .module = module,
+        .closure = {},
         .mode = cxxpython::ExecutionMode::Module,
     }));
     ASSERT_NE(result, nullptr);

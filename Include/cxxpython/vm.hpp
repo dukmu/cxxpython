@@ -30,12 +30,19 @@ namespace cxxpython
     class Frame final : public Object
     {
     public:
-        Frame(TypeObject *type, CodeObject *code, DictObject *locals, DictObject *globals, DictObject *builtins);
+        Frame(TypeObject *type,
+              CodeObject *code,
+              DictObject *locals,
+              DictObject *globals,
+              DictObject *builtins,
+              std::vector<CellObject *> cells = {});
 
         CodeObject *code() const noexcept;
         DictObject *locals() const noexcept;
         DictObject *globals() const noexcept;
         DictObject *builtins() const noexcept;
+        CellObject *cell(std::size_t index) const;
+        std::size_t cell_count() const noexcept;
         std::size_t instruction_pointer() const noexcept;
         std::size_t last_instruction_index() const noexcept;
         void advance() noexcept;
@@ -66,6 +73,7 @@ namespace cxxpython
         DictObject *locals_;
         DictObject *globals_;
         DictObject *builtins_;
+        std::vector<CellObject *> cells_;
         std::size_t ip_ = 0;
         std::size_t last_ip_ = 0;
         std::vector<Object *> stack_;
@@ -118,6 +126,7 @@ namespace cxxpython
         DictObject *globals = nullptr;
         DictObject *builtins = nullptr;
         ModuleObject *module = nullptr;
+        std::vector<CellObject *> closure;
         ExecutionMode mode = ExecutionMode::Exec;
     };
 

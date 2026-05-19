@@ -19,6 +19,10 @@ namespace cxxpython
         LoadFast,
         StoreFast,
         DeleteFast,
+        LoadDeref,
+        StoreDeref,
+        DeleteDeref,
+        LoadClosure,
         LoadAttr,
         StoreAttr,
         DeleteAttr,
@@ -86,6 +90,8 @@ namespace cxxpython
                    std::vector<Object *> varnames,
                    std::vector<Object *> constants,
                    std::vector<Object *> names,
+                   std::vector<Object *> cellvars,
+                   std::vector<Object *> freevars,
                    std::vector<Instruction> instructions,
                    std::vector<std::uint32_t> lines = {});
 
@@ -100,6 +106,8 @@ namespace cxxpython
         const std::vector<Object *> &varnames() const noexcept;
         const std::vector<Object *> &constants() const noexcept;
         const std::vector<Object *> &names() const noexcept;
+        const std::vector<Object *> &cellvars() const noexcept;
+        const std::vector<Object *> &freevars() const noexcept;
         const std::vector<Instruction> &instructions() const noexcept;
         const std::vector<std::uint32_t> &lines() const noexcept;
         std::uint32_t line_for_instruction(std::size_t instruction_index) const noexcept;
@@ -112,6 +120,8 @@ namespace cxxpython
         std::vector<Object *> varnames_;
         std::vector<Object *> constants_;
         std::vector<Object *> names_;
+        std::vector<Object *> cellvars_;
+        std::vector<Object *> freevars_;
         std::vector<Instruction> instructions_;
         std::vector<std::uint32_t> lines_;
     };

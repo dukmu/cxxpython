@@ -141,8 +141,18 @@ Acceptance tests:
 
 Current state:
 
-- Function locals are compiler-discovered, but there are no cell/free vars.
-- `super` cannot be correct without class/function context cells.
+- `CellObject` exists as a runtime type and participates in traversal.
+- Code objects carry `cellvars` and `freevars` metadata.
+- Python function objects carry closure cells and traverse them.
+- Frames own a combined cell vector ordered as `cellvars + freevars`.
+- The VM implements `LOAD_DEREF`, `STORE_DEREF`, `DELETE_DEREF`, and
+  `LOAD_CLOSURE`.
+- The compiler detects function cell/free variables, including free-variable
+  pass-through across intermediate nested functions.
+- Nested functions capture shared mutable cells, so mutation after inner
+  function creation is visible through the closure.
+- `super` still cannot be correct until class-body `__class__` cells and
+  frame/method context are wired.
 
 Target design:
 
@@ -161,13 +171,17 @@ Target design:
   - load class cell
   - make function with closure
 - Class body compilation should create `__class__` cell when needed.
+- Add `global` and `nonlocal` declarations to symbol analysis before default
+  arguments or comprehensions expand the scope surface.
 - Implement zero-argument `super()` by reading current frame, first argument,
   and `__class__` closure cell. Two-argument `super(type, obj)` can be built on
   the same descriptor/MRO path.
 
 Acceptance tests:
 
-- Nested function captures outer local.
+- Nested function captures outer local. Done for normal function scopes.
+- Intermediate nested functions pass free variables through. Done for normal
+  function scopes.
 - `nonlocal` mutates the nearest enclosing cell.
 - `super()` works in a method on a simple inherited class.
 - `super(type, instance).method()` binds through descriptors.

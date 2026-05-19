@@ -80,6 +80,8 @@ namespace cxxpython
                 visitor(frame->globals());
             if (frame->builtins())
                 visitor(frame->builtins());
+            for (std::size_t index = 0; index < frame->cell_count(); ++index)
+                visitor(frame->cell(index));
             frame->visit_stack(visitor);
             if (frame->pending_control_value())
                 visitor(frame->pending_control_value());
@@ -170,8 +172,18 @@ namespace cxxpython
         };
     }
 
-    Frame::Frame(TypeObject *type, CodeObject *code, DictObject *locals, DictObject *globals, DictObject *builtins)
-        : Object(type), code_(code), locals_(locals), globals_(globals), builtins_(builtins)
+    Frame::Frame(TypeObject *type,
+                 CodeObject *code,
+                 DictObject *locals,
+                 DictObject *globals,
+                 DictObject *builtins,
+                 std::vector<CellObject *> cells)
+        : Object(type),
+          code_(code),
+          locals_(locals),
+          globals_(globals),
+          builtins_(builtins),
+          cells_(std::move(cells))
     {
         if (!code_)
             throw BytecodeError("frame requires a code object");
@@ -181,6 +193,8 @@ namespace cxxpython
             throw BytecodeError("frame requires globals");
         if (!builtins_)
             throw BytecodeError("frame requires builtins");
+        if (cells_.size() != code_->cellvars().size() + code_->freevars().size())
+            throw BytecodeError("frame cell count does not match code metadata");
     }
 
     CodeObject *Frame::code() const noexcept
@@ -201,6 +215,18 @@ namespace cxxpython
     DictObject *Frame::builtins() const noexcept
     {
         return builtins_;
+    }
+
+    CellObject *Frame::cell(std::size_t index) const
+    {
+        if (index >= cells_.size())
+            throw BytecodeError("cell index out of range");
+        return cells_[index];
+    }
+
+    std::size_t Frame::cell_count() const noexcept
+    {
+        return cells_.size();
     }
 
     std::size_t Frame::instruction_pointer() const noexcept
@@ -427,6 +453,7 @@ namespace cxxpython
             .locals = &globals,
             .globals = &globals,
             .builtins = runtime_.builtins_dict(),
+            .closure = {},
             .mode = ExecutionMode::Exec,
         });
     }
@@ -438,6 +465,7 @@ namespace cxxpython
             .locals = &locals,
             .globals = &globals,
             .builtins = &builtins,
+            .closure = {},
             .mode = ExecutionMode::Exec,
         });
     }
@@ -458,7 +486,7 @@ namespace cxxpython
         DictObject &locals = *request.locals;
         DictObject &globals = *request.globals;
         DictObject &builtins = *builtins_dict;
-        Frame *frame = runtime_.new_frame(&code, &locals, &globals, &builtins);
+        Frame *frame = runtime_.new_frame(&code, &locals, &globals, &builtins, request.closure);
         ActiveFrame active_frame(thread_, *frame);
         while (frame->instruction_pointer() < code.instructions().size())
         {
@@ -555,6 +583,47 @@ namespace cxxpython
                         &runtime_,
                         "cannot delete local variable '" + name->value +
                             "' where it is not associated with a value");
+                break;
+            }
+            case Opcode::LoadDeref:
+            {
+                CellObject *cell = frame->cell(instruction.operand);
+                if (cell->is_empty())
+                    raise_name_error(&runtime_, "cannot access free variable");
+                frame->push(cell->value());
+                break;
+            }
+            case Opcode::StoreDeref:
+            {
+                CellObject *cell = frame->cell(instruction.operand);
+                Object *value = frame->pop();
+                auto value_root = runtime_.root(value);
+                cell->set_value(value);
+                if (instruction.operand < code.cellvars().size())
+                {
+                    auto *name = dynamic_cast<StrObject *>(code.cellvars()[instruction.operand]);
+                    if (!name)
+                        throw BytecodeError("STORE_DEREF requires a str cellvar name");
+                    locals.set(name, value);
+                }
+                break;
+            }
+            case Opcode::DeleteDeref:
+            {
+                CellObject *cell = frame->cell(instruction.operand);
+                cell->set_value(nullptr);
+                if (instruction.operand < code.cellvars().size())
+                {
+                    auto *name = dynamic_cast<StrObject *>(code.cellvars()[instruction.operand]);
+                    if (!name)
+                        throw BytecodeError("DELETE_DEREF requires a str cellvar name");
+                    (void)locals.erase(name);
+                }
+                break;
+            }
+            case Opcode::LoadClosure:
+            {
+                frame->push(frame->cell(instruction.operand));
                 break;
             }
             case Opcode::LoadAttr:
@@ -791,7 +860,27 @@ namespace cxxpython
                 if (!function_code)
                     throw BytecodeError("MAKE_FUNCTION requires a code object");
                 auto code_root = runtime_.root(function_code);
-                PythonFunctionObject *function = runtime_.new_function(function_code->name(), function_code, &globals);
+                std::vector<CellObject *> closure;
+                std::vector<Rooted<Object>> closure_roots;
+                if (instruction.operand != 0)
+                {
+                    Object *closure_object = frame->pop();
+                    auto *closure_tuple = dynamic_cast<TupleObject *>(closure_object);
+                    if (!closure_tuple)
+                        throw BytecodeError("MAKE_FUNCTION closure requires a tuple");
+                    auto closure_tuple_root = runtime_.root(closure_tuple);
+                    closure.reserve(closure_tuple->size());
+                    for (Object *item : closure_tuple->items())
+                    {
+                        auto *cell = dynamic_cast<CellObject *>(item);
+                        if (!cell)
+                            throw BytecodeError("MAKE_FUNCTION closure entries must be cells");
+                        closure.push_back(cell);
+                        add_temporary_root(runtime_, closure_roots, cell);
+                    }
+                }
+                PythonFunctionObject *function =
+                    runtime_.new_function(function_code->name(), function_code, &globals, std::move(closure));
                 auto function_root = runtime_.root(function);
                 frame->push(function);
                 break;
