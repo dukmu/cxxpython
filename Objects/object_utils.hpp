@@ -15,6 +15,7 @@ namespace cxxpython
     bool default_equal(const Object &left, const Object &right);
     bool default_truth(const Object &object);
     void default_traverse(const Object &object, const VisitChildren &visitor);
+    std::vector<Object *> collect_iterable_items(Runtime *runtime, Object *iterable);
     bool has_keyword_arguments(const CallArguments &args) noexcept;
     void require_no_keywords(Runtime *runtime, std::string_view callable, const CallArguments &args);
     void require_no_positional(Runtime *runtime, std::string_view callable, const CallArguments &args);

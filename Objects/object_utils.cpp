@@ -1,5 +1,7 @@
 #include "object_utils.hpp"
 
+#include "cxxpython/runtime.hpp"
+
 #include <sstream>
 
 namespace cxxpython
@@ -29,6 +31,34 @@ namespace cxxpython
     {
         (void)object;
         (void)visitor;
+    }
+
+    std::vector<Object *> collect_iterable_items(Runtime *runtime, Object *iterable)
+    {
+        if (!runtime)
+            raise_type_error(nullptr, "runtime is required to collect iterable items");
+        auto iterable_root = runtime->root(iterable);
+        Object *iterator = object_iter(iterable_root.get());
+        auto iterator_root = runtime->root(iterator);
+
+        std::vector<Object *> items;
+        std::vector<Rooted<Object>> item_roots;
+        while (true)
+        {
+            try
+            {
+                Object *item = object_next(iterator_root.get());
+                items.push_back(item);
+                item_roots.push_back(runtime->root(item));
+            }
+            catch (const PythonError &error)
+            {
+                if (error.type() == runtime->stop_iteration_type())
+                    break;
+                throw;
+            }
+        }
+        return items;
     }
 
     bool has_keyword_arguments(const CallArguments &args) noexcept

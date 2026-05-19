@@ -106,32 +106,6 @@ namespace cxxpython
             return object.runtime()->new_sequence_iterator(&object);
         }
 
-        std::vector<Object *> collect_iterable_items(Runtime *runtime, Object *iterable)
-        {
-            auto iterable_root = runtime->root(iterable);
-            Object *iterator = object_iter(iterable_root.get());
-            auto iterator_root = runtime->root(iterator);
-
-            std::vector<Object *> items;
-            std::vector<Rooted<Object>> item_roots;
-            while (true)
-            {
-                try
-                {
-                    Object *item = object_next(iterator_root.get());
-                    items.push_back(item);
-                    item_roots.push_back(runtime->root(item));
-                }
-                catch (const PythonError &error)
-                {
-                    if (error.type() == runtime->stop_iteration_type())
-                        break;
-                    throw;
-                }
-            }
-            return items;
-        }
-
         Object *list_new(TypeObject &type, const CallArguments &args)
         {
             require_no_keywords(type.runtime(), "list", args);

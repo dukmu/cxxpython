@@ -51,6 +51,18 @@ target_compile_options(cxxpython_core PRIVATE
 add_executable(cxxpython Programs/cxxpython.cpp)
 target_link_libraries(cxxpython PRIVATE cxxpython_core)
 
+find_path(READLINE_INCLUDE_DIR readline/readline.h)
+find_library(READLINE_LIBRARY NAMES readline)
+find_library(HISTORY_LIBRARY NAMES history)
+if(READLINE_INCLUDE_DIR AND READLINE_LIBRARY)
+    target_compile_definitions(cxxpython PRIVATE CXXPYTHON_HAS_READLINE=1)
+    target_include_directories(cxxpython PRIVATE ${READLINE_INCLUDE_DIR})
+    target_link_libraries(cxxpython PRIVATE ${READLINE_LIBRARY})
+    if(HISTORY_LIBRARY)
+        target_link_libraries(cxxpython PRIVATE ${HISTORY_LIBRARY})
+    endif()
+endif()
+
 enable_testing()
 
 FetchContent_Declare(

@@ -56,6 +56,14 @@ TEST(Module, BootstrapsBuiltinsModule)
     EXPECT_EQ(next->type(), runtime.native_function_type());
     EXPECT_EQ(cxxpython::object_repr(next), "<built-in function next>");
 
+    for (const char *name : {"all", "any", "sum", "min", "max", "sorted", "dir", "vars",
+                             "isinstance", "issubclass", "callable", "id", "globals", "locals"})
+    {
+        cxxpython::Object *function = runtime.builtins_dict()->get(runtime.new_str(name));
+        ASSERT_NE(function, nullptr) << name;
+        EXPECT_EQ(function->type(), runtime.native_function_type()) << name;
+    }
+
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("StopIteration")), runtime.stop_iteration_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("BaseException")), runtime.base_exception_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("Exception")), runtime.exception_type());

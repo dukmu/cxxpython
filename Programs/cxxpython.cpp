@@ -1,11 +1,19 @@
 #include <iostream>
 #include <fstream>
+#include <cstdlib>
+#include <optional>
 #include <sstream>
 #include <string_view>
+#include <unistd.h>
 
 #include "cxxpython/compiler.hpp"
 #include "cxxpython/runtime.hpp"
 #include "cxxpython/vm.hpp"
+
+#ifdef CXXPYTHON_HAS_READLINE
+#include <readline/history.h>
+#include <readline/readline.h>
+#endif
 
 namespace
 {
@@ -41,6 +49,36 @@ namespace
                message.find("expected except after try block") != std::string::npos;
     }
 
+    bool should_use_readline() noexcept
+    {
+        return isatty(STDIN_FILENO) != 0 && isatty(STDOUT_FILENO) != 0;
+    }
+
+    std::optional<std::string> read_repl_line(std::string_view prompt, bool interactive)
+    {
+#ifdef CXXPYTHON_HAS_READLINE
+        if (interactive)
+        {
+            char *raw_line = readline(std::string(prompt).c_str());
+            if (!raw_line)
+                return std::nullopt;
+            std::string line(raw_line);
+            if (!line.empty())
+                add_history(raw_line);
+            std::free(raw_line);
+            return line;
+        }
+#else
+        (void)interactive;
+#endif
+
+        std::cout << prompt << std::flush;
+        std::string line;
+        if (!std::getline(std::cin, line))
+            return std::nullopt;
+        return line;
+    }
+
     int run_repl(cxxpython::Runtime &runtime)
     {
         std::cout << "cxxpython 0.1.0-dev\n";
@@ -48,13 +86,23 @@ namespace
         cxxpython::ModuleObject *module = runtime.new_module("__main__", "<stdin>");
         std::string pending_source;
         bool pending_block = false;
+        const bool interactive = should_use_readline();
+
+#ifdef CXXPYTHON_HAS_READLINE
+        if (interactive)
+        {
+            using_history();
+            stifle_history(1000);
+        }
+#endif
 
         while (true)
         {
-            std::cout << (pending_block ? "... " : ">>> ") << std::flush;
-            std::string line;
-            if (!std::getline(std::cin, line))
+            std::optional<std::string> maybe_line =
+                read_repl_line(pending_block ? "... " : ">>> ", interactive);
+            if (!maybe_line)
                 break;
+            const std::string &line = *maybe_line;
 
             pending_source += line;
             pending_source += '\n';

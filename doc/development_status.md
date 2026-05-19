@@ -33,6 +33,17 @@ Completed:
   expression input compiles through `compile_eval_input` and prints `repr`;
   statements and compound blocks compile through `compile_exec_input` and run
   in a persistent `__main__` module.
+- Upgraded the REPL to use GNU readline/history when attached to a TTY while
+  keeping the non-interactive pipe path stable for tests and scripts.
+- Expanded builtin coverage beyond the bootstrap core:
+  - `all`
+  - `any`
+  - `sum`
+  - `min`
+  - `max`
+  - `sorted`
+  - `dir`
+  - `vars`
 - Expanded native builtins while keeping them ordinary objects in the
   `builtins` module:
   - `print(..., sep=..., end=...)`
@@ -43,7 +54,7 @@ Completed:
   - `globals`
   - `locals`
 - Added Python golden coverage for class `__init__`, exception syntax,
-  builtin introspection, and REPL behavior.
+  builtin introspection, builtin enumeration, and REPL behavior.
 - Added C++ coverage for opcode metadata, VM exception dispatch, compiler
   lowering, `__init__` return checking, and unmatched exception propagation.
 
@@ -56,6 +67,10 @@ Known debt and next risk:
 - REPL incomplete-input detection is intentionally minimal and parser-message
   driven. A real interactive parser mode should replace string matching before
   adding more compound statements.
+- `dir()` currently reflects a deterministic runtime namespace snapshot rather
+  than the full CPython attribute merge algorithm. It is good enough for the
+  current builtin/module surface, but future object-space growth may need a
+  richer merge of module, instance, and inherited attributes.
 - Builtins now cover core introspection, but the native argument parser still
   lacks a structured signature table, optional keyword defaults, positional-only
   markers, keyword-only arguments, and conversion helpers for C/C++ extension
@@ -72,7 +87,7 @@ Verification:
 - `build/test_core_objects --gtest_filter='Cli.RunsInteractiveReplFromStandardInput:PythonScripts.RunsGoldenFiles'`
 - `ctest --test-dir build --output-on-failure`
 
-Result: all 166 tests pass.
+Result: all 167 tests pass.
 
 ## 2026-05-18 Risk Ledger And Immediate Fix Queue
 

@@ -1,0 +1,21 @@
+['AttributeError', 'BaseException', 'Exception', 'False', 'IndexError', 'KeyError', 'NameError', 'None', 'NotImplemented', 'StopIteration', 'SyntaxError', 'True', 'TypeError', 'UnboundLocalError', 'ValueError', '__builtins__', '__file__', '__name__', 'all', 'any', 'bool', 'callable', 'classmethod', 'dict', 'dir', 'globals', 'hash', 'id', 'int', 'isinstance', 'issubclass', 'iter', 'len', 'list', 'locals', 'max', 'min', 'next', 'object', 'print', 'property', 'repr', 'sorted', 'staticmethod', 'str', 'sum', 'tuple', 'type', 'vars']
+builtins
+<class 'module'>
+True
+False
+True
+False
+True
+6
+13
+1
+3
+ant
+cat
+[1, 2, 3]
+['ant', 'bee', 'cat']
+{'b': 2, 'a': 1}
+1
+True
+True
+True

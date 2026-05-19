@@ -3,8 +3,11 @@
 
 #include "object_utils.hpp"
 
+#include <algorithm>
 #include <cstdint>
 #include <ostream>
+#include <set>
+#include <sstream>
 
 namespace cxxpython
 {
@@ -93,6 +96,111 @@ namespace cxxpython
             return runtime.new_int(object_hash(args.positional[0]));
         }
 
+        Object *builtin_all(Runtime &runtime, const CallArguments &args)
+        {
+            require_no_keywords(&runtime, "all", args);
+            require_positional_count(&runtime, "all", args, 1);
+            for (Object *item : collect_iterable_items(&runtime, args.positional[0]))
+            {
+                auto item_root = runtime.root(item);
+                if (!is_true(item_root.get()))
+                    return runtime.false_value();
+            }
+            return runtime.true_value();
+        }
+
+        Object *builtin_any(Runtime &runtime, const CallArguments &args)
+        {
+            require_no_keywords(&runtime, "any", args);
+            require_positional_count(&runtime, "any", args, 1);
+            for (Object *item : collect_iterable_items(&runtime, args.positional[0]))
+            {
+                auto item_root = runtime.root(item);
+                if (is_true(item_root.get()))
+                    return runtime.true_value();
+            }
+            return runtime.false_value();
+        }
+
+        Object *builtin_sum(Runtime &runtime, const CallArguments &args)
+        {
+            require_no_keywords(&runtime, "sum", args);
+            if (args.positional.empty() || args.positional.size() > 2)
+                raise_type_error(&runtime, "sum() takes one or two positional arguments");
+
+            Object *total = args.positional.size() == 2 ? args.positional[1] : runtime.new_int(0);
+            auto total_root = runtime.root(total);
+            for (Object *item : collect_iterable_items(&runtime, args.positional[0]))
+            {
+                auto item_root = runtime.root(item);
+                Object *next_total = object_binary_op(total_root.get(), item_root.get(), BinaryOp::Add);
+                total_root = runtime.root(next_total);
+            }
+            return total_root.get();
+        }
+
+        bool rich_compare_truth(Runtime &runtime, Object *left, Object *right, RichCompareOp op)
+        {
+            auto left_root = runtime.root(left);
+            auto right_root = runtime.root(right);
+            Object *result = object_rich_compare(left_root.get(), right_root.get(), op);
+            auto result_root = runtime.root(result);
+            return is_true(result_root.get());
+        }
+
+        Object *select_extreme(Runtime &runtime,
+                               std::string_view name,
+                               const CallArguments &args,
+                               RichCompareOp op)
+        {
+            require_no_keywords(&runtime, name, args);
+            if (args.positional.empty())
+                raise_type_error(&runtime, std::string(name) + "() expected at least one argument");
+
+            std::vector<Object *> items;
+            if (args.positional.size() == 1)
+            {
+                items = collect_iterable_items(&runtime, args.positional[0]);
+                if (items.empty())
+                    raise_value_error(&runtime, std::string(name) + "() arg is an empty sequence");
+            }
+            else
+            {
+                items = args.positional;
+            }
+
+            Object *best = items.front();
+            auto best_root = runtime.root(best);
+            for (std::size_t index = 1; index < items.size(); ++index)
+            {
+                Object *candidate = items[index];
+                auto candidate_root = runtime.root(candidate);
+                if (rich_compare_truth(runtime, candidate_root.get(), best_root.get(), op))
+                    best_root = runtime.root(candidate_root.get());
+            }
+            return best_root.get();
+        }
+
+        Object *builtin_min(Runtime &runtime, const CallArguments &args)
+        {
+            return select_extreme(runtime, "min", args, RichCompareOp::Less);
+        }
+
+        Object *builtin_max(Runtime &runtime, const CallArguments &args)
+        {
+            return select_extreme(runtime, "max", args, RichCompareOp::Greater);
+        }
+
+        Object *builtin_sorted(Runtime &runtime, const CallArguments &args)
+        {
+            require_no_keywords(&runtime, "sorted", args);
+            require_positional_count(&runtime, "sorted", args, 1);
+            std::vector<Object *> items = collect_iterable_items(&runtime, args.positional[0]);
+            std::stable_sort(items.begin(), items.end(), [&runtime](Object *left, Object *right)
+                             { return rich_compare_truth(runtime, left, right, RichCompareOp::Less); });
+            return runtime.new_list(std::move(items));
+        }
+
         bool classinfo_matches(Runtime &runtime, TypeObject *type, Object *classinfo, const char *function_name)
         {
             if (auto *candidate = dynamic_cast<TypeObject *>(classinfo))
@@ -175,6 +283,95 @@ namespace cxxpython
             require_positional_count(&runtime, "locals", args, 0);
             return current_frame_or_error(runtime, "locals")->locals();
         }
+
+        void collect_dict_names(std::set<std::string> &names, DictObject *dict)
+        {
+            if (!dict)
+                return;
+            for (const DictObject::Entry &entry : dict->entries())
+            {
+                if (auto *name = dynamic_cast<StrObject *>(entry.key))
+                    names.insert(name->value);
+            }
+        }
+
+        void collect_type_names(std::set<std::string> &names, TypeObject *type)
+        {
+            if (!type)
+                return;
+            if (type->mro.empty())
+            {
+                collect_dict_names(names, type->dict);
+                return;
+            }
+            for (TypeObject *item : type->mro)
+                collect_dict_names(names, item ? item->dict : nullptr);
+        }
+
+        std::vector<Object *> names_as_sorted_str_objects(Runtime &runtime, const std::set<std::string> &names)
+        {
+            std::vector<Object *> result;
+            result.reserve(names.size());
+            std::vector<Rooted<StrObject>> roots;
+            for (const std::string &name : names)
+            {
+                StrObject *text = runtime.new_str(name);
+                roots.push_back(runtime.root(text));
+                result.push_back(text);
+            }
+            return result;
+        }
+
+        Object *builtin_dir(Runtime &runtime, const CallArguments &args)
+        {
+            require_no_keywords(&runtime, "dir", args);
+            require_positional_at_most(&runtime, "dir", args, 1);
+
+            std::set<std::string> names;
+            if (args.positional.empty())
+            {
+                collect_dict_names(names, current_frame_or_error(runtime, "dir")->locals());
+            }
+            else
+            {
+                Object *object = args.positional[0];
+                if (auto *module = dynamic_cast<ModuleObject *>(object))
+                {
+                    collect_dict_names(names, module->dict());
+                }
+                else if (auto *type = dynamic_cast<TypeObject *>(object))
+                {
+                    collect_type_names(names, type);
+                }
+                else
+                {
+                    collect_dict_names(names, object ? object->instance_dict() : nullptr);
+                    collect_type_names(names, object ? object->type() : nullptr);
+                }
+            }
+            return runtime.new_list(names_as_sorted_str_objects(runtime, names));
+        }
+
+        Object *builtin_vars(Runtime &runtime, const CallArguments &args)
+        {
+            require_no_keywords(&runtime, "vars", args);
+            require_positional_at_most(&runtime, "vars", args, 1);
+            if (args.positional.empty())
+                return current_frame_or_error(runtime, "vars")->locals();
+
+            Object *object = args.positional[0];
+            auto object_root = runtime.root(object);
+            try
+            {
+                return object_get_attr(object_root.get(), "__dict__");
+            }
+            catch (const PythonError &error)
+            {
+                if (error.type() == runtime.attribute_error_type())
+                    raise_type_error(&runtime, "vars() argument must have __dict__ attribute");
+                throw;
+            }
+        }
     }
 
     void Runtime::initialize_builtins()
@@ -217,11 +414,19 @@ namespace cxxpython
         dict->set(new_str("next"), new_native_function("next", builtin_next));
         dict->set(new_str("repr"), new_native_function("repr", builtin_repr));
         dict->set(new_str("hash"), new_native_function("hash", builtin_hash));
+        dict->set(new_str("all"), new_native_function("all", builtin_all));
+        dict->set(new_str("any"), new_native_function("any", builtin_any));
+        dict->set(new_str("sum"), new_native_function("sum", builtin_sum));
+        dict->set(new_str("min"), new_native_function("min", builtin_min));
+        dict->set(new_str("max"), new_native_function("max", builtin_max));
+        dict->set(new_str("sorted"), new_native_function("sorted", builtin_sorted));
         dict->set(new_str("isinstance"), new_native_function("isinstance", builtin_isinstance));
         dict->set(new_str("issubclass"), new_native_function("issubclass", builtin_issubclass));
         dict->set(new_str("callable"), new_native_function("callable", builtin_callable));
         dict->set(new_str("id"), new_native_function("id", builtin_id));
         dict->set(new_str("globals"), new_native_function("globals", builtin_globals));
         dict->set(new_str("locals"), new_native_function("locals", builtin_locals));
+        dict->set(new_str("dir"), new_native_function("dir", builtin_dir));
+        dict->set(new_str("vars"), new_native_function("vars", builtin_vars));
     }
 }

@@ -78,3 +78,17 @@ TEST(Cli, RunsInteractiveReplFromStandardInput)
               ">>> ... ... ... TypeError('boom')\n"
               ">>> ");
 }
+
+TEST(Cli, RunsNestedMultilineReplDefinitions)
+{
+    const test_process::CommandResult result = test_process::run_command(
+        "printf \"%s\\n\" \"class A:\" \"    def __init__(self):\" "
+        "\"        self.value = 'ok'\" \"A().value\" | " +
+        std::string(CXXPYTHON_PROGRAM_PATH));
+
+    EXPECT_EQ(result.exit_code, 0);
+    EXPECT_EQ(result.output,
+              "cxxpython 0.1.0-dev\n"
+              ">>> ... ... >>> 'ok'\n"
+              ">>> ");
+}
