@@ -30,6 +30,8 @@ namespace cxxpython
     class Frame final : public Object
     {
     public:
+        static constexpr std::size_t MaxValueStackDepth = 1U << 16;
+
         Frame(TypeObject *type,
               CodeObject *code,
               DictObject *locals,
@@ -96,6 +98,8 @@ namespace cxxpython
     class ThreadState final
     {
     public:
+        static constexpr std::size_t MaxFrameDepth = 1000;
+
         explicit ThreadState(InterpreterState &interpreter);
 
         InterpreterState &interpreter() const noexcept;

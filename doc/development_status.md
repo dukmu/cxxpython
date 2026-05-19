@@ -1,5 +1,40 @@
 # Development Status
 
+## 2026-05-19 VM Depth Guard Slice
+
+Review focus:
+
+- Stop unbounded VM recursion before recursive Python calls can consume host
+  stack unpredictably.
+- Add a value-stack guard for malformed bytecode and future compiler bugs.
+- Use Python-visible `RecursionError` rather than reporting this through
+  generic C++ bytecode failures.
+
+Completed:
+
+- Added `RecursionError` to the exception hierarchy, runtime accessors,
+  factories, helper raiser, roots, and builtins.
+- Added `ThreadState::MaxFrameDepth` and enforced it in `push_frame`.
+- Added `Frame::MaxValueStackDepth` and enforced it in `Frame::push`.
+- Added C++ coverage for exception hierarchy, builtins exposure, frame-depth
+  overflow, and value-stack overflow.
+- Updated Python builtins golden output to include `RecursionError`.
+
+Known debt and next risk:
+
+- The recursion limit is currently a fixed VM constant. A script-visible
+  `sys.getrecursionlimit()` / `sys.setrecursionlimit()` belongs with the first
+  `sys` module slice.
+- `CodeObject` still lacks a computed/validated `stacksize`; value-stack
+  pressure is guarded dynamically but not proven at compile time.
+- Full traceback objects remain the next diagnostic substrate needed for deep
+  recursive failures.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter='CoreObjects.RuntimeBootstrapsExceptionHierarchy:Module.BootstrapsBuiltinsModule:Bytecode.EnforcesFrameAndValueStackDepthLimits:PythonScripts.RunsGoldenFiles'`
+
 ## 2026-05-19 For Iteration Slice
 
 Review focus:

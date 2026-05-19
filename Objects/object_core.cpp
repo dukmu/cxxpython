@@ -1073,6 +1073,13 @@ namespace cxxpython
         throw PythonError(runtime->new_unbound_local_error(std::move(message)));
     }
 
+    void raise_recursion_error(Runtime *runtime, std::string message)
+    {
+        if (!runtime)
+            throw std::logic_error("cannot raise Python RecursionError without a runtime");
+        throw PythonError(runtime->new_recursion_error(std::move(message)));
+    }
+
     void raise_attribute_error(Runtime *runtime, std::string message)
     {
         if (!runtime)

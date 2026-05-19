@@ -222,6 +222,11 @@ namespace cxxpython
         return unbound_local_error_type_;
     }
 
+    TypeObject *Runtime::recursion_error_type() const noexcept
+    {
+        return recursion_error_type_;
+    }
+
     TypeObject *Runtime::attribute_error_type() const noexcept
     {
         return attribute_error_type_;

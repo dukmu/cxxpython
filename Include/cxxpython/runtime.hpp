@@ -96,6 +96,7 @@ namespace cxxpython
         TypeObject *syntax_error_type() const noexcept;
         TypeObject *name_error_type() const noexcept;
         TypeObject *unbound_local_error_type() const noexcept;
+        TypeObject *recursion_error_type() const noexcept;
         TypeObject *attribute_error_type() const noexcept;
         TypeObject *import_error_type() const noexcept;
         TypeObject *stop_iteration_type() const noexcept;
@@ -229,6 +230,7 @@ namespace cxxpython
         ExceptionObject *new_syntax_error(std::string message);
         ExceptionObject *new_name_error(std::string message);
         ExceptionObject *new_unbound_local_error(std::string message);
+        ExceptionObject *new_recursion_error(std::string message);
         ExceptionObject *new_attribute_error(std::string message);
         ExceptionObject *new_import_error(std::string message);
         ExceptionObject *new_stop_iteration();
@@ -318,6 +320,7 @@ namespace cxxpython
         TypeObject *syntax_error_type_ = nullptr;
         TypeObject *name_error_type_ = nullptr;
         TypeObject *unbound_local_error_type_ = nullptr;
+        TypeObject *recursion_error_type_ = nullptr;
         TypeObject *attribute_error_type_ = nullptr;
         TypeObject *import_error_type_ = nullptr;
         TypeObject *stop_iteration_type_ = nullptr;

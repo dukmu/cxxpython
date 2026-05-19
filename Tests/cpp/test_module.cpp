@@ -79,6 +79,8 @@ TEST(Module, BootstrapsBuiltinsModule)
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("NameError")), runtime.name_error_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("UnboundLocalError")),
               runtime.unbound_local_error_type());
+    EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("RecursionError")),
+              runtime.recursion_error_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("AttributeError")), runtime.attribute_error_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("ImportError")), runtime.import_error_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("None")), runtime.none());

@@ -254,6 +254,8 @@ namespace cxxpython
     {
         if (!object)
             throw BytecodeError("cannot push null object onto frame stack");
+        if (stack_.size() >= MaxValueStackDepth)
+            raise_recursion_error(runtime(), "maximum VM value stack depth exceeded");
         stack_.push_back(object);
     }
 
@@ -394,6 +396,8 @@ namespace cxxpython
     {
         if (!frame)
             throw BytecodeError("cannot push null frame");
+        if (frames_.size() >= MaxFrameDepth)
+            raise_recursion_error(&interpreter_.runtime(), "maximum recursion depth exceeded");
         frames_.push_back(frame);
     }
 

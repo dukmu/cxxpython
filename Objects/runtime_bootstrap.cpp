@@ -52,6 +52,7 @@ namespace cxxpython
         syntax_error_type_ = allocate_type("SyntaxError");
         name_error_type_ = allocate_type("NameError");
         unbound_local_error_type_ = allocate_type("UnboundLocalError");
+        recursion_error_type_ = allocate_type("RecursionError");
         attribute_error_type_ = allocate_type("AttributeError");
         import_error_type_ = allocate_type("ImportError");
         stop_iteration_type_ = allocate_type("StopIteration");
@@ -100,6 +101,7 @@ namespace cxxpython
         syntax_error_type_->slots = make_exception_slots();
         name_error_type_->slots = make_exception_slots();
         unbound_local_error_type_->slots = make_exception_slots();
+        recursion_error_type_->slots = make_exception_slots();
         attribute_error_type_->slots = make_exception_slots();
         import_error_type_->slots = make_exception_slots();
         stop_iteration_type_->slots = make_exception_slots();
@@ -148,6 +150,7 @@ namespace cxxpython
         syntax_error_type_->set_type(type_type_);
         name_error_type_->set_type(type_type_);
         unbound_local_error_type_->set_type(type_type_);
+        recursion_error_type_->set_type(type_type_);
         attribute_error_type_->set_type(type_type_);
         import_error_type_->set_type(type_type_);
         stop_iteration_type_->set_type(type_type_);
@@ -199,6 +202,7 @@ namespace cxxpython
         initialize_type(syntax_error_type_, exception_type_);
         initialize_type(name_error_type_, exception_type_);
         initialize_type(unbound_local_error_type_, name_error_type_);
+        initialize_type(recursion_error_type_, exception_type_);
         initialize_type(attribute_error_type_, exception_type_);
         initialize_type(import_error_type_, exception_type_);
         initialize_type(stop_iteration_type_, exception_type_);
@@ -247,6 +251,7 @@ namespace cxxpython
         syntax_error_type_->solid_base = base_exception_type_;
         name_error_type_->solid_base = base_exception_type_;
         unbound_local_error_type_->solid_base = base_exception_type_;
+        recursion_error_type_->solid_base = base_exception_type_;
         attribute_error_type_->solid_base = base_exception_type_;
         import_error_type_->solid_base = base_exception_type_;
         stop_iteration_type_->solid_base = base_exception_type_;
@@ -300,6 +305,7 @@ namespace cxxpython
         add_root(syntax_error_type_);
         add_root(name_error_type_);
         add_root(unbound_local_error_type_);
+        add_root(recursion_error_type_);
         add_root(attribute_error_type_);
         add_root(import_error_type_);
         add_root(stop_iteration_type_);

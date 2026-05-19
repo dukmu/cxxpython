@@ -587,6 +587,7 @@ namespace cxxpython
         dict->set(new_str("SyntaxError"), syntax_error_type_);
         dict->set(new_str("NameError"), name_error_type_);
         dict->set(new_str("UnboundLocalError"), unbound_local_error_type_);
+        dict->set(new_str("RecursionError"), recursion_error_type_);
         dict->set(new_str("AttributeError"), attribute_error_type_);
         dict->set(new_str("ImportError"), import_error_type_);
         dict->set(new_str("StopIteration"), stop_iteration_type_);

@@ -1121,6 +1121,48 @@ TEST(Bytecode, ThreadStateVisitsActiveFramesAsRoots)
     EXPECT_EQ(vm.thread_state().frame_depth(), 0U);
 }
 
+TEST(Bytecode, EnforcesFrameAndValueStackDepthLimits)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *locals = runtime.new_dict();
+    cxxpython::DictObject *globals = runtime.new_dict();
+    cxxpython::DictObject *builtins = runtime.builtins_dict();
+    cxxpython::CodeObject *code = runtime.new_code({runtime.none()},
+                                                   {{cxxpython::Opcode::LoadConst, 0},
+                                                    {cxxpython::Opcode::ReturnValue, 0}});
+    cxxpython::Frame *frame = runtime.new_frame(code, locals, globals, builtins);
+
+    for (std::size_t index = 0; index < cxxpython::ThreadState::MaxFrameDepth; ++index)
+        vm.thread_state().push_frame(frame);
+    try
+    {
+        vm.thread_state().push_frame(frame);
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.recursion_error_type());
+        EXPECT_STREQ(error.what(), "maximum recursion depth exceeded");
+    }
+    for (std::size_t index = 0; index < cxxpython::ThreadState::MaxFrameDepth; ++index)
+        vm.thread_state().pop_frame(frame);
+
+    cxxpython::IntObject *value = runtime.new_int(7);
+    for (std::size_t index = 0; index < cxxpython::Frame::MaxValueStackDepth; ++index)
+        frame->push(value);
+    try
+    {
+        frame->push(value);
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.recursion_error_type());
+        EXPECT_STREQ(error.what(), "maximum VM value stack depth exceeded");
+    }
+}
+
 TEST(Bytecode, RejectsMalformedBytecode)
 {
     cxxpython::Runtime runtime;
