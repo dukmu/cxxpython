@@ -337,6 +337,81 @@ TEST(Attributes, DataDescriptorsOverrideInstanceDictionaries)
     EXPECT_EQ(derived_descriptor->last_set_value, set_value);
 }
 
+TEST(Attributes, PropertyObjectsUseDescriptorProtocol)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::TypeObject *owner_type = runtime.new_heap_type("Owner", runtime.object_type());
+    cxxpython::Object *computed = runtime.new_str("computed");
+    cxxpython::Object *set_marker = runtime.new_str("set-marker");
+    cxxpython::Object *last_set = nullptr;
+
+    cxxpython::NativeFunctionObject *getter = runtime.new_native_function(
+        "get_field",
+        [computed](cxxpython::Runtime &runtime, const cxxpython::CallArguments &args)
+        {
+            if (args.positional.size() != 1 || (args.keywords && args.keywords->size() != 0))
+                cxxpython::raise_type_error(&runtime, "get_field() expected self");
+            return computed;
+        });
+    cxxpython::NativeFunctionObject *setter = runtime.new_native_function(
+        "set_field",
+        [&last_set, set_marker](cxxpython::Runtime &runtime, const cxxpython::CallArguments &args)
+        {
+            if (args.positional.size() != 2 || (args.keywords && args.keywords->size() != 0))
+                cxxpython::raise_type_error(&runtime, "set_field() expected self and value");
+            last_set = args.positional[1];
+            return set_marker;
+        });
+    cxxpython::PropertyObject *property = runtime.new_property(getter, setter);
+    owner_type->dict->set(runtime.new_str("field"), property);
+    cxxpython::Object *instance = runtime.allocate<cxxpython::Object>(owner_type);
+    cxxpython::Object *value = runtime.new_str("new-value");
+
+    EXPECT_EQ(property->type(), runtime.property_type());
+    EXPECT_EQ(cxxpython::object_repr(property), "<property getter=set, setter=set, deleter=none>");
+    EXPECT_EQ(cxxpython::object_get_attr(owner_type, "field"), property);
+    EXPECT_EQ(cxxpython::object_get_attr(instance, "field"), computed);
+
+    cxxpython::object_set_attr(instance, "field", value);
+    EXPECT_EQ(last_set, value);
+    EXPECT_EQ(instance->instance_dict(), nullptr);
+
+    std::vector<cxxpython::Object *> children;
+    property->visit_children([&children](cxxpython::Object *object)
+                             { children.push_back(object); });
+    ASSERT_EQ(children.size(), 2U);
+    EXPECT_EQ(children[0], getter);
+    EXPECT_EQ(children[1], setter);
+}
+
+TEST(Attributes, ReadOnlyPropertyRejectsAssignment)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::TypeObject *owner_type = runtime.new_heap_type("Owner", runtime.object_type());
+    cxxpython::NativeFunctionObject *getter = runtime.new_native_function(
+        "get_field",
+        [](cxxpython::Runtime &runtime, const cxxpython::CallArguments &args)
+        {
+            (void)args;
+            return runtime.new_str("computed");
+        });
+    cxxpython::PropertyObject *property = runtime.new_property(getter);
+    owner_type->dict->set(runtime.new_str("field"), property);
+    cxxpython::Object *instance = runtime.allocate<cxxpython::Object>(owner_type);
+
+    try
+    {
+        cxxpython::object_set_attr(instance, "field", runtime.new_str("new-value"));
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.attribute_error_type());
+        EXPECT_STREQ(error.what(), "can't set attribute");
+        EXPECT_EQ(instance->instance_dict(), nullptr);
+    }
+}
+
 TEST(Attributes, RaisesAttributeErrorForMissingAttribute)
 {
     cxxpython::Runtime runtime;

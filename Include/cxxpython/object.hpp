@@ -22,6 +22,7 @@ namespace cxxpython
     class ExceptionObject;
     class MethodDescriptorObject;
     class GetSetDescriptorObject;
+    class PropertyObject;
     class PythonFunctionObject;
 
     using VisitChildren = std::function<void(Object *)>;
@@ -393,6 +394,23 @@ namespace cxxpython
         GetSetSetter setter_;
     };
 
+    class PropertyObject final : public Object
+    {
+    public:
+        PropertyObject(TypeObject *type, Object *getter, Object *setter, Object *deleter, Object *doc);
+
+        Object *getter() const noexcept;
+        Object *setter() const noexcept;
+        Object *deleter() const noexcept;
+        Object *doc() const noexcept;
+
+    private:
+        Object *getter_;
+        Object *setter_;
+        Object *deleter_;
+        Object *doc_;
+    };
+
     class ExceptionObject final : public Object
     {
     public:
@@ -448,6 +466,7 @@ namespace cxxpython
     TypeSlots make_method_slots();
     TypeSlots make_method_descriptor_slots();
     TypeSlots make_getset_descriptor_slots();
+    TypeSlots make_property_slots();
     TypeSlots make_exception_slots();
     TypeSlots make_code_slots();
     TypeSlots make_frame_slots();

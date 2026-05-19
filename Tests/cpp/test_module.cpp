@@ -50,6 +50,7 @@ TEST(Module, BootstrapsBuiltinsModule)
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("type")), runtime.type_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("str")), runtime.str_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("list")), runtime.list_type());
+    EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("property")), runtime.property_type());
 }
 
 TEST(Module, ExecutesCodeUsingModuleGlobals)

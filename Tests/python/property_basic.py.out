@@ -1,0 +1,4 @@
+<property getter=set, setter=none, deleter=none>
+A.a
+<class 'str'>
+AttributeError: can't set attribute

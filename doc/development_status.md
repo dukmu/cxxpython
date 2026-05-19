@@ -37,8 +37,9 @@ Eight tracked risks:
    callable boundary, `str()` is exposed, and `print` uses `object_str`.
    `list()` still accepts no iterable, and the full shared argument parser /
    iterator protocol path is not in place.
-7. Medium: descriptor and type-attribute protocol is incomplete. Lookup is
-   centralized, but `property`, `staticmethod`, `classmethod`, slot wrappers,
+7. Medium, partially fixed: descriptor and type-attribute protocol is
+   incomplete. Lookup is centralized and `property` now works as a data
+   descriptor, but `staticmethod`, `classmethod`, slot wrappers,
    `__getattribute__`, and `__getattr__` are still absent.
 8. Medium, first slice fixed: Python functions now support positional
    varargs, keyword dictionaries, and keyword calls through `CodeObject` flags,
@@ -63,6 +64,8 @@ Immediate order:
   root entries, making nested guards safe.
 - Done in current slice: `str()` is exposed through the normal type call path
   and `print` now uses `object_str` instead of string-only branching.
+- Done in current slice: `property` is now a typed builtin descriptor with
+  getter/setter behavior and read-only assignment errors.
 - Next: continue through `global`/`nonlocal`/closures, `__prepare__`,
   syntax-level `metaclass=`,
   traceback metadata, root guards, builtin protocol cleanup, call expansion,
@@ -190,6 +193,67 @@ Verification:
 - `ctest --test-dir build --output-on-failure`
 
 Result: all tests pass.
+
+## 2026-05-19 Property Descriptor Builtin
+
+Pre-change review:
+
+- Attribute lookup already had the right descriptor priority skeleton, and
+  Python functions bound correctly as methods, but the runtime had no real
+  script-visible descriptor family beyond internal method/getset descriptors.
+- Without `property`, class-system tests would keep using C++ test-only
+  descriptors and miss the real Python path: class namespace stores a
+  descriptor object, instance access calls a Python getter, class access returns
+  the descriptor itself, and assignment to a read-only descriptor raises
+  `AttributeError`.
+
+Debt addressed:
+
+- Added `PropertyObject` as its own runtime object type and bootstrap type.
+- Exposed `property` in builtins through the normal type call path.
+- Implemented property construction with `fget`, `fset`, `fdel`, and `doc`
+  positional slots.
+- Implemented descriptor get/set behavior:
+  - class access returns the property object
+  - instance access calls the getter with the instance
+  - setter calls receive instance and value
+  - missing getter raises `AttributeError`
+  - missing setter raises `AttributeError: can't set attribute`
+- Added traversal for getter/setter/deleter/doc so future GC sees property
+  references.
+
+Completed:
+
+- Added C++ tests for property descriptor access, setter dispatch, read-only
+  assignment, repr, and traversal.
+- Added Python golden coverage for class access, instance access,
+  `type(a.a)`, read-only assignment failure, and a two-argument setter
+  property.
+
+Design review:
+
+- `property` is implemented as a normal typed descriptor in a type dictionary,
+  not as compiler syntax or a VM special case. This keeps future
+  `staticmethod`, `classmethod`, and slot wrappers on the same architecture.
+- The current constructor is intentionally positional-only because keyword
+  parameter parsing is not yet generalized. That debt is recorded under the
+  native argument parser and function default/keyword-only work.
+
+Known debt and next risk:
+
+- `property.getter`, `property.setter`, and `property.deleter` decorator helper
+  methods are not implemented yet.
+- Descriptor delete semantics are still absent because attribute deletion is
+  not yet in the language subset.
+- `staticmethod` and `classmethod` are the next natural descriptor-family
+  builtins.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all 135 tests pass.
 
 ## 2026-05-19 Str Builtin And Object String Conversion
 

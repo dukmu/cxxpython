@@ -57,6 +57,7 @@ namespace cxxpython
         TypeObject *method_type() const noexcept;
         TypeObject *method_descriptor_type() const noexcept;
         TypeObject *getset_descriptor_type() const noexcept;
+        TypeObject *property_type() const noexcept;
         TypeObject *code_type() const noexcept;
         TypeObject *frame_type() const noexcept;
         TypeObject *base_exception_type() const noexcept;
@@ -98,6 +99,7 @@ namespace cxxpython
                                                        TypeObject *owner,
                                                        GetSetGetter getter,
                                                        GetSetSetter setter = {});
+        PropertyObject *new_property(Object *getter, Object *setter = nullptr, Object *deleter = nullptr, Object *doc = nullptr);
         CodeObject *new_code(std::vector<Object *> constants,
                               std::vector<Instruction> instructions);
         CodeObject *new_code(std::string name,
@@ -209,6 +211,7 @@ namespace cxxpython
         TypeObject *method_type_ = nullptr;
         TypeObject *method_descriptor_type_ = nullptr;
         TypeObject *getset_descriptor_type_ = nullptr;
+        TypeObject *property_type_ = nullptr;
         TypeObject *code_type_ = nullptr;
         TypeObject *frame_type_ = nullptr;
         TypeObject *base_exception_type_ = nullptr;

@@ -159,6 +159,7 @@ namespace cxxpython
         initialize_type_dict(method_type_);
         initialize_type_dict(method_descriptor_type_);
         initialize_type_dict(getset_descriptor_type_);
+        initialize_type_dict(property_type_);
         initialize_type_dict(code_type_);
         initialize_type_dict(frame_type_);
         initialize_type_dict(base_exception_type_);

@@ -87,6 +87,11 @@ namespace cxxpython
         return getset_descriptor_type_;
     }
 
+    TypeObject *Runtime::property_type() const noexcept
+    {
+        return property_type_;
+    }
+
     TypeObject *Runtime::code_type() const noexcept
     {
         return code_type_;

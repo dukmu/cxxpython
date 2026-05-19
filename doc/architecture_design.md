@@ -331,3 +331,8 @@ doc/            design docs and milestone plans
   必须允许以后区分 dict-backed instance、slot-only instance 和二者并存的实例。
 - `super`、`classmethod`、`staticmethod`、`property` 都应作为 descriptor
   协议的自然结果实现。先补 descriptor 行为和绑定对象，再暴露语法和 builtins。
+- `property` is a typed data descriptor stored in a class dictionary. Class
+  access returns the descriptor; instance access calls the getter with the
+  instance; assignment calls the setter or raises `AttributeError` for a
+  read-only property. Future descriptor-family builtins must follow this
+  object/type-slot path rather than adding VM or compiler cases.

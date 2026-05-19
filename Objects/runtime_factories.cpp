@@ -121,6 +121,11 @@ namespace cxxpython
                                                 std::move(setter));
     }
 
+    PropertyObject *Runtime::new_property(Object *getter, Object *setter, Object *deleter, Object *doc)
+    {
+        return allocate<PropertyObject>(property_type_, getter, setter, deleter, doc);
+    }
+
     CodeObject *Runtime::new_code(std::vector<Object *> constants, std::vector<Instruction> instructions)
     {
         return new_code("<module>", "<string>", std::move(constants), {}, std::move(instructions));
