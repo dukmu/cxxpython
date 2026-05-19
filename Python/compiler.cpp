@@ -208,6 +208,11 @@ namespace cxxpython
                 statement.value->accept(*this);
             }
 
+            void visit(const compiler_internal::DeleteStmt &statement) override
+            {
+                statement.target->accept(*this);
+            }
+
             void visit(const compiler_internal::IfStmt &statement) override
             {
                 statement.condition->accept(*this);
@@ -273,6 +278,11 @@ namespace cxxpython
             }
 
             void visit(const compiler_internal::AssignStmt &statement) override
+            {
+                statement.target->accept(*this);
+            }
+
+            void visit(const compiler_internal::DeleteStmt &statement) override
             {
                 statement.target->accept(*this);
             }
@@ -563,6 +573,22 @@ namespace cxxpython
 
             void visit(const compiler_internal::NameTarget &target) override
             {
+                if (deleting_target_)
+                {
+                    if (symbols_.scope() == SymbolScope::Function && symbols_.is_local(target.name))
+                    {
+                        emit({
+                            Opcode::DeleteFast,
+                            static_cast<std::uint32_t>(local_index(target.name)),
+                        });
+                        return;
+                    }
+                    emit({
+                        Opcode::DeleteName,
+                        static_cast<std::uint32_t>(name_index(target.name)),
+                    });
+                    return;
+                }
                 emit_pending_assignment_value();
                 if (symbols_.scope() == SymbolScope::Function && symbols_.is_local(target.name))
                 {
@@ -581,6 +607,14 @@ namespace cxxpython
             void visit(const compiler_internal::AttributeTarget &target) override
             {
                 target.object->accept(*this);
+                if (deleting_target_)
+                {
+                    emit({
+                        Opcode::DeleteAttr,
+                        static_cast<std::uint32_t>(name_index(target.name)),
+                    });
+                    return;
+                }
                 emit_pending_assignment_value();
                 emit({
                     Opcode::StoreAttr,
@@ -592,6 +626,11 @@ namespace cxxpython
             {
                 target.object->accept(*this);
                 target.key->accept(*this);
+                if (deleting_target_)
+                {
+                    emit({Opcode::DeleteSubscr, 0});
+                    return;
+                }
                 emit_pending_assignment_value();
                 emit({Opcode::StoreSubscr, 0});
             }
@@ -607,6 +646,13 @@ namespace cxxpython
             {
                 StatementLineGuard line(*this, statement);
                 PendingAssignmentValue pending(*this, *statement.value);
+                statement.target->accept(*this);
+            }
+
+            void visit(const compiler_internal::DeleteStmt &statement) override
+            {
+                StatementLineGuard line(*this, statement);
+                DeletingTarget deleting(*this);
                 statement.target->accept(*this);
             }
 
@@ -727,6 +773,28 @@ namespace cxxpython
             private:
                 BytecodeBuilder &builder_;
                 const compiler_internal::Expr *previous_;
+            };
+
+            class DeletingTarget final
+            {
+            public:
+                explicit DeletingTarget(BytecodeBuilder &builder)
+                    : builder_(builder), previous_(builder.deleting_target_)
+                {
+                    builder_.deleting_target_ = true;
+                }
+
+                ~DeletingTarget()
+                {
+                    builder_.deleting_target_ = previous_;
+                }
+
+                DeletingTarget(const DeletingTarget &) = delete;
+                DeletingTarget &operator=(const DeletingTarget &) = delete;
+
+            private:
+                BytecodeBuilder &builder_;
+                bool previous_;
             };
 
             void emit_pending_assignment_value()
@@ -861,6 +929,7 @@ namespace cxxpython
             std::vector<std::uint32_t> lines_;
             std::uint32_t current_line_ = 1;
             const compiler_internal::Expr *pending_assignment_value_ = nullptr;
+            bool deleting_target_ = false;
         };
 
         SymbolTable collect_symbols(const compiler_internal::Expr &expression)

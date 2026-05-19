@@ -153,6 +153,8 @@ namespace cxxpython::compiler_internal
                     kind = TokenKind::Return;
                 else if (lexeme == "class")
                     kind = TokenKind::Class;
+                else if (lexeme == "del")
+                    kind = TokenKind::Del;
                 else if (lexeme == "True")
                     kind = TokenKind::TrueLiteral;
                 else if (lexeme == "False")

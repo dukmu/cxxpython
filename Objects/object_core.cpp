@@ -558,6 +558,22 @@ namespace cxxpython
         raise_type_error(object->runtime(), message.str());
     }
 
+    void object_delete_item(Object *object, Object *key)
+    {
+        if (!object || !key)
+            raise_type_error(object ? object->runtime() : nullptr, "subscript target and key cannot be null");
+        if (object->type() && object->type()->slots.delitem)
+        {
+            object->type()->slots.delitem(*object, key);
+            return;
+        }
+
+        std::ostringstream message;
+        message << "'" << type_qualified_name(object->type())
+                << "' object does not support item deletion";
+        raise_type_error(object->runtime(), message.str());
+    }
+
     bool object_contains(Object *object, Object *key)
     {
         if (!object || !key)

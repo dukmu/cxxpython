@@ -182,14 +182,20 @@ namespace cxxpython
             return "LOAD_NAME";
         case Opcode::StoreName:
             return "STORE_NAME";
+        case Opcode::DeleteName:
+            return "DELETE_NAME";
         case Opcode::LoadFast:
             return "LOAD_FAST";
         case Opcode::StoreFast:
             return "STORE_FAST";
+        case Opcode::DeleteFast:
+            return "DELETE_FAST";
         case Opcode::LoadAttr:
             return "LOAD_ATTR";
         case Opcode::StoreAttr:
             return "STORE_ATTR";
+        case Opcode::DeleteAttr:
+            return "DELETE_ATTR";
         case Opcode::PopTop:
             return "POP_TOP";
         case Opcode::DupTop:
@@ -206,6 +212,8 @@ namespace cxxpython
             return "BINARY_SUBSCR";
         case Opcode::StoreSubscr:
             return "STORE_SUBSCR";
+        case Opcode::DeleteSubscr:
+            return "DELETE_SUBSCR";
         case Opcode::BuildList:
             return "BUILD_LIST";
         case Opcode::BuildTuple:
@@ -245,6 +253,8 @@ namespace cxxpython
         case Opcode::LoadFast:
             return 1;
         case Opcode::LoadAttr:
+        case Opcode::DeleteName:
+        case Opcode::DeleteFast:
         case Opcode::JumpAbsolute:
         case Opcode::RotTwo:
         case Opcode::RotThree:
@@ -258,6 +268,7 @@ namespace cxxpython
         case Opcode::StoreName:
         case Opcode::StoreFast:
         case Opcode::PopTop:
+        case Opcode::DeleteAttr:
         case Opcode::PopJumpIfFalse:
         case Opcode::PopJumpIfTrue:
         case Opcode::JumpIfFalseOrPop:
@@ -270,6 +281,8 @@ namespace cxxpython
             return -1;
         case Opcode::StoreSubscr:
             return -3;
+        case Opcode::DeleteSubscr:
+            return -2;
         case Opcode::BuildList:
             return 1 - static_cast<int>(instruction.operand);
         case Opcode::BuildTuple:

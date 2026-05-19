@@ -52,8 +52,9 @@ Eight tracked risks:
    typed builtin descriptors with decorator-script coverage. Attribute delete
    now routes through data descriptors and `property.deleter` at the object API
    layer. `__getattr__` fallback now runs after normal module, metatype, type,
-   descriptor, and instance-dict lookup fails. Slot wrappers,
-   `__getattribute__`, and parser/VM `del` statement lowering remain absent.
+   descriptor, and instance-dict lookup fails. Parser/VM `del` statement
+   lowering is now implemented for names, fast locals, attributes, and
+   subscripts. Slot wrappers and `__getattribute__` remain absent.
 8. Medium, first slice fixed: Python functions now support positional
    varargs, keyword dictionaries, and keyword calls through `CodeObject` flags,
    `CALL_KW`, and unified `CallArguments`. Remaining call-family work includes
@@ -85,6 +86,9 @@ Immediate order:
 - Done in current slice: `staticmethod` and `classmethod` now live as typed
   descriptor objects, method binding now supports generic callable/self pairs,
   and Python golden tests cover class and instance access.
+- Done in current slice: `del` statement lowering now emits VM delete opcodes
+  instead of synthetic method calls, and subscript deletion routes through the
+  object item protocol.
 - Done in current slice: native/builtin positional and keyword validation now
   uses shared helper APIs instead of repeated local string-building branches.
 - Done in current slice: VM opcode dispatch now uses scoped root guards around
@@ -150,8 +154,9 @@ Known debt and next risk:
   recursion protection.
 - Slot wrappers remain absent, so special methods like `__len__` are not yet
   script-visible descriptors for builtins.
-- Parser/VM delete statement lowering remains open despite the object-level
-  delete API now existing.
+- Delete statement support is currently single-target. Multi-target and
+  destructuring `del` should extend the same target-family compiler path rather
+  than lowering through synthetic method calls.
 
 Verification:
 
@@ -159,6 +164,54 @@ Verification:
 - `ctest --test-dir build --output-on-failure`
 
 Result: all 149 tests pass.
+
+## 2026-05-19 Del Statement Lowering
+
+Pre-change review:
+
+- Attribute and descriptor deletion already had a centralized object API, but
+  source-level `del` still lacked bytecode lowering. Implementing it through
+  parser-injected `__delattr__` or `__delitem__` calls would have split the
+  protocol from VM operations and made future slot wrappers harder to reason
+  about.
+- Item deletion also needed the same slot-family shape as get/set item before
+  `del x[i]` could be a real opcode operation.
+
+Completed:
+
+- Added `DELETE_NAME`, `DELETE_FAST`, `DELETE_ATTR`, and `DELETE_SUBSCR`
+  bytecodes with opcode metadata and stack effects.
+- Added `DeleteStmt` to the parser/compiler AST path. The parser now accepts
+  `del` targets through the assignment-target validator, and the compiler emits
+  delete opcodes for names, attributes, and subscripts.
+- Added `TypeSlots::delitem` and `object_delete_item`.
+- Implemented list and dict item deletion through slots; tuple and
+  mappingproxy now raise protocol-level `TypeError` for deletion.
+- VM dispatch now routes:
+  - name deletion through locals/fast-locals semantics,
+  - attribute deletion through `object_delete_attr`,
+  - subscript deletion through `object_delete_item`.
+- Added C++ coverage for opcode metadata, VM dispatch, compiler lowering, list
+  and dict deletion, and immutable/mappingproxy error paths.
+- Added `Tests/python/delete_statement.py` golden coverage for name deletion,
+  list/dict subscript deletion, property deleters, and function local delete.
+
+Design notes:
+
+- `DELETE_ATTR` and `DELETE_SUBSCR` are thin VM protocol dispatches. They do
+  not know about properties, list, dict, or mappingproxy internals.
+- Delete target handling now shares the same target-family architecture as
+  assignment. Future multi-target and destructuring deletion should add target
+  recursion there, not a new parser rewrite.
+- `del obj.attr` and `del obj[key]` intentionally preserve descriptor and
+  slot semantics through `object_delete_attr` and `object_delete_item`.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all 152 tests pass.
 
 ## 2026-05-19 Descriptor Delete Protocol
 

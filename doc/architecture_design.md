@@ -292,9 +292,17 @@ doc/            design docs and milestone plans
   calls a module dictionary `__getattr__` directly, without descriptor binding.
 - Descriptor assignment and deletion are centralized through `object_set_attr`
   and `object_delete_attr`. Data descriptors receive normal assignment with a
-  non-null value and deletion as `descr_set(..., value=nullptr)`. Future
-  `DELETE_ATTR` bytecode must call this API rather than deleting from
-  dictionaries directly.
+  non-null value and deletion as `descr_set(..., value=nullptr)`. `DELETE_ATTR`
+  bytecode calls this API rather than deleting from dictionaries directly.
+- Item access follows the same protocol family: `object_get_item`,
+  `object_set_item`, and `object_delete_item` dispatch through `TypeSlots`
+  (`getitem`/`setitem`/`delitem`). `BINARY_SUBSCR`, `STORE_SUBSCR`, and
+  `DELETE_SUBSCR` must remain thin VM dispatches and never special-case list,
+  dict, tuple, or extension layouts.
+- Parser and compiler delete handling must use the assignment-target family.
+  `del name`, `del obj.attr`, and `del obj[key]` lower to dedicated bytecodes;
+  future multi-target/destructuring deletion should extend that target visitor
+  instead of injecting synthetic `__delattr__`/`__delitem__` calls.
 - Object instance dictionaries are optional and lazily allocated through
   `object_set_attr`; they are traversed by the base object traversal path so
   future GC does not need per-type special cases for normal instance state.

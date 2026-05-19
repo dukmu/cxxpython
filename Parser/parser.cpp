@@ -95,6 +95,8 @@ namespace cxxpython::compiler_internal
                     return parse_function_def_statement({});
                 if (peek().kind == TokenKind::Class)
                     return parse_class_def_statement({});
+                if (peek().kind == TokenKind::Del)
+                    return parse_delete_statement();
                 if (peek().kind == TokenKind::Return)
                     return parse_return_statement();
 
@@ -131,6 +133,20 @@ namespace cxxpython::compiler_internal
                     consume(TokenKind::Newline, "expected newline after decorator");
                 }
                 return decorators;
+            }
+
+            ParsedStatement parse_delete_statement()
+            {
+                const Token &del_token = advance();
+                std::unique_ptr<Expr> target_expression = parse_expression_only();
+                std::unique_ptr<AssignTarget> target =
+                    make_assignment_target(std::move(target_expression), del_token);
+                auto statement = std::make_unique<DeleteStmt>(std::move(target));
+                statement->line = del_token.line;
+                return ParsedStatement{
+                    std::move(statement),
+                    false,
+                };
             }
 
             ParsedStatement parse_return_statement()
@@ -610,6 +626,7 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Def:
                 case TokenKind::Return:
                 case TokenKind::Class:
+                case TokenKind::Del:
                 case TokenKind::Indent:
                 case TokenKind::Dedent:
                     raise_at(token, "expected expression");
@@ -700,6 +717,7 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Def:
                 case TokenKind::Return:
                 case TokenKind::Class:
+                case TokenKind::Del:
                 case TokenKind::TrueLiteral:
                 case TokenKind::FalseLiteral:
                 case TokenKind::NoneLiteral:

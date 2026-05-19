@@ -211,6 +211,8 @@ namespace cxxpython
             inherited.getitem = slots.getitem;
         if (slots.setitem)
             inherited.setitem = slots.setitem;
+        if (slots.delitem)
+            inherited.delitem = slots.delitem;
         if (slots.contains)
             inherited.contains = slots.contains;
         if (slots.iter)

@@ -391,6 +391,9 @@ TEST(CoreObjects, SequenceSlotsReadAndWriteListAndTupleItems)
 
     cxxpython::object_set_item(list, runtime.new_int(1), replacement);
     EXPECT_EQ(cxxpython::object_get_item(list, runtime.new_int(1)), replacement);
+    cxxpython::object_delete_item(list, runtime.new_int(0));
+    EXPECT_EQ(cxxpython::object_length(list), 1);
+    EXPECT_EQ(cxxpython::object_get_item(list, runtime.new_int(0)), replacement);
 
     EXPECT_EQ(cxxpython::object_length(tuple), 2);
     EXPECT_EQ(cxxpython::object_get_item(tuple, runtime.new_int(0)), first);
@@ -405,6 +408,17 @@ TEST(CoreObjects, SequenceSlotsReadAndWriteListAndTupleItems)
     {
         EXPECT_EQ(error.type(), runtime.type_error_type());
         EXPECT_STREQ(error.what(), "'tuple' object does not support item assignment");
+    }
+
+    try
+    {
+        cxxpython::object_delete_item(tuple, runtime.new_int(0));
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "'tuple' object does not support item deletion");
     }
 }
 

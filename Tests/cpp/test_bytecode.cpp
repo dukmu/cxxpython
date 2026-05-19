@@ -10,10 +10,13 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::LoadConst), "LOAD_CONST");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::LoadName), "LOAD_NAME");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::StoreName), "STORE_NAME");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::DeleteName), "DELETE_NAME");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::LoadFast), "LOAD_FAST");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::StoreFast), "STORE_FAST");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::DeleteFast), "DELETE_FAST");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::LoadAttr), "LOAD_ATTR");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::StoreAttr), "STORE_ATTR");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::DeleteAttr), "DELETE_ATTR");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::PopTop), "POP_TOP");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::DupTop), "DUP_TOP");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::RotTwo), "ROT_TWO");
@@ -22,6 +25,7 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::BinaryOp), "BINARY_OP");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::BinarySubscr), "BINARY_SUBSCR");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::StoreSubscr), "STORE_SUBSCR");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::DeleteSubscr), "DELETE_SUBSCR");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::BuildList), "BUILD_LIST");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::BuildTuple), "BUILD_TUPLE");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::BuildMap), "BUILD_MAP");
@@ -39,10 +43,13 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::LoadConst, 0}), 1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::LoadName, 0}), 1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::StoreName, 0}), -1);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::DeleteName, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::LoadFast, 0}), 1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::StoreFast, 0}), -1);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::DeleteFast, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::LoadAttr, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::StoreAttr, 0}), -2);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::DeleteAttr, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::PopTop, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::DupTop, 0}), 1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::RotTwo, 0}), 0);
@@ -51,6 +58,7 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BinaryOp, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BinarySubscr, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::StoreSubscr, 0}), -3);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::DeleteSubscr, 0}), -2);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BuildList, 0}), 1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BuildList, 3}), -2);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BuildTuple, 0}), 1);
@@ -401,6 +409,18 @@ TEST(Bytecode, DispatchesSubscriptOpcodesThroughObjectProtocol)
     EXPECT_EQ(vm.execute(*store_list), runtime.none());
     EXPECT_EQ(list->get(1), replacement);
 
+    cxxpython::CodeObject *delete_list = runtime.new_code(
+        {list, runtime.new_int(0), runtime.none()},
+        {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::LoadConst, 1},
+         {cxxpython::Opcode::DeleteSubscr, 0},
+         {cxxpython::Opcode::LoadConst, 2},
+         {cxxpython::Opcode::ReturnValue, 0}});
+
+    EXPECT_EQ(vm.execute(*delete_list), runtime.none());
+    ASSERT_EQ(list->size(), 1U);
+    EXPECT_EQ(list->get(0), replacement);
+
     cxxpython::DictObject *dict = runtime.new_dict();
     cxxpython::Object *key = runtime.new_str("name");
     cxxpython::Object *value = runtime.new_str("dict-value");
@@ -413,6 +433,17 @@ TEST(Bytecode, DispatchesSubscriptOpcodesThroughObjectProtocol)
          {cxxpython::Opcode::ReturnValue, 0}});
 
     EXPECT_EQ(vm.execute(*load_dict), value);
+
+    cxxpython::CodeObject *delete_dict = runtime.new_code(
+        {dict, key, runtime.none()},
+        {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::LoadConst, 1},
+         {cxxpython::Opcode::DeleteSubscr, 0},
+         {cxxpython::Opcode::LoadConst, 2},
+         {cxxpython::Opcode::ReturnValue, 0}});
+
+    EXPECT_EQ(vm.execute(*delete_dict), runtime.none());
+    EXPECT_FALSE(dict->contains(key));
 }
 
 TEST(Bytecode, SubscriptOpcodesRaisePythonErrorsThroughObjectProtocol)
@@ -808,6 +839,26 @@ TEST(Bytecode, DispatchesLoadAttrAndStoreAttrThroughObjectApi)
          {cxxpython::Opcode::ReturnValue, 0}});
 
     EXPECT_EQ(vm.execute(*load), value);
+
+    cxxpython::CodeObject *delete_attr = runtime.new_code(
+        {object, runtime.none()},
+        {name},
+        {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::DeleteAttr, 0},
+         {cxxpython::Opcode::LoadConst, 1},
+         {cxxpython::Opcode::ReturnValue, 0}});
+
+    EXPECT_EQ(vm.execute(*delete_attr), runtime.none());
+    try
+    {
+        (void)cxxpython::object_get_attr(object, "field");
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.attribute_error_type());
+        EXPECT_STREQ(error.what(), "'Carrier' object has no attribute 'field'");
+    }
 }
 
 TEST(Bytecode, CallsCallableObjectsThroughTypeSlot)

@@ -61,10 +61,24 @@ TEST(CoreObjects, MappingSlotsReadWriteAndContainDictItems)
     cxxpython::object_set_item(dict, key, replacement);
     EXPECT_EQ(cxxpython::object_length(dict), 1);
     EXPECT_EQ(cxxpython::object_get_item(dict, key), replacement);
+    cxxpython::object_delete_item(dict, key);
+    EXPECT_EQ(cxxpython::object_length(dict), 0);
+    EXPECT_FALSE(cxxpython::object_contains(dict, key));
 
     try
     {
         (void)cxxpython::object_get_item(dict, runtime.new_str("missing"));
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.key_error_type());
+        EXPECT_STREQ(error.what(), "'missing'");
+    }
+
+    try
+    {
+        cxxpython::object_delete_item(dict, runtime.new_str("missing"));
         FAIL() << "expected PythonError";
     }
     catch (const cxxpython::PythonError &error)
@@ -99,6 +113,17 @@ TEST(CoreObjects, MappingProxySlotsReadAndContainWrappedDictItems)
     {
         EXPECT_EQ(error.type(), runtime.type_error_type());
         EXPECT_STREQ(error.what(), "'mappingproxy' object does not support item assignment");
+    }
+
+    try
+    {
+        cxxpython::object_delete_item(proxy, key);
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "'mappingproxy' object does not support item deletion");
     }
 }
 

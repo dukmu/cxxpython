@@ -599,6 +599,34 @@ TEST(Compile, CompilesAttributeLoadAndStore)
     EXPECT_EQ(vm.execute(*load, *globals), stored);
 }
 
+TEST(Compile, CompilesAttributeDelete)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+    cxxpython::TypeObject *type = runtime.new_heap_type("Carrier", runtime.object_type());
+    cxxpython::Object *object = runtime.allocate<cxxpython::Object>(type);
+    cxxpython::object_set_attr(object, "field", runtime.new_str("stored"));
+    globals->set(runtime.new_str("obj"), object);
+
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(runtime, "del obj.field\n", "script.py");
+    ASSERT_NE(code, nullptr);
+    EXPECT_EQ(code->instructions()[0].opcode, cxxpython::Opcode::LoadName);
+    EXPECT_EQ(code->instructions()[1].opcode, cxxpython::Opcode::DeleteAttr);
+
+    EXPECT_EQ(vm.execute(*code, *globals), runtime.none());
+    try
+    {
+        (void)cxxpython::object_get_attr(object, "field");
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.attribute_error_type());
+        EXPECT_STREQ(error.what(), "'Carrier' object has no attribute 'field'");
+    }
+}
+
 TEST(Compile, CompilesSubscriptLoadAndStore)
 {
     cxxpython::Runtime runtime;
@@ -629,6 +657,82 @@ TEST(Compile, CompilesSubscriptLoadAndStore)
     auto *stored = dynamic_cast<cxxpython::StrObject *>(list->get(1));
     ASSERT_NE(stored, nullptr);
     EXPECT_EQ(stored->value, "updated");
+}
+
+TEST(Compile, CompilesNameAndSubscriptDelete)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(
+        runtime,
+        "x = 'gone'\n"
+        "xs = ['zero', 'one', 'two']\n"
+        "d = {'key': 'value'}\n"
+        "del x\n"
+        "del xs[1]\n"
+        "del d['key']\n",
+        "script.py");
+    ASSERT_NE(code, nullptr);
+    bool saw_delete_name = false;
+    bool saw_delete_subscr = false;
+    for (const cxxpython::Instruction &instruction : code->instructions())
+    {
+        if (instruction.opcode == cxxpython::Opcode::DeleteName)
+            saw_delete_name = true;
+        if (instruction.opcode == cxxpython::Opcode::DeleteSubscr)
+            saw_delete_subscr = true;
+    }
+    EXPECT_TRUE(saw_delete_name);
+    EXPECT_TRUE(saw_delete_subscr);
+
+    EXPECT_EQ(vm.execute(*code, *globals), runtime.none());
+    EXPECT_EQ(globals->get(runtime.new_str("x")), nullptr);
+    auto *list = dynamic_cast<cxxpython::ListObject *>(globals->get(runtime.new_str("xs")));
+    ASSERT_NE(list, nullptr);
+    ASSERT_EQ(list->size(), 2U);
+    EXPECT_EQ(static_cast<cxxpython::StrObject *>(list->get(1))->value, "two");
+    auto *dict = dynamic_cast<cxxpython::DictObject *>(globals->get(runtime.new_str("d")));
+    ASSERT_NE(dict, nullptr);
+    EXPECT_FALSE(dict->contains(runtime.new_str("key")));
+}
+
+TEST(Compile, CompilesFunctionLocalDeleteAsFastLocal)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(
+        runtime,
+        "def f():\n"
+        "    x = 'first'\n"
+        "    del x\n"
+        "    x = 'second'\n"
+        "    return x\n"
+        "result = f()\n",
+        "script.py");
+    ASSERT_NE(code, nullptr);
+
+    cxxpython::CodeObject *function_code = nullptr;
+    for (cxxpython::Object *constant : code->constants())
+    {
+        if (auto *candidate = dynamic_cast<cxxpython::CodeObject *>(constant))
+            function_code = candidate;
+    }
+    ASSERT_NE(function_code, nullptr);
+    bool saw_delete_fast = false;
+    for (const cxxpython::Instruction &instruction : function_code->instructions())
+    {
+        if (instruction.opcode == cxxpython::Opcode::DeleteFast)
+            saw_delete_fast = true;
+    }
+    EXPECT_TRUE(saw_delete_fast);
+
+    cxxpython::DictObject *globals = runtime.new_dict();
+    EXPECT_EQ(vm.execute(*code, *globals), runtime.none());
+    auto *result = dynamic_cast<cxxpython::StrObject *>(globals->get(runtime.new_str("result")));
+    ASSERT_NE(result, nullptr);
+    EXPECT_EQ(result->value, "second");
 }
 
 TEST(Compile, CompilesDictSubscriptThroughObjectProtocol)

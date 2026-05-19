@@ -80,6 +80,13 @@ namespace cxxpython
             dict.set(key, value);
         }
 
+        void dict_delitem(Object &object, Object *key)
+        {
+            auto &dict = static_cast<DictObject &>(object);
+            if (!dict.erase(key))
+                raise_key_error(object.runtime(), key);
+        }
+
         bool dict_contains(Object &object, Object *key)
         {
             auto &dict = static_cast<DictObject &>(object);
@@ -140,6 +147,11 @@ namespace cxxpython
         void mappingproxy_setitem(Object &object, Object *, Object *)
         {
             raise_type_error(object.runtime(), "'mappingproxy' object does not support item assignment");
+        }
+
+        void mappingproxy_delitem(Object &object, Object *)
+        {
+            raise_type_error(object.runtime(), "'mappingproxy' object does not support item deletion");
         }
 
         bool mappingproxy_contains(Object &object, Object *key)
@@ -294,6 +306,7 @@ namespace cxxpython
             .length = dict_length,
             .getitem = dict_getitem,
             .setitem = dict_setitem,
+            .delitem = dict_delitem,
             .contains = dict_contains,
             .iter = dict_iter,
         };
@@ -310,6 +323,7 @@ namespace cxxpython
             .length = mappingproxy_length,
             .getitem = mappingproxy_getitem,
             .setitem = mappingproxy_setitem,
+            .delitem = mappingproxy_delitem,
             .contains = mappingproxy_contains,
             .iter = mappingproxy_iter,
         };

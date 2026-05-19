@@ -352,6 +352,17 @@ namespace cxxpython
                 locals.set(name, value);
                 break;
             }
+            case Opcode::DeleteName:
+            {
+                if (instruction.operand >= code.names().size())
+                    throw BytecodeError("DELETE_NAME operand out of range");
+                auto *name = dynamic_cast<StrObject *>(code.names()[instruction.operand]);
+                if (!name)
+                    throw BytecodeError("DELETE_NAME requires a str name");
+                if (!locals.erase(name))
+                    raise_name_error(&runtime_, "name '" + name->value + "' is not defined");
+                break;
+            }
             case Opcode::LoadFast:
             {
                 if (instruction.operand >= code.varnames().size())
@@ -380,6 +391,20 @@ namespace cxxpython
                 locals.set(name, value);
                 break;
             }
+            case Opcode::DeleteFast:
+            {
+                if (instruction.operand >= code.varnames().size())
+                    throw BytecodeError("DELETE_FAST operand out of range");
+                auto *name = dynamic_cast<StrObject *>(code.varnames()[instruction.operand]);
+                if (!name)
+                    throw BytecodeError("DELETE_FAST requires a str varname");
+                if (!locals.erase(name))
+                    raise_unbound_local_error(
+                        &runtime_,
+                        "cannot delete local variable '" + name->value +
+                            "' where it is not associated with a value");
+                break;
+            }
             case Opcode::LoadAttr:
             {
                 if (instruction.operand >= code.names().size())
@@ -404,6 +429,18 @@ namespace cxxpython
                 auto value_root = runtime_.root(value);
                 auto object_root = runtime_.root(object);
                 object_set_attr(object, name, value);
+                break;
+            }
+            case Opcode::DeleteAttr:
+            {
+                if (instruction.operand >= code.names().size())
+                    throw BytecodeError("DELETE_ATTR operand out of range");
+                auto *name = dynamic_cast<StrObject *>(code.names()[instruction.operand]);
+                if (!name)
+                    throw BytecodeError("DELETE_ATTR requires a str name");
+                Object *object = frame->pop();
+                auto object_root = runtime_.root(object);
+                object_delete_attr(object, name);
                 break;
             }
             case Opcode::PopTop:
@@ -470,6 +507,15 @@ namespace cxxpython
                 auto key_root = runtime_.root(key);
                 auto object_root = runtime_.root(object);
                 object_set_item(object, key, value);
+                break;
+            }
+            case Opcode::DeleteSubscr:
+            {
+                Object *key = frame->pop();
+                Object *object = frame->pop();
+                auto key_root = runtime_.root(key);
+                auto object_root = runtime_.root(object);
+                object_delete_item(object, key);
                 break;
             }
             case Opcode::BuildList:

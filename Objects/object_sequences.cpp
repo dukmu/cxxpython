@@ -3,6 +3,7 @@
 
 #include "object_utils.hpp"
 
+#include <cstddef>
 #include <sstream>
 
 namespace cxxpython
@@ -81,6 +82,12 @@ namespace cxxpython
         {
             auto &list = static_cast<ListObject &>(object);
             list.set(sequence_index(object, key, "list"), value);
+        }
+
+        void list_delitem(Object &object, Object *key)
+        {
+            auto &list = static_cast<ListObject &>(object);
+            list.erase(sequence_index(object, key, "list"));
         }
 
         bool list_contains(Object &object, Object *key)
@@ -215,6 +222,11 @@ namespace cxxpython
             raise_type_error(object.runtime(), "'tuple' object does not support item assignment");
         }
 
+        void tuple_delitem(Object &object, Object *)
+        {
+            raise_type_error(object.runtime(), "'tuple' object does not support item deletion");
+        }
+
         bool tuple_contains(Object &object, Object *key)
         {
             auto &tuple = static_cast<TupleObject &>(object);
@@ -249,6 +261,11 @@ namespace cxxpython
         if (!item)
             raise_type_error(runtime(), "list item cannot be null");
         items_[normalize_index(index)] = item;
+    }
+
+    void ListObject::erase(std::int64_t index)
+    {
+        items_.erase(items_.begin() + static_cast<std::ptrdiff_t>(normalize_index(index)));
     }
 
     const std::vector<Object *> &ListObject::items() const noexcept
@@ -296,6 +313,7 @@ namespace cxxpython
             .length = list_length,
             .getitem = list_getitem,
             .setitem = list_setitem,
+            .delitem = list_delitem,
             .contains = list_contains,
             .iter = sequence_iter,
             .new_object = list_new,
@@ -314,6 +332,7 @@ namespace cxxpython
             .length = tuple_length,
             .getitem = tuple_getitem,
             .setitem = tuple_setitem,
+            .delitem = tuple_delitem,
             .contains = tuple_contains,
             .iter = sequence_iter,
         };

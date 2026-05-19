@@ -32,6 +32,7 @@ namespace cxxpython::compiler_internal
     struct SubscriptTarget;
     struct ExprStmt;
     struct AssignStmt;
+    struct DeleteStmt;
     struct IfStmt;
     struct ReturnStmt;
     struct FunctionDefStmt;
@@ -68,6 +69,7 @@ namespace cxxpython::compiler_internal
         virtual ~StmtVisitor() = default;
         virtual void visit(const ExprStmt &statement) = 0;
         virtual void visit(const AssignStmt &statement) = 0;
+        virtual void visit(const DeleteStmt &statement) = 0;
         virtual void visit(const IfStmt &statement) = 0;
         virtual void visit(const ReturnStmt &statement) = 0;
         virtual void visit(const FunctionDefStmt &statement) = 0;
@@ -106,6 +108,7 @@ namespace cxxpython::compiler_internal
         Def,
         Return,
         Class,
+        Del,
         TrueLiteral,
         FalseLiteral,
         NoneLiteral,
@@ -476,6 +479,21 @@ namespace cxxpython::compiler_internal
 
         std::unique_ptr<AssignTarget> target;
         std::unique_ptr<Expr> value;
+
+        void accept(StmtVisitor &visitor) const override
+        {
+            visitor.visit(*this);
+        }
+    };
+
+    struct DeleteStmt final : Stmt
+    {
+        explicit DeleteStmt(std::unique_ptr<AssignTarget> target_in)
+            : target(std::move(target_in))
+        {
+        }
+
+        std::unique_ptr<AssignTarget> target;
 
         void accept(StmtVisitor &visitor) const override
         {

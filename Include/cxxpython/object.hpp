@@ -89,6 +89,7 @@ namespace cxxpython
     using LengthSlot = std::size_t (*)(const Object &);
     using GetItemSlot = Object *(*)(Object &, Object *);
     using SetItemSlot = void (*)(Object &, Object *, Object *);
+    using DelItemSlot = void (*)(Object &, Object *);
     using ContainsSlot = bool (*)(Object &, Object *);
     using IterSlot = Object *(*)(Object &);
     using IterNextSlot = Object *(*)(Object &);
@@ -113,6 +114,7 @@ namespace cxxpython
         LengthSlot length = nullptr;
         GetItemSlot getitem = nullptr;
         SetItemSlot setitem = nullptr;
+        DelItemSlot delitem = nullptr;
         ContainsSlot contains = nullptr;
         IterSlot iter = nullptr;
         IterNextSlot iternext = nullptr;
@@ -223,6 +225,7 @@ namespace cxxpython
         void append(Object *item);
         Object *get(std::int64_t index) const;
         void set(std::int64_t index, Object *item);
+        void erase(std::int64_t index);
         const std::vector<Object *> &items() const noexcept;
         std::size_t size() const noexcept;
 
@@ -507,6 +510,7 @@ namespace cxxpython
     std::size_t object_length(Object *object);
     Object *object_get_item(Object *object, Object *key);
     void object_set_item(Object *object, Object *key, Object *value);
+    void object_delete_item(Object *object, Object *key);
     bool object_contains(Object *object, Object *key);
     Object *object_iter(Object *object);
     Object *object_next(Object *iterator);
