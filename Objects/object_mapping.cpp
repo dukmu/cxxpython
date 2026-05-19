@@ -1,6 +1,7 @@
 #include "cxxpython/object.hpp"
 #include "cxxpython/runtime.hpp"
 
+#include <cstddef>
 #include <sstream>
 
 namespace cxxpython
@@ -196,6 +197,21 @@ namespace cxxpython
         entries_.push_back(Entry{key, value, key_hash});
         indices_[search.slot] = entries_.size() - 1;
         ensure_index_capacity();
+    }
+
+    bool DictObject::erase(Object *key)
+    {
+        if (!key)
+            raise_type_error(runtime(), "dict key cannot be null");
+
+        const std::int64_t key_hash = object_hash(key);
+        const SlotSearch search = find_slot(key, key_hash);
+        if (!search.found)
+            return false;
+
+        entries_.erase(entries_.begin() + static_cast<std::ptrdiff_t>(indices_[search.slot]));
+        rebuild_indices(indices_.size());
+        return true;
     }
 
     std::size_t DictObject::size() const noexcept

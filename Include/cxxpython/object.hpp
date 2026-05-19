@@ -259,6 +259,7 @@ namespace cxxpython
         bool contains(Object *key) const;
         Object *get(Object *key) const;
         void set(Object *key, Object *value);
+        bool erase(Object *key);
         std::size_t size() const noexcept;
         const std::vector<Entry> &entries() const noexcept;
 
@@ -513,6 +514,8 @@ namespace cxxpython
     Object *object_get_attr(Object *object, const std::string &name);
     void object_set_attr(Object *object, StrObject *name, Object *value);
     void object_set_attr(Object *object, const std::string &name, Object *value);
+    void object_delete_attr(Object *object, StrObject *name);
+    void object_delete_attr(Object *object, const std::string &name);
     Object *type_lookup_attribute(TypeObject *type, StrObject *name);
     std::string object_str(const Object *object);
     std::string object_repr(const Object *object);

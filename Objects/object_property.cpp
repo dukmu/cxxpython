@@ -84,9 +84,14 @@ namespace cxxpython
         {
             auto *property = static_cast<PropertyObject *>(&object);
             if (!instance)
-                raise_attribute_error(property->runtime(), "can't set attribute");
+                raise_attribute_error(property->runtime(), value ? "can't set attribute" : "can't delete attribute");
             if (!value)
-                raise_attribute_error(property->runtime(), "can't delete attribute");
+            {
+                if (!property->deleter())
+                    raise_attribute_error(property->runtime(), "can't delete attribute");
+                (void)object_call(property->deleter(), {instance});
+                return;
+            }
             if (!property->setter())
                 raise_attribute_error(property->runtime(), "can't set attribute");
             (void)object_call(property->setter(), {instance, value});

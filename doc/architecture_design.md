@@ -285,6 +285,11 @@ doc/            design docs and milestone plans
   in type/class dictionaries with a `descr_get` slot are invoked with
   `(descriptor, instance, owner)`. Module namespace entries are direct values;
   module type descriptors still flow through type lookup.
+- Descriptor assignment and deletion are centralized through `object_set_attr`
+  and `object_delete_attr`. Data descriptors receive normal assignment with a
+  non-null value and deletion as `descr_set(..., value=nullptr)`. Future
+  `DELETE_ATTR` bytecode must call this API rather than deleting from
+  dictionaries directly.
 - Object instance dictionaries are optional and lazily allocated through
   `object_set_attr`; they are traversed by the base object traversal path so
   future GC does not need per-type special cases for normal instance state.

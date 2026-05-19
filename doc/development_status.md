@@ -49,9 +49,10 @@ Eight tracked risks:
 7. Medium, partially fixed: descriptor and type-attribute protocol is
    incomplete. Lookup is centralized; `property` works as a data descriptor;
    `property.getter`/`setter`/`deleter`, `staticmethod`, and `classmethod` are
-   typed builtin descriptors with decorator-script coverage. Slot wrappers,
-   `__getattribute__`, `__getattr__`, and descriptor delete semantics remain
-   absent.
+   typed builtin descriptors with decorator-script coverage. Attribute delete
+   now routes through data descriptors and `property.deleter` at the object API
+   layer. Slot wrappers, `__getattribute__`, `__getattr__`, and parser/VM `del`
+   statement lowering remain absent.
 8. Medium, first slice fixed: Python functions now support positional
    varargs, keyword dictionaries, and keyword calls through `CodeObject` flags,
    `CALL_KW`, and unified `CallArguments`. Remaining call-family work includes
@@ -95,11 +96,64 @@ Immediate order:
 - Done in current slice: iterator protocol foundation is now slot-based;
   `StopIteration`, `iter`, `next`, sequence iterators, dict-key iterators, and
   `list(iterable)` all use object protocol dispatch.
+- Done in current slice: `object_delete_attr` now deletes module/type/instance
+  attributes and dispatches data descriptor deletion; `property.deleter` uses
+  the same descriptor path.
 - Next: continue through `global`/`nonlocal`/closures, `__prepare__`,
   syntax-level `metaclass=`,
   full traceback objects, runtime factory root audits, builtin protocol
   cleanup, `for`/call expansion, defaults/keyword-only arguments, and
   descriptor completeness.
+
+## 2026-05-19 Descriptor Delete Protocol
+
+Pre-change review:
+
+- `property.deleter` could create a descriptor object, but there was no
+  attribute-delete API to invoke it. That left descriptor protocol asymmetric:
+  get/set were centralized, while delete had no future parser/VM target.
+- Dict-backed modules, type dictionaries, and instance dictionaries also had
+  no common deletion path, which would have pushed future `del obj.attr`
+  lowering into ad hoc VM branches.
+
+Debt addressed:
+
+- Added `DictObject::erase` and centralized `object_delete_attr`.
+- Attribute deletion now follows the same priority shape as assignment:
+  module dict deletion, metatype data descriptor deletion for type objects,
+  type dict deletion, instance data descriptor deletion, then instance dict
+  deletion.
+- `property` now treats `descr_set(..., value=nullptr)` as descriptor delete:
+  it calls the deleter when present and raises `AttributeError` otherwise.
+
+Completed:
+
+- Added C++ coverage for deleting ordinary instance attributes, deleting
+  through a data descriptor, and invoking `property.deleter`.
+- Covered read-only property delete errors through the same descriptor path.
+
+Design review:
+
+- The parser and VM still do not expose `del` syntax. That is intentional for
+  this slice: the object protocol is now the stable target that future
+  `DELETE_ATTR` lowering should call.
+- Deletion remains in the centralized attribute API. VM opcodes should not
+  inspect instance dictionaries, type dictionaries, modules, or property
+  objects directly.
+
+Known debt and next risk:
+
+- Add AST target support, `DELETE_ATTR`, `DELETE_NAME`, and eventually
+  `DELETE_SUBSCR` using the same target visitor family as assignment.
+- Continue descriptor completeness with `__getattribute__`, `__getattr__`, and
+  slot wrappers.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all 147 tests pass.
 
 ## 2026-05-19 Iterator Protocol Foundation And `list(iterable)`
 

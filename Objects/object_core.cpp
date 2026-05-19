@@ -719,6 +719,55 @@ namespace cxxpython
         object_set_attr(object, runtime->new_str(name), value);
     }
 
+    void object_delete_attr(Object *object, StrObject *name)
+    {
+        if (!object || !name)
+            raise_attribute_error(object ? object->runtime() : nullptr,
+                                  "'<null>' object has no attribute '<null>'");
+
+        if (auto *module = dynamic_cast<ModuleObject *>(object))
+        {
+            if (module->dict()->erase(name))
+                return;
+        }
+        else if (auto *type = dynamic_cast<TypeObject *>(object))
+        {
+            Object *metatype_value = type->type() ? type_lookup_attribute(type->type(), name) : nullptr;
+            if (metatype_value && metatype_value->type() && metatype_value->type()->slots.descr_set)
+            {
+                metatype_value->type()->slots.descr_set(*metatype_value, object, nullptr);
+                return;
+            }
+            if (type->dict->erase(name))
+                return;
+        }
+        else
+        {
+            Object *type_value = type_lookup_attribute(object->type(), name);
+            if (type_value && type_value->type() && type_value->type()->slots.descr_set)
+            {
+                type_value->type()->slots.descr_set(*type_value, object, nullptr);
+                return;
+            }
+            if (object->instance_dict() && object->instance_dict()->erase(name))
+                return;
+        }
+
+        std::ostringstream message;
+        message << "'" << type_qualified_name(object->type())
+                << "' object has no attribute '"
+                << name->value << "'";
+        raise_attribute_error(object->runtime(), message.str());
+    }
+
+    void object_delete_attr(Object *object, const std::string &name)
+    {
+        Runtime *runtime = object ? object->runtime() : nullptr;
+        if (!runtime)
+            raise_attribute_error(nullptr, "'<null>' object has no attribute '" + name + "'");
+        object_delete_attr(object, runtime->new_str(name));
+    }
+
     std::string type_qualified_name(const TypeObject *type)
     {
         if (!type)

@@ -337,6 +337,40 @@ TEST(Attributes, DataDescriptorsOverrideInstanceDictionaries)
     EXPECT_EQ(derived_descriptor->last_set_value, set_value);
 }
 
+TEST(Attributes, DeleteAttrUsesInstanceDictAndDataDescriptorProtocol)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::TypeSlots descriptor_slots;
+    descriptor_slots.descr_get = descriptor_get;
+    descriptor_slots.descr_set = descriptor_set;
+    cxxpython::TypeObject *descriptor_type =
+        runtime.new_heap_type("DataDescriptor", runtime.object_type(), descriptor_slots);
+    cxxpython::TypeObject *owner_type = runtime.new_heap_type("Owner", runtime.object_type());
+    auto *descriptor = runtime.allocate<DescriptorObject>(descriptor_type, runtime.new_str("from-descriptor"));
+    owner_type->dict->set(runtime.new_str("field"), descriptor);
+    cxxpython::Object *instance = runtime.allocate<cxxpython::Object>(owner_type);
+
+    cxxpython::Object *plain_value = runtime.new_str("plain");
+    cxxpython::object_set_attr(instance, "plain", plain_value);
+    EXPECT_EQ(cxxpython::object_get_attr(instance, "plain"), plain_value);
+    cxxpython::object_delete_attr(instance, "plain");
+
+    try
+    {
+        (void)cxxpython::object_get_attr(instance, "plain");
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.attribute_error_type());
+        EXPECT_STREQ(error.what(), "'Owner' object has no attribute 'plain'");
+    }
+
+    cxxpython::object_delete_attr(instance, "field");
+    EXPECT_EQ(descriptor->last_set_instance, instance);
+    EXPECT_EQ(descriptor->last_set_value, nullptr);
+}
+
 TEST(Attributes, PropertyObjectsUseDescriptorProtocol)
 {
     cxxpython::Runtime runtime;
@@ -382,6 +416,48 @@ TEST(Attributes, PropertyObjectsUseDescriptorProtocol)
     ASSERT_EQ(children.size(), 2U);
     EXPECT_EQ(children[0], getter);
     EXPECT_EQ(children[1], setter);
+}
+
+TEST(Attributes, PropertyDeleterUsesDescriptorDeleteProtocol)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::TypeObject *owner_type = runtime.new_heap_type("Owner", runtime.object_type());
+    cxxpython::Object *deleted_self = nullptr;
+
+    cxxpython::NativeFunctionObject *getter = runtime.new_native_function(
+        "get_field",
+        [](cxxpython::Runtime &runtime, const cxxpython::CallArguments &)
+        {
+            return runtime.new_str("computed");
+        });
+    cxxpython::NativeFunctionObject *deleter = runtime.new_native_function(
+        "delete_field",
+        [&deleted_self](cxxpython::Runtime &runtime, const cxxpython::CallArguments &args)
+        {
+            if (args.positional.size() != 1 || (args.keywords && args.keywords->size() != 0))
+                cxxpython::raise_type_error(&runtime, "delete_field() expected self");
+            deleted_self = args.positional[0];
+            return runtime.none();
+        });
+    cxxpython::PropertyObject *property = runtime.new_property(getter, nullptr, deleter);
+    owner_type->dict->set(runtime.new_str("field"), property);
+    cxxpython::Object *instance = runtime.allocate<cxxpython::Object>(owner_type);
+
+    cxxpython::object_delete_attr(instance, "field");
+    EXPECT_EQ(deleted_self, instance);
+
+    cxxpython::PropertyObject *read_only = runtime.new_property(getter);
+    owner_type->dict->set(runtime.new_str("read_only"), read_only);
+    try
+    {
+        cxxpython::object_delete_attr(instance, "read_only");
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.attribute_error_type());
+        EXPECT_STREQ(error.what(), "can't delete attribute");
+    }
 }
 
 TEST(Attributes, ReadOnlyPropertyRejectsAssignment)
