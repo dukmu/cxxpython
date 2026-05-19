@@ -1,5 +1,65 @@
 # Development Status
 
+## 2026-05-19 Builtin Iterator And Dynamic Execution Slice
+
+Review focus:
+
+- The builtin expansion must grow from object-space substrate: real types,
+  slots, constructors, traversal, and Python golden semantics.
+- Iterator builtins should not collect eagerly. They must compose through
+  `object_iter` / `object_next` so future `for` lowering can reuse exactly the
+  same path.
+- Dynamic execution builtins should reuse compiler and VM entry points rather
+  than evaluating strings through ad hoc host-side shortcuts.
+
+Completed:
+
+- Added real runtime types for:
+  - `range`
+  - `range_iterator`
+  - `enumerate`
+  - `zip`
+  - `map`
+  - `filter`
+- Exposed `range`, `enumerate`, `zip`, `map`, and `filter` from the builtins
+  module as type objects.
+- `range` now supports repr, len, getitem, containment, and iteration.
+- `enumerate`, `zip`, `map`, and `filter` now implement lazy
+  `__iter__` / `__next__` behavior through slots.
+- Added `format()` through normal `__format__` attribute dispatch.
+- Added minimal `compile()`, `eval()`, and `exec()` builtins wired to the
+  existing compiler, CodeObject, active frame, and VM execution paths.
+- Expanded `Tests/python/builtins.py` to pin range, iterator-family, format,
+  compile, eval, and exec behavior.
+
+Known debt and next risk:
+
+- `compile` currently supports only `exec` and `eval` modes. It lacks flags,
+  dont_inherit, optimize, AST input, and richer diagnostics.
+- `eval` / `exec` accept dict globals/locals only and rely on the current live
+  frame dictionaries. Optimized locals, closure cells, and builtins injection
+  rules still need CPython-compatible design.
+- `range` length arithmetic is intentionally compact and does not yet defend
+  every int64 overflow edge. A future arbitrary-precision `int` layer should
+  own exact range math.
+- `map` / `filter` / `zip` / `enumerate` are lazy object-space iterators, but
+  they still lack CPython-level repr strings and constructor error wording.
+- `__build_class__` should be next for class-system openness: class statements
+  still go through the VM `MAKE_CLASS` path rather than a visible builtin.
+- `__import__` needs module cache/search-path state before it can be more than
+  a stub.
+- `bytes`, `bytearray`, and `memoryview` need a byte/buffer substrate.
+- `open` and `input` need a runtime-managed IO layer.
+- `slice` should be designed together with slice syntax and sequence slicing.
+- `super` needs compiler support for class/function context cells.
+- `help` should wait for docstrings/module metadata and output policy.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/cxxpython Tests/python/builtins.py`
+- `build/test_core_objects --gtest_filter='PythonScripts.RunsGoldenFiles'`
+
 ## 2026-05-19 Try Finally And Comparison Foundation Slice
 
 Review focus:

@@ -68,3 +68,43 @@ print((1).__bool__())
 print((1).__int__())
 print((1).__index__())
 print((0).__bool__())
+
+print(range(3))
+print(type(range(3)))
+print(len(range(1, 8, 2)))
+print(range(1, 8, 2).__getitem__(2))
+print(range(5).__contains__(3))
+print(4 in range(1, 8, 2))
+print(list(range(3)))
+print(list(range(5, 1, -2)))
+
+print(list(enumerate(['a', 'b'])))
+print(list(enumerate(['a'], 5)))
+print(list(zip([1, 2], ['a', 'b', 'c'])))
+print(list(zip()))
+
+def double(value):
+    return value + value
+
+def add(left, right):
+    return left + right
+
+def at_least_two(value):
+    return value >= 2
+
+print(list(map(double, [1, 2, 3])))
+print(list(map(add, [1, 2], [10, 20])))
+print(list(filter(at_least_two, [1, 3, 2])))
+print(list(filter(None, [0, 1, '', 'x'])))
+print(dir(range).__contains__('__iter__'))
+print(dir(range(3)).__contains__('__next__'))
+print(dir(map).__contains__('__next__'))
+
+print(format(123))
+print(format('abc'))
+code = compile('1 + 2', '<builtins-test>', 'eval')
+print(eval(code))
+print(eval('3 + 4'))
+scope = {}
+exec('answer = 42', scope)
+print(scope['answer'])

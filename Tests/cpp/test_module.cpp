@@ -57,7 +57,8 @@ TEST(Module, BootstrapsBuiltinsModule)
     EXPECT_EQ(cxxpython::object_repr(next), "<built-in function next>");
 
     for (const char *name : {"all", "any", "sum", "min", "max", "sorted", "dir", "vars",
-                             "isinstance", "issubclass", "callable", "id", "globals", "locals"})
+                             "isinstance", "issubclass", "callable", "id", "globals", "locals",
+                             "format", "compile", "eval", "exec"})
     {
         cxxpython::Object *function = runtime.builtins_dict()->get(runtime.new_str(name));
         ASSERT_NE(function, nullptr) << name;
@@ -87,6 +88,11 @@ TEST(Module, BootstrapsBuiltinsModule)
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("list")), runtime.list_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("tuple")), runtime.tuple_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("dict")), runtime.dict_type());
+    EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("range")), runtime.range_type());
+    EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("enumerate")), runtime.enumerate_type());
+    EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("zip")), runtime.zip_type());
+    EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("map")), runtime.map_type());
+    EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("filter")), runtime.filter_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("property")), runtime.property_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("staticmethod")), runtime.staticmethod_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("classmethod")), runtime.classmethod_type());

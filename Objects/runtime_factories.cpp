@@ -67,6 +67,46 @@ namespace cxxpython
         return allocate<DictKeyIteratorObject>(dict_key_iterator_type_, dict);
     }
 
+    RangeObject *Runtime::new_range(std::int64_t start, std::int64_t stop, std::int64_t step)
+    {
+        if (step == 0)
+            raise_value_error(this, "range() arg 3 must not be zero");
+        return allocate<RangeObject>(range_type_, start, stop, step);
+    }
+
+    RangeIteratorObject *Runtime::new_range_iterator(std::int64_t current,
+                                                     std::int64_t step,
+                                                     std::size_t remaining)
+    {
+        return allocate<RangeIteratorObject>(range_iterator_type_, current, step, remaining);
+    }
+
+    EnumerateObject *Runtime::new_enumerate(Object *iterator, std::int64_t next_index)
+    {
+        if (!iterator)
+            raise_type_error(this, "enumerate iterator cannot be null");
+        return allocate<EnumerateObject>(enumerate_type_, iterator, next_index);
+    }
+
+    ZipObject *Runtime::new_zip(std::vector<Object *> iterators)
+    {
+        return allocate<ZipObject>(zip_type_, std::move(iterators));
+    }
+
+    MapObject *Runtime::new_map(Object *callable, std::vector<Object *> iterators)
+    {
+        if (!callable)
+            raise_type_error(this, "map callable cannot be null");
+        return allocate<MapObject>(map_type_, callable, std::move(iterators));
+    }
+
+    FilterObject *Runtime::new_filter(Object *callable, Object *iterator)
+    {
+        if (!callable || !iterator)
+            raise_type_error(this, "filter requires callable and iterator");
+        return allocate<FilterObject>(filter_type_, callable, iterator);
+    }
+
     ModuleObject *Runtime::new_module(std::string name, std::string filename)
     {
         DictObject *dict = new_dict();

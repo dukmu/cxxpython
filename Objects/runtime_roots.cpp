@@ -155,6 +155,12 @@ namespace cxxpython
         initialize_type_dict(mappingproxy_type_);
         initialize_type_dict(sequence_iterator_type_);
         initialize_type_dict(dict_key_iterator_type_);
+        initialize_type_dict(range_type_);
+        initialize_type_dict(range_iterator_type_);
+        initialize_type_dict(enumerate_type_);
+        initialize_type_dict(zip_type_);
+        initialize_type_dict(map_type_);
+        initialize_type_dict(filter_type_);
         initialize_type_dict(module_type_);
         initialize_type_dict(native_function_type_);
         initialize_type_dict(function_type_);

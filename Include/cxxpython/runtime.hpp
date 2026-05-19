@@ -53,6 +53,12 @@ namespace cxxpython
         TypeObject *mappingproxy_type() const noexcept;
         TypeObject *sequence_iterator_type() const noexcept;
         TypeObject *dict_key_iterator_type() const noexcept;
+        TypeObject *range_type() const noexcept;
+        TypeObject *range_iterator_type() const noexcept;
+        TypeObject *enumerate_type() const noexcept;
+        TypeObject *zip_type() const noexcept;
+        TypeObject *map_type() const noexcept;
+        TypeObject *filter_type() const noexcept;
         TypeObject *module_type() const noexcept;
         TypeObject *native_function_type() const noexcept;
         TypeObject *function_type() const noexcept;
@@ -97,6 +103,14 @@ namespace cxxpython
         MappingProxyObject *new_mappingproxy(DictObject *mapping);
         SequenceIteratorObject *new_sequence_iterator(Object *sequence);
         DictKeyIteratorObject *new_dict_key_iterator(DictObject *dict);
+        RangeObject *new_range(std::int64_t start, std::int64_t stop, std::int64_t step);
+        RangeIteratorObject *new_range_iterator(std::int64_t current,
+                                                std::int64_t step,
+                                                std::size_t remaining);
+        EnumerateObject *new_enumerate(Object *iterator, std::int64_t next_index);
+        ZipObject *new_zip(std::vector<Object *> iterators);
+        MapObject *new_map(Object *callable, std::vector<Object *> iterators);
+        FilterObject *new_filter(Object *callable, Object *iterator);
         ModuleObject *new_module(std::string name, std::string filename);
         NativeFunctionObject *new_native_function(std::string name, NativeFunctionCallback callback);
         PythonFunctionObject *new_function(std::string name, CodeObject *code, DictObject *globals);
@@ -234,6 +248,12 @@ namespace cxxpython
         TypeObject *mappingproxy_type_ = nullptr;
         TypeObject *sequence_iterator_type_ = nullptr;
         TypeObject *dict_key_iterator_type_ = nullptr;
+        TypeObject *range_type_ = nullptr;
+        TypeObject *range_iterator_type_ = nullptr;
+        TypeObject *enumerate_type_ = nullptr;
+        TypeObject *zip_type_ = nullptr;
+        TypeObject *map_type_ = nullptr;
+        TypeObject *filter_type_ = nullptr;
         TypeObject *module_type_ = nullptr;
         TypeObject *native_function_type_ = nullptr;
         TypeObject *function_type_ = nullptr;

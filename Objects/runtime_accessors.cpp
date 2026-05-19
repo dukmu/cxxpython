@@ -67,6 +67,36 @@ namespace cxxpython
         return dict_key_iterator_type_;
     }
 
+    TypeObject *Runtime::range_type() const noexcept
+    {
+        return range_type_;
+    }
+
+    TypeObject *Runtime::range_iterator_type() const noexcept
+    {
+        return range_iterator_type_;
+    }
+
+    TypeObject *Runtime::enumerate_type() const noexcept
+    {
+        return enumerate_type_;
+    }
+
+    TypeObject *Runtime::zip_type() const noexcept
+    {
+        return zip_type_;
+    }
+
+    TypeObject *Runtime::map_type() const noexcept
+    {
+        return map_type_;
+    }
+
+    TypeObject *Runtime::filter_type() const noexcept
+    {
+        return filter_type_;
+    }
+
     TypeObject *Runtime::module_type() const noexcept
     {
         return module_type_;

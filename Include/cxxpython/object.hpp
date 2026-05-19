@@ -21,6 +21,12 @@ namespace cxxpython
     class MappingProxyObject;
     class SequenceIteratorObject;
     class DictKeyIteratorObject;
+    class RangeObject;
+    class RangeIteratorObject;
+    class EnumerateObject;
+    class ZipObject;
+    class MapObject;
+    class FilterObject;
     class ExceptionObject;
     class MethodDescriptorObject;
     class SlotWrapperObject;
@@ -355,6 +361,93 @@ namespace cxxpython
         std::size_t index_ = 0;
     };
 
+    class RangeObject final : public Object
+    {
+    public:
+        RangeObject(TypeObject *type, std::int64_t start, std::int64_t stop, std::int64_t step);
+
+        std::int64_t start() const noexcept;
+        std::int64_t stop() const noexcept;
+        std::int64_t step() const noexcept;
+        std::size_t length() const noexcept;
+        std::int64_t value_at(std::size_t index) const;
+
+    private:
+        static std::size_t compute_length(std::int64_t start, std::int64_t stop, std::int64_t step);
+
+        std::int64_t start_;
+        std::int64_t stop_;
+        std::int64_t step_;
+        std::size_t length_;
+    };
+
+    class RangeIteratorObject final : public Object
+    {
+    public:
+        RangeIteratorObject(TypeObject *type,
+                            std::int64_t current,
+                            std::int64_t step,
+                            std::size_t remaining);
+
+        std::int64_t consume_value();
+        std::size_t remaining() const noexcept;
+
+    private:
+        std::int64_t current_;
+        std::int64_t step_;
+        std::size_t remaining_;
+    };
+
+    class EnumerateObject final : public Object
+    {
+    public:
+        EnumerateObject(TypeObject *type, Object *iterator, std::int64_t next_index);
+
+        Object *iterator() const noexcept;
+        std::int64_t consume_index() noexcept;
+
+    private:
+        Object *iterator_;
+        std::int64_t next_index_;
+    };
+
+    class ZipObject final : public Object
+    {
+    public:
+        ZipObject(TypeObject *type, std::vector<Object *> iterators);
+
+        const std::vector<Object *> &iterators() const noexcept;
+
+    private:
+        std::vector<Object *> iterators_;
+    };
+
+    class MapObject final : public Object
+    {
+    public:
+        MapObject(TypeObject *type, Object *callable, std::vector<Object *> iterators);
+
+        Object *callable() const noexcept;
+        const std::vector<Object *> &iterators() const noexcept;
+
+    private:
+        Object *callable_;
+        std::vector<Object *> iterators_;
+    };
+
+    class FilterObject final : public Object
+    {
+    public:
+        FilterObject(TypeObject *type, Object *callable, Object *iterator);
+
+        Object *callable() const noexcept;
+        Object *iterator() const noexcept;
+
+    private:
+        Object *callable_;
+        Object *iterator_;
+    };
+
     class ModuleObject final : public Object
     {
     public:
@@ -616,6 +709,12 @@ namespace cxxpython
     TypeSlots make_mappingproxy_slots();
     TypeSlots make_sequence_iterator_slots();
     TypeSlots make_dict_key_iterator_slots();
+    TypeSlots make_range_slots();
+    TypeSlots make_range_iterator_slots();
+    TypeSlots make_enumerate_slots();
+    TypeSlots make_zip_slots();
+    TypeSlots make_map_slots();
+    TypeSlots make_filter_slots();
     TypeSlots make_module_slots();
     TypeSlots make_native_function_slots();
     TypeSlots make_function_slots();

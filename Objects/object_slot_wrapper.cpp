@@ -452,5 +452,19 @@ namespace cxxpython
         add_slot_wrapper(sequence_iterator_type_, "__next__", SlotWrapperKind::Next);
         add_slot_wrapper(dict_key_iterator_type_, "__iter__", SlotWrapperKind::Iter);
         add_slot_wrapper(dict_key_iterator_type_, "__next__", SlotWrapperKind::Next);
+
+        add_common_object_wrappers(range_type_, true);
+        add_sequence_wrappers(range_type_, false);
+        add_slot_wrapper(range_iterator_type_, "__iter__", SlotWrapperKind::Iter);
+        add_slot_wrapper(range_iterator_type_, "__next__", SlotWrapperKind::Next);
+
+        add_slot_wrapper(enumerate_type_, "__iter__", SlotWrapperKind::Iter);
+        add_slot_wrapper(enumerate_type_, "__next__", SlotWrapperKind::Next);
+        add_slot_wrapper(zip_type_, "__iter__", SlotWrapperKind::Iter);
+        add_slot_wrapper(zip_type_, "__next__", SlotWrapperKind::Next);
+        add_slot_wrapper(map_type_, "__iter__", SlotWrapperKind::Iter);
+        add_slot_wrapper(map_type_, "__next__", SlotWrapperKind::Next);
+        add_slot_wrapper(filter_type_, "__iter__", SlotWrapperKind::Iter);
+        add_slot_wrapper(filter_type_, "__next__", SlotWrapperKind::Next);
     }
 }
