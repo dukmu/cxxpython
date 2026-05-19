@@ -712,6 +712,11 @@ namespace cxxpython
 
             void visit(const compiler_internal::CallExpr &expression) override
             {
+                if (auto *name = dynamic_cast<compiler_internal::NameExpr *>(expression.callee.get()))
+                {
+                    if (name->value == "super" && expression.args.empty())
+                        add_reference("__class__");
+                }
                 expression.callee->accept(*this);
                 for (const auto &arg : expression.args)
                     arg.value->accept(*this);
@@ -1051,12 +1056,28 @@ namespace cxxpython
             {
                 for (const auto &statement : klass.body)
                     statement->accept(*this);
+                if (symbols_.is_cellvar("__class__"))
+                {
+                    emit({
+                        Opcode::LoadClosure,
+                        static_cast<std::uint32_t>(deref_index("__class__")),
+                    });
+                    emit({
+                        Opcode::StoreName,
+                        static_cast<std::uint32_t>(name_index("__classcell__")),
+                    });
+                }
                 emit_constant(runtime_.none());
                 emit({Opcode::ReturnValue, 0});
                 return runtime_.new_code(klass.name,
                                          filename_,
+                                         0,
+                                         0,
+                                         {},
                                          std::move(constants_),
                                          std::move(names_),
+                                         std::move(cellvars_),
+                                         std::move(freevars_),
                                          std::move(instructions_),
                                          std::move(lines_));
             }
@@ -1812,7 +1833,25 @@ namespace cxxpython
                 SymbolCollector collector(symbols);
                 for (const auto &statement : klass.body)
                     statement->accept(collector);
-                return symbols;
+                SymbolTable symbols_with_class = symbols;
+                (void)symbols_with_class.add_cellvar("__class__");
+                bool needs_class_cell = false;
+                NestedFunctionCollector nested_functions;
+                for (const auto &statement : klass.body)
+                    statement->accept(nested_functions);
+                for (const compiler_internal::FunctionDefStmt *function : nested_functions.functions)
+                {
+                    SymbolTable function_symbols = analyze_function_symbols(runtime_, *function, {&symbols_with_class});
+                    if (function_symbols.is_freevar("__class__"))
+                    {
+                        needs_class_cell = true;
+                        break;
+                    }
+                }
+                if (!needs_class_cell)
+                    return symbols;
+                (void)symbols_with_class.add_name("__classcell__");
+                return symbols_with_class;
             }
 
             std::size_t name_index(const std::string &name) const

@@ -154,8 +154,9 @@ Current state:
   use closure cells.
 - Nested functions capture shared mutable cells, so mutation after inner
   function creation is visible through the closure.
-- `super` still cannot be correct until class-body `__class__` cells and
-  frame/method context are wired.
+- `super` is now a real builtin type backed by descriptor and MRO lookup.
+- Class bodies can carry `__class__` cells and backfill `__classcell__` so
+  zero-argument `super()` and direct `__class__` use inside methods work.
 
 Target design:
 
@@ -176,9 +177,10 @@ Target design:
 - Class body compilation should create `__class__` cell when needed.
 - Tighten declaration ordering diagnostics before default arguments or
   comprehensions expand the scope surface.
-- Implement zero-argument `super()` by reading current frame, first argument,
-  and `__class__` closure cell. Two-argument `super(type, obj)` can be built on
-  the same descriptor/MRO path.
+- Keep descriptor/type attribute policy centralized so `super`, property,
+  classmethod, staticmethod, and slot wrappers all share one object-space path.
+- Move symbol analysis out of `compiler.cpp` before more scope rules and class
+  semantics land.
 
 Acceptance tests:
 
@@ -187,8 +189,8 @@ Acceptance tests:
   function scopes.
 - `nonlocal` mutates the nearest enclosing cell. Done for normal function
   scopes.
-- `super()` works in a method on a simple inherited class.
-- `super(type, instance).method()` binds through descriptors.
+- `super()` works in a method on a simple inherited class. Done.
+- `super(type, instance).method()` binds through descriptors. Done.
 
 ## Slice And Sequence Slicing
 

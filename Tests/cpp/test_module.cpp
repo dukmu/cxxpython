@@ -100,6 +100,7 @@ TEST(Module, BootstrapsBuiltinsModule)
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("property")), runtime.property_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("staticmethod")), runtime.staticmethod_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("classmethod")), runtime.classmethod_type());
+    EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("super")), runtime.super_type());
 }
 
 TEST(Module, ImportsPythonModulesThroughRuntimeRegistry)

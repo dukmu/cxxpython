@@ -117,6 +117,11 @@ namespace cxxpython
         return cell_type_;
     }
 
+    TypeObject *Runtime::super_type() const noexcept
+    {
+        return super_type_;
+    }
+
     TypeObject *Runtime::method_type() const noexcept
     {
         return method_type_;

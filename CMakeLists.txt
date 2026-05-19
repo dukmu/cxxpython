@@ -30,6 +30,7 @@ add_library(cxxpython_core
     Objects/object_native_function.cpp
     Objects/object_function.cpp
     Objects/object_cell.cpp
+    Objects/object_super.cpp
     Objects/object_descriptor.cpp
     Objects/object_descriptor_family.cpp
     Objects/object_property.cpp

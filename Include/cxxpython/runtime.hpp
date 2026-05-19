@@ -75,6 +75,7 @@ namespace cxxpython
         TypeObject *native_function_type() const noexcept;
         TypeObject *function_type() const noexcept;
         TypeObject *cell_type() const noexcept;
+        TypeObject *super_type() const noexcept;
         TypeObject *method_type() const noexcept;
         TypeObject *method_descriptor_type() const noexcept;
         TypeObject *slot_wrapper_type() const noexcept;
@@ -134,6 +135,7 @@ namespace cxxpython
                                            DictObject *globals,
                                            std::vector<CellObject *> closure = {});
         CellObject *new_cell(Object *value = nullptr);
+        SuperObject *new_super(TypeObject *start_type, Object *object, TypeObject *object_type);
         PythonMethodObject *new_method(Object *callable, Object *self);
         MethodDescriptorObject *new_method_descriptor(std::string name,
                                                        TypeObject *owner,
@@ -293,6 +295,7 @@ namespace cxxpython
         TypeObject *native_function_type_ = nullptr;
         TypeObject *function_type_ = nullptr;
         TypeObject *cell_type_ = nullptr;
+        TypeObject *super_type_ = nullptr;
         TypeObject *method_type_ = nullptr;
         TypeObject *method_descriptor_type_ = nullptr;
         TypeObject *slot_wrapper_type_ = nullptr;

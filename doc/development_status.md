@@ -1,5 +1,41 @@
 # Development Status
 
+## 2026-05-19 Closure Cell And Super Slice
+
+Review focus:
+
+- Turn zero-argument `super()` into real object-space behavior on top of the
+  shared cell/freevar substrate.
+- Keep `__class__` rooted in class-body closure analysis instead of a VM
+  special case.
+- Avoid duplicating class-cell policy across compiler and runtime layers.
+
+Completed:
+
+- Added a runtime `super` type backed by `Objects/object_super.cpp`.
+- Exposed `super` through builtins and runtime bootstrap.
+- Lowered zero-argument `super()` in methods by marking an implicit
+  `__class__` free variable.
+- Emitted class-body `__class__` cell metadata and backfilled `__classcell__`
+  after class construction.
+- Kept two-argument `super(type, obj)` on the same descriptor and MRO path.
+- Added Python golden coverage for zero-arg and explicit-arg `super()`.
+
+Known debt and next risk:
+
+- `super()` still depends on active frame metadata, so future class/method
+  transformations must preserve the current call frame contract.
+- Class-body closure support is now correct for `super()` and direct
+  `__class__` use in methods, but the broader class protocol still needs more
+  descriptor and metaclass work before it feels complete.
+- The next structural cleanup should move the symbol-analysis machinery out
+  of `compiler.cpp` before more scope rules and class semantics land.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+
 ## 2026-05-19 Global And Nonlocal Symbol Slice
 
 Review focus:

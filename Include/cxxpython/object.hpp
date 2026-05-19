@@ -37,6 +37,7 @@ namespace cxxpython
     class ClassMethodObject;
     class PythonFunctionObject;
     class CellObject;
+    class SuperObject;
 
     using VisitChildren = std::function<void(Object *)>;
     using ObjectSpan = std::span<Object *const>;
@@ -512,6 +513,21 @@ namespace cxxpython
         Object *value_ = nullptr;
     };
 
+    class SuperObject final : public Object
+    {
+    public:
+        SuperObject(TypeObject *type, TypeObject *start_type, Object *object, TypeObject *object_type);
+
+        TypeObject *start_type() const noexcept;
+        Object *object() const noexcept;
+        TypeObject *object_type() const noexcept;
+
+    private:
+        TypeObject *start_type_;
+        Object *object_;
+        TypeObject *object_type_;
+    };
+
     class MethodDescriptorObject final : public Object
     {
     public:
@@ -702,6 +718,7 @@ namespace cxxpython
     bool object_contains(Object *object, Object *key);
     Object *object_iter(Object *object);
     Object *object_next(Object *iterator);
+    Object *super_get_attr_default(SuperObject *super, StrObject *name);
     Object *object_get_attr_default(Object *object, StrObject *name);
     Object *object_get_attr(Object *object, StrObject *name);
     Object *object_get_attr(Object *object, const std::string &name);
@@ -750,6 +767,7 @@ namespace cxxpython
     TypeSlots make_code_slots();
     TypeSlots make_frame_slots();
     TypeSlots make_cell_slots();
+    TypeSlots make_super_slots();
 
     [[noreturn]] void raise_type_error(Runtime *runtime, std::string message);
     [[noreturn]] void raise_value_error(Runtime *runtime, std::string message);

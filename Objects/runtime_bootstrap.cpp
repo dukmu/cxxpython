@@ -31,6 +31,7 @@ namespace cxxpython
         native_function_type_ = allocate_type("builtin_function_or_method");
         function_type_ = allocate_type("function");
         cell_type_ = allocate_type("cell");
+        super_type_ = allocate_type("super");
         method_type_ = allocate_type("method");
         method_descriptor_type_ = allocate_type("method_descriptor");
         slot_wrapper_type_ = allocate_type("wrapper_descriptor");
@@ -77,6 +78,7 @@ namespace cxxpython
         native_function_type_->slots = make_native_function_slots();
         function_type_->slots = make_function_slots();
         cell_type_->slots = make_cell_slots();
+        super_type_->slots = make_super_slots();
         method_type_->slots = make_method_slots();
         method_descriptor_type_->slots = make_method_descriptor_slots();
         slot_wrapper_type_->slots = make_slot_wrapper_slots();
@@ -123,6 +125,7 @@ namespace cxxpython
         native_function_type_->set_type(type_type_);
         function_type_->set_type(type_type_);
         cell_type_->set_type(type_type_);
+        super_type_->set_type(type_type_);
         method_type_->set_type(type_type_);
         method_descriptor_type_->set_type(type_type_);
         slot_wrapper_type_->set_type(type_type_);
@@ -172,6 +175,7 @@ namespace cxxpython
         initialize_type(native_function_type_, object_type_);
         initialize_type(function_type_, object_type_);
         initialize_type(cell_type_, object_type_);
+        initialize_type(super_type_, object_type_);
         initialize_type(method_type_, object_type_);
         initialize_type(method_descriptor_type_, object_type_);
         initialize_type(slot_wrapper_type_, object_type_);
@@ -218,6 +222,7 @@ namespace cxxpython
         native_function_type_->solid_base = native_function_type_;
         function_type_->solid_base = function_type_;
         cell_type_->solid_base = cell_type_;
+        super_type_->solid_base = super_type_;
         method_type_->solid_base = method_type_;
         method_descriptor_type_->solid_base = method_descriptor_type_;
         slot_wrapper_type_->solid_base = slot_wrapper_type_;
@@ -269,6 +274,7 @@ namespace cxxpython
         add_root(native_function_type_);
         add_root(function_type_);
         add_root(cell_type_);
+        add_root(super_type_);
         add_root(method_type_);
         add_root(method_descriptor_type_);
         add_root(slot_wrapper_type_);

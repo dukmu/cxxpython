@@ -206,6 +206,13 @@ namespace cxxpython
         return allocate<CellObject>(cell_type_, value);
     }
 
+    SuperObject *Runtime::new_super(TypeObject *start_type, Object *object, TypeObject *object_type)
+    {
+        if (!start_type || !object || !object_type)
+            raise_type_error(this, "super requires type, object, and object type");
+        return allocate<SuperObject>(super_type_, start_type, object, object_type);
+    }
+
     PythonMethodObject *Runtime::new_method(Object *callable, Object *self)
     {
         if (!callable || !self)
@@ -511,6 +518,9 @@ namespace cxxpython
         initialize_type_dict(type);
         for (const DictObject::Entry &entry : request.namespace_dict->entries())
         {
+            auto *key = dynamic_cast<StrObject *>(entry.key);
+            if (key && key->value == "__classcell__")
+                continue;
             if (entry.key && entry.value)
                 type->dict->set(entry.key, entry.value);
         }
@@ -613,11 +623,21 @@ namespace cxxpython
             .mode = ExecutionMode::ClassBody,
         });
 
+        CellObject *class_cell = nullptr;
+        if (Object *class_cell_object = namespace_dict->get(new_str("__classcell__")))
+        {
+            class_cell = dynamic_cast<CellObject *>(class_cell_object);
+            if (!class_cell)
+                raise_type_error(this, "__classcell__ must be a cell");
+        }
+
         Object *result = object_call(metaclass, {name_root.get(), bases_root.get(), namespace_dict});
         auto result_root = root(result);
         auto *type = dynamic_cast<TypeObject *>(result_root.get());
         if (!type)
             raise_type_error(this, "__build_class__() must return a type");
+        if (class_cell)
+            class_cell->set_value(type);
         return type;
     }
 

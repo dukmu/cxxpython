@@ -672,6 +672,9 @@ namespace cxxpython
             raise_attribute_error(object ? object->runtime() : (name ? name->runtime() : nullptr),
                                   "'<null>' object has no attribute '<null>'");
 
+        if (auto *super = dynamic_cast<SuperObject *>(object))
+            return super_get_attr_default(super, name);
+
         if (auto *module = dynamic_cast<ModuleObject *>(object))
         {
             if (Object *value = module->dict()->get(name))
