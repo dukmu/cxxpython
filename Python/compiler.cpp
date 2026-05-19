@@ -114,6 +114,35 @@ namespace cxxpython
                 emit_constant(runtime_.new_str(expression.value));
             }
 
+            void visit(const compiler_internal::FStringExpr &expression) override
+            {
+                std::size_t emitted_parts = 0;
+                for (const compiler_internal::FStringPart &part : expression.parts)
+                {
+                    if (part.is_expression())
+                    {
+                        part.expression->accept(*this);
+                        emit({Opcode::FormatValue, 0});
+                    }
+                    else
+                    {
+                        if (part.literal.empty())
+                            continue;
+                        emit_constant(runtime_.new_str(part.literal));
+                    }
+                    if (emitted_parts != 0)
+                    {
+                        emit({
+                            Opcode::BinaryOp,
+                            static_cast<std::uint32_t>(BinaryOp::Add),
+                        });
+                    }
+                    ++emitted_parts;
+                }
+                if (emitted_parts == 0)
+                    emit_constant(runtime_.new_str(""));
+            }
+
             void visit(const compiler_internal::UnaryExpr &expression) override
             {
                 expression.operand->accept(*this);

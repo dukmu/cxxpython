@@ -231,7 +231,17 @@ namespace cxxpython::compiler_internal
             }
 
             if ((ch == 'f' || ch == 'F') && index + 1 < source.size() && is_quote(source[index + 1]))
-                raise_at(runtime, filename, line, column, "f-string literals are not supported yet");
+            {
+                const std::size_t start_line = line;
+                const std::size_t start_column = column;
+                advance_one();
+                tokens.push_back(Token{TokenKind::FString,
+                                       scan_string(source[index], start_line, start_column),
+                                       0,
+                                       start_line,
+                                       start_column});
+                continue;
+            }
 
             if (std::isalpha(static_cast<unsigned char>(ch)) != 0 || ch == '_')
             {

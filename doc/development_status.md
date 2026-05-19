@@ -1,5 +1,44 @@
 # Development Status
 
+## 2026-05-19 F-String Foundation Slice
+
+Review focus:
+
+- Land f-string support as real compiler/VM infrastructure instead of reusing
+  plain string tokens or ad hoc runtime concatenation.
+- Keep phase boundaries clean: lexer tokenization, parser part splitting,
+  compiler lowering, VM formatting.
+- Support the common base case first while rejecting unsupported conversion and
+  format-spec syntax with explicit errors.
+
+Completed:
+
+- Added `FString` token kind and `FStringExpr` AST with mixed literal and
+  expression parts.
+- Added parser decomposition for `{expr}` parts, escaped braces (`{{`/`}}`),
+  and nested delimiter tracking inside f-string expressions.
+- Added `FORMAT_VALUE` opcode and VM dispatch using `__format__("")`, with
+  type validation that `__format__` returns `str`.
+- Lowered f-strings to `FORMAT_VALUE` + string concatenation in bytecode.
+- Added C++ coverage for bytecode metadata, successful f-string execution, and
+  syntax rejection for unsupported `!`/`:` conversion-spec features.
+- Added Python golden coverage for basic f-string output and conversion-spec
+  syntax errors.
+
+Known debt and next risk:
+
+- Conversion flags (`!r`, `!s`, `!a`) and format specs (`:{...}`) are still
+  rejected and should be added on top of the same `FStringExpr` substrate.
+- Nested f-strings in format specs remain unsupported.
+- Error locations for inner f-string expressions currently point to the
+  f-string token column, not exact inner offsets.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter='Compile.CompilesAndExecutesBasicFString:Compile.RaisesSyntaxErrorForUnsupportedFStringConversion:Bytecode.MetadataNamesAndStackEffects:PythonScripts.RunsGoldenFiles'`
+- `ctest --test-dir build --output-on-failure`
+
 ## 2026-05-19 Traceback Chain Seed Slice
 
 Review focus:

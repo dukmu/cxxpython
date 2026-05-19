@@ -16,6 +16,7 @@ namespace cxxpython::compiler_internal
 {
     struct IntegerExpr;
     struct StringExpr;
+    struct FStringExpr;
     struct UnaryExpr;
     struct BinaryExpr;
     struct CompareExpr;
@@ -50,6 +51,7 @@ namespace cxxpython::compiler_internal
         virtual ~ExprVisitor() = default;
         virtual void visit(const IntegerExpr &expression) = 0;
         virtual void visit(const StringExpr &expression) = 0;
+        virtual void visit(const FStringExpr &expression) = 0;
         virtual void visit(const UnaryExpr &expression) = 0;
         virtual void visit(const BinaryExpr &expression) = 0;
         virtual void visit(const CompareExpr &expression) = 0;
@@ -94,6 +96,7 @@ namespace cxxpython::compiler_internal
     {
         Integer,
         String,
+        FString,
         Identifier,
         Plus,
         Minus,
@@ -184,6 +187,42 @@ namespace cxxpython::compiler_internal
         }
 
         std::string value;
+
+        void accept(ExprVisitor &visitor) const override
+        {
+            visitor.visit(*this);
+        }
+    };
+
+    struct FStringPart final
+    {
+        explicit FStringPart(std::string literal_in)
+            : literal(std::move(literal_in))
+        {
+        }
+
+        explicit FStringPart(std::unique_ptr<Expr> expression_in)
+            : expression(std::move(expression_in))
+        {
+        }
+
+        bool is_expression() const noexcept
+        {
+            return expression != nullptr;
+        }
+
+        std::string literal;
+        std::unique_ptr<Expr> expression;
+    };
+
+    struct FStringExpr final : Expr
+    {
+        explicit FStringExpr(std::vector<FStringPart> parts_in)
+            : parts(std::move(parts_in))
+        {
+        }
+
+        std::vector<FStringPart> parts;
 
         void accept(ExprVisitor &visitor) const override
         {

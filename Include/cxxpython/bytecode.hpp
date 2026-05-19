@@ -35,6 +35,7 @@ namespace cxxpython
         RotThree,
         UnaryOp,
         BinaryOp,
+        FormatValue,
         BinarySubscr,
         StoreSubscr,
         DeleteSubscr,

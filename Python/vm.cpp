@@ -752,6 +752,21 @@ namespace cxxpython
                 frame->push(object_binary_op(left, right, op));
                 break;
             }
+            case Opcode::FormatValue:
+            {
+                Object *value = frame->pop();
+                auto value_root = runtime_.root(value);
+                StrObject *spec = runtime_.new_str("");
+                auto spec_root = runtime_.root(spec);
+                Object *method = object_get_attr(value_root.get(), "__format__");
+                auto method_root = runtime_.root(method);
+                Object *formatted = object_call(method_root.get(), {spec_root.get()});
+                auto formatted_root = runtime_.root(formatted);
+                if (!dynamic_cast<StrObject *>(formatted_root.get()))
+                    raise_type_error(&runtime_, "__format__ must return str");
+                frame->push(formatted_root.get());
+                break;
+            }
             case Opcode::BinarySubscr:
             {
                 Object *key = frame->pop();

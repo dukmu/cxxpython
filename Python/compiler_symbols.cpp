@@ -26,6 +26,15 @@ namespace cxxpython
                 (void)expression;
             }
 
+            void visit(const compiler_internal::FStringExpr &expression) override
+            {
+                for (const compiler_internal::FStringPart &part : expression.parts)
+                {
+                    if (part.is_expression())
+                        part.expression->accept(*this);
+                }
+            }
+
             void visit(const compiler_internal::UnaryExpr &expression) override
             {
                 expression.operand->accept(*this);
@@ -462,6 +471,15 @@ namespace cxxpython
             void visit(const compiler_internal::StringExpr &expression) override
             {
                 (void)expression;
+            }
+
+            void visit(const compiler_internal::FStringExpr &expression) override
+            {
+                for (const compiler_internal::FStringPart &part : expression.parts)
+                {
+                    if (part.is_expression())
+                        part.expression->accept(*this);
+                }
             }
 
             void visit(const compiler_internal::UnaryExpr &expression) override

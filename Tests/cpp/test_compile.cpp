@@ -1705,19 +1705,53 @@ TEST(Compile, RaisesSyntaxErrorForUnclosedSubscript)
     }
 }
 
-TEST(Compile, RaisesSyntaxErrorForUnsupportedFString)
+TEST(Compile, CompilesAndExecutesBasicFString)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+    globals->set(runtime.new_str("name"), runtime.new_str("Ada"));
+
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(
+        runtime,
+        "value = f'Hello {name}! {1 + 2}'\n"
+        "escaped = f'{{{name}}}'\n",
+        "script.py");
+    ASSERT_NE(code, nullptr);
+
+    bool saw_format_value = false;
+    for (const cxxpython::Instruction &instruction : code->instructions())
+    {
+        if (instruction.opcode == cxxpython::Opcode::FormatValue)
+        {
+            saw_format_value = true;
+            break;
+        }
+    }
+    EXPECT_TRUE(saw_format_value);
+
+    EXPECT_EQ(vm.execute(*code, *globals), runtime.none());
+    auto *value = dynamic_cast<cxxpython::StrObject *>(globals->get(runtime.new_str("value")));
+    ASSERT_NE(value, nullptr);
+    EXPECT_EQ(value->value, "Hello Ada! 3");
+    auto *escaped = dynamic_cast<cxxpython::StrObject *>(globals->get(runtime.new_str("escaped")));
+    ASSERT_NE(escaped, nullptr);
+    EXPECT_EQ(escaped->value, "{Ada}");
+}
+
+TEST(Compile, RaisesSyntaxErrorForUnsupportedFStringConversion)
 {
     cxxpython::Runtime runtime;
 
     try
     {
-        (void)cxxpython::compile_eval_input(runtime, "f\"value={name}\"", "broken.py");
+        (void)cxxpython::compile_eval_input(runtime, "f\"{1!r}\"", "broken.py");
         FAIL() << "expected PythonError";
     }
     catch (const cxxpython::PythonError &error)
     {
         EXPECT_EQ(error.type_name(), "SyntaxError");
-        EXPECT_STREQ(error.what(), "broken.py:1:1: f-string literals are not supported yet");
+        EXPECT_STREQ(error.what(), "broken.py:1:1: f-string conversions and format specs are not supported yet");
     }
 }
 

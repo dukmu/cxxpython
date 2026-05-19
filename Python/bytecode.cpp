@@ -246,6 +246,8 @@ namespace cxxpython
             return "UNARY_OP";
         case Opcode::BinaryOp:
             return "BINARY_OP";
+        case Opcode::FormatValue:
+            return "FORMAT_VALUE";
         case Opcode::BinarySubscr:
             return "BINARY_SUBSCR";
         case Opcode::StoreSubscr:
@@ -329,6 +331,7 @@ namespace cxxpython
         case Opcode::RotThree:
         case Opcode::UnaryOp:
         case Opcode::GetIter:
+        case Opcode::FormatValue:
             return 0;
         case Opcode::ForIter:
             return 1;

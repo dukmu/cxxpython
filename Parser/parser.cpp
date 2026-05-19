@@ -824,6 +824,113 @@ namespace cxxpython::compiler_internal
                 return std::make_unique<ListExpr>(std::move(items));
             }
 
+            std::unique_ptr<Expr> parse_fstring_expression()
+            {
+                const Token &token = advance();
+                std::vector<FStringPart> parts;
+                std::string literal;
+                const std::string &text = token.lexeme;
+                std::size_t index = 0;
+                while (index < text.size())
+                {
+                    const char ch = text[index];
+                    if (ch == '{')
+                    {
+                        if (index + 1 < text.size() && text[index + 1] == '{')
+                        {
+                            literal.push_back('{');
+                            index += 2;
+                            continue;
+                        }
+                        if (!literal.empty())
+                        {
+                            parts.emplace_back(std::move(literal));
+                            literal.clear();
+                        }
+                        const std::size_t expression_start = index + 1;
+                        const std::size_t expression_end = find_fstring_expression_end(text, expression_start, token);
+                        if (expression_end == expression_start)
+                            raise_at(token, "empty expression in f-string");
+                        std::string expression_source = text.substr(expression_start, expression_end - expression_start);
+                        std::vector<Token> expression_tokens =
+                            lex_source(runtime_, expression_source, filename_);
+                        parts.emplace_back(parse_expression(runtime_, expression_tokens, filename_));
+                        index = expression_end + 1;
+                        continue;
+                    }
+                    if (ch == '}')
+                    {
+                        if (index + 1 < text.size() && text[index + 1] == '}')
+                        {
+                            literal.push_back('}');
+                            index += 2;
+                            continue;
+                        }
+                        raise_at(token, "single '}' is not allowed in f-string");
+                    }
+                    literal.push_back(ch);
+                    ++index;
+                }
+                if (!literal.empty())
+                    parts.emplace_back(std::move(literal));
+                return std::make_unique<FStringExpr>(std::move(parts));
+            }
+
+            std::size_t find_fstring_expression_end(const std::string &text,
+                                                    std::size_t start,
+                                                    const Token &token) const
+            {
+                std::size_t nesting = 0;
+                char quote = '\0';
+                bool escaped = false;
+                for (std::size_t index = start; index < text.size(); ++index)
+                {
+                    const char ch = text[index];
+                    if (quote != '\0')
+                    {
+                        if (escaped)
+                        {
+                            escaped = false;
+                            continue;
+                        }
+                        if (ch == '\\')
+                        {
+                            escaped = true;
+                            continue;
+                        }
+                        if (ch == quote)
+                            quote = '\0';
+                        continue;
+                    }
+                    if (ch == '\'' || ch == '"')
+                    {
+                        quote = ch;
+                        continue;
+                    }
+                    if ((ch == '!' || ch == ':') && nesting == 0)
+                        raise_at(token, "f-string conversions and format specs are not supported yet");
+                    if (ch == '(' || ch == '[' || ch == '{')
+                    {
+                        ++nesting;
+                        continue;
+                    }
+                    if (ch == ')' || ch == ']')
+                    {
+                        if (nesting == 0)
+                            raise_at(token, "unmatched delimiter in f-string expression");
+                        --nesting;
+                        continue;
+                    }
+                    if (ch == '}')
+                    {
+                        if (nesting == 0)
+                            return index;
+                        --nesting;
+                    }
+                }
+                raise_at(token, "unterminated expression in f-string");
+            }
+
             std::unique_ptr<Expr> parse_primary()
             {
                 const Token &token = peek();
@@ -833,6 +940,8 @@ namespace cxxpython::compiler_internal
                     return std::make_unique<IntegerExpr>(advance().int_value);
                 case TokenKind::String:
                     return std::make_unique<StringExpr>(advance().lexeme);
+                case TokenKind::FString:
+                    return parse_fstring_expression();
                 case TokenKind::TrueLiteral:
                     advance();
                     return std::make_unique<SingletonExpr>(SingletonKind::TrueValue);
@@ -978,6 +1087,7 @@ namespace cxxpython::compiler_internal
                     break;
                 case TokenKind::Integer:
                 case TokenKind::String:
+                case TokenKind::FString:
                 case TokenKind::Identifier:
                 case TokenKind::Plus:
                 case TokenKind::Minus:

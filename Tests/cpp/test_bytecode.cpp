@@ -30,6 +30,7 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::RotThree), "ROT_THREE");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::UnaryOp), "UNARY_OP");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::BinaryOp), "BINARY_OP");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::FormatValue), "FORMAT_VALUE");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::BinarySubscr), "BINARY_SUBSCR");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::StoreSubscr), "STORE_SUBSCR");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::DeleteSubscr), "DELETE_SUBSCR");
@@ -80,6 +81,7 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::RotThree, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::UnaryOp, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BinaryOp, 0}), -1);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::FormatValue, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BinarySubscr, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::StoreSubscr, 0}), -3);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::DeleteSubscr, 0}), -2);
