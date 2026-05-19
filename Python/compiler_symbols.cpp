@@ -169,6 +169,13 @@ namespace cxxpython
                     (void)symbols_.add_name(name);
             }
 
+            void visit(const compiler_internal::ImportStmt &statement) override
+            {
+                (void)symbols_.add_name("__import__");
+                for (const compiler_internal::ImportAlias &alias : statement.aliases)
+                    (void)symbols_.add_name(alias.binding);
+            }
+
             void visit(const compiler_internal::TryStmt &statement) override
             {
                 for (const auto &item : statement.body)
@@ -278,6 +285,16 @@ namespace cxxpython
                 (void)statement;
             }
 
+            void visit(const compiler_internal::ImportStmt &statement) override
+            {
+                for (const compiler_internal::ImportAlias &alias : statement.aliases)
+                {
+                    if (symbols_.is_global(alias.binding) || symbols_.is_nonlocal(alias.binding))
+                        continue;
+                    (void)symbols_.add_local(alias.binding);
+                }
+            }
+
             void visit(const compiler_internal::TryStmt &statement) override
             {
                 for (const auto &item : statement.body)
@@ -370,6 +387,11 @@ namespace cxxpython
                         raise_syntax_error(&runtime_, "name '" + name + "' is nonlocal and global");
                     symbols_.add_nonlocal(name);
                 }
+            }
+
+            void visit(const compiler_internal::ImportStmt &statement) override
+            {
+                (void)statement;
             }
 
             void visit(const compiler_internal::TryStmt &statement) override
@@ -564,6 +586,11 @@ namespace cxxpython
                 (void)statement;
             }
 
+            void visit(const compiler_internal::ImportStmt &statement) override
+            {
+                (void)statement;
+            }
+
             void visit(const compiler_internal::TryStmt &statement) override
             {
                 for (const auto &item : statement.body)
@@ -647,6 +674,11 @@ namespace cxxpython
             }
 
             void visit(const compiler_internal::NonlocalStmt &statement) override
+            {
+                (void)statement;
+            }
+
+            void visit(const compiler_internal::ImportStmt &statement) override
             {
                 (void)statement;
             }

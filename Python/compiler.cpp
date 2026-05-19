@@ -508,6 +508,21 @@ namespace cxxpython
                 (void)statement;
             }
 
+            void visit(const compiler_internal::ImportStmt &statement) override
+            {
+                StatementLineGuard line(*this, statement);
+                for (const compiler_internal::ImportAlias &alias : statement.aliases)
+                {
+                    emit({
+                        Opcode::LoadName,
+                        static_cast<std::uint32_t>(name_index("__import__")),
+                    });
+                    emit_constant(runtime_.new_str(alias.name));
+                    emit({Opcode::Call, 1});
+                    emit_binding_store(alias.binding);
+                }
+            }
+
             void visit(const compiler_internal::TryStmt &statement) override
             {
                 StatementLineGuard line(*this, statement);

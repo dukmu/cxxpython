@@ -39,6 +39,7 @@ namespace cxxpython::compiler_internal
     struct RaiseStmt;
     struct GlobalStmt;
     struct NonlocalStmt;
+    struct ImportStmt;
     struct TryStmt;
     struct FunctionDefStmt;
     struct ClassDefStmt;
@@ -81,6 +82,7 @@ namespace cxxpython::compiler_internal
         virtual void visit(const RaiseStmt &statement) = 0;
         virtual void visit(const GlobalStmt &statement) = 0;
         virtual void visit(const NonlocalStmt &statement) = 0;
+        virtual void visit(const ImportStmt &statement) = 0;
         virtual void visit(const TryStmt &statement) = 0;
         virtual void visit(const FunctionDefStmt &statement) = 0;
         virtual void visit(const ClassDefStmt &statement) = 0;
@@ -118,6 +120,7 @@ namespace cxxpython::compiler_internal
         Def,
         Return,
         Raise,
+        Import,
         Global,
         Nonlocal,
         Try,
@@ -616,6 +619,32 @@ namespace cxxpython::compiler_internal
         }
 
         std::vector<std::string> names;
+
+        void accept(StmtVisitor &visitor) const override
+        {
+            visitor.visit(*this);
+        }
+    };
+
+    struct ImportAlias final
+    {
+        ImportAlias(std::string name_in, std::string binding_in)
+            : name(std::move(name_in)), binding(std::move(binding_in))
+        {
+        }
+
+        std::string name;
+        std::string binding;
+    };
+
+    struct ImportStmt final : Stmt
+    {
+        explicit ImportStmt(std::vector<ImportAlias> aliases_in)
+            : aliases(std::move(aliases_in))
+        {
+        }
+
+        std::vector<ImportAlias> aliases;
 
         void accept(StmtVisitor &visitor) const override
         {

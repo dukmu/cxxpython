@@ -1,5 +1,43 @@
 # Development Status
 
+## 2026-05-19 Import Statement Slice
+
+Review focus:
+
+- Add `import` syntax without bypassing the existing runtime module registry,
+  cache, search-path, and failure-cleanup substrate.
+- Keep unsupported package semantics explicit until `__package__`, `__path__`,
+  `__spec__`, and top-level package return rules are designed.
+- Make function-scope imports participate in symbol analysis as real local
+  bindings.
+
+Completed:
+
+- Added `import` tokenization and AST representation for import aliases.
+- Added parser support for `import name` and `import name as alias`, including
+  duplicate binding checks.
+- Lowered import statements through the existing `__import__` callable and
+  normal name-binding path.
+- Updated symbol collection and function local analysis so import aliases bind
+  correctly at module and function scope.
+- Added Python golden coverage for module import, alias import, cache identity,
+  and import inside a function.
+
+Known debt and next risk:
+
+- Dotted and relative imports remain rejected at parse/import-runtime
+  boundaries; package objects need a separate coherent slice.
+- `from ... import ...` is not implemented yet and should share the same future
+  package/import request model rather than duplicating parser-specific logic.
+- Import still uses the builtin `__import__` surface directly during lowering;
+  this is acceptable for the current substrate, but full importlib alignment
+  will need a typed import opcode or runtime import request object.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter='PythonScripts.RunsGoldenFiles:Module.ImportsPythonModulesThroughRuntimeRegistry'`
+
 ## 2026-05-19 Lexer String And Comment Slice
 
 Review focus:
