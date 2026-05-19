@@ -168,6 +168,14 @@ doc/            design docs and milestone plans
   dict 和 callable，组装 `CallArguments`，调用统一 `object_call`/type call
   slot，再把返回值压栈。函数对象、native function、type construction、
   bound method 都必须接入这条协议，而不是让 opcode 识别具体对象类型。
+- Exception control flow is VM block-stack behavior. `SETUP_EXCEPT` records a
+  handler target on the frame, `RAISE_VALUE` normalizes a `BaseException`
+  instance or exception type into an `ExceptionObject`, and the VM catch path
+  transfers control to the nearest handler with the exception object on the
+  value stack. Handler matching uses `CHECK_EXCEPTION_MATCH` against real
+  exception types. Future `finally`, bare re-raise, exception groups,
+  traceback objects, and exception state must extend this block/exception
+  model rather than adding parser, builtin, or CLI special cases.
 - Function signature metadata belongs in `CodeObject`, not in ad hoc function
   side tables. `arg_count` records positional parameters; flags record
   `*args` and `**kwargs`; `varnames` layout is positional parameters, varargs
@@ -245,6 +253,15 @@ doc/            design docs and milestone plans
   semantic error categories such as `ValueError` should be added to the
   exception hierarchy before APIs start faking them with unrelated exception
   classes.
+- REPL execution uses the same compiler and module execution path as scripts.
+  Single-line expressions may be compiled with `compile_eval_input` for
+  display, but statements and compound input must run through
+  `compile_exec_input` in a persistent `__main__` module. The CLI must not
+  implement a separate evaluator.
+- Introspection builtins such as `globals()` and `locals()` read the active
+  frame rather than CLI globals. `isinstance` and `issubclass` dispatch through
+  the type/MRO helpers, including tuple classinfo recursion, so future heap
+  types and extension types share one semantic path.
 - Import core 引入前，CLI file execution 可以创建 `__main__` module，但一旦
   `sys.modules` 存在，`__main__` 必须通过同一模块注册/清理路径。
 

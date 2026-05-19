@@ -85,6 +85,19 @@ namespace cxxpython
         {
             if (!is_instance(instance, &type))
                 return;
+            if ((type.flags & TypeFlagHeapType) != 0)
+            {
+                Object *init_descriptor = type_lookup_attribute(&type, type.runtime()->new_str("__init__"));
+                if (init_descriptor)
+                {
+                    Object *init = apply_descriptor(init_descriptor, instance, &type);
+                    auto init_root = type.runtime()->root(init);
+                    Object *result = object_call(init_root.get(), args);
+                    if (result != type.runtime()->none())
+                        raise_type_error(type.runtime(), "__init__() should return None");
+                    return;
+                }
+            }
             if (type.slots.init)
             {
                 type.slots.init(*instance, args);

@@ -1,5 +1,79 @@
 # Development Status
 
+## 2026-05-19 Init, Exception Syntax, REPL, And Builtins Slice
+
+Review focus:
+
+- Closed the current `__init__` construction gap before adding more class
+  surface area.
+- Audited the exception path as a VM/block-stack feature, not a CLI or builtin
+  formatting shortcut.
+- Continued builtin work only through ordinary module entries and
+  `LOAD_NAME`/`CALL`, preserving the object protocol boundary.
+
+Completed:
+
+- Python heap classes now call Python-defined `__init__` through descriptor
+  binding during `type.__call__`. A non-`None` return raises `TypeError`.
+- Added parser/compiler/bytecode/VM support for:
+  - `raise expr`
+  - `try` / `except Type`
+  - `except Type as name`
+  - bare `except`
+  - unmatched handler re-raise
+- Added VM exception handler stack opcodes:
+  - `SETUP_EXCEPT`
+  - `POP_EXCEPT`
+  - `CHECK_EXCEPTION_MATCH`
+  - `RAISE_VALUE`
+- Exception types are constructible through normal type calls, so
+  `raise TypeError('boom')` creates an `ExceptionObject` with args/message
+  semantics instead of relying on host-side strings.
+- Replaced the no-argument CLI placeholder with a minimal REPL:
+  expression input compiles through `compile_eval_input` and prints `repr`;
+  statements and compound blocks compile through `compile_exec_input` and run
+  in a persistent `__main__` module.
+- Expanded native builtins while keeping them ordinary objects in the
+  `builtins` module:
+  - `print(..., sep=..., end=...)`
+  - `isinstance`
+  - `issubclass`
+  - `callable`
+  - `id`
+  - `globals`
+  - `locals`
+- Added Python golden coverage for class `__init__`, exception syntax,
+  builtin introspection, and REPL behavior.
+- Added C++ coverage for opcode metadata, VM exception dispatch, compiler
+  lowering, `__init__` return checking, and unmatched exception propagation.
+
+Known debt and next risk:
+
+- Bare `raise`, `finally`, `else`, tuple exception matching in `except`, and
+  exception state (`sys.exc_info`, context/cause, full traceback objects) are
+  still open. Do not bolt them onto CLI formatting; they belong in VM exception
+  state and runtime traceback objects.
+- REPL incomplete-input detection is intentionally minimal and parser-message
+  driven. A real interactive parser mode should replace string matching before
+  adding more compound statements.
+- Builtins now cover core introspection, but the native argument parser still
+  lacks a structured signature table, optional keyword defaults, positional-only
+  markers, keyword-only arguments, and conversion helpers for C/C++ extension
+  parity.
+- `id()` currently reflects object address identity in the non-moving runtime.
+  A moving GC will need stable identity storage or pinning semantics.
+- `globals()` and `locals()` return live frame dictionaries, which is correct
+  for bootstrap and REPL, but optimized locals and closure cells will need
+  CPython-compatible synchronization rules.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter='Cli.RunsInteractiveReplFromStandardInput:PythonScripts.RunsGoldenFiles'`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all 166 tests pass.
+
 ## 2026-05-18 Risk Ledger And Immediate Fix Queue
 
 Review scope:
@@ -47,7 +121,9 @@ Eight tracked risks:
    `repr()` and `hash()` now dispatch through the same object protocol, and
    core singleton/type names live in the builtins module dict. Core
    constructor types now include basic `int()`, `bool()`, `tuple(iterable)`,
-   and `dict()` support through type `new_object`/`init` slots.
+   and `dict()` support through type `new_object`/`init` slots. The current
+   CLI/REPL slice adds `print` `sep`/`end`, `isinstance`, `issubclass`,
+   `callable`, `id`, `globals`, and `locals`.
    Remaining builtin debt is the richer CPython-style argument parser plus
    protocol users such as `for`, `*iterable`, and `**mapping`.
 7. Medium, partially fixed: descriptor and type-attribute protocol is

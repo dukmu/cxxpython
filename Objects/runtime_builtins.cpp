@@ -1,24 +1,60 @@
 #include "cxxpython/runtime.hpp"
+#include "cxxpython/vm.hpp"
 
 #include "object_utils.hpp"
 
+#include <cstdint>
 #include <ostream>
 
 namespace cxxpython
 {
     namespace
     {
+        StrObject *keyword_as_str(Runtime &runtime, DictObject *keywords, const char *name, const char *function_name)
+        {
+            if (!keywords)
+                return nullptr;
+            Object *value = keywords->get(runtime.new_str(name));
+            if (!value || value == runtime.none())
+                return nullptr;
+            auto *text = dynamic_cast<StrObject *>(value);
+            if (!text)
+                raise_type_error(&runtime, std::string(function_name) + "() " + name + " must be None or a string");
+            return text;
+        }
+
+        void require_print_keywords(Runtime &runtime, const CallArguments &args)
+        {
+            if (!args.keywords)
+                return;
+            for (const DictObject::Entry &entry : args.keywords->entries())
+            {
+                auto *name = dynamic_cast<StrObject *>(entry.key);
+                if (!name)
+                    raise_type_error(&runtime, "print() keywords must be strings");
+                if (name->value != "sep" && name->value != "end")
+                {
+                    raise_type_error(&runtime,
+                                     "print() got an unexpected keyword argument '" + name->value + "'");
+                }
+            }
+        }
+
         Object *builtin_print(Runtime &runtime, const CallArguments &args)
         {
-            require_no_keywords(&runtime, "print", args);
+            require_print_keywords(runtime, args);
+            StrObject *sep_arg = keyword_as_str(runtime, args.keywords, "sep", "print");
+            StrObject *end_arg = keyword_as_str(runtime, args.keywords, "end", "print");
+            const std::string sep = sep_arg ? sep_arg->value : " ";
+            const std::string end = end_arg ? end_arg->value : "\n";
             std::ostream &out = runtime.stdout_stream();
             for (std::size_t index = 0; index < args.positional.size(); ++index)
             {
                 if (index != 0)
-                    out << ' ';
+                    out << sep;
                 out << object_str(args.positional[index]);
             }
-            out << '\n';
+            out << end;
             return runtime.none();
         }
 
@@ -55,6 +91,89 @@ namespace cxxpython
             require_no_keywords(&runtime, "hash", args);
             require_positional_count(&runtime, "hash", args, 1);
             return runtime.new_int(object_hash(args.positional[0]));
+        }
+
+        bool classinfo_matches(Runtime &runtime, TypeObject *type, Object *classinfo, const char *function_name)
+        {
+            if (auto *candidate = dynamic_cast<TypeObject *>(classinfo))
+                return is_subclass(type, candidate);
+            if (auto *tuple = dynamic_cast<TupleObject *>(classinfo))
+            {
+                for (Object *item : tuple->items())
+                {
+                    if (classinfo_matches(runtime, type, item, function_name))
+                        return true;
+                }
+                return false;
+            }
+            raise_type_error(&runtime,
+                             std::string(function_name) +
+                                 "() arg 2 must be a type or tuple of types");
+        }
+
+        Object *builtin_isinstance(Runtime &runtime, const CallArguments &args)
+        {
+            require_no_keywords(&runtime, "isinstance", args);
+            require_positional_count(&runtime, "isinstance", args, 2);
+            Object *object = args.positional[0];
+            if (!object)
+                raise_type_error(&runtime, "isinstance() arg 1 cannot be null");
+            return classinfo_matches(runtime, object->type(), args.positional[1], "isinstance")
+                       ? runtime.true_value()
+                       : runtime.false_value();
+        }
+
+        Object *builtin_issubclass(Runtime &runtime, const CallArguments &args)
+        {
+            require_no_keywords(&runtime, "issubclass", args);
+            require_positional_count(&runtime, "issubclass", args, 2);
+            auto *type = dynamic_cast<TypeObject *>(args.positional[0]);
+            if (!type)
+                raise_type_error(&runtime, "issubclass() arg 1 must be a class");
+            return classinfo_matches(runtime, type, args.positional[1], "issubclass")
+                       ? runtime.true_value()
+                       : runtime.false_value();
+        }
+
+        Object *builtin_callable(Runtime &runtime, const CallArguments &args)
+        {
+            require_no_keywords(&runtime, "callable", args);
+            require_positional_count(&runtime, "callable", args, 1);
+            Object *object = args.positional[0];
+            return object && object->type() && object->type()->slots.call
+                       ? runtime.true_value()
+                       : runtime.false_value();
+        }
+
+        Object *builtin_id(Runtime &runtime, const CallArguments &args)
+        {
+            require_no_keywords(&runtime, "id", args);
+            require_positional_count(&runtime, "id", args, 1);
+            return runtime.new_int(static_cast<std::int64_t>(
+                reinterpret_cast<std::uintptr_t>(args.positional[0])));
+        }
+
+        Frame *current_frame_or_error(Runtime &runtime, const char *function_name)
+        {
+            VirtualMachine *vm = runtime.active_vm();
+            Frame *frame = vm ? vm->thread_state().current_frame() : nullptr;
+            if (!frame)
+                raise_type_error(&runtime, std::string(function_name) + "() requires an active frame");
+            return frame;
+        }
+
+        Object *builtin_globals(Runtime &runtime, const CallArguments &args)
+        {
+            require_no_keywords(&runtime, "globals", args);
+            require_positional_count(&runtime, "globals", args, 0);
+            return current_frame_or_error(runtime, "globals")->globals();
+        }
+
+        Object *builtin_locals(Runtime &runtime, const CallArguments &args)
+        {
+            require_no_keywords(&runtime, "locals", args);
+            require_positional_count(&runtime, "locals", args, 0);
+            return current_frame_or_error(runtime, "locals")->locals();
         }
     }
 
@@ -98,5 +217,11 @@ namespace cxxpython
         dict->set(new_str("next"), new_native_function("next", builtin_next));
         dict->set(new_str("repr"), new_native_function("repr", builtin_repr));
         dict->set(new_str("hash"), new_native_function("hash", builtin_hash));
+        dict->set(new_str("isinstance"), new_native_function("isinstance", builtin_isinstance));
+        dict->set(new_str("issubclass"), new_native_function("issubclass", builtin_issubclass));
+        dict->set(new_str("callable"), new_native_function("callable", builtin_callable));
+        dict->set(new_str("id"), new_native_function("id", builtin_id));
+        dict->set(new_str("globals"), new_native_function("globals", builtin_globals));
+        dict->set(new_str("locals"), new_native_function("locals", builtin_locals));
     }
 }

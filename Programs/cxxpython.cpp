@@ -19,6 +19,119 @@ namespace
         out = buffer.str();
         return true;
     }
+
+    void print_python_error(const cxxpython::PythonError &error)
+    {
+        if (error.value() && error.value()->has_source_location())
+        {
+            std::cerr << "Traceback (most recent call last):\n"
+                      << "  File \"" << error.value()->source_filename()
+                      << "\", line " << error.value()->source_line()
+                      << ", in " << error.value()->source_name() << "\n";
+        }
+        std::cerr << error.type_name() << ": " << error.what() << "\n";
+    }
+
+    bool is_incomplete_input(const cxxpython::PythonError &error)
+    {
+        if (error.type_name() != "SyntaxError")
+            return false;
+        const std::string message = error.what();
+        return message.find("expected indented block") != std::string::npos ||
+               message.find("expected except after try block") != std::string::npos;
+    }
+
+    int run_repl(cxxpython::Runtime &runtime)
+    {
+        std::cout << "cxxpython 0.1.0-dev\n";
+        cxxpython::VirtualMachine vm(runtime);
+        cxxpython::ModuleObject *module = runtime.new_module("__main__", "<stdin>");
+        std::string pending_source;
+        bool pending_block = false;
+
+        while (true)
+        {
+            std::cout << (pending_block ? "... " : ">>> ") << std::flush;
+            std::string line;
+            if (!std::getline(std::cin, line))
+                break;
+
+            pending_source += line;
+            pending_source += '\n';
+
+            cxxpython::CodeObject *code = nullptr;
+            bool print_result = false;
+            if (!pending_block)
+            {
+                try
+                {
+                    code = cxxpython::compile_eval_input(runtime, line, "<stdin>");
+                    print_result = true;
+                }
+                catch (const cxxpython::PythonError &error)
+                {
+                    if (error.type_name() != "SyntaxError")
+                    {
+                        print_python_error(error);
+                        pending_source.clear();
+                        continue;
+                    }
+                }
+            }
+
+            if (!code)
+            {
+                try
+                {
+                    code = cxxpython::compile_exec_input(runtime, pending_source, "<stdin>");
+                }
+                catch (const cxxpython::PythonError &error)
+                {
+                    if (is_incomplete_input(error))
+                    {
+                        pending_block = true;
+                        continue;
+                    }
+                    print_python_error(error);
+                    pending_source.clear();
+                    pending_block = false;
+                    continue;
+                }
+            }
+
+            try
+            {
+                cxxpython::Object *result = vm.execute(*code, *module->dict());
+                if (print_result && result != runtime.none())
+                    std::cout << cxxpython::object_repr(result) << "\n";
+            }
+            catch (const cxxpython::PythonError &error)
+            {
+                print_python_error(error);
+            }
+            catch (const cxxpython::BytecodeError &error)
+            {
+                std::cerr << "BytecodeError: " << error.what() << "\n";
+            }
+
+            pending_source.clear();
+            pending_block = false;
+        }
+
+        if (pending_block && !pending_source.empty())
+        {
+            try
+            {
+                (void)cxxpython::compile_exec_input(runtime, pending_source, "<stdin>");
+            }
+            catch (const cxxpython::PythonError &error)
+            {
+                print_python_error(error);
+                return 1;
+            }
+        }
+        return 0;
+    }
 }
 
 int main(int argc, char **argv)
@@ -33,10 +146,7 @@ int main(int argc, char **argv)
 
     if (argc == 1)
     {
-        std::cout << "cxxpython runtime initialized: "
-                  << cxxpython::object_repr(runtime.type_type())
-                  << "\n";
-        return 0;
+        return run_repl(runtime);
     }
 
     if (argc == 2)
@@ -58,14 +168,7 @@ int main(int argc, char **argv)
         }
         catch (const cxxpython::PythonError &error)
         {
-            if (error.value() && error.value()->has_source_location())
-            {
-                std::cerr << "Traceback (most recent call last):\n"
-                          << "  File \"" << error.value()->source_filename()
-                          << "\", line " << error.value()->source_line()
-                          << ", in " << error.value()->source_name() << "\n";
-            }
-            std::cerr << error.type_name() << ": " << error.what() << "\n";
+            print_python_error(error);
             return 1;
         }
         catch (const cxxpython::BytecodeError &error)
@@ -75,6 +178,6 @@ int main(int argc, char **argv)
         }
     }
 
-    std::cerr << "usage: cxxpython [--version]\n";
+    std::cerr << "usage: cxxpython [--version] [script.py]\n";
     return 2;
 }

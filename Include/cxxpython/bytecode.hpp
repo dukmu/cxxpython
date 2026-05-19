@@ -43,6 +43,10 @@ namespace cxxpython
         MakeClass,
         Call,
         CallKw,
+        SetupExcept,
+        PopExcept,
+        CheckExceptionMatch,
+        RaiseValue,
         ReturnValue,
     };
 

@@ -238,6 +238,14 @@ namespace cxxpython
             return "CALL";
         case Opcode::CallKw:
             return "CALL_KW";
+        case Opcode::SetupExcept:
+            return "SETUP_EXCEPT";
+        case Opcode::PopExcept:
+            return "POP_EXCEPT";
+        case Opcode::CheckExceptionMatch:
+            return "CHECK_EXCEPTION_MATCH";
+        case Opcode::RaiseValue:
+            return "RAISE_VALUE";
         case Opcode::ReturnValue:
             return "RETURN_VALUE";
         }
@@ -256,6 +264,9 @@ namespace cxxpython
         case Opcode::DeleteName:
         case Opcode::DeleteFast:
         case Opcode::JumpAbsolute:
+        case Opcode::SetupExcept:
+        case Opcode::PopExcept:
+        case Opcode::CheckExceptionMatch:
         case Opcode::RotTwo:
         case Opcode::RotThree:
         case Opcode::UnaryOp:
@@ -294,6 +305,7 @@ namespace cxxpython
         case Opcode::CallKw:
             return -static_cast<int>(instruction.operand) - 1;
         case Opcode::ReturnValue:
+        case Opcode::RaiseValue:
             return -1;
         }
         throw BytecodeError("invalid opcode for stack effect");

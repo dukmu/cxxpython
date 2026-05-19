@@ -1138,6 +1138,128 @@ TEST(Compile, CompilesClassDefinitionsWithBases)
     EXPECT_EQ(static_cast<cxxpython::StrObject *>(globals->get(runtime.new_str("child_result")))->value, "child");
 }
 
+TEST(Compile, ClassInstantiationCallsPythonInit)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+    globals->set(runtime.new_str("__name__"), runtime.new_str("__main__"));
+
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(
+        runtime,
+        "class A:\n"
+        "    def __init__(self, value):\n"
+        "        self.value = value\n"
+        "a = A('ready')\n"
+        "result = a.value\n",
+        "script.py");
+    ASSERT_NE(code, nullptr);
+
+    EXPECT_EQ(vm.execute(*code, *globals), runtime.none());
+    auto *result = dynamic_cast<cxxpython::StrObject *>(globals->get(runtime.new_str("result")));
+    ASSERT_NE(result, nullptr);
+    EXPECT_EQ(result->value, "ready");
+}
+
+TEST(Compile, PythonInitMustReturnNone)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+    globals->set(runtime.new_str("__name__"), runtime.new_str("__main__"));
+
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(
+        runtime,
+        "class A:\n"
+        "    def __init__(self):\n"
+        "        return 'bad'\n"
+        "A()\n",
+        "script.py");
+    ASSERT_NE(code, nullptr);
+
+    try
+    {
+        (void)vm.execute(*code, *globals);
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "__init__() should return None");
+    }
+}
+
+TEST(Compile, CompilesTryExceptAndRaiseStatements)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(
+        runtime,
+        "try:\n"
+        "    raise TypeError('boom')\n"
+        "except ValueError:\n"
+        "    result = 'wrong'\n"
+        "except TypeError as e:\n"
+        "    saved = e\n"
+        "    result = 'handled'\n",
+        "script.py");
+    ASSERT_NE(code, nullptr);
+
+    bool saw_setup_except = false;
+    bool saw_check_match = false;
+    bool saw_raise = false;
+    for (const cxxpython::Instruction &instruction : code->instructions())
+    {
+        if (instruction.opcode == cxxpython::Opcode::SetupExcept)
+            saw_setup_except = true;
+        if (instruction.opcode == cxxpython::Opcode::CheckExceptionMatch)
+            saw_check_match = true;
+        if (instruction.opcode == cxxpython::Opcode::RaiseValue)
+            saw_raise = true;
+    }
+    EXPECT_TRUE(saw_setup_except);
+    EXPECT_TRUE(saw_check_match);
+    EXPECT_TRUE(saw_raise);
+
+    EXPECT_EQ(vm.execute(*code, *globals), runtime.none());
+    auto *result = dynamic_cast<cxxpython::StrObject *>(globals->get(runtime.new_str("result")));
+    ASSERT_NE(result, nullptr);
+    EXPECT_EQ(result->value, "handled");
+    auto *saved = dynamic_cast<cxxpython::ExceptionObject *>(globals->get(runtime.new_str("saved")));
+    ASSERT_NE(saved, nullptr);
+    EXPECT_EQ(saved->type(), runtime.type_error_type());
+    EXPECT_EQ(saved->message(), "boom");
+}
+
+TEST(Compile, TryExceptReraisesUnmatchedException)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(
+        runtime,
+        "try:\n"
+        "    raise TypeError('boom')\n"
+        "except ValueError:\n"
+        "    result = 'wrong'\n",
+        "script.py");
+    ASSERT_NE(code, nullptr);
+
+    try
+    {
+        (void)vm.execute(*code, *globals);
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "boom");
+    }
+}
+
 TEST(Compile, ClassDefinitionsSelectInheritedMetaclass)
 {
     cxxpython::Runtime runtime;

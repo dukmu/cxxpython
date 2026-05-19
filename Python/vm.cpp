@@ -28,6 +28,29 @@ namespace cxxpython
             return static_cast<UnaryOp>(operand);
         }
 
+        Object *exception_instance_from_value(Runtime &runtime, Object *value)
+        {
+            if (!value)
+                raise_type_error(&runtime, "exceptions must derive from BaseException");
+            if (auto *exception = dynamic_cast<ExceptionObject *>(value))
+                return exception;
+            auto *type = dynamic_cast<TypeObject *>(value);
+            if (type && is_subclass(type, runtime.base_exception_type()))
+                return object_call(type, {});
+            raise_type_error(&runtime, "exceptions must derive from BaseException");
+        }
+
+        bool exception_matches(Runtime &runtime, Object *exception, Object *matcher)
+        {
+            auto *exception_object = dynamic_cast<ExceptionObject *>(exception);
+            auto *matcher_type = dynamic_cast<TypeObject *>(matcher);
+            if (!exception_object || !matcher_type)
+                raise_type_error(&runtime, "catching classes that do not inherit from BaseException is not allowed");
+            if (!is_subclass(matcher_type, runtime.base_exception_type()))
+                raise_type_error(&runtime, "catching classes that do not inherit from BaseException is not allowed");
+            return is_subclass(exception_object->type(), matcher_type);
+        }
+
         std::string frame_repr(const Object &object)
         {
             auto *frame = static_cast<const Frame *>(&object);
@@ -208,9 +231,33 @@ namespace cxxpython
         return object;
     }
 
+    void Frame::clear_stack() noexcept
+    {
+        stack_.clear();
+    }
+
     std::size_t Frame::stack_size() const noexcept
     {
         return stack_.size();
+    }
+
+    void Frame::push_exception_handler(std::size_t target)
+    {
+        exception_handlers_.push_back(target);
+    }
+
+    std::size_t Frame::pop_exception_handler()
+    {
+        if (exception_handlers_.empty())
+            throw BytecodeError("exception handler stack underflow");
+        const std::size_t target = exception_handlers_.back();
+        exception_handlers_.pop_back();
+        return target;
+    }
+
+    bool Frame::has_exception_handler() const noexcept
+    {
+        return !exception_handlers_.empty();
     }
 
     void Frame::visit_stack(const VisitChildren &visitor) const
@@ -699,6 +746,41 @@ namespace cxxpython
                 frame->push(object_call(callable, CallArguments{std::move(args), keywords}));
                 break;
             }
+            case Opcode::SetupExcept:
+            {
+                if (instruction.operand >= code.instructions().size())
+                    throw BytecodeError("SETUP_EXCEPT target out of range");
+                frame->push_exception_handler(instruction.operand);
+                break;
+            }
+            case Opcode::PopExcept:
+            {
+                (void)frame->pop_exception_handler();
+                break;
+            }
+            case Opcode::CheckExceptionMatch:
+            {
+                Object *matcher = frame->pop();
+                Object *exception = frame->pop();
+                auto matcher_root = runtime_.root(matcher);
+                auto exception_root = runtime_.root(exception);
+                frame->push(exception);
+                frame->push(exception_matches(runtime_, exception, matcher)
+                                ? runtime_.true_value()
+                                : runtime_.false_value());
+                break;
+            }
+            case Opcode::RaiseValue:
+            {
+                Object *value = frame->pop();
+                auto value_root = runtime_.root(value);
+                Object *exception = exception_instance_from_value(runtime_, value_root.get());
+                auto exception_root = runtime_.root(exception);
+                auto *exception_object = dynamic_cast<ExceptionObject *>(exception_root.get());
+                if (!exception_object)
+                    raise_type_error(&runtime_, "exceptions must derive from BaseException");
+                throw PythonError(exception_object);
+            }
             case Opcode::ReturnValue:
                 return frame->pop();
             default:
@@ -708,6 +790,17 @@ namespace cxxpython
             catch (const PythonError &error)
             {
                 attach_source_location(error, code, frame->last_instruction_index());
+                if (frame->has_exception_handler())
+                {
+                    const std::size_t target = frame->pop_exception_handler();
+                    frame->clear_stack();
+                    if (error.value())
+                        frame->push(error.value());
+                    else
+                        frame->push(runtime_.new_exception(runtime_.exception_type(), "unknown exception"));
+                    jump_to(*frame, code, static_cast<std::uint32_t>(target));
+                    continue;
+                }
                 throw;
             }
         }

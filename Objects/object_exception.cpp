@@ -33,6 +33,17 @@ namespace cxxpython
             if (error->args())
                 visitor(error->args());
         }
+
+        Object *exception_new(TypeObject &type, const CallArguments &args)
+        {
+            require_no_keywords(type.runtime(), type_qualified_name(&type), args);
+            return type.runtime()->new_exception(&type, args.positional);
+        }
+
+        void exception_init(Object &object, const CallArguments &args)
+        {
+            require_no_keywords(object.runtime(), type_qualified_name(object.type()), args);
+        }
     }
 
     ExceptionObject::ExceptionObject(TypeObject *type, TupleObject *args, std::string message)
@@ -85,6 +96,8 @@ namespace cxxpython
             .equal = default_equal,
             .truth = default_truth,
             .traverse = exception_traverse,
+            .new_object = exception_new,
+            .init = exception_init,
         };
     }
 

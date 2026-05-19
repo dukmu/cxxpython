@@ -228,6 +228,26 @@ namespace cxxpython
                     statement.value->accept(*this);
             }
 
+            void visit(const compiler_internal::RaiseStmt &statement) override
+            {
+                statement.value->accept(*this);
+            }
+
+            void visit(const compiler_internal::TryStmt &statement) override
+            {
+                for (const auto &item : statement.body)
+                    item->accept(*this);
+                for (const compiler_internal::ExceptHandler &handler : statement.handlers)
+                {
+                    if (handler.type)
+                        handler.type->accept(*this);
+                    if (handler.name)
+                        (void)symbols_.add_name(*handler.name);
+                    for (const auto &item : handler.body)
+                        item->accept(*this);
+                }
+            }
+
             void visit(const compiler_internal::FunctionDefStmt &statement) override
             {
                 for (const auto &decorator : statement.decorators)
@@ -298,6 +318,24 @@ namespace cxxpython
             void visit(const compiler_internal::ReturnStmt &statement) override
             {
                 (void)statement;
+            }
+
+            void visit(const compiler_internal::RaiseStmt &statement) override
+            {
+                (void)statement;
+            }
+
+            void visit(const compiler_internal::TryStmt &statement) override
+            {
+                for (const auto &item : statement.body)
+                    item->accept(*this);
+                for (const compiler_internal::ExceptHandler &handler : statement.handlers)
+                {
+                    if (handler.name)
+                        (void)symbols_.add_local(*handler.name);
+                    for (const auto &item : handler.body)
+                        item->accept(*this);
+                }
             }
 
             void visit(const compiler_internal::FunctionDefStmt &statement) override
@@ -687,6 +725,58 @@ namespace cxxpython
                 emit({Opcode::ReturnValue, 0});
             }
 
+            void visit(const compiler_internal::RaiseStmt &statement) override
+            {
+                StatementLineGuard line(*this, statement);
+                statement.value->accept(*this);
+                emit({Opcode::RaiseValue, 0});
+            }
+
+            void visit(const compiler_internal::TryStmt &statement) override
+            {
+                StatementLineGuard line(*this, statement);
+                const std::size_t handler_jump = emit_jump(Opcode::SetupExcept);
+                for (const auto &item : statement.body)
+                    item->accept(*this);
+                emit({Opcode::PopExcept, 0});
+                const std::size_t end_jump = emit_jump(Opcode::JumpAbsolute);
+
+                patch_jump(handler_jump, instructions_.size());
+                std::vector<std::size_t> next_handler_jumps;
+                std::vector<std::size_t> handled_jumps;
+                for (const compiler_internal::ExceptHandler &handler : statement.handlers)
+                {
+                    for (std::size_t jump : next_handler_jumps)
+                        patch_jump(jump, instructions_.size());
+                    next_handler_jumps.clear();
+
+                    if (handler.type)
+                    {
+                        handler.type->accept(*this);
+                        emit({Opcode::CheckExceptionMatch, 0});
+                        next_handler_jumps.push_back(emit_jump(Opcode::PopJumpIfFalse));
+                    }
+
+                    if (handler.name)
+                    {
+                        emit({Opcode::DupTop, 0});
+                        emit_store_name(*handler.name);
+                    }
+                    emit({Opcode::PopTop, 0});
+                    for (const auto &item : handler.body)
+                        item->accept(*this);
+                    handled_jumps.push_back(emit_jump(Opcode::JumpAbsolute));
+                }
+
+                for (std::size_t jump : next_handler_jumps)
+                    patch_jump(jump, instructions_.size());
+                emit({Opcode::RaiseValue, 0});
+                const std::size_t end_target = instructions_.size();
+                patch_jump(end_jump, end_target);
+                for (std::size_t jump : handled_jumps)
+                    patch_jump(jump, end_target);
+            }
+
             void visit(const compiler_internal::FunctionDefStmt &statement) override
             {
                 StatementLineGuard line(*this, statement);
@@ -837,6 +927,22 @@ namespace cxxpython
             }
 
             void emit_binding_store(const std::string &name)
+            {
+                if (symbols_.scope() == SymbolScope::Function && symbols_.is_local(name))
+                {
+                    emit({
+                        Opcode::StoreFast,
+                        static_cast<std::uint32_t>(local_index(name)),
+                    });
+                    return;
+                }
+                emit({
+                    Opcode::StoreName,
+                    static_cast<std::uint32_t>(name_index(name)),
+                });
+            }
+
+            void emit_store_name(const std::string &name)
             {
                 if (symbols_.scope() == SymbolScope::Function && symbols_.is_local(name))
                 {

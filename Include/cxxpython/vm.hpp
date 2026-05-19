@@ -24,8 +24,12 @@ namespace cxxpython
 
         void push(Object *object);
         Object *pop();
+        void clear_stack() noexcept;
         std::size_t stack_size() const noexcept;
         void visit_stack(const VisitChildren &visitor) const;
+        void push_exception_handler(std::size_t target);
+        std::size_t pop_exception_handler();
+        bool has_exception_handler() const noexcept;
 
     private:
         CodeObject *code_;
@@ -35,6 +39,7 @@ namespace cxxpython
         std::size_t ip_ = 0;
         std::size_t last_ip_ = 0;
         std::vector<Object *> stack_;
+        std::vector<std::size_t> exception_handlers_;
     };
 
     class InterpreterState final

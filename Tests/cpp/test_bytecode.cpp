@@ -38,6 +38,10 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::MakeClass), "MAKE_CLASS");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::Call), "CALL");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::CallKw), "CALL_KW");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::SetupExcept), "SETUP_EXCEPT");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::PopExcept), "POP_EXCEPT");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::CheckExceptionMatch), "CHECK_EXCEPTION_MATCH");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::RaiseValue), "RAISE_VALUE");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::ReturnValue), "RETURN_VALUE");
 
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::LoadConst, 0}), 1);
@@ -76,6 +80,10 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::Call, 2}), -2);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::CallKw, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::CallKw, 2}), -3);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::SetupExcept, 0}), 0);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::PopExcept, 0}), 0);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::CheckExceptionMatch, 0}), 0);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::RaiseValue, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::ReturnValue, 0}), -1);
 }
 
@@ -931,6 +939,55 @@ TEST(Bytecode, RaisesPythonTypeErrorForNonCallable)
     {
         EXPECT_EQ(error.type(), runtime.type_error_type());
         EXPECT_STREQ(error.what(), "'int' object is not callable");
+    }
+}
+
+TEST(Bytecode, DispatchesRaiseAndExceptionHandlers)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::Object *handled = runtime.new_str("handled");
+    cxxpython::Object *unhandled = runtime.new_str("unhandled");
+    cxxpython::ExceptionObject *type_error = runtime.new_exception(runtime.type_error_type(), "boom");
+
+    cxxpython::CodeObject *handled_code = runtime.new_code(
+        {type_error, runtime.type_error_type(), unhandled, handled},
+        {{cxxpython::Opcode::SetupExcept, 5},
+         {cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::RaiseValue, 0},
+         {cxxpython::Opcode::PopExcept, 0},
+         {cxxpython::Opcode::LoadConst, 2},
+         {cxxpython::Opcode::LoadConst, 1},
+         {cxxpython::Opcode::CheckExceptionMatch, 0},
+         {cxxpython::Opcode::PopJumpIfFalse, 10},
+         {cxxpython::Opcode::PopTop, 0},
+         {cxxpython::Opcode::LoadConst, 3},
+         {cxxpython::Opcode::ReturnValue, 0},
+         {cxxpython::Opcode::RaiseValue, 0}});
+
+    EXPECT_EQ(vm.execute(*handled_code), handled);
+
+    cxxpython::CodeObject *unmatched_code = runtime.new_code(
+        {type_error, runtime.value_error_type()},
+        {{cxxpython::Opcode::SetupExcept, 4},
+         {cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::RaiseValue, 0},
+         {cxxpython::Opcode::PopExcept, 0},
+         {cxxpython::Opcode::LoadConst, 1},
+         {cxxpython::Opcode::CheckExceptionMatch, 0},
+         {cxxpython::Opcode::PopJumpIfFalse, 8},
+         {cxxpython::Opcode::PopTop, 0},
+         {cxxpython::Opcode::RaiseValue, 0}});
+
+    try
+    {
+        (void)vm.execute(*unmatched_code);
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.type_error_type());
+        EXPECT_STREQ(error.what(), "boom");
     }
 }
 

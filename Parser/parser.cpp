@@ -91,6 +91,8 @@ namespace cxxpython::compiler_internal
 
                 if (peek().kind == TokenKind::If)
                     return parse_if_statement();
+                if (peek().kind == TokenKind::Try)
+                    return parse_try_statement();
                 if (peek().kind == TokenKind::Def)
                     return parse_function_def_statement({});
                 if (peek().kind == TokenKind::Class)
@@ -99,6 +101,8 @@ namespace cxxpython::compiler_internal
                     return parse_delete_statement();
                 if (peek().kind == TokenKind::Return)
                     return parse_return_statement();
+                if (peek().kind == TokenKind::Raise)
+                    return parse_raise_statement();
 
                 const std::size_t line = peek().line;
                 std::unique_ptr<Expr> target_or_expression = parse_expression_only();
@@ -164,6 +168,60 @@ namespace cxxpython::compiler_internal
                 return ParsedStatement{
                     std::move(statement),
                     false,
+                };
+            }
+
+            ParsedStatement parse_raise_statement()
+            {
+                const Token &raise_token = advance();
+                if (peek().kind == TokenKind::Newline ||
+                    peek().kind == TokenKind::Dedent ||
+                    peek().kind == TokenKind::End)
+                    raise_at(raise_token, "bare raise is not supported yet");
+                auto statement = std::make_unique<RaiseStmt>(parse_expression_only());
+                statement->line = raise_token.line;
+                return ParsedStatement{
+                    std::move(statement),
+                    false,
+                };
+            }
+
+            ParsedStatement parse_try_statement()
+            {
+                const Token &try_token = advance();
+                consume(TokenKind::Colon, "expected ':' after try");
+                consume(TokenKind::Newline, "expected newline after try");
+                std::vector<std::unique_ptr<Stmt>> body = parse_block();
+                std::vector<ExceptHandler> handlers;
+
+                do
+                {
+                    if (peek().kind != TokenKind::Except)
+                        raise_at(peek(), "expected except after try block");
+                    advance();
+                    std::unique_ptr<Expr> exception_type;
+                    std::optional<std::string> exception_name;
+                    if (peek().kind != TokenKind::Colon)
+                    {
+                        exception_type = parse_expression_only();
+                        if (peek().kind == TokenKind::As)
+                        {
+                            advance();
+                            if (peek().kind != TokenKind::Identifier)
+                                raise_at(peek(), "expected name after 'as'");
+                            exception_name = advance().lexeme;
+                        }
+                    }
+                    consume(TokenKind::Colon, "expected ':' after except");
+                    consume(TokenKind::Newline, "expected newline after except");
+                    handlers.emplace_back(std::move(exception_type), std::move(exception_name), parse_block());
+                } while (peek().kind == TokenKind::Except);
+
+                auto statement = std::make_unique<TryStmt>(std::move(body), std::move(handlers));
+                statement->line = try_token.line;
+                return ParsedStatement{
+                    std::move(statement),
+                    true,
                 };
             }
 
@@ -625,6 +683,10 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Else:
                 case TokenKind::Def:
                 case TokenKind::Return:
+                case TokenKind::Raise:
+                case TokenKind::Try:
+                case TokenKind::Except:
+                case TokenKind::As:
                 case TokenKind::Class:
                 case TokenKind::Del:
                 case TokenKind::Indent:
@@ -716,6 +778,10 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Else:
                 case TokenKind::Def:
                 case TokenKind::Return:
+                case TokenKind::Raise:
+                case TokenKind::Try:
+                case TokenKind::Except:
+                case TokenKind::As:
                 case TokenKind::Class:
                 case TokenKind::Del:
                 case TokenKind::TrueLiteral:

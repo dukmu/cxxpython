@@ -20,7 +20,7 @@
 | 函数、默认参数、`*args`, `**kwargs` | P0 |
 | 闭包、`nonlocal`, `global` | P1 |
 | 生成器、`yield from` | P1 |
-| 异常、traceback、chaining | P0/P1 |
+| 异常、traceback、chaining (`raise` / `try` first slice complete) | P0/P1 |
 | `ExceptionGroup`, `except*` | P2 |
 | class、继承、MRO、descriptor、property | P0/P1 |
 | metaclass、`super()`、classmethod、staticmethod | P1 |
@@ -75,7 +75,7 @@
 | 特性 | 目标 |
 | --- | --- |
 | `cxxpython file.py` | P0 |
-| REPL | P0/P1 |
+| REPL (minimal expression/statement loop available) | P0/P1 |
 | `-c`, `-m`, `PYTHONPATH` equivalent | P1 |
 | disassembler | P1 |
 | test runner integration | P1 |

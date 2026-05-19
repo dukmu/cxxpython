@@ -62,3 +62,19 @@ TEST(Cli, ReportsSyntaxErrorsWithLocation)
     EXPECT_NE(result.output.find("SyntaxError: " + script.string() + ":1:8: expected expression"), std::string::npos);
     std::filesystem::remove(script);
 }
+
+TEST(Cli, RunsInteractiveReplFromStandardInput)
+{
+    const test_process::CommandResult result = test_process::run_command(
+        "printf \"%s\\n\" \"1 + 2\" \"x = 'ok'\" \"x\" \"try:\" "
+        "\"    raise TypeError('boom')\" \"except TypeError as e:\" \"    print(e)\" | " +
+        std::string(CXXPYTHON_PROGRAM_PATH));
+
+    EXPECT_EQ(result.exit_code, 0);
+    EXPECT_EQ(result.output,
+              "cxxpython 0.1.0-dev\n"
+              ">>> 3\n"
+              ">>> >>> 'ok'\n"
+              ">>> ... ... ... TypeError('boom')\n"
+              ">>> ");
+}

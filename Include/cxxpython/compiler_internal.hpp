@@ -35,6 +35,8 @@ namespace cxxpython::compiler_internal
     struct DeleteStmt;
     struct IfStmt;
     struct ReturnStmt;
+    struct RaiseStmt;
+    struct TryStmt;
     struct FunctionDefStmt;
     struct ClassDefStmt;
 
@@ -72,6 +74,8 @@ namespace cxxpython::compiler_internal
         virtual void visit(const DeleteStmt &statement) = 0;
         virtual void visit(const IfStmt &statement) = 0;
         virtual void visit(const ReturnStmt &statement) = 0;
+        virtual void visit(const RaiseStmt &statement) = 0;
+        virtual void visit(const TryStmt &statement) = 0;
         virtual void visit(const FunctionDefStmt &statement) = 0;
         virtual void visit(const ClassDefStmt &statement) = 0;
     };
@@ -107,6 +111,10 @@ namespace cxxpython::compiler_internal
         Else,
         Def,
         Return,
+        Raise,
+        Try,
+        Except,
+        As,
         Class,
         Del,
         TrueLiteral,
@@ -530,6 +538,52 @@ namespace cxxpython::compiler_internal
         }
 
         std::unique_ptr<Expr> value;
+
+        void accept(StmtVisitor &visitor) const override
+        {
+            visitor.visit(*this);
+        }
+    };
+
+    struct RaiseStmt final : Stmt
+    {
+        explicit RaiseStmt(std::unique_ptr<Expr> value_in)
+            : value(std::move(value_in))
+        {
+        }
+
+        std::unique_ptr<Expr> value;
+
+        void accept(StmtVisitor &visitor) const override
+        {
+            visitor.visit(*this);
+        }
+    };
+
+    struct ExceptHandler final
+    {
+        ExceptHandler(std::unique_ptr<Expr> type_in,
+                      std::optional<std::string> name_in,
+                      std::vector<std::unique_ptr<Stmt>> body_in)
+            : type(std::move(type_in)), name(std::move(name_in)), body(std::move(body_in))
+        {
+        }
+
+        std::unique_ptr<Expr> type;
+        std::optional<std::string> name;
+        std::vector<std::unique_ptr<Stmt>> body;
+    };
+
+    struct TryStmt final : Stmt
+    {
+        TryStmt(std::vector<std::unique_ptr<Stmt>> body_in,
+                std::vector<ExceptHandler> handlers_in)
+            : body(std::move(body_in)), handlers(std::move(handlers_in))
+        {
+        }
+
+        std::vector<std::unique_ptr<Stmt>> body;
+        std::vector<ExceptHandler> handlers;
 
         void accept(StmtVisitor &visitor) const override
         {
