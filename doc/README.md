@@ -7,8 +7,9 @@ This directory records the restart plan for the new `cxxpython` repository.
 - [架构设计](architecture_design.md): runtime, compiler, VM, modules, GC, C/C++ API.
 - [开发指南](development_guide.md): engineering rules and TDD workflow.
 - [开发路线图](development_plan.md): milestone plan and acceptance criteria.
+- [底层基建设计](bottom_substrate_design.md): execution, class construction,
+  import, closures, slice, buffer, IO, and traceback substrate plan.
 
 The goal is not to preserve the old implementation. The goal is to preserve
 hard-earned knowledge while designing a cleaner, more complete Python 3 runtime
 from first principles.
-

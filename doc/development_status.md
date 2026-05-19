@@ -1,5 +1,50 @@
 # Development Status
 
+## 2026-05-19 Bottom Substrate Planning Slice
+
+Review focus:
+
+- Avoid implementing `__build_class__`, `__import__`, `super`, `slice`,
+  bytes/buffer, and IO as isolated stubs.
+- Identify the shared substrate needed before those names become stable
+  Python-visible APIs.
+- Resolve whether any immediate technical debt blocks the next implementation
+  slice.
+
+Completed:
+
+- Added `doc/bottom_substrate_design.md`.
+- Planned the dependency order:
+  - execution request substrate
+  - class construction and `__build_class__`
+  - module registry and import
+  - closure/cell support for `super`
+  - slice object and sequence slicing
+  - bytes/bytearray/memoryview and buffer protocol
+  - IO substrate for `open` and `input`
+  - traceback and exception-state objects
+- Updated the documentation index.
+
+Technical-debt review:
+
+- `compile` / `eval` / `exec` are currently correct enough as a first slice
+  because they reuse compiler, CodeObject, active frame, and VM execution.
+  The debt is structural: CLI, builtins, function calls, import, and class-body
+  execution still call VM entrypoints directly. The next implementation slice
+  should extract a reusable execution request helper before import or
+  `__build_class__` grow around the old direct calls.
+- `MAKE_CLASS` remains the highest class-system debt. It still owns class-body
+  execution and namespace preparation in the VM. The next feature slice should
+  move class statement semantics behind a `__build_class__`-compatible runtime
+  API.
+- No code change was made in this planning slice because the immediate risk is
+  interface design churn, not a localized bug. The next slice should be code,
+  beginning with execution request extraction.
+
+Verification:
+
+- Documentation-only slice; no runtime behavior changed.
+
 ## 2026-05-19 Builtin Iterator And Dynamic Execution Slice
 
 Review focus:
