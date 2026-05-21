@@ -1,5 +1,52 @@
 # Development Status
 
+## 2026-05-22 CPython-Style Source Layout Slice
+
+Review focus:
+
+- Correct the growing source-layout debt before adding more loader and native
+  module support.
+- Keep `Objects/` reserved for core object model code instead of using it as a
+  bucket for runtime, import, stdlib substrate, and IO implementation.
+- Avoid exposing C++ RAII/template-heavy internals across the future extension
+  ABI boundary.
+
+Completed:
+
+- Moved runtime bootstrap/accessors/factories/rooting from `Objects/` to
+  `Python/`.
+- Moved builtin bootstrap, import core, and GC core from `Objects/` to
+  `Python/`.
+- Moved the native module registry/substrate implementation from `Objects/` to
+  `Modules/config.cpp`.
+- Moved `_io.TextIOWrapper` implementation from `Objects/` to
+  `Modules/_io/textio.cpp`.
+- Updated `CMakeLists.txt` to reflect the CPython-aligned source ownership.
+- Updated architecture docs with the rule that extension ABI must not expose
+  internal RAII/template types such as `Rooted<T>`.
+
+Known debt and next risk:
+
+- `Modules/config.cpp` is still too broad. Split it next into
+  `sysmodule.cpp`, `gcmodule.cpp`, `posixmodule.cpp`, `_iomodule.cpp`, and
+  `_collectionsmodule.cpp` before expanding builtin module APIs.
+- `Python/import.cpp` still combines finder/spec logic, source loading,
+  extension loading, and importlib helper object creation. Split it into
+  smaller import-core files before package/dotted import work.
+- `_io.TextIOWrapper` is still declared in the public monolithic
+  `object.hpp`. Move module-private layouts behind narrower internal headers
+  when the module split settles.
+- The `.so` extension entry point still uses a temporary C++ signature. The
+  next ABI slice should introduce a narrow function-table/object-handle API
+  without exporting internal RAII helpers.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all 192 tests pass.
+
 ## 2026-05-22 Import Loader/Spec Substrate Slice
 
 Review focus:

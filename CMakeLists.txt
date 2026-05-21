@@ -11,18 +11,19 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 add_library(cxxpython_core
     Parser/lexer.cpp
     Parser/parser.cpp
+    Python/runtime_bootstrap.cpp
+    Python/runtime_accessors.cpp
+    Python/runtime_factories.cpp
+    Python/runtime_roots.cpp
+    Python/bltinmodule.cpp
+    Python/import.cpp
+    Python/gc.cpp
     Python/bytecode.cpp
     Python/compiler_symbols.cpp
     Python/compiler.cpp
     Python/vm.cpp
-    Objects/runtime_bootstrap.cpp
-    Objects/runtime_builtins.cpp
-    Objects/runtime_accessors.cpp
-    Objects/runtime_factories.cpp
-    Objects/runtime_import.cpp
-    Objects/runtime_gc.cpp
-    Objects/runtime_stdlib_modules.cpp
-    Objects/runtime_roots.cpp
+    Modules/config.cpp
+    Modules/_io/textio.cpp
     Objects/object_core.cpp
     Objects/object_primitives.cpp
     Objects/object_sequences.cpp
@@ -31,7 +32,6 @@ add_library(cxxpython_core
     Objects/object_iterator.cpp
     Objects/object_iterables.cpp
     Objects/object_module.cpp
-    Objects/object_io.cpp
     Objects/object_native_function.cpp
     Objects/object_function.cpp
     Objects/object_cell.cpp

@@ -2,7 +2,7 @@
 #include "cxxpython/bytecode.hpp"
 #include "cxxpython/vm.hpp"
 
-#include "object_utils.hpp"
+#include "../Objects/object_utils.hpp"
 
 #include <cerrno>
 #include <cctype>

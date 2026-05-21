@@ -1,7 +1,7 @@
 #include "cxxpython/object.hpp"
 #include "cxxpython/runtime.hpp"
 
-#include "object_utils.hpp"
+#include "../../Objects/object_utils.hpp"
 
 #include <fstream>
 #include <iostream>

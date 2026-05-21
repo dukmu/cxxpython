@@ -2,7 +2,7 @@
 #include "cxxpython/vm.hpp"
 #include "cxxpython/compiler.hpp"
 
-#include "object_utils.hpp"
+#include "../Objects/object_utils.hpp"
 
 #include <algorithm>
 #include <cstdint>

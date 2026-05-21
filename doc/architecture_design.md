@@ -6,10 +6,10 @@
 
 ```text
 Include/        public and internal headers
-Objects/        object implementations: int, str, dict, type, function, frame
-Python/         compiler, bytecode, VM, runtime state, import core
+Objects/        core object implementations: object, type, int, str, dict, module, descriptors
+Python/         compiler, bytecode, VM, runtime state, import core, GC core
 Parser/         lexer, parser, AST builder
-Modules/        builtin C/C++ modules
+Modules/        CPython-aligned builtin/native module substrate: sys, posix, _io, gc, ...
 Lib/            Python standard library subset
 Programs/       CLI, REPL, embedding entrypoints
 Tools/          generators, disassembler, dev utilities
@@ -52,6 +52,26 @@ doc/            design docs and milestone plans
 
 10. C/C++ extension layer
    先定义稳定最小 API：object handles、type creation、module definition、argument parsing、exception setting、reference/root guard。C++ binding API 构建在 C API 之上。
+
+## 源码边界
+
+- `Objects/` 只保存 Python object model 的核心布局、协议和基础内建对象。
+  不把 import machinery、stdlib module registry、POSIX/IO host hooks 塞进
+  `Objects/`。如果一个文件主要在回答“如何加载模块、如何执行代码、如何访问宿主
+  OS”，它不属于 `Objects/`。
+- `Python/` 保存解释器内核：runtime bootstrap/accessors/factories/rooting、
+  VM、frame/thread state、compiler/symbol table、import core、GC core 和
+  builtins bootstrap。这里可以依赖内部 C++ 实现，但仍要保持模块边界清晰。
+- `Modules/` 保存 CPython 已定义的 native/builtin substrate。`sys`、`gc`、
+  `posix`、`_io`、`_collections` 等应按模块拆分，而不是聚合成一个
+  `runtime_stdlib_modules.cpp`。public policy 仍优先在 `Lib/`。
+- `Modules/_io/` 这类子目录可以保存 substrate-private object layout，例如
+  `TextIOWrapper`。这类对象不是语言核心对象，不应长期放在 `Objects/`。
+- 新增 native module 前必须先核对 CPython 的模块名和层次。没有 CPython
+  对应物时，默认选择 `Lib/` 脚本实现，而不是发明新的 C++ hook。
+- C/C++ extension ABI 不能暴露内部模板 RAII 类型、`Rooted<T>`、STL 容器布局
+  或 C++ class layout。公开边界使用窄的函数表、不透明句柄和显式错误返回；
+  RAII 可以作为 core 内部实现细节存在。
 
 ## 自举原则
 
