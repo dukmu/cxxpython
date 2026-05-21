@@ -56,6 +56,7 @@ target_compile_options(cxxpython_core PRIVATE
     -Wpedantic
     -Werror
 )
+target_link_libraries(cxxpython_core PUBLIC ${CMAKE_DL_LIBS})
 target_compile_definitions(cxxpython_core PRIVATE
     CXXPYTHON_STDLIB_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/Lib\"
 )

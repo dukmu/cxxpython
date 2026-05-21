@@ -114,7 +114,13 @@ TEST(Module, ImportsPythonModulesThroughRuntimeRegistry)
     const std::filesystem::path module_path = directory / "cxxpython_import_runtime_module.py";
     {
         std::ofstream file(module_path, std::ios::binary);
-        file << "value = 'loaded:' + __name__ + ':' + __file__\n";
+        file << "value = 'loaded:' + __name__ + ':' + __file__\n"
+                "loader_name = __loader__.__class__.__name__\n"
+                "spec_name = __spec__.name\n"
+                "spec_origin = __spec__.origin\n"
+                "spec_loader_name = __spec__.loader.__class__.__name__\n"
+                "has_location = __spec__.has_location\n"
+                "package = __package__\n";
     }
 
     runtime.add_module_search_path(directory.string());
@@ -126,6 +132,22 @@ TEST(Module, ImportsPythonModulesThroughRuntimeRegistry)
     auto *value = dynamic_cast<cxxpython::StrObject *>(module->dict()->get(runtime.new_str("value")));
     ASSERT_NE(value, nullptr);
     EXPECT_EQ(value->value, "loaded:cxxpython_import_runtime_module:" + module_path.string());
+    auto *loader_name = dynamic_cast<cxxpython::StrObject *>(module->dict()->get(runtime.new_str("loader_name")));
+    auto *spec_name = dynamic_cast<cxxpython::StrObject *>(module->dict()->get(runtime.new_str("spec_name")));
+    auto *spec_origin = dynamic_cast<cxxpython::StrObject *>(module->dict()->get(runtime.new_str("spec_origin")));
+    auto *spec_loader_name = dynamic_cast<cxxpython::StrObject *>(module->dict()->get(runtime.new_str("spec_loader_name")));
+    auto *package = dynamic_cast<cxxpython::StrObject *>(module->dict()->get(runtime.new_str("package")));
+    ASSERT_NE(loader_name, nullptr);
+    ASSERT_NE(spec_name, nullptr);
+    ASSERT_NE(spec_origin, nullptr);
+    ASSERT_NE(spec_loader_name, nullptr);
+    ASSERT_NE(package, nullptr);
+    EXPECT_EQ(loader_name->value, "SourceFileLoader");
+    EXPECT_EQ(spec_name->value, "cxxpython_import_runtime_module");
+    EXPECT_EQ(spec_origin->value, module_path.string());
+    EXPECT_EQ(spec_loader_name->value, "SourceFileLoader");
+    EXPECT_EQ(module->dict()->get(runtime.new_str("has_location")), runtime.true_value());
+    EXPECT_EQ(package->value, "");
     EXPECT_EQ(runtime.import_module("cxxpython_import_runtime_module"), module);
 
     std::filesystem::remove(module_path);
@@ -153,6 +175,33 @@ TEST(Module, FailedImportsDoNotPoisonModuleRegistry)
     }
 
     EXPECT_EQ(runtime.modules_dict()->get(runtime.new_str("cxxpython_import_failing_module")), nullptr);
+    std::filesystem::remove(module_path);
+}
+
+TEST(Module, ExtensionImportUsesSharedLoaderAndReportsMissingEntryPoint)
+{
+    cxxpython::Runtime runtime;
+    const std::filesystem::path directory = std::filesystem::temp_directory_path();
+    const std::filesystem::path module_path = directory / "cxxpython_missing_extension.so";
+    {
+        std::ofstream file(module_path, std::ios::binary);
+        file << "not a shared object\n";
+    }
+
+    runtime.add_module_search_path(directory.string());
+    try
+    {
+        (void)runtime.import_module("cxxpython_missing_extension");
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.import_error_type());
+        EXPECT_NE(std::string(error.what()).find("cannot load extension module 'cxxpython_missing_extension'"),
+                  std::string::npos);
+    }
+
+    EXPECT_EQ(runtime.modules_dict()->get(runtime.new_str("cxxpython_missing_extension")), nullptr);
     std::filesystem::remove(module_path);
 }
 
@@ -296,6 +345,16 @@ TEST(Module, ImportsStdlibModulesFromLibPath)
     EXPECT_NE(sys->dict()->get(runtime.new_str("argv")), nullptr);
     EXPECT_NE(posix->dict()->get(runtime.new_str("getcwd")), nullptr);
     EXPECT_NE(io->dict()->get(runtime.new_str("TextIOWrapper")), nullptr);
+    EXPECT_NE(sys->dict()->get(runtime.new_str("__loader__")), nullptr);
+    EXPECT_NE(sys->dict()->get(runtime.new_str("__spec__")), nullptr);
+    auto *sys_package = dynamic_cast<cxxpython::StrObject *>(sys->dict()->get(runtime.new_str("__package__")));
+    ASSERT_NE(sys_package, nullptr);
+    EXPECT_EQ(sys_package->value, "");
+    auto *sys_spec = sys->dict()->get(runtime.new_str("__spec__"));
+    ASSERT_NE(sys_spec, nullptr);
+    auto *origin = dynamic_cast<cxxpython::StrObject *>(cxxpython::object_get_attr(sys_spec, "origin"));
+    ASSERT_NE(origin, nullptr);
+    EXPECT_EQ(origin->value, "built-in");
 }
 
 TEST(Module, ExecutesCodeUsingModuleGlobals)

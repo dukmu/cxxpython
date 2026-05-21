@@ -8,6 +8,7 @@
 #include <type_traits>
 #include <utility>
 #include <vector>
+#include <filesystem>
 
 #include "cxxpython/object.hpp"
 
@@ -46,10 +47,28 @@ namespace cxxpython
         std::string qualname;
     };
 
+    enum class ModuleLoadKind : std::uint8_t
+    {
+        Builtin,
+        Source,
+        Extension,
+    };
+
+    struct ModuleLoadSpec
+    {
+        std::string name;
+        std::string filename;
+        std::string origin;
+        std::string loader_name;
+        std::string package;
+        ModuleLoadKind kind = ModuleLoadKind::Source;
+    };
+
     class Runtime final
     {
     public:
         Runtime();
+        ~Runtime();
         Runtime(const Runtime &) = delete;
         Runtime &operator=(const Runtime &) = delete;
 
@@ -224,6 +243,7 @@ namespace cxxpython
                          DictObject *builtins = nullptr,
                          std::vector<CellObject *> closure = {});
         TypeObject *new_heap_type(std::string name, TypeObject *base, TypeSlots slots = {});
+        Object *new_plain_instance(TypeObject *type);
         DictObject *prepare_class_namespace(const ClassConstructionRequest &request);
         TypeObject *new_class(ClassConstructionRequest request);
         TypeObject *new_class(std::string name,
@@ -236,6 +256,12 @@ namespace cxxpython
                               std::string module_fallback = "builtins");
         TypeObject *build_class(const ClassBuildRequest &request);
         ModuleObject *import_module(std::string name);
+        Object *new_module_loader_object(const ModuleLoadSpec &spec);
+        Object *new_module_spec_object(const ModuleLoadSpec &spec, Object *loader);
+        void initialize_module_import_metadata(ModuleObject *module,
+                                               const ModuleLoadSpec &spec,
+                                               Object *loader,
+                                               Object *module_spec);
         ExceptionObject *new_exception(TypeObject *type, std::string message);
         ExceptionObject *new_exception(TypeObject *type, std::vector<Object *> args);
         ExceptionObject *new_type_error(std::string message);
@@ -287,6 +313,12 @@ namespace cxxpython
                                       const std::vector<TypeObject *> &bases);
         void initialize_builtins();
         ModuleObject *import_stdlib_module(std::string_view name);
+        ModuleLoadSpec *find_module_spec(std::string_view name, ModuleLoadSpec &storage);
+        ModuleObject *load_module_from_spec(const ModuleLoadSpec &spec);
+        TypeObject *importlib_type_for_loader(std::string_view loader_name);
+        Object *new_importlib_object(std::string name,
+                                     std::string module,
+                                     std::initializer_list<std::pair<std::string_view, Object *>> attributes);
 
         friend class VirtualMachine;
 
@@ -353,6 +385,11 @@ namespace cxxpython
         TextIOObject *stderr_object_ = nullptr;
         ModuleObject *builtins_module_ = nullptr;
         DictObject *modules_ = nullptr;
+        TypeObject *builtin_importer_type_ = nullptr;
+        TypeObject *source_file_loader_type_ = nullptr;
+        TypeObject *extension_file_loader_type_ = nullptr;
+        TypeObject *module_spec_type_ = nullptr;
+        std::vector<void *> extension_handles_;
         std::vector<std::string> module_search_paths_;
         std::vector<std::string> program_arguments_;
         std::ostream *stdout_ = nullptr;

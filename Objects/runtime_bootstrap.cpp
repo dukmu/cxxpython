@@ -1,5 +1,6 @@
 #include "cxxpython/runtime.hpp"
 
+#include <dlfcn.h>
 #include <iostream>
 
 namespace cxxpython
@@ -345,5 +346,15 @@ namespace cxxpython
 #ifdef CXXPYTHON_STDLIB_DIR
         module_search_paths_.push_back(CXXPYTHON_STDLIB_DIR);
 #endif
+    }
+
+    Runtime::~Runtime()
+    {
+        heap_.clear();
+        for (void *handle : extension_handles_)
+        {
+            if (handle)
+                dlclose(handle);
+        }
     }
 }

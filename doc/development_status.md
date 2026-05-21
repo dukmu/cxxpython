@@ -1,5 +1,65 @@
 # Development Status
 
+## 2026-05-22 Import Loader/Spec Substrate Slice
+
+Review focus:
+
+- Start moving import toward CPython's loader/spec organization instead of
+  hard-coding every source/native path directly in `Runtime::import_module`.
+- Keep current stdlib native pieces compiled into the runtime for now, while
+  introducing a real extension-module discovery/loading path for future `.so`
+  modules.
+
+Completed:
+
+- Added `ModuleLoadSpec` and `ModuleLoadKind` for builtin, source, and
+  extension module discovery.
+- Routed import through:
+  - `Runtime::find_module_spec`
+  - `Runtime::load_module_from_spec`
+  - `BuiltinImporter`
+  - `SourceFileLoader`
+  - `ExtensionFileLoader`
+  - `ModuleSpec`
+- Added module import metadata:
+  - `__loader__`
+  - `__spec__`
+  - `__package__`
+  - `__cached__`
+- Ensured source modules receive import metadata before executing their module
+  body, so module-level code can read `__loader__` and `__spec__`.
+- Added a true `.so` loader path using `dlopen` and an explicit
+  `CxxPyInit_<module>(Runtime&) -> ModuleObject*` entry point convention.
+- Added runtime ownership of successful extension handles so loaded modules
+  stay mapped for the runtime lifetime and are closed during runtime teardown.
+- Kept stdlib/native modules compiled internally for this stage.
+- Added tests for source module loader/spec visibility, builtin module
+  loader/spec visibility, and extension-loader failure when a discovered `.so`
+  cannot be loaded.
+
+Known debt and next risk:
+
+- `ExtensionFileLoader` has only the discovery/loading skeleton. It still needs
+  a stable C/C++ extension ABI, module definition helpers, ownership/rooting
+  rules for external code, and reload/unload policy beyond runtime-lifetime
+  handle ownership.
+- Import still rejects dotted/package names. `__package__` is seeded for the
+  future, but real packages require directory discovery, `__path__`, and
+  package-relative resolution.
+- Loader/spec helper types are internal heap types, not script-level
+  `importlib._bootstrap` classes. That is acceptable for the substrate slice,
+  but importlib should eventually own the higher-level policy in `Lib/`.
+- `runtime_stdlib_modules.cpp` still groups unrelated native modules. Split it
+  before growing sys/gc/posix/_io/_collections further.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter='Module.ImportsPythonModulesThroughRuntimeRegistry:Module.ExtensionImportUsesSharedLoaderAndReportsMissingEntryPoint:Module.ImportsStdlibModulesFromLibPath'`
+- `build/cxxpython Tests/python/sys_os.py`
+- `build/test_core_objects --gtest_filter='PythonScripts.RunsGoldenFiles'`
+- `ctest --test-dir build --output-on-failure`
+
 ## 2026-05-22 Inspect Script Layer + sys._getframe Slice
 
 Review focus:

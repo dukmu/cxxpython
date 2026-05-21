@@ -13,6 +13,12 @@ False
 <class '_io.TextIOWrapper'>
 <class '_io.TextIOWrapper'>
 <class '_io.TextIOWrapper'>
+BuiltinImporter
+sys
+built-in
+True
+False
+
 posix
 /
 True

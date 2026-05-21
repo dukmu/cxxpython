@@ -502,6 +502,13 @@ namespace cxxpython
         return type;
     }
 
+    Object *Runtime::new_plain_instance(TypeObject *type)
+    {
+        if (!type)
+            raise_type_error(this, "plain instance requires a type");
+        return allocate<Object>(type);
+    }
+
     DictObject *Runtime::prepare_class_namespace(const ClassConstructionRequest &request)
     {
         DictObject *namespace_dict = request.namespace_dict ? request.namespace_dict : new_dict();
