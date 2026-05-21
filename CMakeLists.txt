@@ -23,7 +23,11 @@ add_library(cxxpython_core
     Python/compiler.cpp
     Python/vm.cpp
     Modules/config.cpp
-    Modules/_io/textio.cpp
+    Modules/sys.cpp
+    Modules/gc.cpp
+    Modules/posix.cpp
+    Modules/_io.cpp
+    Modules/_collections.cpp
     Objects/object_core.cpp
     Objects/object_primitives.cpp
     Objects/object_sequences.cpp

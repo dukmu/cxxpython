@@ -1,5 +1,49 @@
 # Development Status
 
+## 2026-05-22 Native Module Registry Split Slice
+
+Review focus:
+
+- Continue correcting the CPython-style source boundary after moving native
+  substrate code out of `Objects/`.
+- Prevent `Modules/config.cpp` from becoming a second monolith.
+- Keep cross-module symbols narrow; no public RAII/template-heavy ABI was
+  introduced.
+
+Completed:
+
+- Reduced `Modules/config.cpp` to the builtin/native module table and dispatch.
+- Added `Modules/module_registry.hpp` as a narrow internal registry boundary.
+- Split native module initialization into:
+  - `Modules/sys.cpp`
+  - `Modules/gc.cpp`
+  - `Modules/posix.cpp`
+  - `Modules/_io.cpp`
+  - `Modules/_collections.cpp`
+- Kept thin `_io.TextIOWrapper` layout/slots in `Modules/_io.cpp`; no `_io/`
+  subdirectory until the module actually needs one.
+- Avoided extra cross-module helper symbols for stdio objects; `sys` reads
+  them directly through `Runtime`.
+
+Known debt and next risk:
+
+- `Modules/_collections.cpp` still contains policy-heavy `namedtuple`. Move that
+  to `Lib/collections.py` once class/string helpers are strong enough.
+- `Python/import.cpp` is now the largest remaining mixed-responsibility file:
+  finder/spec logic, source loading, extension loading, and importlib helper
+  object creation should be split before package/dotted import support.
+- The extension loader still uses a temporary C++ entry point. Next ABI work
+  should expose a compact function table/object-handle boundary and keep
+  `Rooted<T>`/STL-heavy internals private.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter='Module.ImportsStdlibModulesFromLibPath:Module.BootstrapsBuiltinsModule:PythonScripts.RunsGoldenFiles'`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all 192 tests pass.
+
 ## 2026-05-22 CPython-Style Source Layout Slice
 
 Review focus:
@@ -19,17 +63,16 @@ Completed:
   `Python/`.
 - Moved the native module registry/substrate implementation from `Objects/` to
   `Modules/config.cpp`.
-- Moved `_io.TextIOWrapper` implementation from `Objects/` to
-  `Modules/_io/textio.cpp`.
+- Moved `_io.TextIOWrapper` implementation from `Objects/` to `Modules/_io.cpp`.
 - Updated `CMakeLists.txt` to reflect the CPython-aligned source ownership.
 - Updated architecture docs with the rule that extension ABI must not expose
   internal RAII/template types such as `Rooted<T>`.
 
 Known debt and next risk:
 
-- `Modules/config.cpp` is still too broad. Split it next into
-  `sysmodule.cpp`, `gcmodule.cpp`, `posixmodule.cpp`, `_iomodule.cpp`, and
-  `_collectionsmodule.cpp` before expanding builtin module APIs.
+- `Modules/config.cpp` has since been split into direct module files such as
+  `Modules/sys.cpp`, `Modules/gc.cpp`, `Modules/posix.cpp`, `Modules/_io.cpp`,
+  and `Modules/_collections.cpp`.
 - `Python/import.cpp` still combines finder/spec logic, source loading,
   extension loading, and importlib helper object creation. Split it into
   smaller import-core files before package/dotted import work.

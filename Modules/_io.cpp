@@ -1,16 +1,74 @@
-#include "cxxpython/object.hpp"
+#include "module_registry.hpp"
+
 #include "cxxpython/runtime.hpp"
 
-#include "../../Objects/object_utils.hpp"
+#include "../Objects/object_utils.hpp"
 
 #include <fstream>
+#include <ios>
 #include <iostream>
+#include <memory>
 #include <sstream>
 
 namespace cxxpython
 {
     namespace
     {
+        Object *io_stdin(Runtime &runtime, const CallArguments &args)
+        {
+            require_no_keywords(&runtime, "_stdin", args);
+            require_positional_count(&runtime, "_stdin", args, 0);
+            return runtime.stdin_object();
+        }
+
+        Object *io_stdout(Runtime &runtime, const CallArguments &args)
+        {
+            require_no_keywords(&runtime, "_stdout", args);
+            require_positional_count(&runtime, "_stdout", args, 0);
+            return runtime.stdout_object();
+        }
+
+        Object *io_stderr(Runtime &runtime, const CallArguments &args)
+        {
+            require_no_keywords(&runtime, "_stderr", args);
+            require_positional_count(&runtime, "_stderr", args, 0);
+            return runtime.stderr_object();
+        }
+
+        Object *io_open(Runtime &runtime, const CallArguments &args)
+        {
+            require_no_keywords(&runtime, "open", args);
+            if (args.positional.empty() || args.positional.size() > 2)
+                raise_type_error(&runtime, "open() expected 1 or 2 positional arguments");
+            auto *path = dynamic_cast<StrObject *>(args.positional[0]);
+            if (!path)
+                raise_type_error(&runtime, "open() path must be str");
+            std::string mode = "r";
+            if (args.positional.size() == 2)
+            {
+                auto *mode_text = dynamic_cast<StrObject *>(args.positional[1]);
+                if (!mode_text)
+                    raise_type_error(&runtime, "open() mode must be str");
+                mode = mode_text->value;
+            }
+            if (mode != "r" && mode != "w" && mode != "a")
+                raise_value_error(&runtime, "open() only supports text modes 'r', 'w', and 'a'");
+
+            std::ios::openmode open_mode = std::ios::in;
+            if (mode == "w")
+                open_mode = std::ios::out | std::ios::trunc;
+            else if (mode == "a")
+                open_mode = std::ios::out | std::ios::app;
+
+            auto stream = std::make_unique<std::fstream>(path->value, open_mode);
+            if (!stream->is_open())
+                throw PythonError(runtime.new_os_error("open() failed for '" + path->value + "'"));
+            std::fstream *raw = stream.get();
+            std::istream *input = mode == "r" ? raw : nullptr;
+            std::ostream *output = mode == "r" ? nullptr : raw;
+            return runtime.new_text_io(path->value, input, output, true, std::move(stream));
+        }
+
         std::string text_io_repr(const Object &object)
         {
             auto *stream = static_cast<const TextIOObject *>(&object);
@@ -205,5 +263,15 @@ namespace cxxpython
                         runtime.new_method_descriptor("close", type, text_io_close_method));
         type->dict->set(runtime.new_str("closed"),
                         runtime.new_method_descriptor("closed", type, text_io_closed_method));
+    }
+
+    void initialize_io_module(Runtime &runtime, ModuleObject &module)
+    {
+        DictObject *dict = module.dict();
+        dict->set(runtime.new_str("TextIOWrapper"), runtime.text_io_type());
+        dict->set(runtime.new_str("_stdin"), runtime.new_native_function("_stdin", io_stdin));
+        dict->set(runtime.new_str("_stdout"), runtime.new_native_function("_stdout", io_stdout));
+        dict->set(runtime.new_str("_stderr"), runtime.new_native_function("_stderr", io_stderr));
+        dict->set(runtime.new_str("open"), runtime.new_native_function("open", io_open));
     }
 }

@@ -65,8 +65,10 @@ doc/            design docs and milestone plans
 - `Modules/` 保存 CPython 已定义的 native/builtin substrate。`sys`、`gc`、
   `posix`、`_io`、`_collections` 等应按模块拆分，而不是聚合成一个
   `runtime_stdlib_modules.cpp`。public policy 仍优先在 `Lib/`。
-- `Modules/_io/` 这类子目录可以保存 substrate-private object layout，例如
-  `TextIOWrapper`。这类对象不是语言核心对象，不应长期放在 `Objects/`。
+- 当前规模下，每个 native module 优先使用 `Modules/<module>.cpp` 这种直接
+  文件名，例如 `Modules/_io.cpp` 同时保存 `_io` 初始化和薄的
+  `TextIOWrapper` substrate。只有当模块内部已经自然分裂出多个独立子组件时，
+  才建立子目录。
 - 新增 native module 前必须先核对 CPython 的模块名和层次。没有 CPython
   对应物时，默认选择 `Lib/` 脚本实现，而不是发明新的 C++ hook。
 - C/C++ extension ABI 不能暴露内部模板 RAII 类型、`Rooted<T>`、STL 容器布局
