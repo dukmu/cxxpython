@@ -205,6 +205,55 @@ TEST(Module, ExtensionImportUsesSharedLoaderAndReportsMissingEntryPoint)
     std::filesystem::remove(module_path);
 }
 
+TEST(Module, ImportsExtensionModuleThroughNarrowCAbi)
+{
+    cxxpython::Runtime runtime;
+    const std::filesystem::path extension_path =
+        std::filesystem::path(CXXPYTHON_SAMPLE_EXTENSION_PATH);
+    runtime.add_module_search_path(extension_path.parent_path().string());
+
+    cxxpython::ModuleObject *module = runtime.import_module("cxxpython_sample_extension");
+    ASSERT_NE(module, nullptr);
+    EXPECT_EQ(module->name(), "cxxpython_sample_extension");
+
+    auto *answer = dynamic_cast<cxxpython::IntObject *>(module->dict()->get(runtime.new_str("answer")));
+    auto *label = dynamic_cast<cxxpython::StrObject *>(module->dict()->get(runtime.new_str("label")));
+    ASSERT_NE(answer, nullptr);
+    ASSERT_NE(label, nullptr);
+    EXPECT_EQ(answer->value, 42);
+    EXPECT_EQ(label->value, "from-extension");
+    EXPECT_EQ(runtime.modules_dict()->get(runtime.new_str("cxxpython_sample_extension")), module);
+
+    cxxpython::Object *loader = module->dict()->get(runtime.new_str("__loader__"));
+    ASSERT_NE(loader, nullptr);
+    auto *loader_class = dynamic_cast<cxxpython::TypeObject *>(cxxpython::object_get_attr(loader, "__class__"));
+    ASSERT_NE(loader_class, nullptr);
+    auto *loader_name = dynamic_cast<cxxpython::StrObject *>(cxxpython::object_get_attr(loader_class, "__name__"));
+    ASSERT_NE(loader_name, nullptr);
+    EXPECT_EQ(loader_name->value, "ExtensionFileLoader");
+}
+
+TEST(Module, FailedExtensionInitializationDoesNotPoisonModuleRegistry)
+{
+    cxxpython::Runtime runtime;
+    const std::filesystem::path extension_path =
+        std::filesystem::path(CXXPYTHON_FAILING_EXTENSION_PATH);
+    runtime.add_module_search_path(extension_path.parent_path().string());
+
+    try
+    {
+        (void)runtime.import_module("cxxpython_failing_extension");
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.import_error_type());
+        EXPECT_STREQ(error.what(), "sample extension failed during init");
+    }
+
+    EXPECT_EQ(runtime.modules_dict()->get(runtime.new_str("cxxpython_failing_extension")), nullptr);
+}
+
 TEST(Module, MissingImportRaisesImportError)
 {
     cxxpython::Runtime runtime;

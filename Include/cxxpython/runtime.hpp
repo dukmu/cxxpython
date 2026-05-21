@@ -315,6 +315,7 @@ namespace cxxpython
         ModuleObject *import_stdlib_module(std::string_view name);
         ModuleLoadSpec *find_module_spec(std::string_view name, ModuleLoadSpec &storage);
         ModuleObject *load_module_from_spec(const ModuleLoadSpec &spec);
+        ModuleObject *load_extension_module_from_spec(const ModuleLoadSpec &spec);
         TypeObject *importlib_type_for_loader(std::string_view loader_name);
         Object *new_importlib_object(std::string name,
                                      std::string module,

@@ -2,7 +2,6 @@
 #include "cxxpython/compiler.hpp"
 #include "cxxpython/vm.hpp"
 
-#include <dlfcn.h>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -67,32 +66,13 @@ namespace cxxpython
 
         if (spec.kind == ModuleLoadKind::Extension)
         {
-            void *handle = dlopen(spec.filename.c_str(), RTLD_NOW | RTLD_LOCAL);
-            if (!handle)
-                raise_import_error(this, "cannot load extension module '" + spec.name + "': " + dlerror());
-            using InitFunction = ModuleObject *(*)(Runtime &);
-            const std::string symbol = "CxxPyInit_" + spec.name;
-            dlerror();
-            auto *init = reinterpret_cast<InitFunction>(dlsym(handle, symbol.c_str()));
-            const char *error = dlerror();
-            if (error)
-            {
-                dlclose(handle);
-                raise_import_error(this, "extension module '" + spec.name + "' does not define " + symbol);
-            }
-            ModuleObject *module = init(*this);
-            if (!module)
-            {
-                dlclose(handle);
-                raise_import_error(this, "extension module '" + spec.name + "' initialization returned null");
-            }
+            ModuleObject *module = load_extension_module_from_spec(spec);
             auto module_root = root(module);
             Object *loader = new_module_loader_object(spec);
             auto loader_root = root(loader);
             Object *module_spec = new_module_spec_object(spec, loader_root.get());
             auto spec_root = root(module_spec);
             initialize_module_import_metadata(module_root.get(), spec, loader_root.get(), spec_root.get());
-            extension_handles_.push_back(handle);
             return module;
         }
 

@@ -1,5 +1,55 @@
 # Development Status
 
+## 2026-05-22 Minimal Extension C ABI Slice
+
+Review focus:
+
+- Replace the temporary extension loader's C++ `Runtime&` entry convention with
+  a narrow C ABI surface.
+- Keep internal C++ classes, `Rooted<T>`, and STL-heavy implementation details
+  out of extension modules.
+
+Completed:
+
+- Added public `Include/cxxpython/extension_api.h` with opaque runtime/object
+  handles and a small function table.
+- Split extension loading into `Python/import_extension.cpp`.
+- Changed extension entry points to:
+  `CxxPyInit_<module>(CxxPyRuntime *, const CxxPyExtensionApi *)`.
+- Added minimal ABI functions for:
+  - creating modules
+  - creating strings
+  - creating integers
+  - setting module/object attributes
+  - reporting import errors
+- Added `Tests/extensions/cxxpython_sample_extension.c`, compiled as a real
+  `.so` without linking `cxxpython_core`.
+- Added `Tests/extensions/cxxpython_failing_extension.c` to lock failure
+  cleanup and the no-throw pending import-error path.
+- Added focused C++ coverage that imports the sample extension through the
+  normal runtime import path and observes its exported Python attributes and
+  `ExtensionFileLoader` metadata.
+- Added focused C++ coverage that failed extension initialization raises
+  `ImportError` and does not poison `sys.modules`.
+
+Known debt and next risk:
+
+- The ABI has only a minimal no-throw pending-error channel. It still needs a
+  richer exception/status model before exposing native callable callbacks.
+- The ABI has no reference/rooting model yet. Before exposing richer object
+  creation or function callbacks, add explicit handle lifetime/root rules.
+- There is no module definition helper, native function binding helper,
+  argument parser, or extension type layout API yet.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter='Module.ImportsExtensionModuleThroughNarrowCAbi:Module.ExtensionImportUsesSharedLoaderAndReportsMissingEntryPoint:Module.ImportsPythonModulesThroughRuntimeRegistry'`
+- `build/test_core_objects --gtest_filter='Module.ImportsExtensionModuleThroughNarrowCAbi:Module.FailedExtensionInitializationDoesNotPoisonModuleRegistry:Module.ExtensionImportUsesSharedLoaderAndReportsMissingEntryPoint'`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all 194 tests pass.
+
 ## 2026-05-22 Import Core Split Slice
 
 Review focus:

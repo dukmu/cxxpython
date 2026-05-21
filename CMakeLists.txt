@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.22)
 
-project(cxxpython LANGUAGES CXX)
+project(cxxpython LANGUAGES C CXX)
 
 include(FetchContent)
 
@@ -20,6 +20,7 @@ add_library(cxxpython_core
     Python/import_find.cpp
     Python/import_importlib.cpp
     Python/import_load.cpp
+    Python/import_extension.cpp
     Python/gc.cpp
     Python/bytecode.cpp
     Python/compiler_symbols.cpp
@@ -110,6 +111,8 @@ target_link_libraries(test_core_objects PRIVATE cxxpython_core GTest::gtest_main
 target_compile_definitions(test_core_objects PRIVATE
     CXXPYTHON_PROGRAM_PATH=\"$<TARGET_FILE:cxxpython>\"
     CXXPYTHON_PYTHON_TEST_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/Tests/python\"
+    CXXPYTHON_SAMPLE_EXTENSION_PATH=\"$<TARGET_FILE:cxxpython_sample_extension>\"
+    CXXPYTHON_FAILING_EXTENSION_PATH=\"$<TARGET_FILE:cxxpython_failing_extension>\"
 )
 target_compile_options(test_core_objects PRIVATE
     -Wall
@@ -119,3 +122,25 @@ target_compile_options(test_core_objects PRIVATE
 )
 
 gtest_discover_tests(test_core_objects)
+
+add_library(cxxpython_sample_extension MODULE Tests/extensions/cxxpython_sample_extension.c)
+target_include_directories(cxxpython_sample_extension
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/Include
+)
+set_target_properties(cxxpython_sample_extension PROPERTIES
+    PREFIX ""
+    OUTPUT_NAME "cxxpython_sample_extension"
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/extensions"
+)
+
+add_library(cxxpython_failing_extension MODULE Tests/extensions/cxxpython_failing_extension.c)
+target_include_directories(cxxpython_failing_extension
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/Include
+)
+set_target_properties(cxxpython_failing_extension PROPERTIES
+    PREFIX ""
+    OUTPUT_NAME "cxxpython_failing_extension"
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/extensions"
+)
