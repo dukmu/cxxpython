@@ -1,5 +1,327 @@
 # Development Status
 
+## 2026-05-22 CPython Native Module Alignment Review
+
+Review focus:
+
+- Native module names must follow CPython's actual substrate inventory, not a
+  locally invented private-hook naming scheme.
+- Public stdlib still remains script-first: `os.py` owns policy, while the
+  POSIX substrate exposes host calls.
+
+Completed:
+
+- Checked local CPython's `sys.builtin_module_names`; POSIX is exposed as
+  `posix`, `sys` and `gc` are builtin modules, and `_io` remains the native IO
+  substrate.
+- Renamed the runtime POSIX module from `_posix` to CPython-aligned `posix`.
+- Promoted `sys` and `gc` from script wrappers over invented `_sys`/`_gc`
+  hooks to CPython-aligned native modules.
+- Removed `Lib/sys.py` and `Lib/gc.py`; their state comes from the runtime
+  module registry instead of a fake private hook layer.
+- Updated `Lib/os.py` to import `posix`.
+- Added golden coverage that `sys.builtin_module_names` contains `posix` and
+  does not contain `_posix`, and likewise contains `sys`/`gc` rather than
+  `_sys`/`_gc`.
+- Updated architecture documents with the rule: do not invent underscore
+  native module names when CPython already defines the substrate name.
+
+Known debt and next risk:
+
+- `_inspect` is not a CPython builtin module. It remains a temporary bridge
+  and should be split so `sys._getframe` provides the runtime primitive while
+  `Lib/inspect.py` owns policy.
+- `_collections` is a CPython native helper name, but current
+  `collections.namedtuple` still contains too much policy in C++. Move it to
+  Python once class construction and string/list helpers are sufficient.
+- `posix` remains intentionally small: `stat`, errno objects, fd operations,
+  environment mutation, path-like conversion, and richer `OSError` fields are
+  pending.
+- `os.path` should come from script package support (`posixpath.py`), not from
+  C++.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/cxxpython Tests/python/sys_os.py`
+- `build/test_core_objects --gtest_filter='PythonScripts.RunsGoldenFiles:Module.ImportsStdlibModulesFromLibPath'`
+- `ctest --test-dir build --output-on-failure`
+
+## 2026-05-21 IO Substrate Seed Slice
+
+Review focus:
+
+- Apply the CPython-like split: bottom objects and host capabilities in a
+  private `_io` hook, public organization in scripts.
+- Avoid growing `open`, `input`, and `print` as policy-heavy C++ builtins before
+  text stream objects exist.
+
+Completed:
+
+- Added a runtime `TextIOObject` backed by host C++ streams.
+- Added `_io.TextIOWrapper` type and private `_io` hooks:
+  - `_stdin()`
+  - `_stdout()`
+  - `_stderr()`
+  - `open(path, mode='r')`
+- Added text stream methods:
+  - `read()`
+  - `readline()`
+  - `write(str)`
+  - `flush()`
+  - `close()`
+  - `closed()`
+- Added `Lib/io.py` as the public script-level module exposing
+  `TextIOWrapper` and `open`.
+- Updated native `sys` to expose `stdin`, `stdout`, and `stderr` from `_io`.
+- Added Python golden coverage for `io`, `sys.std*`, file read/write,
+  closed-file behavior, and missing-file `OSError`.
+
+Known debt and next risk:
+
+- `print` still writes through `Runtime::stdout_stream()` and only supports
+  `sep`/`end`; it should next dispatch through `sys.stdout.write` and support
+  `file`/`flush` without embedding stream policy in the builtin.
+- Public `open` is available as `io.open`, not yet as `builtins.open`. When it
+  moves to builtins, the public wrapper should come from script/bootstrap
+  policy rather than expanding `_io` semantics.
+- `input()` is still absent. It should be script-level once `sys.stdin` and
+  `sys.stdout` can be used reliably from builtins/bootstrap.
+- `_io.open` supports only text modes `r`, `w`, and `a`; encoding, errors,
+  newline policy, binary modes, buffering, path-like objects, context-manager
+  protocol, and finalizer behavior are pending.
+- `TextIOObject` currently exposes `closed()` as a method because property
+  wiring for native object attrs is still thin. This should become a proper
+  descriptor-backed attribute when native getset coverage expands.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/cxxpython Tests/python/io_module.py`
+- `build/test_core_objects --gtest_filter='CoreObjects.RuntimeBootstrapsBuiltinTypes:CoreObjects.BuiltinTypesHaveRuntimeDictionaries:Module.ImportsStdlibModulesFromLibPath:PythonScripts.RunsGoldenFiles'`
+- `ctest --test-dir build --output-on-failure`
+
+## 2026-05-21 POSIX Hook Split Slice
+
+Review focus:
+
+- Continue the stdlib openness correction by replacing the `_os` pseudo-hook
+  with a real POSIX substrate.
+- Keep public `os` behavior in `Lib/os.py`.
+- Add the exception substrate needed for filesystem errors instead of routing
+  POSIX failures through generic exceptions.
+
+Completed:
+
+- Added builtin `OSError` to the exception hierarchy, runtime accessors,
+  factories, roots, and builtins module.
+- Renamed the native hook module from `_os` to `posix`.
+- Moved `os.name`, `sep`, `linesep`, `curdir`, and `pardir` into `Lib/os.py`
+  as script-level policy constants.
+- Added real `posix` hooks:
+  - `getcwd()`
+  - `listdir(path='.')`
+  - `environ()`
+- Mapped `posix.listdir` filesystem failures to Python `OSError`.
+- Added Python golden coverage for `os.getcwd`, `os.listdir`, `os.environ`,
+  `TypeError` argument validation, and `OSError` missing-path behavior.
+- Added C++ coverage that `OSError` is bootstrapped and visible in builtins.
+- Fixed an adjacent bootstrap omission: `RecursionError` now receives a type
+  dictionary during builtin type initialization.
+
+Known debt and next risk:
+
+- `posix` is still a small substrate. `stat`, `getenv`/`putenv`, errno shape,
+  path-like conversion, file descriptor operations, and richer OSError fields
+  are still pending.
+- `_io` was absent at the time of this slice. `open`, `input`, `sys.stdin`,
+  `sys.stdout`, and `sys.stderr` should not expand until raw/text IO object
+  types exist.
+- Importer still lacks package and dotted-module support, which blocks
+  script-first stdlib growth such as `os.path`, `collections.abc`, and
+  `traceback`.
+- Parser support for boolean operators and some nested call/attribute forms is
+  still thin; POSIX tests were kept within the currently supported syntax.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter='CoreObjects.RuntimeBootstrapsExceptionHierarchy:Module.BootstrapsBuiltinsModule:Module.ImportsStdlibModulesFromLibPath:PythonScripts.RunsGoldenFiles'`
+- `ctest --test-dir build --output-on-failure`
+
+## 2026-05-20 Stdlib Openness Review
+
+Review focus:
+
+- Re-check the stdlib foundation against the project rule that public modules
+  should be script-first.
+- Avoid cementing public API behavior in C++ before POSIX and IO substrates
+  exist.
+- Prevent fake host integration from becoming test-passing technical debt.
+
+Findings:
+
+- `Lib/sys.py`, `Lib/os.py`, `Lib/inspect.py`, `Lib/gc.py`, and
+  `Lib/collections.py` were too thin at this stage. `sys` and `gc` have since
+  been corrected to CPython-aligned native modules; `os.py`, `inspect.py`, and
+  `collections.py` remain script-level policy surfaces.
+- `_os` is the wrong long-term substrate name for host filesystem calls. The
+  native layer should become CPython-aligned `posix` on POSIX platforms, with `os.py`
+  providing public names and portability policy.
+- POSIX is not implemented yet, so exposing placeholder filesystem helpers is
+  dangerous. Placeholder `_os._listdir` was removed instead of returning an
+  empty list.
+- `_io` does not exist yet. `open`, `input`, `sys.stdin`, `sys.stdout`, and
+  `sys.stderr` should wait for a real IO object substrate rather than becoming
+  string/stream special cases in builtins or CLI code.
+- `collections.namedtuple` is still a native helper because the script layer
+  cannot yet express the needed dynamic tuple subclass behavior cleanly. This
+  is acceptable only as a private bootstrap dependency and should be revisited
+  after class/function syntax matures.
+- `sys.builtin_module_names` must describe native/builtin modules, not public
+  script wrappers.
+
+Corrections made:
+
+- Removed the fake `_os._listdir` native hook.
+- Changed the runtime builtin-module inventory away from public script wrappers.
+- Updated `architecture_design.md`, `bottom_substrate_design.md`, and
+  `development_guide.md` with the script-first stdlib rule and the no-fake-hook
+  rule.
+
+Next implementation order:
+
+1. Rename/split `_os` into `posix` and keep `os.py` as the public adapter.
+2. Add a real `posix` substrate for `getcwd`, `listdir`, `stat`, `environ`,
+   and errno-to-Python-exception mapping.
+3. Add `_io` runtime object types before exposing `open`, `input`, stdio, or
+   file-backed imports beyond simple source loading.
+4. Expand importer package support so stdlib can grow as scripts and packages:
+   dotted names, package directories, `__path__`, `__package__`, and later
+   `__spec__`.
+5. Move more `inspect` and `collections` policy into `Lib/` as parser and
+   runtime affordances become available; keep `gc` native because CPython does.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter='Module.ImportsStdlibModulesFromLibPath:PythonScripts.RunsGoldenFiles'`
+- `ctest --test-dir build --output-on-failure`
+
+## 2026-05-20 Stdlib Foundation Slice
+
+Review focus:
+
+- Put `inspect`, `gc`, and `collections.namedtuple` behind a real stdlib load
+  path instead of ad hoc builtin hooks.
+- Expose code/frame metadata through typed descriptors so script-level
+  introspection can stay clean.
+- Make GC a real mark-and-sweep pass that treats active frames and roots as
+  first-class reachability sources.
+
+Completed:
+
+- Added `Lib/` to the default module search path.
+- Added early runtime private stdlib module loading for:
+  - `_inspect`
+  - `_gc`
+  - `_collections`
+  - `_sys`
+  - `_os`
+  This inventory was later corrected: `sys`, `gc`, and `posix` are CPython
+  builtin module names, not local underscore hook names.
+- Added script-level public wrappers for:
+  - `inspect`
+  - `gc`
+  - `collections`
+  - `sys`
+  - `os`
+- Added `inspect.currentframe`, `isframe`, `iscode`, `isfunction`,
+  `getsourcefile`, and `getfile`.
+- Added `gc.collect`, `get_count`, `get_objects`, `isenabled`, `enable`, and
+  `disable` with real heap marking and sweep.
+- Added `collections.namedtuple` with tuple-backed named field access and
+  `_fields` / `__match_args__`.
+- Added minimal `sys.argv`, `sys.path`, `sys.modules`, `sys.builtin_module_names`,
+  and `sys.implementation` plumbing.
+- Added minimal `os.name`, `os.sep`, `os.linesep`, `os.curdir`, and
+  `os.pardir` plumbing.
+- Added code/frame descriptors for:
+  - `co_name`, `co_filename`, `co_argcount`, `co_flags`, `co_stacksize`
+  - `co_consts`, `co_names`, `co_varnames`, `co_cellvars`, `co_freevars`
+  - `co_firstlineno`
+  - `f_code`, `f_locals`, `f_globals`, `f_builtins`, `f_lasti`, `f_lineno`
+- Added Python golden coverage for stdlib module surfaces.
+- Added C++ import coverage for stdlib modules.
+
+Known debt and next risk:
+
+- `gc` is functional but still minimal; generation tracking, thresholds, and
+  finalizer policy are not exposed yet.
+- `inspect` has a narrow API slice; traceback/frame chain objects are still the
+  next diagnostic layer.
+- `collections.namedtuple` is useful but still a small subset of CPython's
+  richer helper/module surface.
+- `sys` and `os` are still minimal and should grow through script modules
+  first, with C++ only providing private data hooks where necessary.
+
+Verification:
+
+- pending
+
+## 2026-05-20 Loop Control + F-String + CodeObject Stacksize Slice
+
+Review focus:
+
+- Close the control-flow gap for `break` / `continue` / `for ... else` so loop
+  semantics are available in parser/compiler/VM together.
+- Expand f-string support beyond the foundation slice with real conversion and
+  format-spec pathways while keeping syntax errors explicit for unsupported
+  branches.
+- Add `CodeObject` stack metadata with control-flow-aware validation instead of
+  linear stack-effect accumulation.
+
+Completed:
+
+- Added parser support for `break`, `continue`, and `for ... else`, including
+  syntax errors for loop-control statements outside loops.
+- Extended AST/symbol passes for new loop statements and `for` else-bodies.
+- Added dedicated bytecode opcodes `BREAK_LOOP` and `CONTINUE_LOOP`.
+- Routed loop-control pending state through VM `finally` unwinding so
+  `continue` and `break` both preserve Python control-flow behavior through
+  `try/finally`.
+- Expanded f-string parsing/codegen to support:
+  - conversion flags `!r` and `!s`
+  - `:{spec}` syntax forwarding through runtime `format(...)`
+  - explicit syntax rejection for unsupported conversion `!a`
+- Added `CodeObject::stack_size()` and control-flow-state stack validation
+  during code object construction.
+- Added/updated C++ and Python tests:
+  - compile errors for out-of-loop `break` / `continue`
+  - runtime golden tests for `for ... else` and loop control through `finally`
+  - f-string conversion/spec success coverage
+  - opcode metadata coverage for new loop-control opcodes
+  - `CodeObject` maximum stack-size metadata coverage
+
+Known debt and next risk:
+
+- f-string `!a` and nested replacement fields inside format specs are still not
+  implemented.
+- Loop-control semantics are now correct through `finally`, but deeper parity
+  work is still needed for the full control-flow family (`while`, `async for`,
+  richer unwind diagnostics).
+- `inspect`, `gc`, and `collections.namedtuple` module surfaces are still
+  pending and remain the next user-visible stdlib compatibility gap.
+- Stack metadata is now CFG-aware, but this is still a verifier-light model; a
+  fuller bytecode validator (block stack discipline and exception edges) is
+  still valuable before exposing code-object mutation APIs.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter='PythonScripts.RunsGoldenFiles'`
+- `ctest --test-dir build --output-on-failure`
+
 ## 2026-05-19 From-Import Statement Slice
 
 Review focus:

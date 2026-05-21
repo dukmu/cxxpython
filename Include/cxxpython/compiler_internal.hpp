@@ -37,6 +37,8 @@ namespace cxxpython::compiler_internal
     struct DeleteStmt;
     struct IfStmt;
     struct ForStmt;
+    struct BreakStmt;
+    struct ContinueStmt;
     struct ReturnStmt;
     struct RaiseStmt;
     struct GlobalStmt;
@@ -83,6 +85,8 @@ namespace cxxpython::compiler_internal
         virtual void visit(const DeleteStmt &statement) = 0;
         virtual void visit(const IfStmt &statement) = 0;
         virtual void visit(const ForStmt &statement) = 0;
+        virtual void visit(const BreakStmt &statement) = 0;
+        virtual void visit(const ContinueStmt &statement) = 0;
         virtual void visit(const ReturnStmt &statement) = 0;
         virtual void visit(const RaiseStmt &statement) = 0;
         virtual void visit(const GlobalStmt &statement) = 0;
@@ -125,6 +129,8 @@ namespace cxxpython::compiler_internal
         If,
         Else,
         For,
+        Break,
+        Continue,
         Def,
         Return,
         Raise,
@@ -197,6 +203,13 @@ namespace cxxpython::compiler_internal
         }
     };
 
+    enum class FStringConversion : std::uint8_t
+    {
+        None,
+        Str,
+        Repr,
+    };
+
     struct FStringPart final
     {
         explicit FStringPart(std::string literal_in)
@@ -204,8 +217,12 @@ namespace cxxpython::compiler_internal
         {
         }
 
-        explicit FStringPart(std::unique_ptr<Expr> expression_in)
-            : expression(std::move(expression_in))
+        explicit FStringPart(std::unique_ptr<Expr> expression_in,
+                             FStringConversion conversion_in = FStringConversion::None,
+                             std::string format_spec_in = {})
+            : expression(std::move(expression_in)),
+              conversion(conversion_in),
+              format_spec(std::move(format_spec_in))
         {
         }
 
@@ -216,6 +233,8 @@ namespace cxxpython::compiler_internal
 
         std::string literal;
         std::unique_ptr<Expr> expression;
+        FStringConversion conversion = FStringConversion::None;
+        std::string format_spec;
     };
 
     struct FStringExpr final : Expr
@@ -615,16 +634,39 @@ namespace cxxpython::compiler_internal
     {
         ForStmt(std::string target_in,
                 std::unique_ptr<Expr> iterable_in,
-                std::vector<std::unique_ptr<Stmt>> body_in)
+                std::vector<std::unique_ptr<Stmt>> body_in,
+                std::vector<std::unique_ptr<Stmt>> else_body_in)
             : target(std::move(target_in)),
               iterable(std::move(iterable_in)),
-              body(std::move(body_in))
+              body(std::move(body_in)),
+              else_body(std::move(else_body_in))
         {
         }
 
         std::string target;
         std::unique_ptr<Expr> iterable;
         std::vector<std::unique_ptr<Stmt>> body;
+        std::vector<std::unique_ptr<Stmt>> else_body;
+
+        void accept(StmtVisitor &visitor) const override
+        {
+            visitor.visit(*this);
+        }
+    };
+
+    struct BreakStmt final : Stmt
+    {
+        BreakStmt() = default;
+
+        void accept(StmtVisitor &visitor) const override
+        {
+            visitor.visit(*this);
+        }
+    };
+
+    struct ContinueStmt final : Stmt
+    {
+        ContinueStmt() = default;
 
         void accept(StmtVisitor &visitor) const override
         {

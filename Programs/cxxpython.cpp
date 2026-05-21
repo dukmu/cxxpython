@@ -200,6 +200,11 @@ namespace
 int main(int argc, char **argv)
 {
     cxxpython::Runtime runtime;
+    std::vector<std::string> program_args;
+    program_args.reserve(static_cast<std::size_t>(argc));
+    for (int index = 0; index < argc; ++index)
+        program_args.push_back(argv[index] ? argv[index] : "");
+    runtime.set_program_arguments(std::move(program_args));
 
     if (argc == 2 && std::string_view(argv[1]) == "--version")
     {

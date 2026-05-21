@@ -77,6 +77,27 @@ namespace cxxpython::compiler_internal
                 std::size_t &depth_;
             };
 
+            class LoopDepthGuard final
+            {
+            public:
+                explicit LoopDepthGuard(std::size_t &depth)
+                    : depth_(depth)
+                {
+                    ++depth_;
+                }
+
+                ~LoopDepthGuard()
+                {
+                    --depth_;
+                }
+
+                LoopDepthGuard(const LoopDepthGuard &) = delete;
+                LoopDepthGuard &operator=(const LoopDepthGuard &) = delete;
+
+            private:
+                std::size_t &depth_;
+            };
+
             ParsedStatement parse_statement()
             {
                 std::vector<std::unique_ptr<Expr>> decorators = parse_decorators();
@@ -113,6 +134,10 @@ namespace cxxpython::compiler_internal
                     return parse_global_statement();
                 if (peek().kind == TokenKind::Nonlocal)
                     return parse_nonlocal_statement();
+                if (peek().kind == TokenKind::Break)
+                    return parse_break_statement();
+                if (peek().kind == TokenKind::Continue)
+                    return parse_continue_statement();
 
                 const std::size_t line = peek().line;
                 std::unique_ptr<Expr> target_or_expression = parse_expression_only();
@@ -214,6 +239,32 @@ namespace cxxpython::compiler_internal
                     raise_at(nonlocal_token, "nonlocal declaration not allowed at module level");
                 auto statement = std::make_unique<NonlocalStmt>(parse_name_list("nonlocal"));
                 statement->line = nonlocal_token.line;
+                return ParsedStatement{
+                    std::move(statement),
+                    false,
+                };
+            }
+
+            ParsedStatement parse_break_statement()
+            {
+                const Token &break_token = advance();
+                if (loop_depth_ == 0)
+                    raise_at(break_token, "'break' outside loop");
+                auto statement = std::make_unique<BreakStmt>();
+                statement->line = break_token.line;
+                return ParsedStatement{
+                    std::move(statement),
+                    false,
+                };
+            }
+
+            ParsedStatement parse_continue_statement()
+            {
+                const Token &continue_token = advance();
+                if (loop_depth_ == 0)
+                    raise_at(continue_token, "'continue' outside loop");
+                auto statement = std::make_unique<ContinueStmt>();
+                statement->line = continue_token.line;
                 return ParsedStatement{
                     std::move(statement),
                     false,
@@ -420,9 +471,22 @@ namespace cxxpython::compiler_internal
                 std::unique_ptr<Expr> iterable = parse_expression_only();
                 consume(TokenKind::Colon, "expected ':' after for iterable");
                 consume(TokenKind::Newline, "expected newline after for statement");
+                LoopDepthGuard loop_guard(loop_depth_);
                 std::vector<std::unique_ptr<Stmt>> body = parse_block();
+                std::vector<std::unique_ptr<Stmt>> else_body;
+                if (peek().kind == TokenKind::Else)
+                {
+                    advance();
+                    consume(TokenKind::Colon, "expected ':' after else");
+                    consume(TokenKind::Newline, "expected newline after else");
+                    else_body = parse_block();
+                }
                 auto statement =
-                    std::make_unique<ForStmt>(std::move(target), std::move(iterable), std::move(body));
+                    std::make_unique<ForStmt>(
+                        std::move(target),
+                        std::move(iterable),
+                        std::move(body),
+                        std::move(else_body));
                 statement->line = for_token.line;
                 return ParsedStatement{
                     std::move(statement),
@@ -891,15 +955,15 @@ namespace cxxpython::compiler_internal
                             parts.emplace_back(std::move(literal));
                             literal.clear();
                         }
-                        const std::size_t expression_start = index + 1;
-                        const std::size_t expression_end = find_fstring_expression_end(text, expression_start, token);
-                        if (expression_end == expression_start)
+                        ParsedFStringExpression parsed = parse_fstring_part_expression(text, index, token);
+                        if (parsed.expression_source.empty())
                             raise_at(token, "empty expression in f-string");
-                        std::string expression_source = text.substr(expression_start, expression_end - expression_start);
                         std::vector<Token> expression_tokens =
-                            lex_source(runtime_, expression_source, filename_);
-                        parts.emplace_back(parse_expression(runtime_, expression_tokens, filename_));
-                        index = expression_end + 1;
+                            lex_source(runtime_, parsed.expression_source, filename_);
+                        parts.emplace_back(parse_expression(runtime_, expression_tokens, filename_),
+                                           parsed.conversion,
+                                           std::move(parsed.format_spec));
+                        index = parsed.next_index;
                         continue;
                     }
                     if (ch == '}')
@@ -920,9 +984,17 @@ namespace cxxpython::compiler_internal
                 return std::make_unique<FStringExpr>(std::move(parts));
             }
 
-            std::size_t find_fstring_expression_end(const std::string &text,
-                                                    std::size_t start,
-                                                    const Token &token) const
+            struct ParsedFStringExpression final
+            {
+                std::string expression_source;
+                FStringConversion conversion = FStringConversion::None;
+                std::string format_spec;
+                std::size_t next_index = 0;
+            };
+
+            std::size_t skip_fstring_delimited(const std::string &text,
+                                               std::size_t start,
+                                               const Token &token) const
             {
                 std::size_t nesting = 0;
                 char quote = '\0';
@@ -951,8 +1023,6 @@ namespace cxxpython::compiler_internal
                         quote = ch;
                         continue;
                     }
-                    if ((ch == '!' || ch == ':') && nesting == 0)
-                        raise_at(token, "f-string conversions and format specs are not supported yet");
                     if (ch == '(' || ch == '[' || ch == '{')
                     {
                         ++nesting;
@@ -973,6 +1043,100 @@ namespace cxxpython::compiler_internal
                     }
                 }
                 raise_at(token, "unterminated expression in f-string");
+            }
+
+            ParsedFStringExpression parse_fstring_part_expression(const std::string &text,
+                                                                  std::size_t opening_brace_index,
+                                                                  const Token &token) const
+            {
+                const std::size_t expression_start = opening_brace_index + 1;
+                std::size_t index = expression_start;
+                std::size_t nesting = 0;
+                char quote = '\0';
+                bool escaped = false;
+                while (index < text.size())
+                {
+                    const char ch = text[index];
+                    if (quote != '\0')
+                    {
+                        if (escaped)
+                        {
+                            escaped = false;
+                            ++index;
+                            continue;
+                        }
+                        if (ch == '\\')
+                        {
+                            escaped = true;
+                            ++index;
+                            continue;
+                        }
+                        if (ch == quote)
+                            quote = '\0';
+                        ++index;
+                        continue;
+                    }
+                    if (ch == '\'' || ch == '"')
+                    {
+                        quote = ch;
+                        ++index;
+                        continue;
+                    }
+                    if (ch == '(' || ch == '[' || ch == '{')
+                    {
+                        ++nesting;
+                        ++index;
+                        continue;
+                    }
+                    if (ch == ')' || ch == ']')
+                    {
+                        if (nesting == 0)
+                            raise_at(token, "unmatched delimiter in f-string expression");
+                        --nesting;
+                        ++index;
+                        continue;
+                    }
+                    if (ch == '}')
+                    {
+                        if (nesting == 0)
+                            break;
+                        --nesting;
+                        ++index;
+                        continue;
+                    }
+                    if ((ch == '!' || ch == ':') && nesting == 0)
+                        break;
+                    ++index;
+                }
+                if (index >= text.size())
+                    raise_at(token, "unterminated expression in f-string");
+
+                ParsedFStringExpression parsed;
+                parsed.expression_source = text.substr(expression_start, index - expression_start);
+                if (text[index] == '!')
+                {
+                    ++index;
+                    if (index >= text.size())
+                        raise_at(token, "unterminated expression in f-string");
+                    if (text[index] == 'r')
+                        parsed.conversion = FStringConversion::Repr;
+                    else if (text[index] == 's')
+                        parsed.conversion = FStringConversion::Str;
+                    else
+                        raise_at(token, "unsupported f-string conversion");
+                    ++index;
+                }
+                if (index < text.size() && text[index] == ':')
+                {
+                    const std::size_t spec_start = index + 1;
+                    const std::size_t spec_end = skip_fstring_delimited(text, spec_start, token);
+                    parsed.format_spec = text.substr(spec_start, spec_end - spec_start);
+                    index = spec_end;
+                }
+                if (index >= text.size() || text[index] != '}')
+                    raise_at(token, "unterminated expression in f-string");
+                parsed.next_index = index + 1;
+                return parsed;
             }
 
             std::unique_ptr<Expr> parse_primary()
@@ -1027,6 +1191,8 @@ namespace cxxpython::compiler_internal
                 case TokenKind::If:
                 case TokenKind::Else:
                 case TokenKind::For:
+                case TokenKind::Break:
+                case TokenKind::Continue:
                 case TokenKind::Def:
                 case TokenKind::Return:
                 case TokenKind::Raise:
@@ -1153,6 +1319,8 @@ namespace cxxpython::compiler_internal
                 case TokenKind::If:
                 case TokenKind::Else:
                 case TokenKind::For:
+                case TokenKind::Break:
+                case TokenKind::Continue:
                 case TokenKind::Def:
                 case TokenKind::Return:
                 case TokenKind::Raise:
@@ -1190,6 +1358,7 @@ namespace cxxpython::compiler_internal
             std::string filename_;
             std::size_t index_ = 0;
             std::size_t function_depth_ = 0;
+            std::size_t loop_depth_ = 0;
         };
     }
 

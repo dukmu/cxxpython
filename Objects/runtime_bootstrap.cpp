@@ -28,6 +28,7 @@ namespace cxxpython
         zip_type_ = allocate_type("zip");
         map_type_ = allocate_type("map");
         filter_type_ = allocate_type("filter");
+        text_io_type_ = allocate_type("_io.TextIOWrapper");
         module_type_ = allocate_type("module");
         native_function_type_ = allocate_type("builtin_function_or_method");
         function_type_ = allocate_type("function");
@@ -55,6 +56,7 @@ namespace cxxpython
         recursion_error_type_ = allocate_type("RecursionError");
         attribute_error_type_ = allocate_type("AttributeError");
         import_error_type_ = allocate_type("ImportError");
+        os_error_type_ = allocate_type("OSError");
         stop_iteration_type_ = allocate_type("StopIteration");
 
         object_type_->slots = make_object_slots();
@@ -77,6 +79,7 @@ namespace cxxpython
         zip_type_->slots = make_zip_slots();
         map_type_->slots = make_map_slots();
         filter_type_->slots = make_filter_slots();
+        text_io_type_->slots = make_text_io_slots();
         module_type_->slots = make_module_slots();
         native_function_type_->slots = make_native_function_slots();
         function_type_->slots = make_function_slots();
@@ -104,6 +107,7 @@ namespace cxxpython
         recursion_error_type_->slots = make_exception_slots();
         attribute_error_type_->slots = make_exception_slots();
         import_error_type_->slots = make_exception_slots();
+        os_error_type_->slots = make_exception_slots();
         stop_iteration_type_->slots = make_exception_slots();
 
         object_type_->set_type(type_type_);
@@ -126,6 +130,7 @@ namespace cxxpython
         zip_type_->set_type(type_type_);
         map_type_->set_type(type_type_);
         filter_type_->set_type(type_type_);
+        text_io_type_->set_type(type_type_);
         module_type_->set_type(type_type_);
         native_function_type_->set_type(type_type_);
         function_type_->set_type(type_type_);
@@ -153,6 +158,7 @@ namespace cxxpython
         recursion_error_type_->set_type(type_type_);
         attribute_error_type_->set_type(type_type_);
         import_error_type_->set_type(type_type_);
+        os_error_type_->set_type(type_type_);
         stop_iteration_type_->set_type(type_type_);
 
         object_type_->base = nullptr;
@@ -178,6 +184,7 @@ namespace cxxpython
         initialize_type(zip_type_, object_type_);
         initialize_type(map_type_, object_type_);
         initialize_type(filter_type_, object_type_);
+        initialize_type(text_io_type_, object_type_);
         initialize_type(module_type_, object_type_);
         initialize_type(native_function_type_, object_type_);
         initialize_type(function_type_, object_type_);
@@ -205,6 +212,7 @@ namespace cxxpython
         initialize_type(recursion_error_type_, exception_type_);
         initialize_type(attribute_error_type_, exception_type_);
         initialize_type(import_error_type_, exception_type_);
+        initialize_type(os_error_type_, exception_type_);
         initialize_type(stop_iteration_type_, exception_type_);
 
         object_type_->solid_base = object_type_;
@@ -227,6 +235,7 @@ namespace cxxpython
         zip_type_->solid_base = zip_type_;
         map_type_->solid_base = map_type_;
         filter_type_->solid_base = filter_type_;
+        text_io_type_->solid_base = text_io_type_;
         module_type_->solid_base = module_type_;
         native_function_type_->solid_base = native_function_type_;
         function_type_->solid_base = function_type_;
@@ -254,12 +263,16 @@ namespace cxxpython
         recursion_error_type_->solid_base = base_exception_type_;
         attribute_error_type_->solid_base = base_exception_type_;
         import_error_type_->solid_base = base_exception_type_;
+        os_error_type_->solid_base = base_exception_type_;
         stop_iteration_type_->solid_base = base_exception_type_;
 
         none_ = allocate<NoneObject>(none_type_);
         not_implemented_ = allocate<NotImplementedObject>(not_implemented_type_);
         true_ = allocate<BoolObject>(bool_type_, true);
         false_ = allocate<BoolObject>(bool_type_, false);
+        stdin_object_ = new_text_io("<stdin>", &std::cin, nullptr, false);
+        stdout_object_ = new_text_io("<stdout>", nullptr, &std::cout, false);
+        stderr_object_ = new_text_io("<stderr>", nullptr, &std::cerr, false);
 
         add_root(object_type_);
         add_root(type_type_);
@@ -281,6 +294,7 @@ namespace cxxpython
         add_root(zip_type_);
         add_root(map_type_);
         add_root(filter_type_);
+        add_root(text_io_type_);
         add_root(module_type_);
         add_root(native_function_type_);
         add_root(function_type_);
@@ -308,11 +322,15 @@ namespace cxxpython
         add_root(recursion_error_type_);
         add_root(attribute_error_type_);
         add_root(import_error_type_);
+        add_root(os_error_type_);
         add_root(stop_iteration_type_);
         add_root(none_);
         add_root(not_implemented_);
         add_root(true_);
         add_root(false_);
+        add_root(stdin_object_);
+        add_root(stdout_object_);
+        add_root(stderr_object_);
 
         initialize_type_dicts();
         initialize_type_descriptors();
@@ -324,5 +342,8 @@ namespace cxxpython
         modules_->set(new_str("builtins"), builtins_module_);
         add_root(modules_);
         module_search_paths_.push_back(".");
+#ifdef CXXPYTHON_STDLIB_DIR
+        module_search_paths_.push_back(CXXPYTHON_STDLIB_DIR);
+#endif
     }
 }

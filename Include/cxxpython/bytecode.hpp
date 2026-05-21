@@ -46,6 +46,8 @@ namespace cxxpython
         CompareOp,
         GetIter,
         ForIter,
+        BreakLoop,
+        ContinueLoop,
         JumpAbsolute,
         PopJumpIfFalse,
         PopJumpIfTrue,
@@ -117,6 +119,7 @@ namespace cxxpython
         const std::vector<Object *> &freevars() const noexcept;
         const std::vector<Instruction> &instructions() const noexcept;
         const std::vector<std::uint32_t> &lines() const noexcept;
+        std::uint32_t stack_size() const noexcept;
         std::uint32_t line_for_instruction(std::size_t instruction_index) const noexcept;
 
     private:
@@ -131,6 +134,7 @@ namespace cxxpython
         std::vector<Object *> freevars_;
         std::vector<Instruction> instructions_;
         std::vector<std::uint32_t> lines_;
+        std::uint32_t stack_size_ = 0;
     };
 
     const char *opcode_name(Opcode opcode);

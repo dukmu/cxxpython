@@ -20,6 +20,8 @@ add_library(cxxpython_core
     Objects/runtime_accessors.cpp
     Objects/runtime_factories.cpp
     Objects/runtime_import.cpp
+    Objects/runtime_gc.cpp
+    Objects/runtime_stdlib_modules.cpp
     Objects/runtime_roots.cpp
     Objects/object_core.cpp
     Objects/object_primitives.cpp
@@ -29,6 +31,7 @@ add_library(cxxpython_core
     Objects/object_iterator.cpp
     Objects/object_iterables.cpp
     Objects/object_module.cpp
+    Objects/object_io.cpp
     Objects/object_native_function.cpp
     Objects/object_function.cpp
     Objects/object_cell.cpp
@@ -52,6 +55,9 @@ target_compile_options(cxxpython_core PRIVATE
     -Wextra
     -Wpedantic
     -Werror
+)
+target_compile_definitions(cxxpython_core PRIVATE
+    CXXPYTHON_STDLIB_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/Lib\"
 )
 
 add_executable(cxxpython Programs/cxxpython.cpp)

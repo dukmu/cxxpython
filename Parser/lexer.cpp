@@ -263,6 +263,10 @@ namespace cxxpython::compiler_internal
                     kind = TokenKind::Else;
                 else if (lexeme == "for")
                     kind = TokenKind::For;
+                else if (lexeme == "break")
+                    kind = TokenKind::Break;
+                else if (lexeme == "continue")
+                    kind = TokenKind::Continue;
                 else if (lexeme == "def")
                     kind = TokenKind::Def;
                 else if (lexeme == "return")

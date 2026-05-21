@@ -3,7 +3,9 @@
 #include <cstdint>
 #include <functional>
 #include <exception>
+#include <iostream>
 #include <limits>
+#include <memory>
 #include <span>
 #include <string>
 #include <utility>
@@ -39,6 +41,7 @@ namespace cxxpython
     class PythonFunctionObject;
     class CellObject;
     class SuperObject;
+    class TextIOObject;
 
     using VisitChildren = std::function<void(Object *)>;
     using ObjectSpan = std::span<Object *const>;
@@ -474,6 +477,42 @@ namespace cxxpython
         Object *iterator_;
     };
 
+    class TextIOObject final : public Object
+    {
+    public:
+        enum class Capability : std::uint8_t
+        {
+            Readable = 1U << 0,
+            Writable = 1U << 1,
+        };
+
+        TextIOObject(TypeObject *type,
+                     std::string name,
+                     std::istream *input,
+                     std::ostream *output,
+                     bool owns_streams,
+                     std::unique_ptr<std::iostream> owned_stream = nullptr);
+        ~TextIOObject() override;
+
+        const std::string &name() const noexcept;
+        bool readable() const noexcept;
+        bool writable() const noexcept;
+        bool closed() const noexcept;
+        std::string read_all();
+        std::string readline();
+        void write(std::string_view text);
+        void flush();
+        void close();
+
+    private:
+        std::string name_;
+        std::istream *input_ = nullptr;
+        std::ostream *output_ = nullptr;
+        bool owns_streams_ = false;
+        bool closed_ = false;
+        std::unique_ptr<std::iostream> owned_stream_;
+    };
+
     class ModuleObject final : public Object
     {
     public:
@@ -788,6 +827,7 @@ namespace cxxpython
     TypeSlots make_zip_slots();
     TypeSlots make_map_slots();
     TypeSlots make_filter_slots();
+    TypeSlots make_text_io_slots();
     TypeSlots make_module_slots();
     TypeSlots make_native_function_slots();
     TypeSlots make_function_slots();
@@ -804,6 +844,7 @@ namespace cxxpython
     TypeSlots make_frame_slots();
     TypeSlots make_cell_slots();
     TypeSlots make_super_slots();
+    void initialize_text_io_methods(Runtime &runtime, TypeObject *type);
 
     [[noreturn]] void raise_type_error(Runtime *runtime, std::string message);
     [[noreturn]] void raise_value_error(Runtime *runtime, std::string message);

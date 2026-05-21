@@ -161,6 +161,18 @@ namespace cxxpython
                 statement.iterable->accept(*this);
                 for (const auto &item : statement.body)
                     item->accept(*this);
+                for (const auto &item : statement.else_body)
+                    item->accept(*this);
+            }
+
+            void visit(const compiler_internal::BreakStmt &statement) override
+            {
+                (void)statement;
+            }
+
+            void visit(const compiler_internal::ContinueStmt &statement) override
+            {
+                (void)statement;
             }
 
             void visit(const compiler_internal::ReturnStmt &statement) override
@@ -299,6 +311,18 @@ namespace cxxpython
                     (void)symbols_.add_local(statement.target);
                 for (const auto &item : statement.body)
                     item->accept(*this);
+                for (const auto &item : statement.else_body)
+                    item->accept(*this);
+            }
+
+            void visit(const compiler_internal::BreakStmt &statement) override
+            {
+                (void)statement;
+            }
+
+            void visit(const compiler_internal::ContinueStmt &statement) override
+            {
+                (void)statement;
             }
 
             void visit(const compiler_internal::ReturnStmt &statement) override
@@ -409,6 +433,18 @@ namespace cxxpython
             {
                 for (const auto &item : statement.body)
                     item->accept(*this);
+                for (const auto &item : statement.else_body)
+                    item->accept(*this);
+            }
+
+            void visit(const compiler_internal::BreakStmt &statement) override
+            {
+                (void)statement;
+            }
+
+            void visit(const compiler_internal::ContinueStmt &statement) override
+            {
+                (void)statement;
             }
 
             void visit(const compiler_internal::ReturnStmt &statement) override
@@ -636,6 +672,18 @@ namespace cxxpython
                 statement.iterable->accept(*this);
                 for (const auto &item : statement.body)
                     item->accept(*this);
+                for (const auto &item : statement.else_body)
+                    item->accept(*this);
+            }
+
+            void visit(const compiler_internal::BreakStmt &statement) override
+            {
+                (void)statement;
+            }
+
+            void visit(const compiler_internal::ContinueStmt &statement) override
+            {
+                (void)statement;
             }
 
             void visit(const compiler_internal::ReturnStmt &statement) override
@@ -741,6 +789,18 @@ namespace cxxpython
             {
                 for (const auto &item : statement.body)
                     item->accept(*this);
+                for (const auto &item : statement.else_body)
+                    item->accept(*this);
+            }
+
+            void visit(const compiler_internal::BreakStmt &statement) override
+            {
+                (void)statement;
+            }
+
+            void visit(const compiler_internal::ContinueStmt &statement) override
+            {
+                (void)statement;
             }
 
             void visit(const compiler_internal::ReturnStmt &statement) override

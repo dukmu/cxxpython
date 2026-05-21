@@ -590,6 +590,7 @@ namespace cxxpython
         dict->set(new_str("RecursionError"), recursion_error_type_);
         dict->set(new_str("AttributeError"), attribute_error_type_);
         dict->set(new_str("ImportError"), import_error_type_);
+        dict->set(new_str("OSError"), os_error_type_);
         dict->set(new_str("StopIteration"), stop_iteration_type_);
         dict->set(new_str("None"), none_);
         dict->set(new_str("True"), true_);

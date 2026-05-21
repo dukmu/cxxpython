@@ -1,0 +1,27 @@
+cxxpython
+0.1.0-dev
+True
+<class 'list'>
+<class 'dict'>
+<class 'tuple'>
+True
+False
+True
+False
+True
+False
+<class '_io.TextIOWrapper'>
+<class '_io.TextIOWrapper'>
+<class '_io.TextIOWrapper'>
+posix
+/
+True
+.
+..
+<class 'str'>
+True
+<class 'list'>
+True
+<class 'dict'>
+<class 'TypeError'>
+<class 'OSError'>

@@ -83,6 +83,7 @@ TEST(Module, BootstrapsBuiltinsModule)
               runtime.recursion_error_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("AttributeError")), runtime.attribute_error_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("ImportError")), runtime.import_error_type());
+    EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("OSError")), runtime.os_error_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("None")), runtime.none());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("True")), runtime.true_value());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("False")), runtime.false_value());
@@ -264,6 +265,37 @@ TEST(Module, BuiltinCoreConstructorsCreateProtocolObjects)
         EXPECT_EQ(error.type(), runtime.value_error_type());
         EXPECT_STREQ(error.what(), "invalid literal for int() with base 10: 'not-an-int'");
     }
+}
+
+TEST(Module, ImportsStdlibModulesFromLibPath)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::ModuleObject *inspect = runtime.import_module("inspect");
+    cxxpython::ModuleObject *gc = runtime.import_module("gc");
+    cxxpython::ModuleObject *collections = runtime.import_module("collections");
+    cxxpython::ModuleObject *sys = runtime.import_module("sys");
+    cxxpython::ModuleObject *posix = runtime.import_module("posix");
+    cxxpython::ModuleObject *io = runtime.import_module("_io");
+
+    ASSERT_NE(inspect, nullptr);
+    ASSERT_NE(gc, nullptr);
+    ASSERT_NE(collections, nullptr);
+    ASSERT_NE(sys, nullptr);
+    ASSERT_NE(posix, nullptr);
+    ASSERT_NE(io, nullptr);
+    EXPECT_EQ(runtime.modules_dict()->get(runtime.new_str("inspect")), inspect);
+    EXPECT_EQ(runtime.modules_dict()->get(runtime.new_str("gc")), gc);
+    EXPECT_EQ(runtime.modules_dict()->get(runtime.new_str("collections")), collections);
+    EXPECT_EQ(runtime.modules_dict()->get(runtime.new_str("sys")), sys);
+    EXPECT_EQ(runtime.modules_dict()->get(runtime.new_str("posix")), posix);
+    EXPECT_EQ(runtime.modules_dict()->get(runtime.new_str("_io")), io);
+
+    EXPECT_NE(inspect->dict()->get(runtime.new_str("currentframe")), nullptr);
+    EXPECT_NE(gc->dict()->get(runtime.new_str("collect")), nullptr);
+    EXPECT_NE(collections->dict()->get(runtime.new_str("namedtuple")), nullptr);
+    EXPECT_NE(sys->dict()->get(runtime.new_str("argv")), nullptr);
+    EXPECT_NE(posix->dict()->get(runtime.new_str("getcwd")), nullptr);
+    EXPECT_NE(io->dict()->get(runtime.new_str("TextIOWrapper")), nullptr);
 }
 
 TEST(Module, ExecutesCodeUsingModuleGlobals)

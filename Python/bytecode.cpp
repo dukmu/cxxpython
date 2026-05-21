@@ -1,7 +1,11 @@
 #include "cxxpython/bytecode.hpp"
 
+#include <algorithm>
+#include <optional>
+#include <queue>
 #include <sstream>
 #include <utility>
+#include <vector>
 
 namespace cxxpython
 {
@@ -101,6 +105,73 @@ namespace cxxpython
     {
         if (!lines_.empty() && lines_.size() != instructions_.size())
             throw BytecodeError("code object line table must match instruction count");
+        struct State
+        {
+            std::size_t index;
+            int depth;
+        };
+
+        std::vector<std::vector<int>> seen_depths(instructions_.size());
+        std::queue<State> worklist;
+        worklist.push(State{0, 0});
+        int max_depth = 0;
+
+        auto push_state = [&](std::size_t successor, int depth) {
+            if (depth < 0)
+                throw BytecodeError("code object stack effect underflow");
+            if (successor >= instructions_.size())
+                return;
+            std::vector<int> &depths = seen_depths[successor];
+            if (std::find(depths.begin(), depths.end(), depth) != depths.end())
+                return;
+            depths.push_back(depth);
+            worklist.push(State{successor, depth});
+        };
+
+        while (!worklist.empty())
+        {
+            const State state = worklist.front();
+            worklist.pop();
+            const Instruction instruction = instructions_[state.index];
+            const int entry_depth = state.depth;
+
+            if (entry_depth > max_depth)
+                max_depth = entry_depth;
+
+            auto apply = [&](std::size_t successor, int delta) {
+                push_state(successor, entry_depth + delta);
+            };
+
+            switch (instruction.opcode)
+            {
+            case Opcode::ReturnValue:
+            case Opcode::RaiseValue:
+                apply(instructions_.size(), stack_effect(instruction));
+                break;
+            case Opcode::JumpAbsolute:
+            case Opcode::BreakLoop:
+            case Opcode::ContinueLoop:
+                apply(instruction.operand, 0);
+                break;
+            case Opcode::PopJumpIfFalse:
+            case Opcode::PopJumpIfTrue:
+                apply(state.index + 1, -1);
+                apply(instruction.operand, -1);
+                break;
+            case Opcode::JumpIfFalseOrPop:
+                apply(state.index + 1, -1);
+                apply(instruction.operand, 0);
+                break;
+            case Opcode::ForIter:
+                apply(state.index + 1, 1);
+                apply(instruction.operand, -1);
+                break;
+            default:
+                apply(state.index + 1, stack_effect(instruction));
+                break;
+            }
+        }
+        stack_size_ = static_cast<std::uint32_t>(max_depth);
     }
 
     const std::string &CodeObject::name() const noexcept
@@ -176,6 +247,11 @@ namespace cxxpython
     const std::vector<std::uint32_t> &CodeObject::lines() const noexcept
     {
         return lines_;
+    }
+
+    std::uint32_t CodeObject::stack_size() const noexcept
+    {
+        return stack_size_;
     }
 
     std::uint32_t CodeObject::line_for_instruction(std::size_t instruction_index) const noexcept
@@ -268,6 +344,10 @@ namespace cxxpython
             return "GET_ITER";
         case Opcode::ForIter:
             return "FOR_ITER";
+        case Opcode::BreakLoop:
+            return "BREAK_LOOP";
+        case Opcode::ContinueLoop:
+            return "CONTINUE_LOOP";
         case Opcode::JumpAbsolute:
             return "JUMP_ABSOLUTE";
         case Opcode::PopJumpIfFalse:
@@ -321,6 +401,8 @@ namespace cxxpython
         case Opcode::DeleteFast:
         case Opcode::DeleteDeref:
         case Opcode::JumpAbsolute:
+        case Opcode::BreakLoop:
+        case Opcode::ContinueLoop:
         case Opcode::SetupExcept:
         case Opcode::SetupFinally:
         case Opcode::PopExcept:

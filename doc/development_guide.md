@@ -21,6 +21,12 @@
 - 不复制核心逻辑到 opcode、builtin、type method 三处。
 - 不创建没有所有权模型的裸指针长期对象。
 - 不新增无测试的 public API。
+- 不为尚未实现的系统能力写 placeholder 行为。例如 POSIX、IO、socket、
+  time 等 native hook 必须接真实 substrate 或明确抛 Python 异常，不能返回
+  空列表、空字符串、固定成功值来通过测试。
+- Public stdlib 优先写在 `Lib/`。C++ native module 默认只能是私有 hook
+  或 bootstrap seed；如果新增 public native API，必须在
+  `doc/development_status.md` 说明为什么它无法脚本化。
 - 每次提交前审查一遍可能造成技术债的设计或者代码，并把结果写入
   `doc/development_status.md`。
 

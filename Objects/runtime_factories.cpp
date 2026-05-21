@@ -176,6 +176,21 @@ namespace cxxpython
         return allocate<FilterObject>(filter_type_, callable, iterator);
     }
 
+    TextIOObject *Runtime::new_text_io(std::string name,
+                                       std::istream *input,
+                                       std::ostream *output,
+                                       bool owns_streams,
+                                       std::unique_ptr<std::iostream> owned_stream)
+    {
+        return allocate<TextIOObject>(
+            text_io_type_,
+            std::move(name),
+            input,
+            output,
+            owns_streams,
+            std::move(owned_stream));
+    }
+
     ModuleObject *Runtime::new_module(std::string name, std::string filename)
     {
         DictObject *dict = new_dict();
@@ -712,6 +727,11 @@ namespace cxxpython
     ExceptionObject *Runtime::new_import_error(std::string message)
     {
         return new_exception(import_error_type_, std::move(message));
+    }
+
+    ExceptionObject *Runtime::new_os_error(std::string message)
+    {
+        return new_exception(os_error_type_, std::move(message));
     }
 
     ExceptionObject *Runtime::new_stop_iteration()

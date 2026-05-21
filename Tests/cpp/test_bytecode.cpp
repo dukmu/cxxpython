@@ -41,6 +41,8 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::CompareOp), "COMPARE_OP");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::GetIter), "GET_ITER");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::ForIter), "FOR_ITER");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::BreakLoop), "BREAK_LOOP");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::ContinueLoop), "CONTINUE_LOOP");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::JumpAbsolute), "JUMP_ABSOLUTE");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::PopJumpIfFalse), "POP_JUMP_IF_FALSE");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::PopJumpIfTrue), "POP_JUMP_IF_TRUE");
@@ -95,6 +97,8 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::CompareOp, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::GetIter, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::ForIter, 0}), 1);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BreakLoop, 0}), 0);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::ContinueLoop, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::JumpAbsolute, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::PopJumpIfFalse, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::PopJumpIfTrue, 0}), -1);
@@ -545,11 +549,12 @@ TEST(Bytecode, SubscriptOpcodesRaisePythonErrorsThroughObjectProtocol)
 
     cxxpython::TupleObject *tuple = runtime.new_tuple({runtime.new_int(1)});
     cxxpython::CodeObject *store_tuple = runtime.new_code(
-        {tuple, runtime.new_int(0), runtime.new_int(9)},
+        {tuple, runtime.new_int(0), runtime.new_int(9), runtime.none()},
         {{cxxpython::Opcode::LoadConst, 0},
          {cxxpython::Opcode::LoadConst, 1},
          {cxxpython::Opcode::LoadConst, 2},
          {cxxpython::Opcode::StoreSubscr, 0},
+         {cxxpython::Opcode::LoadConst, 3},
          {cxxpython::Opcode::ReturnValue, 0}});
 
     try
@@ -818,6 +823,20 @@ TEST(Bytecode, CodeObjectsExposeInstructionLineTable)
                      {{cxxpython::Opcode::ReturnValue, 0}},
                      {1, 2}),
                  cxxpython::BytecodeError);
+}
+
+TEST(Bytecode, CodeObjectsComputeMaximumStackSize)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::CodeObject *code = runtime.new_code(
+        {runtime.new_int(1), runtime.new_int(2), runtime.new_int(3)},
+        {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::LoadConst, 1},
+         {cxxpython::Opcode::LoadConst, 2},
+         {cxxpython::Opcode::BuildTuple, 3},
+         {cxxpython::Opcode::ReturnValue, 0}});
+
+    EXPECT_EQ(code->stack_size(), 3U);
 }
 
 TEST(Bytecode, FrameObjectsTrackCodeAndStackReferences)

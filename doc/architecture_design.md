@@ -44,7 +44,11 @@ doc/            design docs and milestone plans
    采用 tracing GC 起步，可叠加引用计数或 arena。所有可达根必须明确：builtins、modules、active frames、C stack handles、intern tables、static singletons。
 
 9. Modules
-   Builtin modules 是 typed native modules。Python modules 使用 dict namespace。Import system 逐步对齐 importlib，但核心 bootstrap 需要最小、可测试。
+   模块是 typed module object。Public stdlib 模块默认来自 `Lib/*.py`；
+   native 模块只允许作为 CPython 已定义的 builtin/substrate 模块或不可避免的
+   bootstrap seed 存在，例如 `sys` 提供运行时状态、`posix` 提供宿主平台调用、
+   `_io` 提供 IO substrate。Import system 逐步对齐 importlib，但核心
+   bootstrap 需要最小、可测试。
 
 10. C/C++ extension layer
    先定义稳定最小 API：object handles、type creation、module definition、argument parsing、exception setting、reference/root guard。C++ binding API 构建在 C API 之上。
@@ -55,6 +59,11 @@ doc/            design docs and milestone plans
 - 一旦 VM、code object、module object 和 import core 可用，后续 builtins、标准库子集、测试脚本和开发工具应尽量通过运行时自身加载和执行。
 - 手写 bytecode tests 是早期锁定 VM 语义的工具，不是长期执行入口。长期入口必须走 parser/compiler/code object/module 执行链。
 - 每个新的运行时能力都要回答：它是 bootstrap seed，还是应该由 Python 层自举出来。如果是 seed，必须保持小而稳定。
+- Public 标准库 API 不应直接落在 C++ 注册表中。C++ 可以暴露 `_io`
+  这类 CPython 已有的私有、窄口、真实能力 hook；也可以暴露 `sys`、`gc`、
+  `posix` 这类 CPython 定义为 builtin 的底层模块。策略、兼容别名、
+  参数默认值、helper class 和组合逻辑应写在 `Lib/` 中。新增底层模块名
+  必须先核对 CPython，不能随意发明私有前缀。
 
 ## C 与 C++ 的分工
 
@@ -223,6 +232,16 @@ doc/            design docs and milestone plans
 - 模块是 typed runtime object，模块 dict 是脚本层可见 namespace。CLI、
   import、`sys.modules`、package execution 都应围绕 module object 工作，
   不再退回裸 dict 模块模型。
+- Public stdlib-first rule: `sys`、`os`、`inspect`、`gc`、`collections` 等
+  对外模块应优先是 `Lib/*.py`。C++ 层只提供私有 hook 模块和不可替代的
+  runtime/kernel 对象；不能把 public API 面逐项塞进
+  `Runtime::import_stdlib_module`。
+- Native hook modules must expose real substrate only. A hook such as
+  `posix.listdir` may call the host filesystem and raise Python exceptions; it
+  must not return placeholder values to make an API appear supported.
+- `sys.builtin_module_names` lists native/builtin module names, not public
+  script wrappers. Public wrappers become visible through normal import and
+  `sys.modules`.
 - 模块初始化最小字段包括 `__name__`、`__file__`、`__builtins__`。后续导入
   系统加入 `__spec__`、`__package__`、`__loader__`、`__path__`。
 - Builtins 应首先作为模块对象存在，再由 frame name resolution 的 builtins

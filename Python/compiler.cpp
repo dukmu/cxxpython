@@ -122,7 +122,38 @@ namespace cxxpython
                     if (part.is_expression())
                     {
                         part.expression->accept(*this);
-                        emit({Opcode::FormatValue, 0});
+                        if (part.conversion == compiler_internal::FStringConversion::Repr)
+                        {
+                            emit({
+                                Opcode::LoadName,
+                                static_cast<std::uint32_t>(ensure_name_index("repr")),
+                            });
+                            emit({Opcode::RotTwo, 0});
+                            emit({Opcode::Call, 1});
+                        }
+                        else if (part.conversion == compiler_internal::FStringConversion::Str)
+                        {
+                            emit({
+                                Opcode::LoadName,
+                                static_cast<std::uint32_t>(ensure_name_index("str")),
+                            });
+                            emit({Opcode::RotTwo, 0});
+                            emit({Opcode::Call, 1});
+                        }
+                        if (part.format_spec.empty())
+                        {
+                            emit({Opcode::FormatValue, 0});
+                        }
+                        else
+                        {
+                            emit({
+                                Opcode::LoadName,
+                                static_cast<std::uint32_t>(ensure_name_index("format")),
+                            });
+                            emit({Opcode::RotTwo, 0});
+                            emit_constant(runtime_.new_str(part.format_spec));
+                            emit({Opcode::Call, 2});
+                        }
                     }
                     else
                     {
@@ -517,6 +548,13 @@ namespace cxxpython
                 emit({Opcode::GetIter, 0});
                 const std::size_t loop_start = instructions_.size();
                 const std::size_t exit_jump = emit_jump(Opcode::ForIter);
+                loop_stack_.push_back(LoopControl{
+                    .start = loop_start,
+                    .continue_target = loop_start,
+                    .break_target = 0,
+                    .break_jumps = {},
+                    .continue_jumps = {},
+                });
                 emit_binding_store(statement.target);
                 for (const auto &item : statement.body)
                     item->accept(*this);
@@ -524,7 +562,34 @@ namespace cxxpython
                     Opcode::JumpAbsolute,
                     static_cast<std::uint32_t>(loop_start),
                 });
-                patch_jump(exit_jump, instructions_.size());
+                const std::size_t else_start = instructions_.size();
+                patch_jump(exit_jump, else_start);
+                LoopControl loop = std::move(loop_stack_.back());
+                loop_stack_.pop_back();
+                for (std::size_t jump : loop.continue_jumps)
+                    patch_jump(jump, loop.continue_target);
+                for (const auto &item : statement.else_body)
+                    item->accept(*this);
+                const std::size_t loop_end = instructions_.size();
+                loop.break_target = loop_end;
+                for (std::size_t jump : loop.break_jumps)
+                    patch_jump(jump, loop.break_target);
+            }
+
+            void visit(const compiler_internal::BreakStmt &statement) override
+            {
+                StatementLineGuard line(*this, statement);
+                if (loop_stack_.empty())
+                    raise_syntax_error(&runtime_, "'break' outside loop");
+                loop_stack_.back().break_jumps.push_back(emit_jump(Opcode::BreakLoop));
+            }
+
+            void visit(const compiler_internal::ContinueStmt &statement) override
+            {
+                StatementLineGuard line(*this, statement);
+                if (loop_stack_.empty())
+                    raise_syntax_error(&runtime_, "'continue' outside loop");
+                loop_stack_.back().continue_jumps.push_back(emit_jump(Opcode::ContinueLoop));
             }
 
             void visit(const compiler_internal::ReturnStmt &statement) override
@@ -934,6 +999,15 @@ namespace cxxpython
                 instructions_[instruction_index].operand = static_cast<std::uint32_t>(target);
             }
 
+            struct LoopControl final
+            {
+                std::size_t start = 0;
+                std::size_t continue_target = 0;
+                std::size_t break_target = 0;
+                std::vector<std::size_t> break_jumps;
+                std::vector<std::size_t> continue_jumps;
+            };
+
             SymbolTable collect_function_symbols(const compiler_internal::FunctionDefStmt &function) const
             {
                 return analyze_function_symbols(runtime_, function, {&symbols_});
@@ -965,6 +1039,18 @@ namespace cxxpython
                 raise_syntax_error(&runtime_, "unknown symbol table entry");
             }
 
+            std::size_t ensure_name_index(const std::string &name)
+            {
+                for (std::size_t index = 0; index < names_.size(); ++index)
+                {
+                    auto *entry = dynamic_cast<StrObject *>(names_[index]);
+                    if (entry && entry->value == name)
+                        return index;
+                }
+                names_.push_back(runtime_.new_str(name));
+                return names_.size() - 1;
+            }
+
             std::size_t local_index(const std::string &name) const
             {
                 const std::size_t index = symbols_.local_index(name);
@@ -991,6 +1077,7 @@ namespace cxxpython
             std::vector<Object *> constants_;
             std::vector<Instruction> instructions_;
             std::vector<std::uint32_t> lines_;
+            std::vector<LoopControl> loop_stack_;
             std::uint32_t current_line_ = 1;
             const compiler_internal::Expr *pending_assignment_value_ = nullptr;
             bool deleting_target_ = false;

@@ -162,6 +162,7 @@ namespace cxxpython
         initialize_type_dict(zip_type_);
         initialize_type_dict(map_type_);
         initialize_type_dict(filter_type_);
+        initialize_type_dict(text_io_type_);
         initialize_type_dict(module_type_);
         initialize_type_dict(native_function_type_);
         initialize_type_dict(function_type_);
@@ -184,8 +185,10 @@ namespace cxxpython
         initialize_type_dict(syntax_error_type_);
         initialize_type_dict(name_error_type_);
         initialize_type_dict(unbound_local_error_type_);
+        initialize_type_dict(recursion_error_type_);
         initialize_type_dict(attribute_error_type_);
         initialize_type_dict(import_error_type_);
+        initialize_type_dict(os_error_type_);
         initialize_type_dict(stop_iteration_type_);
     }
 

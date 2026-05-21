@@ -22,6 +22,43 @@ requests; `super` needs closure context; bytes and memoryview need buffer
 ownership; `open` and `input` need runtime-managed IO objects; full traceback
 needs frame/code/source metadata and exception state.
 
+## Stdlib Openness Rule
+
+The public standard library must be script-first. A public module should live
+in `Lib/` unless it is an unavoidable bootstrap seed. C++ native modules should
+follow CPython's native module inventory and keep narrow, substrate-shaped
+APIs:
+
+- `sys` exposes interpreter state that scripts cannot create themselves:
+  argv, module registry, search path, recursion limit, implementation data.
+- `posix` exposes real host POSIX calls: cwd, listdir, stat, environ, file
+  descriptor operations, and errno mapping.
+- `_io` exposes runtime-managed raw/text IO objects and stdio handles.
+- `gc` exposes collector control and heap statistics.
+
+The rule cuts both ways: do not implement policy-heavy public modules in C++,
+and do not expose fake native hooks. A missing POSIX or IO primitive should be
+absent or raise a precise Python exception until the substrate is real; it
+must not return placeholder data. Native module names must be checked against
+CPython before introduction; do not invent underscore modules where CPython
+already exposes a concrete builtin such as `posix`.
+
+Immediate correction plan:
+
+1. Keep policy-heavy modules such as `os.py`, `inspect.py`, and
+   `collections.py` as public scripts. Keep CPython builtin modules such as
+   `sys` and `gc` native.
+2. Split `_os` into CPython-aligned `posix` before adding filesystem
+   behavior. `os.py` imports `posix` on POSIX platforms and maps names at
+   script level.
+3. Add `_io` before growing `open()`, `input()`, `sys.stdin`, `sys.stdout`,
+   and `sys.stderr`.
+4. Move `collections.namedtuple` policy out of C++ after parser/runtime support
+   is enough to express tuple subclass helpers in Python. Until then, keep the
+   native helper private and documented as a bootstrap dependency.
+5. Expand the importer to package/dotted-name support so script stdlib can
+   grow into packages (`os.path`, `collections.abc`, `importlib`, `traceback`).
+
 ## Execution Requests
 
 Current state:

@@ -1,0 +1,37 @@
+<class 'module'>
+<class 'module'>
+<class 'module'>
+<stdlib>
+<class 'frame'>
+True
+False
+True
+<module>
+True
+<class 'dict'>
+<class 'dict'>
+<class 'dict'>
+True
+True
+<class 'tuple'>
+<class 'tuple'>
+<class 'tuple'>
+<class 'tuple'>
+3
+<class 'int'>
+True
+True
+<class 'list'>
+True
+True
+<class 'type'>
+<class '__main__.Point'>
+True
+True
+3
+4
+3
+4
+('x', 'y')
+('x', 'y')
+3

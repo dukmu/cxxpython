@@ -1689,6 +1689,38 @@ TEST(Compile, RaisesSyntaxErrorForReturnOutsideFunction)
     }
 }
 
+TEST(Compile, RaisesSyntaxErrorForBreakOutsideLoop)
+{
+    cxxpython::Runtime runtime;
+
+    try
+    {
+        (void)cxxpython::compile_exec_input(runtime, "break\n", "broken.py");
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type_name(), "SyntaxError");
+        EXPECT_STREQ(error.what(), "broken.py:1:1: 'break' outside loop");
+    }
+}
+
+TEST(Compile, RaisesSyntaxErrorForContinueOutsideLoop)
+{
+    cxxpython::Runtime runtime;
+
+    try
+    {
+        (void)cxxpython::compile_exec_input(runtime, "continue\n", "broken.py");
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type_name(), "SyntaxError");
+        EXPECT_STREQ(error.what(), "broken.py:1:1: 'continue' outside loop");
+    }
+}
+
 TEST(Compile, RaisesSyntaxErrorForUnclosedSubscript)
 {
     cxxpython::Runtime runtime;
@@ -1739,19 +1771,45 @@ TEST(Compile, CompilesAndExecutesBasicFString)
     EXPECT_EQ(escaped->value, "{Ada}");
 }
 
-TEST(Compile, RaisesSyntaxErrorForUnsupportedFStringConversion)
+TEST(Compile, CompilesAndExecutesFStringConversionsAndFormatSpec)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(
+        runtime,
+        "a = f\"{1!r}\"\n"
+        "b = f\"{'xy'!s}\"\n"
+        "c = f\"{7:}\"\n",
+        "script.py");
+    ASSERT_NE(code, nullptr);
+    EXPECT_EQ(vm.execute(*code, *globals), runtime.none());
+
+    auto *a = dynamic_cast<cxxpython::StrObject *>(globals->get(runtime.new_str("a")));
+    ASSERT_NE(a, nullptr);
+    EXPECT_EQ(a->value, "1");
+    auto *b = dynamic_cast<cxxpython::StrObject *>(globals->get(runtime.new_str("b")));
+    ASSERT_NE(b, nullptr);
+    EXPECT_EQ(b->value, "xy");
+    auto *c = dynamic_cast<cxxpython::StrObject *>(globals->get(runtime.new_str("c")));
+    ASSERT_NE(c, nullptr);
+    EXPECT_EQ(c->value, "7");
+}
+
+TEST(Compile, RaisesSyntaxErrorForUnsupportedFStringAsciiConversion)
 {
     cxxpython::Runtime runtime;
 
     try
     {
-        (void)cxxpython::compile_eval_input(runtime, "f\"{1!r}\"", "broken.py");
+        (void)cxxpython::compile_eval_input(runtime, "f\"{1!a}\"", "broken.py");
         FAIL() << "expected PythonError";
     }
     catch (const cxxpython::PythonError &error)
     {
         EXPECT_EQ(error.type_name(), "SyntaxError");
-        EXPECT_STREQ(error.what(), "broken.py:1:1: f-string conversions and format specs are not supported yet");
+        EXPECT_STREQ(error.what(), "broken.py:1:1: unsupported f-string conversion");
     }
 }
 

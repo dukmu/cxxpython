@@ -97,6 +97,9 @@ namespace cxxpython
             return module;
         }
 
+        if (ModuleObject *stdlib_module = import_stdlib_module(name))
+            return stdlib_module;
+
         const std::filesystem::path relative = relative_module_path(name);
         std::filesystem::path filename;
         std::string source;

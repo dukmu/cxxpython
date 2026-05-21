@@ -71,6 +71,7 @@ TEST(CoreObjects, RuntimeBootstrapsExceptionHierarchy)
     EXPECT_EQ(runtime.recursion_error_type()->base, runtime.exception_type());
     EXPECT_EQ(runtime.attribute_error_type()->base, runtime.exception_type());
     EXPECT_EQ(runtime.import_error_type()->base, runtime.exception_type());
+    EXPECT_EQ(runtime.os_error_type()->base, runtime.exception_type());
     EXPECT_TRUE(cxxpython::is_subclass(runtime.type_error_type(), runtime.base_exception_type()));
     EXPECT_TRUE(cxxpython::is_subclass(runtime.index_error_type(), runtime.base_exception_type()));
     EXPECT_TRUE(cxxpython::is_subclass(runtime.key_error_type(), runtime.base_exception_type()));
@@ -81,6 +82,7 @@ TEST(CoreObjects, RuntimeBootstrapsExceptionHierarchy)
     EXPECT_TRUE(cxxpython::is_subclass(runtime.recursion_error_type(), runtime.base_exception_type()));
     EXPECT_TRUE(cxxpython::is_subclass(runtime.attribute_error_type(), runtime.base_exception_type()));
     EXPECT_TRUE(cxxpython::is_subclass(runtime.import_error_type(), runtime.base_exception_type()));
+    EXPECT_TRUE(cxxpython::is_subclass(runtime.os_error_type(), runtime.base_exception_type()));
 }
 
 TEST(CoreObjects, ReprAndExceptionObjects)

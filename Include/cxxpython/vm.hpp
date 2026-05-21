@@ -13,6 +13,8 @@ namespace cxxpython
         None,
         Return,
         Exception,
+        Break,
+        Continue,
     };
 
     enum class FrameBlockKind : std::uint8_t
@@ -52,6 +54,7 @@ namespace cxxpython
 
         void push(Object *object);
         Object *pop();
+        void truncate_stack(std::size_t size) noexcept;
         void clear_stack() noexcept;
         std::size_t stack_size() const noexcept;
         void visit_stack(const VisitChildren &visitor) const;
@@ -66,8 +69,11 @@ namespace cxxpython
         bool has_block_handler() const noexcept;
         void set_pending_return(Object *value);
         void set_pending_exception(ExceptionObject *value);
+        void set_pending_break(std::size_t target);
+        void set_pending_continue(std::size_t target);
         PendingControlKind pending_control_kind() const noexcept;
         Object *pending_control_value() const noexcept;
+        std::size_t pending_control_target() const noexcept;
         void clear_pending_control() noexcept;
 
     private:
@@ -82,6 +88,7 @@ namespace cxxpython
         std::vector<FrameBlockHandler> block_handlers_;
         PendingControlKind pending_control_kind_ = PendingControlKind::None;
         Object *pending_control_value_ = nullptr;
+        std::size_t pending_control_target_ = 0;
     };
 
     class InterpreterState final

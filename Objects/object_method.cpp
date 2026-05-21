@@ -565,6 +565,7 @@ namespace cxxpython
                               new_method_descriptor("append", list_type_, list_append_method));
         slice_type_->dict->set(new_str("indices"),
                                new_method_descriptor("indices", slice_type_, slice_indices_method));
+        initialize_text_io_methods(*this, text_io_type_);
         property_type_->dict->set(new_str("getter"),
                                   new_method_descriptor("getter", property_type_, property_getter_method));
         property_type_->dict->set(new_str("setter"),

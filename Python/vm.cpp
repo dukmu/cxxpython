@@ -268,6 +268,12 @@ namespace cxxpython
         return object;
     }
 
+    void Frame::truncate_stack(std::size_t size) noexcept
+    {
+        if (size < stack_.size())
+            stack_.resize(size);
+    }
+
     void Frame::clear_stack() noexcept
     {
         stack_.clear();
@@ -348,12 +354,28 @@ namespace cxxpython
     {
         pending_control_kind_ = PendingControlKind::Return;
         pending_control_value_ = value;
+        pending_control_target_ = 0;
     }
 
     void Frame::set_pending_exception(ExceptionObject *value)
     {
         pending_control_kind_ = PendingControlKind::Exception;
         pending_control_value_ = value;
+        pending_control_target_ = 0;
+    }
+
+    void Frame::set_pending_break(std::size_t target)
+    {
+        pending_control_kind_ = PendingControlKind::Break;
+        pending_control_value_ = nullptr;
+        pending_control_target_ = target;
+    }
+
+    void Frame::set_pending_continue(std::size_t target)
+    {
+        pending_control_kind_ = PendingControlKind::Continue;
+        pending_control_value_ = nullptr;
+        pending_control_target_ = target;
     }
 
     PendingControlKind Frame::pending_control_kind() const noexcept
@@ -366,10 +388,16 @@ namespace cxxpython
         return pending_control_value_;
     }
 
+    std::size_t Frame::pending_control_target() const noexcept
+    {
+        return pending_control_target_;
+    }
+
     void Frame::clear_pending_control() noexcept
     {
         pending_control_kind_ = PendingControlKind::None;
         pending_control_value_ = nullptr;
+        pending_control_target_ = 0;
     }
 
     InterpreterState::InterpreterState(Runtime &runtime)
@@ -922,6 +950,43 @@ namespace cxxpython
                 }
                 break;
             }
+            case Opcode::BreakLoop:
+            {
+                bool jumped_to_finally = false;
+                while (frame->has_block_handler())
+                {
+                    const FrameBlockHandler handler = frame->pop_block_handler();
+                    if (handler.kind == FrameBlockKind::Except)
+                        continue;
+                    frame->clear_stack();
+                    frame->set_pending_break(instruction.operand);
+                    jump_to(*frame, code, static_cast<std::uint32_t>(handler.target));
+                    jumped_to_finally = true;
+                    break;
+                }
+                if (jumped_to_finally)
+                    continue;
+                jump_to(*frame, code, instruction.operand);
+                break;
+            }
+            case Opcode::ContinueLoop:
+            {
+                bool jumped_to_finally = false;
+                while (frame->has_block_handler())
+                {
+                    const FrameBlockHandler handler = frame->pop_block_handler();
+                    if (handler.kind == FrameBlockKind::Except)
+                        continue;
+                    frame->set_pending_continue(instruction.operand);
+                    jump_to(*frame, code, static_cast<std::uint32_t>(handler.target));
+                    jumped_to_finally = true;
+                    break;
+                }
+                if (jumped_to_finally)
+                    continue;
+                jump_to(*frame, code, instruction.operand);
+                break;
+            }
             case Opcode::JumpAbsolute:
             {
                 jump_to(*frame, code, instruction.operand);
@@ -1124,6 +1189,20 @@ namespace cxxpython
                     if (!exception)
                         raise_type_error(&runtime_, "finally handler stored non-exception pending state");
                     throw PythonError(exception);
+                }
+                case PendingControlKind::Break:
+                {
+                    const std::size_t target = frame->pending_control_target();
+                    frame->clear_pending_control();
+                    jump_to(*frame, code, static_cast<std::uint32_t>(target));
+                    continue;
+                }
+                case PendingControlKind::Continue:
+                {
+                    const std::size_t target = frame->pending_control_target();
+                    frame->clear_pending_control();
+                    jump_to(*frame, code, static_cast<std::uint32_t>(target));
+                    continue;
                 }
                 }
                 break;

@@ -102,6 +102,11 @@ namespace cxxpython
         return filter_type_;
     }
 
+    TypeObject *Runtime::text_io_type() const noexcept
+    {
+        return text_io_type_;
+    }
+
     TypeObject *Runtime::module_type() const noexcept
     {
         return module_type_;
@@ -237,6 +242,11 @@ namespace cxxpython
         return import_error_type_;
     }
 
+    TypeObject *Runtime::os_error_type() const noexcept
+    {
+        return os_error_type_;
+    }
+
     TypeObject *Runtime::stop_iteration_type() const noexcept
     {
         return stop_iteration_type_;
@@ -262,6 +272,21 @@ namespace cxxpython
         return false_;
     }
 
+    TextIOObject *Runtime::stdin_object() const noexcept
+    {
+        return stdin_object_;
+    }
+
+    TextIOObject *Runtime::stdout_object() const noexcept
+    {
+        return stdout_object_;
+    }
+
+    TextIOObject *Runtime::stderr_object() const noexcept
+    {
+        return stderr_object_;
+    }
+
     ModuleObject *Runtime::builtins_module() const noexcept
     {
         return builtins_module_;
@@ -277,9 +302,24 @@ namespace cxxpython
         return modules_;
     }
 
+    const std::vector<std::string> &Runtime::module_search_paths() const noexcept
+    {
+        return module_search_paths_;
+    }
+
     void Runtime::add_module_search_path(std::string path)
     {
         module_search_paths_.insert(module_search_paths_.begin(), std::move(path));
+    }
+
+    const std::vector<std::string> &Runtime::program_arguments() const noexcept
+    {
+        return program_arguments_;
+    }
+
+    void Runtime::set_program_arguments(std::vector<std::string> args)
+    {
+        program_arguments_ = std::move(args);
     }
 
     std::ostream &Runtime::stdout_stream() const noexcept

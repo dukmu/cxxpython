@@ -3,6 +3,7 @@
 #include <iosfwd>
 #include <memory>
 #include <string>
+#include <string_view>
 #include <functional>
 #include <type_traits>
 #include <utility>
@@ -72,6 +73,7 @@ namespace cxxpython
         TypeObject *zip_type() const noexcept;
         TypeObject *map_type() const noexcept;
         TypeObject *filter_type() const noexcept;
+        TypeObject *text_io_type() const noexcept;
         TypeObject *module_type() const noexcept;
         TypeObject *native_function_type() const noexcept;
         TypeObject *function_type() const noexcept;
@@ -99,6 +101,7 @@ namespace cxxpython
         TypeObject *recursion_error_type() const noexcept;
         TypeObject *attribute_error_type() const noexcept;
         TypeObject *import_error_type() const noexcept;
+        TypeObject *os_error_type() const noexcept;
         TypeObject *stop_iteration_type() const noexcept;
 
         NoneObject *none() const noexcept;
@@ -108,7 +111,11 @@ namespace cxxpython
         ModuleObject *builtins_module() const noexcept;
         DictObject *builtins_dict() const noexcept;
         DictObject *modules_dict() const noexcept;
+        const std::vector<std::string> &module_search_paths() const noexcept;
         void add_module_search_path(std::string path);
+        const std::vector<std::string> &program_arguments() const noexcept;
+        void set_program_arguments(std::vector<std::string> args);
+        std::size_t collect_garbage();
         std::ostream &stdout_stream() const noexcept;
         void set_stdout(std::ostream &stream) noexcept;
         VirtualMachine *active_vm() const noexcept;
@@ -131,6 +138,14 @@ namespace cxxpython
         ZipObject *new_zip(std::vector<Object *> iterators);
         MapObject *new_map(Object *callable, std::vector<Object *> iterators);
         FilterObject *new_filter(Object *callable, Object *iterator);
+        TextIOObject *new_text_io(std::string name,
+                                  std::istream *input,
+                                  std::ostream *output,
+                                  bool owns_streams,
+                                  std::unique_ptr<std::iostream> owned_stream = nullptr);
+        TextIOObject *stdin_object() const noexcept;
+        TextIOObject *stdout_object() const noexcept;
+        TextIOObject *stderr_object() const noexcept;
         ModuleObject *new_module(std::string name, std::string filename);
         NativeFunctionObject *new_native_function(std::string name, NativeFunctionCallback callback);
         PythonFunctionObject *new_function(std::string name,
@@ -233,6 +248,7 @@ namespace cxxpython
         ExceptionObject *new_recursion_error(std::string message);
         ExceptionObject *new_attribute_error(std::string message);
         ExceptionObject *new_import_error(std::string message);
+        ExceptionObject *new_os_error(std::string message);
         ExceptionObject *new_stop_iteration();
 
         void add_root(Object *object);
@@ -270,6 +286,7 @@ namespace cxxpython
         TypeObject *select_metaclass(TypeObject *explicit_metaclass,
                                       const std::vector<TypeObject *> &bases);
         void initialize_builtins();
+        ModuleObject *import_stdlib_module(std::string_view name);
 
         friend class VirtualMachine;
 
@@ -296,6 +313,7 @@ namespace cxxpython
         TypeObject *zip_type_ = nullptr;
         TypeObject *map_type_ = nullptr;
         TypeObject *filter_type_ = nullptr;
+        TypeObject *text_io_type_ = nullptr;
         TypeObject *module_type_ = nullptr;
         TypeObject *native_function_type_ = nullptr;
         TypeObject *function_type_ = nullptr;
@@ -323,15 +341,20 @@ namespace cxxpython
         TypeObject *recursion_error_type_ = nullptr;
         TypeObject *attribute_error_type_ = nullptr;
         TypeObject *import_error_type_ = nullptr;
+        TypeObject *os_error_type_ = nullptr;
         TypeObject *stop_iteration_type_ = nullptr;
 
         NoneObject *none_ = nullptr;
         NotImplementedObject *not_implemented_ = nullptr;
         BoolObject *true_ = nullptr;
         BoolObject *false_ = nullptr;
+        TextIOObject *stdin_object_ = nullptr;
+        TextIOObject *stdout_object_ = nullptr;
+        TextIOObject *stderr_object_ = nullptr;
         ModuleObject *builtins_module_ = nullptr;
         DictObject *modules_ = nullptr;
         std::vector<std::string> module_search_paths_;
+        std::vector<std::string> program_arguments_;
         std::ostream *stdout_ = nullptr;
         VirtualMachine *active_vm_ = nullptr;
     };
