@@ -1,11 +1,13 @@
 import inspect
 import gc
 import collections
+import sys
 
 print(type(inspect))
 print(type(gc))
 print(type(collections))
 print(gc.__file__)
+print(sys.builtin_module_names.__contains__('_inspect'))
 
 frame = inspect.currentframe()
 print(type(frame))
@@ -14,6 +16,8 @@ print(inspect.isfunction(inspect.currentframe))
 print(inspect.iscode(frame.f_code))
 print(frame.f_code.co_name)
 print(frame.f_code.co_filename.__contains__('stdlib_modules.py'))
+print(sys._getframe().f_code.co_name)
+print(sys._getframe(0).f_code.co_name)
 print(type(frame.f_locals))
 print(type(frame.f_globals))
 print(type(frame.f_builtins))
@@ -22,6 +26,17 @@ print(frame.f_code.co_stacksize >= 1)
 print(type(frame.f_code.co_consts))
 print(type(frame.f_code.co_names))
 print(type(frame.f_code.co_varnames))
+
+def function_metadata():
+    return 'ok'
+
+print(function_metadata.__name__)
+print(function_metadata.__qualname__)
+print(function_metadata.__module__)
+print(function_metadata.__code__.co_name)
+print(function_metadata.__globals__ is globals())
+print(inspect.getfile(function_metadata).__contains__('stdlib_modules.py'))
+print(inspect.getsourcefile(function_metadata).__contains__('stdlib_modules.py'))
 
 counts_before = gc.get_count()
 print(type(counts_before))

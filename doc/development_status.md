@@ -1,5 +1,50 @@
 # Development Status
 
+## 2026-05-22 Inspect Script Layer + sys._getframe Slice
+
+Review focus:
+
+- Continue the CPython native-module inventory correction: `inspect` is a
+  Python stdlib module, not a builtin/native module.
+- Expose only the unavoidable runtime primitive through `sys._getframe`, then
+  keep `inspect` policy in `Lib/inspect.py`.
+
+Completed:
+
+- Removed the temporary native `_inspect` module from the runtime stdlib
+  registry.
+- Added `ThreadState::frame_at_depth(...)` and native `sys._getframe(depth=0)`.
+- Rewrote `Lib/inspect.py` as a script module using `sys._getframe` and public
+  frame/code/function attributes.
+- Added read-only function descriptors:
+  - `__name__`
+  - `__qualname__`
+  - `__code__`
+  - `__globals__`
+  - `__module__`
+- Added Python golden coverage that `_inspect` is absent from
+  `sys.builtin_module_names`, `sys._getframe` works at depth 0, function
+  metadata is script-visible, and `inspect.getfile/getsourcefile` use that
+  metadata.
+
+Known debt and next risk:
+
+- `inspect.isfunction` currently uses the function type name because the
+  script layer lacks a CPython-like `types.FunctionType`. Add a script-level
+  `types.py` once native type aliases can be exposed cleanly.
+- `sys._getframe` has only depth support. `f_back` is still absent, so richer
+  traceback/debugger traversal remains blocked.
+- `runtime_stdlib_modules.cpp` now hosts several unrelated native modules
+  (`sys`, `gc`, `posix`, `_io`, `_collections`). Split it by substrate before
+  the native module surface grows again.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/cxxpython Tests/python/stdlib_modules.py`
+- `build/test_core_objects --gtest_filter='PythonScripts.RunsGoldenFiles:Module.ImportsStdlibModulesFromLibPath'`
+- `ctest --test-dir build --output-on-failure`
+
 ## 2026-05-22 CPython Native Module Alignment Review
 
 Review focus:
@@ -28,9 +73,9 @@ Completed:
 
 Known debt and next risk:
 
-- `_inspect` is not a CPython builtin module. It remains a temporary bridge
-  and should be split so `sys._getframe` provides the runtime primitive while
-  `Lib/inspect.py` owns policy.
+- `_inspect` was not a CPython builtin module; it has since been removed.
+  `sys._getframe` now provides the runtime primitive while `Lib/inspect.py`
+  owns policy.
 - `_collections` is a CPython native helper name, but current
   `collections.namedtuple` still contains too much policy in C++. Move it to
   Python once class construction and string/list helpers are sufficient.

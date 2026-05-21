@@ -113,6 +113,7 @@ namespace cxxpython
         void push_frame(Frame *frame);
         void pop_frame(Frame *frame);
         Frame *current_frame() const noexcept;
+        Frame *frame_at_depth(std::size_t depth) const noexcept;
         std::size_t frame_depth() const noexcept;
         void visit_frames(const VisitChildren &visitor) const;
 

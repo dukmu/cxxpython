@@ -220,6 +220,42 @@ namespace cxxpython
             return runtime.new_int(static_cast<std::int64_t>(line));
         }
 
+        PythonFunctionObject *require_function_instance(Runtime &runtime, Object *instance, const char *name)
+        {
+            auto *function = dynamic_cast<PythonFunctionObject *>(instance);
+            if (!function)
+                raise_type_error(&runtime, std::string(name) + " descriptor receiver does not have function layout");
+            return function;
+        }
+
+        Object *function_name_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            return runtime.new_str(require_function_instance(runtime, instance, "__name__")->name());
+        }
+
+        Object *function_qualname_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            return runtime.new_str(require_function_instance(runtime, instance, "__qualname__")->name());
+        }
+
+        Object *function_code_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            return require_function_instance(runtime, instance, "__code__")->code();
+        }
+
+        Object *function_globals_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            return require_function_instance(runtime, instance, "__globals__")->globals();
+        }
+
+        Object *function_module_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            PythonFunctionObject *function = require_function_instance(runtime, instance, "__module__");
+            if (auto *module = dynamic_cast<StrObject *>(function->globals()->get(runtime.new_str("__name__"))))
+                return module;
+            return runtime.none();
+        }
+
         Frame *require_frame_instance(Runtime &runtime, Object *instance, const char *name)
         {
             auto *frame = dynamic_cast<Frame *>(instance);
@@ -407,6 +443,31 @@ namespace cxxpython
                                                     code_type_,
                                                     code_firstlineno_getter,
                                                     nullptr));
+        function_type_->dict->set(new_str("__name__"),
+                                  new_getset_descriptor("__name__",
+                                                        function_type_,
+                                                        function_name_getter,
+                                                        nullptr));
+        function_type_->dict->set(new_str("__qualname__"),
+                                  new_getset_descriptor("__qualname__",
+                                                        function_type_,
+                                                        function_qualname_getter,
+                                                        nullptr));
+        function_type_->dict->set(new_str("__code__"),
+                                  new_getset_descriptor("__code__",
+                                                        function_type_,
+                                                        function_code_getter,
+                                                        nullptr));
+        function_type_->dict->set(new_str("__globals__"),
+                                  new_getset_descriptor("__globals__",
+                                                        function_type_,
+                                                        function_globals_getter,
+                                                        nullptr));
+        function_type_->dict->set(new_str("__module__"),
+                                  new_getset_descriptor("__module__",
+                                                        function_type_,
+                                                        function_module_getter,
+                                                        nullptr));
         frame_type_->dict->set(new_str("f_code"),
                                new_getset_descriptor("f_code",
                                                      frame_type_,

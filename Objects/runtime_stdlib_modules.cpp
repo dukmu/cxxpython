@@ -50,62 +50,25 @@ namespace cxxpython
             return "__main__";
         }
 
-        Object *inspect_currentframe(Runtime &runtime, const CallArguments &args)
+        Object *sys_getframe(Runtime &runtime, const CallArguments &args)
         {
-            require_no_keywords(&runtime, "currentframe", args);
-            require_positional_count(&runtime, "currentframe", args, 0);
+            require_no_keywords(&runtime, "_getframe", args);
+            require_positional_at_most(&runtime, "_getframe", args, 1);
+            std::size_t depth = 0;
+            if (!args.positional.empty())
+            {
+                auto *value = dynamic_cast<IntObject *>(args.positional[0]);
+                if (!value)
+                    raise_type_error(&runtime, "_getframe() depth must be int");
+                if (value->value < 0)
+                    raise_value_error(&runtime, "_getframe() depth must be non-negative");
+                depth = static_cast<std::size_t>(value->value);
+            }
             VirtualMachine *vm = runtime.active_vm();
-            Frame *frame = vm ? vm->thread_state().current_frame() : nullptr;
-            return frame ? static_cast<Object *>(frame) : static_cast<Object *>(runtime.none());
-        }
-
-        Object *inspect_isframe(Runtime &runtime, const CallArguments &args)
-        {
-            require_no_keywords(&runtime, "isframe", args);
-            require_positional_count(&runtime, "isframe", args, 1);
-            return is_instance(args.positional[0], runtime.frame_type())
-                       ? runtime.true_value()
-                       : runtime.false_value();
-        }
-
-        Object *inspect_iscode(Runtime &runtime, const CallArguments &args)
-        {
-            require_no_keywords(&runtime, "iscode", args);
-            require_positional_count(&runtime, "iscode", args, 1);
-            return is_instance(args.positional[0], runtime.code_type())
-                       ? runtime.true_value()
-                       : runtime.false_value();
-        }
-
-        Object *inspect_isfunction(Runtime &runtime, const CallArguments &args)
-        {
-            require_no_keywords(&runtime, "isfunction", args);
-            require_positional_count(&runtime, "isfunction", args, 1);
-            return is_instance(args.positional[0], runtime.function_type())
-                       ? runtime.true_value()
-                       : runtime.false_value();
-        }
-
-        Object *inspect_getsourcefile(Runtime &runtime, const CallArguments &args)
-        {
-            require_no_keywords(&runtime, "getsourcefile", args);
-            require_positional_count(&runtime, "getsourcefile", args, 1);
-            Object *object = args.positional[0];
-
-            if (auto *module = dynamic_cast<ModuleObject *>(object))
-                return runtime.new_str(module->filename());
-            if (auto *code = dynamic_cast<CodeObject *>(object))
-                return runtime.new_str(code->filename());
-            if (auto *function = dynamic_cast<PythonFunctionObject *>(object))
-                return runtime.new_str(function->code()->filename());
-            if (auto *frame = dynamic_cast<Frame *>(object))
-                return runtime.new_str(frame->code()->filename());
-            return runtime.none();
-        }
-
-        Object *inspect_getfile(Runtime &runtime, const CallArguments &args)
-        {
-            return inspect_getsourcefile(runtime, args);
+            Frame *frame = vm ? vm->thread_state().frame_at_depth(depth) : nullptr;
+            if (!frame)
+                raise_value_error(&runtime, "call stack is not deep enough");
+            return frame;
         }
 
         Object *gc_collect(Runtime &runtime, const CallArguments &args)
@@ -205,8 +168,8 @@ namespace cxxpython
             require_no_keywords(&runtime, "builtin_module_names", args);
             require_positional_count(&runtime, "builtin_module_names", args, 0);
             std::vector<Object *> names{
-                runtime.new_str("_collections"),
                 runtime.new_str("_io"),
+                runtime.new_str("_collections"),
                 runtime.new_str("builtins"),
                 runtime.new_str("gc"),
                 runtime.new_str("posix"),
@@ -516,8 +479,7 @@ namespace cxxpython
 
     ModuleObject *Runtime::import_stdlib_module(std::string_view name)
     {
-        if (name != "_inspect" &&
-            name != "gc" &&
+        if (name != "gc" &&
             name != "_collections" &&
             name != "_io" &&
             name != "sys" &&
@@ -526,17 +488,6 @@ namespace cxxpython
 
         ModuleObject *module = new_module(std::string(name), "<stdlib>");
         DictObject *dict = module->dict();
-
-        if (name == "_inspect")
-        {
-            dict->set(new_str("currentframe"), new_native_function("currentframe", inspect_currentframe));
-            dict->set(new_str("isframe"), new_native_function("isframe", inspect_isframe));
-            dict->set(new_str("iscode"), new_native_function("iscode", inspect_iscode));
-            dict->set(new_str("isfunction"), new_native_function("isfunction", inspect_isfunction));
-            dict->set(new_str("getsourcefile"), new_native_function("getsourcefile", inspect_getsourcefile));
-            dict->set(new_str("getfile"), new_native_function("getfile", inspect_getfile));
-            return module;
-        }
 
         if (name == "gc")
         {
@@ -570,6 +521,7 @@ namespace cxxpython
             dict->set(new_str("_modules"), new_native_function("_modules", sys_modules));
             dict->set(new_str("_builtin_module_names"),
                       new_native_function("_builtin_module_names", sys_builtin_module_names));
+            dict->set(new_str("_getframe"), new_native_function("_getframe", sys_getframe));
             return module;
         }
 

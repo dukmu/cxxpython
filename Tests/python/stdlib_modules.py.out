@@ -2,12 +2,15 @@
 <class 'module'>
 <class 'module'>
 <stdlib>
+False
 <class 'frame'>
 True
 False
 True
 <module>
 True
+<module>
+<module>
 <class 'dict'>
 <class 'dict'>
 <class 'dict'>
@@ -16,6 +19,13 @@ True
 <class 'tuple'>
 <class 'tuple'>
 <class 'tuple'>
+function_metadata
+function_metadata
+__main__
+function_metadata
+True
+True
+True
 <class 'tuple'>
 3
 <class 'int'>

@@ -443,6 +443,13 @@ namespace cxxpython
         return frames_.back();
     }
 
+    Frame *ThreadState::frame_at_depth(std::size_t depth) const noexcept
+    {
+        if (depth >= frames_.size())
+            return nullptr;
+        return frames_[frames_.size() - 1 - depth];
+    }
+
     std::size_t ThreadState::frame_depth() const noexcept
     {
         return frames_.size();
