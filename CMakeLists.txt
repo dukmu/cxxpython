@@ -17,6 +17,9 @@ add_library(cxxpython_core
     Python/runtime_roots.cpp
     Python/bltinmodule.cpp
     Python/import.cpp
+    Python/import_find.cpp
+    Python/import_importlib.cpp
+    Python/import_load.cpp
     Python/gc.cpp
     Python/bytecode.cpp
     Python/compiler_symbols.cpp

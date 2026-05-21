@@ -1,5 +1,47 @@
 # Development Status
 
+## 2026-05-22 Import Core Split Slice
+
+Review focus:
+
+- Reduce `Python/import.cpp` from a mixed finder/importlib/source/extension
+  implementation into narrower import-core translation units.
+- Keep behavior unchanged before adding package imports or a stable extension
+  ABI.
+
+Completed:
+
+- Kept `Python/import.cpp` focused on `Runtime::import_module` orchestration
+  and `sys.modules` cache handling.
+- Added `Python/import_find.cpp` for builtin/source/extension discovery and
+  `ModuleLoadSpec` creation.
+- Added `Python/import_importlib.cpp` for loader/spec helper object creation
+  and module metadata initialization.
+- Added `Python/import_load.cpp` for builtin, source, and current `.so`
+  extension loading paths.
+- Reused the `Modules/module_registry.hpp` builtin/native module registry
+  instead of duplicating builtin module-name lists in import code.
+
+Known debt and next risk:
+
+- `import_load.cpp` still contains both source execution and extension loading.
+  The next `.so` ABI slice should split extension loading into a dedicated
+  file and replace the temporary `CxxPyInit_<module>(Runtime&)` convention with
+  a narrow function-table/object-handle API.
+- Dotted/package imports are still intentionally unsupported by the public
+  `import_module` path. Package discovery, `__path__`, and importlib script
+  policy should land as a separate behavior-changing slice.
+- Importlib helper objects are still runtime-created heap types rather than
+  script-level `importlib._bootstrap` classes.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter='Module.*:Cli.ImportsSiblingPythonModule:PythonScripts.RunsGoldenFiles'`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all 192 tests pass.
+
 ## 2026-05-22 Native Module Registry Split Slice
 
 Review focus:
