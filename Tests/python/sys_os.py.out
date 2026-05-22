@@ -24,6 +24,11 @@ posix
 True
 .
 ..
+/
+/tmp/cxxpython/x.py
+x.py
+/tmp/cxxpython
+True
 <class 'str'>
 True
 <class 'list'>

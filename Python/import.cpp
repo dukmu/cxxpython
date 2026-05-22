@@ -25,7 +25,36 @@ namespace cxxpython
 
         bool is_supported_module_name(std::string_view name)
         {
-            return is_identifier_component(name);
+            if (name.empty())
+                return false;
+            std::size_t start = 0;
+            while (start < name.size())
+            {
+                const std::size_t dot = name.find('.', start);
+                const std::size_t end = dot == std::string_view::npos ? name.size() : dot;
+                if (!is_identifier_component(name.substr(start, end - start)))
+                    return false;
+                if (dot == std::string_view::npos)
+                    return true;
+                start = dot + 1;
+            }
+            return false;
+        }
+
+        std::string parent_module_name(std::string_view name)
+        {
+            const std::size_t dot = name.rfind('.');
+            if (dot == std::string_view::npos)
+                return "";
+            return std::string(name.substr(0, dot));
+        }
+
+        std::string child_module_name(std::string_view name)
+        {
+            const std::size_t dot = name.rfind('.');
+            if (dot == std::string_view::npos)
+                return std::string(name);
+            return std::string(name.substr(dot + 1));
         }
     }
 
@@ -46,6 +75,17 @@ namespace cxxpython
             return module;
         }
 
+        const std::string parent_name = parent_module_name(name);
+        ModuleObject *parent_module = nullptr;
+        if (!parent_name.empty())
+        {
+            parent_module = import_module(parent_name);
+            auto parent_root = root(parent_module);
+            Object *path = parent_root->dict()->get(new_str("__path__"));
+            if (!path)
+                raise_import_error(this, "No module named '" + name + "'");
+        }
+
         ModuleLoadSpec spec;
         if (!find_module_spec(name, spec))
             raise_import_error(this, "No module named '" + name + "'");
@@ -57,6 +97,11 @@ namespace cxxpython
         try
         {
             modules_->set(name_key_root.get(), module_root.get());
+            if (parent_module)
+            {
+                auto parent_root = root(parent_module);
+                object_set_attr(parent_root.get(), child_module_name(name), module_root.get());
+            }
         }
         catch (...)
         {

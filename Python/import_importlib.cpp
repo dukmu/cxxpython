@@ -62,6 +62,14 @@ namespace cxxpython
 
     Object *Runtime::new_module_spec_object(const ModuleLoadSpec &spec, Object *loader)
     {
+        Object *search_locations = none();
+        if (spec.is_package)
+        {
+            Object *package_dir = new_str(spec.package_dir);
+            auto package_dir_root = root(package_dir);
+            search_locations = new_list({package_dir_root.get()});
+        }
+        auto search_locations_root = root(search_locations);
         return new_importlib_object(
             "ModuleSpec",
             "_frozen_importlib",
@@ -72,6 +80,7 @@ namespace cxxpython
                 {"has_location", spec.kind == ModuleLoadKind::Source || spec.kind == ModuleLoadKind::Extension
                                      ? static_cast<Object *>(true_value())
                                      : static_cast<Object *>(false_value())},
+                {"submodule_search_locations", search_locations_root.get()},
             });
     }
 
@@ -86,5 +95,11 @@ namespace cxxpython
         module->dict()->set(new_str("__spec__"), module_spec);
         module->dict()->set(new_str("__package__"), new_str(spec.package));
         module->dict()->set(new_str("__cached__"), none());
+        if (spec.is_package)
+        {
+            Object *package_dir = new_str(spec.package_dir);
+            auto package_dir_root = root(package_dir);
+            module->dict()->set(new_str("__path__"), new_list({package_dir_root.get()}));
+        }
     }
 }

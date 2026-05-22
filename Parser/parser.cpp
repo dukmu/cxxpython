@@ -277,19 +277,16 @@ namespace cxxpython::compiler_internal
                 std::vector<ImportAlias> aliases;
                 while (true)
                 {
-                    if (peek().kind != TokenKind::Identifier)
-                        raise_at(peek(), "expected module name after import");
-                    std::string name = advance().lexeme;
-                    if (peek().kind == TokenKind::Dot)
-                        raise_at(peek(), "dotted imports are not supported yet");
-
-                    std::string binding = name;
+                    std::string name = parse_dotted_name("expected module name after import");
+                    std::string binding = import_binding_for(name);
+                    bool bind_full_module = false;
                     if (peek().kind == TokenKind::As)
                     {
                         advance();
                         if (peek().kind != TokenKind::Identifier)
                             raise_at(peek(), "expected name after import alias");
                         binding = advance().lexeme;
+                        bind_full_module = true;
                     }
 
                     for (const ImportAlias &existing : aliases)
@@ -297,7 +294,7 @@ namespace cxxpython::compiler_internal
                         if (existing.binding == binding)
                             raise_at(previous(), "duplicate binding in import statement");
                     }
-                    aliases.emplace_back(std::move(name), std::move(binding));
+                    aliases.emplace_back(std::move(name), std::move(binding), bind_full_module);
                     if (peek().kind != TokenKind::Comma)
                         break;
                     advance();
@@ -313,11 +310,7 @@ namespace cxxpython::compiler_internal
             ParsedStatement parse_from_import_statement()
             {
                 const Token &from_token = advance();
-                if (peek().kind != TokenKind::Identifier)
-                    raise_at(peek(), "expected module name after from");
-                std::string module = advance().lexeme;
-                if (peek().kind == TokenKind::Dot)
-                    raise_at(peek(), "dotted imports are not supported yet");
+                std::string module = parse_dotted_name("expected module name after from");
                 consume(TokenKind::Import, "expected import after from module name");
 
                 std::vector<ImportAlias> aliases;
@@ -350,6 +343,30 @@ namespace cxxpython::compiler_internal
                     std::move(statement),
                     false,
                 };
+            }
+
+            std::string parse_dotted_name(const char *message)
+            {
+                if (peek().kind != TokenKind::Identifier)
+                    raise_at(peek(), message);
+                std::string name = advance().lexeme;
+                while (peek().kind == TokenKind::Dot)
+                {
+                    advance();
+                    if (peek().kind != TokenKind::Identifier)
+                        raise_at(peek(), "expected identifier after '.'");
+                    name += ".";
+                    name += advance().lexeme;
+                }
+                return name;
+            }
+
+            std::string import_binding_for(std::string_view module_name)
+            {
+                const std::size_t dot = module_name.find('.');
+                if (dot == std::string_view::npos)
+                    return std::string(module_name);
+                return std::string(module_name.substr(0, dot));
             }
 
             std::vector<std::string> parse_name_list(const char *statement_name)

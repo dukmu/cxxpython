@@ -13,10 +13,15 @@ namespace
     {
         std::vector<std::filesystem::path> files;
         const std::filesystem::path root = CXXPYTHON_PYTHON_TEST_DIR;
-        for (const std::filesystem::directory_entry &entry : std::filesystem::directory_iterator(root))
+        for (const std::filesystem::directory_entry &entry : std::filesystem::recursive_directory_iterator(root))
         {
-            if (entry.is_regular_file() && entry.path().extension() == ".py")
-                files.push_back(entry.path());
+            if (!entry.is_regular_file() || entry.path().extension() != ".py")
+                continue;
+            if (entry.path().filename() == "__init__.py")
+                continue;
+            if (!std::filesystem::exists(entry.path().string() + ".out"))
+                continue;
+            files.push_back(entry.path());
         }
         std::sort(files.begin(), files.end());
         return files;

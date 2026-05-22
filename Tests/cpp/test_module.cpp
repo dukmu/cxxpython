@@ -153,6 +153,58 @@ TEST(Module, ImportsPythonModulesThroughRuntimeRegistry)
     std::filesystem::remove(module_path);
 }
 
+TEST(Module, ImportsPackagesAndDottedSubmodules)
+{
+    cxxpython::Runtime runtime;
+    const std::filesystem::path directory = std::filesystem::temp_directory_path();
+    const std::filesystem::path package_dir = directory / "cxxpython_import_pkg";
+    const std::filesystem::path init_path = package_dir / "__init__.py";
+    const std::filesystem::path child_path = package_dir / "child.py";
+    std::filesystem::create_directories(package_dir);
+    {
+        std::ofstream file(init_path, std::ios::binary);
+        file << "package_value = 'package:' + __name__\n"
+                "package_name = __package__\n"
+                "path_size = len(__path__)\n";
+    }
+    {
+        std::ofstream file(child_path, std::ios::binary);
+        file << "value = 'child:' + __name__\n"
+                "package_name = __package__\n";
+    }
+
+    runtime.add_module_search_path(directory.string());
+    cxxpython::ModuleObject *child = runtime.import_module("cxxpython_import_pkg.child");
+    ASSERT_NE(child, nullptr);
+    cxxpython::Object *package_object = runtime.modules_dict()->get(runtime.new_str("cxxpython_import_pkg"));
+    auto *package = dynamic_cast<cxxpython::ModuleObject *>(package_object);
+    ASSERT_NE(package, nullptr);
+    EXPECT_EQ(runtime.modules_dict()->get(runtime.new_str("cxxpython_import_pkg.child")), child);
+    EXPECT_EQ(cxxpython::object_get_attr(package, "child"), child);
+
+    auto *package_value = dynamic_cast<cxxpython::StrObject *>(
+        package->dict()->get(runtime.new_str("package_value")));
+    auto *package_name = dynamic_cast<cxxpython::StrObject *>(
+        package->dict()->get(runtime.new_str("package_name")));
+    auto *path_size = dynamic_cast<cxxpython::IntObject *>(package->dict()->get(runtime.new_str("path_size")));
+    auto *child_value = dynamic_cast<cxxpython::StrObject *>(child->dict()->get(runtime.new_str("value")));
+    auto *child_package = dynamic_cast<cxxpython::StrObject *>(child->dict()->get(runtime.new_str("package_name")));
+    ASSERT_NE(package_value, nullptr);
+    ASSERT_NE(package_name, nullptr);
+    ASSERT_NE(path_size, nullptr);
+    ASSERT_NE(child_value, nullptr);
+    ASSERT_NE(child_package, nullptr);
+    EXPECT_EQ(package_value->value, "package:cxxpython_import_pkg");
+    EXPECT_EQ(package_name->value, "cxxpython_import_pkg");
+    EXPECT_EQ(path_size->value, 1);
+    EXPECT_EQ(child_value->value, "child:cxxpython_import_pkg.child");
+    EXPECT_EQ(child_package->value, "cxxpython_import_pkg");
+
+    std::filesystem::remove(child_path);
+    std::filesystem::remove(init_path);
+    std::filesystem::remove(package_dir);
+}
+
 TEST(Module, FailedImportsDoNotPoisonModuleRegistry)
 {
     cxxpython::Runtime runtime;

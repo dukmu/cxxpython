@@ -736,13 +736,16 @@ namespace cxxpython::compiler_internal
 
     struct ImportAlias final
     {
-        ImportAlias(std::string name_in, std::string binding_in)
-            : name(std::move(name_in)), binding(std::move(binding_in))
+        ImportAlias(std::string name_in, std::string binding_in, bool bind_full_module_in = false)
+            : name(std::move(name_in)),
+              binding(std::move(binding_in)),
+              bind_full_module(bind_full_module_in)
         {
         }
 
         std::string name;
         std::string binding;
+        bool bind_full_module = false;
     };
 
     struct ImportStmt final : Stmt

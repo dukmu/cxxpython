@@ -9,6 +9,7 @@
 #include <ostream>
 #include <set>
 #include <sstream>
+#include <string>
 #include <string_view>
 #include <utility>
 
@@ -565,7 +566,48 @@ namespace cxxpython
                 if (level->value != 0)
                     raise_import_error(&runtime, "relative imports are not supported yet");
             }
-            return runtime.import_module(name->value);
+
+            ModuleObject *module = runtime.import_module(name->value);
+            auto module_root = runtime.root(module);
+            if (args.positional.size() >= 4 && args.positional[3] != runtime.none() && is_true(args.positional[3]))
+            {
+                if (module_root->dict()->get(runtime.new_str("__path__")))
+                {
+                    std::vector<Object *> from_items = collect_iterable_items(&runtime, args.positional[3]);
+                    std::vector<Rooted<Object>> from_roots;
+                    from_roots.reserve(from_items.size());
+                    for (Object *item : from_items)
+                    {
+                        from_roots.push_back(runtime.root(item));
+                        auto *item_name = dynamic_cast<StrObject *>(item);
+                        if (!item_name || item_name->value == "*")
+                            continue;
+                        if (module_root->dict()->get(runtime.new_str(item_name->value)))
+                            continue;
+                        try
+                        {
+                            (void)runtime.import_module(name->value + "." + item_name->value);
+                        }
+                        catch (const PythonError &error)
+                        {
+                            if (error.type() != runtime.import_error_type())
+                                throw;
+                        }
+                    }
+                }
+                return module_root.get();
+            }
+
+            const std::size_t dot = name->value.find('.');
+            if (dot == std::string::npos)
+                return module_root.get();
+
+            const std::string top_level = name->value.substr(0, dot);
+            Object *top_level_module = runtime.modules_dict()->get(runtime.new_str(top_level));
+            auto *top_level_object = dynamic_cast<ModuleObject *>(top_level_module);
+            if (!top_level_object)
+                raise_import_error(&runtime, "module registry entry is not a module");
+            return top_level_object;
         }
     }
 

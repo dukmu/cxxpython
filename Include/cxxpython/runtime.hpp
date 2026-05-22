@@ -61,6 +61,8 @@ namespace cxxpython
         std::string origin;
         std::string loader_name;
         std::string package;
+        std::string package_dir;
+        bool is_package = false;
         ModuleLoadKind kind = ModuleLoadKind::Source;
     };
 

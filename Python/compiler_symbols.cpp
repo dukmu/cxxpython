@@ -208,7 +208,6 @@ namespace cxxpython
             void visit(const compiler_internal::FromImportStmt &statement) override
             {
                 (void)symbols_.add_name("__import__");
-                (void)symbols_.add_name(statement.module);
                 for (const compiler_internal::ImportAlias &alias : statement.aliases)
                 {
                     (void)symbols_.add_name(alias.name);
@@ -714,8 +713,7 @@ namespace cxxpython
 
             void visit(const compiler_internal::FromImportStmt &statement) override
             {
-                for (const compiler_internal::ImportAlias &alias : statement.aliases)
-                    add_reference(alias.name);
+                (void)statement;
             }
 
             void visit(const compiler_internal::TryStmt &statement) override

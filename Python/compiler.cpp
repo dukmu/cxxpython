@@ -3,6 +3,7 @@
 #include "cxxpython/compiler_internal.hpp"
 #include "compiler_symbols.hpp"
 
+#include <string_view>
 #include <utility>
 
 namespace cxxpython
@@ -624,12 +625,9 @@ namespace cxxpython
                 StatementLineGuard line(*this, statement);
                 for (const compiler_internal::ImportAlias &alias : statement.aliases)
                 {
-                    emit({
-                        Opcode::LoadName,
-                        static_cast<std::uint32_t>(name_index("__import__")),
-                    });
-                    emit_constant(runtime_.new_str(alias.name));
-                    emit({Opcode::Call, 1});
+                    emit_import_call(alias.name, runtime_.new_tuple({}));
+                    if (alias.bind_full_module)
+                        emit_load_dotted_tail(alias.name);
                     emit_binding_store(alias.binding);
                 }
             }
@@ -637,12 +635,11 @@ namespace cxxpython
             void visit(const compiler_internal::FromImportStmt &statement) override
             {
                 StatementLineGuard line(*this, statement);
-                emit({
-                    Opcode::LoadName,
-                    static_cast<std::uint32_t>(name_index("__import__")),
-                });
-                emit_constant(runtime_.new_str(statement.module));
-                emit({Opcode::Call, 1});
+                std::vector<Object *> fromlist;
+                fromlist.reserve(statement.aliases.size());
+                for (const compiler_internal::ImportAlias &alias : statement.aliases)
+                    fromlist.push_back(runtime_.new_str(alias.name));
+                emit_import_call(statement.module, runtime_.new_tuple(std::move(fromlist)));
 
                 for (const compiler_internal::ImportAlias &alias : statement.aliases)
                 {
@@ -874,6 +871,39 @@ namespace cxxpython
                 if (!pending_assignment_value_)
                     raise_syntax_error(&runtime_, "assignment target emitted without value");
                 pending_assignment_value_->accept(*this);
+            }
+
+            void emit_import_call(std::string_view module_name, TupleObject *fromlist)
+            {
+                emit({
+                    Opcode::LoadName,
+                    static_cast<std::uint32_t>(name_index("__import__")),
+                });
+                emit_constant(runtime_.new_str(std::string(module_name)));
+                emit_constant(runtime_.none());
+                emit_constant(runtime_.none());
+                emit_constant(fromlist);
+                emit_constant(runtime_.new_int(0));
+                emit({Opcode::Call, 5});
+            }
+
+            void emit_load_dotted_tail(std::string_view module_name)
+            {
+                std::size_t start = module_name.find('.');
+                while (start != std::string_view::npos)
+                {
+                    const std::size_t component_start = start + 1;
+                    const std::size_t next = module_name.find('.', component_start);
+                    const std::size_t component_end =
+                        next == std::string_view::npos ? module_name.size() : next;
+                    emit({
+                        Opcode::LoadAttr,
+                        static_cast<std::uint32_t>(
+                            ensure_name_index(std::string(module_name.substr(component_start,
+                                                                            component_end - component_start)))),
+                    });
+                    start = next;
+                }
             }
 
             void emit_constant(Object *constant)

@@ -1,0 +1,68 @@
+sep = '/'
+altsep = None
+curdir = '.'
+pardir = '..'
+extsep = '.'
+pathsep = ':'
+defpath = '/bin:/usr/bin'
+devnull = '/dev/null'
+
+
+def _as_path_text(path):
+    if isinstance(path, str):
+        return path
+    raise TypeError('path must be str')
+
+
+def join(path, *paths):
+    result = _as_path_text(path)
+    for item in paths:
+        component = _as_path_text(item)
+        absolute = False
+        if len(component) > 0:
+            if component[0] == sep:
+                absolute = True
+        if absolute:
+            result = component
+        else:
+            if result == '':
+                result = result + component
+            else:
+                if result[-1] == sep:
+                    result = result + component
+                else:
+                    result = result + sep + component
+    return result
+
+
+def basename(path):
+    path = _as_path_text(path)
+    last = -1
+    for index in range(len(path)):
+        if path[index] == sep:
+            last = index
+    return path[last + 1:]
+
+
+def dirname(path):
+    path = _as_path_text(path)
+    last = -1
+    for index in range(len(path)):
+        if path[index] == sep:
+            last = index
+    if last < 0:
+        return ''
+    if last == 0:
+        return sep
+    return path[:last]
+
+
+def split(path):
+    return (dirname(path), basename(path))
+
+
+def isabs(path):
+    path = _as_path_text(path)
+    if len(path) == 0:
+        return False
+    return path[0] == sep

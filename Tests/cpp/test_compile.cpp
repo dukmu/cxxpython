@@ -1813,20 +1813,17 @@ TEST(Compile, RaisesSyntaxErrorForUnsupportedFStringAsciiConversion)
     }
 }
 
-TEST(Compile, RaisesSyntaxErrorForUnsupportedDottedFromImport)
+TEST(Compile, AcceptsDottedImports)
 {
     cxxpython::Runtime runtime;
 
-    try
-    {
-        (void)cxxpython::compile_exec_input(runtime, "from pkg.mod import value\n", "broken.py");
-        FAIL() << "expected PythonError";
-    }
-    catch (const cxxpython::PythonError &error)
-    {
-        EXPECT_EQ(error.type_name(), "SyntaxError");
-        EXPECT_STREQ(error.what(), "broken.py:1:9: dotted imports are not supported yet");
-    }
+    cxxpython::CodeObject *from_import =
+        cxxpython::compile_exec_input(runtime, "from pkg.mod import value\n", "script.py");
+    cxxpython::CodeObject *plain_import =
+        cxxpython::compile_exec_input(runtime, "import pkg.mod\nimport pkg.mod as alias\n", "script.py");
+
+    ASSERT_NE(from_import, nullptr);
+    ASSERT_NE(plain_import, nullptr);
 }
 
 TEST(Compile, CallsNonCallableThroughNormalTypeErrorPath)

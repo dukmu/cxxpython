@@ -1,5 +1,78 @@
 # Development Status
 
+## 2026-05-22 Package Imports and Script Path Layer
+
+Review focus:
+
+- Continue opening the stdlib/import layer without adding unnecessary native
+  modules.
+- Make package imports real enough for script-level `os.path` and future
+  package-based stdlib modules.
+
+Completed:
+
+- Added package-aware module specs with `package_dir`, `is_package`,
+  `__path__`, and `ModuleSpec.submodule_search_locations`.
+- Extended runtime import discovery from flat module names to dotted package
+  paths:
+  - `pkg/__init__.py`
+  - `pkg/mod.py`
+  - `pkg/mod.so`
+- Made `Runtime::import_module("pkg.child")` import and validate the parent
+  package first, cache both modules, and bind the child module on the parent.
+- Updated parser/compiler import lowering for dotted `import` and
+  `from ... import ...`:
+  - plain `import pkg.child` binds `pkg`;
+  - `import pkg.child as alias` binds the child module to `alias`;
+  - `from pkg.child import value` uses a real fromlist.
+- Updated `__import__` to follow the CPython return rule:
+  - no fromlist returns the top-level package for dotted imports;
+  - non-empty fromlist returns the requested module;
+  - package fromlist entries are opportunistically imported as submodules.
+- Added recursive Python golden discovery so package fixtures under
+  `Tests/python/` can be tested without being executed as top-level scripts.
+- Added `Tests/python/package_fixture/` and `Tests/python/package_imports.py`
+  coverage for package metadata, dotted imports, aliases, from-imports, and
+  direct `__import__`.
+- Added script-level `Lib/posixpath.py` and exposed it as `os.path`, keeping
+  path manipulation in Python instead of adding unnecessary native module
+  surface.
+
+Design notes:
+
+- Import behavior now has a single semantic entry through `__import__` and
+  `Runtime::import_module`; the compiler no longer relies on one-argument
+  `__import__` shortcuts that would block package/fromlist semantics later.
+- Package metadata is deliberately minimal but shaped like CPython's public
+  objects: `__package__`, `__path__`, `__loader__`, `__spec__`, and
+  `submodule_search_locations` are now present where scripts expect them.
+- `posixpath.py` uses only currently supported language syntax. This is not a
+  compatibility fallback; it prevents the stdlib from depending on parser
+  features that are not implemented yet.
+
+Known debt and next risk:
+
+- Parser expression support is still uneven for Lib-quality code: `elif`,
+  augmented assignment, boolean `and/or`, and plain comparison expressions in
+  `while` conditions need proper grammar/compiler support so stdlib modules can
+  be written more naturally.
+- Import still lacks relative import resolution, star-import lowering,
+  `__all__`, package `__path__` search through multiple entries, and a real
+  importlib bootstrap module. These should be added before stdlib grows many
+  packages.
+- `__import__` currently ignores globals/locals for package context because
+  relative imports are still rejected; that should move to a dedicated
+  import-state/request object before relative imports land.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects '--gtest_filter=Module.ImportsPackagesAndDottedSubmodules:Module.ImportsStdlibModulesFromLibPath:Compile.AcceptsDottedImports:PythonScripts.RunsGoldenFiles'`
+- `build/cxxpython Tests/python/sys_os.py`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all 195 tests pass.
+
 ## 2026-05-22 Minimal Extension C ABI Slice
 
 Review focus:
