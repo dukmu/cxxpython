@@ -1,5 +1,51 @@
 # Development Status
 
+## 2026-05-22 Native Module Definition Metadata Slice
+
+Review focus:
+
+- Keep native module initialization closer to CPython's module-definition
+  shape instead of scattering module metadata through ad hoc dictionary writes.
+- Continue docstring coverage at the module boundary so script-side
+  `inspect.getdoc()` can work without C++ special cases.
+
+Completed:
+
+- Added `NativeModuleDef` and `initialize_native_module(...)` in
+  `Modules/module_registry.hpp`.
+- Native module definitions now carry module name, module docstring, and the
+  existing native method table as one declaration.
+- Converted `builtins`, `sys`, `gc`, `posix`, `_io`, and `_collections` to use
+  the shared native module definition initializer.
+- `builtins.__doc__` and native extension module `__doc__` are now visible
+  through ordinary module dictionaries.
+- Extended Python golden coverage for module-level docstrings via
+  `inspect.getdoc()` and updated `dir(__builtins__)` expectations for the new
+  standard `__doc__` entry.
+
+Design notes:
+
+- The new helper mirrors the useful part of CPython's `PyModuleDef` without
+  introducing code generation or policy-heavy module slots yet.
+- Script-level stdlib modules remain script-level. This only standardizes
+  native substrate modules that already have to exist in C++.
+
+Known debt and next risk:
+
+- Module definitions still do not describe per-module state, slots, traverse
+  hooks, or multi-phase initialization.
+- `__all__` remains script module metadata for modules that expose it; native
+  modules should not grow `__all__` casually unless CPython-compatible policy
+  requires it.
+- A future Argument Clinic-like source of truth should generate method
+  signatures, docs, and argument validation from one table.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter=PythonScripts.RunsGoldenFiles:Module.ImportsStdlibModulesFromLibPath`
+- `ctest --test-dir build --output-on-failure`
+
 ## 2026-05-22 Function Annotation And Docstring Slice
 
 Review focus:

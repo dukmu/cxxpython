@@ -4,10 +4,16 @@ import collections
 import sys
 import posix
 import _io
+import _collections
 
 print(type(inspect))
 print(type(gc))
 print(type(collections))
+print(inspect.getdoc(sys).__contains__('interpreter state'))
+print(inspect.getdoc(gc).__contains__('garbage collector'))
+print(inspect.getdoc(posix).__contains__('operating-system'))
+print(inspect.getdoc(_io).__contains__('native stream'))
+print(inspect.getdoc(_collections).__contains__('collection helpers'))
 print(inspect.__all__.__contains__('currentframe'))
 print(collections.__all__.__contains__('namedtuple'))
 print(gc.__file__)

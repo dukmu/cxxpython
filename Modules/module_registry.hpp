@@ -18,6 +18,13 @@ namespace cxxpython
         const char *text_signature = "";
     };
 
+    struct NativeModuleDef
+    {
+        const char *name;
+        const char *doc;
+        std::span<const NativeModuleFunctionDef> methods;
+    };
+
     inline void add_module_function(Runtime &runtime,
                                     ModuleObject &module,
                                     const char *name,
@@ -45,6 +52,19 @@ namespace cxxpython
                                 function.doc,
                                 function.text_signature);
         }
+    }
+
+    inline void initialize_native_module(Runtime &runtime,
+                                         ModuleObject &module,
+                                         const NativeModuleDef &definition)
+    {
+        DictObject *dict = module.dict();
+        if (definition.name && definition.name[0] != '\0')
+            dict->set(runtime.new_str("__name__"), runtime.new_str(definition.name));
+        Object *doc = definition.doc ? static_cast<Object *>(runtime.new_str(definition.doc))
+                                     : static_cast<Object *>(runtime.none());
+        dict->set(runtime.new_str("__doc__"), doc);
+        add_module_functions(runtime, module, definition.methods);
     }
 
     bool is_builtin_extension_module(std::string_view name);

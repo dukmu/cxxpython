@@ -223,10 +223,16 @@ namespace cxxpython
                 "($module, typename, field_names, /)",
             },
         };
+
+        constexpr NativeModuleDef collections_module = {
+            "_collections",
+            "Provide native collection helpers used by the script-level collections module.",
+            collections_methods,
+        };
     }
 
     void initialize_collections_module(Runtime &runtime, ModuleObject &module)
     {
-        add_module_functions(runtime, module, collections_methods);
+        initialize_native_module(runtime, module, collections_module);
     }
 }

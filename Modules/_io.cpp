@@ -210,6 +210,12 @@ namespace cxxpython
                 "($module, file, mode='r', /)",
             },
         };
+
+        constexpr NativeModuleDef io_module = {
+            "_io",
+            "Provide the native stream substrate for the script-level io module.",
+            io_methods,
+        };
     }
 
     TextIOObject::TextIOObject(TypeObject *type,
@@ -340,6 +346,6 @@ namespace cxxpython
     {
         DictObject *dict = module.dict();
         dict->set(runtime.new_str("TextIOWrapper"), runtime.text_io_type());
-        add_module_functions(runtime, module, io_methods);
+        initialize_native_module(runtime, module, io_module);
     }
 }

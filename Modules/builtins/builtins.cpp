@@ -169,6 +169,12 @@ namespace cxxpython
                 "($module, name, globals=None, locals=None, fromlist=(), level=0, /)",
             },
         };
+
+        constexpr NativeModuleDef builtin_module = {
+            "builtins",
+            "Built-in functions, types, exceptions, and other objects.",
+            builtin_methods,
+        };
     }
 
     void Runtime::initialize_builtins()
@@ -217,6 +223,6 @@ namespace cxxpython
         install_builtin_constant(*this, dict, "classmethod", classmethod_type_);
         install_builtin_constant(*this, dict, "super", super_type_);
 
-        add_module_functions(*this, *builtins_module_, builtin_methods);
+        initialize_native_module(*this, *builtins_module_, builtin_module);
     }
 }

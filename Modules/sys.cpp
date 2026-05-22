@@ -126,6 +126,12 @@ namespace cxxpython
                 "($module, depth=0, /)",
             },
         };
+
+        constexpr NativeModuleDef sys_module = {
+            "sys",
+            "Access interpreter state, argv, module registry, and standard streams.",
+            sys_methods,
+        };
     }
 
     void initialize_sys_module(Runtime &runtime, ModuleObject &module)
@@ -144,6 +150,6 @@ namespace cxxpython
         dict->set(runtime.new_str("stdin"), runtime.stdin_object());
         dict->set(runtime.new_str("stdout"), runtime.stdout_object());
         dict->set(runtime.new_str("stderr"), runtime.stderr_object());
-        add_module_functions(runtime, module, sys_methods);
+        initialize_native_module(runtime, module, sys_module);
     }
 }

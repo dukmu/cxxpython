@@ -2,6 +2,7 @@ print(dir(__builtins__))
 print(__builtins__.__name__)
 print(type(__builtins__))
 print(dir(__builtins__).__contains__('OSError'))
+print(__builtins__.__doc__.__contains__('Built-in functions'))
 
 print(all([True, 1, 'x']))
 print(all([True, 0, 'x']))

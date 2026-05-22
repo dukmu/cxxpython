@@ -108,10 +108,16 @@ namespace cxxpython
                 "($module, /)",
             },
         };
+
+        constexpr NativeModuleDef posix_module = {
+            "posix",
+            "Access operating-system services implemented by the POSIX substrate.",
+            posix_methods,
+        };
     }
 
     void initialize_posix_module(Runtime &runtime, ModuleObject &module)
     {
-        add_module_functions(runtime, module, posix_methods);
+        initialize_native_module(runtime, module, posix_module);
     }
 }

@@ -102,10 +102,16 @@ namespace cxxpython
                 "($module, /)",
             },
         };
+
+        constexpr NativeModuleDef gc_module = {
+            "gc",
+            "Expose garbage collector controls and tracked-object introspection.",
+            gc_methods,
+        };
     }
 
     void initialize_gc_module(Runtime &runtime, ModuleObject &module)
     {
-        add_module_functions(runtime, module, gc_methods);
+        initialize_native_module(runtime, module, gc_module);
     }
 }

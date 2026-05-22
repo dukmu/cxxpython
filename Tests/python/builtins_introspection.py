@@ -2,6 +2,7 @@ class A:
     marker = 'a'
 
 a = A()
+print(__builtins__.__doc__.__contains__('Built-in functions'))
 print(isinstance(a, A))
 print(isinstance(a, object))
 print(isinstance(a, (int, A)))
