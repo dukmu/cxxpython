@@ -17,7 +17,6 @@ add_library(cxxpython_core
     Python/runtime_roots.cpp
     Python/runtime_type_descriptors.cpp
     Python/runtime_execution.cpp
-    Python/bltinmodule.cpp
     Python/import.cpp
     Python/import_find.cpp
     Python/import_importlib.cpp
@@ -28,6 +27,11 @@ add_library(cxxpython_core
     Python/compiler_symbols.cpp
     Python/compiler.cpp
     Python/vm.cpp
+    Modules/builtins/builtins.cpp
+    Modules/builtins/core.cpp
+    Modules/builtins/reflection.cpp
+    Modules/builtins/exec.cpp
+    Modules/builtins/import.cpp
     Modules/config.cpp
     Modules/sys.cpp
     Modules/gc.cpp

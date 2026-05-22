@@ -1,5 +1,63 @@
 # Development Status
 
+## 2026-05-22 Builtins Module Split
+
+Review focus:
+
+- Remove the oversized `Python/bltinmodule.cpp` bucket.
+- Treat builtins as a CPython-like native module substrate under `Modules/`,
+  while keeping VM/compiler/runtime internals in `Python/`.
+- Keep the split mechanical and behavior-preserving before deeper importlib or
+  script-level stdlib changes.
+
+Completed:
+
+- Moved builtins implementation into `Modules/builtins/`:
+  - `builtins.cpp` owns `Runtime::initialize_builtins()` and the registration
+    table;
+  - `core.cpp` owns user-facing core builtins such as `print`, `len`, `iter`,
+    `next`, `repr`, `hash`, `all`, `any`, `sum`, `min`, `max`, `sorted`, and
+    `format`;
+  - `reflection.cpp` owns `isinstance`, `issubclass`, `callable`, `id`,
+    `globals`, `locals`, `dir`, `vars`, and the shared active-frame helper;
+  - `exec.cpp` owns `compile`, `eval`, and `exec`;
+  - `import.cpp` owns `__build_class__` and `__import__`.
+- Added internal `Modules/builtins/builtins.hpp` for registration-only
+  linkage. No public API was added.
+- Updated CMake to build the new module folder and removed
+  `Python/bltinmodule.cpp`.
+
+Design notes:
+
+- This follows the repository's current source-boundary rule: native/builtin
+  module substrate lives in `Modules/`; VM, compiler, runtime state, import
+  core, and bytecode stay in `Python/`.
+- `exec.cpp` and `import.cpp` still depend on VM/compiler/import runtime APIs
+  because their Python-visible functions expose those capabilities. That is a
+  substrate dependency, not foundational object-layer coupling.
+- The split intentionally preserves behavior. Moving more import policy toward
+  script-level importlib remains a later semantic change.
+
+Known debt and next risk:
+
+- `Modules/builtins/import.cpp` still contains public `__import__` fromlist
+  loading and relative-name policy. Once enough script substrate is available,
+  this should shrink toward bootstrap hooks with more policy in `Lib/importlib`.
+- `Modules/builtins/exec.cpp` directly drives the active VM for `eval`/`exec`;
+  future tracing/debug hooks should keep using `CodeObject`/`Frame` objects
+  rather than adding ad hoc builtin-side state.
+- Core builtins still consume some iterables into vectors. Before stronger GC
+  pressure, replace raw vector collection with a rooted streaming helper where
+  behavior allows it.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+- `git diff --check`
+
+Result: all 199 tests pass.
+
 ## 2026-05-22 Type Dictionary Ownership Slice
 
 Review focus:
@@ -57,12 +115,9 @@ Pre-commit review:
   `elif`, `pass`, inline simple statements, conditional expressions, chained
   comparisons, star import `__all__`, relative imports, f-strings, traceback
   seeds, and VM stack/frame depth tests are present and passing.
-- Remaining risk is now concentrated in two places:
-  - `Python/bltinmodule.cpp` still mixes builtin functions, dynamic execution,
-    import policy, and class-building helpers;
-  - public stdlib/import behavior should continue moving toward script-level
-    `Lib/`/importlib once more substrate exists, with C++ kept to CPython-like
-    builtin/native modules.
+- Remaining risk is now concentrated in public stdlib/import behavior, which
+  should continue moving toward script-level `Lib/`/importlib once more
+  substrate exists, with C++ kept to CPython-like builtin/native modules.
 
 Verification:
 
@@ -115,10 +170,8 @@ Design notes:
 
 Known debt and next risk:
 
-- `Python/bltinmodule.cpp` still contains a broad mix of builtin policy,
-  import policy, and execution helpers. Split builtin groups or move more
-  import policy toward script-level importlib once the script substrate is
-  ready.
+- Builtins have since moved under `Modules/builtins/`; remaining import policy
+  debt is tracked there.
 - `Python/runtime_factories.cpp` still includes VM details for class body
   execution. That is Python/runtime policy, but it should be watched as class
   construction grows.
