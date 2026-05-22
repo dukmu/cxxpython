@@ -2,6 +2,7 @@
 #include "cxxpython/runtime.hpp"
 
 #include "object_utils.hpp"
+#include "type_initialization.hpp"
 
 #include <sstream>
 
@@ -204,61 +205,6 @@ namespace cxxpython
             return wrapper->runtime()->new_bound_slot_wrapper(wrapper, instance);
         }
 
-        void add_slot_wrapper(TypeObject *type,
-                              const char *name,
-                              SlotWrapperKind kind,
-                              BinaryOp binary_op = BinaryOp::Add,
-                              UnaryOp unary_op = UnaryOp::Positive,
-                              RichCompareOp rich_compare_op = RichCompareOp::Equal)
-        {
-            type->dict->set(type->runtime()->new_str(name),
-                            type->runtime()->new_slot_wrapper(name,
-                                                              type,
-                                                              kind,
-                                                              binary_op,
-                                                              unary_op,
-                                                              rich_compare_op));
-        }
-
-        void add_common_object_wrappers(TypeObject *type, bool hashable)
-        {
-            add_slot_wrapper(type, "__repr__", SlotWrapperKind::Repr);
-            add_slot_wrapper(type, "__eq__", SlotWrapperKind::RichCompare, BinaryOp::Add, UnaryOp::Positive, RichCompareOp::Equal);
-            add_slot_wrapper(type, "__ne__", SlotWrapperKind::RichCompare, BinaryOp::Add, UnaryOp::Positive, RichCompareOp::NotEqual);
-            if (hashable)
-                add_slot_wrapper(type, "__hash__", SlotWrapperKind::Hash);
-        }
-
-        void add_order_wrappers(TypeObject *type)
-        {
-            add_slot_wrapper(type, "__lt__", SlotWrapperKind::RichCompare, BinaryOp::Add, UnaryOp::Positive, RichCompareOp::Less);
-            add_slot_wrapper(type, "__le__", SlotWrapperKind::RichCompare, BinaryOp::Add, UnaryOp::Positive, RichCompareOp::LessEqual);
-            add_slot_wrapper(type, "__gt__", SlotWrapperKind::RichCompare, BinaryOp::Add, UnaryOp::Positive, RichCompareOp::Greater);
-            add_slot_wrapper(type, "__ge__", SlotWrapperKind::RichCompare, BinaryOp::Add, UnaryOp::Positive, RichCompareOp::GreaterEqual);
-        }
-
-        void add_numeric_wrappers(TypeObject *type)
-        {
-            add_slot_wrapper(type, "__add__", SlotWrapperKind::BinaryOp, BinaryOp::Add);
-            add_slot_wrapper(type, "__sub__", SlotWrapperKind::BinaryOp, BinaryOp::Subtract);
-            add_slot_wrapper(type, "__mul__", SlotWrapperKind::BinaryOp, BinaryOp::Multiply);
-            add_slot_wrapper(type, "__pos__", SlotWrapperKind::UnaryOp, BinaryOp::Add, UnaryOp::Positive);
-            add_slot_wrapper(type, "__neg__", SlotWrapperKind::UnaryOp, BinaryOp::Add, UnaryOp::Negative);
-            add_slot_wrapper(type, "__invert__", SlotWrapperKind::UnaryOp, BinaryOp::Add, UnaryOp::Invert);
-        }
-
-        void add_sequence_wrappers(TypeObject *type, bool is_mutable)
-        {
-            add_slot_wrapper(type, "__len__", SlotWrapperKind::Length);
-            add_slot_wrapper(type, "__getitem__", SlotWrapperKind::GetItem);
-            if (is_mutable)
-            {
-                add_slot_wrapper(type, "__setitem__", SlotWrapperKind::SetItem);
-                add_slot_wrapper(type, "__delitem__", SlotWrapperKind::DeleteItem);
-            }
-            add_slot_wrapper(type, "__contains__", SlotWrapperKind::Contains);
-            add_slot_wrapper(type, "__iter__", SlotWrapperKind::Iter);
-        }
     }
 
     SlotWrapperObject::SlotWrapperObject(TypeObject *type,
@@ -417,56 +363,82 @@ namespace cxxpython
         };
     }
 
+    void add_slot_wrapper(TypeObject *type,
+                          const char *name,
+                          SlotWrapperKind kind,
+                          BinaryOp binary_op,
+                          UnaryOp unary_op,
+                          RichCompareOp rich_compare_op)
+    {
+        type->dict->set(type->runtime()->new_str(name),
+                        type->runtime()->new_slot_wrapper(name,
+                                                          type,
+                                                          kind,
+                                                          binary_op,
+                                                          unary_op,
+                                                          rich_compare_op));
+    }
+
+    void add_common_object_slot_wrappers(TypeObject *type, bool hashable)
+    {
+        add_slot_wrapper(type, "__repr__", SlotWrapperKind::Repr);
+        add_slot_wrapper(type, "__eq__", SlotWrapperKind::RichCompare, BinaryOp::Add, UnaryOp::Positive, RichCompareOp::Equal);
+        add_slot_wrapper(type, "__ne__", SlotWrapperKind::RichCompare, BinaryOp::Add, UnaryOp::Positive, RichCompareOp::NotEqual);
+        if (hashable)
+            add_slot_wrapper(type, "__hash__", SlotWrapperKind::Hash);
+    }
+
+    void add_order_slot_wrappers(TypeObject *type)
+    {
+        add_slot_wrapper(type, "__lt__", SlotWrapperKind::RichCompare, BinaryOp::Add, UnaryOp::Positive, RichCompareOp::Less);
+        add_slot_wrapper(type, "__le__", SlotWrapperKind::RichCompare, BinaryOp::Add, UnaryOp::Positive, RichCompareOp::LessEqual);
+        add_slot_wrapper(type, "__gt__", SlotWrapperKind::RichCompare, BinaryOp::Add, UnaryOp::Positive, RichCompareOp::Greater);
+        add_slot_wrapper(type, "__ge__", SlotWrapperKind::RichCompare, BinaryOp::Add, UnaryOp::Positive, RichCompareOp::GreaterEqual);
+    }
+
+    void add_numeric_slot_wrappers(TypeObject *type)
+    {
+        add_slot_wrapper(type, "__add__", SlotWrapperKind::BinaryOp, BinaryOp::Add);
+        add_slot_wrapper(type, "__sub__", SlotWrapperKind::BinaryOp, BinaryOp::Subtract);
+        add_slot_wrapper(type, "__mul__", SlotWrapperKind::BinaryOp, BinaryOp::Multiply);
+        add_slot_wrapper(type, "__pos__", SlotWrapperKind::UnaryOp, BinaryOp::Add, UnaryOp::Positive);
+        add_slot_wrapper(type, "__neg__", SlotWrapperKind::UnaryOp, BinaryOp::Add, UnaryOp::Negative);
+        add_slot_wrapper(type, "__invert__", SlotWrapperKind::UnaryOp, BinaryOp::Add, UnaryOp::Invert);
+    }
+
+    void add_sequence_slot_wrappers(TypeObject *type, bool is_mutable)
+    {
+        add_slot_wrapper(type, "__len__", SlotWrapperKind::Length);
+        add_slot_wrapper(type, "__getitem__", SlotWrapperKind::GetItem);
+        if (is_mutable)
+        {
+            add_slot_wrapper(type, "__setitem__", SlotWrapperKind::SetItem);
+            add_slot_wrapper(type, "__delitem__", SlotWrapperKind::DeleteItem);
+        }
+        add_slot_wrapper(type, "__contains__", SlotWrapperKind::Contains);
+        add_slot_wrapper(type, "__iter__", SlotWrapperKind::Iter);
+    }
+
     void Runtime::initialize_slot_wrappers()
     {
-        add_common_object_wrappers(object_type_, true);
-        add_common_object_wrappers(none_type_, true);
-        add_common_object_wrappers(not_implemented_type_, true);
-
-        add_common_object_wrappers(int_type_, true);
-        add_order_wrappers(int_type_);
-        add_numeric_wrappers(int_type_);
-
-        add_common_object_wrappers(bool_type_, true);
-        add_order_wrappers(bool_type_);
-        add_numeric_wrappers(bool_type_);
-
-        add_common_object_wrappers(str_type_, true);
-        add_order_wrappers(str_type_);
-        add_slot_wrapper(str_type_, "__add__", SlotWrapperKind::BinaryOp, BinaryOp::Add);
-        add_sequence_wrappers(str_type_, false);
-
-        add_common_object_wrappers(list_type_, false);
-        add_sequence_wrappers(list_type_, true);
-
-        add_common_object_wrappers(tuple_type_, true);
-        add_sequence_wrappers(tuple_type_, false);
-
-        add_common_object_wrappers(slice_type_, true);
-
-        add_common_object_wrappers(dict_type_, false);
-        add_sequence_wrappers(dict_type_, true);
-
-        add_common_object_wrappers(mappingproxy_type_, false);
-        add_sequence_wrappers(mappingproxy_type_, false);
-
-        add_slot_wrapper(sequence_iterator_type_, "__iter__", SlotWrapperKind::Iter);
-        add_slot_wrapper(sequence_iterator_type_, "__next__", SlotWrapperKind::Next);
-        add_slot_wrapper(dict_key_iterator_type_, "__iter__", SlotWrapperKind::Iter);
-        add_slot_wrapper(dict_key_iterator_type_, "__next__", SlotWrapperKind::Next);
-
-        add_common_object_wrappers(range_type_, true);
-        add_sequence_wrappers(range_type_, false);
-        add_slot_wrapper(range_iterator_type_, "__iter__", SlotWrapperKind::Iter);
-        add_slot_wrapper(range_iterator_type_, "__next__", SlotWrapperKind::Next);
-
-        add_slot_wrapper(enumerate_type_, "__iter__", SlotWrapperKind::Iter);
-        add_slot_wrapper(enumerate_type_, "__next__", SlotWrapperKind::Next);
-        add_slot_wrapper(zip_type_, "__iter__", SlotWrapperKind::Iter);
-        add_slot_wrapper(zip_type_, "__next__", SlotWrapperKind::Next);
-        add_slot_wrapper(map_type_, "__iter__", SlotWrapperKind::Iter);
-        add_slot_wrapper(map_type_, "__next__", SlotWrapperKind::Next);
-        add_slot_wrapper(filter_type_, "__iter__", SlotWrapperKind::Iter);
-        add_slot_wrapper(filter_type_, "__next__", SlotWrapperKind::Next);
+        initialize_object_slot_wrappers(*this, object_type_);
+        initialize_none_slot_wrappers(*this, none_type_);
+        initialize_not_implemented_slot_wrappers(*this, not_implemented_type_);
+        initialize_int_slot_wrappers(*this, int_type_);
+        initialize_bool_slot_wrappers(*this, bool_type_);
+        initialize_str_slot_wrappers(*this, str_type_);
+        initialize_list_slot_wrappers(*this, list_type_);
+        initialize_tuple_slot_wrappers(*this, tuple_type_);
+        initialize_slice_slot_wrappers(*this, slice_type_);
+        initialize_dict_slot_wrappers(*this, dict_type_);
+        initialize_mappingproxy_slot_wrappers(*this, mappingproxy_type_);
+        initialize_iterator_slot_wrappers(*this, sequence_iterator_type_);
+        initialize_iterator_slot_wrappers(*this, dict_key_iterator_type_);
+        initialize_range_slot_wrappers(*this, range_type_);
+        initialize_range_iterator_slot_wrappers(*this, range_iterator_type_);
+        initialize_enumerate_slot_wrappers(*this, enumerate_type_);
+        initialize_zip_slot_wrappers(*this, zip_type_);
+        initialize_map_slot_wrappers(*this, map_type_);
+        initialize_filter_slot_wrappers(*this, filter_type_);
     }
 }

@@ -2,6 +2,7 @@
 #include "cxxpython/runtime.hpp"
 
 #include "object_utils.hpp"
+#include "type_initialization.hpp"
 
 #include <cstddef>
 #include <sstream>
@@ -344,5 +345,17 @@ namespace cxxpython
             .contains = mappingproxy_contains,
             .iter = mappingproxy_iter,
         };
+    }
+
+    void initialize_dict_slot_wrappers(Runtime &, TypeObject *type)
+    {
+        add_common_object_slot_wrappers(type, false);
+        add_sequence_slot_wrappers(type, true);
+    }
+
+    void initialize_mappingproxy_slot_wrappers(Runtime &, TypeObject *type)
+    {
+        add_common_object_slot_wrappers(type, false);
+        add_sequence_slot_wrappers(type, false);
     }
 }

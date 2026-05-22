@@ -1,5 +1,78 @@
 # Development Status
 
+## 2026-05-22 Type Dictionary Ownership Slice
+
+Review focus:
+
+- Stop centralizing builtin type `tp_dict` population in descriptor helper
+  files.
+- Keep method descriptor and slot wrapper objects as generic mechanisms, while
+  letting each object implementation install its own Python-visible methods,
+  getset descriptors, and slot wrappers.
+- Avoid exposing bootstrap initialization helpers through the public object
+  header.
+
+Completed:
+
+- Added internal `Objects/type_initialization.hpp` for runtime bootstrap
+  wiring that is not part of the public object API.
+- Reduced `Objects/object_method.cpp` to method descriptor and bound-method
+  mechanics plus the narrow runtime dispatch call.
+- Moved type method registration to the owning object implementations:
+  - `object` and `type` methods in `Objects/object_core.cpp`;
+  - `int` conversion methods in `Objects/object_primitives.cpp`;
+  - `list.append` in `Objects/object_sequences.cpp`;
+  - `slice.indices` in `Objects/object_slice.cpp`;
+  - `property.getter/setter/deleter` in `Objects/object_property.cpp`.
+- Moved getset descriptor registration for object-model types to their
+  owning layers:
+  - `object.__class__`, `object.__dict__`, and `object.__doc__` in
+    `Objects/object_core.cpp`;
+  - `type.__base__`, `type.__bases__`, `type.__mro__`, and
+    `type.__qualname__` in `Objects/object_core.cpp`;
+  - function descriptors such as `__code__`, `__globals__`, and `__module__`
+    in `Objects/object_function.cpp`;
+  - code/frame execution descriptors kept in `Python/runtime_type_descriptors.cpp`.
+- Split slot wrapper installation so sequence, mapping, iterator, primitive,
+  and iterable types each declare their own wrappers, while
+  `Objects/object_slot_wrapper.cpp` only owns the wrapper descriptor object and
+  shared wrapper helpers.
+
+Design notes:
+
+- This mirrors the CPython shape more closely: a type implementation owns its
+  visible methods and attributes; descriptor object files own descriptor
+  behavior, not every other type's initialization.
+- `code` and `frame` descriptors intentionally remain in the Python/runtime
+  layer because they depend on bytecode and VM frame metadata. Moving them into
+  foundational object files would reintroduce the execution dependency we just
+  removed.
+- The new initialization header is internal to core sources. Public
+  `Include/cxxpython/object.hpp` still exposes object layout, slots, protocol
+  entrypoints, and type slot factories, not runtime bootstrap wiring.
+
+Pre-commit review:
+
+- Existing parser gaps from the prior note have mostly been closed already:
+  `elif`, `pass`, inline simple statements, conditional expressions, chained
+  comparisons, star import `__all__`, relative imports, f-strings, traceback
+  seeds, and VM stack/frame depth tests are present and passing.
+- Remaining risk is now concentrated in two places:
+  - `Python/bltinmodule.cpp` still mixes builtin functions, dynamic execution,
+    import policy, and class-building helpers;
+  - public stdlib/import behavior should continue moving toward script-level
+    `Lib/`/importlib once more substrate exists, with C++ kept to CPython-like
+    builtin/native modules.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects '--gtest_filter=CoreObjects.*:Attributes.*:PythonScripts.RunsGoldenFiles:Compile.*'`
+- `ctest --test-dir build --output-on-failure`
+- `git diff --check`
+
+Result: all 199 tests pass.
+
 ## 2026-05-22 Object Runtime Execution Boundary Slice
 
 Review focus:

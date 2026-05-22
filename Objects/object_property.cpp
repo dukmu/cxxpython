@@ -2,6 +2,7 @@
 #include "cxxpython/runtime.hpp"
 
 #include "object_utils.hpp"
+#include "type_initialization.hpp"
 
 #include <array>
 #include <sstream>
@@ -112,6 +113,68 @@ namespace cxxpython
         {
             validate_property_args(object.runtime(), args);
         }
+
+        PropertyObject *as_property(Runtime &runtime, Object *self)
+        {
+            auto *property = dynamic_cast<PropertyObject *>(self);
+            if (!property)
+                raise_type_error(&runtime, "property descriptor receiver does not have property layout");
+            return property;
+        }
+
+        Object *property_getter_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (args.size() != 1)
+            {
+                std::ostringstream message;
+                message << "property.getter() takes exactly one argument ("
+                        << args.size() << " given)";
+                raise_type_error(&runtime, message.str());
+            }
+            PropertyObject *property = as_property(runtime, self);
+            return runtime.allocate<PropertyObject>(
+                property->type(),
+                args[0],
+                property->setter(),
+                property->deleter(),
+                property->doc());
+        }
+
+        Object *property_setter_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (args.size() != 1)
+            {
+                std::ostringstream message;
+                message << "property.setter() takes exactly one argument ("
+                        << args.size() << " given)";
+                raise_type_error(&runtime, message.str());
+            }
+            PropertyObject *property = as_property(runtime, self);
+            return runtime.allocate<PropertyObject>(
+                property->type(),
+                property->getter(),
+                args[0],
+                property->deleter(),
+                property->doc());
+        }
+
+        Object *property_deleter_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (args.size() != 1)
+            {
+                std::ostringstream message;
+                message << "property.deleter() takes exactly one argument ("
+                        << args.size() << " given)";
+                raise_type_error(&runtime, message.str());
+            }
+            PropertyObject *property = as_property(runtime, self);
+            return runtime.allocate<PropertyObject>(
+                property->type(),
+                property->getter(),
+                property->setter(),
+                args[0],
+                property->doc());
+        }
     }
 
     PropertyObject::PropertyObject(TypeObject *type,
@@ -160,5 +223,15 @@ namespace cxxpython
             .new_object = property_new,
             .init = property_init,
         };
+    }
+
+    void initialize_property_type_methods(Runtime &runtime, TypeObject *type)
+    {
+        type->dict->set(runtime.new_str("getter"),
+                        runtime.new_method_descriptor("getter", type, property_getter_method));
+        type->dict->set(runtime.new_str("setter"),
+                        runtime.new_method_descriptor("setter", type, property_setter_method));
+        type->dict->set(runtime.new_str("deleter"),
+                        runtime.new_method_descriptor("deleter", type, property_deleter_method));
     }
 }

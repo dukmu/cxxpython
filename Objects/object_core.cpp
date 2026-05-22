@@ -2,6 +2,7 @@
 #include "cxxpython/runtime.hpp"
 
 #include "object_utils.hpp"
+#include "type_initialization.hpp"
 
 #include <sstream>
 #include <stdexcept>
@@ -78,6 +79,184 @@ namespace cxxpython
         {
             (void)args;
             return type.runtime()->allocate<Object>(&type);
+        }
+
+        Object *object_getattribute_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (args.size() != 1)
+            {
+                std::ostringstream message;
+                message << "object.__getattribute__() takes exactly one argument ("
+                        << args.size() << " given)";
+                raise_type_error(&runtime, message.str());
+            }
+            auto *name = dynamic_cast<StrObject *>(args[0]);
+            if (!name)
+                raise_type_error(&runtime, "attribute name must be str");
+            return object_get_attr_default(self, name);
+        }
+
+        Object *object_setattr_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (args.size() != 2)
+            {
+                std::ostringstream message;
+                message << "object.__setattr__() takes exactly two arguments ("
+                        << args.size() << " given)";
+                raise_type_error(&runtime, message.str());
+            }
+            auto *name = dynamic_cast<StrObject *>(args[0]);
+            if (!name)
+                raise_type_error(&runtime, "attribute name must be str");
+            object_set_attr_default(self, name, args[1]);
+            return runtime.none();
+        }
+
+        Object *object_delattr_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (args.size() != 1)
+            {
+                std::ostringstream message;
+                message << "object.__delattr__() takes exactly one argument ("
+                        << args.size() << " given)";
+                raise_type_error(&runtime, message.str());
+            }
+            auto *name = dynamic_cast<StrObject *>(args[0]);
+            if (!name)
+                raise_type_error(&runtime, "attribute name must be str");
+            object_delete_attr_default(self, name);
+            return runtime.none();
+        }
+
+        Object *object_init_method(Runtime &runtime, Object *, ObjectSpan args)
+        {
+            if (!args.empty())
+                raise_type_error(&runtime, "object.__init__() takes exactly zero arguments");
+            return runtime.none();
+        }
+
+        Object *object_new_method(Runtime &runtime, Object *, ObjectSpan args)
+        {
+            if (args.empty())
+                raise_type_error(&runtime, "object.__new__() takes exactly one argument");
+            auto *type = dynamic_cast<TypeObject *>(args[0]);
+            if (!type)
+                raise_type_error(&runtime, "object.__new__() argument 1 must be type");
+            CallArguments empty{{}, nullptr};
+            if (!type->slots.new_object)
+                raise_type_error(&runtime, "object.__new__() cannot create '" + type_qualified_name(type) + "' instances");
+            return type->slots.new_object(*type, empty);
+        }
+
+        Object *object_str_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (!args.empty())
+                raise_type_error(&runtime, "object.__str__() takes exactly zero arguments");
+            return runtime.new_str(object_str(self));
+        }
+
+        Object *object_format_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (args.size() != 1)
+                raise_type_error(&runtime, "object.__format__() takes exactly one argument");
+            auto *format_spec = dynamic_cast<StrObject *>(args[0]);
+            if (!format_spec)
+                raise_type_error(&runtime, "format specifier must be a string");
+            if (!format_spec->value.empty())
+                raise_type_error(&runtime, "unsupported format string passed to object.__format__");
+            return runtime.new_str(object_str(self));
+        }
+
+        Object *object_bool_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (!args.empty())
+                raise_type_error(&runtime, "object.__bool__() takes exactly zero arguments");
+            return is_true(self) ? runtime.true_value() : runtime.false_value();
+        }
+
+        Object *object_dir_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (!args.empty())
+                raise_type_error(&runtime, "object.__dir__() takes exactly zero arguments");
+            Object *dir_builtin = runtime.builtins_dict()->get(runtime.new_str("dir"));
+            if (!dir_builtin)
+                raise_type_error(&runtime, "dir builtin is not initialized");
+            return object_call(dir_builtin, {self});
+        }
+
+        Object *object_sizeof_method(Runtime &runtime, Object *, ObjectSpan args)
+        {
+            if (!args.empty())
+                raise_type_error(&runtime, "object.__sizeof__() takes exactly zero arguments");
+            return runtime.new_int(0);
+        }
+
+        Object *object_getstate_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (!args.empty())
+                raise_type_error(&runtime, "object.__getstate__() takes exactly zero arguments");
+            if (self && self->instance_dict())
+                return self->instance_dict();
+            return runtime.none();
+        }
+
+        Object *object_init_subclass_method(Runtime &runtime, Object *, ObjectSpan args)
+        {
+            if (!args.empty())
+                raise_type_error(&runtime, "object.__init_subclass__() takes no arguments");
+            return runtime.none();
+        }
+
+        Object *object_subclasshook_method(Runtime &runtime, Object *, ObjectSpan args)
+        {
+            if (args.size() != 1)
+                raise_type_error(&runtime, "object.__subclasshook__() takes exactly one argument");
+            return runtime.not_implemented();
+        }
+
+        Object *class_getter(Runtime &, Object *instance, TypeObject *)
+        {
+            return instance->type();
+        }
+
+        void class_setter(Runtime &runtime, Object *, Object *)
+        {
+            raise_type_error(&runtime, "__class__ assignment only supported for mutable types or ModuleType subclasses");
+        }
+
+        Object *dict_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            if (auto *type = dynamic_cast<TypeObject *>(instance))
+                return runtime.new_mappingproxy(type->dict);
+            if (auto *module = dynamic_cast<ModuleObject *>(instance))
+                return module->dict();
+            if ((instance->type()->flags & TypeFlagHasInstanceDict) == 0)
+            {
+                raise_attribute_error(&runtime,
+                                      "'" + type_qualified_name(instance->type()) +
+                                          "' object has no attribute '__dict__'");
+            }
+            if (!instance->instance_dict())
+                instance->set_instance_dict(runtime.new_dict());
+            return instance->instance_dict();
+        }
+
+        void dict_setter(Runtime &runtime, Object *, Object *)
+        {
+            raise_attribute_error(&runtime, "attribute '__dict__' is read-only");
+        }
+
+        Object *doc_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            if (auto *type = dynamic_cast<TypeObject *>(instance))
+            {
+                if (type->dict)
+                {
+                    if (Object *doc = type->dict->get(runtime.new_str("__doc__")))
+                        return doc;
+                }
+            }
+            return runtime.none();
         }
 
         void call_init_slot(TypeObject &type, Object *instance, const CallArguments &args)
@@ -173,6 +352,152 @@ namespace cxxpython
                 raise_type_error(type->runtime(), "__new__ returned null");
             call_init_slot(*type, instance, args);
             return instance;
+        }
+
+        TypeObject *type_from_three_args(Runtime &runtime, TypeObject *metaclass, ObjectSpan args)
+        {
+            if (args.size() != 3)
+                raise_type_error(&runtime, "type.__new__() takes exactly three arguments");
+            auto *name = dynamic_cast<StrObject *>(args[0]);
+            if (!name)
+                raise_type_error(&runtime, "type.__new__() name must be a str");
+            auto *bases_tuple = dynamic_cast<TupleObject *>(args[1]);
+            if (!bases_tuple)
+                raise_type_error(&runtime, "type.__new__() bases must be a tuple");
+            auto *namespace_dict = dynamic_cast<DictObject *>(args[2]);
+            if (!namespace_dict)
+                raise_type_error(&runtime, "type.__new__() namespace must be a dict");
+
+            std::vector<TypeObject *> bases;
+            bases.reserve(bases_tuple->size());
+            for (Object *base : bases_tuple->items())
+            {
+                auto *base_type = dynamic_cast<TypeObject *>(base);
+                if (!base_type)
+                    raise_type_error(&runtime, "type.__new__() bases must contain only types");
+                bases.push_back(base_type);
+            }
+
+            ClassConstructionRequest request;
+            request.name = name->value;
+            request.bases = std::move(bases);
+            request.namespace_dict = namespace_dict;
+            request.module_fallback = runtime.active_module_name("builtins");
+            request.qualname = name->value;
+            request.explicit_metaclass = metaclass == runtime.type_type() ? nullptr : metaclass;
+            return runtime.new_class(std::move(request));
+        }
+
+        Object *type_call_method(Runtime &, Object *self, ObjectSpan args)
+        {
+            std::vector<Object *> positional(args.begin(), args.end());
+            return object_call(self, CallArguments{std::move(positional), nullptr});
+        }
+
+        Object *type_new_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            auto *metaclass = dynamic_cast<TypeObject *>(self);
+            if (!metaclass)
+                raise_type_error(&runtime, "type.__new__() receiver must be a type");
+            return type_from_three_args(runtime, metaclass, args);
+        }
+
+        Object *type_init_method(Runtime &runtime, Object *, ObjectSpan args)
+        {
+            if (!args.empty() && args.size() != 3)
+                raise_type_error(&runtime, "type.__init__() takes zero or three arguments");
+            return runtime.none();
+        }
+
+        Object *type_prepare_method(Runtime &runtime, Object *, ObjectSpan args)
+        {
+            if (args.size() < 2)
+                raise_type_error(&runtime, "type.__prepare__() missing name or bases");
+            if (!dynamic_cast<StrObject *>(args[0]))
+                raise_type_error(&runtime, "type.__prepare__() name must be a str");
+            if (!dynamic_cast<TupleObject *>(args[1]))
+                raise_type_error(&runtime, "type.__prepare__() bases must be a tuple");
+            return runtime.new_dict();
+        }
+
+        Object *type_mro_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (!args.empty())
+                raise_type_error(&runtime, "type.mro() takes exactly zero arguments");
+            auto *type = dynamic_cast<TypeObject *>(self);
+            if (!type)
+                raise_type_error(&runtime, "type.mro() receiver must be a type");
+            std::vector<Object *> mro;
+            mro.reserve(type->mro.size());
+            for (TypeObject *item : type->mro)
+                mro.push_back(item);
+            return runtime.new_list(std::move(mro));
+        }
+
+        Object *type_instancecheck_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (args.size() != 1)
+                raise_type_error(&runtime, "type.__instancecheck__() takes exactly one argument");
+            auto *type = dynamic_cast<TypeObject *>(self);
+            if (!type)
+                raise_type_error(&runtime, "type.__instancecheck__() receiver must be a type");
+            return is_instance(args[0], type) ? runtime.true_value() : runtime.false_value();
+        }
+
+        Object *type_subclasscheck_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (args.size() != 1)
+                raise_type_error(&runtime, "type.__subclasscheck__() takes exactly one argument");
+            auto *type = dynamic_cast<TypeObject *>(self);
+            auto *derived = dynamic_cast<TypeObject *>(args[0]);
+            if (!type || !derived)
+                raise_type_error(&runtime, "type.__subclasscheck__() arguments must be types");
+            return is_subclass(derived, type) ? runtime.true_value() : runtime.false_value();
+        }
+
+        TypeObject *require_type_instance(Runtime &runtime, Object *instance, const char *name)
+        {
+            auto *type = dynamic_cast<TypeObject *>(instance);
+            if (!type)
+                raise_type_error(&runtime, std::string(name) + " descriptor receiver does not have type layout");
+            return type;
+        }
+
+        Object *type_base_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            TypeObject *type = require_type_instance(runtime, instance, "__base__");
+            return type->base ? static_cast<Object *>(type->base) : static_cast<Object *>(runtime.none());
+        }
+
+        Object *type_bases_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            TypeObject *type = require_type_instance(runtime, instance, "__bases__");
+            std::vector<Object *> bases;
+            bases.reserve(type->bases.size());
+            for (TypeObject *base : type->bases)
+                bases.push_back(base);
+            return runtime.new_tuple(std::move(bases));
+        }
+
+        Object *type_mro_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            TypeObject *type = require_type_instance(runtime, instance, "__mro__");
+            std::vector<Object *> mro;
+            mro.reserve(type->mro.size());
+            for (TypeObject *item : type->mro)
+                mro.push_back(item);
+            return runtime.new_tuple(std::move(mro));
+        }
+
+        Object *type_qualname_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            TypeObject *type = require_type_instance(runtime, instance, "__qualname__");
+            if (type->dict)
+            {
+                if (auto *qualname = dynamic_cast<StrObject *>(type->dict->get(runtime.new_str("__qualname__"))))
+                    return qualname;
+            }
+            return runtime.new_str(type->name);
         }
 
         bool is_not_implemented(Object *object)
@@ -1008,6 +1333,102 @@ namespace cxxpython
             .traverse = type_traverse,
             .call = type_call,
         };
+    }
+
+    void initialize_object_type_methods(Runtime &runtime, TypeObject *type)
+    {
+        type->dict->set(runtime.new_str("__getattribute__"),
+                        runtime.new_method_descriptor("__getattribute__", type, object_getattribute_method));
+        type->dict->set(runtime.new_str("__new__"),
+                        runtime.new_method_descriptor("__new__", type, object_new_method));
+        type->dict->set(runtime.new_str("__init__"),
+                        runtime.new_method_descriptor("__init__", type, object_init_method));
+        type->dict->set(runtime.new_str("__str__"),
+                        runtime.new_method_descriptor("__str__", type, object_str_method));
+        type->dict->set(runtime.new_str("__format__"),
+                        runtime.new_method_descriptor("__format__", type, object_format_method));
+        type->dict->set(runtime.new_str("__bool__"),
+                        runtime.new_method_descriptor("__bool__", type, object_bool_method));
+        type->dict->set(runtime.new_str("__dir__"),
+                        runtime.new_method_descriptor("__dir__", type, object_dir_method));
+        type->dict->set(runtime.new_str("__sizeof__"),
+                        runtime.new_method_descriptor("__sizeof__", type, object_sizeof_method));
+        type->dict->set(runtime.new_str("__getstate__"),
+                        runtime.new_method_descriptor("__getstate__", type, object_getstate_method));
+        type->dict->set(runtime.new_str("__init_subclass__"),
+                        runtime.new_method_descriptor("__init_subclass__", type, object_init_subclass_method));
+        type->dict->set(runtime.new_str("__subclasshook__"),
+                        runtime.new_method_descriptor("__subclasshook__", type, object_subclasshook_method));
+        type->dict->set(runtime.new_str("__setattr__"),
+                        runtime.new_method_descriptor("__setattr__", type, object_setattr_method));
+        type->dict->set(runtime.new_str("__delattr__"),
+                        runtime.new_method_descriptor("__delattr__", type, object_delattr_method));
+    }
+
+    void initialize_type_type_methods(Runtime &runtime, TypeObject *type)
+    {
+        type->dict->set(runtime.new_str("__call__"),
+                        runtime.new_method_descriptor("__call__", type, type_call_method));
+        type->dict->set(runtime.new_str("__new__"),
+                        runtime.new_method_descriptor("__new__", type, type_new_method));
+        type->dict->set(runtime.new_str("__init__"),
+                        runtime.new_method_descriptor("__init__", type, type_init_method));
+        type->dict->set(runtime.new_str("__prepare__"),
+                        runtime.new_method_descriptor("__prepare__", type, type_prepare_method));
+        type->dict->set(runtime.new_str("mro"),
+                        runtime.new_method_descriptor("mro", type, type_mro_method));
+        type->dict->set(runtime.new_str("__instancecheck__"),
+                        runtime.new_method_descriptor("__instancecheck__", type, type_instancecheck_method));
+        type->dict->set(runtime.new_str("__subclasscheck__"),
+                        runtime.new_method_descriptor("__subclasscheck__", type, type_subclasscheck_method));
+    }
+
+    void initialize_object_type_descriptors(Runtime &runtime, TypeObject *type)
+    {
+        type->dict->set(runtime.new_str("__class__"),
+                        runtime.new_getset_descriptor("__class__",
+                                                      type,
+                                                      class_getter,
+                                                      class_setter));
+        type->dict->set(runtime.new_str("__dict__"),
+                        runtime.new_getset_descriptor("__dict__",
+                                                      type,
+                                                      dict_getter,
+                                                      dict_setter));
+        type->dict->set(runtime.new_str("__doc__"),
+                        runtime.new_getset_descriptor("__doc__",
+                                                      type,
+                                                      doc_getter,
+                                                      nullptr));
+    }
+
+    void initialize_type_type_descriptors(Runtime &runtime, TypeObject *type)
+    {
+        type->dict->set(runtime.new_str("__base__"),
+                        runtime.new_getset_descriptor("__base__",
+                                                      type,
+                                                      type_base_getter,
+                                                      nullptr));
+        type->dict->set(runtime.new_str("__bases__"),
+                        runtime.new_getset_descriptor("__bases__",
+                                                      type,
+                                                      type_bases_getter,
+                                                      nullptr));
+        type->dict->set(runtime.new_str("__mro__"),
+                        runtime.new_getset_descriptor("__mro__",
+                                                      type,
+                                                      type_mro_getter,
+                                                      nullptr));
+        type->dict->set(runtime.new_str("__qualname__"),
+                        runtime.new_getset_descriptor("__qualname__",
+                                                      type,
+                                                      type_qualname_getter,
+                                                      nullptr));
+    }
+
+    void initialize_object_slot_wrappers(Runtime &, TypeObject *type)
+    {
+        add_common_object_slot_wrappers(type, true);
     }
 
     void raise_type_error(Runtime *runtime, std::string message)

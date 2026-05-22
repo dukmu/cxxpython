@@ -2,6 +2,7 @@
 #include "cxxpython/runtime.hpp"
 
 #include "object_utils.hpp"
+#include "type_initialization.hpp"
 
 #include <charconv>
 #include <utility>
@@ -322,6 +323,23 @@ namespace cxxpython
         {
             validate_str_constructor_args(object.runtime(), args);
         }
+
+        Object *int_bool_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (!args.empty())
+                raise_type_error(&runtime, "int.__bool__() takes exactly zero arguments");
+            return is_true(self) ? runtime.true_value() : runtime.false_value();
+        }
+
+        Object *int_identity_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (!args.empty())
+                raise_type_error(&runtime, "int conversion method takes exactly zero arguments");
+            auto *integer = dynamic_cast<IntObject *>(self);
+            if (!integer)
+                raise_type_error(&runtime, "int conversion receiver does not have int layout");
+            return integer;
+        }
     }
 
     NoneObject::NoneObject(TypeObject *type)
@@ -420,5 +438,47 @@ namespace cxxpython
             .new_object = str_new,
             .init = str_init,
         };
+    }
+
+    void initialize_none_slot_wrappers(Runtime &, TypeObject *type)
+    {
+        add_common_object_slot_wrappers(type, true);
+    }
+
+    void initialize_not_implemented_slot_wrappers(Runtime &, TypeObject *type)
+    {
+        add_common_object_slot_wrappers(type, true);
+    }
+
+    void initialize_int_type_methods(Runtime &runtime, TypeObject *type)
+    {
+        type->dict->set(runtime.new_str("__bool__"),
+                        runtime.new_method_descriptor("__bool__", type, int_bool_method));
+        type->dict->set(runtime.new_str("__int__"),
+                        runtime.new_method_descriptor("__int__", type, int_identity_method));
+        type->dict->set(runtime.new_str("__index__"),
+                        runtime.new_method_descriptor("__index__", type, int_identity_method));
+    }
+
+    void initialize_int_slot_wrappers(Runtime &, TypeObject *type)
+    {
+        add_common_object_slot_wrappers(type, true);
+        add_order_slot_wrappers(type);
+        add_numeric_slot_wrappers(type);
+    }
+
+    void initialize_bool_slot_wrappers(Runtime &, TypeObject *type)
+    {
+        add_common_object_slot_wrappers(type, true);
+        add_order_slot_wrappers(type);
+        add_numeric_slot_wrappers(type);
+    }
+
+    void initialize_str_slot_wrappers(Runtime &, TypeObject *type)
+    {
+        add_common_object_slot_wrappers(type, true);
+        add_order_slot_wrappers(type);
+        add_slot_wrapper(type, "__add__", SlotWrapperKind::BinaryOp, BinaryOp::Add);
+        add_sequence_slot_wrappers(type, false);
     }
 }

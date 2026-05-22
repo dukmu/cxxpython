@@ -132,6 +132,42 @@ namespace cxxpython
                    (code->has_varargs() ? 1U : 0U) +
                    (code->has_varkeywords() ? 1U : 0U);
         }
+
+        PythonFunctionObject *require_function_instance(Runtime &runtime, Object *instance, const char *name)
+        {
+            auto *function = dynamic_cast<PythonFunctionObject *>(instance);
+            if (!function)
+                raise_type_error(&runtime, std::string(name) + " descriptor receiver does not have function layout");
+            return function;
+        }
+
+        Object *function_name_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            return runtime.new_str(require_function_instance(runtime, instance, "__name__")->name());
+        }
+
+        Object *function_qualname_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            return runtime.new_str(require_function_instance(runtime, instance, "__qualname__")->name());
+        }
+
+        Object *function_code_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            return require_function_instance(runtime, instance, "__code__")->code();
+        }
+
+        Object *function_globals_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            return require_function_instance(runtime, instance, "__globals__")->globals();
+        }
+
+        Object *function_module_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            PythonFunctionObject *function = require_function_instance(runtime, instance, "__module__");
+            if (auto *module = dynamic_cast<StrObject *>(function->globals()->get(runtime.new_str("__name__"))))
+                return module;
+            return runtime.none();
+        }
     }
 
     PythonFunctionObject::PythonFunctionObject(TypeObject *type,
@@ -298,5 +334,34 @@ namespace cxxpython
             .traverse = method_traverse,
             .call = method_call,
         };
+    }
+
+    void initialize_function_type_descriptors(Runtime &runtime, TypeObject *type)
+    {
+        type->dict->set(runtime.new_str("__name__"),
+                        runtime.new_getset_descriptor("__name__",
+                                                      type,
+                                                      function_name_getter,
+                                                      nullptr));
+        type->dict->set(runtime.new_str("__qualname__"),
+                        runtime.new_getset_descriptor("__qualname__",
+                                                      type,
+                                                      function_qualname_getter,
+                                                      nullptr));
+        type->dict->set(runtime.new_str("__code__"),
+                        runtime.new_getset_descriptor("__code__",
+                                                      type,
+                                                      function_code_getter,
+                                                      nullptr));
+        type->dict->set(runtime.new_str("__globals__"),
+                        runtime.new_getset_descriptor("__globals__",
+                                                      type,
+                                                      function_globals_getter,
+                                                      nullptr));
+        type->dict->set(runtime.new_str("__module__"),
+                        runtime.new_getset_descriptor("__module__",
+                                                      type,
+                                                      function_module_getter,
+                                                      nullptr));
     }
 }

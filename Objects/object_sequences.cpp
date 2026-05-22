@@ -2,6 +2,7 @@
 #include "cxxpython/runtime.hpp"
 
 #include "object_utils.hpp"
+#include "type_initialization.hpp"
 
 #include <cstddef>
 #include <sstream>
@@ -140,6 +141,24 @@ namespace cxxpython
         {
             require_no_keywords(object.runtime(), "list", args);
             require_positional_at_most(object.runtime(), "list", args, 1);
+        }
+
+        Object *list_append_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (args.size() != 1)
+            {
+                std::ostringstream message;
+                message << "list.append() takes exactly one argument ("
+                        << args.size() << " given)";
+                raise_type_error(&runtime, message.str());
+            }
+
+            auto *list = dynamic_cast<ListObject *>(self);
+            if (!list)
+                raise_type_error(&runtime, "list.append() receiver does not have list layout");
+
+            list->append(args[0]);
+            return runtime.none();
         }
 
         std::string tuple_repr(const Object &object)
@@ -354,5 +373,23 @@ namespace cxxpython
             .new_object = tuple_new,
             .init = tuple_init,
         };
+    }
+
+    void initialize_list_type_methods(Runtime &runtime, TypeObject *type)
+    {
+        type->dict->set(runtime.new_str("append"),
+                        runtime.new_method_descriptor("append", type, list_append_method));
+    }
+
+    void initialize_list_slot_wrappers(Runtime &, TypeObject *type)
+    {
+        add_common_object_slot_wrappers(type, false);
+        add_sequence_slot_wrappers(type, true);
+    }
+
+    void initialize_tuple_slot_wrappers(Runtime &, TypeObject *type)
+    {
+        add_common_object_slot_wrappers(type, true);
+        add_sequence_slot_wrappers(type, false);
     }
 }

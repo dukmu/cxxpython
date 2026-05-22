@@ -2,6 +2,7 @@
 #include "cxxpython/runtime.hpp"
 
 #include "object_utils.hpp"
+#include "type_initialization.hpp"
 
 #include <cstddef>
 #include <sstream>
@@ -544,5 +545,41 @@ namespace cxxpython
             .new_object = filter_new,
             .init = filter_init,
         };
+    }
+
+    void initialize_range_slot_wrappers(Runtime &, TypeObject *type)
+    {
+        add_common_object_slot_wrappers(type, true);
+        add_sequence_slot_wrappers(type, false);
+    }
+
+    void initialize_range_iterator_slot_wrappers(Runtime &, TypeObject *type)
+    {
+        add_slot_wrapper(type, "__iter__", SlotWrapperKind::Iter);
+        add_slot_wrapper(type, "__next__", SlotWrapperKind::Next);
+    }
+
+    void initialize_enumerate_slot_wrappers(Runtime &, TypeObject *type)
+    {
+        add_slot_wrapper(type, "__iter__", SlotWrapperKind::Iter);
+        add_slot_wrapper(type, "__next__", SlotWrapperKind::Next);
+    }
+
+    void initialize_zip_slot_wrappers(Runtime &, TypeObject *type)
+    {
+        add_slot_wrapper(type, "__iter__", SlotWrapperKind::Iter);
+        add_slot_wrapper(type, "__next__", SlotWrapperKind::Next);
+    }
+
+    void initialize_map_slot_wrappers(Runtime &, TypeObject *type)
+    {
+        add_slot_wrapper(type, "__iter__", SlotWrapperKind::Iter);
+        add_slot_wrapper(type, "__next__", SlotWrapperKind::Next);
+    }
+
+    void initialize_filter_slot_wrappers(Runtime &, TypeObject *type)
+    {
+        add_slot_wrapper(type, "__iter__", SlotWrapperKind::Iter);
+        add_slot_wrapper(type, "__next__", SlotWrapperKind::Next);
     }
 }

@@ -2,6 +2,7 @@
 #include "cxxpython/runtime.hpp"
 
 #include "object_utils.hpp"
+#include "type_initialization.hpp"
 
 namespace cxxpython
 {
@@ -121,5 +122,11 @@ namespace cxxpython
             .iter = iterator_iter,
             .iternext = dict_key_iterator_next,
         };
+    }
+
+    void initialize_iterator_slot_wrappers(Runtime &, TypeObject *type)
+    {
+        add_slot_wrapper(type, "__iter__", SlotWrapperKind::Iter);
+        add_slot_wrapper(type, "__next__", SlotWrapperKind::Next);
     }
 }
