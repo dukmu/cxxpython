@@ -1,4 +1,7 @@
 #include "cxxpython/bytecode.hpp"
+#include "cxxpython/runtime.hpp"
+
+#include "../Objects/type_initialization.hpp"
 
 #include <algorithm>
 #include <optional>
@@ -21,6 +24,83 @@ namespace cxxpython
 
     namespace
     {
+        CodeObject *require_code_instance(Runtime &runtime, Object *instance, const char *name)
+        {
+            auto *code = dynamic_cast<CodeObject *>(instance);
+            if (!code)
+                raise_type_error(&runtime, std::string(name) + " descriptor receiver does not have code layout");
+            return code;
+        }
+
+        Object *code_name_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            return runtime.new_str(require_code_instance(runtime, instance, "co_name")->name());
+        }
+
+        Object *code_filename_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            return runtime.new_str(require_code_instance(runtime, instance, "co_filename")->filename());
+        }
+
+        Object *code_argcount_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            return runtime.new_int(static_cast<std::int64_t>(
+                require_code_instance(runtime, instance, "co_argcount")->arg_count()));
+        }
+
+        Object *code_flags_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            return runtime.new_int(static_cast<std::int64_t>(
+                require_code_instance(runtime, instance, "co_flags")->flags()));
+        }
+
+        Object *code_stacksize_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            return runtime.new_int(static_cast<std::int64_t>(
+                require_code_instance(runtime, instance, "co_stacksize")->stack_size()));
+        }
+
+        Object *tuple_from_object_vector(Runtime &runtime, const std::vector<Object *> &items)
+        {
+            std::vector<Object *> copied(items.begin(), items.end());
+            return runtime.new_tuple(std::move(copied));
+        }
+
+        Object *code_consts_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            return tuple_from_object_vector(runtime, require_code_instance(runtime, instance, "co_consts")->constants());
+        }
+
+        Object *code_names_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            return tuple_from_object_vector(runtime, require_code_instance(runtime, instance, "co_names")->names());
+        }
+
+        Object *code_varnames_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            return tuple_from_object_vector(runtime, require_code_instance(runtime, instance, "co_varnames")->varnames());
+        }
+
+        Object *code_cellvars_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            return tuple_from_object_vector(runtime, require_code_instance(runtime, instance, "co_cellvars")->cellvars());
+        }
+
+        Object *code_freevars_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            return tuple_from_object_vector(runtime, require_code_instance(runtime, instance, "co_freevars")->freevars());
+        }
+
+        Object *code_firstlineno_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            CodeObject *code = require_code_instance(runtime, instance, "co_firstlineno");
+            std::uint32_t line = 0;
+            const std::vector<std::uint32_t> &lines = code->lines();
+            if (!lines.empty())
+                line = lines.front();
+            return runtime.new_int(static_cast<std::int64_t>(line));
+        }
+
         std::string code_repr(const Object &object)
         {
             auto *code = static_cast<const CodeObject *>(&object);
@@ -76,6 +156,65 @@ namespace cxxpython
                     visitor(freevar);
             }
         }
+    }
+
+    void initialize_code_type_descriptors(Runtime &runtime, TypeObject *type)
+    {
+        type->dict->set(runtime.new_str("co_name"),
+                        runtime.new_getset_descriptor("co_name",
+                                                      type,
+                                                      code_name_getter,
+                                                      nullptr));
+        type->dict->set(runtime.new_str("co_filename"),
+                        runtime.new_getset_descriptor("co_filename",
+                                                      type,
+                                                      code_filename_getter,
+                                                      nullptr));
+        type->dict->set(runtime.new_str("co_argcount"),
+                        runtime.new_getset_descriptor("co_argcount",
+                                                      type,
+                                                      code_argcount_getter,
+                                                      nullptr));
+        type->dict->set(runtime.new_str("co_flags"),
+                        runtime.new_getset_descriptor("co_flags",
+                                                      type,
+                                                      code_flags_getter,
+                                                      nullptr));
+        type->dict->set(runtime.new_str("co_stacksize"),
+                        runtime.new_getset_descriptor("co_stacksize",
+                                                      type,
+                                                      code_stacksize_getter,
+                                                      nullptr));
+        type->dict->set(runtime.new_str("co_consts"),
+                        runtime.new_getset_descriptor("co_consts",
+                                                      type,
+                                                      code_consts_getter,
+                                                      nullptr));
+        type->dict->set(runtime.new_str("co_names"),
+                        runtime.new_getset_descriptor("co_names",
+                                                      type,
+                                                      code_names_getter,
+                                                      nullptr));
+        type->dict->set(runtime.new_str("co_varnames"),
+                        runtime.new_getset_descriptor("co_varnames",
+                                                      type,
+                                                      code_varnames_getter,
+                                                      nullptr));
+        type->dict->set(runtime.new_str("co_cellvars"),
+                        runtime.new_getset_descriptor("co_cellvars",
+                                                      type,
+                                                      code_cellvars_getter,
+                                                      nullptr));
+        type->dict->set(runtime.new_str("co_freevars"),
+                        runtime.new_getset_descriptor("co_freevars",
+                                                      type,
+                                                      code_freevars_getter,
+                                                      nullptr));
+        type->dict->set(runtime.new_str("co_firstlineno"),
+                        runtime.new_getset_descriptor("co_firstlineno",
+                                                      type,
+                                                      code_firstlineno_getter,
+                                                      nullptr));
     }
 
     CodeObject::CodeObject(TypeObject *type,

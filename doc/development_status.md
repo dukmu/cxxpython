@@ -1,5 +1,51 @@
 # Development Status
 
+## 2026-05-22 Code And Frame Descriptor Ownership Slice
+
+Review focus:
+
+- Finish the earlier type-dictionary ownership rule: a type's visible
+  descriptors should be declared next to the type implementation.
+- Keep `Python/runtime_type_descriptors.cpp` as bootstrap orchestration only,
+  not as a bucket of unrelated `co_*` and `f_*` descriptors.
+- Preserve script-visible `code` and `frame` introspection behavior.
+
+Completed:
+
+- Moved `CodeObject` descriptors from `Python/runtime_type_descriptors.cpp`
+  into `Python/bytecode.cpp`:
+  - `co_name`, `co_filename`, `co_argcount`, `co_flags`, `co_stacksize`;
+  - `co_consts`, `co_names`, `co_varnames`, `co_cellvars`, `co_freevars`;
+  - `co_firstlineno`.
+- Moved `Frame` descriptors from `Python/runtime_type_descriptors.cpp` into
+  `Python/vm.cpp`:
+  - `f_code`, `f_locals`, `f_globals`, `f_builtins`, `f_lasti`, `f_lineno`.
+- Reduced `Python/runtime_type_descriptors.cpp` to the narrow
+  `Runtime::initialize_type_descriptors()` dispatcher.
+- Updated historical status notes that previously described code/frame
+  descriptors as centralized runtime registrations.
+
+Design notes:
+
+- `CodeObject` metadata belongs with bytecode because it is bytecode layout,
+  not generic runtime policy.
+- `Frame` metadata belongs with VM/frame implementation because it exposes
+  execution state and line tracking.
+- The internal `Objects/type_initialization.hpp` remains the bootstrap wiring
+  point, but concrete descriptor getter logic now lives with the owning type.
+
+Known debt and next risk:
+
+- `Runtime::initialize_type_descriptors()` is still a central call sequence;
+  that is acceptable bootstrap wiring, but new type descriptors should be
+  declared in the owning object/module file first.
+- Native module functions outside `builtins` still need doc/signature metadata.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+
 ## 2026-05-22 Callable Metadata Slice
 
 Review focus:
@@ -205,7 +251,8 @@ Completed:
     `type.__qualname__` in `Objects/object_core.cpp`;
   - function descriptors such as `__code__`, `__globals__`, and `__module__`
     in `Objects/object_function.cpp`;
-  - code/frame execution descriptors kept in `Python/runtime_type_descriptors.cpp`.
+  - code descriptors have since moved to `Python/bytecode.cpp`;
+  - frame descriptors have since moved to `Python/vm.cpp`.
 - Split slot wrapper installation so sequence, mapping, iterator, primitive,
   and iterable types each declare their own wrappers, while
   `Objects/object_slot_wrapper.cpp` only owns the wrapper descriptor object and
@@ -216,10 +263,9 @@ Design notes:
 - This mirrors the CPython shape more closely: a type implementation owns its
   visible methods and attributes; descriptor object files own descriptor
   behavior, not every other type's initialization.
-- `code` and `frame` descriptors intentionally remain in the Python/runtime
-  layer because they depend on bytecode and VM frame metadata. Moving them into
-  foundational object files would reintroduce the execution dependency we just
-  removed.
+- `code` and `frame` descriptors now live with their owning execution types in
+  `Python/bytecode.cpp` and `Python/vm.cpp`, keeping foundational object files
+  independent from execution metadata.
 - The new initialization header is internal to core sources. Public
   `Include/cxxpython/object.hpp` still exposes object layout, slots, protocol
   entrypoints, and type slot factories, not runtime bootstrap wiring.
@@ -547,8 +593,10 @@ Completed:
   its slots only.
 - Moved runtime registration of `__class__`, `__dict__`, `__doc__`,
   `type.__base__`, `type.__bases__`, `type.__mro__`, `type.__qualname__`,
-  code-object attributes, function attributes, and frame attributes into
-  `Python/runtime_type_descriptors.cpp`.
+  code-object attributes, function attributes, and frame attributes out of
+  `Objects/object_descriptor.cpp`. Code/frame descriptors have since moved
+  from the runtime dispatcher into their owning `Python/bytecode.cpp` and
+  `Python/vm.cpp` implementations.
 - Added the new runtime descriptor translation unit to the core build.
 - Verified that descriptor mechanics no longer pull `bytecode.hpp` or
   `vm.hpp` into the descriptor object implementation.
@@ -558,9 +606,9 @@ Design notes:
 - `GetSetDescriptorObject` is now a reusable object-layer primitive.
   Per-type descriptor registration is runtime bootstrapping policy, not part
   of the descriptor object's storage/dispatch implementation.
-- Code/function/frame attributes remain intentionally registered from the
-  Python/runtime side because they expose execution objects to the script
-  layer and require bytecode/VM layouts.
+- Code/frame attributes remain in the Python execution layer because they
+  expose bytecode and VM layouts. Function attributes live with
+  `Objects/object_function.cpp`.
 - This split is behavior-preserving; it is an architecture slice before adding
   richer descriptor and introspection protocols.
 

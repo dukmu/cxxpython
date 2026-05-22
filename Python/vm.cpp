@@ -1,6 +1,7 @@
 #include "cxxpython/vm.hpp"
 
 #include "../Objects/object_utils.hpp"
+#include "../Objects/type_initialization.hpp"
 
 #include <sstream>
 #include <utility>
@@ -103,6 +104,47 @@ namespace cxxpython
         {
             (void)object;
             return true;
+        }
+
+        Frame *require_frame_instance(Runtime &runtime, Object *instance, const char *name)
+        {
+            auto *frame = dynamic_cast<Frame *>(instance);
+            if (!frame)
+                raise_type_error(&runtime, std::string(name) + " descriptor receiver does not have frame layout");
+            return frame;
+        }
+
+        Object *frame_code_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            return require_frame_instance(runtime, instance, "f_code")->code();
+        }
+
+        Object *frame_locals_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            return require_frame_instance(runtime, instance, "f_locals")->locals();
+        }
+
+        Object *frame_globals_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            return require_frame_instance(runtime, instance, "f_globals")->globals();
+        }
+
+        Object *frame_builtins_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            return require_frame_instance(runtime, instance, "f_builtins")->builtins();
+        }
+
+        Object *frame_lasti_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            Frame *frame = require_frame_instance(runtime, instance, "f_lasti");
+            return runtime.new_int(static_cast<std::int64_t>(frame->last_instruction_index()));
+        }
+
+        Object *frame_lineno_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            Frame *frame = require_frame_instance(runtime, instance, "f_lineno");
+            return runtime.new_int(static_cast<std::int64_t>(
+                frame->code()->line_for_instruction(frame->last_instruction_index())));
         }
 
         std::string module_name_from_globals(Runtime &runtime, DictObject &globals)
@@ -238,6 +280,40 @@ namespace cxxpython
             Runtime &runtime_;
             VirtualMachine *previous_;
         };
+    }
+
+    void initialize_frame_type_descriptors(Runtime &runtime, TypeObject *type)
+    {
+        type->dict->set(runtime.new_str("f_code"),
+                        runtime.new_getset_descriptor("f_code",
+                                                      type,
+                                                      frame_code_getter,
+                                                      nullptr));
+        type->dict->set(runtime.new_str("f_locals"),
+                        runtime.new_getset_descriptor("f_locals",
+                                                      type,
+                                                      frame_locals_getter,
+                                                      nullptr));
+        type->dict->set(runtime.new_str("f_globals"),
+                        runtime.new_getset_descriptor("f_globals",
+                                                      type,
+                                                      frame_globals_getter,
+                                                      nullptr));
+        type->dict->set(runtime.new_str("f_builtins"),
+                        runtime.new_getset_descriptor("f_builtins",
+                                                      type,
+                                                      frame_builtins_getter,
+                                                      nullptr));
+        type->dict->set(runtime.new_str("f_lasti"),
+                        runtime.new_getset_descriptor("f_lasti",
+                                                      type,
+                                                      frame_lasti_getter,
+                                                      nullptr));
+        type->dict->set(runtime.new_str("f_lineno"),
+                        runtime.new_getset_descriptor("f_lineno",
+                                                      type,
+                                                      frame_lineno_getter,
+                                                      nullptr));
     }
 
     Frame::Frame(TypeObject *type,
