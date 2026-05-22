@@ -712,6 +712,141 @@ TEST(Compile, CompilesSubscriptLoadAndStore)
     EXPECT_EQ(stored->value, "updated");
 }
 
+TEST(Compile, CompilesAndExecutesAugmentedAssignment)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(
+        runtime,
+        "x = 4\n"
+        "x += 3\n"
+        "x *= 2\n"
+        "x -= 5\n",
+        "script.py");
+    ASSERT_NE(code, nullptr);
+
+    bool saw_inplace = false;
+    for (const cxxpython::Instruction &instruction : code->instructions())
+    {
+        if (instruction.opcode == cxxpython::Opcode::InplaceBinaryOp)
+            saw_inplace = true;
+    }
+    EXPECT_TRUE(saw_inplace);
+
+    EXPECT_EQ(vm.execute(*code, *globals), runtime.none());
+    auto *result = dynamic_cast<cxxpython::IntObject *>(globals->get(runtime.new_str("x")));
+    ASSERT_NE(result, nullptr);
+    EXPECT_EQ(result->value, 9);
+}
+
+TEST(Compile, AugmentedAssignmentEvaluatesAttributeTargetOnce)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(
+        runtime,
+        "class Box:\n"
+        "    pass\n"
+        "def get_box():\n"
+        "    global hits\n"
+        "    hits += 1\n"
+        "    return box\n"
+        "box = Box()\n"
+        "box.value = 2\n"
+        "hits = 0\n"
+        "get_box().value += 5\n",
+        "script.py");
+    ASSERT_NE(code, nullptr);
+
+    EXPECT_EQ(vm.execute(*code, *globals), runtime.none());
+    auto *hits = dynamic_cast<cxxpython::IntObject *>(globals->get(runtime.new_str("hits")));
+    ASSERT_NE(hits, nullptr);
+    EXPECT_EQ(hits->value, 1);
+    cxxpython::Object *box = globals->get(runtime.new_str("box"));
+    ASSERT_NE(box, nullptr);
+    auto *value = dynamic_cast<cxxpython::IntObject *>(cxxpython::object_get_attr(box, "value"));
+    ASSERT_NE(value, nullptr);
+    EXPECT_EQ(value->value, 7);
+}
+
+TEST(Compile, AugmentedAssignmentEvaluatesSubscriptTargetOnce)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(
+        runtime,
+        "def get_list():\n"
+        "    global object_hits\n"
+        "    object_hits += 1\n"
+        "    return xs\n"
+        "def get_index():\n"
+        "    global index_hits\n"
+        "    index_hits += 1\n"
+        "    return 0\n"
+        "xs = [2]\n"
+        "object_hits = 0\n"
+        "index_hits = 0\n"
+        "get_list()[get_index()] *= 4\n",
+        "script.py");
+    ASSERT_NE(code, nullptr);
+
+    bool saw_dup_two = false;
+    for (const cxxpython::Instruction &instruction : code->instructions())
+    {
+        if (instruction.opcode == cxxpython::Opcode::DupTwo)
+            saw_dup_two = true;
+    }
+    EXPECT_TRUE(saw_dup_two);
+
+    EXPECT_EQ(vm.execute(*code, *globals), runtime.none());
+    auto *object_hits = dynamic_cast<cxxpython::IntObject *>(globals->get(runtime.new_str("object_hits")));
+    auto *index_hits = dynamic_cast<cxxpython::IntObject *>(globals->get(runtime.new_str("index_hits")));
+    ASSERT_NE(object_hits, nullptr);
+    ASSERT_NE(index_hits, nullptr);
+    EXPECT_EQ(object_hits->value, 1);
+    EXPECT_EQ(index_hits->value, 1);
+    auto *list = dynamic_cast<cxxpython::ListObject *>(globals->get(runtime.new_str("xs")));
+    ASSERT_NE(list, nullptr);
+    auto *value = dynamic_cast<cxxpython::IntObject *>(list->get(0));
+    ASSERT_NE(value, nullptr);
+    EXPECT_EQ(value->value, 8);
+}
+
+TEST(Compile, AugmentedAssignmentSupportsGlobalAndNonlocalBindings)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(
+        runtime,
+        "value = 1\n"
+        "def bump_global():\n"
+        "    global value\n"
+        "    value += 4\n"
+        "def outer():\n"
+        "    item = 3\n"
+        "    def bump_nonlocal():\n"
+        "        nonlocal item\n"
+        "        item += 5\n"
+        "    bump_nonlocal()\n"
+        "    return item\n"
+        "bump_global()\n"
+        "result = outer()\n",
+        "script.py");
+    ASSERT_NE(code, nullptr);
+
+    EXPECT_EQ(vm.execute(*code, *globals), runtime.none());
+    auto *value = dynamic_cast<cxxpython::IntObject *>(globals->get(runtime.new_str("value")));
+    auto *result = dynamic_cast<cxxpython::IntObject *>(globals->get(runtime.new_str("result")));
+    ASSERT_NE(value, nullptr);
+    ASSERT_NE(result, nullptr);
+    EXPECT_EQ(value->value, 5);
+    EXPECT_EQ(result->value, 8);
+}
+
 TEST(Compile, CompilesNameAndSubscriptDelete)
 {
     cxxpython::Runtime runtime;

@@ -343,17 +343,35 @@ namespace cxxpython::compiler_internal
 
             if (ch == '+')
             {
-                tokens.push_back(Token{TokenKind::Plus, "+", 0, line, column});
-                ++index;
-                ++column;
+                if (index + 1 < source.size() && source[index + 1] == '=')
+                {
+                    tokens.push_back(Token{TokenKind::PlusEqual, "+=", 0, line, column});
+                    index += 2;
+                    column += 2;
+                }
+                else
+                {
+                    tokens.push_back(Token{TokenKind::Plus, "+", 0, line, column});
+                    ++index;
+                    ++column;
+                }
                 continue;
             }
 
             if (ch == '-')
             {
-                tokens.push_back(Token{TokenKind::Minus, "-", 0, line, column});
-                ++index;
-                ++column;
+                if (index + 1 < source.size() && source[index + 1] == '=')
+                {
+                    tokens.push_back(Token{TokenKind::MinusEqual, "-=", 0, line, column});
+                    index += 2;
+                    column += 2;
+                }
+                else
+                {
+                    tokens.push_back(Token{TokenKind::Minus, "-", 0, line, column});
+                    ++index;
+                    ++column;
+                }
                 continue;
             }
 
@@ -362,6 +380,12 @@ namespace cxxpython::compiler_internal
                 if (index + 1 < source.size() && source[index + 1] == '*')
                 {
                     tokens.push_back(Token{TokenKind::DoubleStar, "**", 0, line, column});
+                    index += 2;
+                    column += 2;
+                }
+                else if (index + 1 < source.size() && source[index + 1] == '=')
+                {
+                    tokens.push_back(Token{TokenKind::StarEqual, "*=", 0, line, column});
                     index += 2;
                     column += 2;
                 }

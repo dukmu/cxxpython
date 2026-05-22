@@ -283,42 +283,7 @@ namespace cxxpython
 
             void visit(const compiler_internal::NameExpr &expression) override
             {
-                if (symbols_.scope() == SymbolScope::Function && symbols_.is_global(expression.value))
-                {
-                    emit({
-                        Opcode::LoadGlobal,
-                        static_cast<std::uint32_t>(name_index(expression.value)),
-                    });
-                    return;
-                }
-                if (symbols_.scope() == SymbolScope::Function && symbols_.is_cellvar(expression.value))
-                {
-                    emit({
-                        Opcode::LoadDeref,
-                        static_cast<std::uint32_t>(deref_index(expression.value)),
-                    });
-                    return;
-                }
-                if (symbols_.scope() == SymbolScope::Function && symbols_.is_freevar(expression.value))
-                {
-                    emit({
-                        Opcode::LoadDeref,
-                        static_cast<std::uint32_t>(deref_index(expression.value)),
-                    });
-                    return;
-                }
-                if (symbols_.scope() == SymbolScope::Function && symbols_.is_local(expression.value))
-                {
-                    emit({
-                        Opcode::LoadFast,
-                        static_cast<std::uint32_t>(local_index(expression.value)),
-                    });
-                    return;
-                }
-                emit({
-                    Opcode::LoadName,
-                    static_cast<std::uint32_t>(name_index(expression.value)),
-                });
+                emit_load_name(expression.value);
             }
 
             void visit(const compiler_internal::AttributeExpr &expression) override
@@ -548,6 +513,12 @@ namespace cxxpython
                 StatementLineGuard line(*this, statement);
                 PendingAssignmentValue pending(*this, *statement.value);
                 statement.target->accept(*this);
+            }
+
+            void visit(const compiler_internal::AugAssignStmt &statement) override
+            {
+                StatementLineGuard line(*this, statement);
+                emit_augmented_assignment(*statement.target, statement.op, *statement.value);
             }
 
             void visit(const compiler_internal::DeleteStmt &statement) override
@@ -954,6 +925,57 @@ namespace cxxpython
                 pending_assignment_value_->accept(*this);
             }
 
+            void emit_augmented_assignment(const compiler_internal::AssignTarget &target,
+                                           BinaryOp op,
+                                           const compiler_internal::Expr &value)
+            {
+                if (auto *name = dynamic_cast<const compiler_internal::NameTarget *>(&target))
+                {
+                    emit_load_name(name->name);
+                    value.accept(*this);
+                    emit({
+                        Opcode::InplaceBinaryOp,
+                        static_cast<std::uint32_t>(op),
+                    });
+                    emit_store_name(name->name);
+                    return;
+                }
+                if (auto *attribute = dynamic_cast<const compiler_internal::AttributeTarget *>(&target))
+                {
+                    attribute->object->accept(*this);
+                    emit({Opcode::DupTop, 0});
+                    emit({
+                        Opcode::LoadAttr,
+                        static_cast<std::uint32_t>(name_index(attribute->name)),
+                    });
+                    value.accept(*this);
+                    emit({
+                        Opcode::InplaceBinaryOp,
+                        static_cast<std::uint32_t>(op),
+                    });
+                    emit({
+                        Opcode::StoreAttr,
+                        static_cast<std::uint32_t>(name_index(attribute->name)),
+                    });
+                    return;
+                }
+                if (auto *subscript = dynamic_cast<const compiler_internal::SubscriptTarget *>(&target))
+                {
+                    subscript->object->accept(*this);
+                    subscript->key->accept(*this);
+                    emit({Opcode::DupTwo, 0});
+                    emit({Opcode::BinarySubscr, 0});
+                    value.accept(*this);
+                    emit({
+                        Opcode::InplaceBinaryOp,
+                        static_cast<std::uint32_t>(op),
+                    });
+                    emit({Opcode::StoreSubscr, 0});
+                    return;
+                }
+                raise_syntax_error(&runtime_, "invalid augmented assignment target");
+            }
+
             void emit_import_call(std::string_view module_name, TupleObject *fromlist)
             {
                 emit({
@@ -1095,6 +1117,46 @@ namespace cxxpython
                 }
                 emit({
                     Opcode::StoreName,
+                    static_cast<std::uint32_t>(name_index(name)),
+                });
+            }
+
+            void emit_load_name(const std::string &name)
+            {
+                if (symbols_.scope() == SymbolScope::Function && symbols_.is_global(name))
+                {
+                    emit({
+                        Opcode::LoadGlobal,
+                        static_cast<std::uint32_t>(name_index(name)),
+                    });
+                    return;
+                }
+                if (symbols_.scope() == SymbolScope::Function && symbols_.is_cellvar(name))
+                {
+                    emit({
+                        Opcode::LoadDeref,
+                        static_cast<std::uint32_t>(deref_index(name)),
+                    });
+                    return;
+                }
+                if (symbols_.scope() == SymbolScope::Function && symbols_.is_freevar(name))
+                {
+                    emit({
+                        Opcode::LoadDeref,
+                        static_cast<std::uint32_t>(deref_index(name)),
+                    });
+                    return;
+                }
+                if (symbols_.scope() == SymbolScope::Function && symbols_.is_local(name))
+                {
+                    emit({
+                        Opcode::LoadFast,
+                        static_cast<std::uint32_t>(local_index(name)),
+                    });
+                    return;
+                }
+                emit({
+                    Opcode::LoadName,
                     static_cast<std::uint32_t>(name_index(name)),
                 });
             }

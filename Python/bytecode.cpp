@@ -314,6 +314,8 @@ namespace cxxpython
             return "POP_TOP";
         case Opcode::DupTop:
             return "DUP_TOP";
+        case Opcode::DupTwo:
+            return "DUP_TWO";
         case Opcode::RotTwo:
             return "ROT_TWO";
         case Opcode::RotThree:
@@ -322,6 +324,8 @@ namespace cxxpython
             return "UNARY_OP";
         case Opcode::BinaryOp:
             return "BINARY_OP";
+        case Opcode::InplaceBinaryOp:
+            return "INPLACE_BINARY_OP";
         case Opcode::FormatValue:
             return "FORMAT_VALUE";
         case Opcode::BinarySubscr:
@@ -425,6 +429,8 @@ namespace cxxpython
             return -2;
         case Opcode::DupTop:
             return 1;
+        case Opcode::DupTwo:
+            return 2;
         case Opcode::StoreName:
         case Opcode::StoreGlobal:
         case Opcode::StoreFast:
@@ -439,6 +445,7 @@ namespace cxxpython
         case Opcode::StoreAttr:
             return -2;
         case Opcode::BinaryOp:
+        case Opcode::InplaceBinaryOp:
         case Opcode::BinarySubscr:
         case Opcode::CompareOp:
             return -1;

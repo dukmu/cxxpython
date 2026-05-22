@@ -188,6 +188,22 @@ namespace cxxpython::compiler_internal
                         false,
                     };
                 }
+                if (starts_augmented_assignment())
+                {
+                    const Token &op_token = advance();
+                    std::unique_ptr<Expr> value = parse_expression_only();
+                    std::unique_ptr<AssignTarget> target =
+                        make_assignment_target(std::move(target_or_expression), op_token);
+                    auto statement = std::make_unique<AugAssignStmt>(
+                        std::move(target),
+                        augmented_assignment_op(op_token),
+                        std::move(value));
+                    statement->line = line;
+                    return ParsedStatement{
+                        std::move(statement),
+                        false,
+                    };
+                }
                 auto statement = std::make_unique<ExprStmt>(std::move(target_or_expression));
                 statement->line = line;
                 return ParsedStatement{
@@ -1380,6 +1396,9 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Colon:
                 case TokenKind::Semicolon:
                 case TokenKind::Equal:
+                case TokenKind::PlusEqual:
+                case TokenKind::MinusEqual:
+                case TokenKind::StarEqual:
                 case TokenKind::EqualEqual:
                 case TokenKind::BangEqual:
                 case TokenKind::Less:
@@ -1466,6 +1485,14 @@ namespace cxxpython::compiler_internal
                        (kind == TokenKind::Not && peek_next().kind == TokenKind::In);
             }
 
+            bool starts_augmented_assignment() const
+            {
+                const TokenKind kind = peek().kind;
+                return kind == TokenKind::PlusEqual ||
+                       kind == TokenKind::MinusEqual ||
+                       kind == TokenKind::StarEqual;
+            }
+
             bool starts_statement() const
             {
                 switch (peek().kind)
@@ -1511,6 +1538,9 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Colon:
                 case TokenKind::Semicolon:
                 case TokenKind::Equal:
+                case TokenKind::PlusEqual:
+                case TokenKind::MinusEqual:
+                case TokenKind::StarEqual:
                 case TokenKind::EqualEqual:
                 case TokenKind::BangEqual:
                 case TokenKind::Less:
@@ -1590,6 +1620,9 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Colon:
                 case TokenKind::Semicolon:
                 case TokenKind::Equal:
+                case TokenKind::PlusEqual:
+                case TokenKind::MinusEqual:
+                case TokenKind::StarEqual:
                 case TokenKind::If:
                 case TokenKind::Elif:
                 case TokenKind::Else:
@@ -1623,6 +1656,81 @@ namespace cxxpython::compiler_internal
                     break;
                 }
                 raise_at(token, "expected comparison operator");
+            }
+
+            BinaryOp augmented_assignment_op(const Token &token) const
+            {
+                switch (token.kind)
+                {
+                case TokenKind::PlusEqual:
+                    return BinaryOp::Add;
+                case TokenKind::MinusEqual:
+                    return BinaryOp::Subtract;
+                case TokenKind::StarEqual:
+                    return BinaryOp::Multiply;
+                case TokenKind::Integer:
+                case TokenKind::String:
+                case TokenKind::FString:
+                case TokenKind::Identifier:
+                case TokenKind::Plus:
+                case TokenKind::Minus:
+                case TokenKind::Star:
+                case TokenKind::DoubleStar:
+                case TokenKind::At:
+                case TokenKind::Tilde:
+                case TokenKind::LeftParen:
+                case TokenKind::RightParen:
+                case TokenKind::Comma:
+                case TokenKind::Dot:
+                case TokenKind::LeftBracket:
+                case TokenKind::RightBracket:
+                case TokenKind::LeftBrace:
+                case TokenKind::RightBrace:
+                case TokenKind::Colon:
+                case TokenKind::Semicolon:
+                case TokenKind::Equal:
+                case TokenKind::EqualEqual:
+                case TokenKind::BangEqual:
+                case TokenKind::Less:
+                case TokenKind::LessEqual:
+                case TokenKind::Greater:
+                case TokenKind::GreaterEqual:
+                case TokenKind::If:
+                case TokenKind::Elif:
+                case TokenKind::Else:
+                case TokenKind::For:
+                case TokenKind::While:
+                case TokenKind::Break:
+                case TokenKind::Continue:
+                case TokenKind::Def:
+                case TokenKind::Return:
+                case TokenKind::Raise:
+                case TokenKind::Import:
+                case TokenKind::From:
+                case TokenKind::Global:
+                case TokenKind::Nonlocal:
+                case TokenKind::Try:
+                case TokenKind::Except:
+                case TokenKind::Finally:
+                case TokenKind::As:
+                case TokenKind::In:
+                case TokenKind::Is:
+                case TokenKind::Not:
+                case TokenKind::And:
+                case TokenKind::Or:
+                case TokenKind::Class:
+                case TokenKind::Del:
+                case TokenKind::Pass:
+                case TokenKind::TrueLiteral:
+                case TokenKind::FalseLiteral:
+                case TokenKind::NoneLiteral:
+                case TokenKind::Indent:
+                case TokenKind::Dedent:
+                case TokenKind::Newline:
+                case TokenKind::End:
+                    break;
+                }
+                raise_at(token, "expected augmented assignment operator");
             }
 
             [[noreturn]] void raise_at(const Token &token, const std::string &message) const

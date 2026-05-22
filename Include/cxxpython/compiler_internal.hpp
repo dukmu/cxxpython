@@ -36,6 +36,7 @@ namespace cxxpython::compiler_internal
     struct SubscriptTarget;
     struct ExprStmt;
     struct AssignStmt;
+    struct AugAssignStmt;
     struct DeleteStmt;
     struct IfStmt;
     struct ForStmt;
@@ -88,6 +89,7 @@ namespace cxxpython::compiler_internal
         virtual ~StmtVisitor() = default;
         virtual void visit(const ExprStmt &statement) = 0;
         virtual void visit(const AssignStmt &statement) = 0;
+        virtual void visit(const AugAssignStmt &statement) = 0;
         virtual void visit(const DeleteStmt &statement) = 0;
         virtual void visit(const IfStmt &statement) = 0;
         virtual void visit(const ForStmt &statement) = 0;
@@ -129,6 +131,9 @@ namespace cxxpython::compiler_internal
         Colon,
         Semicolon,
         Equal,
+        PlusEqual,
+        MinusEqual,
+        StarEqual,
         EqualEqual,
         BangEqual,
         Less,
@@ -643,6 +648,23 @@ namespace cxxpython::compiler_internal
         }
 
         std::unique_ptr<AssignTarget> target;
+        std::unique_ptr<Expr> value;
+
+        void accept(StmtVisitor &visitor) const override
+        {
+            visitor.visit(*this);
+        }
+    };
+
+    struct AugAssignStmt final : Stmt
+    {
+        AugAssignStmt(std::unique_ptr<AssignTarget> target_in, BinaryOp op_in, std::unique_ptr<Expr> value_in)
+            : target(std::move(target_in)), op(op_in), value(std::move(value_in))
+        {
+        }
+
+        std::unique_ptr<AssignTarget> target;
+        BinaryOp op;
         std::unique_ptr<Expr> value;
 
         void accept(StmtVisitor &visitor) const override

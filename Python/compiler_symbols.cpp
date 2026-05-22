@@ -154,6 +154,12 @@ namespace cxxpython
                 statement.value->accept(*this);
             }
 
+            void visit(const compiler_internal::AugAssignStmt &statement) override
+            {
+                statement.target->accept(*this);
+                statement.value->accept(*this);
+            }
+
             void visit(const compiler_internal::DeleteStmt &statement) override
             {
                 statement.target->accept(*this);
@@ -320,6 +326,11 @@ namespace cxxpython
                 statement.target->accept(*this);
             }
 
+            void visit(const compiler_internal::AugAssignStmt &statement) override
+            {
+                statement.target->accept(*this);
+            }
+
             void visit(const compiler_internal::DeleteStmt &statement) override
             {
                 statement.target->accept(*this);
@@ -455,6 +466,11 @@ namespace cxxpython
             }
 
             void visit(const compiler_internal::AssignStmt &statement) override
+            {
+                (void)statement;
+            }
+
+            void visit(const compiler_internal::AugAssignStmt &statement) override
             {
                 (void)statement;
             }
@@ -697,7 +713,8 @@ namespace cxxpython
 
             void visit(const compiler_internal::NameTarget &target) override
             {
-                (void)target;
+                if (read_target_)
+                    add_reference(target.name);
             }
 
             void visit(const compiler_internal::AttributeTarget &target) override
@@ -720,6 +737,13 @@ namespace cxxpython
             {
                 statement.value->accept(*this);
                 statement.target->accept(*this);
+            }
+
+            void visit(const compiler_internal::AugAssignStmt &statement) override
+            {
+                const ScopedReadTarget read_target(*this);
+                statement.target->accept(*this);
+                statement.value->accept(*this);
             }
 
             void visit(const compiler_internal::DeleteStmt &statement) override
@@ -832,6 +856,28 @@ namespace cxxpython
             }
 
         private:
+            class ScopedReadTarget final
+            {
+            public:
+                explicit ScopedReadTarget(LexicalReferenceCollector &collector)
+                    : collector_(collector), previous_(collector.read_target_)
+                {
+                    collector_.read_target_ = true;
+                }
+
+                ~ScopedReadTarget()
+                {
+                    collector_.read_target_ = previous_;
+                }
+
+                ScopedReadTarget(const ScopedReadTarget &) = delete;
+                ScopedReadTarget &operator=(const ScopedReadTarget &) = delete;
+
+            private:
+                LexicalReferenceCollector &collector_;
+                bool previous_;
+            };
+
             void add_reference(const std::string &name)
             {
                 if (std::find(references_.begin(), references_.end(), name) == references_.end())
@@ -839,6 +885,7 @@ namespace cxxpython
             }
 
             std::vector<std::string> references_;
+            bool read_target_ = false;
         };
 
         class NestedFunctionCollector final : public compiler_internal::StmtVisitor
@@ -850,6 +897,11 @@ namespace cxxpython
             }
 
             void visit(const compiler_internal::AssignStmt &statement) override
+            {
+                (void)statement;
+            }
+
+            void visit(const compiler_internal::AugAssignStmt &statement) override
             {
                 (void)statement;
             }

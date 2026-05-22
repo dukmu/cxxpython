@@ -1,5 +1,69 @@
 # Development Status
 
+## 2026-05-22 Augmented Assignment Slice
+
+Review focus:
+
+- Close the remaining parser assignment gap without lowering `x += y` into
+  a target-reevaluating `x = x + y` shortcut.
+- Keep target evaluation order compatible with Python semantics for names,
+  attributes, and subscripts.
+- Preserve symbol-analysis correctness for augmented assignment as both a
+  read and a binding operation.
+
+Completed:
+
+- Added lexer/parser/AST support for `+=`, `-=`, and `*=`.
+- Added `INPLACE_BINARY_OP` dispatch through the existing
+  `object_inplace_binary_op` protocol.
+- Added `DUP_TWO` stack support for subscript augmented assignment, so
+  object and key expressions are evaluated exactly once before load/update/store.
+- Lowered augmented assignment by target shape:
+  - names load through the same fast/local/global/deref resolution as normal
+    reads, then store through the same binding path as assignment;
+  - attributes keep the receiver on the stack while loading the old value and
+    storing the updated value;
+  - subscripts keep object/key pairs on the stack while loading the old item and
+    storing the updated item.
+- Updated symbol passes so `global` and `nonlocal` augmented assignments bind
+  through the correct scope and so name targets are treated as reads for
+  lexical free-variable analysis.
+- Added C++ and Python golden coverage for name, string, attribute, list
+  subscript, dict subscript, `global`, and `nonlocal` augmented assignment.
+
+Design notes:
+
+- `INPLACE_BINARY_OP` is intentionally separate from `BINARY_OP` even though
+  today's builtins often fall back to normal binary slots. This keeps the VM
+  bytecode contract aligned with the object protocol and avoids losing in-place
+  behavior once mutable numeric/sequence slots grow.
+- `DUP_TWO` is a stack primitive for preserving object/key pairs, not a
+  subscript-specific special case. It can be reused by future target lowering
+  without teaching the VM about AST shapes.
+- Augmented assignment uses target-specific compiler lowering rather than a
+  generic store visitor, because reads and stores need different stack contracts
+  for attributes and subscripts.
+
+Known debt and next risk:
+
+- Relative import syntax and package `__path__` multi-entry search remain the
+  next import-system correctness gap.
+- Object-layer files still including `vm.hpp` should be reviewed one by one;
+  code/function/frame/type execution descriptors belong in Python/runtime
+  layers, while foundational objects should reach execution only through
+  narrow Runtime-facing APIs where possible.
+- Star import's `__all__` collection still uses a raw-vector iterable helper;
+  replace that with a rooted iterator-consumption API before increasing GC
+  pressure.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/cxxpython Tests/python/augmented_assignment.py`
+- `build/test_core_objects '--gtest_filter=Bytecode.MetadataNamesAndStackEffects:Compile.CompilesAndExecutesAugmentedAssignment:Compile.AugmentedAssignmentEvaluatesAttributeTargetOnce:Compile.AugmentedAssignmentEvaluatesSubscriptTargetOnce:Compile.AugmentedAssignmentSupportsGlobalAndNonlocalBindings:PythonScripts.RunsGoldenFiles'`
+
+Result: focused tests pass.
+
 ## 2026-05-22 While And Boolean Control Slice
 
 Review focus:

@@ -819,6 +819,16 @@ namespace cxxpython
                 frame->push(top);
                 break;
             }
+            case Opcode::DupTwo:
+            {
+                Object *top = frame->pop();
+                Object *second = frame->pop();
+                frame->push(second);
+                frame->push(top);
+                frame->push(second);
+                frame->push(top);
+                break;
+            }
             case Opcode::RotTwo:
             {
                 Object *top = frame->pop();
@@ -853,6 +863,16 @@ namespace cxxpython
                 auto right_root = runtime_.root(right);
                 auto left_root = runtime_.root(left);
                 frame->push(object_binary_op(left, right, op));
+                break;
+            }
+            case Opcode::InplaceBinaryOp:
+            {
+                const BinaryOp op = decode_binary_op(instruction.operand);
+                Object *right = frame->pop();
+                Object *left = frame->pop();
+                auto right_root = runtime_.root(right);
+                auto left_root = runtime_.root(left);
+                frame->push(object_inplace_binary_op(left, right, op));
                 break;
             }
             case Opcode::FormatValue:
