@@ -1,5 +1,67 @@
 # Development Status
 
+## 2026-05-22 Parser Syntax and Stdlib Export Slice
+
+Review focus:
+
+- Remove parser limitations that were already forcing `Lib/` modules into
+  awkward one-line or artificially nested code.
+- Add public `__all__` metadata to the current script-level stdlib modules
+  without implementing star-import lowering prematurely.
+- Record the descriptor layering issue before further attribute/runtime growth.
+
+Completed:
+
+- Added lexer tokens for `elif`, `pass`, and `;`.
+- Taught the lexer to suppress physical newline/indent/dedent tokens while
+  inside `()`, `[]`, or `{}` so multiline literals work like Python.
+- Added AST/compiler support for:
+  - `pass`;
+  - `elif`;
+  - colon-following inline suites such as `if x: pass`;
+  - semicolon-separated simple statements;
+  - conditional expressions, `a if cond else b`.
+- Added script-level coverage in `Tests/python/parser_syntax.py` for `pass`,
+  `elif`, inline suites, semicolon-separated statements, conditional
+  expressions, class one-line bodies, for-loop one-line bodies, and chained
+  comparisons.
+- Added `__all__` to `collections`, `io`, `inspect`, `os`, and `posixpath`.
+- Extended stdlib golden tests to assert representative `__all__` entries.
+
+Design notes:
+
+- Statement conditions now parse through comparison expressions rather than
+  the full conditional-expression entry point. That prevents `if cond:` from
+  being misread as the beginning of `x if cond else y`.
+- Multiline literal support belongs in the lexer by tracking nesting depth; the
+  parser should not consume arbitrary newlines inside expression parsing,
+  because that crosses statement boundaries incorrectly.
+- `__all__` is now present as module metadata. Star-import is intentionally not
+  lowered yet; it needs compiler/import integration and `__all__` fallback
+  rules as a separate semantic slice.
+
+Known debt and next risk:
+
+- `object_descriptor.cpp` still mixes the getset descriptor object
+  implementation with registration for object/type/code/function/frame
+  attributes, and therefore includes VM/bytecode details in an object-level
+  file. Split descriptor mechanics from per-type descriptor registration so
+  foundational object code does not absorb VM-specific responsibilities.
+- Parser still lacks boolean `and/or`, `while`, augmented assignment, star
+  import, and relative import syntax/semantics.
+- `__all__` is metadata-only until star-import lowering is added.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/cxxpython Tests/python/parser_syntax.py`
+- `build/cxxpython Tests/python/sys_os.py`
+- `build/cxxpython Tests/python/stdlib_modules.py`
+- `build/test_core_objects '--gtest_filter=PythonScripts.RunsGoldenFiles:Compile.CompilesChainedComparisonsWithShortCircuit'`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all 195 tests pass.
+
 ## 2026-05-22 Package Imports and Script Path Layer
 
 Review focus:

@@ -228,6 +228,17 @@ namespace cxxpython
                 }
             }
 
+            void visit(const compiler_internal::ConditionalExpr &expression) override
+            {
+                expression.condition->accept(*this);
+                const std::size_t false_jump = emit_jump(Opcode::PopJumpIfFalse);
+                expression.body->accept(*this);
+                const std::size_t end_jump = emit_jump(Opcode::JumpAbsolute);
+                patch_jump(false_jump, instructions_.size());
+                expression.else_body->accept(*this);
+                patch_jump(end_jump, instructions_.size());
+            }
+
             void visit(const compiler_internal::SingletonExpr &expression) override
             {
                 switch (expression.kind)
@@ -575,6 +586,11 @@ namespace cxxpython
                 loop.break_target = loop_end;
                 for (std::size_t jump : loop.break_jumps)
                     patch_jump(jump, loop.break_target);
+            }
+
+            void visit(const compiler_internal::PassStmt &statement) override
+            {
+                StatementLineGuard line(*this, statement);
             }
 
             void visit(const compiler_internal::BreakStmt &statement) override

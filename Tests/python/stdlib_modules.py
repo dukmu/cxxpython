@@ -6,6 +6,8 @@ import sys
 print(type(inspect))
 print(type(gc))
 print(type(collections))
+print(inspect.__all__.__contains__('currentframe'))
+print(collections.__all__.__contains__('namedtuple'))
 print(gc.__file__)
 print(sys.builtin_module_names.__contains__('_inspect'))
 

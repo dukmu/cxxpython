@@ -20,6 +20,7 @@ namespace cxxpython::compiler_internal
     struct UnaryExpr;
     struct BinaryExpr;
     struct CompareExpr;
+    struct ConditionalExpr;
     struct SingletonExpr;
     struct NameExpr;
     struct AttributeExpr;
@@ -37,6 +38,7 @@ namespace cxxpython::compiler_internal
     struct DeleteStmt;
     struct IfStmt;
     struct ForStmt;
+    struct PassStmt;
     struct BreakStmt;
     struct ContinueStmt;
     struct ReturnStmt;
@@ -58,6 +60,7 @@ namespace cxxpython::compiler_internal
         virtual void visit(const UnaryExpr &expression) = 0;
         virtual void visit(const BinaryExpr &expression) = 0;
         virtual void visit(const CompareExpr &expression) = 0;
+        virtual void visit(const ConditionalExpr &expression) = 0;
         virtual void visit(const SingletonExpr &expression) = 0;
         virtual void visit(const NameExpr &expression) = 0;
         virtual void visit(const AttributeExpr &expression) = 0;
@@ -85,6 +88,7 @@ namespace cxxpython::compiler_internal
         virtual void visit(const DeleteStmt &statement) = 0;
         virtual void visit(const IfStmt &statement) = 0;
         virtual void visit(const ForStmt &statement) = 0;
+        virtual void visit(const PassStmt &statement) = 0;
         virtual void visit(const BreakStmt &statement) = 0;
         virtual void visit(const ContinueStmt &statement) = 0;
         virtual void visit(const ReturnStmt &statement) = 0;
@@ -119,6 +123,7 @@ namespace cxxpython::compiler_internal
         LeftBrace,
         RightBrace,
         Colon,
+        Semicolon,
         Equal,
         EqualEqual,
         BangEqual,
@@ -127,6 +132,7 @@ namespace cxxpython::compiler_internal
         Greater,
         GreaterEqual,
         If,
+        Elif,
         Else,
         For,
         Break,
@@ -147,6 +153,7 @@ namespace cxxpython::compiler_internal
         Not,
         Class,
         Del,
+        Pass,
         TrueLiteral,
         FalseLiteral,
         NoneLiteral,
@@ -305,6 +312,27 @@ namespace cxxpython::compiler_internal
 
         std::unique_ptr<Expr> left;
         std::vector<Comparison> comparisons;
+
+        void accept(ExprVisitor &visitor) const override
+        {
+            visitor.visit(*this);
+        }
+    };
+
+    struct ConditionalExpr final : Expr
+    {
+        ConditionalExpr(std::unique_ptr<Expr> body_in,
+                        std::unique_ptr<Expr> condition_in,
+                        std::unique_ptr<Expr> else_body_in)
+            : body(std::move(body_in)),
+              condition(std::move(condition_in)),
+              else_body(std::move(else_body_in))
+        {
+        }
+
+        std::unique_ptr<Expr> body;
+        std::unique_ptr<Expr> condition;
+        std::unique_ptr<Expr> else_body;
 
         void accept(ExprVisitor &visitor) const override
         {
@@ -647,6 +675,16 @@ namespace cxxpython::compiler_internal
         std::unique_ptr<Expr> iterable;
         std::vector<std::unique_ptr<Stmt>> body;
         std::vector<std::unique_ptr<Stmt>> else_body;
+
+        void accept(StmtVisitor &visitor) const override
+        {
+            visitor.visit(*this);
+        }
+    };
+
+    struct PassStmt final : Stmt
+    {
+        PassStmt() = default;
 
         void accept(StmtVisitor &visitor) const override
         {

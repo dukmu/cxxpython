@@ -43,6 +43,7 @@ namespace cxxpython::compiler_internal
         std::size_t index = 0;
         std::size_t line = 1;
         std::size_t column = 1;
+        std::size_t nesting = 0;
         bool at_line_start = true;
         auto is_quote = [](char value) {
             return value == '\'' || value == '"';
@@ -157,6 +158,17 @@ namespace cxxpython::compiler_internal
 
                 if (index >= source.size())
                     break;
+                if (nesting != 0)
+                {
+                    if (source[index] == '#')
+                    {
+                        skip_comment();
+                        continue;
+                    }
+                    if (source[index] != '\n' && source[index] != '\r')
+                        at_line_start = false;
+                    continue;
+                }
                 if (source[index] == '#')
                 {
                     skip_comment();
@@ -200,7 +212,8 @@ namespace cxxpython::compiler_internal
 
             if (ch == '\n')
             {
-                tokens.push_back(Token{TokenKind::Newline, "\n", 0, line, column});
+                if (nesting == 0)
+                    tokens.push_back(Token{TokenKind::Newline, "\n", 0, line, column});
                 advance_one();
                 at_line_start = true;
                 continue;
@@ -210,7 +223,8 @@ namespace cxxpython::compiler_internal
             {
                 if (index + 1 < source.size() && source[index + 1] == '\n')
                     ++index;
-                tokens.push_back(Token{TokenKind::Newline, "\n", 0, line, column});
+                if (nesting == 0)
+                    tokens.push_back(Token{TokenKind::Newline, "\n", 0, line, column});
                 advance_one();
                 at_line_start = true;
                 continue;
@@ -259,6 +273,8 @@ namespace cxxpython::compiler_internal
                 TokenKind kind = TokenKind::Identifier;
                 if (lexeme == "if")
                     kind = TokenKind::If;
+                else if (lexeme == "elif")
+                    kind = TokenKind::Elif;
                 else if (lexeme == "else")
                     kind = TokenKind::Else;
                 else if (lexeme == "for")
@@ -299,6 +315,8 @@ namespace cxxpython::compiler_internal
                     kind = TokenKind::Class;
                 else if (lexeme == "del")
                     kind = TokenKind::Del;
+                else if (lexeme == "pass")
+                    kind = TokenKind::Pass;
                 else if (lexeme == "True")
                     kind = TokenKind::TrueLiteral;
                 else if (lexeme == "False")
@@ -369,6 +387,7 @@ namespace cxxpython::compiler_internal
             if (ch == '(')
             {
                 tokens.push_back(Token{TokenKind::LeftParen, "(", 0, line, column});
+                ++nesting;
                 ++index;
                 ++column;
                 continue;
@@ -377,6 +396,8 @@ namespace cxxpython::compiler_internal
             if (ch == ')')
             {
                 tokens.push_back(Token{TokenKind::RightParen, ")", 0, line, column});
+                if (nesting != 0)
+                    --nesting;
                 ++index;
                 ++column;
                 continue;
@@ -401,6 +422,7 @@ namespace cxxpython::compiler_internal
             if (ch == '[')
             {
                 tokens.push_back(Token{TokenKind::LeftBracket, "[", 0, line, column});
+                ++nesting;
                 ++index;
                 ++column;
                 continue;
@@ -409,6 +431,8 @@ namespace cxxpython::compiler_internal
             if (ch == ']')
             {
                 tokens.push_back(Token{TokenKind::RightBracket, "]", 0, line, column});
+                if (nesting != 0)
+                    --nesting;
                 ++index;
                 ++column;
                 continue;
@@ -417,6 +441,7 @@ namespace cxxpython::compiler_internal
             if (ch == '{')
             {
                 tokens.push_back(Token{TokenKind::LeftBrace, "{", 0, line, column});
+                ++nesting;
                 ++index;
                 ++column;
                 continue;
@@ -425,6 +450,8 @@ namespace cxxpython::compiler_internal
             if (ch == '}')
             {
                 tokens.push_back(Token{TokenKind::RightBrace, "}", 0, line, column});
+                if (nesting != 0)
+                    --nesting;
                 ++index;
                 ++column;
                 continue;
@@ -433,6 +460,14 @@ namespace cxxpython::compiler_internal
             if (ch == ':')
             {
                 tokens.push_back(Token{TokenKind::Colon, ":", 0, line, column});
+                ++index;
+                ++column;
+                continue;
+            }
+
+            if (ch == ';')
+            {
+                tokens.push_back(Token{TokenKind::Semicolon, ";", 0, line, column});
                 ++index;
                 ++column;
                 continue;

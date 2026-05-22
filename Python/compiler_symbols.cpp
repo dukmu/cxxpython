@@ -53,6 +53,13 @@ namespace cxxpython
                     comparison.right->accept(*this);
             }
 
+            void visit(const compiler_internal::ConditionalExpr &expression) override
+            {
+                expression.body->accept(*this);
+                expression.condition->accept(*this);
+                expression.else_body->accept(*this);
+            }
+
             void visit(const compiler_internal::SingletonExpr &expression) override
             {
                 (void)expression;
@@ -163,6 +170,11 @@ namespace cxxpython
                     item->accept(*this);
                 for (const auto &item : statement.else_body)
                     item->accept(*this);
+            }
+
+            void visit(const compiler_internal::PassStmt &statement) override
+            {
+                (void)statement;
             }
 
             void visit(const compiler_internal::BreakStmt &statement) override
@@ -314,6 +326,11 @@ namespace cxxpython
                     item->accept(*this);
             }
 
+            void visit(const compiler_internal::PassStmt &statement) override
+            {
+                (void)statement;
+            }
+
             void visit(const compiler_internal::BreakStmt &statement) override
             {
                 (void)statement;
@@ -434,6 +451,11 @@ namespace cxxpython
                     item->accept(*this);
                 for (const auto &item : statement.else_body)
                     item->accept(*this);
+            }
+
+            void visit(const compiler_internal::PassStmt &statement) override
+            {
+                (void)statement;
             }
 
             void visit(const compiler_internal::BreakStmt &statement) override
@@ -561,6 +583,13 @@ namespace cxxpython
                     comparison.right->accept(*this);
             }
 
+            void visit(const compiler_internal::ConditionalExpr &expression) override
+            {
+                expression.body->accept(*this);
+                expression.condition->accept(*this);
+                expression.else_body->accept(*this);
+            }
+
             void visit(const compiler_internal::SingletonExpr &expression) override
             {
                 (void)expression;
@@ -673,6 +702,11 @@ namespace cxxpython
                     item->accept(*this);
                 for (const auto &item : statement.else_body)
                     item->accept(*this);
+            }
+
+            void visit(const compiler_internal::PassStmt &statement) override
+            {
+                (void)statement;
             }
 
             void visit(const compiler_internal::BreakStmt &statement) override
@@ -789,6 +823,11 @@ namespace cxxpython
                     item->accept(*this);
                 for (const auto &item : statement.else_body)
                     item->accept(*this);
+            }
+
+            void visit(const compiler_internal::PassStmt &statement) override
+            {
+                (void)statement;
             }
 
             void visit(const compiler_internal::BreakStmt &statement) override

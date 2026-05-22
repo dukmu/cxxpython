@@ -7,6 +7,22 @@ pathsep = ':'
 defpath = '/bin:/usr/bin'
 devnull = '/dev/null'
 
+__all__ = [
+    'sep',
+    'altsep',
+    'curdir',
+    'pardir',
+    'extsep',
+    'pathsep',
+    'defpath',
+    'devnull',
+    'join',
+    'basename',
+    'dirname',
+    'split',
+    'isabs',
+]
+
 
 def _as_path_text(path):
     if isinstance(path, str):

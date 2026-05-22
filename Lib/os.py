@@ -1,6 +1,19 @@
 import posix
 import posixpath as path
 
+__all__ = [
+    'name',
+    'sep',
+    'linesep',
+    'curdir',
+    'pardir',
+    'pathsep',
+    'path',
+    'environ',
+    'getcwd',
+    'listdir',
+]
+
 name = 'posix'
 sep = '/'
 linesep = '\n'

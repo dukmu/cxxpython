@@ -1,5 +1,14 @@
 import sys
 
+__all__ = [
+    'currentframe',
+    'isframe',
+    'iscode',
+    'isfunction',
+    'getsourcefile',
+    'getfile',
+]
+
 _frame_type = type(sys._getframe())
 _code_type = type(sys._getframe().f_code)
 

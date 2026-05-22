@@ -32,12 +32,16 @@ namespace cxxpython::compiler_internal
                 {
                     ParsedStatement parsed = parse_statement();
                     const bool compound = parsed.compound;
-                    module.statements.push_back(std::move(parsed.statement));
+                    append_statement_with_inline_tail(module.statements, std::move(parsed));
                     if (peek().kind == TokenKind::Newline)
                     {
                         skip_newlines();
                     }
                     else if (compound)
+                    {
+                        continue;
+                    }
+                    else if (starts_statement())
                     {
                         continue;
                     }
@@ -120,6 +124,11 @@ namespace cxxpython::compiler_internal
                     return parse_function_def_statement({});
                 if (peek().kind == TokenKind::Class)
                     return parse_class_def_statement({});
+                return parse_simple_statement();
+            }
+
+            ParsedStatement parse_simple_statement()
+            {
                 if (peek().kind == TokenKind::Del)
                     return parse_delete_statement();
                 if (peek().kind == TokenKind::Return)
@@ -138,6 +147,8 @@ namespace cxxpython::compiler_internal
                     return parse_break_statement();
                 if (peek().kind == TokenKind::Continue)
                     return parse_continue_statement();
+                if (peek().kind == TokenKind::Pass)
+                    return parse_pass_statement();
 
                 const std::size_t line = peek().line;
                 std::unique_ptr<Expr> target_or_expression = parse_expression_only();
@@ -160,6 +171,51 @@ namespace cxxpython::compiler_internal
                     std::move(statement),
                     false,
                 };
+            }
+
+            void append_statement_with_inline_tail(std::vector<std::unique_ptr<Stmt>> &statements,
+                                                   ParsedStatement parsed)
+            {
+                const bool compound = parsed.compound;
+                statements.push_back(std::move(parsed.statement));
+                if (compound && peek().kind == TokenKind::Semicolon)
+                    raise_at(peek(), "compound statements cannot be chained with ';'");
+                while (peek().kind == TokenKind::Semicolon)
+                {
+                    advance();
+                    if (peek().kind == TokenKind::Newline ||
+                        peek().kind == TokenKind::Dedent ||
+                        peek().kind == TokenKind::End)
+                        break;
+                    statements.push_back(parse_simple_statement().statement);
+                }
+            }
+
+            std::vector<std::unique_ptr<Stmt>> parse_suite(const char *newline_message)
+            {
+                if (peek().kind == TokenKind::Newline)
+                {
+                    advance();
+                    return parse_block();
+                }
+
+                if (peek().kind == TokenKind::Dedent || peek().kind == TokenKind::End)
+                    raise_at(peek(), newline_message);
+
+                std::vector<std::unique_ptr<Stmt>> body;
+                body.push_back(parse_simple_statement().statement);
+                while (peek().kind == TokenKind::Semicolon)
+                {
+                    advance();
+                    if (peek().kind == TokenKind::Newline ||
+                        peek().kind == TokenKind::Dedent ||
+                        peek().kind == TokenKind::End)
+                        break;
+                    body.push_back(parse_simple_statement().statement);
+                }
+                if (peek().kind == TokenKind::Newline)
+                    advance();
+                return body;
             }
 
             std::vector<std::unique_ptr<Expr>> parse_decorators()
@@ -265,6 +321,17 @@ namespace cxxpython::compiler_internal
                     raise_at(continue_token, "'continue' outside loop");
                 auto statement = std::make_unique<ContinueStmt>();
                 statement->line = continue_token.line;
+                return ParsedStatement{
+                    std::move(statement),
+                    false,
+                };
+            }
+
+            ParsedStatement parse_pass_statement()
+            {
+                const Token &pass_token = advance();
+                auto statement = std::make_unique<PassStmt>();
+                statement->line = pass_token.line;
                 return ParsedStatement{
                     std::move(statement),
                     false,
@@ -402,8 +469,7 @@ namespace cxxpython::compiler_internal
             {
                 const Token &try_token = advance();
                 consume(TokenKind::Colon, "expected ':' after try");
-                consume(TokenKind::Newline, "expected newline after try");
-                std::vector<std::unique_ptr<Stmt>> body = parse_block();
+                std::vector<std::unique_ptr<Stmt>> body = parse_suite("expected newline after try");
                 std::vector<ExceptHandler> handlers;
                 std::vector<std::unique_ptr<Stmt>> finally_body;
 
@@ -424,16 +490,16 @@ namespace cxxpython::compiler_internal
                         }
                     }
                     consume(TokenKind::Colon, "expected ':' after except");
-                    consume(TokenKind::Newline, "expected newline after except");
-                    handlers.emplace_back(std::move(exception_type), std::move(exception_name), parse_block());
+                    handlers.emplace_back(std::move(exception_type),
+                                          std::move(exception_name),
+                                          parse_suite("expected newline after except"));
                 }
 
                 if (peek().kind == TokenKind::Finally)
                 {
                     advance();
                     consume(TokenKind::Colon, "expected ':' after finally");
-                    consume(TokenKind::Newline, "expected newline after finally");
-                    finally_body = parse_block();
+                    finally_body = parse_suite("expected newline after finally");
                 }
 
                 if (handlers.empty() && finally_body.empty())
@@ -453,18 +519,21 @@ namespace cxxpython::compiler_internal
             ParsedStatement parse_if_statement()
             {
                 const Token &if_token = advance();
-                std::unique_ptr<Expr> condition = parse_expression_only();
+                std::unique_ptr<Expr> condition = parse_comparison();
                 consume(TokenKind::Colon, "expected ':' after if condition");
-                consume(TokenKind::Newline, "expected newline after if condition");
-                std::vector<std::unique_ptr<Stmt>> then_body = parse_block();
+                std::vector<std::unique_ptr<Stmt>> then_body = parse_suite("expected newline after if condition");
                 std::vector<std::unique_ptr<Stmt>> else_body;
 
-                if (peek().kind == TokenKind::Else)
+                if (peek().kind == TokenKind::Elif)
+                {
+                    ParsedStatement elif_statement = parse_if_statement();
+                    else_body.push_back(std::move(elif_statement.statement));
+                }
+                else if (peek().kind == TokenKind::Else)
                 {
                     advance();
                     consume(TokenKind::Colon, "expected ':' after else");
-                    consume(TokenKind::Newline, "expected newline after else");
-                    else_body = parse_block();
+                    else_body = parse_suite("expected newline after else");
                 }
 
                 auto statement = std::make_unique<IfStmt>(
@@ -487,16 +556,14 @@ namespace cxxpython::compiler_internal
                 consume(TokenKind::In, "expected 'in' after for target");
                 std::unique_ptr<Expr> iterable = parse_expression_only();
                 consume(TokenKind::Colon, "expected ':' after for iterable");
-                consume(TokenKind::Newline, "expected newline after for statement");
                 LoopDepthGuard loop_guard(loop_depth_);
-                std::vector<std::unique_ptr<Stmt>> body = parse_block();
+                std::vector<std::unique_ptr<Stmt>> body = parse_suite("expected newline after for statement");
                 std::vector<std::unique_ptr<Stmt>> else_body;
                 if (peek().kind == TokenKind::Else)
                 {
                     advance();
                     consume(TokenKind::Colon, "expected ':' after else");
-                    consume(TokenKind::Newline, "expected newline after else");
-                    else_body = parse_block();
+                    else_body = parse_suite("expected newline after else");
                 }
                 auto statement =
                     std::make_unique<ForStmt>(
@@ -568,10 +635,9 @@ namespace cxxpython::compiler_internal
                 }
                 consume(TokenKind::RightParen, "expected ')' after parameters");
                 consume(TokenKind::Colon, "expected ':' after function signature");
-                consume(TokenKind::Newline, "expected newline after function signature");
 
                 FunctionDepthGuard guard(function_depth_);
-                std::vector<std::unique_ptr<Stmt>> body = parse_block();
+                std::vector<std::unique_ptr<Stmt>> body = parse_suite("expected newline after function signature");
                 auto statement = std::make_unique<FunctionDefStmt>(
                     std::move(name),
                     std::move(params),
@@ -630,8 +696,7 @@ namespace cxxpython::compiler_internal
                     consume(TokenKind::RightParen, "expected ')' after class bases");
                 }
                 consume(TokenKind::Colon, "expected ':' after class name");
-                consume(TokenKind::Newline, "expected newline after class definition");
-                std::vector<std::unique_ptr<Stmt>> body = parse_block();
+                std::vector<std::unique_ptr<Stmt>> body = parse_suite("expected newline after class definition");
                 auto statement = std::make_unique<ClassDefStmt>(
                     std::move(name),
                     std::move(bases),
@@ -658,10 +723,12 @@ namespace cxxpython::compiler_internal
                 {
                     ParsedStatement parsed = parse_statement();
                     const bool compound = parsed.compound;
-                    body.push_back(std::move(parsed.statement));
+                    append_statement_with_inline_tail(body, std::move(parsed));
                     if (peek().kind == TokenKind::Newline)
                         skip_newlines();
                     else if (compound)
+                        continue;
+                    else if (starts_statement())
                         continue;
                     else if (peek().kind != TokenKind::Dedent && peek().kind != TokenKind::End)
                         raise_at(peek(), "expected newline after statement");
@@ -709,7 +776,18 @@ namespace cxxpython::compiler_internal
 
             std::unique_ptr<Expr> parse_expression_only()
             {
-                return parse_comparison();
+                std::unique_ptr<Expr> body = parse_comparison();
+                if (peek().kind != TokenKind::If)
+                    return body;
+
+                advance();
+                std::unique_ptr<Expr> condition = parse_comparison();
+                consume(TokenKind::Else, "expected else after conditional expression");
+                std::unique_ptr<Expr> else_body = parse_expression_only();
+                return std::make_unique<ConditionalExpr>(
+                    std::move(body),
+                    std::move(condition),
+                    std::move(else_body));
             }
 
             std::unique_ptr<Expr> parse_comparison()
@@ -874,6 +952,7 @@ namespace cxxpython::compiler_internal
             std::unique_ptr<Expr> parse_parenthesized_expression()
             {
                 advance();
+                skip_newlines();
                 if (peek().kind == TokenKind::RightParen)
                 {
                     advance();
@@ -892,10 +971,12 @@ namespace cxxpython::compiler_internal
                 while (peek().kind == TokenKind::Comma)
                 {
                     advance();
+                    skip_newlines();
                     if (peek().kind == TokenKind::RightParen)
                         break;
                     items.push_back(parse_expression_only());
                 }
+                skip_newlines();
                 consume(TokenKind::RightParen, "expected ')' after tuple literal");
                 return std::make_unique<TupleExpr>(std::move(items));
             }
@@ -904,6 +985,7 @@ namespace cxxpython::compiler_internal
             {
                 advance();
                 std::vector<DictItem> items;
+                skip_newlines();
                 if (peek().kind == TokenKind::RightBrace)
                 {
                     advance();
@@ -913,15 +995,19 @@ namespace cxxpython::compiler_internal
                 while (true)
                 {
                     std::unique_ptr<Expr> key = parse_expression_only();
+                    skip_newlines();
                     consume(TokenKind::Colon, "expected ':' after dict key");
                     std::unique_ptr<Expr> value = parse_expression_only();
                     items.emplace_back(std::move(key), std::move(value));
+                    skip_newlines();
                     if (peek().kind != TokenKind::Comma)
                         break;
                     advance();
+                    skip_newlines();
                     if (peek().kind == TokenKind::RightBrace)
                         break;
                 }
+                skip_newlines();
                 consume(TokenKind::RightBrace, "expected '}' after dict literal");
                 return std::make_unique<DictExpr>(std::move(items));
             }
@@ -930,6 +1016,7 @@ namespace cxxpython::compiler_internal
             {
                 advance();
                 std::vector<std::unique_ptr<Expr>> items;
+                skip_newlines();
                 if (peek().kind == TokenKind::RightBracket)
                 {
                     advance();
@@ -939,12 +1026,15 @@ namespace cxxpython::compiler_internal
                 while (true)
                 {
                     items.push_back(parse_expression_only());
+                    skip_newlines();
                     if (peek().kind != TokenKind::Comma)
                         break;
                     advance();
+                    skip_newlines();
                     if (peek().kind == TokenKind::RightBracket)
                         break;
                 }
+                skip_newlines();
                 consume(TokenKind::RightBracket, "expected ']' after list literal");
                 return std::make_unique<ListExpr>(std::move(items));
             }
@@ -1198,6 +1288,7 @@ namespace cxxpython::compiler_internal
                 case TokenKind::RightBracket:
                 case TokenKind::RightBrace:
                 case TokenKind::Colon:
+                case TokenKind::Semicolon:
                 case TokenKind::Equal:
                 case TokenKind::EqualEqual:
                 case TokenKind::BangEqual:
@@ -1206,6 +1297,7 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Greater:
                 case TokenKind::GreaterEqual:
                 case TokenKind::If:
+                case TokenKind::Elif:
                 case TokenKind::Else:
                 case TokenKind::For:
                 case TokenKind::Break:
@@ -1226,6 +1318,7 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Not:
                 case TokenKind::Class:
                 case TokenKind::Del:
+                case TokenKind::Pass:
                 case TokenKind::Indent:
                 case TokenKind::Dedent:
                     raise_at(token, "expected expression");
@@ -1280,6 +1373,73 @@ namespace cxxpython::compiler_internal
                        (kind == TokenKind::Not && peek_next().kind == TokenKind::In);
             }
 
+            bool starts_statement() const
+            {
+                switch (peek().kind)
+                {
+                case TokenKind::Integer:
+                case TokenKind::String:
+                case TokenKind::FString:
+                case TokenKind::Identifier:
+                case TokenKind::Plus:
+                case TokenKind::Minus:
+                case TokenKind::Tilde:
+                case TokenKind::LeftParen:
+                case TokenKind::LeftBracket:
+                case TokenKind::LeftBrace:
+                case TokenKind::If:
+                case TokenKind::For:
+                case TokenKind::Def:
+                case TokenKind::Return:
+                case TokenKind::Raise:
+                case TokenKind::Import:
+                case TokenKind::From:
+                case TokenKind::Global:
+                case TokenKind::Nonlocal:
+                case TokenKind::Try:
+                case TokenKind::Class:
+                case TokenKind::Del:
+                case TokenKind::Pass:
+                case TokenKind::Break:
+                case TokenKind::Continue:
+                case TokenKind::TrueLiteral:
+                case TokenKind::FalseLiteral:
+                case TokenKind::NoneLiteral:
+                    return true;
+                case TokenKind::Star:
+                case TokenKind::DoubleStar:
+                case TokenKind::At:
+                case TokenKind::RightParen:
+                case TokenKind::Comma:
+                case TokenKind::Dot:
+                case TokenKind::RightBracket:
+                case TokenKind::RightBrace:
+                case TokenKind::Colon:
+                case TokenKind::Semicolon:
+                case TokenKind::Equal:
+                case TokenKind::EqualEqual:
+                case TokenKind::BangEqual:
+                case TokenKind::Less:
+                case TokenKind::LessEqual:
+                case TokenKind::Greater:
+                case TokenKind::GreaterEqual:
+                case TokenKind::Elif:
+                case TokenKind::Else:
+                case TokenKind::Except:
+                case TokenKind::Finally:
+                case TokenKind::As:
+                case TokenKind::In:
+                case TokenKind::Is:
+                case TokenKind::Not:
+                case TokenKind::Indent:
+                case TokenKind::Dedent:
+                case TokenKind::Newline:
+                case TokenKind::End:
+                    return false;
+                }
+                return false;
+            }
+
             ComparisonOp comparison_op()
             {
                 const Token &token = advance();
@@ -1332,8 +1492,10 @@ namespace cxxpython::compiler_internal
                 case TokenKind::LeftBrace:
                 case TokenKind::RightBrace:
                 case TokenKind::Colon:
+                case TokenKind::Semicolon:
                 case TokenKind::Equal:
                 case TokenKind::If:
+                case TokenKind::Elif:
                 case TokenKind::Else:
                 case TokenKind::For:
                 case TokenKind::Break:
@@ -1351,6 +1513,7 @@ namespace cxxpython::compiler_internal
                 case TokenKind::As:
                 case TokenKind::Class:
                 case TokenKind::Del:
+                case TokenKind::Pass:
                 case TokenKind::TrueLiteral:
                 case TokenKind::FalseLiteral:
                 case TokenKind::NoneLiteral:
