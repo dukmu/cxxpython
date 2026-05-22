@@ -9,6 +9,7 @@
 #include <csignal>
 #include <cstddef>
 #include <string>
+#include <vector>
 
 namespace cxxpython
 {
@@ -173,6 +174,11 @@ namespace cxxpython
         {
             module.dict()->set(runtime.new_str(name), runtime.new_int(value));
         }
+
+        void append_export(Runtime &runtime, std::vector<Object *> &exports, const char *name)
+        {
+            exports.push_back(runtime.new_str(name));
+        }
     }
 
     void initialize_signal_module(Runtime &runtime, ModuleObject &module)
@@ -180,34 +186,51 @@ namespace cxxpython
         initialize_native_module(runtime, module, signal_module_def);
         DictObject *dict = module.dict();
         dict->set(runtime.new_str("_handlers"), runtime.new_dict());
+        std::vector<Object *> exports{
+            runtime.new_str("SIG_DFL"),
+            runtime.new_str("SIG_IGN"),
+            runtime.new_str("signal"),
+            runtime.new_str("getsignal"),
+            runtime.new_str("raise_signal"),
+        };
         set_signal_constant(runtime, module, "SIG_DFL", signal_default);
         set_signal_constant(runtime, module, "SIG_IGN", signal_ignore);
 #ifdef SIGHUP
         set_signal_constant(runtime, module, "SIGHUP", SIGHUP);
+        append_export(runtime, exports, "SIGHUP");
 #endif
 #ifdef SIGINT
         set_signal_constant(runtime, module, "SIGINT", SIGINT);
+        append_export(runtime, exports, "SIGINT");
 #endif
 #ifdef SIGQUIT
         set_signal_constant(runtime, module, "SIGQUIT", SIGQUIT);
+        append_export(runtime, exports, "SIGQUIT");
 #endif
 #ifdef SIGTERM
         set_signal_constant(runtime, module, "SIGTERM", SIGTERM);
+        append_export(runtime, exports, "SIGTERM");
 #endif
 #ifdef SIGPIPE
         set_signal_constant(runtime, module, "SIGPIPE", SIGPIPE);
+        append_export(runtime, exports, "SIGPIPE");
 #endif
 #ifdef SIGALRM
         set_signal_constant(runtime, module, "SIGALRM", SIGALRM);
+        append_export(runtime, exports, "SIGALRM");
 #endif
 #ifdef SIGCHLD
         set_signal_constant(runtime, module, "SIGCHLD", SIGCHLD);
+        append_export(runtime, exports, "SIGCHLD");
 #endif
 #ifdef SIGUSR1
         set_signal_constant(runtime, module, "SIGUSR1", SIGUSR1);
+        append_export(runtime, exports, "SIGUSR1");
 #endif
 #ifdef SIGUSR2
         set_signal_constant(runtime, module, "SIGUSR2", SIGUSR2);
+        append_export(runtime, exports, "SIGUSR2");
 #endif
+        dict->set(runtime.new_str("__all__"), runtime.new_list(std::move(exports)));
     }
 }

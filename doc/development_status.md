@@ -1,5 +1,48 @@
 # Development Status
 
+## 2026-05-22 Script Stdlib Doc Metadata Slice
+
+Review focus:
+
+- Improve documentation metadata without moving script-level library policy
+  into C++.
+- Keep native module metadata honest: native `signal` owns its real exports,
+  while script modules own their module/function docstrings.
+
+Completed:
+
+- Added module docstrings for `os`, `collections`, `io`, `inspect`, and
+  `posixpath`.
+- Added function docstrings for `posixpath` helpers and `inspect` helpers.
+- Added `signal.__all__` from native module initialization because `signal`
+  is currently a native builtin module, not a script wrapper.
+- Extended stdlib golden coverage through `inspect.getdoc()` and
+  `signal.__all__`.
+
+Design notes:
+
+- A same-named `Lib/signal.py` wrapper would not currently execute because
+  builtin extension resolution owns `signal`. Keeping `__all__` in native
+  metadata avoids pretending a script wrapper is active.
+- Longer-form documentation and paging remain future `pydoc`/`help` policy;
+  this slice only makes object metadata visible and testable.
+
+Known debt and next risk:
+
+- Import layering needs an explicit policy for native substrate modules that
+  also have script facades, similar to CPython's `_io` plus `io` split.
+- `inspect.signature()` is still text-signature based and should eventually
+  return a richer signature object.
+- `help()` still prints directly from minimal metadata and should later
+  delegate to script-side documentation tooling.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/cxxpython Tests/python/signal_module.py`
+- `build/cxxpython Tests/python/stdlib_modules.py`
+- `ctest --test-dir build --output-on-failure`
+
 ## 2026-05-22 Signal Native Module Slice
 
 Review focus:

@@ -1,3 +1,5 @@
+"""Common pathname manipulations for POSIX paths."""
+
 sep = '/'
 altsep = None
 curdir = '.'
@@ -25,12 +27,14 @@ __all__ = [
 
 
 def _as_path_text(path):
+    """Return path as a string or raise TypeError."""
     if isinstance(path, str):
         return path
     raise TypeError('path must be str')
 
 
 def join(path, *paths):
+    """Join one or more path components using POSIX separators."""
     result = _as_path_text(path)
     for item in paths:
         component = _as_path_text(item)
@@ -52,6 +56,7 @@ def join(path, *paths):
 
 
 def basename(path):
+    """Return the final component of a POSIX path."""
     path = _as_path_text(path)
     last = -1
     for index in range(len(path)):
@@ -61,6 +66,7 @@ def basename(path):
 
 
 def dirname(path):
+    """Return the directory component of a POSIX path."""
     path = _as_path_text(path)
     last = -1
     for index in range(len(path)):
@@ -74,10 +80,12 @@ def dirname(path):
 
 
 def split(path):
+    """Split a POSIX path into (head, tail)."""
     return (dirname(path), basename(path))
 
 
 def isabs(path):
+    """Return whether a POSIX path is absolute."""
     path = _as_path_text(path)
     if len(path) == 0:
         return False

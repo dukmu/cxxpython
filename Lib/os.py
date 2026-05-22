@@ -1,3 +1,5 @@
+"""Expose portable operating-system interfaces on top of the POSIX substrate."""
+
 import posix
 import posixpath as path
 

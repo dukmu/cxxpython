@@ -3,6 +3,9 @@ import gc
 import collections
 import sys
 import posix
+import os
+import io
+import posixpath
 import _io
 import _collections
 
@@ -14,6 +17,10 @@ print(inspect.getdoc(gc).__contains__('garbage collector'))
 print(inspect.getdoc(posix).__contains__('operating-system'))
 print(inspect.getdoc(_io).__contains__('native stream'))
 print(inspect.getdoc(_collections).__contains__('collection helpers'))
+print(inspect.getdoc(os).__contains__('operating-system interfaces'))
+print(inspect.getdoc(io).__contains__('Core stream'))
+print(inspect.getdoc(collections).__contains__('Container datatypes'))
+print(inspect.getdoc(posixpath).__contains__('POSIX paths'))
 print(inspect.__all__.__contains__('currentframe'))
 print(collections.__all__.__contains__('namedtuple'))
 print(gc.__file__)
@@ -28,6 +35,9 @@ print(inspect.signature(_io.open))
 print(inspect.getdoc(_io.open).__contains__('Open file'))
 print(inspect.signature(_io.TextIOWrapper.read))
 print(inspect.getdoc(_io.TextIOWrapper.write).__contains__('Write a string'))
+print(inspect.getdoc(posixpath.join).__contains__('Join one or more'))
+print(inspect.getdoc(posixpath.basename).__contains__('final component'))
+print(inspect.getdoc(inspect.signature).__contains__('text signature'))
 print(inspect.signature(collections.namedtuple))
 print(inspect.getdoc(collections.namedtuple).__contains__('tuple subclass'))
 

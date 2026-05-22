@@ -9,6 +9,8 @@ print(sys.builtin_module_names.__contains__('signal'))
 print(dir(signal).__contains__('signal'))
 print(dir(signal).__contains__('getsignal'))
 print(dir(signal).__contains__('raise_signal'))
+print(signal.__all__.__contains__('signal'))
+print(signal.__all__.__contains__('SIGINT'))
 print(signal.signal.__text_signature__)
 print(signal.getsignal.__text_signature__)
 

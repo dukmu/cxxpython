@@ -6,6 +6,8 @@ True
 True
 True
 True
+True
+True
 ($module, signalnum, handler, /)
 ($module, signalnum, /)
 True
