@@ -133,6 +133,30 @@ namespace cxxpython
                 "($module, object=None, /)",
             },
             {
+                "getattr",
+                builtin_getattr,
+                "Return the named attribute from an object, or a default value if provided.",
+                "($module, object, name, default=<unrepresentable>, /)",
+            },
+            {
+                "setattr",
+                builtin_setattr,
+                "Set the named attribute on an object.",
+                "($module, object, name, value, /)",
+            },
+            {
+                "hasattr",
+                builtin_hasattr,
+                "Return whether an object has the named attribute.",
+                "($module, object, name, /)",
+            },
+            {
+                "help",
+                builtin_help,
+                "Print a brief help summary for an object.",
+                "($module, object=None, /)",
+            },
+            {
                 "format",
                 builtin_format,
                 "Return value.__format__(format_spec).",

@@ -3,6 +3,7 @@
 #include "../../Objects/object_utils.hpp"
 
 #include <cstdint>
+#include <ostream>
 #include <set>
 #include <string>
 #include <vector>
@@ -73,6 +74,49 @@ namespace cxxpython
                 result.push_back(text);
             }
             return result;
+        }
+
+        StrObject *require_attribute_name(Runtime &runtime, const char *function_name, Object *object)
+        {
+            auto *name = dynamic_cast<StrObject *>(object);
+            if (!name)
+                raise_type_error(&runtime, std::string(function_name) + "() attribute name must be str");
+            return name;
+        }
+
+        std::string help_name(Runtime &runtime, Object *object)
+        {
+            if (!object)
+                return "help";
+            try
+            {
+                Object *name = object_get_attr(object, "__name__");
+                auto name_root = runtime.root(name);
+                if (auto *text = dynamic_cast<StrObject *>(name_root.get()))
+                    return text->value;
+            }
+            catch (const PythonError &error)
+            {
+                if (error.type() != runtime.attribute_error_type())
+                    throw;
+            }
+            return type_qualified_name(object->type());
+        }
+
+        Object *help_doc(Runtime &runtime, Object *object)
+        {
+            if (!object)
+                return runtime.none();
+            try
+            {
+                return object_get_attr(object, "__doc__");
+            }
+            catch (const PythonError &error)
+            {
+                if (error.type() != runtime.attribute_error_type())
+                    throw;
+                return runtime.none();
+            }
         }
     }
 
@@ -191,5 +235,70 @@ namespace cxxpython
                 raise_type_error(&runtime, "vars() argument must have __dict__ attribute");
             throw;
         }
+    }
+
+    Object *builtin_getattr(Runtime &runtime, const CallArguments &args)
+    {
+        require_no_keywords(&runtime, "getattr", args);
+        require_positional_range(&runtime, "getattr", args, 2, 3);
+        StrObject *name = require_attribute_name(runtime, "getattr", args.positional[1]);
+        try
+        {
+            return object_get_attr(args.positional[0], name);
+        }
+        catch (const PythonError &error)
+        {
+            if (args.positional.size() == 3 && error.type() == runtime.attribute_error_type())
+                return args.positional[2];
+            throw;
+        }
+    }
+
+    Object *builtin_setattr(Runtime &runtime, const CallArguments &args)
+    {
+        require_no_keywords(&runtime, "setattr", args);
+        require_positional_count(&runtime, "setattr", args, 3);
+        StrObject *name = require_attribute_name(runtime, "setattr", args.positional[1]);
+        object_set_attr(args.positional[0], name, args.positional[2]);
+        return runtime.none();
+    }
+
+    Object *builtin_hasattr(Runtime &runtime, const CallArguments &args)
+    {
+        require_no_keywords(&runtime, "hasattr", args);
+        require_positional_count(&runtime, "hasattr", args, 2);
+        StrObject *name = require_attribute_name(runtime, "hasattr", args.positional[1]);
+        try
+        {
+            (void)object_get_attr(args.positional[0], name);
+            return runtime.true_value();
+        }
+        catch (const PythonError &error)
+        {
+            if (error.type() == runtime.attribute_error_type())
+                return runtime.false_value();
+            throw;
+        }
+    }
+
+    Object *builtin_help(Runtime &runtime, const CallArguments &args)
+    {
+        require_no_keywords(&runtime, "help", args);
+        require_positional_at_most(&runtime, "help", args, 1);
+        std::ostream &out = runtime.stdout_stream();
+        if (args.positional.empty())
+        {
+            out << "Type help(object) for help about object.\n";
+            return runtime.none();
+        }
+
+        Object *object = args.positional[0];
+        auto object_root = runtime.root(object);
+        out << "Help on " << help_name(runtime, object_root.get()) << ":\n";
+        Object *doc = help_doc(runtime, object_root.get());
+        auto doc_root = runtime.root(doc);
+        if (doc_root.get() != runtime.none())
+            out << object_str(doc_root.get()) << "\n";
+        return runtime.none();
     }
 }

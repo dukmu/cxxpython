@@ -1,0 +1,14 @@
+class-marker
+computed
+fallback
+True
+False
+None
+42
+True
+True
+True
+True
+Help on documented:
+documented function
+Type help(object) for help about object.

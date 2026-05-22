@@ -1,5 +1,51 @@
 # Development Status
 
+## 2026-05-22 Reflection Builtins And Help Slice
+
+Review focus:
+
+- Add REPL-critical reflection builtins through the normal object protocol.
+- Keep descriptor, `__getattribute__`, and `__getattr__` behavior centralized
+  in the object layer instead of duplicating attribute lookup in builtins.
+- Provide a minimal `help()` that can grow from object metadata while keeping
+  richer paging/introspection policy script-side for later.
+
+Completed:
+
+- Added builtins: `getattr`, `setattr`, `hasattr`, and `help`.
+- `getattr` supports the optional default and only suppresses
+  `AttributeError`, matching the important CPython control-flow rule.
+- `setattr` delegates to `object_set_attr`, preserving descriptor and
+  `__setattr__` semantics.
+- `hasattr` delegates to `object_get_attr` and only converts
+  `AttributeError` to `False`.
+- `help()` now prints a small metadata summary for objects with `__name__` and
+  `__doc__`, and prints a REPL hint when called without arguments.
+- Added Python golden coverage for dynamic `__getattr__`, defaulted
+  `getattr`, `setattr`, `hasattr`, and `help`.
+
+Design notes:
+
+- This is intentionally a substrate-level `help`, not a full `pydoc`
+  implementation. It gives the CLI a useful command while leaving the mature
+  documentation browser to future script-layer modules.
+- The new builtins use the same native method table metadata as other builtins,
+  so `dir(__builtins__)`, `__doc__`, and `__text_signature__` remain coherent.
+
+Known debt and next risk:
+
+- `help()` should eventually delegate to a script-level `pydoc`/`site` style
+  helper once imports, paging, and richer inspect objects are ready.
+- `delattr` is still missing and should be added with the same protocol
+  discipline.
+- Keyword-aware native argument parsing is still bespoke.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter=PythonScripts.RunsGoldenFiles`
+- `ctest --test-dir build --output-on-failure`
+
 ## 2026-05-22 Native Positional Argument Range Slice
 
 Review focus:
