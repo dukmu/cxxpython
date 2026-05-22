@@ -1,5 +1,62 @@
 # Development Status
 
+## 2026-05-22 Import Runtime Request Slice
+
+Review focus:
+
+- Remove import policy from the Python-visible builtins implementation.
+- Keep `Modules/builtins/import.cpp` as argument parsing and dispatch only.
+- Give the runtime import subsystem one API for dotted-name return semantics,
+  fromlist child loading, and relative import resolution.
+
+Completed:
+
+- Added `ImportRequest` and `Runtime::import_name(...)`.
+- Moved relative import name resolution from `Modules/builtins/import.cpp` into
+  `Python/import.cpp`.
+- Moved `__import__` fromlist child loading into the runtime import subsystem.
+  The implementation now streams fromlist iteration instead of first collecting
+  an unrooted vector of items.
+- Kept `Runtime::import_module(...)` as the low-level absolute module loader
+  and cache entrypoint.
+- Made source module loading insert the module into `sys.modules` before
+  executing its code, preserving circular import visibility while retaining
+  existing failure cleanup.
+- Added C++ coverage for the runtime import API:
+  - dotted import without fromlist returns the top-level package;
+  - dotted import with fromlist returns the leaf module;
+  - relative import resolves from caller globals.
+- Added C++ coverage for partially initialized source modules during circular
+  import.
+
+Design notes:
+
+- Public builtin `__import__` now mirrors CPython's layering more closely:
+  parse/validate the visible call shape, then delegate to import runtime
+  machinery.
+- `Runtime::import_name(...)` is intentionally higher level than
+  `Runtime::import_module(...)`; the former implements import statement and
+  `__import__` return semantics, while the latter loads a concrete absolute
+  module.
+- This is still bootstrap import machinery, not full importlib. Future
+  `Lib/importlib` work should use this API as the substrate rather than
+  duplicating policy in builtins or the compiler.
+
+Known debt and next risk:
+
+- Fromlist handling still treats non-string entries leniently to preserve the
+  current behavior; this should be tightened when argument/error compatibility
+  tests for `__import__` are expanded.
+- Importlib objects are still minimal runtime-created Python objects. As
+  `Lib/importlib` grows, loader/spec policy should move script-side while the
+  C++ layer keeps only filesystem/native loading primitives.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter=Module.ImportNameOwnsDottedFromlistAndRelativeSemantics:Module.ImportsPackagesAndDottedSubmodules:PythonScripts.RunsGoldenFiles`
+- `ctest --test-dir build --output-on-failure`
+
 ## 2026-05-22 Builtins Module Split
 
 Review focus:
@@ -40,9 +97,10 @@ Design notes:
 
 Known debt and next risk:
 
-- `Modules/builtins/import.cpp` still contains public `__import__` fromlist
-  loading and relative-name policy. Once enough script substrate is available,
-  this should shrink toward bootstrap hooks with more policy in `Lib/importlib`.
+- `Modules/builtins/import.cpp` no longer owns public `__import__` fromlist
+  loading or relative-name policy; those moved to `Runtime::import_name(...)`.
+  More importlib policy should still migrate script-side once the substrate is
+  ready.
 - `Modules/builtins/exec.cpp` directly drives the active VM for `eval`/`exec`;
   future tracing/debug hooks should keep using `CodeObject`/`Frame` objects
   rather than adding ad hoc builtin-side state.

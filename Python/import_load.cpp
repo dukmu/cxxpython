@@ -89,6 +89,7 @@ namespace cxxpython
         initialize_module_import_metadata(module_root.get(), spec, loader_root.get(), spec_root.get());
         try
         {
+            modules_->set(root(new_str(spec.name)).get(), module_root.get());
             CodeObject *code = compile_exec_input(*this, source, spec.filename);
             auto code_root = root(code);
             SearchPathGuard imported_directory(module_search_paths_, std::filesystem::path(spec.filename).parent_path());

@@ -1,7 +1,10 @@
 #include "cxxpython/runtime.hpp"
 
 #include <cctype>
+#include <cstdint>
+#include <string>
 #include <string_view>
+#include <vector>
 
 namespace cxxpython
 {
@@ -57,6 +60,71 @@ namespace cxxpython
             return std::string(name.substr(dot + 1));
         }
 
+        std::string package_name_from_globals(Runtime &runtime, DictObject *globals)
+        {
+            if (!globals)
+                return "";
+            if (auto *package = dynamic_cast<StrObject *>(globals->get(runtime.new_str("__package__"))))
+            {
+                if (!package->value.empty())
+                    return package->value;
+            }
+            if (globals->get(runtime.new_str("__path__")))
+            {
+                if (auto *name = dynamic_cast<StrObject *>(globals->get(runtime.new_str("__name__"))))
+                    return name->value;
+            }
+            if (auto *name = dynamic_cast<StrObject *>(globals->get(runtime.new_str("__name__"))))
+            {
+                const std::size_t dot = name->value.rfind('.');
+                if (dot != std::string::npos)
+                    return name->value.substr(0, dot);
+            }
+            return "";
+        }
+
+        std::string resolve_import_name(Runtime &runtime, const ImportRequest &request)
+        {
+            if (request.level < 0)
+                raise_value_error(&runtime, "level must be >= 0");
+            if (request.level == 0)
+                return request.name;
+
+            std::string package = package_name_from_globals(runtime, request.globals);
+            if (package.empty())
+                raise_import_error(&runtime, "attempted relative import with no known parent package");
+
+            std::vector<std::string_view> components;
+            std::size_t start = 0;
+            while (start <= package.size())
+            {
+                const std::size_t dot = package.find('.', start);
+                const std::size_t end = dot == std::string::npos ? package.size() : dot;
+                components.push_back(std::string_view(package).substr(start, end - start));
+                if (dot == std::string::npos)
+                    break;
+                start = dot + 1;
+            }
+            if (request.level > static_cast<std::int64_t>(components.size()))
+                raise_import_error(&runtime, "attempted relative import beyond top-level package");
+
+            const std::size_t keep = components.size() - static_cast<std::size_t>(request.level) + 1;
+            std::string resolved;
+            for (std::size_t index = 0; index < keep; ++index)
+            {
+                if (!resolved.empty())
+                    resolved += '.';
+                resolved += components[index];
+            }
+            if (!request.name.empty())
+            {
+                if (!resolved.empty())
+                    resolved += '.';
+                resolved += request.name;
+            }
+            return resolved;
+        }
+
         std::vector<std::string> package_paths(Runtime &runtime, ModuleObject *package)
         {
             std::vector<std::string> paths;
@@ -87,6 +155,66 @@ namespace cxxpython
             }
             return paths;
         }
+
+        void load_fromlist_children(Runtime &runtime, std::string_view module_name, ModuleObject *module, Object *fromlist)
+        {
+            if (!module->dict()->get(runtime.new_str("__path__")))
+                return;
+
+            Object *iterator = object_iter(fromlist);
+            auto iterator_root = runtime.root(iterator);
+            while (true)
+            {
+                try
+                {
+                    Object *item = object_next(iterator_root.get());
+                    auto item_root = runtime.root(item);
+                    auto *item_name = dynamic_cast<StrObject *>(item_root.get());
+                    if (!item_name || item_name->value == "*")
+                        continue;
+                    if (module->dict()->get(runtime.new_str(item_name->value)))
+                        continue;
+                    try
+                    {
+                        (void)runtime.import_module(std::string(module_name) + "." + item_name->value);
+                    }
+                    catch (const PythonError &error)
+                    {
+                        if (error.type() != runtime.import_error_type())
+                            throw;
+                    }
+                }
+                catch (const PythonError &error)
+                {
+                    if (error.type() && is_subclass(error.type(), runtime.stop_iteration_type()))
+                        break;
+                    throw;
+                }
+            }
+        }
+    }
+
+    Object *Runtime::import_name(const ImportRequest &request)
+    {
+        const std::string absolute_name = resolve_import_name(*this, request);
+        ModuleObject *module = import_module(absolute_name);
+        auto module_root = root(module);
+        if (request.fromlist && request.fromlist != none() && is_true(request.fromlist))
+        {
+            load_fromlist_children(*this, absolute_name, module_root.get(), request.fromlist);
+            return module_root.get();
+        }
+
+        const std::size_t dot = absolute_name.find('.');
+        if (dot == std::string::npos)
+            return module_root.get();
+
+        const std::string top_level = absolute_name.substr(0, dot);
+        Object *top_level_module = modules_->get(new_str(top_level));
+        auto *top_level_object = dynamic_cast<ModuleObject *>(top_level_module);
+        if (!top_level_object)
+            raise_import_error(this, "module registry entry is not a module");
+        return top_level_object;
     }
 
     ModuleObject *Runtime::import_module(std::string name)
@@ -133,9 +261,11 @@ namespace cxxpython
         auto module_root = root(module);
         if (!module_root)
             raise_import_error(this, "loader returned null for module '" + name + "'");
+        const bool already_registered = modules_->get(name_key_root.get()) == module_root.get();
         try
         {
-            modules_->set(name_key_root.get(), module_root.get());
+            if (!already_registered)
+                modules_->set(name_key_root.get(), module_root.get());
             if (parent_module)
             {
                 auto parent_root = root(parent_module);

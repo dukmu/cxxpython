@@ -66,6 +66,15 @@ namespace cxxpython
         ModuleLoadKind kind = ModuleLoadKind::Source;
     };
 
+    struct ImportRequest
+    {
+        std::string name;
+        DictObject *globals = nullptr;
+        DictObject *locals = nullptr;
+        Object *fromlist = nullptr;
+        std::int64_t level = 0;
+    };
+
     class Runtime final
     {
     public:
@@ -260,6 +269,7 @@ namespace cxxpython
                               DictObject *namespace_dict,
                               std::string module_fallback = "builtins");
         TypeObject *build_class(const ClassBuildRequest &request);
+        Object *import_name(const ImportRequest &request);
         ModuleObject *import_module(std::string name);
         Object *new_module_loader_object(const ModuleLoadSpec &spec);
         Object *new_module_spec_object(const ModuleLoadSpec &spec, Object *loader);

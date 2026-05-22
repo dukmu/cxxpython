@@ -232,6 +232,95 @@ TEST(Module, ImportsPackagesAndDottedSubmodules)
     std::filesystem::remove(package_dir);
 }
 
+TEST(Module, ImportNameOwnsDottedFromlistAndRelativeSemantics)
+{
+    cxxpython::Runtime runtime;
+    const std::filesystem::path directory = std::filesystem::temp_directory_path();
+    const std::filesystem::path package_dir = directory / "cxxpython_import_name_pkg";
+    const std::filesystem::path init_path = package_dir / "__init__.py";
+    const std::filesystem::path child_path = package_dir / "child.py";
+    std::filesystem::create_directories(package_dir);
+    {
+        std::ofstream file(init_path, std::ios::binary);
+        file << "label = 'package'\n";
+    }
+    {
+        std::ofstream file(child_path, std::ios::binary);
+        file << "value = 'child:' + __name__\n";
+    }
+
+    runtime.add_module_search_path(directory.string());
+
+    cxxpython::Object *top = runtime.import_name(cxxpython::ImportRequest{
+        .name = "cxxpython_import_name_pkg.child",
+        .fromlist = runtime.new_tuple({}),
+    });
+    auto *package = dynamic_cast<cxxpython::ModuleObject *>(top);
+    ASSERT_NE(package, nullptr);
+    EXPECT_EQ(package->name(), "cxxpython_import_name_pkg");
+
+    cxxpython::Object *leaf = runtime.import_name(cxxpython::ImportRequest{
+        .name = "cxxpython_import_name_pkg.child",
+        .fromlist = runtime.new_tuple({runtime.new_str("value")}),
+    });
+    auto *child = dynamic_cast<cxxpython::ModuleObject *>(leaf);
+    ASSERT_NE(child, nullptr);
+    EXPECT_EQ(child->name(), "cxxpython_import_name_pkg.child");
+    EXPECT_EQ(cxxpython::object_get_attr(package, "child"), child);
+
+    cxxpython::Object *relative_leaf = runtime.import_name(cxxpython::ImportRequest{
+        .name = "child",
+        .globals = package->dict(),
+        .fromlist = runtime.new_tuple({runtime.new_str("value")}),
+        .level = 1,
+    });
+    EXPECT_EQ(relative_leaf, child);
+
+    auto *value = dynamic_cast<cxxpython::StrObject *>(child->dict()->get(runtime.new_str("value")));
+    ASSERT_NE(value, nullptr);
+    EXPECT_EQ(value->value, "child:cxxpython_import_name_pkg.child");
+
+    std::filesystem::remove(child_path);
+    std::filesystem::remove(init_path);
+    std::filesystem::remove(package_dir);
+}
+
+TEST(Module, SourceModulesAreVisibleDuringCircularImport)
+{
+    cxxpython::Runtime runtime;
+    const std::filesystem::path directory = std::filesystem::temp_directory_path();
+    const std::filesystem::path first_path = directory / "cxxpython_circular_first.py";
+    const std::filesystem::path second_path = directory / "cxxpython_circular_second.py";
+    {
+        std::ofstream file(first_path, std::ios::binary);
+        file << "before = 'visible'\n"
+                "import cxxpython_circular_second\n"
+                "after = cxxpython_circular_second.seen\n";
+    }
+    {
+        std::ofstream file(second_path, std::ios::binary);
+        file << "import cxxpython_circular_first\n"
+                "seen = cxxpython_circular_first.before\n";
+    }
+
+    runtime.add_module_search_path(directory.string());
+    cxxpython::ModuleObject *first = runtime.import_module("cxxpython_circular_first");
+    ASSERT_NE(first, nullptr);
+    auto *second = dynamic_cast<cxxpython::ModuleObject *>(
+        runtime.modules_dict()->get(runtime.new_str("cxxpython_circular_second")));
+    ASSERT_NE(second, nullptr);
+
+    auto *after = dynamic_cast<cxxpython::StrObject *>(first->dict()->get(runtime.new_str("after")));
+    auto *seen = dynamic_cast<cxxpython::StrObject *>(second->dict()->get(runtime.new_str("seen")));
+    ASSERT_NE(after, nullptr);
+    ASSERT_NE(seen, nullptr);
+    EXPECT_EQ(after->value, "visible");
+    EXPECT_EQ(seen->value, "visible");
+
+    std::filesystem::remove(second_path);
+    std::filesystem::remove(first_path);
+}
+
 TEST(Module, FailedImportsDoNotPoisonModuleRegistry)
 {
     cxxpython::Runtime runtime;

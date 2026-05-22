@@ -2,10 +2,7 @@
 
 #include "../../Objects/object_utils.hpp"
 
-#include <cstdint>
 #include <string>
-#include <string_view>
-#include <utility>
 #include <vector>
 
 namespace cxxpython
@@ -20,74 +17,6 @@ namespace cxxpython
                     return name->value;
             }
             return "__main__";
-        }
-
-        std::string package_name_from_globals(Runtime &runtime, DictObject *globals)
-        {
-            if (!globals)
-                return "";
-            if (auto *package = dynamic_cast<StrObject *>(globals->get(runtime.new_str("__package__"))))
-            {
-                if (!package->value.empty())
-                    return package->value;
-            }
-            if (globals->get(runtime.new_str("__path__")))
-            {
-                if (auto *name = dynamic_cast<StrObject *>(globals->get(runtime.new_str("__name__"))))
-                    return name->value;
-            }
-            if (auto *name = dynamic_cast<StrObject *>(globals->get(runtime.new_str("__name__"))))
-            {
-                const std::size_t dot = name->value.rfind('.');
-                if (dot != std::string::npos)
-                    return name->value.substr(0, dot);
-            }
-            return "";
-        }
-
-        std::string resolve_relative_import(Runtime &runtime,
-                                            const std::string &name,
-                                            DictObject *globals,
-                                            std::int64_t level)
-        {
-            if (level < 0)
-                raise_value_error(&runtime, "level must be >= 0");
-            if (level == 0)
-                return name;
-
-            std::string package = package_name_from_globals(runtime, globals);
-            if (package.empty())
-                raise_import_error(&runtime, "attempted relative import with no known parent package");
-
-            std::vector<std::string_view> components;
-            std::size_t start = 0;
-            while (start <= package.size())
-            {
-                const std::size_t dot = package.find('.', start);
-                const std::size_t end = dot == std::string::npos ? package.size() : dot;
-                components.push_back(std::string_view(package).substr(start, end - start));
-                if (dot == std::string::npos)
-                    break;
-                start = dot + 1;
-            }
-            if (level > static_cast<std::int64_t>(components.size()))
-                raise_import_error(&runtime, "attempted relative import beyond top-level package");
-
-            const std::size_t keep = components.size() - static_cast<std::size_t>(level) + 1;
-            std::string resolved;
-            for (std::size_t index = 0; index < keep; ++index)
-            {
-                if (!resolved.empty())
-                    resolved += '.';
-                resolved += components[index];
-            }
-            if (!name.empty())
-            {
-                if (!resolved.empty())
-                    resolved += '.';
-                resolved += name;
-            }
-            return resolved;
         }
     }
 
@@ -148,47 +77,13 @@ namespace cxxpython
             level_value = level->value;
         }
 
-        const std::string absolute_name = resolve_relative_import(runtime, name->value, globals, level_value);
-        ModuleObject *module = runtime.import_module(absolute_name);
-        auto module_root = runtime.root(module);
-        if (args.positional.size() >= 4 && args.positional[3] != runtime.none() && is_true(args.positional[3]))
-        {
-            if (module_root->dict()->get(runtime.new_str("__path__")))
-            {
-                std::vector<Object *> from_items = collect_iterable_items(&runtime, args.positional[3]);
-                std::vector<Rooted<Object>> from_roots;
-                from_roots.reserve(from_items.size());
-                for (Object *item : from_items)
-                {
-                    from_roots.push_back(runtime.root(item));
-                    auto *item_name = dynamic_cast<StrObject *>(item);
-                    if (!item_name || item_name->value == "*")
-                        continue;
-                    if (module_root->dict()->get(runtime.new_str(item_name->value)))
-                        continue;
-                    try
-                    {
-                        (void)runtime.import_module(absolute_name + "." + item_name->value);
-                    }
-                    catch (const PythonError &error)
-                    {
-                        if (error.type() != runtime.import_error_type())
-                            throw;
-                    }
-                }
-            }
-            return module_root.get();
-        }
-
-        const std::size_t dot = absolute_name.find('.');
-        if (dot == std::string::npos)
-            return module_root.get();
-
-        const std::string top_level = absolute_name.substr(0, dot);
-        Object *top_level_module = runtime.modules_dict()->get(runtime.new_str(top_level));
-        auto *top_level_object = dynamic_cast<ModuleObject *>(top_level_module);
-        if (!top_level_object)
-            raise_import_error(&runtime, "module registry entry is not a module");
-        return top_level_object;
+        Object *fromlist = args.positional.size() >= 4 ? args.positional[3] : runtime.none();
+        return runtime.import_name(ImportRequest{
+            .name = name->value,
+            .globals = globals,
+            .locals = nullptr,
+            .fromlist = fromlist,
+            .level = level_value,
+        });
     }
 }
