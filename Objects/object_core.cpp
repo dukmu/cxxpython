@@ -105,6 +105,22 @@ namespace cxxpython
             return type && type->dict && type->dict->contains(type->runtime()->new_str(name));
         }
 
+        template <class Slot>
+        void inherit_heap_slot(TypeObject *type, Slot TypeSlots::*member, Slot fallback = nullptr)
+        {
+            type->slots.*member = type->base ? type->base->slots.*member : fallback;
+        }
+
+        template <class Slot>
+        void override_heap_slot_if_present(TypeObject *type,
+                                           const char *method_name,
+                                           Slot TypeSlots::*member,
+                                           Slot slot)
+        {
+            if (type_dict_contains(type, method_name))
+                type->slots.*member = slot;
+        }
+
         Object *call_heap_special_no_args(Object &object, const char *name)
         {
             Object *method = object_get_attr(&object, name);
@@ -1098,33 +1114,26 @@ namespace cxxpython
     {
         if (!type || (type->flags & TypeFlagHeapType) == 0)
             return;
-        type->slots.iter = type->base ? type->base->slots.iter : nullptr;
-        type->slots.iternext = type->base ? type->base->slots.iternext : nullptr;
-        type->slots.length = type->base ? type->base->slots.length : nullptr;
-        type->slots.truth = type->base ? type->base->slots.truth : default_truth;
-        type->slots.getitem = type->base ? type->base->slots.getitem : nullptr;
-        type->slots.setitem = type->base ? type->base->slots.setitem : nullptr;
-        type->slots.delitem = type->base ? type->base->slots.delitem : nullptr;
-        type->slots.contains = type->base ? type->base->slots.contains : nullptr;
+        inherit_heap_slot(type, &TypeSlots::iter);
+        inherit_heap_slot(type, &TypeSlots::iternext);
+        inherit_heap_slot(type, &TypeSlots::length);
+        inherit_heap_slot(type, &TypeSlots::truth, default_truth);
+        inherit_heap_slot(type, &TypeSlots::getitem);
+        inherit_heap_slot(type, &TypeSlots::setitem);
+        inherit_heap_slot(type, &TypeSlots::delitem);
+        inherit_heap_slot(type, &TypeSlots::contains);
         if (type_dict_contains(type, "__len__"))
         {
             type->slots.length = heap_length_slot;
             type->slots.truth = heap_truth_slot;
         }
-        if (type_dict_contains(type, "__bool__"))
-            type->slots.truth = heap_truth_slot;
-        if (type_dict_contains(type, "__iter__"))
-            type->slots.iter = heap_iter_slot;
-        if (type_dict_contains(type, "__next__"))
-            type->slots.iternext = heap_iternext_slot;
-        if (type_dict_contains(type, "__getitem__"))
-            type->slots.getitem = heap_getitem_slot;
-        if (type_dict_contains(type, "__setitem__"))
-            type->slots.setitem = heap_setitem_slot;
-        if (type_dict_contains(type, "__delitem__"))
-            type->slots.delitem = heap_delitem_slot;
-        if (type_dict_contains(type, "__contains__"))
-            type->slots.contains = heap_contains_slot;
+        override_heap_slot_if_present(type, "__bool__", &TypeSlots::truth, heap_truth_slot);
+        override_heap_slot_if_present(type, "__iter__", &TypeSlots::iter, heap_iter_slot);
+        override_heap_slot_if_present(type, "__next__", &TypeSlots::iternext, heap_iternext_slot);
+        override_heap_slot_if_present(type, "__getitem__", &TypeSlots::getitem, heap_getitem_slot);
+        override_heap_slot_if_present(type, "__setitem__", &TypeSlots::setitem, heap_setitem_slot);
+        override_heap_slot_if_present(type, "__delitem__", &TypeSlots::delitem, heap_delitem_slot);
+        override_heap_slot_if_present(type, "__contains__", &TypeSlots::contains, heap_contains_slot);
         if (!type->slots.iter && type->slots.length && type->slots.getitem)
             type->slots.iter = heap_sequence_iter_slot;
     }

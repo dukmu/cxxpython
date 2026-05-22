@@ -1,5 +1,43 @@
 # Development Status
 
+## 2026-05-22 Heap Slot Refresh Helper Cleanup
+
+Review focus:
+
+- Keep the growing heap special-method refresh mechanism from turning into
+  repetitive manual slot assignment.
+- Prepare for numeric, comparison, and call slot refresh without copying the
+  same inheritance and override pattern again.
+
+Completed:
+
+- Added local helper templates in `Objects/object_core.cpp` to:
+  - inherit a slot from the best base with an optional fallback;
+  - override a slot only when the heap type dictionary defines the matching
+    special method.
+- Reworked `refresh_heap_type_slots_from_dict(...)` to use the helpers for the
+  currently supported iterator, truth/length, item, and membership slots.
+
+Design notes:
+
+- This is an incremental cleanup, not the final table-driven slot metadata
+  design.
+- The next structural cleanup should group special-method names, slot members,
+  and thunk functions in a small declarative table where the C++ type system
+  allows it cleanly.
+
+Known debt and next risk:
+
+- Numeric/comparison slots involve operator-specific dispatch and return
+  `NotImplemented`, so they need a richer mapping than the simple one-slot
+  helpers used here.
+- Subclass invalidation after base type mutation remains unresolved.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure`
+
 ## 2026-05-22 Heap Item Membership Slot Refresh Slice
 
 Review focus:
