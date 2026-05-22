@@ -63,16 +63,49 @@ namespace cxxpython
             require_positional_count(&runtime, "disable", args, 0);
             return runtime.none();
         }
+
+        constexpr NativeModuleFunctionDef gc_methods[] = {
+            {
+                "collect",
+                gc_collect,
+                "Run a garbage collection and return the number of collected objects.",
+                "($module, generation=None, /)",
+            },
+            {
+                "get_count",
+                gc_get_count,
+                "Return the current collection counters.",
+                "($module, /)",
+            },
+            {
+                "get_objects",
+                gc_get_objects,
+                "Return objects tracked by the collector.",
+                "($module, /)",
+            },
+            {
+                "isenabled",
+                gc_isenabled,
+                "Return whether automatic garbage collection is enabled.",
+                "($module, /)",
+            },
+            {
+                "enable",
+                gc_enable,
+                "Enable automatic garbage collection.",
+                "($module, /)",
+            },
+            {
+                "disable",
+                gc_disable,
+                "Disable automatic garbage collection.",
+                "($module, /)",
+            },
+        };
     }
 
     void initialize_gc_module(Runtime &runtime, ModuleObject &module)
     {
-        DictObject *dict = module.dict();
-        dict->set(runtime.new_str("collect"), runtime.new_native_function("collect", gc_collect));
-        dict->set(runtime.new_str("get_count"), runtime.new_native_function("get_count", gc_get_count));
-        dict->set(runtime.new_str("get_objects"), runtime.new_native_function("get_objects", gc_get_objects));
-        dict->set(runtime.new_str("isenabled"), runtime.new_native_function("isenabled", gc_isenabled));
-        dict->set(runtime.new_str("enable"), runtime.new_native_function("enable", gc_enable));
-        dict->set(runtime.new_str("disable"), runtime.new_native_function("disable", gc_disable));
+        add_module_functions(runtime, module, gc_methods);
     }
 }

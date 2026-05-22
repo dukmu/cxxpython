@@ -1,5 +1,63 @@
 # Development Status
 
+## 2026-05-22 Native Module Method Table Slice
+
+Review focus:
+
+- Continue callable metadata work without growing hand-written registration
+  noise in each native module.
+- Align native module registration with CPython's table-driven style:
+  `PyMethodDef`/Argument Clinic conceptually map to small C++ method tables
+  plus a common registration helper.
+- Extend doc/signature metadata beyond `builtins` to the bootstrap native
+  modules that currently expose CPython-like substrate.
+
+Completed:
+
+- Added `NativeModuleFunctionDef` and `add_module_functions(...)` in
+  `Modules/module_registry.hpp`.
+- Converted `sys`, `gc`, `posix`, `_io`, and `_collections` native functions
+  to module-local method tables instead of ad hoc registration calls.
+- Added docstrings and `__text_signature__` metadata for native functions in:
+  - `sys`: `_implementation`, `_argv`, `_path`, `_modules`,
+    `_builtin_module_names`, `_getframe`;
+  - `gc`: `collect`, `get_count`, `get_objects`, `isenabled`, `enable`,
+    `disable`;
+  - `posix`: `getcwd`, `listdir`, `environ`;
+  - `_io`: `_stdin`, `_stdout`, `_stderr`, `open`;
+  - `_collections`: `namedtuple`.
+- Converted `_io.TextIOWrapper` method descriptor registration to a local
+  table for `read`, `readline`, `write`, `flush`, `close`, and `closed`,
+  including doc/signature metadata.
+- Added C++ and Python golden coverage through `inspect.getdoc()` and
+  `inspect.signature()` for these native module functions and `_io` methods.
+
+Design notes:
+
+- This is closer to CPython's shape than scattered calls: module metadata lives
+  in a declarative table near the native implementation, while the common
+  helper owns object creation and metadata wiring.
+- We are not implementing Argument Clinic yet. The current table is a
+  hand-written bootstrap analogue, but it gives us the right place to later
+  generate signatures, docstrings, and argument parsing metadata.
+- Public policy remains script-side where possible. These C++ functions are
+  substrate/native boundaries: interpreter state, GC visibility, POSIX calls,
+  IO streams, and the temporary `_collections.namedtuple` bootstrap helper.
+
+Known debt and next risk:
+
+- Builtins still use a local registration list in `Modules/builtins`; it should
+  be converted to the same method-table style.
+- A future Argument Clinic-like generator should derive signature metadata and
+  argument validation from one source of truth.
+- `_collections.namedtuple` is still native bootstrap policy; move more of it
+  to `Lib/collections.py` as the parser and class runtime grow.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter=Module.ImportsStdlibModulesFromLibPath:PythonScripts.RunsGoldenFiles`
+
 ## 2026-05-22 Code And Frame Descriptor Ownership Slice
 
 Review focus:

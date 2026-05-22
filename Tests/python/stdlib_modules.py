@@ -2,6 +2,8 @@ import inspect
 import gc
 import collections
 import sys
+import posix
+import _io
 
 print(type(inspect))
 print(type(gc))
@@ -10,6 +12,18 @@ print(inspect.__all__.__contains__('currentframe'))
 print(collections.__all__.__contains__('namedtuple'))
 print(gc.__file__)
 print(sys.builtin_module_names.__contains__('_inspect'))
+print(inspect.signature(sys._getframe))
+print(inspect.getdoc(sys._getframe).__contains__('frame object'))
+print(inspect.signature(gc.collect))
+print(inspect.getdoc(gc.collect).__contains__('garbage collection'))
+print(inspect.signature(posix.getcwd))
+print(inspect.getdoc(posix.listdir).__contains__('directory'))
+print(inspect.signature(_io.open))
+print(inspect.getdoc(_io.open).__contains__('Open file'))
+print(inspect.signature(_io.TextIOWrapper.read))
+print(inspect.getdoc(_io.TextIOWrapper.write).__contains__('Write a string'))
+print(inspect.signature(collections.namedtuple))
+print(inspect.getdoc(collections.namedtuple).__contains__('tuple subclass'))
 
 frame = inspect.currentframe()
 print(type(frame))

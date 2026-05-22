@@ -1,11 +1,51 @@
 #pragma once
 
+#include "cxxpython/object.hpp"
+#include "cxxpython/runtime.hpp"
+
+#include <span>
 #include <string_view>
 
 namespace cxxpython
 {
-    class ModuleObject;
-    class Runtime;
+    using NativeModuleFunctionCallback = Object *(*)(Runtime &, const CallArguments &);
+
+    struct NativeModuleFunctionDef
+    {
+        const char *name;
+        NativeModuleFunctionCallback callback;
+        const char *doc = "";
+        const char *text_signature = "";
+    };
+
+    inline void add_module_function(Runtime &runtime,
+                                    ModuleObject &module,
+                                    const char *name,
+                                    NativeModuleFunctionCallback callback,
+                                    const char *doc = "",
+                                    const char *text_signature = "")
+    {
+        module.dict()->set(runtime.new_str(name),
+                           runtime.new_native_function(name,
+                                                       callback,
+                                                       doc,
+                                                       text_signature));
+    }
+
+    inline void add_module_functions(Runtime &runtime,
+                                     ModuleObject &module,
+                                     std::span<const NativeModuleFunctionDef> functions)
+    {
+        for (const NativeModuleFunctionDef &function : functions)
+        {
+            add_module_function(runtime,
+                                module,
+                                function.name,
+                                function.callback,
+                                function.doc,
+                                function.text_signature);
+        }
+    }
 
     bool is_builtin_extension_module(std::string_view name);
     ModuleObject *initialize_builtin_extension_module(Runtime &runtime, std::string_view name);

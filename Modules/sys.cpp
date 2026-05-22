@@ -87,6 +87,45 @@ namespace cxxpython
             };
             return runtime.new_tuple(std::move(names));
         }
+
+        constexpr NativeModuleFunctionDef sys_methods[] = {
+            {
+                "_implementation",
+                sys_implementation,
+                "Return implementation metadata for this interpreter.",
+                "($module, /)",
+            },
+            {
+                "_argv",
+                sys_argv,
+                "Return a copy of the process argument list.",
+                "($module, /)",
+            },
+            {
+                "_path",
+                sys_path,
+                "Return a copy of the module search path.",
+                "($module, /)",
+            },
+            {
+                "_modules",
+                sys_modules,
+                "Return the interpreter module registry.",
+                "($module, /)",
+            },
+            {
+                "_builtin_module_names",
+                sys_builtin_module_names,
+                "Return the names of built-in native modules.",
+                "($module, /)",
+            },
+            {
+                "_getframe",
+                sys_getframe,
+                "Return a frame object from the call stack.",
+                "($module, depth=0, /)",
+            },
+        };
     }
 
     void initialize_sys_module(Runtime &runtime, ModuleObject &module)
@@ -105,13 +144,6 @@ namespace cxxpython
         dict->set(runtime.new_str("stdin"), runtime.stdin_object());
         dict->set(runtime.new_str("stdout"), runtime.stdout_object());
         dict->set(runtime.new_str("stderr"), runtime.stderr_object());
-        dict->set(runtime.new_str("_implementation"),
-                  runtime.new_native_function("_implementation", sys_implementation));
-        dict->set(runtime.new_str("_argv"), runtime.new_native_function("_argv", sys_argv));
-        dict->set(runtime.new_str("_path"), runtime.new_native_function("_path", sys_path));
-        dict->set(runtime.new_str("_modules"), runtime.new_native_function("_modules", sys_modules));
-        dict->set(runtime.new_str("_builtin_module_names"),
-                  runtime.new_native_function("_builtin_module_names", sys_builtin_module_names));
-        dict->set(runtime.new_str("_getframe"), runtime.new_native_function("_getframe", sys_getframe));
+        add_module_functions(runtime, module, sys_methods);
     }
 }

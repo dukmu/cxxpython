@@ -576,6 +576,34 @@ TEST(Module, ImportsStdlibModulesFromLibPath)
     EXPECT_NE(sys->dict()->get(runtime.new_str("argv")), nullptr);
     EXPECT_NE(posix->dict()->get(runtime.new_str("getcwd")), nullptr);
     EXPECT_NE(io->dict()->get(runtime.new_str("TextIOWrapper")), nullptr);
+
+    auto *getframe_signature = dynamic_cast<cxxpython::StrObject *>(
+        cxxpython::object_get_attr(sys->dict()->get(runtime.new_str("_getframe")), "__text_signature__"));
+    auto *gc_doc = dynamic_cast<cxxpython::StrObject *>(
+        cxxpython::object_get_attr(gc->dict()->get(runtime.new_str("collect")), "__doc__"));
+    auto *posix_signature = dynamic_cast<cxxpython::StrObject *>(
+        cxxpython::object_get_attr(posix->dict()->get(runtime.new_str("listdir")), "__text_signature__"));
+    auto *io_signature = dynamic_cast<cxxpython::StrObject *>(
+        cxxpython::object_get_attr(io->dict()->get(runtime.new_str("open")), "__text_signature__"));
+    auto *namedtuple_doc = dynamic_cast<cxxpython::StrObject *>(
+        cxxpython::object_get_attr(collections->dict()->get(runtime.new_str("namedtuple")), "__doc__"));
+    ASSERT_NE(getframe_signature, nullptr);
+    ASSERT_NE(gc_doc, nullptr);
+    ASSERT_NE(posix_signature, nullptr);
+    ASSERT_NE(io_signature, nullptr);
+    ASSERT_NE(namedtuple_doc, nullptr);
+    EXPECT_EQ(getframe_signature->value, "($module, depth=0, /)");
+    EXPECT_NE(gc_doc->value.find("garbage collection"), std::string::npos);
+    EXPECT_EQ(posix_signature->value, "($module, path='.', /)");
+    EXPECT_EQ(io_signature->value, "($module, file, mode='r', /)");
+    EXPECT_NE(namedtuple_doc->value.find("tuple subclass"), std::string::npos);
+
+    cxxpython::Object *read_descriptor = cxxpython::object_get_attr(runtime.text_io_type(), "read");
+    auto *read_signature =
+        dynamic_cast<cxxpython::StrObject *>(cxxpython::object_get_attr(read_descriptor, "__text_signature__"));
+    ASSERT_NE(read_signature, nullptr);
+    EXPECT_EQ(read_signature->value, "($self, /)");
+
     EXPECT_NE(sys->dict()->get(runtime.new_str("__loader__")), nullptr);
     EXPECT_NE(sys->dict()->get(runtime.new_str("__spec__")), nullptr);
     auto *sys_package = dynamic_cast<cxxpython::StrObject *>(sys->dict()->get(runtime.new_str("__package__")));

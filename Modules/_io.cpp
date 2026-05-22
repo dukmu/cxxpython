@@ -136,6 +136,80 @@ namespace cxxpython
                 raise_type_error(&runtime, "TextIOWrapper.closed() takes exactly zero arguments");
             return as_text_io(runtime, self)->closed() ? runtime.true_value() : runtime.false_value();
         }
+
+        struct NativeMethodDef
+        {
+            const char *name;
+            MethodDescriptorCallback callback;
+            const char *doc;
+            const char *text_signature;
+        };
+
+        const NativeMethodDef text_io_methods[] = {
+            {
+                "read",
+                text_io_read_method,
+                "Read all data from the stream.",
+                "($self, /)",
+            },
+            {
+                "readline",
+                text_io_readline_method,
+                "Read one line from the stream.",
+                "($self, /)",
+            },
+            {
+                "write",
+                text_io_write_method,
+                "Write a string to the stream and return the number of characters written.",
+                "($self, text, /)",
+            },
+            {
+                "flush",
+                text_io_flush_method,
+                "Flush the stream.",
+                "($self, /)",
+            },
+            {
+                "close",
+                text_io_close_method,
+                "Close the stream.",
+                "($self, /)",
+            },
+            {
+                "closed",
+                text_io_closed_method,
+                "Return True if the stream is closed.",
+                "($self, /)",
+            },
+        };
+
+        constexpr NativeModuleFunctionDef io_methods[] = {
+            {
+                "_stdin",
+                io_stdin,
+                "Return the interpreter standard input stream.",
+                "($module, /)",
+            },
+            {
+                "_stdout",
+                io_stdout,
+                "Return the interpreter standard output stream.",
+                "($module, /)",
+            },
+            {
+                "_stderr",
+                io_stderr,
+                "Return the interpreter standard error stream.",
+                "($module, /)",
+            },
+            {
+                "open",
+                io_open,
+                "Open file and return a stream.",
+                "($module, file, mode='r', /)",
+            },
+        };
     }
 
     TextIOObject::TextIOObject(TypeObject *type,
@@ -251,27 +325,21 @@ namespace cxxpython
 
     void initialize_text_io_methods(Runtime &runtime, TypeObject *type)
     {
-        type->dict->set(runtime.new_str("read"),
-                        runtime.new_method_descriptor("read", type, text_io_read_method));
-        type->dict->set(runtime.new_str("readline"),
-                        runtime.new_method_descriptor("readline", type, text_io_readline_method));
-        type->dict->set(runtime.new_str("write"),
-                        runtime.new_method_descriptor("write", type, text_io_write_method));
-        type->dict->set(runtime.new_str("flush"),
-                        runtime.new_method_descriptor("flush", type, text_io_flush_method));
-        type->dict->set(runtime.new_str("close"),
-                        runtime.new_method_descriptor("close", type, text_io_close_method));
-        type->dict->set(runtime.new_str("closed"),
-                        runtime.new_method_descriptor("closed", type, text_io_closed_method));
+        for (const NativeMethodDef &method : text_io_methods)
+        {
+            type->dict->set(runtime.new_str(method.name),
+                            runtime.new_method_descriptor(method.name,
+                                                          type,
+                                                          method.callback,
+                                                          method.doc,
+                                                          method.text_signature));
+        }
     }
 
     void initialize_io_module(Runtime &runtime, ModuleObject &module)
     {
         DictObject *dict = module.dict();
         dict->set(runtime.new_str("TextIOWrapper"), runtime.text_io_type());
-        dict->set(runtime.new_str("_stdin"), runtime.new_native_function("_stdin", io_stdin));
-        dict->set(runtime.new_str("_stdout"), runtime.new_native_function("_stdout", io_stdout));
-        dict->set(runtime.new_str("_stderr"), runtime.new_native_function("_stderr", io_stderr));
-        dict->set(runtime.new_str("open"), runtime.new_native_function("open", io_open));
+        add_module_functions(runtime, module, io_methods);
     }
 }

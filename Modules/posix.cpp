@@ -87,13 +87,31 @@ namespace cxxpython
             }
             return dict_root.get();
         }
+
+        constexpr NativeModuleFunctionDef posix_methods[] = {
+            {
+                "getcwd",
+                posix_getcwd,
+                "Return a unicode string representing the current working directory.",
+                "($module, /)",
+            },
+            {
+                "listdir",
+                posix_listdir,
+                "Return a list containing the names of entries in the directory.",
+                "($module, path='.', /)",
+            },
+            {
+                "environ",
+                posix_environ,
+                "Return a dictionary containing the process environment.",
+                "($module, /)",
+            },
+        };
     }
 
     void initialize_posix_module(Runtime &runtime, ModuleObject &module)
     {
-        DictObject *dict = module.dict();
-        dict->set(runtime.new_str("getcwd"), runtime.new_native_function("getcwd", posix_getcwd));
-        dict->set(runtime.new_str("listdir"), runtime.new_native_function("listdir", posix_listdir));
-        dict->set(runtime.new_str("environ"), runtime.new_native_function("environ", posix_environ));
+        add_module_functions(runtime, module, posix_methods);
     }
 }

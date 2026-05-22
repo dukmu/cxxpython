@@ -214,11 +214,19 @@ namespace cxxpython
             validate_namedtuple_identifiers(runtime, typename_object->value, fields);
             return build_namedtuple_type(runtime, typename_object->value, fields);
         }
+
+        constexpr NativeModuleFunctionDef collections_methods[] = {
+            {
+                "namedtuple",
+                collections_namedtuple,
+                "Return a new tuple subclass with named fields.",
+                "($module, typename, field_names, /)",
+            },
+        };
     }
 
     void initialize_collections_module(Runtime &runtime, ModuleObject &module)
     {
-        module.dict()->set(runtime.new_str("namedtuple"),
-                           runtime.new_native_function("namedtuple", collections_namedtuple));
+        add_module_functions(runtime, module, collections_methods);
     }
 }

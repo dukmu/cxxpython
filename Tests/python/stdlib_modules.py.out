@@ -5,6 +5,18 @@ True
 True
 <stdlib>
 False
+($module, depth=0, /)
+True
+($module, generation=None, /)
+True
+($module, /)
+True
+($module, file, mode='r', /)
+True
+($self, /)
+True
+($module, typename, field_names, /)
+True
 <class 'frame'>
 True
 False
