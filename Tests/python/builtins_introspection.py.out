@@ -12,6 +12,13 @@ print
 True
 ($module, /, *args, sep=' ', end='\n')
 ($module, object, /)
+($module, iterable, start=0, /)
+($module, value, format_spec='', /)
+True
+($module, source, globals=None, locals=None, /)
+($module, source, globals=None, locals=None, /)
+($module, name, globals=None, locals=None, fromlist=(), level=0, /)
+True
 append
 True
 ($self, object, /)

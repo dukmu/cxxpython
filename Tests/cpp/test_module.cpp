@@ -80,6 +80,13 @@ TEST(Module, BootstrapsBuiltinsModule)
         cxxpython::Object *function = runtime.builtins_dict()->get(runtime.new_str(name));
         ASSERT_NE(function, nullptr) << name;
         EXPECT_EQ(function->type(), runtime.native_function_type()) << name;
+        auto *doc = dynamic_cast<cxxpython::StrObject *>(cxxpython::object_get_attr(function, "__doc__"));
+        auto *signature =
+            dynamic_cast<cxxpython::StrObject *>(cxxpython::object_get_attr(function, "__text_signature__"));
+        ASSERT_NE(doc, nullptr) << name;
+        ASSERT_NE(signature, nullptr) << name;
+        EXPECT_FALSE(doc->value.empty()) << name;
+        EXPECT_FALSE(signature->value.empty()) << name;
     }
 
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("StopIteration")), runtime.stop_iteration_type());

@@ -1,5 +1,52 @@
 # Development Status
 
+## 2026-05-22 Builtins Method Table Slice
+
+Review focus:
+
+- Finish the CPython-like method-table direction started for native modules.
+- Remove the remaining ad hoc builtin native function registration path.
+- Keep builtin behavior unchanged while making metadata registration uniform.
+
+Completed:
+
+- Converted `Modules/builtins/builtins.cpp` from one-call-per-function
+  registration to a `NativeModuleFunctionDef builtin_methods[]` table.
+- Reused the shared `add_module_functions(...)` helper for the `builtins`
+  module, matching `sys`, `gc`, `posix`, `_io`, and `_collections`.
+- Kept builtin constants and type objects explicit because they are runtime
+  bootstrap roots, not native callable methods.
+- Extended C++ coverage so every checked builtin native function has non-empty
+  `__doc__` and `__text_signature__` metadata.
+- Extended Python golden introspection coverage for `sum`, `format`,
+  `compile`, `eval`, `exec`, `__import__`, and `__build_class__`.
+
+Design notes:
+
+- This is closer to CPython's `PyMethodDef` organization: behavior lives in the
+  owning implementation files, while visible function metadata is declarative
+  and colocated with module initialization.
+- The next stronger step is an Argument Clinic-like source of truth that can
+  generate method tables, text signatures, docs, and argument validation
+  helpers together.
+- Builtin constants may later move to a small declarative constant/type table,
+  but that should remain separate from callable method registration.
+
+Known debt and next risk:
+
+- Several builtin implementations still duplicate argument validation manually;
+  the method table only centralizes registration and metadata.
+- Iterator-consuming builtins such as `all`, `any`, `sum`, `min`, `max`, and
+  `sorted` still collect eagerly in places. They should stream through the
+  iterator protocol with rooted temporaries before GC pressure increases.
+- Public `open` is still exposed through `io.open`, not `builtins.open`.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter=Module.BootstrapsBuiltinsModule:PythonScripts.RunsGoldenFiles`
+- `ctest --test-dir build --output-on-failure`
+
 ## 2026-05-22 Native Module Method Table Slice
 
 Review focus:
