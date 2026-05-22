@@ -113,6 +113,8 @@ namespace
 
             pending_source += line;
             pending_source += '\n';
+            if (pending_block && !line.empty())
+                continue;
 
             cxxpython::CodeObject *code = nullptr;
             bool print_result = false;

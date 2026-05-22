@@ -1,5 +1,47 @@
 # Development Status
 
+## 2026-05-22 REPL Block Submission Slice
+
+Review focus:
+
+- Bring interactive compound-statement submission closer to CPython: a
+  multiline block should remain pending until the user submits a blank line.
+- Keep the stdin fallback testable while preserving readline usage for real
+  TTY sessions.
+
+Completed:
+
+- Updated the REPL pending-block loop so non-empty continuation lines are
+  accumulated instead of compiling the block immediately.
+- Updated CLI golden tests to terminate compound statements with an explicit
+  blank line.
+- Added focused coverage proving `def` blocks submit only after the blank
+  line, then evaluate normally in the same `__main__` module.
+
+Design notes:
+
+- The REPL still uses the same compiler entry points as script execution:
+  expression input is tried only at the primary prompt, while pending blocks
+  go through `compile_exec_input`.
+- Prompt output in non-TTY tests remains intentionally visible, matching the
+  stdin fallback behavior used by the CLI golden tests.
+
+Known debt and next risk:
+
+- Incomplete-input detection is still parser-message based. A structured
+  parser result for "need more input" should replace string matching before
+  expanding the grammar further.
+- EOF while a block is pending reports the parser's syntax error; signal-aware
+  interruption and richer interactive recovery still need VM safe points.
+- The REPL should eventually route through a script-side `site`/`pydoc` layer
+  for startup behavior and help display.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter='Cli.RunsInteractiveReplFromStandardInput:Cli.RunsNestedMultilineReplDefinitions:Cli.RequiresBlankLineToSubmitInteractiveBlocks'`
+- `ctest --test-dir build --output-on-failure`
+
 ## 2026-05-22 Script Stdlib Doc Metadata Slice
 
 Review focus:
