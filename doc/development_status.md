@@ -1,5 +1,53 @@
 # Development Status
 
+## 2026-05-22 Streaming Builtin Iterator Slice
+
+Review focus:
+
+- Reduce the iterator/rooting debt left in native builtins.
+- Preserve Python short-circuit semantics for `all()` and `any()`.
+- Avoid materializing full iterables for `sum()`, `min(iterable)`, and
+  `max(iterable)` when a streaming loop is sufficient.
+
+Completed:
+
+- Added a local `next_or_null(...)` helper in `Modules/builtins/core.cpp` that
+  translates `StopIteration` into loop termination and rethrows all other
+  Python exceptions.
+- Reworked `all()` and `any()` to consume iterators lazily and short-circuit
+  immediately.
+- Reworked `sum()` to consume the iterator one item at a time while keeping
+  the running total rooted.
+- Reworked one-argument `min()`/`max()` to stream through the iterator instead
+  of collecting every item first.
+- Added Python golden coverage proving `all(map(...))` and `any(map(...))`
+  do not advance past the first decisive item.
+
+Design notes:
+
+- This keeps builtin behavior on the object protocol path:
+  `object_iter(...)`/`object_next(...)` remain the single iterator substrate.
+- `sorted()` still must materialize items by definition; its collection helper
+  remains acceptable for now, but should eventually use a rooted builder model
+  rather than parallel raw and rooted vectors.
+- Python-defined `__iter__`/`__next__` still do not populate type slots for
+  heap classes. That is a distinct slot-wrapper/type update debt.
+
+Known debt and next risk:
+
+- `collect_iterable_items(...)` remains useful for list/tuple constructors and
+  APIs that genuinely need materialization, but callers must be audited before
+  GC becomes more aggressive.
+- The repeated native loop pattern should eventually share an iterator cursor
+  helper, preferably alongside the future Argument Clinic-like call metadata
+  work.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter=PythonScripts.RunsGoldenFiles:Module.BootstrapsBuiltinsModule`
+- `ctest --test-dir build --output-on-failure`
+
 ## 2026-05-22 Builtins Method Table Slice
 
 Review focus:

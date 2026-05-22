@@ -53,6 +53,41 @@ namespace cxxpython
             return is_true(result_root.get());
         }
 
+        Object *next_or_null(Runtime &runtime, Object *iterator)
+        {
+            try
+            {
+                return object_next(iterator);
+            }
+            catch (const PythonError &error)
+            {
+                if (error.type() == runtime.stop_iteration_type())
+                    return nullptr;
+                throw;
+            }
+        }
+
+        Object *select_extreme_from_iterator(Runtime &runtime,
+                                             std::string_view name,
+                                             Object *iterable,
+                                             RichCompareOp op)
+        {
+            Object *iterator = object_iter(iterable);
+            auto iterator_root = runtime.root(iterator);
+            Object *first = next_or_null(runtime, iterator_root.get());
+            if (!first)
+                raise_value_error(&runtime, std::string(name) + "() arg is an empty sequence");
+
+            auto best_root = runtime.root(first);
+            while (Object *candidate = next_or_null(runtime, iterator_root.get()))
+            {
+                auto candidate_root = runtime.root(candidate);
+                if (rich_compare_truth(runtime, candidate_root.get(), best_root.get(), op))
+                    best_root = runtime.root(candidate_root.get());
+            }
+            return best_root.get();
+        }
+
         Object *select_extreme(Runtime &runtime,
                                std::string_view name,
                                const CallArguments &args,
@@ -62,23 +97,14 @@ namespace cxxpython
             if (args.positional.empty())
                 raise_type_error(&runtime, std::string(name) + "() expected at least one argument");
 
-            std::vector<Object *> items;
             if (args.positional.size() == 1)
-            {
-                items = collect_iterable_items(&runtime, args.positional[0]);
-                if (items.empty())
-                    raise_value_error(&runtime, std::string(name) + "() arg is an empty sequence");
-            }
-            else
-            {
-                items = args.positional;
-            }
+                return select_extreme_from_iterator(runtime, name, args.positional[0], op);
 
-            Object *best = items.front();
+            Object *best = args.positional.front();
             auto best_root = runtime.root(best);
-            for (std::size_t index = 1; index < items.size(); ++index)
+            for (std::size_t index = 1; index < args.positional.size(); ++index)
             {
-                Object *candidate = items[index];
+                Object *candidate = args.positional[index];
                 auto candidate_root = runtime.root(candidate);
                 if (rich_compare_truth(runtime, candidate_root.get(), best_root.get(), op))
                     best_root = runtime.root(candidate_root.get());
@@ -144,7 +170,9 @@ namespace cxxpython
     {
         require_no_keywords(&runtime, "all", args);
         require_positional_count(&runtime, "all", args, 1);
-        for (Object *item : collect_iterable_items(&runtime, args.positional[0]))
+        Object *iterator = object_iter(args.positional[0]);
+        auto iterator_root = runtime.root(iterator);
+        while (Object *item = next_or_null(runtime, iterator_root.get()))
         {
             auto item_root = runtime.root(item);
             if (!is_true(item_root.get()))
@@ -157,7 +185,9 @@ namespace cxxpython
     {
         require_no_keywords(&runtime, "any", args);
         require_positional_count(&runtime, "any", args, 1);
-        for (Object *item : collect_iterable_items(&runtime, args.positional[0]))
+        Object *iterator = object_iter(args.positional[0]);
+        auto iterator_root = runtime.root(iterator);
+        while (Object *item = next_or_null(runtime, iterator_root.get()))
         {
             auto item_root = runtime.root(item);
             if (is_true(item_root.get()))
@@ -174,7 +204,9 @@ namespace cxxpython
 
         Object *total = args.positional.size() == 2 ? args.positional[1] : runtime.new_int(0);
         auto total_root = runtime.root(total);
-        for (Object *item : collect_iterable_items(&runtime, args.positional[0]))
+        Object *iterator = object_iter(args.positional[0]);
+        auto iterator_root = runtime.root(iterator);
+        while (Object *item = next_or_null(runtime, iterator_root.get()))
         {
             auto item_root = runtime.root(item);
             Object *next_total = object_binary_op(total_root.get(), item_root.get(), BinaryOp::Add);

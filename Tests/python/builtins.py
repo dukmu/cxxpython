@@ -9,6 +9,19 @@ print(all([]))
 print(any([False, 0, '']))
 print(any([False, 0, 'yes']))
 
+def false_or_raise(value):
+    if value:
+        raise TypeError('all advanced too far')
+    return False
+
+def true_or_raise(value):
+    if value:
+        return True
+    raise TypeError('any advanced too far')
+
+print(all(map(false_or_raise, [0, 1])))
+print(any(map(true_or_raise, [1, 0])))
+
 print(sum([1, 2, 3]))
 print(sum([1, 2], 10))
 print(min([3, 1, 2]))
