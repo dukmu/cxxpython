@@ -8,6 +8,8 @@ False
 <class 'frame'>
 True
 False
+()
+True
 True
 <module>
 True
@@ -26,6 +28,8 @@ function_metadata
 __main__
 function_metadata
 True
+()
+None
 True
 True
 <class 'tuple'>

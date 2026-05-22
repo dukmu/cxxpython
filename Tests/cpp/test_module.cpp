@@ -43,11 +43,25 @@ TEST(Module, BootstrapsBuiltinsModule)
     ASSERT_NE(print, nullptr);
     EXPECT_EQ(print->type(), runtime.native_function_type());
     EXPECT_EQ(cxxpython::object_repr(print), "<built-in function print>");
+    auto *print_name = dynamic_cast<cxxpython::StrObject *>(cxxpython::object_get_attr(print, "__name__"));
+    auto *print_doc = dynamic_cast<cxxpython::StrObject *>(cxxpython::object_get_attr(print, "__doc__"));
+    auto *print_signature =
+        dynamic_cast<cxxpython::StrObject *>(cxxpython::object_get_attr(print, "__text_signature__"));
+    ASSERT_NE(print_name, nullptr);
+    ASSERT_NE(print_doc, nullptr);
+    ASSERT_NE(print_signature, nullptr);
+    EXPECT_EQ(print_name->value, "print");
+    EXPECT_NE(print_doc->value.find("Print objects"), std::string::npos);
+    EXPECT_EQ(print_signature->value, "($module, /, *args, sep=' ', end='\\n')");
 
     cxxpython::Object *len = runtime.builtins_dict()->get(runtime.new_str("len"));
     ASSERT_NE(len, nullptr);
     EXPECT_EQ(len->type(), runtime.native_function_type());
     EXPECT_EQ(cxxpython::object_repr(len), "<built-in function len>");
+    auto *len_signature =
+        dynamic_cast<cxxpython::StrObject *>(cxxpython::object_get_attr(len, "__text_signature__"));
+    ASSERT_NE(len_signature, nullptr);
+    EXPECT_EQ(len_signature->value, "($module, object, /)");
 
     cxxpython::Object *iter = runtime.builtins_dict()->get(runtime.new_str("iter"));
     ASSERT_NE(iter, nullptr);

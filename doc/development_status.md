@@ -1,5 +1,62 @@
 # Development Status
 
+## 2026-05-22 Callable Metadata Slice
+
+Review focus:
+
+- Give callable objects stable CPython-like metadata before growing
+  `inspect`, builtin modules, and extension APIs.
+- Avoid ad hoc attributes in individual modules; metadata should belong to the
+  callable object or descriptor type.
+- Keep public `inspect` policy script-side while exposing minimal substrate
+  fields from C++ objects.
+
+Completed:
+
+- Extended `NativeFunctionObject` with stored `__doc__` and
+  `__text_signature__` metadata, exposed through getset descriptors alongside
+  `__name__`.
+- Extended `MethodDescriptorObject` with stored `__doc__` and
+  `__text_signature__`, exposed through the descriptor type.
+- Extended `PythonFunctionObject` with:
+  - `__doc__` from the first function-body string literal, or `None`;
+  - generated `__text_signature__` from code object argument metadata,
+    including `*args` and `**kwargs`.
+- Changed function compilation to reserve `co_consts[0]` for the docstring
+  seed, matching the direction needed for CPython-like code metadata.
+- Added doc/signature metadata to core builtins and `list.append`.
+- Added script-level `inspect.getdoc()` and `inspect.signature()` helpers that
+  read the object-space metadata rather than requiring C++ special cases.
+- Added C++ and Python golden coverage for builtin functions, method
+  descriptors, and Python functions.
+
+Design notes:
+
+- `inspect.signature()` currently returns the text signature string. That is a
+  bootstrap-compatible API surface for now; the eventual target is an
+  inspect.Signature object implemented in `Lib/inspect.py`.
+- Native module functions outside `builtins` can now opt into metadata through
+  `Runtime::new_native_function(...)`; they should be filled in as each module
+  grows behavior.
+- Function default values, keyword-only arguments, annotations, and positional
+  markers are still absent, so generated Python function signatures intentionally
+  describe only the supported parser/runtime subset.
+
+Known debt and next risk:
+
+- Expand metadata for `sys`, `gc`, `posix`, `_io`, and `_collections` native
+  functions.
+- Add parser/runtime support for defaults and annotations before claiming full
+  `inspect.signature` compatibility.
+- Move toward real `inspect.Signature`/`Parameter` script classes once class
+  construction and repr support are sufficient.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter=PythonScripts.RunsGoldenFiles:Module.BootstrapsBuiltinsModule:CoreObjects.ListAppendIsExposedAsMethodDescriptor:Functions.*`
+- `ctest --test-dir build --output-on-failure`
+
 ## 2026-05-22 Import Runtime Request Slice
 
 Review focus:

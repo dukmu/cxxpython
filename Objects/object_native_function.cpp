@@ -2,11 +2,41 @@
 #include "cxxpython/runtime.hpp"
 
 #include "object_utils.hpp"
+#include "type_initialization.hpp"
 
 namespace cxxpython
 {
     namespace
     {
+        NativeFunctionObject *require_native_function(Runtime &runtime, Object *instance, const char *name)
+        {
+            auto *function = dynamic_cast<NativeFunctionObject *>(instance);
+            if (!function)
+                raise_type_error(&runtime, std::string(name) + " descriptor receiver does not have native function layout");
+            return function;
+        }
+
+        Object *native_function_name_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            return runtime.new_str(require_native_function(runtime, instance, "__name__")->name());
+        }
+
+        Object *native_function_doc_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            const std::string &doc = require_native_function(runtime, instance, "__doc__")->doc();
+            if (doc.empty())
+                return runtime.none();
+            return runtime.new_str(doc);
+        }
+
+        Object *native_function_text_signature_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            const std::string &signature = require_native_function(runtime, instance, "__text_signature__")->text_signature();
+            if (signature.empty())
+                return runtime.none();
+            return runtime.new_str(signature);
+        }
+
         std::string native_function_repr(const Object &object)
         {
             if (auto *function = dynamic_cast<const NativeFunctionObject *>(&object))
@@ -59,14 +89,30 @@ namespace cxxpython
 
     NativeFunctionObject::NativeFunctionObject(TypeObject *type,
                                                std::string name,
-                                               NativeFunctionCallback callback)
-        : Object(type), name_(std::move(name)), callback_(std::move(callback))
+                                               NativeFunctionCallback callback,
+                                               std::string doc,
+                                               std::string text_signature)
+        : Object(type),
+          name_(std::move(name)),
+          doc_(std::move(doc)),
+          text_signature_(std::move(text_signature)),
+          callback_(std::move(callback))
     {
     }
 
     const std::string &NativeFunctionObject::name() const noexcept
     {
         return name_;
+    }
+
+    const std::string &NativeFunctionObject::doc() const noexcept
+    {
+        return doc_;
+    }
+
+    const std::string &NativeFunctionObject::text_signature() const noexcept
+    {
+        return text_signature_;
     }
 
     Object *NativeFunctionObject::call(Runtime &runtime, const CallArguments &args)
@@ -89,5 +135,24 @@ namespace cxxpython
             .traverse = native_function_traverse,
             .call = native_function_call,
         };
+    }
+
+    void initialize_native_function_type_descriptors(Runtime &runtime, TypeObject *type)
+    {
+        type->dict->set(runtime.new_str("__name__"),
+                        runtime.new_getset_descriptor("__name__",
+                                                      type,
+                                                      native_function_name_getter,
+                                                      nullptr));
+        type->dict->set(runtime.new_str("__doc__"),
+                        runtime.new_getset_descriptor("__doc__",
+                                                      type,
+                                                      native_function_doc_getter,
+                                                      nullptr));
+        type->dict->set(runtime.new_str("__text_signature__"),
+                        runtime.new_getset_descriptor("__text_signature__",
+                                                      type,
+                                                      native_function_text_signature_getter,
+                                                      nullptr));
     }
 }

@@ -8,6 +8,8 @@ namespace cxxpython
     void initialize_type_type_descriptors(Runtime &runtime, TypeObject *type);
     void initialize_code_type_descriptors(Runtime &runtime, TypeObject *type);
     void initialize_frame_type_descriptors(Runtime &runtime, TypeObject *type);
+    void initialize_native_function_type_descriptors(Runtime &runtime, TypeObject *type);
+    void initialize_method_descriptor_type_descriptors(Runtime &runtime, TypeObject *type);
     void initialize_function_type_descriptors(Runtime &runtime, TypeObject *type);
 
     void initialize_object_type_methods(Runtime &runtime, TypeObject *type);

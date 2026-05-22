@@ -10,6 +10,36 @@ namespace cxxpython
 {
     namespace
     {
+        MethodDescriptorObject *require_method_descriptor(Runtime &runtime, Object *instance, const char *name)
+        {
+            auto *method = dynamic_cast<MethodDescriptorObject *>(instance);
+            if (!method)
+                raise_type_error(&runtime, std::string(name) + " descriptor receiver does not have method descriptor layout");
+            return method;
+        }
+
+        Object *method_descriptor_name_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            return runtime.new_str(require_method_descriptor(runtime, instance, "__name__")->name());
+        }
+
+        Object *method_descriptor_doc_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            const std::string &doc = require_method_descriptor(runtime, instance, "__doc__")->doc();
+            if (doc.empty())
+                return runtime.none();
+            return runtime.new_str(doc);
+        }
+
+        Object *method_descriptor_text_signature_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            const std::string &signature =
+                require_method_descriptor(runtime, instance, "__text_signature__")->text_signature();
+            if (signature.empty())
+                return runtime.none();
+            return runtime.new_str(signature);
+        }
+
         std::string method_descriptor_repr(const Object &object)
         {
             auto *method = static_cast<const MethodDescriptorObject *>(&object);
@@ -60,14 +90,31 @@ namespace cxxpython
     MethodDescriptorObject::MethodDescriptorObject(TypeObject *type,
                                                    std::string name,
                                                    TypeObject *owner,
-                                                   MethodDescriptorCallback callback)
-        : Object(type), name_(std::move(name)), owner_(owner), callback_(std::move(callback))
+                                                   MethodDescriptorCallback callback,
+                                                   std::string doc,
+                                                   std::string text_signature)
+        : Object(type),
+          name_(std::move(name)),
+          doc_(std::move(doc)),
+          text_signature_(std::move(text_signature)),
+          owner_(owner),
+          callback_(std::move(callback))
     {
     }
 
     const std::string &MethodDescriptorObject::name() const noexcept
     {
         return name_;
+    }
+
+    const std::string &MethodDescriptorObject::doc() const noexcept
+    {
+        return doc_;
+    }
+
+    const std::string &MethodDescriptorObject::text_signature() const noexcept
+    {
+        return text_signature_;
     }
 
     TypeObject *MethodDescriptorObject::owner() const noexcept
@@ -143,6 +190,25 @@ namespace cxxpython
             .call = method_descriptor_call,
             .descr_get = method_descriptor_get,
         };
+    }
+
+    void initialize_method_descriptor_type_descriptors(Runtime &runtime, TypeObject *type)
+    {
+        type->dict->set(runtime.new_str("__name__"),
+                        runtime.new_getset_descriptor("__name__",
+                                                      type,
+                                                      method_descriptor_name_getter,
+                                                      nullptr));
+        type->dict->set(runtime.new_str("__doc__"),
+                        runtime.new_getset_descriptor("__doc__",
+                                                      type,
+                                                      method_descriptor_doc_getter,
+                                                      nullptr));
+        type->dict->set(runtime.new_str("__text_signature__"),
+                        runtime.new_getset_descriptor("__text_signature__",
+                                                      type,
+                                                      method_descriptor_text_signature_getter,
+                                                      nullptr));
     }
 
     void Runtime::initialize_type_methods()

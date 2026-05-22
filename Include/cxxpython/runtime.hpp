@@ -178,7 +178,10 @@ namespace cxxpython
         TextIOObject *stdout_object() const noexcept;
         TextIOObject *stderr_object() const noexcept;
         ModuleObject *new_module(std::string name, std::string filename);
-        NativeFunctionObject *new_native_function(std::string name, NativeFunctionCallback callback);
+        NativeFunctionObject *new_native_function(std::string name,
+                                                  NativeFunctionCallback callback,
+                                                  std::string doc = "",
+                                                  std::string text_signature = "");
         PythonFunctionObject *new_function(std::string name,
                                            CodeObject *code,
                                            DictObject *globals,
@@ -190,7 +193,9 @@ namespace cxxpython
         PythonMethodObject *new_method(Object *callable, Object *self);
         MethodDescriptorObject *new_method_descriptor(std::string name,
                                                        TypeObject *owner,
-                                                       MethodDescriptorCallback callback);
+                                                       MethodDescriptorCallback callback,
+                                                       std::string doc = "",
+                                                       std::string text_signature = "");
         BoundMethodObject *new_bound_method(MethodDescriptorObject *method, Object *self);
         SlotWrapperObject *new_slot_wrapper(std::string name,
                                             TypeObject *owner,

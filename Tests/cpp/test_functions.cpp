@@ -22,6 +22,10 @@ TEST(Functions, CallsPythonFunctionObjectsWithCapturedGlobals)
 
     EXPECT_EQ(function->type(), runtime.function_type());
     EXPECT_EQ(cxxpython::object_repr(function), "<function f>");
+    auto *signature = dynamic_cast<cxxpython::StrObject *>(cxxpython::object_get_attr(function, "__text_signature__"));
+    ASSERT_NE(signature, nullptr);
+    EXPECT_EQ(signature->value, "()");
+    EXPECT_EQ(cxxpython::object_get_attr(function, "__doc__"), runtime.none());
     EXPECT_EQ(cxxpython::object_call(function, {}), answer);
 
     std::vector<cxxpython::Object *> children;
@@ -57,6 +61,9 @@ TEST(Functions, PythonFunctionsBindAsMethodsThroughDescriptorProtocol)
         {{cxxpython::Opcode::LoadName, 0},
          {cxxpython::Opcode::ReturnValue, 0}});
     cxxpython::PythonFunctionObject *function = runtime.new_function("method", code, globals);
+    auto *signature = dynamic_cast<cxxpython::StrObject *>(cxxpython::object_get_attr(function, "__text_signature__"));
+    ASSERT_NE(signature, nullptr);
+    EXPECT_EQ(signature->value, "(self)");
     cxxpython::TypeObject *owner_type = runtime.new_heap_type("Owner", runtime.object_type());
     owner_type->dict->set(runtime.new_str("method"), function);
     cxxpython::Object *instance = runtime.allocate<cxxpython::Object>(owner_type);

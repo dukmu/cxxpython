@@ -531,13 +531,21 @@ namespace cxxpython
     class NativeFunctionObject final : public Object
     {
     public:
-        NativeFunctionObject(TypeObject *type, std::string name, NativeFunctionCallback callback);
+        NativeFunctionObject(TypeObject *type,
+                             std::string name,
+                             NativeFunctionCallback callback,
+                             std::string doc = "",
+                             std::string text_signature = "");
 
         const std::string &name() const noexcept;
+        const std::string &doc() const noexcept;
+        const std::string &text_signature() const noexcept;
         Object *call(Runtime &runtime, const CallArguments &args);
 
     private:
         std::string name_;
+        std::string doc_;
+        std::string text_signature_;
         NativeFunctionCallback callback_;
     };
 
@@ -551,6 +559,8 @@ namespace cxxpython
                              std::vector<CellObject *> closure = {});
 
         const std::string &name() const noexcept;
+        Object *doc() const noexcept;
+        std::string text_signature() const;
         CodeObject *code() const noexcept;
         DictObject *globals() const noexcept;
         const std::vector<CellObject *> &closure() const noexcept;
@@ -560,6 +570,7 @@ namespace cxxpython
         std::string name_;
         CodeObject *code_;
         DictObject *globals_;
+        Object *doc_ = nullptr;
         std::vector<CellObject *> closure_;
     };
 
@@ -597,9 +608,13 @@ namespace cxxpython
         MethodDescriptorObject(TypeObject *type,
                                std::string name,
                                TypeObject *owner,
-                               MethodDescriptorCallback callback);
+                               MethodDescriptorCallback callback,
+                               std::string doc = "",
+                               std::string text_signature = "");
 
         const std::string &name() const noexcept;
+        const std::string &doc() const noexcept;
+        const std::string &text_signature() const noexcept;
         TypeObject *owner() const noexcept;
         Object *call_unbound(const CallArguments &args);
         Object *call_bound(Object *self, const CallArguments &args);
@@ -607,6 +622,8 @@ namespace cxxpython
 
     private:
         std::string name_;
+        std::string doc_;
+        std::string text_signature_;
         TypeObject *owner_;
         MethodDescriptorCallback callback_;
     };

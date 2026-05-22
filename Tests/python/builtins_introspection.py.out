@@ -8,3 +8,13 @@ True
 visible
 visible
 a:b!done
+print
+True
+($module, /, *args, sep=' ', end='\n')
+($module, object, /)
+append
+True
+($self, object, /)
+sample_signature
+sample docs
+(alpha, beta, *items, **options)

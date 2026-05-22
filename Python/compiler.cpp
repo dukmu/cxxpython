@@ -58,6 +58,7 @@ namespace cxxpython
 
             CodeObject *build_function(const compiler_internal::FunctionDefStmt &function)
             {
+                emit_function_doc_constant(function);
                 for (const auto &statement : function.body)
                     statement->accept(*this);
                 emit_constant(runtime_.none());
@@ -499,6 +500,24 @@ namespace cxxpython
                 }
                 emit_pending_assignment_value();
                 emit({Opcode::StoreSubscr, 0});
+            }
+
+            void emit_function_doc_constant(const compiler_internal::FunctionDefStmt &function)
+            {
+                Object *doc = runtime_.none();
+                if (!function.body.empty())
+                {
+                    if (auto *expr_statement =
+                            dynamic_cast<compiler_internal::ExprStmt *>(function.body.front().get()))
+                    {
+                        if (auto *string_expr =
+                                dynamic_cast<compiler_internal::StringExpr *>(expr_statement->expression.get()))
+                        {
+                            doc = runtime_.new_str(string_expr->value);
+                        }
+                    }
+                }
+                constants_.push_back(doc);
             }
 
             void visit(const compiler_internal::ExprStmt &statement) override

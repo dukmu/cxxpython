@@ -2,9 +2,11 @@ import sys
 
 __all__ = [
     'currentframe',
+    'getdoc',
     'isframe',
     'iscode',
     'isfunction',
+    'signature',
     'getsourcefile',
     'getfile',
 ]
@@ -13,6 +15,7 @@ _frame_type = type(sys._getframe())
 _code_type = type(sys._getframe().f_code)
 
 def currentframe():
+    "Return the caller's frame object."
     return sys._getframe(1)
 
 def isframe(object):
@@ -33,3 +36,15 @@ def getsourcefile(object):
 
 def getfile(object):
     return getsourcefile(object)
+
+def getdoc(object):
+    try:
+        return object.__doc__
+    except AttributeError:
+        return None
+
+def signature(object):
+    try:
+        return object.__text_signature__
+    except AttributeError:
+        return None

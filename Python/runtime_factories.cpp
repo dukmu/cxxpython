@@ -206,9 +206,16 @@ namespace cxxpython
         return module;
     }
 
-    NativeFunctionObject *Runtime::new_native_function(std::string name, NativeFunctionCallback callback)
+    NativeFunctionObject *Runtime::new_native_function(std::string name,
+                                                       NativeFunctionCallback callback,
+                                                       std::string doc,
+                                                       std::string text_signature)
     {
-        return allocate<NativeFunctionObject>(native_function_type_, std::move(name), std::move(callback));
+        return allocate<NativeFunctionObject>(native_function_type_,
+                                              std::move(name),
+                                              std::move(callback),
+                                              std::move(doc),
+                                              std::move(text_signature));
     }
 
     PythonFunctionObject *Runtime::new_function(std::string name,
@@ -246,14 +253,18 @@ namespace cxxpython
 
     MethodDescriptorObject *Runtime::new_method_descriptor(std::string name,
                                                            TypeObject *owner,
-                                                           MethodDescriptorCallback callback)
+                                                           MethodDescriptorCallback callback,
+                                                           std::string doc,
+                                                           std::string text_signature)
     {
         if (!owner)
             raise_type_error(this, "method descriptor owner cannot be null");
         return allocate<MethodDescriptorObject>(method_descriptor_type_,
                                                 std::move(name),
                                                 owner,
-                                                std::move(callback));
+                                                std::move(callback),
+                                                std::move(doc),
+                                                std::move(text_signature));
     }
 
     BoundMethodObject *Runtime::new_bound_method(MethodDescriptorObject *method, Object *self)

@@ -378,7 +378,11 @@ namespace cxxpython
     void initialize_list_type_methods(Runtime &runtime, TypeObject *type)
     {
         type->dict->set(runtime.new_str("append"),
-                        runtime.new_method_descriptor("append", type, list_append_method));
+                        runtime.new_method_descriptor("append",
+                                                      type,
+                                                      list_append_method,
+                                                      "Append object to the end of the list.",
+                                                      "($self, object, /)"));
     }
 
     void initialize_list_slot_wrappers(Runtime &, TypeObject *type)

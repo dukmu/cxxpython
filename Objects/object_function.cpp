@@ -6,6 +6,8 @@
 
 #include <algorithm>
 #include <sstream>
+#include <string>
+#include <string_view>
 
 namespace cxxpython
 {
@@ -168,6 +170,17 @@ namespace cxxpython
                 return module;
             return runtime.none();
         }
+
+        Object *function_doc_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            Object *doc = require_function_instance(runtime, instance, "__doc__")->doc();
+            return doc ? doc : runtime.none();
+        }
+
+        Object *function_text_signature_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            return runtime.new_str(require_function_instance(runtime, instance, "__text_signature__")->text_signature());
+        }
     }
 
     PythonFunctionObject::PythonFunctionObject(TypeObject *type,
@@ -179,13 +192,50 @@ namespace cxxpython
           name_(std::move(name)),
           code_(code),
           globals_(globals),
+          doc_(nullptr),
           closure_(std::move(closure))
     {
+        if (code_ && !code_->constants().empty())
+        {
+            if (dynamic_cast<StrObject *>(code_->constants().front()))
+                doc_ = code_->constants().front();
+        }
     }
 
     const std::string &PythonFunctionObject::name() const noexcept
     {
         return name_;
+    }
+
+    Object *PythonFunctionObject::doc() const noexcept
+    {
+        return doc_;
+    }
+
+    std::string PythonFunctionObject::text_signature() const
+    {
+        if (!code_)
+            return "()";
+
+        std::ostringstream signature;
+        signature << "(";
+        bool first = true;
+        auto append_name = [&signature, &first](StrObject *name, std::string_view prefix = {})
+        {
+            if (!first)
+                signature << ", ";
+            first = false;
+            signature << prefix << name->value;
+        };
+
+        for (std::uint32_t index = 0; index < code_->arg_count(); ++index)
+            append_name(varname_at(code_, index));
+        if (code_->has_varargs())
+            append_name(varname_at(code_, code_->varargs_index()), "*");
+        if (code_->has_varkeywords())
+            append_name(varname_at(code_, code_->varkeywords_index()), "**");
+        signature << ")";
+        return signature.str();
     }
 
     CodeObject *PythonFunctionObject::code() const noexcept
@@ -362,6 +412,16 @@ namespace cxxpython
                         runtime.new_getset_descriptor("__module__",
                                                       type,
                                                       function_module_getter,
+                                                      nullptr));
+        type->dict->set(runtime.new_str("__doc__"),
+                        runtime.new_getset_descriptor("__doc__",
+                                                      type,
+                                                      function_doc_getter,
+                                                      nullptr));
+        type->dict->set(runtime.new_str("__text_signature__"),
+                        runtime.new_getset_descriptor("__text_signature__",
+                                                      type,
+                                                      function_text_signature_getter,
                                                       nullptr));
     }
 }

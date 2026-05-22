@@ -14,9 +14,15 @@ namespace cxxpython
         void install_builtin_function(Runtime &runtime,
                                       DictObject *dict,
                                       const char *name,
-                                      NativeFunctionCallback callback)
+                                      NativeFunctionCallback callback,
+                                      const char *doc = "",
+                                      const char *text_signature = "")
         {
-            dict->set(runtime.new_str(name), runtime.new_native_function(name, std::move(callback)));
+            dict->set(runtime.new_str(name),
+                      runtime.new_native_function(name,
+                                                  std::move(callback),
+                                                  doc,
+                                                  text_signature));
         }
     }
 
@@ -66,31 +72,41 @@ namespace cxxpython
         install_builtin_constant(*this, dict, "classmethod", classmethod_type_);
         install_builtin_constant(*this, dict, "super", super_type_);
 
-        install_builtin_function(*this, dict, "print", builtin_print);
-        install_builtin_function(*this, dict, "len", builtin_len);
-        install_builtin_function(*this, dict, "iter", builtin_iter);
-        install_builtin_function(*this, dict, "next", builtin_next);
-        install_builtin_function(*this, dict, "repr", builtin_repr);
-        install_builtin_function(*this, dict, "hash", builtin_hash);
-        install_builtin_function(*this, dict, "all", builtin_all);
-        install_builtin_function(*this, dict, "any", builtin_any);
-        install_builtin_function(*this, dict, "sum", builtin_sum);
-        install_builtin_function(*this, dict, "min", builtin_min);
-        install_builtin_function(*this, dict, "max", builtin_max);
-        install_builtin_function(*this, dict, "sorted", builtin_sorted);
-        install_builtin_function(*this, dict, "isinstance", builtin_isinstance);
-        install_builtin_function(*this, dict, "issubclass", builtin_issubclass);
-        install_builtin_function(*this, dict, "callable", builtin_callable);
-        install_builtin_function(*this, dict, "id", builtin_id);
-        install_builtin_function(*this, dict, "globals", builtin_globals);
-        install_builtin_function(*this, dict, "locals", builtin_locals);
-        install_builtin_function(*this, dict, "dir", builtin_dir);
-        install_builtin_function(*this, dict, "vars", builtin_vars);
-        install_builtin_function(*this, dict, "format", builtin_format);
-        install_builtin_function(*this, dict, "compile", builtin_compile);
-        install_builtin_function(*this, dict, "eval", builtin_eval);
-        install_builtin_function(*this, dict, "exec", builtin_exec);
-        install_builtin_function(*this, dict, "__build_class__", builtin_build_class);
-        install_builtin_function(*this, dict, "__import__", builtin_import);
+        install_builtin_function(*this,
+                                 dict,
+                                 "print",
+                                 builtin_print,
+                                 "Print objects to the text stream, separated by sep and followed by end.",
+                                 "($module, /, *args, sep=' ', end='\\n')");
+        install_builtin_function(*this,
+                                 dict,
+                                 "len",
+                                 builtin_len,
+                                 "Return the number of items in a container.",
+                                 "($module, object, /)");
+        install_builtin_function(*this, dict, "iter", builtin_iter, "Return an iterator.", "($module, object, /)");
+        install_builtin_function(*this, dict, "next", builtin_next, "Return the next item from an iterator.", "($module, iterator, /)");
+        install_builtin_function(*this, dict, "repr", builtin_repr, "Return the canonical string representation of an object.", "($module, object, /)");
+        install_builtin_function(*this, dict, "hash", builtin_hash, "Return the hash value for an object.", "($module, object, /)");
+        install_builtin_function(*this, dict, "all", builtin_all, "Return True if bool(x) is True for all values x in the iterable.", "($module, iterable, /)");
+        install_builtin_function(*this, dict, "any", builtin_any, "Return True if bool(x) is True for any value x in the iterable.", "($module, iterable, /)");
+        install_builtin_function(*this, dict, "sum", builtin_sum, "Return the sum of a start value and an iterable of numbers.", "($module, iterable, start=0, /)");
+        install_builtin_function(*this, dict, "min", builtin_min, "Return the smallest item.", "($module, iterable, /)");
+        install_builtin_function(*this, dict, "max", builtin_max, "Return the largest item.", "($module, iterable, /)");
+        install_builtin_function(*this, dict, "sorted", builtin_sorted, "Return a new sorted list from the items in iterable.", "($module, iterable, /)");
+        install_builtin_function(*this, dict, "isinstance", builtin_isinstance, "Return whether an object is an instance of a class or tuple of classes.", "($module, object, classinfo, /)");
+        install_builtin_function(*this, dict, "issubclass", builtin_issubclass, "Return whether cls is a subclass of classinfo.", "($module, cls, classinfo, /)");
+        install_builtin_function(*this, dict, "callable", builtin_callable, "Return whether the object appears callable.", "($module, object, /)");
+        install_builtin_function(*this, dict, "id", builtin_id, "Return the identity of an object.", "($module, object, /)");
+        install_builtin_function(*this, dict, "globals", builtin_globals, "Return the current global namespace.", "($module, /)");
+        install_builtin_function(*this, dict, "locals", builtin_locals, "Return the current local namespace.", "($module, /)");
+        install_builtin_function(*this, dict, "dir", builtin_dir, "Return a sorted list of names in the current scope or object.", "($module, object=None, /)");
+        install_builtin_function(*this, dict, "vars", builtin_vars, "Return the __dict__ attribute for a module, class, instance, or current locals.", "($module, object=None, /)");
+        install_builtin_function(*this, dict, "format", builtin_format, "Return value.__format__(format_spec).", "($module, value, format_spec='', /)");
+        install_builtin_function(*this, dict, "compile", builtin_compile, "Compile source into a code object.", "($module, source, filename, mode, /)");
+        install_builtin_function(*this, dict, "eval", builtin_eval, "Evaluate source in the given global and local namespaces.", "($module, source, globals=None, locals=None, /)");
+        install_builtin_function(*this, dict, "exec", builtin_exec, "Execute source in the given global and local namespaces.", "($module, source, globals=None, locals=None, /)");
+        install_builtin_function(*this, dict, "__build_class__", builtin_build_class, "Internal helper used by class statements.", "($module, func, name, /, *bases, **kwds)");
+        install_builtin_function(*this, dict, "__import__", builtin_import, "Import a module.", "($module, name, globals=None, locals=None, fromlist=(), level=0, /)");
     }
 }

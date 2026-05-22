@@ -564,6 +564,18 @@ TEST(CoreObjects, ListAppendIsExposedAsMethodDescriptor)
     ASSERT_NE(descriptor, nullptr);
     EXPECT_EQ(descriptor->type(), runtime.method_descriptor_type());
     EXPECT_EQ(cxxpython::object_repr(descriptor), "<method 'append' of 'list' objects>");
+    auto *descriptor_name =
+        dynamic_cast<cxxpython::StrObject *>(cxxpython::object_get_attr(descriptor, "__name__"));
+    auto *descriptor_doc =
+        dynamic_cast<cxxpython::StrObject *>(cxxpython::object_get_attr(descriptor, "__doc__"));
+    auto *descriptor_signature =
+        dynamic_cast<cxxpython::StrObject *>(cxxpython::object_get_attr(descriptor, "__text_signature__"));
+    ASSERT_NE(descriptor_name, nullptr);
+    ASSERT_NE(descriptor_doc, nullptr);
+    ASSERT_NE(descriptor_signature, nullptr);
+    EXPECT_EQ(descriptor_name->value, "append");
+    EXPECT_NE(descriptor_doc->value.find("Append object"), std::string::npos);
+    EXPECT_EQ(descriptor_signature->value, "($self, object, /)");
 
     cxxpython::Object *unbound_result = cxxpython::object_call(descriptor, {list, item});
     EXPECT_EQ(unbound_result, runtime.none());
