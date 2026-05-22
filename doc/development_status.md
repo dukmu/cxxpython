@@ -1,5 +1,62 @@
 # Development Status
 
+## 2026-05-22 Heap Operator Call Slot Refresh Slice
+
+Review focus:
+
+- Close the remaining heap special-method gap for operators and callable
+  instances.
+- Keep VM and builtins thin: opcodes and native helpers must continue to
+  dispatch through object protocol slots, not ad-hoc string lookups.
+- Align heap special-method dispatch with Python semantics by bypassing
+  instance attributes and `__getattribute__` during slot calls.
+
+Completed:
+
+- Extended heap type slot refresh to populate:
+  - `TypeSlots::binary_op` from `__add__`, `__sub__`, `__mul__`,
+    `__truediv__`, `__floordiv__`, `__mod__`, and `__pow__`;
+  - `TypeSlots::reflected_binary_op` from the matching reflected methods;
+  - `TypeSlots::inplace_binary_op` from the matching in-place methods;
+  - `TypeSlots::unary_op` from `__pos__`, `__neg__`, and `__invert__`;
+  - `TypeSlots::rich_compare` from the six rich comparison methods;
+  - `TypeSlots::call` from `__call__`.
+- Reworked heap special-method thunks to use type MRO lookup plus descriptor
+  binding instead of `object_get_attr(...)`, so instance dictionaries and
+  `__getattribute__` no longer affect slot dispatch.
+- Added Python golden coverage for binary/reflected/in-place operator slots,
+  inherited operator slots, runtime assignment/deletion of operator methods,
+  heap `__call__` with positional and keyword arguments, and the
+  `__getattribute__` bypass rule.
+
+Design notes:
+
+- This preserves the current CPython-like split: special method names update
+  type slots at type creation/mutation time, and VM instructions dispatch only
+  through object protocol helpers.
+- Missing operator-specific methods inside an installed heap slot return
+  `NotImplemented`, letting the existing binary/rich-compare fallback protocol
+  decide the final result.
+- The method-name tables are local and compact, but a future slot metadata
+  table should eventually share names with slot-wrapper registration to avoid
+  two sources of truth.
+
+Known debt and next risk:
+
+- Subclass invalidation after base type mutation remains unresolved; changing
+  a base special method after subclass creation does not refresh descendants.
+- Parser/runtime function signatures still lack default argument values, and
+  call sites still lack `*args` / `**kwargs` expansion. Function definition
+  `*args` / `**kwargs` binding works, but the call protocol is not complete.
+- Sequence iteration fallback still stops by length rather than by
+  `IndexError` from `__getitem__`.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter=PythonScripts.RunsGoldenFiles`
+- `ctest --test-dir build --output-on-failure`
+
 ## 2026-05-22 Heap Slot Refresh Helper Cleanup
 
 Review focus:

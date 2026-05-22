@@ -81,20 +81,6 @@ namespace cxxpython
             return type.runtime()->allocate<Object>(&type);
         }
 
-        Object *heap_iter_slot(Object &object)
-        {
-            Object *method = object_get_attr(&object, "__iter__");
-            auto method_root = object.runtime()->root(method);
-            return object_call(method_root.get(), {});
-        }
-
-        Object *heap_iternext_slot(Object &object)
-        {
-            Object *method = object_get_attr(&object, "__next__");
-            auto method_root = object.runtime()->root(method);
-            return object_call(method_root.get(), {});
-        }
-
         Object *heap_sequence_iter_slot(Object &object)
         {
             return object.runtime()->new_sequence_iterator(&object);
@@ -121,11 +107,29 @@ namespace cxxpython
                 type->slots.*member = slot;
         }
 
+        Object *call_heap_special(Object &object, const char *name, const CallArguments &args)
+        {
+            Object *descriptor = type_lookup_attribute(object.type(), object.runtime()->new_str(name));
+            if (!descriptor)
+                return object.runtime()->not_implemented();
+            Object *method = apply_descriptor(descriptor, &object, object.type());
+            auto method_root = object.runtime()->root(method);
+            return object_call(method_root.get(), args);
+        }
+
         Object *call_heap_special_no_args(Object &object, const char *name)
         {
-            Object *method = object_get_attr(&object, name);
-            auto method_root = object.runtime()->root(method);
-            return object_call(method_root.get(), {});
+            return call_heap_special(object, name, CallArguments{{}, nullptr});
+        }
+
+        Object *heap_iter_slot(Object &object)
+        {
+            return call_heap_special_no_args(object, "__iter__");
+        }
+
+        Object *heap_iternext_slot(Object &object)
+        {
+            return call_heap_special_no_args(object, "__next__");
         }
 
         std::size_t heap_length_slot(const Object &object)
@@ -161,10 +165,8 @@ namespace cxxpython
 
         Object *call_heap_special_one_arg(Object &object, const char *name, Object *arg)
         {
-            Object *method = object_get_attr(&object, name);
-            auto method_root = object.runtime()->root(method);
             auto arg_root = object.runtime()->root(arg);
-            return object_call(method_root.get(), {arg_root.get()});
+            return call_heap_special(object, name, CallArguments{{arg_root.get()}, nullptr});
         }
 
         Object *heap_getitem_slot(Object &object, Object *key)
@@ -174,11 +176,11 @@ namespace cxxpython
 
         void heap_setitem_slot(Object &object, Object *key, Object *value)
         {
-            Object *method = object_get_attr(&object, "__setitem__");
-            auto method_root = object.runtime()->root(method);
             auto key_root = object.runtime()->root(key);
             auto value_root = object.runtime()->root(value);
-            (void)object_call(method_root.get(), {key_root.get(), value_root.get()});
+            (void)call_heap_special(object,
+                                    "__setitem__",
+                                    CallArguments{{key_root.get(), value_root.get()}, nullptr});
         }
 
         void heap_delitem_slot(Object &object, Object *key)
@@ -191,6 +193,161 @@ namespace cxxpython
             Object *result = call_heap_special_one_arg(object, "__contains__", key);
             auto result_root = object.runtime()->root(result);
             return is_true(result_root.get());
+        }
+
+        const char *binary_method_name(BinaryOp op)
+        {
+            switch (op)
+            {
+            case BinaryOp::Add:
+                return "__add__";
+            case BinaryOp::Subtract:
+                return "__sub__";
+            case BinaryOp::Multiply:
+                return "__mul__";
+            case BinaryOp::TrueDivide:
+                return "__truediv__";
+            case BinaryOp::FloorDivide:
+                return "__floordiv__";
+            case BinaryOp::Modulo:
+                return "__mod__";
+            case BinaryOp::Power:
+                return "__pow__";
+            }
+            return nullptr;
+        }
+
+        const char *reflected_binary_method_name(BinaryOp op)
+        {
+            switch (op)
+            {
+            case BinaryOp::Add:
+                return "__radd__";
+            case BinaryOp::Subtract:
+                return "__rsub__";
+            case BinaryOp::Multiply:
+                return "__rmul__";
+            case BinaryOp::TrueDivide:
+                return "__rtruediv__";
+            case BinaryOp::FloorDivide:
+                return "__rfloordiv__";
+            case BinaryOp::Modulo:
+                return "__rmod__";
+            case BinaryOp::Power:
+                return "__rpow__";
+            }
+            return nullptr;
+        }
+
+        const char *inplace_binary_method_name(BinaryOp op)
+        {
+            switch (op)
+            {
+            case BinaryOp::Add:
+                return "__iadd__";
+            case BinaryOp::Subtract:
+                return "__isub__";
+            case BinaryOp::Multiply:
+                return "__imul__";
+            case BinaryOp::TrueDivide:
+                return "__itruediv__";
+            case BinaryOp::FloorDivide:
+                return "__ifloordiv__";
+            case BinaryOp::Modulo:
+                return "__imod__";
+            case BinaryOp::Power:
+                return "__ipow__";
+            }
+            return nullptr;
+        }
+
+        const char *unary_method_name(UnaryOp op)
+        {
+            switch (op)
+            {
+            case UnaryOp::Positive:
+                return "__pos__";
+            case UnaryOp::Negative:
+                return "__neg__";
+            case UnaryOp::Invert:
+                return "__invert__";
+            }
+            return nullptr;
+        }
+
+        const char *rich_compare_method_name(RichCompareOp op)
+        {
+            switch (op)
+            {
+            case RichCompareOp::Equal:
+                return "__eq__";
+            case RichCompareOp::NotEqual:
+                return "__ne__";
+            case RichCompareOp::Less:
+                return "__lt__";
+            case RichCompareOp::LessEqual:
+                return "__le__";
+            case RichCompareOp::Greater:
+                return "__gt__";
+            case RichCompareOp::GreaterEqual:
+                return "__ge__";
+            }
+            return nullptr;
+        }
+
+        Object *heap_binary_op_slot(const Object &left, const Object &right, BinaryOp op)
+        {
+            auto &mutable_left = const_cast<Object &>(left);
+            auto right_root = left.runtime()->root(const_cast<Object *>(&right));
+            return call_heap_special_one_arg(mutable_left, binary_method_name(op), right_root.get());
+        }
+
+        Object *heap_reflected_binary_op_slot(const Object &right, const Object &left, BinaryOp op)
+        {
+            auto &mutable_right = const_cast<Object &>(right);
+            auto left_root = right.runtime()->root(const_cast<Object *>(&left));
+            return call_heap_special_one_arg(mutable_right, reflected_binary_method_name(op), left_root.get());
+        }
+
+        Object *heap_inplace_binary_op_slot(const Object &left, const Object &right, BinaryOp op)
+        {
+            auto &mutable_left = const_cast<Object &>(left);
+            auto right_root = left.runtime()->root(const_cast<Object *>(&right));
+            return call_heap_special_one_arg(mutable_left, inplace_binary_method_name(op), right_root.get());
+        }
+
+        Object *heap_unary_op_slot(const Object &operand, UnaryOp op)
+        {
+            auto &mutable_operand = const_cast<Object &>(operand);
+            return call_heap_special_no_args(mutable_operand, unary_method_name(op));
+        }
+
+        Object *heap_rich_compare_slot(const Object &left, const Object &right, RichCompareOp op)
+        {
+            auto &mutable_left = const_cast<Object &>(left);
+            auto right_root = left.runtime()->root(const_cast<Object *>(&right));
+            return call_heap_special_one_arg(mutable_left, rich_compare_method_name(op), right_root.get());
+        }
+
+        Object *heap_call_slot(Object &object, const CallArguments &args)
+        {
+            return call_heap_special(object, "__call__", args);
+        }
+
+        bool type_dict_contains_any(TypeObject *type, const char *const *names, std::size_t count)
+        {
+            for (std::size_t index = 0; index < count; ++index)
+            {
+                if (type_dict_contains(type, names[index]))
+                    return true;
+            }
+            return false;
+        }
+
+        template <std::size_t Count>
+        bool type_dict_contains_any(TypeObject *type, const char *const (&names)[Count])
+        {
+            return type_dict_contains_any(type, names, Count);
         }
 
         Object *object_getattribute_method(Runtime &runtime, Object *self, ObjectSpan args)
@@ -1122,6 +1279,12 @@ namespace cxxpython
         inherit_heap_slot(type, &TypeSlots::setitem);
         inherit_heap_slot(type, &TypeSlots::delitem);
         inherit_heap_slot(type, &TypeSlots::contains);
+        inherit_heap_slot(type, &TypeSlots::binary_op);
+        inherit_heap_slot(type, &TypeSlots::reflected_binary_op);
+        inherit_heap_slot(type, &TypeSlots::inplace_binary_op);
+        inherit_heap_slot(type, &TypeSlots::unary_op);
+        inherit_heap_slot(type, &TypeSlots::rich_compare);
+        inherit_heap_slot(type, &TypeSlots::call);
         if (type_dict_contains(type, "__len__"))
         {
             type->slots.length = heap_length_slot;
@@ -1136,6 +1299,59 @@ namespace cxxpython
         override_heap_slot_if_present(type, "__contains__", &TypeSlots::contains, heap_contains_slot);
         if (!type->slots.iter && type->slots.length && type->slots.getitem)
             type->slots.iter = heap_sequence_iter_slot;
+
+        static constexpr const char *binary_methods[] = {
+            "__add__",
+            "__sub__",
+            "__mul__",
+            "__truediv__",
+            "__floordiv__",
+            "__mod__",
+            "__pow__",
+        };
+        static constexpr const char *reflected_binary_methods[] = {
+            "__radd__",
+            "__rsub__",
+            "__rmul__",
+            "__rtruediv__",
+            "__rfloordiv__",
+            "__rmod__",
+            "__rpow__",
+        };
+        static constexpr const char *inplace_binary_methods[] = {
+            "__iadd__",
+            "__isub__",
+            "__imul__",
+            "__itruediv__",
+            "__ifloordiv__",
+            "__imod__",
+            "__ipow__",
+        };
+        static constexpr const char *unary_methods[] = {
+            "__pos__",
+            "__neg__",
+            "__invert__",
+        };
+        static constexpr const char *rich_compare_methods[] = {
+            "__eq__",
+            "__ne__",
+            "__lt__",
+            "__le__",
+            "__gt__",
+            "__ge__",
+        };
+
+        if (type_dict_contains_any(type, binary_methods))
+            type->slots.binary_op = heap_binary_op_slot;
+        if (type_dict_contains_any(type, reflected_binary_methods))
+            type->slots.reflected_binary_op = heap_reflected_binary_op_slot;
+        if (type_dict_contains_any(type, inplace_binary_methods))
+            type->slots.inplace_binary_op = heap_inplace_binary_op_slot;
+        if (type_dict_contains_any(type, unary_methods))
+            type->slots.unary_op = heap_unary_op_slot;
+        if (type_dict_contains_any(type, rich_compare_methods))
+            type->slots.rich_compare = heap_rich_compare_slot;
+        override_heap_slot_if_present(type, "__call__", &TypeSlots::call, heap_call_slot);
     }
 
     Object *object_get_attr_default(Object *object, StrObject *name)
