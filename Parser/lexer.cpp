@@ -279,6 +279,8 @@ namespace cxxpython::compiler_internal
                     kind = TokenKind::Else;
                 else if (lexeme == "for")
                     kind = TokenKind::For;
+                else if (lexeme == "while")
+                    kind = TokenKind::While;
                 else if (lexeme == "break")
                     kind = TokenKind::Break;
                 else if (lexeme == "continue")
@@ -311,6 +313,10 @@ namespace cxxpython::compiler_internal
                     kind = TokenKind::Is;
                 else if (lexeme == "not")
                     kind = TokenKind::Not;
+                else if (lexeme == "and")
+                    kind = TokenKind::And;
+                else if (lexeme == "or")
+                    kind = TokenKind::Or;
                 else if (lexeme == "class")
                     kind = TokenKind::Class;
                 else if (lexeme == "del")

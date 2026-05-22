@@ -139,6 +139,8 @@ namespace cxxpython::compiler_internal
                     return parse_if_statement();
                 if (peek().kind == TokenKind::For)
                     return parse_for_statement();
+                if (peek().kind == TokenKind::While)
+                    return parse_while_statement();
                 if (peek().kind == TokenKind::Try)
                     return parse_try_statement();
                 if (peek().kind == TokenKind::Def)
@@ -553,7 +555,7 @@ namespace cxxpython::compiler_internal
             ParsedStatement parse_if_statement()
             {
                 const Token &if_token = advance();
-                std::unique_ptr<Expr> condition = parse_comparison();
+                std::unique_ptr<Expr> condition = parse_or_expression();
                 consume(TokenKind::Colon, "expected ':' after if condition");
                 std::vector<std::unique_ptr<Stmt>> then_body = parse_suite("expected newline after if condition");
                 std::vector<std::unique_ptr<Stmt>> else_body;
@@ -606,6 +608,31 @@ namespace cxxpython::compiler_internal
                         std::move(body),
                         std::move(else_body));
                 statement->line = for_token.line;
+                return ParsedStatement{
+                    std::move(statement),
+                    true,
+                };
+            }
+
+            ParsedStatement parse_while_statement()
+            {
+                const Token &while_token = advance();
+                std::unique_ptr<Expr> condition = parse_or_expression();
+                consume(TokenKind::Colon, "expected ':' after while condition");
+                LoopDepthGuard loop_guard(loop_depth_);
+                std::vector<std::unique_ptr<Stmt>> body = parse_suite("expected newline after while condition");
+                std::vector<std::unique_ptr<Stmt>> else_body;
+                if (peek().kind == TokenKind::Else)
+                {
+                    advance();
+                    consume(TokenKind::Colon, "expected ':' after else");
+                    else_body = parse_suite("expected newline after else");
+                }
+                auto statement = std::make_unique<WhileStmt>(
+                    std::move(condition),
+                    std::move(body),
+                    std::move(else_body));
+                statement->line = while_token.line;
                 return ParsedStatement{
                     std::move(statement),
                     true,
@@ -811,18 +838,46 @@ namespace cxxpython::compiler_internal
 
             std::unique_ptr<Expr> parse_expression_only()
             {
-                std::unique_ptr<Expr> body = parse_comparison();
+                std::unique_ptr<Expr> body = parse_or_expression();
                 if (peek().kind != TokenKind::If)
                     return body;
 
                 advance();
-                std::unique_ptr<Expr> condition = parse_comparison();
+                std::unique_ptr<Expr> condition = parse_or_expression();
                 consume(TokenKind::Else, "expected else after conditional expression");
                 std::unique_ptr<Expr> else_body = parse_expression_only();
                 return std::make_unique<ConditionalExpr>(
                     std::move(body),
                     std::move(condition),
                     std::move(else_body));
+            }
+
+            std::unique_ptr<Expr> parse_or_expression()
+            {
+                std::vector<std::unique_ptr<Expr>> values;
+                values.push_back(parse_and_expression());
+                while (peek().kind == TokenKind::Or)
+                {
+                    advance();
+                    values.push_back(parse_and_expression());
+                }
+                if (values.size() == 1)
+                    return std::move(values.front());
+                return std::make_unique<BoolExpr>(BoolOp::Or, std::move(values));
+            }
+
+            std::unique_ptr<Expr> parse_and_expression()
+            {
+                std::vector<std::unique_ptr<Expr>> values;
+                values.push_back(parse_comparison());
+                while (peek().kind == TokenKind::And)
+                {
+                    advance();
+                    values.push_back(parse_comparison());
+                }
+                if (values.size() == 1)
+                    return std::move(values.front());
+                return std::make_unique<BoolExpr>(BoolOp::And, std::move(values));
             }
 
             std::unique_ptr<Expr> parse_comparison()
@@ -1335,6 +1390,7 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Elif:
                 case TokenKind::Else:
                 case TokenKind::For:
+                case TokenKind::While:
                 case TokenKind::Break:
                 case TokenKind::Continue:
                 case TokenKind::Def:
@@ -1351,6 +1407,8 @@ namespace cxxpython::compiler_internal
                 case TokenKind::In:
                 case TokenKind::Is:
                 case TokenKind::Not:
+                case TokenKind::And:
+                case TokenKind::Or:
                 case TokenKind::Class:
                 case TokenKind::Del:
                 case TokenKind::Pass:
@@ -1424,6 +1482,7 @@ namespace cxxpython::compiler_internal
                 case TokenKind::LeftBrace:
                 case TokenKind::If:
                 case TokenKind::For:
+                case TokenKind::While:
                 case TokenKind::Def:
                 case TokenKind::Return:
                 case TokenKind::Raise:
@@ -1466,6 +1525,8 @@ namespace cxxpython::compiler_internal
                 case TokenKind::In:
                 case TokenKind::Is:
                 case TokenKind::Not:
+                case TokenKind::And:
+                case TokenKind::Or:
                 case TokenKind::Indent:
                 case TokenKind::Dedent:
                 case TokenKind::Newline:
@@ -1533,6 +1594,7 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Elif:
                 case TokenKind::Else:
                 case TokenKind::For:
+                case TokenKind::While:
                 case TokenKind::Break:
                 case TokenKind::Continue:
                 case TokenKind::Def:
@@ -1546,6 +1608,8 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Except:
                 case TokenKind::Finally:
                 case TokenKind::As:
+                case TokenKind::And:
+                case TokenKind::Or:
                 case TokenKind::Class:
                 case TokenKind::Del:
                 case TokenKind::Pass:

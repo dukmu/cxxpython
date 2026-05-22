@@ -19,6 +19,7 @@ namespace cxxpython::compiler_internal
     struct FStringExpr;
     struct UnaryExpr;
     struct BinaryExpr;
+    struct BoolExpr;
     struct CompareExpr;
     struct ConditionalExpr;
     struct SingletonExpr;
@@ -38,6 +39,7 @@ namespace cxxpython::compiler_internal
     struct DeleteStmt;
     struct IfStmt;
     struct ForStmt;
+    struct WhileStmt;
     struct PassStmt;
     struct BreakStmt;
     struct ContinueStmt;
@@ -59,6 +61,7 @@ namespace cxxpython::compiler_internal
         virtual void visit(const FStringExpr &expression) = 0;
         virtual void visit(const UnaryExpr &expression) = 0;
         virtual void visit(const BinaryExpr &expression) = 0;
+        virtual void visit(const BoolExpr &expression) = 0;
         virtual void visit(const CompareExpr &expression) = 0;
         virtual void visit(const ConditionalExpr &expression) = 0;
         virtual void visit(const SingletonExpr &expression) = 0;
@@ -88,6 +91,7 @@ namespace cxxpython::compiler_internal
         virtual void visit(const DeleteStmt &statement) = 0;
         virtual void visit(const IfStmt &statement) = 0;
         virtual void visit(const ForStmt &statement) = 0;
+        virtual void visit(const WhileStmt &statement) = 0;
         virtual void visit(const PassStmt &statement) = 0;
         virtual void visit(const BreakStmt &statement) = 0;
         virtual void visit(const ContinueStmt &statement) = 0;
@@ -135,6 +139,7 @@ namespace cxxpython::compiler_internal
         Elif,
         Else,
         For,
+        While,
         Break,
         Continue,
         Def,
@@ -151,6 +156,8 @@ namespace cxxpython::compiler_internal
         In,
         Is,
         Not,
+        And,
+        Or,
         Class,
         Del,
         Pass,
@@ -285,6 +292,28 @@ namespace cxxpython::compiler_internal
 
         UnaryOp op;
         std::unique_ptr<Expr> operand;
+
+        void accept(ExprVisitor &visitor) const override
+        {
+            visitor.visit(*this);
+        }
+    };
+
+    enum class BoolOp
+    {
+        And,
+        Or,
+    };
+
+    struct BoolExpr final : Expr
+    {
+        BoolExpr(BoolOp op_in, std::vector<std::unique_ptr<Expr>> values_in)
+            : op(op_in), values(std::move(values_in))
+        {
+        }
+
+        BoolOp op;
+        std::vector<std::unique_ptr<Expr>> values;
 
         void accept(ExprVisitor &visitor) const override
         {
@@ -673,6 +702,27 @@ namespace cxxpython::compiler_internal
 
         std::string target;
         std::unique_ptr<Expr> iterable;
+        std::vector<std::unique_ptr<Stmt>> body;
+        std::vector<std::unique_ptr<Stmt>> else_body;
+
+        void accept(StmtVisitor &visitor) const override
+        {
+            visitor.visit(*this);
+        }
+    };
+
+    struct WhileStmt final : Stmt
+    {
+        WhileStmt(std::unique_ptr<Expr> condition_in,
+                  std::vector<std::unique_ptr<Stmt>> body_in,
+                  std::vector<std::unique_ptr<Stmt>> else_body_in)
+            : condition(std::move(condition_in)),
+              body(std::move(body_in)),
+              else_body(std::move(else_body_in))
+        {
+        }
+
+        std::unique_ptr<Expr> condition;
         std::vector<std::unique_ptr<Stmt>> body;
         std::vector<std::unique_ptr<Stmt>> else_body;
 

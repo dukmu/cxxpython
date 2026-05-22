@@ -31,3 +31,8 @@ print(1 < 2 < 3)
 print(1 < 3 < 2)
 print(1 < 2 == 2)
 print('yes' if 1 < 2 < 3 else 'no')
+
+count = 0
+while count < 2: count = count + 1
+print(count)
+print('a' and 'b' or 'c')

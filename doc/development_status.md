@@ -1,5 +1,53 @@
 # Development Status
 
+## 2026-05-22 While And Boolean Control Slice
+
+Review focus:
+
+- Close the next parser/control-flow gap before growing more script-level
+  stdlib.
+- Implement Python truth-control semantics without adding unnecessary VM
+  state or low-quality special cases.
+
+Completed:
+
+- Added lexer/parser/AST/compiler support for `while` and `while ... else`.
+- Added boolean `and` / `or` expressions with short-circuit lowering.
+- Preserved Python's value-returning boolean semantics:
+  - `a and b` returns the first false operand, otherwise the last operand;
+  - `a or b` returns the first true operand, otherwise the last operand.
+- Reused the existing loop stack for `break` and `continue`, including
+  `while`-`else` behavior where `break` skips the `else` suite.
+- Extended Python golden coverage for `while`, `continue`, `break`,
+  `while ... else`, boolean short-circuit side effects, and inline parser
+  syntax.
+
+Design notes:
+
+- `and` uses `JUMP_IF_FALSE_OR_POP`; `or` lowers to
+  `DUP_TOP`, `POP_JUMP_IF_TRUE`, `POP_TOP` so short-circuiting keeps the
+  original truthy object on the stack while falsey values are discarded before
+  evaluating the next operand.
+- `while` uses existing absolute jumps and the same loop control records as
+  `for`, so future finally/unwind behavior stays centralized.
+
+Known debt and next risk:
+
+- Augmented assignment remains the next expression/target lowering gap.
+- Parser still lacks relative import syntax and package `__path__` multi-entry
+  search in import execution.
+- Object-layer VM includes remain a design cleanup target.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/cxxpython Tests/python/control_bool.py`
+- `build/cxxpython Tests/python/parser_syntax.py`
+- `build/test_core_objects '--gtest_filter=PythonScripts.RunsGoldenFiles:Compile.CompilesIfElseStatements:Compile.CompilesChainedComparisonsWithShortCircuit:Bytecode.DispatchesJumpOpcodesThroughTruthProtocol:Bytecode.DispatchesJumpIfFalseOrPop'`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all 195 tests pass.
+
 ## 2026-05-22 Star Import and `__all__` Protocol Slice
 
 Review focus:

@@ -194,6 +194,31 @@ namespace cxxpython
                 });
             }
 
+            void visit(const compiler_internal::BoolExpr &expression) override
+            {
+                if (expression.values.empty())
+                    raise_syntax_error(&runtime_, "boolean expression requires at least one value");
+
+                std::vector<std::size_t> cleanup_jumps;
+                expression.values.front()->accept(*this);
+                for (std::size_t index = 1; index < expression.values.size(); ++index)
+                {
+                    if (expression.op == compiler_internal::BoolOp::And)
+                    {
+                        cleanup_jumps.push_back(emit_jump(Opcode::JumpIfFalseOrPop));
+                    }
+                    else
+                    {
+                        emit({Opcode::DupTop, 0});
+                        cleanup_jumps.push_back(emit_jump(Opcode::PopJumpIfTrue));
+                        emit({Opcode::PopTop, 0});
+                    }
+                    expression.values[index]->accept(*this);
+                }
+                for (std::size_t jump : cleanup_jumps)
+                    patch_jump(jump, instructions_.size());
+            }
+
             void visit(const compiler_internal::CompareExpr &expression) override
             {
                 expression.left->accept(*this);
@@ -568,6 +593,39 @@ namespace cxxpython
                     .continue_jumps = {},
                 });
                 emit_binding_store(statement.target);
+                for (const auto &item : statement.body)
+                    item->accept(*this);
+                emit({
+                    Opcode::JumpAbsolute,
+                    static_cast<std::uint32_t>(loop_start),
+                });
+                const std::size_t else_start = instructions_.size();
+                patch_jump(exit_jump, else_start);
+                LoopControl loop = std::move(loop_stack_.back());
+                loop_stack_.pop_back();
+                for (std::size_t jump : loop.continue_jumps)
+                    patch_jump(jump, loop.continue_target);
+                for (const auto &item : statement.else_body)
+                    item->accept(*this);
+                const std::size_t loop_end = instructions_.size();
+                loop.break_target = loop_end;
+                for (std::size_t jump : loop.break_jumps)
+                    patch_jump(jump, loop.break_target);
+            }
+
+            void visit(const compiler_internal::WhileStmt &statement) override
+            {
+                StatementLineGuard line(*this, statement);
+                const std::size_t loop_start = instructions_.size();
+                statement.condition->accept(*this);
+                const std::size_t exit_jump = emit_jump(Opcode::PopJumpIfFalse);
+                loop_stack_.push_back(LoopControl{
+                    .start = loop_start,
+                    .continue_target = loop_start,
+                    .break_target = 0,
+                    .break_jumps = {},
+                    .continue_jumps = {},
+                });
                 for (const auto &item : statement.body)
                     item->accept(*this);
                 emit({
