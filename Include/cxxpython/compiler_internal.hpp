@@ -22,6 +22,7 @@ namespace cxxpython::compiler_internal
     struct BoolExpr;
     struct CompareExpr;
     struct ConditionalExpr;
+    struct LambdaExpr;
     struct SingletonExpr;
     struct NameExpr;
     struct AttributeExpr;
@@ -65,6 +66,7 @@ namespace cxxpython::compiler_internal
         virtual void visit(const BoolExpr &expression) = 0;
         virtual void visit(const CompareExpr &expression) = 0;
         virtual void visit(const ConditionalExpr &expression) = 0;
+        virtual void visit(const LambdaExpr &expression) = 0;
         virtual void visit(const SingletonExpr &expression) = 0;
         virtual void visit(const NameExpr &expression) = 0;
         virtual void visit(const AttributeExpr &expression) = 0;
@@ -165,6 +167,7 @@ namespace cxxpython::compiler_internal
         Not,
         And,
         Or,
+        Lambda,
         Class,
         Del,
         Pass,
@@ -192,6 +195,32 @@ namespace cxxpython::compiler_internal
     {
         virtual ~Expr() = default;
         virtual void accept(ExprVisitor &visitor) const = 0;
+    };
+
+    struct FunctionParameters final
+    {
+        struct Annotation final
+        {
+            std::string name;
+            std::unique_ptr<Expr> value;
+        };
+
+        struct KeywordOnlyParameter final
+        {
+            std::string name;
+            std::unique_ptr<Expr> default_value;
+            std::unique_ptr<Expr> annotation;
+        };
+
+        std::vector<std::string> positional;
+        std::uint32_t positional_only_count = 0;
+        std::vector<std::unique_ptr<Expr>> defaults;
+        std::vector<Annotation> annotations;
+        std::vector<KeywordOnlyParameter> keyword_only;
+        std::optional<std::string> varargs;
+        std::unique_ptr<Expr> varargs_annotation;
+        std::optional<std::string> varkeywords;
+        std::unique_ptr<Expr> varkeywords_annotation;
     };
 
     struct IntegerExpr final : Expr
@@ -369,6 +398,23 @@ namespace cxxpython::compiler_internal
         std::unique_ptr<Expr> body;
         std::unique_ptr<Expr> condition;
         std::unique_ptr<Expr> else_body;
+
+        void accept(ExprVisitor &visitor) const override
+        {
+            visitor.visit(*this);
+        }
+    };
+
+    struct LambdaExpr final : Expr
+    {
+        LambdaExpr(FunctionParameters params_in, std::unique_ptr<Expr> body_in, std::size_t line_in)
+            : params(std::move(params_in)), body(std::move(body_in)), line(line_in)
+        {
+        }
+
+        FunctionParameters params;
+        std::unique_ptr<Expr> body;
+        std::size_t line = 1;
 
         void accept(ExprVisitor &visitor) const override
         {
@@ -939,32 +985,6 @@ namespace cxxpython::compiler_internal
         {
             visitor.visit(*this);
         }
-    };
-
-    struct FunctionParameters final
-    {
-        struct Annotation final
-        {
-            std::string name;
-            std::unique_ptr<Expr> value;
-        };
-
-        struct KeywordOnlyParameter final
-        {
-            std::string name;
-            std::unique_ptr<Expr> default_value;
-            std::unique_ptr<Expr> annotation;
-        };
-
-        std::vector<std::string> positional;
-        std::uint32_t positional_only_count = 0;
-        std::vector<std::unique_ptr<Expr>> defaults;
-        std::vector<Annotation> annotations;
-        std::vector<KeywordOnlyParameter> keyword_only;
-        std::optional<std::string> varargs;
-        std::unique_ptr<Expr> varargs_annotation;
-        std::optional<std::string> varkeywords;
-        std::unique_ptr<Expr> varkeywords_annotation;
     };
 
     struct FunctionDefStmt final : Stmt

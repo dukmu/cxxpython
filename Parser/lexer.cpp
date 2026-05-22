@@ -317,6 +317,8 @@ namespace cxxpython::compiler_internal
                     kind = TokenKind::And;
                 else if (lexeme == "or")
                     kind = TokenKind::Or;
+                else if (lexeme == "lambda")
+                    kind = TokenKind::Lambda;
                 else if (lexeme == "class")
                     kind = TokenKind::Class;
                 else if (lexeme == "del")

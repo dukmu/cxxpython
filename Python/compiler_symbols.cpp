@@ -66,6 +66,17 @@ namespace cxxpython
                 expression.else_body->accept(*this);
             }
 
+            void visit(const compiler_internal::LambdaExpr &expression) override
+            {
+                for (const auto &default_value : expression.params.defaults)
+                    default_value->accept(*this);
+                for (const auto &parameter : expression.params.keyword_only)
+                {
+                    if (parameter.default_value)
+                        parameter.default_value->accept(*this);
+                }
+            }
+
             void visit(const compiler_internal::SingletonExpr &expression) override
             {
                 (void)expression;
@@ -664,6 +675,17 @@ namespace cxxpython
                 expression.else_body->accept(*this);
             }
 
+            void visit(const compiler_internal::LambdaExpr &expression) override
+            {
+                for (const auto &default_value : expression.params.defaults)
+                    default_value->accept(*this);
+                for (const auto &parameter : expression.params.keyword_only)
+                {
+                    if (parameter.default_value)
+                        parameter.default_value->accept(*this);
+                }
+            }
+
             void visit(const compiler_internal::SingletonExpr &expression) override
             {
                 (void)expression;
@@ -922,22 +944,144 @@ namespace cxxpython
             bool read_target_ = false;
         };
 
-        class NestedFunctionCollector final : public compiler_internal::StmtVisitor
+        class NestedFunctionCollector final : public compiler_internal::ExprVisitor,
+                                             public compiler_internal::StmtVisitor
         {
         public:
+            void visit(const compiler_internal::IntegerExpr &expression) override
+            {
+                (void)expression;
+            }
+
+            void visit(const compiler_internal::StringExpr &expression) override
+            {
+                (void)expression;
+            }
+
+            void visit(const compiler_internal::FStringExpr &expression) override
+            {
+                for (const compiler_internal::FStringPart &part : expression.parts)
+                {
+                    if (part.is_expression())
+                        part.expression->accept(*this);
+                }
+            }
+
+            void visit(const compiler_internal::UnaryExpr &expression) override
+            {
+                expression.operand->accept(*this);
+            }
+
+            void visit(const compiler_internal::BinaryExpr &expression) override
+            {
+                expression.left->accept(*this);
+                expression.right->accept(*this);
+            }
+
+            void visit(const compiler_internal::BoolExpr &expression) override
+            {
+                for (const auto &value : expression.values)
+                    value->accept(*this);
+            }
+
+            void visit(const compiler_internal::CompareExpr &expression) override
+            {
+                expression.left->accept(*this);
+                for (const compiler_internal::Comparison &comparison : expression.comparisons)
+                    comparison.right->accept(*this);
+            }
+
+            void visit(const compiler_internal::ConditionalExpr &expression) override
+            {
+                expression.body->accept(*this);
+                expression.condition->accept(*this);
+                expression.else_body->accept(*this);
+            }
+
+            void visit(const compiler_internal::LambdaExpr &expression) override
+            {
+                lambdas.push_back(&expression);
+                for (const auto &default_value : expression.params.defaults)
+                    default_value->accept(*this);
+                for (const auto &parameter : expression.params.keyword_only)
+                {
+                    if (parameter.default_value)
+                        parameter.default_value->accept(*this);
+                }
+            }
+
+            void visit(const compiler_internal::SingletonExpr &expression) override
+            {
+                (void)expression;
+            }
+
+            void visit(const compiler_internal::NameExpr &expression) override
+            {
+                (void)expression;
+            }
+
+            void visit(const compiler_internal::AttributeExpr &expression) override
+            {
+                expression.object->accept(*this);
+            }
+
+            void visit(const compiler_internal::SubscriptExpr &expression) override
+            {
+                expression.object->accept(*this);
+                expression.key->accept(*this);
+            }
+
+            void visit(const compiler_internal::SliceExpr &expression) override
+            {
+                if (expression.start)
+                    expression.start->accept(*this);
+                if (expression.stop)
+                    expression.stop->accept(*this);
+                if (expression.step)
+                    expression.step->accept(*this);
+            }
+
+            void visit(const compiler_internal::ListExpr &expression) override
+            {
+                for (const auto &item : expression.items)
+                    item->accept(*this);
+            }
+
+            void visit(const compiler_internal::TupleExpr &expression) override
+            {
+                for (const auto &item : expression.items)
+                    item->accept(*this);
+            }
+
+            void visit(const compiler_internal::DictExpr &expression) override
+            {
+                for (const compiler_internal::DictItem &item : expression.items)
+                {
+                    item.key->accept(*this);
+                    item.value->accept(*this);
+                }
+            }
+
+            void visit(const compiler_internal::CallExpr &expression) override
+            {
+                expression.callee->accept(*this);
+                for (const auto &arg : expression.args)
+                    arg.value->accept(*this);
+            }
+
             void visit(const compiler_internal::ExprStmt &statement) override
             {
-                (void)statement;
+                statement.expression->accept(*this);
             }
 
             void visit(const compiler_internal::AssignStmt &statement) override
             {
-                (void)statement;
+                statement.value->accept(*this);
             }
 
             void visit(const compiler_internal::AugAssignStmt &statement) override
             {
-                (void)statement;
+                statement.value->accept(*this);
             }
 
             void visit(const compiler_internal::DeleteStmt &statement) override
@@ -986,12 +1130,13 @@ namespace cxxpython
 
             void visit(const compiler_internal::ReturnStmt &statement) override
             {
-                (void)statement;
+                if (statement.value)
+                    statement.value->accept(*this);
             }
 
             void visit(const compiler_internal::RaiseStmt &statement) override
             {
-                (void)statement;
+                statement.value->accept(*this);
             }
 
             void visit(const compiler_internal::GlobalStmt &statement) override
@@ -1020,6 +1165,8 @@ namespace cxxpython
                     item->accept(*this);
                 for (const compiler_internal::ExceptHandler &handler : statement.handlers)
                 {
+                    if (handler.type)
+                        handler.type->accept(*this);
                     for (const auto &item : handler.body)
                         item->accept(*this);
                 }
@@ -1034,10 +1181,16 @@ namespace cxxpython
 
             void visit(const compiler_internal::ClassDefStmt &statement) override
             {
-                (void)statement;
+                for (const auto &decorator : statement.decorators)
+                    decorator->accept(*this);
+                for (const auto &base : statement.bases)
+                    base->accept(*this);
+                for (const auto &keyword : statement.keywords)
+                    keyword.value->accept(*this);
             }
 
             std::vector<const compiler_internal::FunctionDefStmt *> functions;
+            std::vector<const compiler_internal::LambdaExpr *> lambdas;
         };
 
         const SymbolTable *find_enclosing_scope(const std::vector<const SymbolTable *> &enclosing,
@@ -1049,6 +1202,92 @@ namespace cxxpython
                     return symbols;
             }
             return nullptr;
+        }
+
+        void add_parameters_to_symbols(Runtime &runtime,
+                                       SymbolTable &symbols,
+                                       const compiler_internal::FunctionParameters &params)
+        {
+            for (const std::string &param : params.positional)
+            {
+                if (symbols.is_global(param) || symbols.is_nonlocal(param))
+                    raise_syntax_error(&runtime, "name '" + param + "' is parameter and nonlocal/global");
+                (void)symbols.add_local(param);
+            }
+            for (const auto &param : params.keyword_only)
+            {
+                if (symbols.is_global(param.name) || symbols.is_nonlocal(param.name))
+                    raise_syntax_error(&runtime, "name '" + param.name + "' is parameter and nonlocal/global");
+                (void)symbols.add_local(param.name);
+            }
+            if (params.varargs)
+            {
+                if (symbols.is_global(*params.varargs) || symbols.is_nonlocal(*params.varargs))
+                    raise_syntax_error(&runtime, "name '" + *params.varargs + "' is parameter and nonlocal/global");
+                (void)symbols.add_local(*params.varargs);
+            }
+            if (params.varkeywords)
+            {
+                if (symbols.is_global(*params.varkeywords) || symbols.is_nonlocal(*params.varkeywords))
+                    raise_syntax_error(&runtime, "name '" + *params.varkeywords + "' is parameter and nonlocal/global");
+                (void)symbols.add_local(*params.varkeywords);
+            }
+        }
+
+        void add_direct_freevars(Runtime &runtime,
+                                 SymbolTable &symbols,
+                                 const std::vector<const SymbolTable *> &enclosing,
+                                 const std::vector<std::string> &references)
+        {
+            (void)runtime;
+            if (enclosing.empty())
+                return;
+            for (const std::string &name : references)
+            {
+                if (!symbols.is_local(name) &&
+                    !symbols.is_global(name) &&
+                    find_enclosing_scope(enclosing, name))
+                    (void)symbols.add_freevar(name);
+            }
+        }
+
+        void validate_nonlocals(Runtime &runtime,
+                                SymbolTable &symbols,
+                                const std::vector<const SymbolTable *> &enclosing)
+        {
+            for (const std::string &name : symbols.nonlocals())
+            {
+                if (!find_enclosing_scope(enclosing, name))
+                    raise_syntax_error(&runtime, "no binding for nonlocal '" + name + "' found");
+                (void)symbols.add_freevar(name);
+            }
+        }
+
+        void add_nested_freevars(Runtime &runtime,
+                                 SymbolTable &symbols,
+                                 const std::vector<const SymbolTable *> &enclosing,
+                                 const NestedFunctionCollector &nested)
+        {
+            std::vector<const SymbolTable *> nested_enclosing;
+            nested_enclosing.reserve(enclosing.size() + 1);
+            nested_enclosing.push_back(&symbols);
+            nested_enclosing.insert(nested_enclosing.end(), enclosing.begin(), enclosing.end());
+
+            auto apply_nested_symbols = [&](const SymbolTable &nested_symbols)
+            {
+                for (const std::string &freevar : nested_symbols.freevars())
+                {
+                    if (symbols.is_local(freevar))
+                        (void)symbols.add_cellvar(freevar);
+                    else if (!symbols.is_freevar(freevar) && find_enclosing_scope(enclosing, freevar))
+                        (void)symbols.add_freevar(freevar);
+                }
+            };
+
+            for (const compiler_internal::FunctionDefStmt *nested_function : nested.functions)
+                apply_nested_symbols(analyze_function_symbols(runtime, *nested_function, nested_enclosing));
+            for (const compiler_internal::LambdaExpr *nested_lambda : nested.lambdas)
+                apply_nested_symbols(analyze_lambda_symbols(runtime, *nested_lambda, nested_enclosing));
         }
     }
 
@@ -1279,30 +1518,7 @@ namespace cxxpython
         for (const auto &statement : function.body)
             statement->accept(directives);
 
-        for (const std::string &param : function.params.positional)
-        {
-            if (symbols.is_global(param) || symbols.is_nonlocal(param))
-                raise_syntax_error(&runtime, "name '" + param + "' is parameter and nonlocal/global");
-            (void)symbols.add_local(param);
-        }
-        for (const auto &param : function.params.keyword_only)
-        {
-            if (symbols.is_global(param.name) || symbols.is_nonlocal(param.name))
-                raise_syntax_error(&runtime, "name '" + param.name + "' is parameter and nonlocal/global");
-            (void)symbols.add_local(param.name);
-        }
-        if (function.params.varargs)
-        {
-            if (symbols.is_global(*function.params.varargs) || symbols.is_nonlocal(*function.params.varargs))
-                raise_syntax_error(&runtime, "name '" + *function.params.varargs + "' is parameter and nonlocal/global");
-            (void)symbols.add_local(*function.params.varargs);
-        }
-        if (function.params.varkeywords)
-        {
-            if (symbols.is_global(*function.params.varkeywords) || symbols.is_nonlocal(*function.params.varkeywords))
-                raise_syntax_error(&runtime, "name '" + *function.params.varkeywords + "' is parameter and nonlocal/global");
-            (void)symbols.add_local(*function.params.varkeywords);
-        }
+        add_parameters_to_symbols(runtime, symbols, function.params);
 
         FunctionLocalCollector locals(symbols);
         for (const auto &statement : function.body)
@@ -1315,42 +1531,35 @@ namespace cxxpython
         LexicalReferenceCollector references;
         for (const auto &statement : function.body)
             statement->accept(references);
-        if (!enclosing.empty())
-        {
-            for (const std::string &name : references.references())
-            {
-                if (!symbols.is_local(name) &&
-                    !symbols.is_global(name) &&
-                    find_enclosing_scope(enclosing, name))
-                    (void)symbols.add_freevar(name);
-            }
-        }
+        add_direct_freevars(runtime, symbols, enclosing, references.references());
 
-        for (const std::string &name : symbols.nonlocals())
-        {
-            if (!find_enclosing_scope(enclosing, name))
-                raise_syntax_error(&runtime, "no binding for nonlocal '" + name + "' found");
-            (void)symbols.add_freevar(name);
-        }
+        validate_nonlocals(runtime, symbols, enclosing);
 
         NestedFunctionCollector nested_functions;
         for (const auto &statement : function.body)
             statement->accept(nested_functions);
-        std::vector<const SymbolTable *> nested_enclosing;
-        nested_enclosing.reserve(enclosing.size() + 1);
-        nested_enclosing.push_back(&symbols);
-        nested_enclosing.insert(nested_enclosing.end(), enclosing.begin(), enclosing.end());
-        for (const compiler_internal::FunctionDefStmt *nested : nested_functions.functions)
-        {
-            SymbolTable nested_symbols = analyze_function_symbols(runtime, *nested, nested_enclosing);
-            for (const std::string &freevar : nested_symbols.freevars())
-            {
-                if (symbols.is_local(freevar))
-                    (void)symbols.add_cellvar(freevar);
-                else if (!symbols.is_freevar(freevar) && find_enclosing_scope(enclosing, freevar))
-                    (void)symbols.add_freevar(freevar);
-            }
-        }
+        add_nested_freevars(runtime, symbols, enclosing, nested_functions);
+
+        return symbols;
+    }
+
+    SymbolTable analyze_lambda_symbols(Runtime &runtime,
+                                       const compiler_internal::LambdaExpr &lambda,
+                                       const std::vector<const SymbolTable *> &enclosing)
+    {
+        SymbolTable symbols(SymbolScope::Function);
+        add_parameters_to_symbols(runtime, symbols, lambda.params);
+
+        SymbolCollector collector(symbols);
+        lambda.body->accept(collector);
+
+        LexicalReferenceCollector references;
+        lambda.body->accept(references);
+        add_direct_freevars(runtime, symbols, enclosing, references.references());
+
+        NestedFunctionCollector nested_functions;
+        lambda.body->accept(nested_functions);
+        add_nested_freevars(runtime, symbols, enclosing, nested_functions);
 
         return symbols;
     }
@@ -1376,6 +1585,18 @@ namespace cxxpython
             {
                 needs_class_cell = true;
                 break;
+            }
+        }
+        if (!needs_class_cell)
+        {
+            for (const compiler_internal::LambdaExpr *lambda : nested_functions.lambdas)
+            {
+                SymbolTable lambda_symbols = analyze_lambda_symbols(runtime, *lambda, {&symbols_with_class});
+                if (lambda_symbols.is_freevar("__class__"))
+                {
+                    needs_class_cell = true;
+                    break;
+                }
             }
         }
         if (!needs_class_cell)

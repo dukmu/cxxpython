@@ -98,6 +98,26 @@ namespace cxxpython
                                          std::move(lines_));
             }
 
+            CodeObject *build_lambda(const compiler_internal::LambdaExpr &lambda)
+            {
+                emit_constant(runtime_.none());
+                lambda.body->accept(*this);
+                emit({Opcode::ReturnValue, 0});
+                return runtime_.new_code("<lambda>",
+                                         filename_,
+                                         static_cast<std::uint32_t>(lambda.params.positional.size()),
+                                         lambda.params.positional_only_count,
+                                         static_cast<std::uint32_t>(lambda.params.keyword_only.size()),
+                                         function_flags(lambda.params),
+                                         std::move(varnames_),
+                                         std::move(constants_),
+                                         std::move(names_),
+                                         std::move(cellvars_),
+                                         std::move(freevars_),
+                                         std::move(instructions_),
+                                         std::move(lines_));
+            }
+
             CodeObject *build_class(const compiler_internal::ClassDefStmt &klass)
             {
                 bool skipped_docstring = false;
@@ -297,6 +317,26 @@ namespace cxxpython
                 patch_jump(false_jump, instructions_.size());
                 expression.else_body->accept(*this);
                 patch_jump(end_jump, instructions_.size());
+            }
+
+            void visit(const compiler_internal::LambdaExpr &expression) override
+            {
+                SymbolTable lambda_symbols = collect_lambda_symbols(expression);
+                emit_closure_tuple(lambda_symbols);
+                BytecodeBuilder lambda_builder(
+                    runtime_,
+                    lambda_symbols,
+                    filename_,
+                    static_cast<std::uint32_t>(expression.line));
+                FunctionEmission emitted = emit_function_components(
+                    expression.params,
+                    nullptr);
+                CodeObject *code = lambda_builder.build_lambda(expression);
+                emit_constant(code);
+                emit({
+                    Opcode::MakeFunction,
+                    make_function_operand(lambda_symbols, emitted),
+                });
             }
 
             void visit(const compiler_internal::SingletonExpr &expression) override
@@ -920,103 +960,20 @@ namespace cxxpython
                 StatementLineGuard line(*this, statement);
                 emit_decorators(statement.decorators);
                 SymbolTable function_symbols = collect_function_symbols(statement);
-                for (const std::string &freevar : function_symbols.freevars())
-                {
-                    emit({
-                        Opcode::LoadClosure,
-                        static_cast<std::uint32_t>(deref_index(freevar)),
-                    });
-                }
-                if (!function_symbols.freevars().empty())
-                {
-                    emit({
-                        Opcode::BuildTuple,
-                        static_cast<std::uint32_t>(function_symbols.freevars().size()),
-                    });
-                }
+                emit_closure_tuple(function_symbols);
                 BytecodeBuilder function_builder(
                     runtime_,
                     function_symbols,
                     filename_,
                     static_cast<std::uint32_t>(statement.line));
-                if (!statement.params.defaults.empty())
-                {
-                    for (const auto &default_value : statement.params.defaults)
-                        default_value->accept(*this);
-                    emit({
-                        Opcode::BuildTuple,
-                        static_cast<std::uint32_t>(statement.params.defaults.size()),
-                    });
-                }
-                std::uint32_t keyword_default_count = 0;
-                for (const auto &parameter : statement.params.keyword_only)
-                {
-                    if (!parameter.default_value)
-                        continue;
-                    emit_constant(runtime_.new_str(parameter.name));
-                    parameter.default_value->accept(*this);
-                    ++keyword_default_count;
-                }
-                if (keyword_default_count != 0)
-                {
-                    emit({
-                        Opcode::BuildMap,
-                        keyword_default_count,
-                    });
-                }
-                std::uint32_t annotation_count = 0;
-                for (const auto &annotation : statement.params.annotations)
-                {
-                    emit_constant(runtime_.new_str(annotation.name));
-                    annotation.value->accept(*this);
-                    ++annotation_count;
-                }
-                if (statement.params.varargs_annotation)
-                {
-                    emit_constant(runtime_.new_str(*statement.params.varargs));
-                    statement.params.varargs_annotation->accept(*this);
-                    ++annotation_count;
-                }
-                for (const auto &parameter : statement.params.keyword_only)
-                {
-                    if (!parameter.annotation)
-                        continue;
-                    emit_constant(runtime_.new_str(parameter.name));
-                    parameter.annotation->accept(*this);
-                    ++annotation_count;
-                }
-                if (statement.params.varkeywords_annotation)
-                {
-                    emit_constant(runtime_.new_str(*statement.params.varkeywords));
-                    statement.params.varkeywords_annotation->accept(*this);
-                    ++annotation_count;
-                }
-                if (statement.return_annotation)
-                {
-                    emit_constant(runtime_.new_str("return"));
-                    statement.return_annotation->accept(*this);
-                    ++annotation_count;
-                }
-                if (annotation_count != 0)
-                {
-                    emit({
-                        Opcode::BuildMap,
-                        annotation_count,
-                    });
-                }
+                FunctionEmission emitted = emit_function_components(
+                    statement.params,
+                    statement.return_annotation.get());
                 CodeObject *code = function_builder.build_function(statement);
                 emit_constant(code);
-                std::uint32_t operand =
-                    static_cast<std::uint32_t>(function_symbols.freevars().size());
-                if (!statement.params.defaults.empty())
-                    operand |= MakeFunctionHasDefaults;
-                if (keyword_default_count != 0)
-                    operand |= MakeFunctionHasKwDefaults;
-                if (annotation_count != 0)
-                    operand |= MakeFunctionHasAnnotations;
                 emit({
                     Opcode::MakeFunction,
-                    operand,
+                    make_function_operand(function_symbols, emitted),
                 });
                 apply_decorators(statement.decorators.size());
                 emit_binding_store(statement.name);
@@ -1257,6 +1214,122 @@ namespace cxxpython
                 lines_.push_back(current_line_);
             }
 
+            struct FunctionEmission final
+            {
+                bool has_defaults = false;
+                bool has_kwdefaults = false;
+                bool has_annotations = false;
+            };
+
+            void emit_closure_tuple(const SymbolTable &function_symbols)
+            {
+                for (const std::string &freevar : function_symbols.freevars())
+                {
+                    emit({
+                        Opcode::LoadClosure,
+                        static_cast<std::uint32_t>(deref_index(freevar)),
+                    });
+                }
+                if (!function_symbols.freevars().empty())
+                {
+                    emit({
+                        Opcode::BuildTuple,
+                        static_cast<std::uint32_t>(function_symbols.freevars().size()),
+                    });
+                }
+            }
+
+            FunctionEmission emit_function_components(const compiler_internal::FunctionParameters &params,
+                                                      const compiler_internal::Expr *return_annotation)
+            {
+                FunctionEmission emitted;
+                if (!params.defaults.empty())
+                {
+                    for (const auto &default_value : params.defaults)
+                        default_value->accept(*this);
+                    emit({
+                        Opcode::BuildTuple,
+                        static_cast<std::uint32_t>(params.defaults.size()),
+                    });
+                    emitted.has_defaults = true;
+                }
+
+                std::uint32_t keyword_default_count = 0;
+                for (const auto &parameter : params.keyword_only)
+                {
+                    if (!parameter.default_value)
+                        continue;
+                    emit_constant(runtime_.new_str(parameter.name));
+                    parameter.default_value->accept(*this);
+                    ++keyword_default_count;
+                }
+                if (keyword_default_count != 0)
+                {
+                    emit({
+                        Opcode::BuildMap,
+                        keyword_default_count,
+                    });
+                    emitted.has_kwdefaults = true;
+                }
+
+                std::uint32_t annotation_count = 0;
+                for (const auto &annotation : params.annotations)
+                {
+                    emit_constant(runtime_.new_str(annotation.name));
+                    annotation.value->accept(*this);
+                    ++annotation_count;
+                }
+                if (params.varargs_annotation)
+                {
+                    emit_constant(runtime_.new_str(*params.varargs));
+                    params.varargs_annotation->accept(*this);
+                    ++annotation_count;
+                }
+                for (const auto &parameter : params.keyword_only)
+                {
+                    if (!parameter.annotation)
+                        continue;
+                    emit_constant(runtime_.new_str(parameter.name));
+                    parameter.annotation->accept(*this);
+                    ++annotation_count;
+                }
+                if (params.varkeywords_annotation)
+                {
+                    emit_constant(runtime_.new_str(*params.varkeywords));
+                    params.varkeywords_annotation->accept(*this);
+                    ++annotation_count;
+                }
+                if (return_annotation)
+                {
+                    emit_constant(runtime_.new_str("return"));
+                    return_annotation->accept(*this);
+                    ++annotation_count;
+                }
+                if (annotation_count != 0)
+                {
+                    emit({
+                        Opcode::BuildMap,
+                        annotation_count,
+                    });
+                    emitted.has_annotations = true;
+                }
+                return emitted;
+            }
+
+            std::uint32_t make_function_operand(const SymbolTable &function_symbols,
+                                                FunctionEmission emitted) const
+            {
+                std::uint32_t operand =
+                    static_cast<std::uint32_t>(function_symbols.freevars().size());
+                if (emitted.has_defaults)
+                    operand |= MakeFunctionHasDefaults;
+                if (emitted.has_kwdefaults)
+                    operand |= MakeFunctionHasKwDefaults;
+                if (emitted.has_annotations)
+                    operand |= MakeFunctionHasAnnotations;
+                return operand;
+            }
+
             void emit_binding_store(const std::string &name)
             {
                 if (symbols_.scope() == SymbolScope::Function && symbols_.is_global(name))
@@ -1400,6 +1473,11 @@ namespace cxxpython
             SymbolTable collect_function_symbols(const compiler_internal::FunctionDefStmt &function) const
             {
                 return analyze_function_symbols(runtime_, function, {&symbols_});
+            }
+
+            SymbolTable collect_lambda_symbols(const compiler_internal::LambdaExpr &lambda) const
+            {
+                return analyze_lambda_symbols(runtime_, lambda, {&symbols_});
             }
 
             CodeObject::Flags function_flags(const compiler_internal::FunctionParameters &params) const

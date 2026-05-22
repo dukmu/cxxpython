@@ -68,6 +68,9 @@ namespace cxxpython
     SymbolTable analyze_function_symbols(Runtime &runtime,
                                          const compiler_internal::FunctionDefStmt &function,
                                          const std::vector<const SymbolTable *> &enclosing);
+    SymbolTable analyze_lambda_symbols(Runtime &runtime,
+                                       const compiler_internal::LambdaExpr &lambda,
+                                       const std::vector<const SymbolTable *> &enclosing);
     SymbolTable analyze_class_symbols(Runtime &runtime,
                                       const compiler_internal::ClassDefStmt &klass);
 

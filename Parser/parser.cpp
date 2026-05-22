@@ -673,120 +673,7 @@ namespace cxxpython::compiler_internal
                     raise_at(peek(), "expected function name");
                 std::string name = advance().lexeme;
                 consume(TokenKind::LeftParen, "expected '(' after function name");
-                FunctionParameters params;
-                if (peek().kind != TokenKind::RightParen)
-                {
-                    bool seen_varargs = false;
-                    bool seen_varkeywords = false;
-                    bool seen_default = false;
-                    bool keyword_only_section = false;
-                    bool seen_positional_only_marker = false;
-                    while (true)
-                    {
-                        bool is_varargs = false;
-                        bool is_varkeywords = false;
-                        if (peek().kind == TokenKind::Slash)
-                        {
-                            if (seen_positional_only_marker || keyword_only_section || params.positional.empty())
-                                raise_at(peek(), "invalid positional-only marker");
-                            seen_positional_only_marker = true;
-                            params.positional_only_count =
-                                static_cast<std::uint32_t>(params.positional.size());
-                            advance();
-                            if (peek().kind != TokenKind::Comma)
-                                raise_at(peek(), "expected ',' after positional-only marker");
-                            advance();
-                            if (peek().kind == TokenKind::RightParen)
-                                break;
-                            continue;
-                        }
-                        if (peek().kind == TokenKind::Star)
-                        {
-                            if (seen_varargs)
-                                raise_at(peek(), "duplicate * parameter");
-                            is_varargs = true;
-                            seen_varargs = true;
-                            advance();
-                            keyword_only_section = true;
-                            if (peek().kind == TokenKind::Comma)
-                            {
-                                advance();
-                                if (peek().kind == TokenKind::RightParen)
-                                    raise_at(peek(), "named arguments must follow bare *");
-                                continue;
-                            }
-                        }
-                        else if (peek().kind == TokenKind::DoubleStar)
-                        {
-                            if (seen_varkeywords)
-                                raise_at(peek(), "duplicate ** parameter");
-                            is_varkeywords = true;
-                            seen_varkeywords = true;
-                            advance();
-                        }
-                        if (peek().kind != TokenKind::Identifier)
-                            raise_at(peek(), "expected parameter name");
-                        std::string param = advance().lexeme;
-                        ensure_unique_parameter(params, param, previous());
-                        std::unique_ptr<Expr> annotation;
-                        if (peek().kind == TokenKind::Colon)
-                        {
-                            advance();
-                            annotation = parse_expression_only();
-                        }
-                        std::unique_ptr<Expr> default_value;
-                        if (!is_varargs && !is_varkeywords && peek().kind == TokenKind::Equal)
-                        {
-                            advance();
-                            default_value = parse_expression_only();
-                            if (!keyword_only_section)
-                                seen_default = true;
-                        }
-                        else if (!is_varargs && !is_varkeywords && !keyword_only_section && seen_default)
-                        {
-                            raise_at(previous(), "non-default argument follows default argument");
-                        }
-                        if (is_varkeywords)
-                        {
-                            params.varkeywords_annotation = std::move(annotation);
-                            params.varkeywords = std::move(param);
-                        }
-                        else if (is_varargs)
-                        {
-                            params.varargs_annotation = std::move(annotation);
-                            params.varargs = std::move(param);
-                        }
-                        else if (keyword_only_section)
-                        {
-                            params.keyword_only.push_back(
-                                FunctionParameters::KeywordOnlyParameter{
-                                    std::move(param),
-                                    std::move(default_value),
-                                    std::move(annotation),
-                                });
-                        }
-                        else
-                        {
-                            if (annotation)
-                            {
-                                params.annotations.push_back(FunctionParameters::Annotation{
-                                    param,
-                                    std::move(annotation),
-                                });
-                            }
-                            params.positional.push_back(std::move(param));
-                            if (default_value)
-                                params.defaults.push_back(std::move(default_value));
-                        }
-                        if (peek().kind != TokenKind::Comma)
-                            break;
-                        advance();
-                        if (peek().kind == TokenKind::RightParen)
-                            break;
-                        if (seen_varkeywords)
-                            raise_at(peek(), "expected ')' after ** parameter");
-                    }
-                }
+                FunctionParameters params = parse_parameters_until(TokenKind::RightParen, true);
                 consume(TokenKind::RightParen, "expected ')' after parameters");
                 std::unique_ptr<Expr> return_annotation;
                 if (peek().kind == TokenKind::Arrow)
@@ -941,8 +828,129 @@ namespace cxxpython::compiler_internal
                     raise_at(token, "duplicate parameter name");
             }
 
+            FunctionParameters parse_parameters_until(TokenKind end_kind, bool allow_annotations)
+            {
+                FunctionParameters params;
+                if (peek().kind == end_kind)
+                    return params;
+
+                bool seen_varargs = false;
+                bool seen_varkeywords = false;
+                bool seen_default = false;
+                bool keyword_only_section = false;
+                bool seen_positional_only_marker = false;
+                while (true)
+                {
+                    bool is_varargs = false;
+                    bool is_varkeywords = false;
+                    if (peek().kind == TokenKind::Slash)
+                    {
+                        if (seen_positional_only_marker || keyword_only_section || params.positional.empty())
+                            raise_at(peek(), "invalid positional-only marker");
+                        seen_positional_only_marker = true;
+                        params.positional_only_count =
+                            static_cast<std::uint32_t>(params.positional.size());
+                        advance();
+                        if (peek().kind != TokenKind::Comma)
+                            raise_at(peek(), "expected ',' after positional-only marker");
+                        advance();
+                        if (peek().kind == end_kind)
+                            break;
+                        continue;
+                    }
+                    if (peek().kind == TokenKind::Star)
+                    {
+                        if (seen_varargs)
+                            raise_at(peek(), "duplicate * parameter");
+                        is_varargs = true;
+                        seen_varargs = true;
+                        advance();
+                        keyword_only_section = true;
+                        if (peek().kind == TokenKind::Comma)
+                        {
+                            advance();
+                            if (peek().kind == end_kind)
+                                raise_at(peek(), "named arguments must follow bare *");
+                            continue;
+                        }
+                    }
+                    else if (peek().kind == TokenKind::DoubleStar)
+                    {
+                        if (seen_varkeywords)
+                            raise_at(peek(), "duplicate ** parameter");
+                        is_varkeywords = true;
+                        seen_varkeywords = true;
+                        advance();
+                    }
+                    if (peek().kind != TokenKind::Identifier)
+                        raise_at(peek(), "expected parameter name");
+                    std::string param = advance().lexeme;
+                    ensure_unique_parameter(params, param, previous());
+                    std::unique_ptr<Expr> annotation;
+                    if (peek().kind == TokenKind::Colon && allow_annotations)
+                    {
+                        advance();
+                        annotation = parse_expression_only();
+                    }
+                    std::unique_ptr<Expr> default_value;
+                    if (!is_varargs && !is_varkeywords && peek().kind == TokenKind::Equal)
+                    {
+                        advance();
+                        default_value = parse_expression_only();
+                        if (!keyword_only_section)
+                            seen_default = true;
+                    }
+                    else if (!is_varargs && !is_varkeywords && !keyword_only_section && seen_default)
+                    {
+                        raise_at(previous(), "non-default argument follows default argument");
+                    }
+                    if (is_varkeywords)
+                    {
+                        params.varkeywords_annotation = std::move(annotation);
+                        params.varkeywords = std::move(param);
+                    }
+                    else if (is_varargs)
+                    {
+                        params.varargs_annotation = std::move(annotation);
+                        params.varargs = std::move(param);
+                    }
+                    else if (keyword_only_section)
+                    {
+                        params.keyword_only.push_back(
+                            FunctionParameters::KeywordOnlyParameter{
+                                std::move(param),
+                                std::move(default_value),
+                                std::move(annotation),
+                            });
+                    }
+                    else
+                    {
+                        if (annotation)
+                        {
+                            params.annotations.push_back(FunctionParameters::Annotation{
+                                param,
+                                std::move(annotation),
+                            });
+                        }
+                        params.positional.push_back(std::move(param));
+                        if (default_value)
+                            params.defaults.push_back(std::move(default_value));
+                    }
+                    if (peek().kind != TokenKind::Comma)
+                        break;
+                    advance();
+                    if (peek().kind == end_kind)
+                        break;
+                    if (seen_varkeywords)
+                        raise_at(peek(), "expected end of parameters after ** parameter");
+                }
+                return params;
+            }
+
             std::unique_ptr<Expr> parse_expression_only()
             {
+                if (peek().kind == TokenKind::Lambda)
+                    return parse_lambda_expression();
                 std::unique_ptr<Expr> body = parse_or_expression();
                 if (peek().kind != TokenKind::If)
                     return body;
@@ -955,6 +963,17 @@ namespace cxxpython::compiler_internal
                     std::move(body),
                     std::move(condition),
                     std::move(else_body));
+            }
+
+            std::unique_ptr<Expr> parse_lambda_expression()
+            {
+                const Token &lambda_token = advance();
+                FunctionParameters params = parse_parameters_until(TokenKind::Colon, false);
+                consume(TokenKind::Colon, "expected ':' after lambda parameters");
+                return std::make_unique<LambdaExpr>(
+                    std::move(params),
+                    parse_expression_only(),
+                    lambda_token.line);
             }
 
             std::unique_ptr<Expr> parse_or_expression()
@@ -1536,6 +1555,7 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Not:
                 case TokenKind::And:
                 case TokenKind::Or:
+                case TokenKind::Lambda:
                 case TokenKind::Class:
                 case TokenKind::Del:
                 case TokenKind::Pass:
@@ -1617,6 +1637,7 @@ namespace cxxpython::compiler_internal
                 case TokenKind::LeftBracket:
                 case TokenKind::LeftBrace:
                 case TokenKind::If:
+                case TokenKind::Lambda:
                 case TokenKind::For:
                 case TokenKind::While:
                 case TokenKind::Def:
@@ -1755,6 +1776,7 @@ namespace cxxpython::compiler_internal
                 case TokenKind::As:
                 case TokenKind::And:
                 case TokenKind::Or:
+                case TokenKind::Lambda:
                 case TokenKind::Class:
                 case TokenKind::Del:
                 case TokenKind::Pass:
@@ -1832,6 +1854,7 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Not:
                 case TokenKind::And:
                 case TokenKind::Or:
+                case TokenKind::Lambda:
                 case TokenKind::Class:
                 case TokenKind::Del:
                 case TokenKind::Pass:

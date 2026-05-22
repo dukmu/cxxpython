@@ -1,5 +1,56 @@
 # Development Status
 
+## 2026-05-22 Lambda Expression Slice
+
+Review focus:
+
+- Add `lambda` as a real language construct, not as a builtin shortcut.
+- Reuse function parameter metadata, `CodeObject`, closure analysis, and
+  `MAKE_FUNCTION` so lambdas do not fork the function object model.
+- Keep lambda grammar CPython-aligned: defaults, positional-only markers,
+  keyword-only parameters, `*args`, and `**kwargs` are supported; parameter
+  annotations are intentionally rejected.
+
+Completed:
+
+- Added `lambda` tokenization, AST support, parser lowering, bytecode
+  generation, and symbol analysis.
+- Extracted parser parameter-list parsing into a shared helper used by both
+  `def` and lambda expressions.
+- Added lambda `CodeObject` generation with name `<lambda>`, `None`
+  docstring, defaults, keyword defaults, varargs, varkeywords, and closure
+  metadata.
+- Extended nested callable symbol analysis so lambdas inside expression
+  statements, assignments, returns, defaults, and class bodies participate in
+  cell/free-variable propagation.
+- Added Python golden coverage for lambda calls, defaults, keyword-only
+  defaults, `*args`/`**kwargs`, conditional bodies, metadata, and nested
+  closures.
+
+Design notes:
+
+- Lambda body names are analyzed in the lambda's own function scope. Lambda
+  default expressions remain in the enclosing scope, matching Python's
+  evaluation model.
+- Function construction now uses shared component emission for closure tuple,
+  defaults, keyword defaults, annotations, and `MAKE_FUNCTION` operands. This
+  prevents future signature features from being implemented twice.
+
+Known debt and next risk:
+
+- `CodeObject.__qualname__` is still function-name level only; nested
+  functions and lambdas should eventually gain lexical qualnames.
+- Lambda grammar is expression-only and intentionally excludes annotations,
+  but richer syntax errors should be tightened as parser coverage expands.
+- Future comprehension scopes must use the same nested-callable freevar
+  propagation rules.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/cxxpython Tests/python/lambda.py`
+- `build/test_core_objects --gtest_filter='Compile.CompilesLambdaThroughFunctionObjectPath:PythonScripts.RunsGoldenFiles'`
+
 ## 2026-05-22 Reflection Builtins And Help Slice
 
 Review focus:

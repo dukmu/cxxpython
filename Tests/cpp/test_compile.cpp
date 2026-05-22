@@ -2160,3 +2160,49 @@ TEST(Compile, CallsNonCallableThroughNormalTypeErrorPath)
         EXPECT_STREQ(error.what(), "'int' object is not callable");
     }
 }
+
+TEST(Compile, CompilesLambdaThroughFunctionObjectPath)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(
+        runtime,
+        "def outer(base):\n"
+        "    return lambda value, *, scale=2: base + value * scale\n"
+        "f = outer(10)\n"
+        "result = f(3, scale=4)\n",
+        "script.py");
+    ASSERT_NE(code, nullptr);
+
+    cxxpython::CodeObject *outer_code = nullptr;
+    for (cxxpython::Object *constant : code->constants())
+    {
+        auto *candidate = dynamic_cast<cxxpython::CodeObject *>(constant);
+        if (candidate && candidate->name() == "outer")
+            outer_code = candidate;
+    }
+    ASSERT_NE(outer_code, nullptr);
+
+    bool saw_lambda_make_function_with_kwdefaults = false;
+    for (const cxxpython::Instruction &instruction : outer_code->instructions())
+    {
+        if (instruction.opcode == cxxpython::Opcode::MakeFunction &&
+            (instruction.operand & cxxpython::MakeFunctionHasKwDefaults) != 0)
+            saw_lambda_make_function_with_kwdefaults = true;
+    }
+    EXPECT_TRUE(saw_lambda_make_function_with_kwdefaults);
+
+    EXPECT_EQ(vm.execute(*code, *globals), runtime.none());
+    auto *result = dynamic_cast<cxxpython::IntObject *>(globals->get(runtime.new_str("result")));
+    ASSERT_NE(result, nullptr);
+    EXPECT_EQ(result->value, 22);
+
+    auto *function = dynamic_cast<cxxpython::PythonFunctionObject *>(globals->get(runtime.new_str("f")));
+    ASSERT_NE(function, nullptr);
+    EXPECT_EQ(function->name(), "<lambda>");
+    auto *signature = dynamic_cast<cxxpython::StrObject *>(cxxpython::object_get_attr(function, "__text_signature__"));
+    ASSERT_NE(signature, nullptr);
+    EXPECT_EQ(signature->value, "(value, *, scale=...)");
+}
