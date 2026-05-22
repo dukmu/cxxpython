@@ -1456,6 +1456,31 @@ TEST(Compile, CompilesKeywordOnlyArguments)
     EXPECT_EQ(result->value, 6);
 }
 
+TEST(Compile, CompilesPositionalOnlyArguments)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(
+        runtime,
+        "def choose(first, second=2, /, third=3):\n"
+        "    return first + second + third\n"
+        "result = choose(1, third=4)\n",
+        "script.py");
+    ASSERT_NE(code, nullptr);
+
+    EXPECT_EQ(vm.execute(*code, *globals), runtime.none());
+    auto *function = dynamic_cast<cxxpython::PythonFunctionObject *>(globals->get(runtime.new_str("choose")));
+    ASSERT_NE(function, nullptr);
+    EXPECT_EQ(function->code()->arg_count(), 3U);
+    EXPECT_EQ(function->code()->posonly_arg_count(), 2U);
+    EXPECT_EQ(function->code()->kwonly_arg_count(), 0U);
+    auto *result = dynamic_cast<cxxpython::IntObject *>(globals->get(runtime.new_str("result")));
+    ASSERT_NE(result, nullptr);
+    EXPECT_EQ(result->value, 7);
+}
+
 TEST(Compile, CompilesCallSiteArgumentUnpacking)
 {
     cxxpython::Runtime runtime;

@@ -106,6 +106,7 @@ namespace cxxpython
                    std::string name,
                    std::string filename,
                    std::uint32_t arg_count,
+                   std::uint32_t posonly_arg_count,
                    std::uint32_t kwonly_arg_count,
                    Flags flags,
                    std::vector<Object *> varnames,
@@ -119,6 +120,7 @@ namespace cxxpython
         const std::string &name() const noexcept;
         const std::string &filename() const noexcept;
         std::uint32_t arg_count() const noexcept;
+        std::uint32_t posonly_arg_count() const noexcept;
         std::uint32_t kwonly_arg_count() const noexcept;
         Flags flags() const noexcept;
         bool has_varargs() const noexcept;
@@ -139,6 +141,7 @@ namespace cxxpython
         std::string name_;
         std::string filename_;
         std::uint32_t arg_count_ = 0;
+        std::uint32_t posonly_arg_count_ = 0;
         std::uint32_t kwonly_arg_count_ = 0;
         Flags flags_ = 0;
         std::vector<Object *> varnames_;

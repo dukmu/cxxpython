@@ -48,6 +48,12 @@ namespace cxxpython
                 require_code_instance(runtime, instance, "co_argcount")->arg_count()));
         }
 
+        Object *code_posonlyargcount_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            return runtime.new_int(static_cast<std::int64_t>(
+                require_code_instance(runtime, instance, "co_posonlyargcount")->posonly_arg_count()));
+        }
+
         Object *code_kwonlyargcount_getter(Runtime &runtime, Object *instance, TypeObject *)
         {
             return runtime.new_int(static_cast<std::int64_t>(
@@ -181,6 +187,11 @@ namespace cxxpython
                                                       type,
                                                       code_argcount_getter,
                                                       nullptr));
+        type->dict->set(runtime.new_str("co_posonlyargcount"),
+                        runtime.new_getset_descriptor("co_posonlyargcount",
+                                                      type,
+                                                      code_posonlyargcount_getter,
+                                                      nullptr));
         type->dict->set(runtime.new_str("co_kwonlyargcount"),
                         runtime.new_getset_descriptor("co_kwonlyargcount",
                                                       type,
@@ -232,6 +243,7 @@ namespace cxxpython
                            std::string name,
                            std::string filename,
                            std::uint32_t arg_count,
+                           std::uint32_t posonly_arg_count,
                            std::uint32_t kwonly_arg_count,
                            CodeObject::Flags flags,
                            std::vector<Object *> varnames,
@@ -245,6 +257,7 @@ namespace cxxpython
           name_(std::move(name)),
           filename_(std::move(filename)),
           arg_count_(arg_count),
+          posonly_arg_count_(posonly_arg_count),
           kwonly_arg_count_(kwonly_arg_count),
           flags_(flags),
           varnames_(std::move(varnames)),
@@ -255,6 +268,8 @@ namespace cxxpython
           instructions_(std::move(instructions)),
           lines_(std::move(lines))
     {
+        if (posonly_arg_count_ > arg_count_)
+            throw BytecodeError("code object positional-only count exceeds argument count");
         if (!lines_.empty() && lines_.size() != instructions_.size())
             throw BytecodeError("code object line table must match instruction count");
         struct State
@@ -339,6 +354,11 @@ namespace cxxpython
     std::uint32_t CodeObject::arg_count() const noexcept
     {
         return arg_count_;
+    }
+
+    std::uint32_t CodeObject::posonly_arg_count() const noexcept
+    {
+        return posonly_arg_count_;
     }
 
     std::uint32_t CodeObject::kwonly_arg_count() const noexcept

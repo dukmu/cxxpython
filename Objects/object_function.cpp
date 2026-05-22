@@ -287,6 +287,13 @@ namespace cxxpython
             append_name(varname_at(code_, index));
             if (defaults_ && index >= code_->arg_count() - defaults_->size())
                 signature << "=...";
+            if (code_->posonly_arg_count() != 0 && index + 1 == code_->posonly_arg_count())
+            {
+                if (!first)
+                    signature << ", ";
+                first = false;
+                signature << "/";
+            }
         }
         if (code_->has_varargs())
             append_name(varname_at(code_, code_->varargs_index()), "*");
@@ -389,7 +396,7 @@ namespace cxxpython
                     raise_type_error(runtime(), name_ + "() keywords must be strings");
 
                 bool matched = false;
-                for (std::uint32_t index = 0; index < expected; ++index)
+                for (std::uint32_t index = code_->posonly_arg_count(); index < expected; ++index)
                 {
                     StrObject *parameter = varname_at(code_, index);
                     if (parameter->value != keyword_name->value)
@@ -426,6 +433,16 @@ namespace cxxpython
                 {
                     if (!keyword_locals)
                     {
+                        for (std::uint32_t index = 0; index < code_->posonly_arg_count(); ++index)
+                        {
+                            StrObject *parameter = varname_at(code_, index);
+                            if (parameter->value == keyword_name->value)
+                            {
+                                raise_type_error(runtime(),
+                                                 name_ + "() got positional-only argument '" +
+                                                     keyword_name->value + "' passed as keyword argument");
+                            }
+                        }
                         raise_type_error(runtime(),
                                          name_ + "() got an unexpected keyword argument '" +
                                              keyword_name->value + "'");

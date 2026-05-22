@@ -797,13 +797,20 @@ TEST(Bytecode, CodeObjectsExposeArgumentMetadata)
         "method",
         "test.py",
         2,
+        1,
+        0,
+        0,
         {self_name, value_name},
         {constant},
         {global_name},
+        {},
+        {},
         {{cxxpython::Opcode::LoadConst, 0},
          {cxxpython::Opcode::ReturnValue, 0}});
 
     EXPECT_EQ(code->arg_count(), 2U);
+    EXPECT_EQ(code->posonly_arg_count(), 1U);
+    EXPECT_EQ(code->kwonly_arg_count(), 0U);
     ASSERT_EQ(code->varnames().size(), 2U);
     EXPECT_EQ(code->varnames()[0], self_name);
     EXPECT_EQ(code->varnames()[1], value_name);

@@ -680,10 +680,26 @@ namespace cxxpython::compiler_internal
                     bool seen_varkeywords = false;
                     bool seen_default = false;
                     bool keyword_only_section = false;
+                    bool seen_positional_only_marker = false;
                     while (true)
                     {
                         bool is_varargs = false;
                         bool is_varkeywords = false;
+                        if (peek().kind == TokenKind::Slash)
+                        {
+                            if (seen_positional_only_marker || keyword_only_section || params.positional.empty())
+                                raise_at(peek(), "invalid positional-only marker");
+                            seen_positional_only_marker = true;
+                            params.positional_only_count =
+                                static_cast<std::uint32_t>(params.positional.size());
+                            advance();
+                            if (peek().kind != TokenKind::Comma)
+                                raise_at(peek(), "expected ',' after positional-only marker");
+                            advance();
+                            if (peek().kind == TokenKind::RightParen)
+                                break;
+                            continue;
+                        }
                         if (peek().kind == TokenKind::Star)
                         {
                             if (seen_varargs)
@@ -1449,6 +1465,7 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Minus:
                 case TokenKind::Star:
                 case TokenKind::DoubleStar:
+                case TokenKind::Slash:
                 case TokenKind::At:
                 case TokenKind::Tilde:
                 case TokenKind::RightParen:
@@ -1592,6 +1609,7 @@ namespace cxxpython::compiler_internal
                     return true;
                 case TokenKind::Star:
                 case TokenKind::DoubleStar:
+                case TokenKind::Slash:
                 case TokenKind::At:
                 case TokenKind::RightParen:
                 case TokenKind::Comma:
@@ -1670,6 +1688,7 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Minus:
                 case TokenKind::Star:
                 case TokenKind::DoubleStar:
+                case TokenKind::Slash:
                 case TokenKind::At:
                 case TokenKind::Tilde:
                 case TokenKind::LeftParen:
@@ -1739,6 +1758,7 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Minus:
                 case TokenKind::Star:
                 case TokenKind::DoubleStar:
+                case TokenKind::Slash:
                 case TokenKind::At:
                 case TokenKind::Tilde:
                 case TokenKind::LeftParen:

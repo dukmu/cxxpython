@@ -43,3 +43,30 @@ def outer():
 
 print(outer())
 print(outer.__code__.co_kwonlyargcount)
+
+
+def posonly(first, second=2, /, third=3, *, fourth=4):
+    print(first)
+    print(second)
+    print(third)
+    print(fourth)
+
+
+posonly(1)
+posonly(1, 20, third=30, fourth=40)
+print(posonly.__text_signature__)
+print(posonly.__code__.co_argcount)
+print(posonly.__code__.co_posonlyargcount)
+
+try:
+    posonly(first=1)
+except TypeError as exc:
+    print(str(exc).__contains__('positional-only'))
+
+
+def posonly_with_kwargs(first, /, **kwargs):
+    print(first)
+    print(kwargs)
+
+
+posonly_with_kwargs(1, first=2)

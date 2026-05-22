@@ -1,5 +1,53 @@
 # Development Status
 
+## 2026-05-22 Positional-Only Function Signature Slice
+
+Review focus:
+
+- Complete the core Python argument layout before pushing further into
+  builtins, inspect, and stdlib-facing signature APIs.
+- Keep positional-only semantics in the same CodeObject/function binding path
+  as positional defaults and keyword-only arguments.
+
+Completed:
+
+- Added lexer and parser support for `/` in function parameter lists.
+- FunctionParameters now records the positional-only prefix length.
+- CodeObject now stores and exposes `posonly_arg_count()` and script-level
+  `co_posonlyargcount`.
+- Runtime code factories gained a full metadata constructor with
+  positional-only and keyword-only counts; existing simpler overloads forward
+  with zero positional-only arguments.
+- PythonFunctionObject text signatures now render `/` in the positional-only
+  boundary.
+- Keyword binding now skips positional-only slots; without `**kwargs`, passing
+  a positional-only parameter by keyword raises a dedicated TypeError.
+- With `**kwargs`, positional-only parameter names can still appear as extra
+  keyword entries, matching CPython's practical call-binding behavior.
+- Added C++ and Python golden coverage for `/`, `co_posonlyargcount`,
+  defaults around `/`, keyword-only interaction, and `**kwargs` interaction.
+
+Design notes:
+
+- Positional-only is represented as a prefix count inside the existing
+  positional argument range rather than as a separate parameter list. This
+  preserves CPython-like varname ordering and avoids extra VM paths.
+- The VM remains unaware of individual parameter categories; PythonFunctionObject
+  owns argument binding from CodeObject metadata.
+
+Known debt and next risk:
+
+- Function annotations and `__annotations__` are still missing.
+- `inspect.signature` needs richer metadata than the current
+  `__text_signature__` string builder.
+- Parser diagnostics around invalid `/` placement are intentionally minimal and
+  should be polished once the grammar is more complete.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter=PythonScripts.RunsGoldenFiles:Compile.CompilesPositionalOnlyArguments:Compile.CompilesKeywordOnlyArguments:Bytecode.CodeObjectsExposeArgumentMetadata`
+
 ## 2026-05-22 Keyword-Only Function Signature Slice
 
 Review focus:

@@ -118,6 +118,7 @@ namespace cxxpython::compiler_internal
         Minus,
         Star,
         DoubleStar,
+        Slash,
         At,
         Tilde,
         LeftParen,
@@ -948,6 +949,7 @@ namespace cxxpython::compiler_internal
         };
 
         std::vector<std::string> positional;
+        std::uint32_t positional_only_count = 0;
         std::vector<std::unique_ptr<Expr>> defaults;
         std::vector<KeywordOnlyParameter> keyword_only;
         std::optional<std::string> varargs;

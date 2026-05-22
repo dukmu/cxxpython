@@ -66,6 +66,7 @@ namespace cxxpython
                 return runtime_.new_code(function.name,
                                          filename_,
                                          static_cast<std::uint32_t>(function.params.positional.size()),
+                                         function.params.positional_only_count,
                                          static_cast<std::uint32_t>(function.params.keyword_only.size()),
                                          function_flags(function.params),
                                          std::move(varnames_),
