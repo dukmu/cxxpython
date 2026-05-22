@@ -9,10 +9,12 @@ print(sys.builtin_module_names.__contains__('signal'))
 print(dir(signal).__contains__('signal'))
 print(dir(signal).__contains__('getsignal'))
 print(dir(signal).__contains__('raise_signal'))
+print(dir(signal).__contains__('default_int_handler'))
 print(signal.__all__.__contains__('signal'))
 print(signal.__all__.__contains__('SIGINT'))
 print(signal.signal.__text_signature__)
 print(signal.getsignal.__text_signature__)
+print(signal.default_int_handler.__text_signature__)
 
 seen = []
 
@@ -27,6 +29,11 @@ print(signal.raise_signal(signal.SIGUSR1))
 print(seen[0])
 print(seen[1])
 print(signal.signal(signal.SIGUSR1, signal.SIG_DFL) is handler)
+
+try:
+    signal.raise_signal(signal.SIGINT)
+except KeyboardInterrupt as exc:
+    print(type(exc))
 
 try:
     signal.signal(signal.SIGUSR1, 42)

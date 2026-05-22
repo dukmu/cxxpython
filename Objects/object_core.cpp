@@ -1881,4 +1881,11 @@ namespace cxxpython
             throw std::logic_error("cannot raise Python ImportError without a runtime");
         throw PythonError(runtime->new_import_error(std::move(message)));
     }
+
+    void raise_keyboard_interrupt(Runtime *runtime)
+    {
+        if (!runtime)
+            throw std::logic_error("cannot raise Python KeyboardInterrupt without a runtime");
+        throw PythonError(runtime->new_keyboard_interrupt());
+    }
 }

@@ -887,5 +887,6 @@ namespace cxxpython
     [[noreturn]] void raise_recursion_error(Runtime *runtime, std::string message);
     [[noreturn]] void raise_attribute_error(Runtime *runtime, std::string message);
     [[noreturn]] void raise_import_error(Runtime *runtime, std::string message);
+    [[noreturn]] void raise_keyboard_interrupt(Runtime *runtime);
     [[noreturn]] void raise_stop_iteration(Runtime *runtime);
 }

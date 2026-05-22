@@ -8,6 +8,7 @@
 #include <array>
 #include <csignal>
 #include <cstddef>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -72,6 +73,28 @@ namespace cxxpython
             return object && object->type() && object->type()->slots.call;
         }
 
+        std::optional<int> take_pending_signal()
+        {
+            for (std::size_t index = 0; index < pending_signals.size(); ++index)
+            {
+                if (pending_signals[index] == 0)
+                    continue;
+                pending_signals[index] = 0;
+                return static_cast<int>(index);
+            }
+            return std::nullopt;
+        }
+
+        Object *current_frame_object(Runtime &runtime)
+        {
+            if (VirtualMachine *vm = runtime.active_vm())
+            {
+                if (Frame *frame = vm->thread_state().frame_at_depth(0))
+                    return frame;
+            }
+            return runtime.none();
+        }
+
         void install_native_handler(Runtime &runtime, int signum, Object *handler)
         {
             if (auto *number = dynamic_cast<IntObject *>(handler))
@@ -129,11 +152,7 @@ namespace cxxpython
 
             if (is_callable(handler_root.get()))
             {
-                Frame *frame = nullptr;
-                if (VirtualMachine *vm = runtime.active_vm())
-                    frame = vm->thread_state().frame_at_depth(0);
-                Object *frame_object = frame ? static_cast<Object *>(frame) : static_cast<Object *>(runtime.none());
-                (void)object_call(handler_root.get(), {runtime.new_int(signum), frame_object});
+                (void)object_call(handler_root.get(), {runtime.new_int(signum), current_frame_object(runtime)});
                 if (signum >= 0 && static_cast<std::size_t>(signum) < pending_signals.size())
                     pending_signals[static_cast<std::size_t>(signum)] = 0;
                 return runtime.none();
@@ -141,6 +160,13 @@ namespace cxxpython
 
             std::raise(signum);
             return runtime.none();
+        }
+
+        Object *signal_default_int_handler(Runtime &runtime, const CallArguments &args)
+        {
+            require_no_keywords(&runtime, "default_int_handler", args);
+            require_positional_count(&runtime, "default_int_handler", args, 2);
+            raise_keyboard_interrupt(&runtime);
         }
 
         constexpr NativeModuleFunctionDef signal_methods[] = {
@@ -161,6 +187,12 @@ namespace cxxpython
                 signal_raise_signal,
                 "Raise a signal in the current process.",
                 "($module, signalnum, /)",
+            },
+            {
+                "default_int_handler",
+                signal_default_int_handler,
+                "Default handler for SIGINT that raises KeyboardInterrupt.",
+                "($module, signalnum, frame, /)",
             },
         };
 
@@ -192,6 +224,7 @@ namespace cxxpython
             runtime.new_str("signal"),
             runtime.new_str("getsignal"),
             runtime.new_str("raise_signal"),
+            runtime.new_str("default_int_handler"),
         };
         set_signal_constant(runtime, module, "SIG_DFL", signal_default);
         set_signal_constant(runtime, module, "SIG_IGN", signal_ignore);
@@ -202,6 +235,9 @@ namespace cxxpython
 #ifdef SIGINT
         set_signal_constant(runtime, module, "SIGINT", SIGINT);
         append_export(runtime, exports, "SIGINT");
+        if (auto *handlers = dynamic_cast<DictObject *>(dict->get(runtime.new_str("_handlers"))))
+            handlers->set(runtime.new_int(SIGINT), dict->get(runtime.new_str("default_int_handler")));
+        std::signal(SIGINT, signal_trampoline);
 #endif
 #ifdef SIGQUIT
         set_signal_constant(runtime, module, "SIGQUIT", SIGQUIT);
@@ -232,5 +268,31 @@ namespace cxxpython
         append_export(runtime, exports, "SIGUSR2");
 #endif
         dict->set(runtime.new_str("__all__"), runtime.new_list(std::move(exports)));
+    }
+
+    void deliver_pending_signals(Runtime &runtime)
+    {
+        while (std::optional<int> signum = take_pending_signal())
+        {
+            if (!signal_module(runtime))
+            {
+#ifdef SIGINT
+                if (*signum == SIGINT)
+                    raise_keyboard_interrupt(&runtime);
+#endif
+                continue;
+            }
+            Object *handler = get_stored_handler(runtime, *signum);
+            auto handler_root = runtime.root(handler);
+            if (is_callable(handler_root.get()))
+            {
+                (void)object_call(handler_root.get(), {runtime.new_int(*signum), current_frame_object(runtime)});
+                continue;
+            }
+#ifdef SIGINT
+            if (*signum == SIGINT)
+                raise_keyboard_interrupt(&runtime);
+#endif
+        }
     }
 }

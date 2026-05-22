@@ -1,5 +1,61 @@
 # Development Status
 
+## 2026-05-22 Signal Safe-Point Delivery Slice
+
+Review focus:
+
+- Turn native `signal` from a synchronous helper into a VM-integrated
+  substrate: OS signal trampolines mark pending state, and Python bytecode
+  dispatch consumes that state at safe points.
+- Add the missing `KeyboardInterrupt` exception type so SIGINT can follow the
+  normal Python exception path instead of a bespoke CLI branch.
+
+Completed:
+
+- Added `KeyboardInterrupt` to the runtime exception hierarchy as a direct
+  `BaseException` subclass, including accessors, factory, raise helper,
+  builtins export, and root management.
+- Added `signal.default_int_handler` with metadata and installed it as the
+  default SIGINT handler when the native `signal` module initializes.
+- Added `deliver_pending_signals(runtime)` and called it at VM instruction
+  safe points, so pending signals attach traceback entries through the normal
+  VM error path.
+- Extended signal golden tests for `default_int_handler`,
+  `KeyboardInterrupt`, and metadata.
+- Added C++ coverage proving an OS SIGINT raised through the native trampoline
+  is delivered by the next VM safe point with traceback location.
+
+Design notes:
+
+- The C signal handler remains async-signal-safe: it only flips a
+  `sig_atomic_t` flag. Python callbacks run later inside the VM.
+- `signal.raise_signal(SIGINT)` still calls the current Python handler
+  synchronously for deterministic script tests; external/native signals use
+  the pending safe-point path.
+- Default SIGINT handling lives in the signal module, while the exception type
+  belongs to the core runtime. That keeps POSIX policy out of the generic
+  exception object implementation.
+
+Known debt and next risk:
+
+- Pending signals are process-global static flags, not per-interpreter or
+  thread-state queues. This must be revisited before true multithreading.
+- Signal delivery still looks up the module handler table through the runtime
+  module registry; a future interpreter-state signal table would avoid module
+  dictionary coupling at safe points.
+- `posix.getpid`, `posix.kill`, and more signal APIs are still missing, so
+  script-level async signal tests remain limited.
+- Only SIGINT has default Python exception semantics today; other signals
+  still need fuller CPython compatibility as the POSIX substrate grows.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/cxxpython Tests/python/signal_module.py`
+- `build/cxxpython Tests/python/builtins.py`
+- `build/test_core_objects --gtest_filter='Module.BootstrapsBuiltinsModule:Module.ImportsStdlibModulesFromLibPath:Module.SignalDeliveryRaisesKeyboardInterruptAtSafePoints'`
+- `ctest --test-dir build --output-on-failure`
+
 ## 2026-05-22 Reflection `delattr` Slice
 
 Review focus:

@@ -837,6 +837,11 @@ namespace cxxpython
         return new_exception(os_error_type_, std::move(message));
     }
 
+    ExceptionObject *Runtime::new_keyboard_interrupt()
+    {
+        return new_exception(keyboard_interrupt_type_, std::vector<Object *>{});
+    }
+
     ExceptionObject *Runtime::new_stop_iteration()
     {
         return new_exception(stop_iteration_type_, std::vector<Object *>{});

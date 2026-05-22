@@ -58,6 +58,7 @@ namespace cxxpython
         attribute_error_type_ = allocate_type("AttributeError");
         import_error_type_ = allocate_type("ImportError");
         os_error_type_ = allocate_type("OSError");
+        keyboard_interrupt_type_ = allocate_type("KeyboardInterrupt");
         stop_iteration_type_ = allocate_type("StopIteration");
 
         object_type_->slots = make_object_slots();
@@ -109,6 +110,7 @@ namespace cxxpython
         attribute_error_type_->slots = make_exception_slots();
         import_error_type_->slots = make_exception_slots();
         os_error_type_->slots = make_exception_slots();
+        keyboard_interrupt_type_->slots = make_exception_slots();
         stop_iteration_type_->slots = make_exception_slots();
 
         object_type_->set_type(type_type_);
@@ -160,6 +162,7 @@ namespace cxxpython
         attribute_error_type_->set_type(type_type_);
         import_error_type_->set_type(type_type_);
         os_error_type_->set_type(type_type_);
+        keyboard_interrupt_type_->set_type(type_type_);
         stop_iteration_type_->set_type(type_type_);
 
         object_type_->base = nullptr;
@@ -214,6 +217,7 @@ namespace cxxpython
         initialize_type(attribute_error_type_, exception_type_);
         initialize_type(import_error_type_, exception_type_);
         initialize_type(os_error_type_, exception_type_);
+        initialize_type(keyboard_interrupt_type_, base_exception_type_);
         initialize_type(stop_iteration_type_, exception_type_);
 
         object_type_->solid_base = object_type_;
@@ -265,6 +269,7 @@ namespace cxxpython
         attribute_error_type_->solid_base = base_exception_type_;
         import_error_type_->solid_base = base_exception_type_;
         os_error_type_->solid_base = base_exception_type_;
+        keyboard_interrupt_type_->solid_base = base_exception_type_;
         stop_iteration_type_->solid_base = base_exception_type_;
 
         none_ = allocate<NoneObject>(none_type_);
@@ -324,6 +329,7 @@ namespace cxxpython
         add_root(attribute_error_type_);
         add_root(import_error_type_);
         add_root(os_error_type_);
+        add_root(keyboard_interrupt_type_);
         add_root(stop_iteration_type_);
         add_root(none_);
         add_root(not_implemented_);

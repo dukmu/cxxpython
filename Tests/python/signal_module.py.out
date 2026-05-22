@@ -8,13 +8,16 @@ True
 True
 True
 True
+True
 ($module, signalnum, handler, /)
 ($module, signalnum, /)
+($module, signalnum, frame, /)
 True
 True
 None
 True
 frame
 True
+<class 'KeyboardInterrupt'>
 <class 'TypeError'>
 <class 'ValueError'>

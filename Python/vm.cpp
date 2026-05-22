@@ -2,6 +2,7 @@
 
 #include "../Objects/object_utils.hpp"
 #include "../Objects/type_initialization.hpp"
+#include "../Modules/module_registry.hpp"
 
 #include <sstream>
 #include <utility>
@@ -677,6 +678,7 @@ namespace cxxpython
             frame->advance();
             try
             {
+            deliver_pending_signals(runtime_);
             switch (instruction.opcode)
             {
             case Opcode::LoadConst:

@@ -247,6 +247,11 @@ namespace cxxpython
         return os_error_type_;
     }
 
+    TypeObject *Runtime::keyboard_interrupt_type() const noexcept
+    {
+        return keyboard_interrupt_type_;
+    }
+
     TypeObject *Runtime::stop_iteration_type() const noexcept
     {
         return stop_iteration_type_;

@@ -230,6 +230,7 @@ namespace cxxpython
         install_builtin_constant(*this, dict, "AttributeError", attribute_error_type_);
         install_builtin_constant(*this, dict, "ImportError", import_error_type_);
         install_builtin_constant(*this, dict, "OSError", os_error_type_);
+        install_builtin_constant(*this, dict, "KeyboardInterrupt", keyboard_interrupt_type_);
         install_builtin_constant(*this, dict, "StopIteration", stop_iteration_type_);
         install_builtin_constant(*this, dict, "None", none_);
         install_builtin_constant(*this, dict, "True", true_);

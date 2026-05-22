@@ -1,5 +1,6 @@
 #include <gtest/gtest.h>
 
+#include <csignal>
 #include <filesystem>
 #include <fstream>
 
@@ -105,6 +106,7 @@ TEST(Module, BootstrapsBuiltinsModule)
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("AttributeError")), runtime.attribute_error_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("ImportError")), runtime.import_error_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("OSError")), runtime.os_error_type());
+    EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("KeyboardInterrupt")), runtime.keyboard_interrupt_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("None")), runtime.none());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("True")), runtime.true_value());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("False")), runtime.false_value());
@@ -629,6 +631,36 @@ TEST(Module, ImportsStdlibModulesFromLibPath)
     auto *origin = dynamic_cast<cxxpython::StrObject *>(cxxpython::object_get_attr(sys_spec, "origin"));
     ASSERT_NE(origin, nullptr);
     EXPECT_EQ(origin->value, "built-in");
+}
+
+TEST(Module, SignalDeliveryRaisesKeyboardInterruptAtSafePoints)
+{
+#ifdef SIGINT
+    cxxpython::Runtime runtime;
+    cxxpython::ModuleObject *signal = runtime.import_module("signal");
+    ASSERT_NE(signal, nullptr);
+    ASSERT_NE(signal->dict()->get(runtime.new_str("default_int_handler")), nullptr);
+
+    std::raise(SIGINT);
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(runtime, "1 + 1\n", "<signal-test>");
+    cxxpython::VirtualMachine vm(runtime);
+    try
+    {
+        (void)vm.execute(*code);
+        FAIL() << "expected KeyboardInterrupt";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.keyboard_interrupt_type());
+        ASSERT_NE(error.value(), nullptr);
+        ASSERT_FALSE(error.value()->traceback_entries().empty());
+        const auto &entry = error.value()->traceback_entries().back();
+        EXPECT_EQ(entry.filename, "<signal-test>");
+        EXPECT_EQ(entry.line, 1U);
+    }
+#else
+    GTEST_SKIP() << "SIGINT is not available on this platform";
+#endif
 }
 
 TEST(Module, ExecutesCodeUsingModuleGlobals)

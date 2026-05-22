@@ -132,6 +132,7 @@ namespace cxxpython
         TypeObject *attribute_error_type() const noexcept;
         TypeObject *import_error_type() const noexcept;
         TypeObject *os_error_type() const noexcept;
+        TypeObject *keyboard_interrupt_type() const noexcept;
         TypeObject *stop_iteration_type() const noexcept;
 
         NoneObject *none() const noexcept;
@@ -327,6 +328,7 @@ namespace cxxpython
         ExceptionObject *new_attribute_error(std::string message);
         ExceptionObject *new_import_error(std::string message);
         ExceptionObject *new_os_error(std::string message);
+        ExceptionObject *new_keyboard_interrupt();
         ExceptionObject *new_stop_iteration();
 
         void add_root(Object *object);
@@ -430,6 +432,7 @@ namespace cxxpython
         TypeObject *attribute_error_type_ = nullptr;
         TypeObject *import_error_type_ = nullptr;
         TypeObject *os_error_type_ = nullptr;
+        TypeObject *keyboard_interrupt_type_ = nullptr;
         TypeObject *stop_iteration_type_ = nullptr;
 
         NoneObject *none_ = nullptr;
