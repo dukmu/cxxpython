@@ -415,6 +415,8 @@ namespace cxxpython::compiler_internal
     {
         Positional,
         Keyword,
+        PositionalUnpack,
+        KeywordUnpack,
     };
 
     struct CallArgument final
@@ -428,6 +430,11 @@ namespace cxxpython::compiler_internal
             : kind(CallArgumentKind::Keyword),
               keyword(std::move(keyword_in)),
               value(std::move(value_in))
+        {
+        }
+
+        CallArgument(CallArgumentKind kind_in, std::unique_ptr<Expr> value_in)
+            : kind(kind_in), value(std::move(value_in))
         {
         }
 

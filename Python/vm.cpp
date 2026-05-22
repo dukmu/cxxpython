@@ -1025,6 +1025,33 @@ namespace cxxpython
                 frame->push(tuple);
                 break;
             }
+            case Opcode::BuildTupleUnpack:
+            {
+                std::vector<Object *> sources(instruction.operand);
+                std::vector<Rooted<Object>> roots;
+                roots.reserve(sources.size());
+                for (std::size_t index = sources.size(); index > 0; --index)
+                {
+                    sources[index - 1] = frame->pop();
+                    add_temporary_root(runtime_, roots, sources[index - 1]);
+                }
+
+                std::vector<Object *> items;
+                std::vector<Rooted<Object>> item_roots;
+                for (Object *source : sources)
+                {
+                    std::vector<Object *> source_items = collect_iterable_items(&runtime_, source);
+                    for (Object *item : source_items)
+                    {
+                        items.push_back(item);
+                        add_temporary_root(runtime_, item_roots, item);
+                    }
+                }
+                TupleObject *tuple = runtime_.new_tuple(std::move(items));
+                auto tuple_root = runtime_.root(tuple);
+                frame->push(tuple);
+                break;
+            }
             case Opcode::BuildMap:
             {
                 std::vector<Object *> keys(instruction.operand);
@@ -1042,6 +1069,38 @@ namespace cxxpython
                 auto dict_root = runtime_.root(dict);
                 for (std::size_t index = 0; index < keys.size(); ++index)
                     dict->set(keys[index], values[index]);
+                frame->push(dict);
+                break;
+            }
+            case Opcode::BuildKwMapUnpack:
+            {
+                std::vector<Object *> sources(instruction.operand);
+                std::vector<Rooted<Object>> roots;
+                roots.reserve(sources.size());
+                for (std::size_t index = sources.size(); index > 0; --index)
+                {
+                    sources[index - 1] = frame->pop();
+                    add_temporary_root(runtime_, roots, sources[index - 1]);
+                }
+
+                DictObject *dict = runtime_.new_dict();
+                auto dict_root = runtime_.root(dict);
+                for (Object *source : sources)
+                {
+                    auto *source_dict = dynamic_cast<DictObject *>(source);
+                    if (!source_dict)
+                        raise_type_error(&runtime_, "** argument must be a dict");
+                    for (const DictObject::Entry &entry : source_dict->entries())
+                    {
+                        if (!dynamic_cast<StrObject *>(entry.key))
+                            raise_type_error(&runtime_, "keywords must be strings");
+                        if (dict->contains(entry.key))
+                            raise_type_error(&runtime_,
+                                             "got multiple values for keyword argument '" +
+                                                 object_str(entry.key) + "'");
+                        dict->set(entry.key, entry.value);
+                    }
+                }
                 frame->push(dict);
                 break;
             }
@@ -1290,6 +1349,30 @@ namespace cxxpython
                 }
                 Object *callable = frame->pop();
                 auto callable_root = runtime_.root(callable);
+                frame->push(object_call(callable, CallArguments{std::move(args), keywords}));
+                break;
+            }
+            case Opcode::CallEx:
+            {
+                Object *keywords_object = frame->pop();
+                auto *keywords = dynamic_cast<DictObject *>(keywords_object);
+                if (!keywords)
+                    throw BytecodeError("CALL_EX requires keyword dict");
+                auto keywords_root = runtime_.root(keywords);
+
+                Object *positional_object = frame->pop();
+                auto *positional_tuple = dynamic_cast<TupleObject *>(positional_object);
+                if (!positional_tuple)
+                    throw BytecodeError("CALL_EX requires positional tuple");
+                auto positional_root = runtime_.root(positional_tuple);
+
+                Object *callable = frame->pop();
+                auto callable_root = runtime_.root(callable);
+                std::vector<Object *> args(positional_tuple->items().begin(), positional_tuple->items().end());
+                std::vector<Rooted<Object>> roots;
+                roots.reserve(args.size());
+                for (Object *arg : args)
+                    add_temporary_root(runtime_, roots, arg);
                 frame->push(object_call(callable, CallArguments{std::move(args), keywords}));
                 break;
             }

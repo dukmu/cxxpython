@@ -978,19 +978,36 @@ namespace cxxpython::compiler_internal
                         std::vector<CallArgument> args;
                         std::vector<std::string> keyword_names;
                         bool seen_keyword = false;
+                        bool seen_unpack = false;
                         if (peek().kind != TokenKind::RightParen)
                         {
                             while (true)
                             {
-                                if (peek().kind == TokenKind::Identifier && peek_next().kind == TokenKind::Equal)
+                                if (peek().kind == TokenKind::Star)
+                                {
+                                    seen_unpack = true;
+                                    advance();
+                                    args.emplace_back(CallArgumentKind::PositionalUnpack, parse_expression_only());
+                                }
+                                else if (peek().kind == TokenKind::DoubleStar)
+                                {
+                                    seen_unpack = true;
+                                    seen_keyword = true;
+                                    advance();
+                                    args.emplace_back(CallArgumentKind::KeywordUnpack, parse_expression_only());
+                                }
+                                else if (peek().kind == TokenKind::Identifier && peek_next().kind == TokenKind::Equal)
                                 {
                                     seen_keyword = true;
                                     std::string keyword = advance().lexeme;
                                     advance();
-                                    for (const std::string &existing : keyword_names)
+                                    if (!seen_unpack)
                                     {
-                                        if (existing == keyword)
-                                            raise_at(previous(), "keyword argument repeated");
+                                        for (const std::string &existing : keyword_names)
+                                        {
+                                            if (existing == keyword)
+                                                raise_at(previous(), "keyword argument repeated");
+                                        }
                                     }
                                     keyword_names.push_back(keyword);
                                     args.emplace_back(std::move(keyword), parse_expression_only());

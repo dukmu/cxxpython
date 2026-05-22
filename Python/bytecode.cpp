@@ -477,8 +477,12 @@ namespace cxxpython
             return "BUILD_LIST";
         case Opcode::BuildTuple:
             return "BUILD_TUPLE";
+        case Opcode::BuildTupleUnpack:
+            return "BUILD_TUPLE_UNPACK";
         case Opcode::BuildMap:
             return "BUILD_MAP";
+        case Opcode::BuildKwMapUnpack:
+            return "BUILD_KW_MAP_UNPACK";
         case Opcode::BuildSlice:
             return "BUILD_SLICE";
         case Opcode::CompareOp:
@@ -507,6 +511,8 @@ namespace cxxpython
             return "CALL";
         case Opcode::CallKw:
             return "CALL_KW";
+        case Opcode::CallEx:
+            return "CALL_EX";
         case Opcode::ImportStar:
             return "IMPORT_STAR";
         case Opcode::SetupExcept:
@@ -596,14 +602,20 @@ namespace cxxpython
             return 1 - static_cast<int>(instruction.operand);
         case Opcode::BuildTuple:
             return 1 - static_cast<int>(instruction.operand);
+        case Opcode::BuildTupleUnpack:
+            return 1 - static_cast<int>(instruction.operand);
         case Opcode::BuildMap:
             return 1 - 2 * static_cast<int>(instruction.operand);
+        case Opcode::BuildKwMapUnpack:
+            return 1 - static_cast<int>(instruction.operand);
         case Opcode::BuildSlice:
             return 1 - static_cast<int>(instruction.operand);
         case Opcode::Call:
             return -static_cast<int>(instruction.operand);
         case Opcode::CallKw:
             return -static_cast<int>(instruction.operand) - 1;
+        case Opcode::CallEx:
+            return -2;
         case Opcode::ReturnValue:
         case Opcode::RaiseValue:
             return -1;

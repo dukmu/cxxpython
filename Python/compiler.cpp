@@ -356,6 +356,70 @@ namespace cxxpython
             void visit(const compiler_internal::CallExpr &expression) override
             {
                 expression.callee->accept(*this);
+                bool has_unpacking = false;
+                for (const auto &arg : expression.args)
+                {
+                    if (arg.kind == compiler_internal::CallArgumentKind::PositionalUnpack ||
+                        arg.kind == compiler_internal::CallArgumentKind::KeywordUnpack)
+                    {
+                        has_unpacking = true;
+                        break;
+                    }
+                }
+                if (has_unpacking)
+                {
+                    std::size_t positional_source_count = 0;
+                    std::size_t keyword_source_count = 0;
+                    for (const auto &arg : expression.args)
+                    {
+                        if (arg.kind == compiler_internal::CallArgumentKind::Positional ||
+                            arg.kind == compiler_internal::CallArgumentKind::PositionalUnpack)
+                        {
+                            arg.value->accept(*this);
+                            if (arg.kind == compiler_internal::CallArgumentKind::Positional)
+                            {
+                                emit({
+                                    Opcode::BuildTuple,
+                                    1,
+                                });
+                            }
+                            ++positional_source_count;
+                        }
+                    }
+                    emit({
+                        Opcode::BuildTupleUnpack,
+                        static_cast<std::uint32_t>(positional_source_count),
+                    });
+                    for (const auto &arg : expression.args)
+                    {
+                        if (arg.kind == compiler_internal::CallArgumentKind::Keyword)
+                        {
+                            emit_constant(runtime_.new_str(arg.keyword));
+                            arg.value->accept(*this);
+                            emit({
+                                Opcode::BuildMap,
+                                1,
+                            });
+                            ++keyword_source_count;
+                            continue;
+                        }
+                        if (arg.kind == compiler_internal::CallArgumentKind::KeywordUnpack)
+                        {
+                            arg.value->accept(*this);
+                            ++keyword_source_count;
+                        }
+                    }
+                    emit({
+                        Opcode::BuildKwMapUnpack,
+                        static_cast<std::uint32_t>(keyword_source_count),
+                    });
+                    emit({
+                        Opcode::CallEx,
+                        0,
+                    });
+                    return;
+                }
+
                 std::size_t positional_count = 0;
                 std::size_t keyword_count = 0;
                 for (const auto &arg : expression.args)

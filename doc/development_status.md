@@ -1,5 +1,51 @@
 # Development Status
 
+## 2026-05-22 Call-Site Argument Unpacking Slice
+
+Review focus:
+
+- Complete the caller side of `*args` / `**kwargs` without pushing unpacking
+  special cases into function objects or builtins.
+- Keep the bytecode stack model explicit and testable.
+
+Completed:
+
+- Extended call argument AST nodes with `PositionalUnpack` and
+  `KeywordUnpack`.
+- Added parser support for call-site `*expr` and `**expr`.
+- Added `BUILD_TUPLE_UNPACK`, `BUILD_KW_MAP_UNPACK`, and `CALL_EX` opcodes.
+- Compiles calls with any unpacking into:
+  - a packed positional tuple assembled from normal positional arguments and
+    unpacked iterables;
+  - a merged keyword dict assembled from normal keywords and `**` dicts;
+  - one `CALL_EX` dispatch through the normal `object_call(...)` protocol.
+- Added C++ compile coverage and Python golden coverage for successful
+  unpacking, duplicate keywords, non-string keyword keys, and non-iterable
+  positional unpacking.
+
+Design notes:
+
+- PythonFunctionObject binding remains unchanged; it receives a normalized
+  `CallArguments` object regardless of whether the caller used unpacking.
+- VM owns bytecode-level materialization; builtins and native functions do not
+  need caller-syntax awareness.
+
+Known debt and next risk:
+
+- `**` unpacking currently accepts concrete `dict` only. CPython accepts
+  mapping-like objects; this should be revisited after mapping protocol
+  methods such as `keys()` / item iteration are stronger.
+- Function definitions still do not support default argument values or
+  keyword-only arguments.
+- Parser accepts some CPython-valid argument orders around unpacking, but the
+  exact syntax validation matrix still needs a dedicated pass.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter=PythonScripts.RunsGoldenFiles`
+- `ctest --test-dir build --output-on-failure`
+
 ## 2026-05-22 Heap Operator Call Slot Refresh Slice
 
 Review focus:

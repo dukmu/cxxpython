@@ -1381,6 +1381,45 @@ TEST(Compile, CompilesVarargsVarkeywordsAndKeywordCalls)
     EXPECT_EQ(extra->value, "value");
 }
 
+TEST(Compile, CompilesCallSiteArgumentUnpacking)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(
+        runtime,
+        "def collect(*args, **kwargs):\n"
+        "    return args\n"
+        "result = collect(1, *[2, 3], flag=True)\n",
+        "script.py");
+    ASSERT_NE(code, nullptr);
+
+    bool saw_tuple_unpack = false;
+    bool saw_kw_map_unpack = false;
+    bool saw_call_ex = false;
+    for (const cxxpython::Instruction &instruction : code->instructions())
+    {
+        if (instruction.opcode == cxxpython::Opcode::BuildTupleUnpack)
+            saw_tuple_unpack = true;
+        if (instruction.opcode == cxxpython::Opcode::BuildKwMapUnpack)
+            saw_kw_map_unpack = true;
+        if (instruction.opcode == cxxpython::Opcode::CallEx)
+            saw_call_ex = true;
+    }
+    EXPECT_TRUE(saw_tuple_unpack);
+    EXPECT_TRUE(saw_kw_map_unpack);
+    EXPECT_TRUE(saw_call_ex);
+
+    EXPECT_EQ(vm.execute(*code, *globals), runtime.none());
+    auto *result = dynamic_cast<cxxpython::TupleObject *>(globals->get(runtime.new_str("result")));
+    ASSERT_NE(result, nullptr);
+    ASSERT_EQ(result->size(), 3U);
+    EXPECT_EQ(dynamic_cast<cxxpython::IntObject *>(result->items()[0])->value, 1);
+    EXPECT_EQ(dynamic_cast<cxxpython::IntObject *>(result->items()[1])->value, 2);
+    EXPECT_EQ(dynamic_cast<cxxpython::IntObject *>(result->items()[2])->value, 3);
+}
+
 TEST(Compile, CompilesMinimalClassDefinitions)
 {
     cxxpython::Runtime runtime;

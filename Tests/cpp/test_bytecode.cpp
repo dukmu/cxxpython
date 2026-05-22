@@ -38,7 +38,9 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::DeleteSubscr), "DELETE_SUBSCR");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::BuildList), "BUILD_LIST");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::BuildTuple), "BUILD_TUPLE");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::BuildTupleUnpack), "BUILD_TUPLE_UNPACK");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::BuildMap), "BUILD_MAP");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::BuildKwMapUnpack), "BUILD_KW_MAP_UNPACK");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::BuildSlice), "BUILD_SLICE");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::CompareOp), "COMPARE_OP");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::GetIter), "GET_ITER");
@@ -53,6 +55,7 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::MakeClass), "MAKE_CLASS");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::Call), "CALL");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::CallKw), "CALL_KW");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::CallEx), "CALL_EX");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::ImportStar), "IMPORT_STAR");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::SetupExcept), "SETUP_EXCEPT");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::SetupFinally), "SETUP_FINALLY");
@@ -96,8 +99,10 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BuildList, 3}), -2);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BuildTuple, 0}), 1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BuildTuple, 3}), -2);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BuildTupleUnpack, 3}), -2);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BuildMap, 0}), 1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BuildMap, 2}), -3);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BuildKwMapUnpack, 2}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::BuildSlice, 3}), -2);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::CompareOp, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::GetIter, 0}), 0);
@@ -115,6 +120,7 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::Call, 2}), -2);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::CallKw, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::CallKw, 2}), -3);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::CallEx, 0}), -2);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::ImportStar, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::SetupExcept, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::SetupFinally, 0}), 0);
