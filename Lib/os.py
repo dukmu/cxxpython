@@ -13,6 +13,8 @@ __all__ = [
     'path',
     'environ',
     'getcwd',
+    'getpid',
+    'kill',
     'listdir',
 ]
 
@@ -24,4 +26,6 @@ pardir = '..'
 pathsep = ':'
 environ = posix.environ()
 getcwd = posix.getcwd
+getpid = posix.getpid
+kill = posix.kill
 listdir = posix.listdir

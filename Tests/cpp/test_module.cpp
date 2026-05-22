@@ -596,6 +596,8 @@ TEST(Module, ImportsStdlibModulesFromLibPath)
         cxxpython::object_get_attr(gc->dict()->get(runtime.new_str("collect")), "__doc__"));
     auto *posix_signature = dynamic_cast<cxxpython::StrObject *>(
         cxxpython::object_get_attr(posix->dict()->get(runtime.new_str("listdir")), "__text_signature__"));
+    auto *posix_kill_signature = dynamic_cast<cxxpython::StrObject *>(
+        cxxpython::object_get_attr(posix->dict()->get(runtime.new_str("kill")), "__text_signature__"));
     auto *signal_signature = dynamic_cast<cxxpython::StrObject *>(
         cxxpython::object_get_attr(signal->dict()->get(runtime.new_str("signal")), "__text_signature__"));
     auto *io_signature = dynamic_cast<cxxpython::StrObject *>(
@@ -605,12 +607,14 @@ TEST(Module, ImportsStdlibModulesFromLibPath)
     ASSERT_NE(getframe_signature, nullptr);
     ASSERT_NE(gc_doc, nullptr);
     ASSERT_NE(posix_signature, nullptr);
+    ASSERT_NE(posix_kill_signature, nullptr);
     ASSERT_NE(signal_signature, nullptr);
     ASSERT_NE(io_signature, nullptr);
     ASSERT_NE(namedtuple_doc, nullptr);
     EXPECT_EQ(getframe_signature->value, "($module, depth=0, /)");
     EXPECT_NE(gc_doc->value.find("garbage collection"), std::string::npos);
     EXPECT_EQ(posix_signature->value, "($module, path='.', /)");
+    EXPECT_EQ(posix_kill_signature->value, "($module, pid, signal, /)");
     EXPECT_EQ(signal_signature->value, "($module, signalnum, handler, /)");
     EXPECT_EQ(io_signature->value, "($module, file, mode='r', /)");
     EXPECT_NE(namedtuple_doc->value.find("tuple subclass"), std::string::npos);

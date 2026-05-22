@@ -22,6 +22,8 @@ False
 posix
 True
 True
+True
+True
 /
 True
 .
@@ -33,8 +35,12 @@ x.py
 True
 <class 'str'>
 True
+<class 'int'>
+True
+None
 <class 'list'>
 True
 <class 'dict'>
 <class 'TypeError'>
 <class 'OSError'>
+<class 'KeyboardInterrupt'>

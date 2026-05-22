@@ -1,5 +1,52 @@
 # Development Status
 
+## 2026-05-22 POSIX Process Signal Slice
+
+Review focus:
+
+- Extend POSIX substrate in CPython's direction: process primitives belong in
+  native `posix`, while public `os` remains a script-level facade.
+- Use the new signal safe-point path from Python, not only from C++ tests.
+
+Completed:
+
+- Added native `posix.getpid()` and `posix.kill(pid, signal)` with docstrings
+  and `__text_signature__` metadata.
+- Added explicit integer type and range validation before narrowing to
+  `pid_t` and `int`.
+- Exposed `os.getpid` and `os.kill` from `Lib/os.py`, keeping public policy in
+  the script layer.
+- Extended Python golden coverage for `os.__all__`, `os.getpid`,
+  `os.kill(pid, 0)`, and `os.kill(os.getpid(), signal.SIGINT)` raising
+  `KeyboardInterrupt` through the VM safe-point path.
+- Extended stdlib introspection and C++ module metadata coverage for the new
+  POSIX functions.
+
+Design notes:
+
+- `kill(pid, 0)` is used as a harmless syscall probe in script tests; SIGINT
+  coverage uses the current process and catches `KeyboardInterrupt`.
+- POSIX errno failures are translated to `OSError` with a simple message.
+  Rich `errno`, filename, and subclass mapping should come with a broader
+  exception payload design rather than ad hoc fields.
+
+Known debt and next risk:
+
+- `posix` still lacks many CPython substrate APIs: `stat`, `open/read/write`,
+  `fork/exec/wait`, uid/gid helpers, environment mutation, and richer errno
+  constants.
+- `os.environ` is a snapshot dictionary today, not a live mutable environ
+  proxy.
+- `OverflowError` does not exist yet, so numeric narrowing errors currently
+  raise `ValueError`.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/cxxpython Tests/python/sys_os.py`
+- `build/cxxpython Tests/python/stdlib_modules.py`
+- `ctest --test-dir build --output-on-failure`
+
 ## 2026-05-22 Signal Safe-Point Delivery Slice
 
 Review focus:

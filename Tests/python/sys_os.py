@@ -1,5 +1,6 @@
 import sys
 import os
+import signal
 
 print(sys.name)
 print(sys.version)
@@ -24,6 +25,8 @@ print(sys.__spec__.has_location)
 print(sys.__package__)
 print(os.name)
 print(os.__all__.__contains__('getcwd'))
+print(os.__all__.__contains__('getpid'))
+print(os.__all__.__contains__('kill'))
 print(os.path.__all__.__contains__('join'))
 print(os.sep)
 print(os.linesep == '\n')
@@ -37,6 +40,10 @@ print(os.path.isabs('/tmp'))
 cwd = os.getcwd()
 print(type(cwd))
 print(len(cwd) > 0)
+pid = os.getpid()
+print(type(pid))
+print(pid > 0)
+print(os.kill(pid, 0))
 entries = os.listdir(os.curdir)
 print(type(entries))
 print(len(entries) > 0)
@@ -49,4 +56,9 @@ except TypeError as exc:
 try:
     os.listdir('/definitely/not/a/cxxpython/path')
 except OSError as exc:
+    print(type(exc))
+try:
+    os.kill(os.getpid(), signal.SIGINT)
+    print('not-interrupted')
+except KeyboardInterrupt as exc:
     print(type(exc))

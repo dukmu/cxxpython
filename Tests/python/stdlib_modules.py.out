@@ -19,6 +19,9 @@ True
 ($module, generation=None, /)
 True
 ($module, /)
+($module, /)
+($module, pid, signal, /)
+True
 True
 ($module, file, mode='r', /)
 True
