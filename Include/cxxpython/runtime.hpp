@@ -315,7 +315,10 @@ namespace cxxpython
                                       const std::vector<TypeObject *> &bases);
         void initialize_builtins();
         ModuleObject *import_stdlib_module(std::string_view name);
-        ModuleLoadSpec *find_module_spec(std::string_view name, ModuleLoadSpec &storage);
+        ModuleLoadSpec *find_module_spec(std::string_view name,
+                                         ModuleLoadSpec &storage,
+                                         const std::vector<std::string> *package_paths = nullptr,
+                                         std::string_view search_name = {});
         ModuleObject *load_module_from_spec(const ModuleLoadSpec &spec);
         ModuleObject *load_extension_module_from_spec(const ModuleLoadSpec &spec);
         TypeObject *importlib_type_for_loader(std::string_view loader_name);

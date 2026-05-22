@@ -416,7 +416,17 @@ namespace cxxpython::compiler_internal
             ParsedStatement parse_from_import_statement()
             {
                 const Token &from_token = advance();
-                std::string module = parse_dotted_name("expected module name after from");
+                std::uint32_t level = 0;
+                while (peek().kind == TokenKind::Dot)
+                {
+                    advance();
+                    ++level;
+                }
+                std::string module;
+                if (peek().kind == TokenKind::Identifier)
+                    module = parse_dotted_name("expected module name after from");
+                else if (level == 0)
+                    raise_at(peek(), "expected module name after from");
                 consume(TokenKind::Import, "expected import after from module name");
 
                 std::vector<ImportAlias> aliases;
@@ -456,7 +466,8 @@ namespace cxxpython::compiler_internal
                 auto statement = std::make_unique<FromImportStmt>(
                     std::move(module),
                     std::move(aliases),
-                    import_star);
+                    import_star,
+                    level);
                 statement->line = from_token.line;
                 return ParsedStatement{
                     std::move(statement),

@@ -56,6 +56,37 @@ namespace cxxpython
                 return std::string(name);
             return std::string(name.substr(dot + 1));
         }
+
+        std::vector<std::string> package_paths(Runtime &runtime, ModuleObject *package)
+        {
+            std::vector<std::string> paths;
+            if (!package)
+                return paths;
+            Object *path_object = package->dict()->get(runtime.new_str("__path__"));
+            if (!path_object)
+                return paths;
+            Object *iterator = object_iter(path_object);
+            auto iterator_root = runtime.root(iterator);
+            while (true)
+            {
+                try
+                {
+                    Object *item = object_next(iterator_root.get());
+                    auto item_root = runtime.root(item);
+                    auto *text = dynamic_cast<StrObject *>(item_root.get());
+                    if (!text)
+                        raise_import_error(&runtime, "__path__ entries must be str");
+                    paths.push_back(text->value);
+                }
+                catch (const PythonError &error)
+                {
+                    if (error.type() && is_subclass(error.type(), runtime.stop_iteration_type()))
+                        break;
+                    throw;
+                }
+            }
+            return paths;
+        }
     }
 
     ModuleObject *Runtime::import_module(std::string name)
@@ -87,8 +118,16 @@ namespace cxxpython
         }
 
         ModuleLoadSpec spec;
-        if (!find_module_spec(name, spec))
+        if (parent_module)
+        {
+            std::vector<std::string> paths = package_paths(*this, parent_module);
+            if (paths.empty() || !find_module_spec(name, spec, &paths, child_module_name(name)))
+                raise_import_error(this, "No module named '" + name + "'");
+        }
+        else if (!find_module_spec(name, spec))
+        {
             raise_import_error(this, "No module named '" + name + "'");
+        }
 
         ModuleObject *module = load_module_from_spec(spec);
         auto module_root = root(module);

@@ -1,5 +1,69 @@
 # Development Status
 
+## 2026-05-22 Relative Import and Package Path Slice
+
+Review focus:
+
+- Move relative import support through the same parser/compiler/`__import__`
+  path as absolute imports instead of adding package-only shortcuts.
+- Make package child lookup honor the package object's `__path__`, including
+  entries appended after the package is imported.
+- Keep higher-level import policy in Python/import runtime files rather than
+  foundational object implementations.
+
+Completed:
+
+- Added parser/AST/compiler support for leading-dot from-import syntax:
+  `from . import name`, `from .module import name`, and higher relative
+  levels.
+- Extended `FromImportStmt` with an explicit import `level`, and passed that
+  value through the existing `__import__(name, globals, locals, fromlist,
+  level)` call shape.
+- Implemented relative import resolution in `__import__` using the caller's
+  globals when explicit globals are absent, matching import-statement behavior.
+- Updated package child discovery so `Runtime::import_module("pkg.child")`
+  searches the parent package's iterable `__path__` for the child component
+  instead of relying only on the global module search path.
+- Added Python golden coverage for:
+  - `from . import sibling`;
+  - `from .child import value`;
+  - `from . import child as alias`;
+  - appending a second directory to `package.__path__` and importing a child
+    from that extra path.
+- Extended C++ module tests to verify package `__path__` multi-entry child
+  loading and parent attribute binding.
+
+Design notes:
+
+- Relative import resolution is intentionally located in the import builtin
+  because that is where CPython's public call contract exposes `level`,
+  `globals`, `locals`, and `fromlist`. The runtime importer continues to accept
+  absolute module names only.
+- Parent package search uses the parent module's current `__path__`, so script
+  code can mutate `__path__` before importing additional children.
+- `__path__` consumption stores only strings before allocation-sensitive module
+  loading begins, keeping object lifetimes simple under the current root model.
+
+Known debt and next risk:
+
+- `__import__` still contains fromlist child-loading policy. A future
+  importlib slice should move more of this policy to script-level importlib
+  once enough library infrastructure exists.
+- Import error messages are still minimal and not CPython-identical for every
+  relative import edge case.
+- Remaining layering cleanup: review `Objects/object_core.cpp`,
+  `Objects/object_function.cpp`, `Objects/object_method.cpp`, and
+  `Objects/object_super.cpp` for unnecessary direct `vm.hpp` dependencies.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/cxxpython Tests/python/package_imports.py`
+- `build/test_core_objects '--gtest_filter=Module.ImportsPackagesAndDottedSubmodules:PythonScripts.RunsGoldenFiles'`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all 199 tests pass.
+
 ## 2026-05-22 Augmented Assignment Slice
 
 Review focus:

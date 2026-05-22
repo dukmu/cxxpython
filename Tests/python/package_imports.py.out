@@ -6,5 +6,10 @@ child
 True
 child
 sibling
+sibling
+child
+child
+package_fixture
 True
 True
+extra-path

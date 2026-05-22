@@ -682,7 +682,7 @@ namespace cxxpython
                 StatementLineGuard line(*this, statement);
                 if (statement.import_star)
                 {
-                    emit_import_call(statement.module, runtime_.new_tuple({runtime_.new_str("*")}));
+                    emit_import_call(statement.module, runtime_.new_tuple({runtime_.new_str("*")}), statement.level);
                     emit({Opcode::ImportStar, 0});
                     return;
                 }
@@ -691,7 +691,7 @@ namespace cxxpython
                 fromlist.reserve(statement.aliases.size());
                 for (const compiler_internal::ImportAlias &alias : statement.aliases)
                     fromlist.push_back(runtime_.new_str(alias.name));
-                emit_import_call(statement.module, runtime_.new_tuple(std::move(fromlist)));
+                emit_import_call(statement.module, runtime_.new_tuple(std::move(fromlist)), statement.level);
 
                 for (const compiler_internal::ImportAlias &alias : statement.aliases)
                 {
@@ -978,6 +978,11 @@ namespace cxxpython
 
             void emit_import_call(std::string_view module_name, TupleObject *fromlist)
             {
+                emit_import_call(module_name, fromlist, 0);
+            }
+
+            void emit_import_call(std::string_view module_name, TupleObject *fromlist, std::uint32_t level)
+            {
                 emit({
                     Opcode::LoadName,
                     static_cast<std::uint32_t>(name_index("__import__")),
@@ -986,7 +991,7 @@ namespace cxxpython
                 emit_constant(runtime_.none());
                 emit_constant(runtime_.none());
                 emit_constant(fromlist);
-                emit_constant(runtime_.new_int(0));
+                emit_constant(runtime_.new_int(static_cast<std::int64_t>(level)));
                 emit({Opcode::Call, 5});
             }
 

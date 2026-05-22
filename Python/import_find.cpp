@@ -69,7 +69,10 @@ namespace cxxpython
         }
     }
 
-    ModuleLoadSpec *Runtime::find_module_spec(std::string_view name, ModuleLoadSpec &storage)
+    ModuleLoadSpec *Runtime::find_module_spec(std::string_view name,
+                                              ModuleLoadSpec &storage,
+                                              const std::vector<std::string> *package_paths,
+                                              std::string_view search_name)
     {
         if (is_builtin_extension_module(name))
         {
@@ -86,10 +89,12 @@ namespace cxxpython
             return &storage;
         }
 
-        const std::filesystem::path source_relative = relative_module_path(name);
-        const std::filesystem::path extension_relative = relative_extension_path(name);
-        const std::filesystem::path package_relative = relative_package_init_path(name);
-        for (const std::string &search_path : module_search_paths_)
+        const std::string_view relative_lookup = search_name.empty() ? name : search_name;
+        const std::filesystem::path source_relative = relative_module_path(relative_lookup);
+        const std::filesystem::path extension_relative = relative_extension_path(relative_lookup);
+        const std::filesystem::path package_relative = relative_package_init_path(relative_lookup);
+        const std::vector<std::string> &search_paths = package_paths ? *package_paths : module_search_paths_;
+        for (const std::string &search_path : search_paths)
         {
             std::filesystem::path package_candidate = std::filesystem::path(search_path) / package_relative;
             if (std::filesystem::is_regular_file(package_candidate))

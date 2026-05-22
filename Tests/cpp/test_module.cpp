@@ -158,9 +158,14 @@ TEST(Module, ImportsPackagesAndDottedSubmodules)
     cxxpython::Runtime runtime;
     const std::filesystem::path directory = std::filesystem::temp_directory_path();
     const std::filesystem::path package_dir = directory / "cxxpython_import_pkg";
+    const std::filesystem::path extra_root = directory / "cxxpython_import_extra";
+    const std::filesystem::path extra_package_dir = extra_root / "cxxpython_import_pkg";
     const std::filesystem::path init_path = package_dir / "__init__.py";
     const std::filesystem::path child_path = package_dir / "child.py";
+    const std::filesystem::path sibling_path = package_dir / "sibling.py";
+    const std::filesystem::path extra_path = extra_package_dir / "extra.py";
     std::filesystem::create_directories(package_dir);
+    std::filesystem::create_directories(extra_package_dir);
     {
         std::ofstream file(init_path, std::ios::binary);
         file << "package_value = 'package:' + __name__\n"
@@ -171,6 +176,14 @@ TEST(Module, ImportsPackagesAndDottedSubmodules)
         std::ofstream file(child_path, std::ios::binary);
         file << "value = 'child:' + __name__\n"
                 "package_name = __package__\n";
+    }
+    {
+        std::ofstream file(sibling_path, std::ios::binary);
+        file << "value = 'sibling'\n";
+    }
+    {
+        std::ofstream file(extra_path, std::ios::binary);
+        file << "value = 'extra'\n";
     }
 
     runtime.add_module_search_path(directory.string());
@@ -200,8 +213,22 @@ TEST(Module, ImportsPackagesAndDottedSubmodules)
     EXPECT_EQ(child_value->value, "child:cxxpython_import_pkg.child");
     EXPECT_EQ(child_package->value, "cxxpython_import_pkg");
 
+    auto *path = dynamic_cast<cxxpython::ListObject *>(package->dict()->get(runtime.new_str("__path__")));
+    ASSERT_NE(path, nullptr);
+    path->append(runtime.new_str(extra_package_dir.string()));
+    cxxpython::ModuleObject *extra = runtime.import_module("cxxpython_import_pkg.extra");
+    ASSERT_NE(extra, nullptr);
+    auto *extra_value = dynamic_cast<cxxpython::StrObject *>(extra->dict()->get(runtime.new_str("value")));
+    ASSERT_NE(extra_value, nullptr);
+    EXPECT_EQ(extra_value->value, "extra");
+    EXPECT_EQ(cxxpython::object_get_attr(package, "extra"), extra);
+
     std::filesystem::remove(child_path);
+    std::filesystem::remove(sibling_path);
+    std::filesystem::remove(extra_path);
     std::filesystem::remove(init_path);
+    std::filesystem::remove(extra_package_dir);
+    std::filesystem::remove(extra_root);
     std::filesystem::remove(package_dir);
 }
 

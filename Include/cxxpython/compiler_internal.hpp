@@ -875,14 +875,21 @@ namespace cxxpython::compiler_internal
 
     struct FromImportStmt final : Stmt
     {
-        FromImportStmt(std::string module_in, std::vector<ImportAlias> aliases_in, bool import_star_in = false)
-            : module(std::move(module_in)), aliases(std::move(aliases_in)), import_star(import_star_in)
+        FromImportStmt(std::string module_in,
+                       std::vector<ImportAlias> aliases_in,
+                       bool import_star_in = false,
+                       std::uint32_t level_in = 0)
+            : module(std::move(module_in)),
+              aliases(std::move(aliases_in)),
+              import_star(import_star_in),
+              level(level_in)
         {
         }
 
         std::string module;
         std::vector<ImportAlias> aliases;
         bool import_star = false;
+        std::uint32_t level = 0;
 
         void accept(StmtVisitor &visitor) const override
         {
