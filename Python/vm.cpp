@@ -1251,14 +1251,28 @@ namespace cxxpython
             }
             case Opcode::MakeFunction:
             {
+                const std::uint32_t closure_count =
+                    instruction.operand & MakeFunctionClosureCountMask;
+                const bool has_defaults =
+                    (instruction.operand & MakeFunctionHasDefaults) != 0;
                 Object *code_object = frame->pop();
                 auto *function_code = dynamic_cast<CodeObject *>(code_object);
                 if (!function_code)
                     throw BytecodeError("MAKE_FUNCTION requires a code object");
                 auto code_root = runtime_.root(function_code);
+                TupleObject *defaults = nullptr;
+                std::vector<Rooted<Object>> defaults_roots;
+                if (has_defaults)
+                {
+                    Object *defaults_object = frame->pop();
+                    defaults = dynamic_cast<TupleObject *>(defaults_object);
+                    if (!defaults)
+                        throw BytecodeError("MAKE_FUNCTION defaults require a tuple");
+                    add_temporary_root(runtime_, defaults_roots, defaults);
+                }
                 std::vector<CellObject *> closure;
                 std::vector<Rooted<Object>> closure_roots;
-                if (instruction.operand != 0)
+                if (closure_count != 0)
                 {
                     Object *closure_object = frame->pop();
                     auto *closure_tuple = dynamic_cast<TupleObject *>(closure_object);
@@ -1276,7 +1290,7 @@ namespace cxxpython
                     }
                 }
                 PythonFunctionObject *function =
-                    runtime_.new_function(function_code->name(), function_code, &globals, std::move(closure));
+                    runtime_.new_function(function_code->name(), function_code, &globals, defaults, std::move(closure));
                 auto function_root = runtime_.root(function);
                 frame->push(function);
                 break;

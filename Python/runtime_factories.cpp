@@ -221,15 +221,26 @@ namespace cxxpython
     PythonFunctionObject *Runtime::new_function(std::string name,
                                                 CodeObject *code,
                                                 DictObject *globals,
+                                                TupleObject *defaults,
                                                 std::vector<CellObject *> closure)
     {
         if (!code)
             raise_type_error(this, "function requires a code object");
         if (!globals)
             raise_type_error(this, "function requires globals");
+        if (defaults && defaults->size() > code->arg_count())
+            raise_type_error(this, "function defaults exceed positional arguments");
         if (closure.size() != code->freevars().size())
             raise_type_error(this, "function closure size does not match code free variables");
-        return allocate<PythonFunctionObject>(function_type_, std::move(name), code, globals, std::move(closure));
+        return allocate<PythonFunctionObject>(function_type_, std::move(name), code, globals, defaults, std::move(closure));
+    }
+
+    PythonFunctionObject *Runtime::new_function(std::string name,
+                                                CodeObject *code,
+                                                DictObject *globals,
+                                                std::vector<CellObject *> closure)
+    {
+        return new_function(std::move(name), code, globals, nullptr, std::move(closure));
     }
 
     CellObject *Runtime::new_cell(Object *value)

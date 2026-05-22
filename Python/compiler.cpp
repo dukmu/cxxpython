@@ -884,11 +884,24 @@ namespace cxxpython
                     function_symbols,
                     filename_,
                     static_cast<std::uint32_t>(statement.line));
+                if (!statement.params.defaults.empty())
+                {
+                    for (const auto &default_value : statement.params.defaults)
+                        default_value->accept(*this);
+                    emit({
+                        Opcode::BuildTuple,
+                        static_cast<std::uint32_t>(statement.params.defaults.size()),
+                    });
+                }
                 CodeObject *code = function_builder.build_function(statement);
                 emit_constant(code);
+                std::uint32_t operand =
+                    static_cast<std::uint32_t>(function_symbols.freevars().size());
+                if (!statement.params.defaults.empty())
+                    operand |= MakeFunctionHasDefaults;
                 emit({
                     Opcode::MakeFunction,
-                    static_cast<std::uint32_t>(function_symbols.freevars().size()),
+                    operand,
                 });
                 apply_decorators(statement.decorators.size());
                 emit_binding_store(statement.name);

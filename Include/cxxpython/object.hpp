@@ -556,6 +556,7 @@ namespace cxxpython
                              std::string name,
                              CodeObject *code,
                              DictObject *globals,
+                             TupleObject *defaults = nullptr,
                              std::vector<CellObject *> closure = {});
 
         const std::string &name() const noexcept;
@@ -563,6 +564,8 @@ namespace cxxpython
         std::string text_signature() const;
         CodeObject *code() const noexcept;
         DictObject *globals() const noexcept;
+        TupleObject *defaults() const noexcept;
+        void set_defaults(TupleObject *defaults);
         const std::vector<CellObject *> &closure() const noexcept;
         Object *call(const CallArguments &args);
 
@@ -570,6 +573,7 @@ namespace cxxpython
         std::string name_;
         CodeObject *code_;
         DictObject *globals_;
+        TupleObject *defaults_;
         Object *doc_ = nullptr;
         std::vector<CellObject *> closure_;
     };

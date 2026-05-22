@@ -1,5 +1,57 @@
 # Development Status
 
+## 2026-05-22 Function Default Arguments Slice
+
+Review focus:
+
+- Add positional default arguments without baking runtime function state into
+  CodeObject.
+- Preserve CPython-like evaluation timing: defaults are evaluated when the
+  `def` statement executes and then stored on the function object.
+- Keep symbol analysis correct for default expressions evaluated in the
+  enclosing scope.
+
+Completed:
+
+- Extended function parameter AST with positional default expressions.
+- Parser now accepts trailing positional defaults and rejects
+  non-default positional parameters after defaults.
+- `MAKE_FUNCTION` now carries a high-bit defaults flag while preserving the
+  existing closure-count operand.
+- PythonFunctionObject now stores a defaults tuple, visits it for GC, uses it
+  during argument binding, and exposes mutable `__defaults__`.
+- Added text-signature marking for defaulted positional parameters.
+- Updated symbol collection and lexical reference analysis to visit default
+  expressions, including defaults inside nested functions.
+- Added C++ compile coverage and Python golden coverage for:
+  - omitted and overridden defaults;
+  - keyword calls using defaults;
+  - mutable default identity;
+  - `*args` / `**kwargs` with defaults;
+  - `__defaults__` get/set/clear;
+  - default expressions referencing enclosing locals.
+
+Design notes:
+
+- Defaults live on PythonFunctionObject, not CodeObject, matching the split
+  between immutable code metadata and mutable function runtime state.
+- A compatibility overload keeps `Runtime::new_function(name, code, globals,
+  closure)` usable for existing C++ callers.
+
+Known debt and next risk:
+
+- Keyword-only parameters and keyword-only defaults are still absent.
+- `__kwdefaults__`, annotations, and full signature rendering are still
+  missing.
+- `__text_signature__` currently marks defaulted parameters with `...`
+  instead of rendering real default expressions.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter=PythonScripts.RunsGoldenFiles:Compile.CompilesFunctionDefaultArguments:Bytecode.MetadataNamesAndStackEffects`
+- `ctest --test-dir build --output-on-failure`
+
 ## 2026-05-22 Call-Site Argument Unpacking Slice
 
 Review focus:

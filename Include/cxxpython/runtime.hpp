@@ -185,7 +185,12 @@ namespace cxxpython
         PythonFunctionObject *new_function(std::string name,
                                            CodeObject *code,
                                            DictObject *globals,
+                                           TupleObject *defaults = nullptr,
                                            std::vector<CellObject *> closure = {});
+        PythonFunctionObject *new_function(std::string name,
+                                           CodeObject *code,
+                                           DictObject *globals,
+                                           std::vector<CellObject *> closure);
         Object *call_python_function(PythonFunctionObject *function, DictObject *locals);
         CellObject *new_cell(Object *value = nullptr);
         SuperObject *new_super(TypeObject *start_type, Object *object, TypeObject *object_type);

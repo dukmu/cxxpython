@@ -942,6 +942,7 @@ namespace cxxpython::compiler_internal
     struct FunctionParameters final
     {
         std::vector<std::string> positional;
+        std::vector<std::unique_ptr<Expr>> defaults;
         std::optional<std::string> varargs;
         std::optional<std::string> varkeywords;
     };

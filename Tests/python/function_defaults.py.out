@@ -1,0 +1,19 @@
+hello, Ada!
+hi, Ada!
+hello, Ada.
+('hello', '!')
+(name, prefix=..., suffix=...)
+yo, Ada?
+[1]
+[1, 1]
+1
+2
+()
+{}
+1
+3
+(4,)
+{'flag': True}
+True
+True
+42

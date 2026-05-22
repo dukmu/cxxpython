@@ -89,6 +89,9 @@ namespace cxxpython
         std::string message_;
     };
 
+    constexpr std::uint32_t MakeFunctionHasDefaults = 1U << 31;
+    constexpr std::uint32_t MakeFunctionClosureCountMask = ~MakeFunctionHasDefaults;
+
     class CodeObject final : public Object
     {
     public:

@@ -569,7 +569,13 @@ namespace cxxpython
         case Opcode::ForIter:
             return 1;
         case Opcode::MakeFunction:
-            return instruction.operand == 0 ? 0 : -1;
+        {
+            const std::uint32_t closure_count =
+                instruction.operand & MakeFunctionClosureCountMask;
+            const bool has_defaults =
+                (instruction.operand & MakeFunctionHasDefaults) != 0;
+            return 1 - 1 - static_cast<int>(closure_count != 0) - static_cast<int>(has_defaults);
+        }
         case Opcode::MakeClass:
             return -2;
         case Opcode::DupTop:

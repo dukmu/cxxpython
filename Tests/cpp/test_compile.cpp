@@ -1381,6 +1381,45 @@ TEST(Compile, CompilesVarargsVarkeywordsAndKeywordCalls)
     EXPECT_EQ(extra->value, "value");
 }
 
+TEST(Compile, CompilesFunctionDefaultArguments)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(
+        runtime,
+        "def add(left, right=5):\n"
+        "    return left + right\n"
+        "first = add(2)\n"
+        "second = add(2, 3)\n",
+        "script.py");
+    ASSERT_NE(code, nullptr);
+
+    bool saw_default_function = false;
+    for (const cxxpython::Instruction &instruction : code->instructions())
+    {
+        if (instruction.opcode == cxxpython::Opcode::MakeFunction &&
+            (instruction.operand & cxxpython::MakeFunctionHasDefaults) != 0)
+        {
+            saw_default_function = true;
+        }
+    }
+    EXPECT_TRUE(saw_default_function);
+
+    EXPECT_EQ(vm.execute(*code, *globals), runtime.none());
+    auto *function = dynamic_cast<cxxpython::PythonFunctionObject *>(globals->get(runtime.new_str("add")));
+    ASSERT_NE(function, nullptr);
+    ASSERT_NE(function->defaults(), nullptr);
+    ASSERT_EQ(function->defaults()->size(), 1U);
+    auto *first = dynamic_cast<cxxpython::IntObject *>(globals->get(runtime.new_str("first")));
+    auto *second = dynamic_cast<cxxpython::IntObject *>(globals->get(runtime.new_str("second")));
+    ASSERT_NE(first, nullptr);
+    ASSERT_NE(second, nullptr);
+    EXPECT_EQ(first->value, 7);
+    EXPECT_EQ(second->value, 5);
+}
+
 TEST(Compile, CompilesCallSiteArgumentUnpacking)
 {
     cxxpython::Runtime runtime;

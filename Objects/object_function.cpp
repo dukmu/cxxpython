@@ -54,6 +54,8 @@ namespace cxxpython
                 visitor(function->code());
             if (function->globals())
                 visitor(function->globals());
+            if (function->defaults())
+                visitor(function->defaults());
             for (CellObject *cell : function->closure())
             {
                 if (cell)
@@ -158,6 +160,26 @@ namespace cxxpython
             return require_function_instance(runtime, instance, "__code__")->code();
         }
 
+        Object *function_defaults_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            PythonFunctionObject *function = require_function_instance(runtime, instance, "__defaults__");
+            return function->defaults() ? static_cast<Object *>(function->defaults()) : static_cast<Object *>(runtime.none());
+        }
+
+        void function_defaults_setter(Runtime &runtime, Object *instance, Object *value)
+        {
+            PythonFunctionObject *function = require_function_instance(runtime, instance, "__defaults__");
+            if (!value || value == runtime.none())
+            {
+                function->set_defaults(nullptr);
+                return;
+            }
+            auto *defaults = dynamic_cast<TupleObject *>(value);
+            if (!defaults)
+                raise_type_error(&runtime, "__defaults__ must be set to a tuple or None");
+            function->set_defaults(defaults);
+        }
+
         Object *function_globals_getter(Runtime &runtime, Object *instance, TypeObject *)
         {
             return require_function_instance(runtime, instance, "__globals__")->globals();
@@ -187,11 +209,13 @@ namespace cxxpython
                                                std::string name,
                                                CodeObject *code,
                                                DictObject *globals,
+                                               TupleObject *defaults,
                                                std::vector<CellObject *> closure)
         : Object(type),
           name_(std::move(name)),
           code_(code),
           globals_(globals),
+          defaults_(defaults),
           doc_(nullptr),
           closure_(std::move(closure))
     {
@@ -229,7 +253,11 @@ namespace cxxpython
         };
 
         for (std::uint32_t index = 0; index < code_->arg_count(); ++index)
+        {
             append_name(varname_at(code_, index));
+            if (defaults_ && index >= code_->arg_count() - defaults_->size())
+                signature << "=...";
+        }
         if (code_->has_varargs())
             append_name(varname_at(code_, code_->varargs_index()), "*");
         if (code_->has_varkeywords())
@@ -246,6 +274,18 @@ namespace cxxpython
     DictObject *PythonFunctionObject::globals() const noexcept
     {
         return globals_;
+    }
+
+    TupleObject *PythonFunctionObject::defaults() const noexcept
+    {
+        return defaults_;
+    }
+
+    void PythonFunctionObject::set_defaults(TupleObject *defaults)
+    {
+        if (defaults && defaults->size() > code_->arg_count())
+            raise_type_error(runtime(), "__defaults__ length exceeds positional arguments");
+        defaults_ = defaults;
     }
 
     const std::vector<CellObject *> &PythonFunctionObject::closure() const noexcept
@@ -328,6 +368,15 @@ namespace cxxpython
             if (bound[index])
                 continue;
             StrObject *parameter = varname_at(code_, index);
+            const std::size_t default_count = defaults_ ? defaults_->size() : 0;
+            const std::uint32_t first_default_index =
+                expected - static_cast<std::uint32_t>(default_count);
+            if (index >= first_default_index)
+            {
+                Object *value = defaults_->items()[index - first_default_index];
+                locals->set(parameter, value);
+                continue;
+            }
             raise_type_error(runtime(),
                              name_ + "() missing required positional argument: '" +
                                  parameter->value + "'");
@@ -403,6 +452,11 @@ namespace cxxpython
                                                       type,
                                                       function_code_getter,
                                                       nullptr));
+        type->dict->set(runtime.new_str("__defaults__"),
+                        runtime.new_getset_descriptor("__defaults__",
+                                                      type,
+                                                      function_defaults_getter,
+                                                      function_defaults_setter));
         type->dict->set(runtime.new_str("__globals__"),
                         runtime.new_getset_descriptor("__globals__",
                                                       type,

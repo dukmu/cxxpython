@@ -678,6 +678,7 @@ namespace cxxpython::compiler_internal
                 {
                     bool seen_varargs = false;
                     bool seen_varkeywords = false;
+                    bool seen_default = false;
                     while (true)
                     {
                         bool is_varargs = false;
@@ -706,12 +707,27 @@ namespace cxxpython::compiler_internal
                             raise_at(peek(), "expected parameter name");
                         std::string param = advance().lexeme;
                         ensure_unique_parameter(params, param, previous());
+                        std::unique_ptr<Expr> default_value;
+                        if (!is_varargs && !is_varkeywords && peek().kind == TokenKind::Equal)
+                        {
+                            seen_default = true;
+                            advance();
+                            default_value = parse_expression_only();
+                        }
+                        else if (!is_varargs && !is_varkeywords && seen_default)
+                        {
+                            raise_at(previous(), "non-default argument follows default argument");
+                        }
                         if (is_varkeywords)
                             params.varkeywords = std::move(param);
                         else if (is_varargs)
                             params.varargs = std::move(param);
                         else
+                        {
                             params.positional.push_back(std::move(param));
+                            if (default_value)
+                                params.defaults.push_back(std::move(default_value));
+                        }
                         if (peek().kind != TokenKind::Comma)
                             break;
                         advance();

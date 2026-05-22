@@ -271,6 +271,8 @@ namespace cxxpython
             {
                 for (const auto &decorator : statement.decorators)
                     decorator->accept(*this);
+                for (const auto &default_value : statement.params.defaults)
+                    default_value->accept(*this);
                 (void)symbols_.add_name(statement.name);
             }
 
@@ -843,6 +845,8 @@ namespace cxxpython
             {
                 for (const auto &decorator : statement.decorators)
                     decorator->accept(*this);
+                for (const auto &default_value : statement.params.defaults)
+                    default_value->accept(*this);
             }
 
             void visit(const compiler_internal::ClassDefStmt &statement) override
