@@ -95,6 +95,11 @@ namespace cxxpython
             return object_call(method_root.get(), {});
         }
 
+        Object *heap_sequence_iter_slot(Object &object)
+        {
+            return object.runtime()->new_sequence_iterator(&object);
+        }
+
         bool type_dict_contains(TypeObject *type, const char *name)
         {
             return type && type->dict && type->dict->contains(type->runtime()->new_str(name));
@@ -136,6 +141,40 @@ namespace cxxpython
             if (mutable_object.type() && mutable_object.type()->slots.length)
                 return mutable_object.type()->slots.length(object) != 0;
             return default_truth(object);
+        }
+
+        Object *call_heap_special_one_arg(Object &object, const char *name, Object *arg)
+        {
+            Object *method = object_get_attr(&object, name);
+            auto method_root = object.runtime()->root(method);
+            auto arg_root = object.runtime()->root(arg);
+            return object_call(method_root.get(), {arg_root.get()});
+        }
+
+        Object *heap_getitem_slot(Object &object, Object *key)
+        {
+            return call_heap_special_one_arg(object, "__getitem__", key);
+        }
+
+        void heap_setitem_slot(Object &object, Object *key, Object *value)
+        {
+            Object *method = object_get_attr(&object, "__setitem__");
+            auto method_root = object.runtime()->root(method);
+            auto key_root = object.runtime()->root(key);
+            auto value_root = object.runtime()->root(value);
+            (void)object_call(method_root.get(), {key_root.get(), value_root.get()});
+        }
+
+        void heap_delitem_slot(Object &object, Object *key)
+        {
+            (void)call_heap_special_one_arg(object, "__delitem__", key);
+        }
+
+        bool heap_contains_slot(Object &object, Object *key)
+        {
+            Object *result = call_heap_special_one_arg(object, "__contains__", key);
+            auto result_root = object.runtime()->root(result);
+            return is_true(result_root.get());
         }
 
         Object *object_getattribute_method(Runtime &runtime, Object *self, ObjectSpan args)
@@ -975,6 +1014,27 @@ namespace cxxpython
             raise_type_error(object ? object->runtime() : nullptr, "contains target and key cannot be null");
         if (object->type() && object->type()->slots.contains)
             return object->type()->slots.contains(*object, key);
+        if (object->type() && object->type()->slots.iter)
+        {
+            Object *iterator = object_iter(object);
+            auto iterator_root = object->runtime()->root(iterator);
+            while (true)
+            {
+                try
+                {
+                    Object *item = object_next(iterator_root.get());
+                    auto item_root = object->runtime()->root(item);
+                    if (object_equal(item_root.get(), key))
+                        return true;
+                }
+                catch (const PythonError &error)
+                {
+                    if (error.type() == object->runtime()->stop_iteration_type())
+                        return false;
+                    throw;
+                }
+            }
+        }
 
         std::ostringstream message;
         message << "argument of type '" << type_qualified_name(object->type())
@@ -1042,6 +1102,10 @@ namespace cxxpython
         type->slots.iternext = type->base ? type->base->slots.iternext : nullptr;
         type->slots.length = type->base ? type->base->slots.length : nullptr;
         type->slots.truth = type->base ? type->base->slots.truth : default_truth;
+        type->slots.getitem = type->base ? type->base->slots.getitem : nullptr;
+        type->slots.setitem = type->base ? type->base->slots.setitem : nullptr;
+        type->slots.delitem = type->base ? type->base->slots.delitem : nullptr;
+        type->slots.contains = type->base ? type->base->slots.contains : nullptr;
         if (type_dict_contains(type, "__len__"))
         {
             type->slots.length = heap_length_slot;
@@ -1053,6 +1117,16 @@ namespace cxxpython
             type->slots.iter = heap_iter_slot;
         if (type_dict_contains(type, "__next__"))
             type->slots.iternext = heap_iternext_slot;
+        if (type_dict_contains(type, "__getitem__"))
+            type->slots.getitem = heap_getitem_slot;
+        if (type_dict_contains(type, "__setitem__"))
+            type->slots.setitem = heap_setitem_slot;
+        if (type_dict_contains(type, "__delitem__"))
+            type->slots.delitem = heap_delitem_slot;
+        if (type_dict_contains(type, "__contains__"))
+            type->slots.contains = heap_contains_slot;
+        if (!type->slots.iter && type->slots.length && type->slots.getitem)
+            type->slots.iter = heap_sequence_iter_slot;
     }
 
     Object *object_get_attr_default(Object *object, StrObject *name)

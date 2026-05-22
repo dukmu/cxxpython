@@ -1,5 +1,57 @@
 # Development Status
 
+## 2026-05-22 Heap Item Membership Slot Refresh Slice
+
+Review focus:
+
+- Continue heap special-method refresh into subscript and membership
+  protocols.
+- Keep `x[i]`, `x[i] = v`, `del x[i]`, and `item in x` on the same
+  `TypeSlots` path used by VM opcodes and builtins.
+- Add the old sequence-protocol iterator fallback for heap classes that define
+  `__len__` and `__getitem__` but not `__iter__`.
+
+Completed:
+
+- Extended heap slot refresh to populate:
+  - `TypeSlots::getitem` from `__getitem__`;
+  - `TypeSlots::setitem` from `__setitem__`;
+  - `TypeSlots::delitem` from `__delitem__`;
+  - `TypeSlots::contains` from `__contains__`.
+- Added heap thunks that call Python-defined item/membership special methods
+  through descriptor binding and `object_call`.
+- Added membership fallback in `object_contains(...)`: when no contains slot
+  exists but an iterator slot does, `in` walks the iterator and compares items.
+- Added sequence iterator fallback for heap classes with length and getitem
+  slots but no explicit iterator.
+- Added Python golden coverage for subscript load/store/delete, membership,
+  runtime assignment/deletion of `__getitem__`, truth conversion from
+  `__contains__`, iterator membership fallback, and sequence-protocol
+  iteration.
+
+Design notes:
+
+- VM opcodes remain thin: `BINARY_SUBSCR`, `STORE_SUBSCR`, `DELETE_SUBSCR`,
+  and `COMPARE_OP in/not in` dispatch through object protocol helpers.
+- The slot refresh mechanism is now broad enough that further expansion should
+  move toward a compact special-method descriptor table, not more scattered
+  string checks.
+
+Known debt and next risk:
+
+- Numeric, comparison, and `__call__` heap special methods still do not refresh
+  slots.
+- Subclass invalidation after base type mutation remains unresolved.
+- Sequence iteration currently relies on `__len__` stopping the iterator; a
+  future CPython-closer path should also handle `IndexError` termination for
+  objects without reliable length.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter=PythonScripts.RunsGoldenFiles`
+- `ctest --test-dir build --output-on-failure`
+
 ## 2026-05-22 Heap Truth Length Slot Refresh Slice
 
 Review focus:
