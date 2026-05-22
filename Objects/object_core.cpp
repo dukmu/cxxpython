@@ -81,6 +81,25 @@ namespace cxxpython
             return type.runtime()->allocate<Object>(&type);
         }
 
+        Object *heap_iter_slot(Object &object)
+        {
+            Object *method = object_get_attr(&object, "__iter__");
+            auto method_root = object.runtime()->root(method);
+            return object_call(method_root.get(), {});
+        }
+
+        Object *heap_iternext_slot(Object &object)
+        {
+            Object *method = object_get_attr(&object, "__next__");
+            auto method_root = object.runtime()->root(method);
+            return object_call(method_root.get(), {});
+        }
+
+        bool type_dict_contains(TypeObject *type, const char *name)
+        {
+            return type && type->dict && type->dict->contains(type->runtime()->new_str(name));
+        }
+
         Object *object_getattribute_method(Runtime &runtime, Object *self, ObjectSpan args)
         {
             if (args.size() != 1)
@@ -977,6 +996,18 @@ namespace cxxpython
         return nullptr;
     }
 
+    void refresh_heap_type_slots_from_dict(TypeObject *type)
+    {
+        if (!type || (type->flags & TypeFlagHeapType) == 0)
+            return;
+        type->slots.iter = type->base ? type->base->slots.iter : nullptr;
+        type->slots.iternext = type->base ? type->base->slots.iternext : nullptr;
+        if (type_dict_contains(type, "__iter__"))
+            type->slots.iter = heap_iter_slot;
+        if (type_dict_contains(type, "__next__"))
+            type->slots.iternext = heap_iternext_slot;
+    }
+
     Object *object_get_attr_default(Object *object, StrObject *name)
     {
         if (!object || !name)
@@ -1178,6 +1209,7 @@ namespace cxxpython
                 return;
             }
             type->dict->set(name, value);
+            refresh_heap_type_slots_from_dict(type);
             return;
         }
 
@@ -1244,7 +1276,10 @@ namespace cxxpython
                 return;
             }
             if (type->dict->erase(name))
+            {
+                refresh_heap_type_slots_from_dict(type);
                 return;
+            }
         }
         else
         {

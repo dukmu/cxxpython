@@ -820,6 +820,7 @@ namespace cxxpython
     void object_delete_attr(Object *object, StrObject *name);
     void object_delete_attr(Object *object, const std::string &name);
     Object *type_lookup_attribute(TypeObject *type, StrObject *name);
+    void refresh_heap_type_slots_from_dict(TypeObject *type);
     std::string object_str(const Object *object);
     std::string object_repr(const Object *object);
     std::string type_qualified_name(const TypeObject *type);

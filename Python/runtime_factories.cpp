@@ -566,6 +566,7 @@ namespace cxxpython
             if (entry.key && entry.value)
                 type->dict->set(entry.key, entry.value);
         }
+        refresh_heap_type_slots_from_dict(type);
         if (namespace_module)
             type->module = namespace_module->value;
         else

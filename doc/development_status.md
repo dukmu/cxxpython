@@ -1,5 +1,60 @@
 # Development Status
 
+## 2026-05-22 Heap Iterator Slot Refresh Slice
+
+Review focus:
+
+- Close the type-system openness gap where Python heap classes could define
+  `__iter__` and `__next__`, but object protocol dispatch still ignored them.
+- Keep protocol dispatch CPython-like: special methods update type slots at
+  type creation/update time, instead of having VM opcodes or builtins look up
+  names ad hoc.
+- Establish a clear slot-refresh extension point for future `__len__`,
+  numeric, comparison, and mapping special methods.
+
+Completed:
+
+- Added `refresh_heap_type_slots_from_dict(TypeObject *)` in the object layer.
+- Added heap iterator slot thunks for Python-defined `__iter__` and
+  `__next__`, dispatching through normal descriptor binding and `object_call`.
+- Called slot refresh after `Runtime::new_class(...)` copies the class
+  namespace into the type dictionary.
+- Refreshed heap slots when attributes are assigned to or deleted from a type,
+  so runtime updates such as `C.__iter__ = f` affect protocol dispatch.
+- Added Python golden coverage for:
+  - `list(Counter(...))` using Python-defined `__iter__`/`__next__`;
+  - `for` loops over heap iterators;
+  - `iter()`/`next()` over heap iterators;
+  - inherited `__iter__`;
+  - runtime assignment and deletion of `__iter__`.
+
+Design notes:
+
+- This intentionally avoids adding special lookup paths to `object_iter()` or
+  `object_next()`. They continue to dispatch through `TypeSlots`.
+- Slot refresh currently covers only the iterator family. The mechanism is the
+  right place to add length, item access, contains, numeric, comparison, call,
+  and descriptor-family special methods as the runtime grows.
+- Deleting a heap special method resets the slot to the base type's slot,
+  preserving inherited behavior.
+
+Known debt and next risk:
+
+- Python-defined `__len__`, `__getitem__`, `__contains__`, arithmetic dunders,
+  comparison dunders, and `__call__` still do not refresh slots.
+- The refresh logic is currently hand-written. It should evolve toward a small
+  declarative special-method-to-slot table rather than a growing chain of
+  string checks.
+- Subclasses are not automatically invalidated when a base class gains or
+  loses a special method after subclass creation. A type version/invalidation
+  mechanism will be needed before broader mutable type semantics.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter=PythonScripts.RunsGoldenFiles`
+- `ctest --test-dir build --output-on-failure`
+
 ## 2026-05-22 Streaming Builtin Iterator Slice
 
 Review focus:
