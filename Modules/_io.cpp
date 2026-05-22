@@ -38,8 +38,7 @@ namespace cxxpython
         Object *io_open(Runtime &runtime, const CallArguments &args)
         {
             require_no_keywords(&runtime, "open", args);
-            if (args.positional.empty() || args.positional.size() > 2)
-                raise_type_error(&runtime, "open() expected 1 or 2 positional arguments");
+            require_positional_range(&runtime, "open", args, 1, 2);
             auto *path = dynamic_cast<StrObject *>(args.positional[0]);
             if (!path)
                 raise_type_error(&runtime, "open() path must be str");

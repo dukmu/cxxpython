@@ -1,5 +1,48 @@
 # Development Status
 
+## 2026-05-22 Native Positional Argument Range Slice
+
+Review focus:
+
+- Reduce repeated handwritten argument-count checks in native functions and
+  builtin type constructors.
+- Prepare for a future Argument Clinic-like signature/validation table without
+  doing a large mechanical rewrite in one step.
+
+Completed:
+
+- Added `require_positional_range(...)` to `Objects/object_utils`.
+- Migrated representative one-to-N native call sites:
+  - builtins: `sum`, `format`, `eval`, `exec`, `__import__`;
+  - native IO: `_io.open`;
+  - builtin iterable types: `range`, `enumerate`.
+- Added Python golden coverage for the shared range-error wording.
+
+Design notes:
+
+- This keeps validation at the native boundary but gives those boundaries a
+  common vocabulary. It is a small step toward table-driven parsing while
+  avoiding premature generator machinery.
+- Existing exact-count and max-count helpers remain useful for the simpler
+  fast paths; range validation only covers genuinely variable arity.
+
+Known debt and next risk:
+
+- Many type methods still hand-format exact-count messages. Move them
+  incrementally to shared helpers or metadata-backed descriptors.
+- Keyword parsing is still bespoke for richer native callables such as
+  `print`; a keyword-aware parser helper should come before expanding
+  keyword-heavy builtins.
+- Error wording is intentionally stable for current tests, not yet a complete
+  CPython clone.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/cxxpython Tests/python/argument_range_errors.py`
+- `build/test_core_objects --gtest_filter=PythonScripts.RunsGoldenFiles`
+- `ctest --test-dir build --output-on-failure`
+
 ## 2026-05-22 Native Module Definition Metadata Slice
 
 Review focus:

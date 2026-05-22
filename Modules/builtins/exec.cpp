@@ -76,8 +76,7 @@ namespace cxxpython
     Object *builtin_eval(Runtime &runtime, const CallArguments &args)
     {
         require_no_keywords(&runtime, "eval", args);
-        if (args.positional.empty() || args.positional.size() > 3)
-            raise_type_error(&runtime, "eval() expected 1 to 3 arguments");
+        require_positional_range(&runtime, "eval", args, 1, 3);
         Frame *frame = current_frame_or_error(runtime, "eval");
         DictObject *globals = optional_dict_arg(runtime, args, 1, frame->globals(), "eval", "globals");
         DictObject *locals = optional_dict_arg(runtime, args, 2, globals, "eval", "locals");
@@ -99,8 +98,7 @@ namespace cxxpython
     Object *builtin_exec(Runtime &runtime, const CallArguments &args)
     {
         require_no_keywords(&runtime, "exec", args);
-        if (args.positional.empty() || args.positional.size() > 3)
-            raise_type_error(&runtime, "exec() expected 1 to 3 arguments");
+        require_positional_range(&runtime, "exec", args, 1, 3);
         Frame *frame = current_frame_or_error(runtime, "exec");
         DictObject *globals = optional_dict_arg(runtime, args, 1, frame->globals(), "exec", "globals");
         DictObject *locals = optional_dict_arg(runtime, args, 2, globals, "exec", "locals");

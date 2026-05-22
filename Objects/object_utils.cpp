@@ -124,6 +124,32 @@ namespace cxxpython
         raise_type_error(runtime, message.str());
     }
 
+    void require_positional_range(Runtime *runtime,
+                                  std::string_view callable,
+                                  const CallArguments &args,
+                                  std::size_t minimum,
+                                  std::size_t maximum)
+    {
+        const std::size_t count = args.positional.size();
+        if (count >= minimum && count <= maximum)
+            return;
+        std::ostringstream message;
+        message << callable_name(callable) << " expected ";
+        if (minimum == maximum)
+        {
+            message << argument_count_phrase(minimum);
+        }
+        else if (minimum + 1 == maximum)
+        {
+            message << minimum << " or " << maximum << " arguments";
+        }
+        else
+        {
+            message << minimum << " to " << maximum << " arguments";
+        }
+        raise_type_error(runtime, message.str());
+    }
+
     const char *binary_op_symbol(BinaryOp op)
     {
         switch (op)

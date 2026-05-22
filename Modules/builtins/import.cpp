@@ -54,8 +54,7 @@ namespace cxxpython
     Object *builtin_import(Runtime &runtime, const CallArguments &args)
     {
         require_no_keywords(&runtime, "__import__", args);
-        if (args.positional.empty() || args.positional.size() > 5)
-            raise_type_error(&runtime, "__import__() expected 1 to 5 arguments");
+        require_positional_range(&runtime, "__import__", args, 1, 5);
         auto *name = dynamic_cast<StrObject *>(args.positional[0]);
         if (!name)
             raise_type_error(&runtime, "__import__() name must be str");

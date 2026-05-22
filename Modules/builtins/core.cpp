@@ -199,8 +199,7 @@ namespace cxxpython
     Object *builtin_sum(Runtime &runtime, const CallArguments &args)
     {
         require_no_keywords(&runtime, "sum", args);
-        if (args.positional.empty() || args.positional.size() > 2)
-            raise_type_error(&runtime, "sum() takes one or two positional arguments");
+        require_positional_range(&runtime, "sum", args, 1, 2);
 
         Object *total = args.positional.size() == 2 ? args.positional[1] : runtime.new_int(0);
         auto total_root = runtime.root(total);
@@ -238,8 +237,7 @@ namespace cxxpython
     Object *builtin_format(Runtime &runtime, const CallArguments &args)
     {
         require_no_keywords(&runtime, "format", args);
-        if (args.positional.empty() || args.positional.size() > 2)
-            raise_type_error(&runtime, "format() expected 1 or 2 arguments");
+        require_positional_range(&runtime, "format", args, 1, 2);
         Object *value = args.positional[0];
         auto value_root = runtime.root(value);
         Object *spec = args.positional.size() == 2 ? args.positional[1] : runtime.new_str("");

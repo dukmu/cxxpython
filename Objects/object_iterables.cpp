@@ -35,8 +35,7 @@ namespace cxxpython
         RangeArguments parse_range_args(Runtime *runtime, const CallArguments &args)
         {
             require_no_keywords(runtime, "range", args);
-            if (args.positional.empty() || args.positional.size() > 3)
-                raise_type_error(runtime, "range() expected 1 to 3 arguments");
+            require_positional_range(runtime, "range", args, 1, 3);
 
             RangeArguments parsed;
             if (args.positional.size() == 1)
@@ -159,8 +158,7 @@ namespace cxxpython
         Object *enumerate_new(TypeObject &type, const CallArguments &args)
         {
             require_no_keywords(type.runtime(), "enumerate", args);
-            if (args.positional.empty() || args.positional.size() > 2)
-                raise_type_error(type.runtime(), "enumerate() expected 1 or 2 arguments");
+            require_positional_range(type.runtime(), "enumerate", args, 1, 2);
             std::int64_t start = 0;
             if (args.positional.size() == 2)
                 start = require_int_arg(type.runtime(), "enumerate", args.positional[1]);
@@ -172,8 +170,7 @@ namespace cxxpython
         void enumerate_init(Object &object, const CallArguments &args)
         {
             require_no_keywords(object.runtime(), "enumerate", args);
-            if (args.positional.empty() || args.positional.size() > 2)
-                raise_type_error(object.runtime(), "enumerate() expected 1 or 2 arguments");
+            require_positional_range(object.runtime(), "enumerate", args, 1, 2);
             if (args.positional.size() == 2)
                 (void)require_int_arg(object.runtime(), "enumerate", args.positional[1]);
         }

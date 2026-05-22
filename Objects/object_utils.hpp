@@ -27,6 +27,11 @@ namespace cxxpython
                                     std::string_view callable,
                                     const CallArguments &args,
                                     std::size_t maximum);
+    void require_positional_range(Runtime *runtime,
+                                  std::string_view callable,
+                                  const CallArguments &args,
+                                  std::size_t minimum,
+                                  std::size_t maximum);
     const char *binary_op_symbol(BinaryOp op);
     std::string unsupported_binary_op_message(BinaryOp op, const Object *left, const Object *right);
     const char *unary_op_symbol(UnaryOp op);
