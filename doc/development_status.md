@@ -1,5 +1,58 @@
 # Development Status
 
+## 2026-05-22 Descriptor Layer Split Slice
+
+Review focus:
+
+- Remove the layering violation where `Objects/object_descriptor.cpp`
+  implemented getset descriptor mechanics and also registered object, type,
+  code, function, and frame attributes.
+- Keep foundational descriptor objects independent from VM/bytecode headers.
+- Preserve current script-visible behavior while making the next attribute and
+  introspection work less tangled.
+
+Completed:
+
+- Reduced `Objects/object_descriptor.cpp` to the getset descriptor object and
+  its slots only.
+- Moved runtime registration of `__class__`, `__dict__`, `__doc__`,
+  `type.__base__`, `type.__bases__`, `type.__mro__`, `type.__qualname__`,
+  code-object attributes, function attributes, and frame attributes into
+  `Python/runtime_type_descriptors.cpp`.
+- Added the new runtime descriptor translation unit to the core build.
+- Verified that descriptor mechanics no longer pull `bytecode.hpp` or
+  `vm.hpp` into the descriptor object implementation.
+
+Design notes:
+
+- `GetSetDescriptorObject` is now a reusable object-layer primitive.
+  Per-type descriptor registration is runtime bootstrapping policy, not part
+  of the descriptor object's storage/dispatch implementation.
+- Code/function/frame attributes remain intentionally registered from the
+  Python/runtime side because they expose execution objects to the script
+  layer and require bytecode/VM layouts.
+- This split is behavior-preserving; it is an architecture slice before adding
+  richer descriptor and introspection protocols.
+
+Known debt and next risk:
+
+- `Objects/object_core.cpp`, `Objects/object_function.cpp`,
+  `Objects/object_method.cpp`, and `Objects/object_super.cpp` still include
+  `vm.hpp`. Review each dependency and move VM-specific call/class/super
+  behavior behind Runtime or Python-layer helpers where practical.
+- Star import lowering still needs to use module `__all__` with CPython's
+  fallback behavior for public names.
+- Parser syntax still lacks boolean `and/or`, `while`, augmented assignment,
+  relative import syntax, and more complete import statement variants.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects '--gtest_filter=Attributes.*:Bytecode.*:PythonScripts.RunsGoldenFiles:Module.*'`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all 195 tests pass.
+
 ## 2026-05-22 Parser Syntax and Stdlib Export Slice
 
 Review focus:
