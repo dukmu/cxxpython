@@ -1,5 +1,65 @@
 # Development Status
 
+## 2026-05-22 Script-Layer REPL Slice
+
+Review focus:
+
+- Move interactive execution policy out of `Programs/cxxpython.cpp` and into
+  the script stdlib, following CPython's `code.InteractiveConsole` direction.
+- Keep native C++ responsible only for process integration: program startup,
+  tty/readline line input, and final bootstrap error reporting.
+- Expose just enough exception metadata to let script code format REPL errors
+  without hard-coding traceback policy in the launcher.
+
+Completed:
+
+- Added `Lib/code.py` with `InteractiveInterpreter`,
+  `InteractiveConsole`, `compile_command()`, and `interact()`.
+- Reworked `Programs/cxxpython.cpp` so the REPL imports `code`, creates an
+  `InteractiveConsole` over the `__main__` module dictionary, and delegates
+  every entered line to `console.push()`.
+- Preserved readline-backed input for real TTY sessions and stdin fallback
+  prompts for deterministic CLI tests.
+- Added script-visible `type.__name__`, `BaseException.args`, and a minimal
+  `BaseException.__traceback__` facade so Python code can render exception
+  names, messages, and traceback locations.
+- Added `Tests/python/code_module.py` golden coverage for expression output,
+  persistent locals, blank-line block submission, handled exceptions, and
+  REPL traceback formatting.
+
+Design notes:
+
+- The launcher now has no compile/eval/exec decision tree and no
+  incomplete-input string matching. Those decisions live in `Lib/code.py`.
+- `Lib/code.py` intentionally avoids depending on missing convenience
+  builtins such as `reversed()` and missing string methods such as
+  `str.join()`. That keeps this slice focused on REPL architecture while
+  leaving those builtin/type gaps visible.
+- `__traceback__` is currently a list of `(filename, line, name)` tuples. It
+  is a script-visible seed for formatting, not the final CPython traceback
+  object model.
+
+Known debt and next risk:
+
+- `compile_command()` still recognizes incomplete input from existing
+  `SyntaxError` messages. The compiler should eventually return a structured
+  "incomplete input" result, similar to CPython `codeop`.
+- The real traceback object/type, exception chaining, and `traceback` module
+  are still missing.
+- The script-level REPL currently works around missing `str.join()` and
+  `reversed()`; these should be added as ordinary builtin/type features, not
+  REPL-specific helpers.
+- `Programs/cxxpython.cpp` still owns the banner and line acquisition loop.
+  A later `site`/startup layer can move banner policy and optional startup
+  hooks further into Python.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/cxxpython Tests/python/code_module.py`
+- `ctest --test-dir build -R "Cli|PythonScripts" --output-on-failure`
+- `ctest --test-dir build --output-on-failure`
+
 ## 2026-05-22 POSIX Process Signal Slice
 
 Review focus:

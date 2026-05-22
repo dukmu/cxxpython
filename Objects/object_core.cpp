@@ -769,6 +769,12 @@ namespace cxxpython
             return runtime.new_str(type->name);
         }
 
+        Object *type_name_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            TypeObject *type = require_type_instance(runtime, instance, "__name__");
+            return runtime.new_str(type->name);
+        }
+
         bool is_not_implemented(Object *object)
         {
             return object && object->runtime() && object == object->runtime()->not_implemented();
@@ -1799,6 +1805,11 @@ namespace cxxpython
                         runtime.new_getset_descriptor("__mro__",
                                                       type,
                                                       type_mro_getter,
+                                                      nullptr));
+        type->dict->set(runtime.new_str("__name__"),
+                        runtime.new_getset_descriptor("__name__",
+                                                      type,
+                                                      type_name_getter,
                                                       nullptr));
         type->dict->set(runtime.new_str("__qualname__"),
                         runtime.new_getset_descriptor("__qualname__",

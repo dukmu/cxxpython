@@ -45,16 +45,6 @@ namespace
         std::cerr << error.type_name() << ": " << error.what() << "\n";
     }
 
-    bool is_incomplete_input(const cxxpython::PythonError &error)
-    {
-        if (error.type_name() != "SyntaxError")
-            return false;
-        const std::string message = error.what();
-        return message.find("expected indented block") != std::string::npos ||
-               message.find("expected except after try block") != std::string::npos ||
-               message.find("expected except or finally after try block") != std::string::npos;
-    }
-
     bool should_use_readline() noexcept
     {
         return isatty(STDIN_FILENO) != 0 && isatty(STDOUT_FILENO) != 0;
@@ -89,10 +79,8 @@ namespace
     {
         std::cout << "cxxpython 0.1.0-dev\n";
         runtime.add_module_search_path(std::filesystem::current_path().string());
-        cxxpython::VirtualMachine vm(runtime);
         cxxpython::ModuleObject *module = runtime.new_module("__main__", "<stdin>");
-        std::string pending_source;
-        bool pending_block = false;
+        auto module_root = runtime.root(module);
         const bool interactive = should_use_readline();
 
 #ifdef CXXPYTHON_HAS_READLINE
@@ -103,91 +91,65 @@ namespace
         }
 #endif
 
+        cxxpython::ModuleObject *code_module = nullptr;
+        cxxpython::Object *console = nullptr;
+        try
+        {
+            code_module = runtime.import_module("code");
+            auto code_module_root = runtime.root(code_module);
+            cxxpython::Object *console_type = cxxpython::object_get_attr(code_module_root.get(), "InteractiveConsole");
+            auto console_type_root = runtime.root(console_type);
+            console = cxxpython::object_call(console_type_root.get(), {module_root->dict()});
+        }
+        catch (const cxxpython::PythonError &error)
+        {
+            print_python_error(error);
+            return 1;
+        }
+        catch (const cxxpython::BytecodeError &error)
+        {
+            std::cerr << "BytecodeError: " << error.what() << "\n";
+            return 1;
+        }
+
+        auto console_root = runtime.root(console);
+        bool pending_block = false;
         while (true)
         {
             std::optional<std::string> maybe_line =
                 read_repl_line(pending_block ? "... " : ">>> ", interactive);
             if (!maybe_line)
                 break;
-            const std::string &line = *maybe_line;
-
-            pending_source += line;
-            pending_source += '\n';
-            if (pending_block && !line.empty())
-                continue;
-
-            cxxpython::CodeObject *code = nullptr;
-            bool print_result = false;
-            if (!pending_block)
-            {
-                try
-                {
-                    code = cxxpython::compile_eval_input(runtime, line, "<stdin>");
-                    print_result = true;
-                }
-                catch (const cxxpython::PythonError &error)
-                {
-                    if (error.type_name() != "SyntaxError")
-                    {
-                        print_python_error(error);
-                        pending_source.clear();
-                        continue;
-                    }
-                }
-            }
-
-            if (!code)
-            {
-                try
-                {
-                    code = cxxpython::compile_exec_input(runtime, pending_source, "<stdin>");
-                }
-                catch (const cxxpython::PythonError &error)
-                {
-                    if (is_incomplete_input(error))
-                    {
-                        pending_block = true;
-                        continue;
-                    }
-                    print_python_error(error);
-                    pending_source.clear();
-                    pending_block = false;
-                    continue;
-                }
-            }
 
             try
             {
-                cxxpython::Object *result = vm.execute(cxxpython::ExecutionRequest{
-                    .code = code,
-                    .locals = module->dict(),
-                    .globals = module->dict(),
-                    .builtins = runtime.builtins_dict(),
-                    .module = module,
-                    .closure = {},
-                    .mode = print_result ? cxxpython::ExecutionMode::Eval : cxxpython::ExecutionMode::Exec,
-                });
-                if (print_result && result != runtime.none())
-                    std::cout << cxxpython::object_repr(result) << "\n";
+                cxxpython::Object *push = cxxpython::object_get_attr(console_root.get(), "push");
+                auto push_root = runtime.root(push);
+                cxxpython::StrObject *line = runtime.new_str(*maybe_line);
+                auto line_root = runtime.root(line);
+                cxxpython::Object *more = cxxpython::object_call(push_root.get(), {line_root.get()});
+                auto more_root = runtime.root(more);
+                pending_block = cxxpython::is_true(more_root.get());
             }
             catch (const cxxpython::PythonError &error)
             {
                 print_python_error(error);
+                pending_block = false;
             }
             catch (const cxxpython::BytecodeError &error)
             {
                 std::cerr << "BytecodeError: " << error.what() << "\n";
+                pending_block = false;
             }
-
-            pending_source.clear();
-            pending_block = false;
         }
 
-        if (pending_block && !pending_source.empty())
+        if (pending_block)
         {
             try
             {
-                (void)cxxpython::compile_exec_input(runtime, pending_source, "<stdin>");
+                cxxpython::Object *finalize = cxxpython::object_get_attr(console_root.get(), "finalize");
+                auto finalize_root = runtime.root(finalize);
+                (void)cxxpython::object_call(finalize_root.get(), {});
             }
             catch (const cxxpython::PythonError &error)
             {
@@ -195,6 +157,7 @@ namespace
                 return 1;
             }
         }
+
         return 0;
     }
 }

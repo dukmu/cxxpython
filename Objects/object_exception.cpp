@@ -2,6 +2,7 @@
 #include "cxxpython/runtime.hpp"
 
 #include "object_utils.hpp"
+#include "type_initialization.hpp"
 
 namespace cxxpython
 {
@@ -32,6 +33,41 @@ namespace cxxpython
             auto *error = static_cast<const ExceptionObject *>(&object);
             if (error->args())
                 visitor(error->args());
+        }
+
+        ExceptionObject *require_exception(Runtime &runtime, Object *instance, const char *name)
+        {
+            auto *error = dynamic_cast<ExceptionObject *>(instance);
+            if (!error)
+                raise_type_error(&runtime, std::string(name) + " descriptor receiver does not have exception layout");
+            return error;
+        }
+
+        Object *exception_args_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            ExceptionObject *error = require_exception(runtime, instance, "args");
+            return error->args() ? static_cast<Object *>(error->args()) : static_cast<Object *>(runtime.new_tuple({}));
+        }
+
+        Object *exception_traceback_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            ExceptionObject *error = require_exception(runtime, instance, "__traceback__");
+            std::vector<Object *> entries;
+            entries.reserve(error->traceback_entries().size());
+            std::vector<Rooted<Object>> roots;
+            for (const ExceptionObject::TracebackEntry &entry : error->traceback_entries())
+            {
+                Object *filename = runtime.new_str(entry.filename);
+                Object *line = runtime.new_int(static_cast<std::int64_t>(entry.line));
+                Object *name = runtime.new_str(entry.name);
+                roots.push_back(runtime.root(filename));
+                roots.push_back(runtime.root(line));
+                roots.push_back(runtime.root(name));
+                Object *tuple = runtime.new_tuple({filename, line, name});
+                roots.push_back(runtime.root(tuple));
+                entries.push_back(tuple);
+            }
+            return runtime.new_list(std::move(entries));
         }
 
         Object *exception_new(TypeObject &type, const CallArguments &args)
@@ -123,6 +159,20 @@ namespace cxxpython
             .new_object = exception_new,
             .init = exception_init,
         };
+    }
+
+    void initialize_exception_type_descriptors(Runtime &runtime, TypeObject *type)
+    {
+        type->dict->set(runtime.new_str("args"),
+                        runtime.new_getset_descriptor("args",
+                                                      type,
+                                                      exception_args_getter,
+                                                      nullptr));
+        type->dict->set(runtime.new_str("__traceback__"),
+                        runtime.new_getset_descriptor("__traceback__",
+                                                      type,
+                                                      exception_traceback_getter,
+                                                      nullptr));
     }
 
     void raise_stop_iteration(Runtime *runtime)
