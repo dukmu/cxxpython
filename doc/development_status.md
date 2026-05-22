@@ -1,5 +1,61 @@
 # Development Status
 
+## 2026-05-22 Keyword-Only Function Signature Slice
+
+Review focus:
+
+- Continue tightening function signature semantics before expanding builtins
+  and inspect-facing APIs.
+- Keep mutable function runtime state on PythonFunctionObject, while making
+  immutable argument layout visible through CodeObject metadata.
+- Avoid VM-local argument binding special cases.
+
+Completed:
+
+- Parser now supports bare `*`, keyword-only parameters, keyword-only
+  defaults, and keyword-only parameters after `*args`.
+- Added `CodeObject::kwonly_arg_count()` and exposed
+  `co_kwonlyargcount` at script level.
+- Updated argument layout to positional, keyword-only, `*args`, then
+  `**kwargs`; varargs/varkeywords indices now account for keyword-only slots.
+- Added `MAKE_FUNCTION` keyword-defaults flag and VM support for popping a
+  keyword-default dict alongside positional defaults and closures.
+- PythonFunctionObject now stores, traverses, binds, and exposes mutable
+  `__kwdefaults__`.
+- Function calls now bind keyword-only arguments, fill keyword-only defaults,
+  and raise missing required keyword-only errors.
+- Improved positional-count TypeError wording to include “positional” for the
+  supplied argument count.
+- Added C++ and Python golden coverage for keyword-only signatures,
+  `__kwdefaults__`, `co_kwonlyargcount`, default evaluation in enclosing
+  scopes, and `*args`/`**kwargs` interaction.
+
+Design notes:
+
+- Keyword-only defaults live on PythonFunctionObject rather than CodeObject,
+  matching the mutable `__kwdefaults__` model.
+- CodeObject owns only the immutable slot layout: positional count,
+  keyword-only count, flags, and varname order.
+- The old C++ `Runtime::new_code(...)` overload remains available and forwards
+  to the full metadata constructor with `kwonly_arg_count = 0`.
+
+Known debt and next risk:
+
+- Positional-only parameters, annotations, and full signature rendering are
+  still absent.
+- `__text_signature__` still renders defaults as `...`; proper `inspect`
+  support needs a richer signature object or metadata path.
+- Keyword binding still scans parameter names linearly; acceptable for now,
+  but function call performance will need a compact signature cache once
+  argument semantics stabilize.
+- Call-site `**` unpacking still only accepts concrete dicts rather than
+  mapping protocol objects.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter=PythonScripts.RunsGoldenFiles:Compile.CompilesKeywordOnlyArguments:Compile.CompilesFunctionDefaultArguments:Bytecode.MetadataNamesAndStackEffects`
+
 ## 2026-05-22 Function Default Arguments Slice
 
 Review focus:

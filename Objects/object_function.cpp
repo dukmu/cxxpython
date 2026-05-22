@@ -56,6 +56,8 @@ namespace cxxpython
                 visitor(function->globals());
             if (function->defaults())
                 visitor(function->defaults());
+            if (function->kwdefaults())
+                visitor(function->kwdefaults());
             for (CellObject *cell : function->closure())
             {
                 if (cell)
@@ -133,8 +135,14 @@ namespace cxxpython
         std::uint32_t argument_slot_count(const CodeObject *code)
         {
             return code->arg_count() +
+                   code->kwonly_arg_count() +
                    (code->has_varargs() ? 1U : 0U) +
                    (code->has_varkeywords() ? 1U : 0U);
+        }
+
+        std::uint32_t keyword_only_index(const CodeObject *code, std::uint32_t index)
+        {
+            return code->arg_count() + index;
         }
 
         PythonFunctionObject *require_function_instance(Runtime &runtime, Object *instance, const char *name)
@@ -180,6 +188,26 @@ namespace cxxpython
             function->set_defaults(defaults);
         }
 
+        Object *function_kwdefaults_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            PythonFunctionObject *function = require_function_instance(runtime, instance, "__kwdefaults__");
+            return function->kwdefaults() ? static_cast<Object *>(function->kwdefaults()) : static_cast<Object *>(runtime.none());
+        }
+
+        void function_kwdefaults_setter(Runtime &runtime, Object *instance, Object *value)
+        {
+            PythonFunctionObject *function = require_function_instance(runtime, instance, "__kwdefaults__");
+            if (!value || value == runtime.none())
+            {
+                function->set_kwdefaults(nullptr);
+                return;
+            }
+            auto *kwdefaults = dynamic_cast<DictObject *>(value);
+            if (!kwdefaults)
+                raise_type_error(&runtime, "__kwdefaults__ must be set to a dict or None");
+            function->set_kwdefaults(kwdefaults);
+        }
+
         Object *function_globals_getter(Runtime &runtime, Object *instance, TypeObject *)
         {
             return require_function_instance(runtime, instance, "__globals__")->globals();
@@ -210,12 +238,14 @@ namespace cxxpython
                                                CodeObject *code,
                                                DictObject *globals,
                                                TupleObject *defaults,
+                                               DictObject *kwdefaults,
                                                std::vector<CellObject *> closure)
         : Object(type),
           name_(std::move(name)),
           code_(code),
           globals_(globals),
           defaults_(defaults),
+          kwdefaults_(kwdefaults),
           doc_(nullptr),
           closure_(std::move(closure))
     {
@@ -260,6 +290,20 @@ namespace cxxpython
         }
         if (code_->has_varargs())
             append_name(varname_at(code_, code_->varargs_index()), "*");
+        else if (code_->kwonly_arg_count() != 0)
+        {
+            if (!first)
+                signature << ", ";
+            first = false;
+            signature << "*";
+        }
+        for (std::uint32_t index = 0; index < code_->kwonly_arg_count(); ++index)
+        {
+            StrObject *parameter = varname_at(code_, keyword_only_index(code_, index));
+            append_name(parameter);
+            if (kwdefaults_ && kwdefaults_->get(parameter))
+                signature << "=...";
+        }
         if (code_->has_varkeywords())
             append_name(varname_at(code_, code_->varkeywords_index()), "**");
         signature << ")";
@@ -288,6 +332,16 @@ namespace cxxpython
         defaults_ = defaults;
     }
 
+    DictObject *PythonFunctionObject::kwdefaults() const noexcept
+    {
+        return kwdefaults_;
+    }
+
+    void PythonFunctionObject::set_kwdefaults(DictObject *kwdefaults)
+    {
+        kwdefaults_ = kwdefaults;
+    }
+
     const std::vector<CellObject *> &PythonFunctionObject::closure() const noexcept
     {
         return closure_;
@@ -297,10 +351,12 @@ namespace cxxpython
     {
         DictObject *locals = runtime()->new_dict();
         const std::uint32_t expected = code_->arg_count();
+        const std::uint32_t keyword_only_count = code_->kwonly_arg_count();
         if (code_->varnames().size() < argument_slot_count(code_))
             throw BytecodeError("function code object argument metadata exceeds varnames");
 
         std::vector<bool> bound(expected, false);
+        std::vector<bool> keyword_only_bound(keyword_only_count, false);
         const std::size_t direct_count = std::min<std::size_t>(args.positional.size(), expected);
         for (std::size_t index = 0; index < direct_count; ++index)
         {
@@ -350,6 +406,22 @@ namespace cxxpython
                     break;
                 }
 
+                for (std::uint32_t index = 0; !matched && index < keyword_only_count; ++index)
+                {
+                    StrObject *parameter = varname_at(code_, keyword_only_index(code_, index));
+                    if (parameter->value != keyword_name->value)
+                        continue;
+                    if (keyword_only_bound[index])
+                    {
+                        raise_type_error(runtime(),
+                                         name_ + "() got multiple values for argument '" +
+                                             keyword_name->value + "'");
+                    }
+                    locals->set(parameter, entry.value);
+                    keyword_only_bound[index] = true;
+                    matched = true;
+                }
+
                 if (!matched)
                 {
                     if (!keyword_locals)
@@ -379,6 +451,24 @@ namespace cxxpython
             }
             raise_type_error(runtime(),
                              name_ + "() missing required positional argument: '" +
+                                 parameter->value + "'");
+        }
+
+        for (std::uint32_t index = 0; index < keyword_only_count; ++index)
+        {
+            if (keyword_only_bound[index])
+                continue;
+            StrObject *parameter = varname_at(code_, keyword_only_index(code_, index));
+            if (kwdefaults_)
+            {
+                if (Object *value = kwdefaults_->get(parameter))
+                {
+                    locals->set(parameter, value);
+                    continue;
+                }
+            }
+            raise_type_error(runtime(),
+                             name_ + "() missing required keyword-only argument: '" +
                                  parameter->value + "'");
         }
 
@@ -457,6 +547,11 @@ namespace cxxpython
                                                       type,
                                                       function_defaults_getter,
                                                       function_defaults_setter));
+        type->dict->set(runtime.new_str("__kwdefaults__"),
+                        runtime.new_getset_descriptor("__kwdefaults__",
+                                                      type,
+                                                      function_kwdefaults_getter,
+                                                      function_kwdefaults_setter));
         type->dict->set(runtime.new_str("__globals__"),
                         runtime.new_getset_descriptor("__globals__",
                                                       type,

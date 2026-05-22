@@ -273,6 +273,11 @@ namespace cxxpython
                     decorator->accept(*this);
                 for (const auto &default_value : statement.params.defaults)
                     default_value->accept(*this);
+                for (const auto &parameter : statement.params.keyword_only)
+                {
+                    if (parameter.default_value)
+                        parameter.default_value->accept(*this);
+                }
                 (void)symbols_.add_name(statement.name);
             }
 
@@ -847,6 +852,11 @@ namespace cxxpython
                     decorator->accept(*this);
                 for (const auto &default_value : statement.params.defaults)
                     default_value->accept(*this);
+                for (const auto &parameter : statement.params.keyword_only)
+                {
+                    if (parameter.default_value)
+                        parameter.default_value->accept(*this);
+                }
             }
 
             void visit(const compiler_internal::ClassDefStmt &statement) override
@@ -1254,6 +1264,12 @@ namespace cxxpython
             if (symbols.is_global(param) || symbols.is_nonlocal(param))
                 raise_syntax_error(&runtime, "name '" + param + "' is parameter and nonlocal/global");
             (void)symbols.add_local(param);
+        }
+        for (const auto &param : function.params.keyword_only)
+        {
+            if (symbols.is_global(param.name) || symbols.is_nonlocal(param.name))
+                raise_syntax_error(&runtime, "name '" + param.name + "' is parameter and nonlocal/global");
+            (void)symbols.add_local(param.name);
         }
         if (function.params.varargs)
         {

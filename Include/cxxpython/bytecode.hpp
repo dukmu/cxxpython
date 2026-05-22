@@ -90,7 +90,9 @@ namespace cxxpython
     };
 
     constexpr std::uint32_t MakeFunctionHasDefaults = 1U << 31;
-    constexpr std::uint32_t MakeFunctionClosureCountMask = ~MakeFunctionHasDefaults;
+    constexpr std::uint32_t MakeFunctionHasKwDefaults = 1U << 30;
+    constexpr std::uint32_t MakeFunctionClosureCountMask =
+        ~(MakeFunctionHasDefaults | MakeFunctionHasKwDefaults);
 
     class CodeObject final : public Object
     {
@@ -104,6 +106,7 @@ namespace cxxpython
                    std::string name,
                    std::string filename,
                    std::uint32_t arg_count,
+                   std::uint32_t kwonly_arg_count,
                    Flags flags,
                    std::vector<Object *> varnames,
                    std::vector<Object *> constants,
@@ -116,6 +119,7 @@ namespace cxxpython
         const std::string &name() const noexcept;
         const std::string &filename() const noexcept;
         std::uint32_t arg_count() const noexcept;
+        std::uint32_t kwonly_arg_count() const noexcept;
         Flags flags() const noexcept;
         bool has_varargs() const noexcept;
         bool has_varkeywords() const noexcept;
@@ -135,6 +139,7 @@ namespace cxxpython
         std::string name_;
         std::string filename_;
         std::uint32_t arg_count_ = 0;
+        std::uint32_t kwonly_arg_count_ = 0;
         Flags flags_ = 0;
         std::vector<Object *> varnames_;
         std::vector<Object *> constants_;

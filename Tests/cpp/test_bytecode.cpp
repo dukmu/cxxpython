@@ -116,7 +116,12 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::MakeFunction, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::MakeFunction, 1}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::MakeFunction, cxxpython::MakeFunctionHasDefaults}), -1);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::MakeFunction, cxxpython::MakeFunctionHasKwDefaults}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::MakeFunction, cxxpython::MakeFunctionHasDefaults | 1U}), -2);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::MakeFunction,
+                                       cxxpython::MakeFunctionHasDefaults |
+                                           cxxpython::MakeFunctionHasKwDefaults | 1U}),
+              -3);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::MakeClass, 0}), -2);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::Call, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::Call, 2}), -2);

@@ -679,6 +679,7 @@ namespace cxxpython::compiler_internal
                     bool seen_varargs = false;
                     bool seen_varkeywords = false;
                     bool seen_default = false;
+                    bool keyword_only_section = false;
                     while (true)
                     {
                         bool is_varargs = false;
@@ -690,6 +691,14 @@ namespace cxxpython::compiler_internal
                             is_varargs = true;
                             seen_varargs = true;
                             advance();
+                            keyword_only_section = true;
+                            if (peek().kind == TokenKind::Comma)
+                            {
+                                advance();
+                                if (peek().kind == TokenKind::RightParen)
+                                    raise_at(peek(), "named arguments must follow bare *");
+                                continue;
+                            }
                         }
                         else if (peek().kind == TokenKind::DoubleStar)
                         {
@@ -699,10 +708,6 @@ namespace cxxpython::compiler_internal
                             seen_varkeywords = true;
                             advance();
                         }
-                        else if (seen_varargs)
-                        {
-                            raise_at(peek(), "expected keyword-only or ** parameter");
-                        }
                         if (peek().kind != TokenKind::Identifier)
                             raise_at(peek(), "expected parameter name");
                         std::string param = advance().lexeme;
@@ -710,11 +715,12 @@ namespace cxxpython::compiler_internal
                         std::unique_ptr<Expr> default_value;
                         if (!is_varargs && !is_varkeywords && peek().kind == TokenKind::Equal)
                         {
-                            seen_default = true;
                             advance();
                             default_value = parse_expression_only();
+                            if (!keyword_only_section)
+                                seen_default = true;
                         }
-                        else if (!is_varargs && !is_varkeywords && seen_default)
+                        else if (!is_varargs && !is_varkeywords && !keyword_only_section && seen_default)
                         {
                             raise_at(previous(), "non-default argument follows default argument");
                         }
@@ -722,6 +728,14 @@ namespace cxxpython::compiler_internal
                             params.varkeywords = std::move(param);
                         else if (is_varargs)
                             params.varargs = std::move(param);
+                        else if (keyword_only_section)
+                        {
+                            params.keyword_only.push_back(
+                                FunctionParameters::KeywordOnlyParameter{
+                                    std::move(param),
+                                    std::move(default_value),
+                                });
+                        }
                         else
                         {
                             params.positional.push_back(std::move(param));
@@ -875,6 +889,11 @@ namespace cxxpython::compiler_internal
                 }
                 if (params.varargs && *params.varargs == name)
                     raise_at(token, "duplicate parameter name");
+                for (const auto &existing : params.keyword_only)
+                {
+                    if (existing.name == name)
+                        raise_at(token, "duplicate parameter name");
+                }
                 if (params.varkeywords && *params.varkeywords == name)
                     raise_at(token, "duplicate parameter name");
             }

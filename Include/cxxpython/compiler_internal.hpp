@@ -941,8 +941,15 @@ namespace cxxpython::compiler_internal
 
     struct FunctionParameters final
     {
+        struct KeywordOnlyParameter final
+        {
+            std::string name;
+            std::unique_ptr<Expr> default_value;
+        };
+
         std::vector<std::string> positional;
         std::vector<std::unique_ptr<Expr>> defaults;
+        std::vector<KeywordOnlyParameter> keyword_only;
         std::optional<std::string> varargs;
         std::optional<std::string> varkeywords;
     };

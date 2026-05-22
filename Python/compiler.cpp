@@ -66,6 +66,7 @@ namespace cxxpython
                 return runtime_.new_code(function.name,
                                          filename_,
                                          static_cast<std::uint32_t>(function.params.positional.size()),
+                                         static_cast<std::uint32_t>(function.params.keyword_only.size()),
                                          function_flags(function.params),
                                          std::move(varnames_),
                                          std::move(constants_),
@@ -95,6 +96,7 @@ namespace cxxpython
                 emit({Opcode::ReturnValue, 0});
                 return runtime_.new_code(klass.name,
                                          filename_,
+                                         0,
                                          0,
                                          0,
                                          {},
@@ -893,12 +895,30 @@ namespace cxxpython
                         static_cast<std::uint32_t>(statement.params.defaults.size()),
                     });
                 }
+                std::uint32_t keyword_default_count = 0;
+                for (const auto &parameter : statement.params.keyword_only)
+                {
+                    if (!parameter.default_value)
+                        continue;
+                    emit_constant(runtime_.new_str(parameter.name));
+                    parameter.default_value->accept(*this);
+                    ++keyword_default_count;
+                }
+                if (keyword_default_count != 0)
+                {
+                    emit({
+                        Opcode::BuildMap,
+                        keyword_default_count,
+                    });
+                }
                 CodeObject *code = function_builder.build_function(statement);
                 emit_constant(code);
                 std::uint32_t operand =
                     static_cast<std::uint32_t>(function_symbols.freevars().size());
                 if (!statement.params.defaults.empty())
                     operand |= MakeFunctionHasDefaults;
+                if (keyword_default_count != 0)
+                    operand |= MakeFunctionHasKwDefaults;
                 emit({
                     Opcode::MakeFunction,
                     operand,

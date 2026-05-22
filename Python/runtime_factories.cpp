@@ -222,6 +222,7 @@ namespace cxxpython
                                                 CodeObject *code,
                                                 DictObject *globals,
                                                 TupleObject *defaults,
+                                                DictObject *kwdefaults,
                                                 std::vector<CellObject *> closure)
     {
         if (!code)
@@ -232,7 +233,14 @@ namespace cxxpython
             raise_type_error(this, "function defaults exceed positional arguments");
         if (closure.size() != code->freevars().size())
             raise_type_error(this, "function closure size does not match code free variables");
-        return allocate<PythonFunctionObject>(function_type_, std::move(name), code, globals, defaults, std::move(closure));
+        return allocate<PythonFunctionObject>(
+            function_type_,
+            std::move(name),
+            code,
+            globals,
+            defaults,
+            kwdefaults,
+            std::move(closure));
     }
 
     PythonFunctionObject *Runtime::new_function(std::string name,
@@ -240,7 +248,7 @@ namespace cxxpython
                                                 DictObject *globals,
                                                 std::vector<CellObject *> closure)
     {
-        return new_function(std::move(name), code, globals, nullptr, std::move(closure));
+        return new_function(std::move(name), code, globals, nullptr, nullptr, std::move(closure));
     }
 
     CellObject *Runtime::new_cell(Object *value)
@@ -408,6 +416,7 @@ namespace cxxpython
                         std::move(filename),
                         arg_count,
                         0,
+                        0,
                         std::move(varnames),
                         std::move(constants),
                         std::move(names),
@@ -430,6 +439,7 @@ namespace cxxpython
         return new_code(std::move(name),
                         std::move(filename),
                         arg_count,
+                        0,
                         flags,
                         std::move(varnames),
                         std::move(constants),
@@ -452,10 +462,38 @@ namespace cxxpython
                                   std::vector<Instruction> instructions,
                                   std::vector<std::uint32_t> lines)
     {
+        return new_code(std::move(name),
+                        std::move(filename),
+                        arg_count,
+                        0,
+                        flags,
+                        std::move(varnames),
+                        std::move(constants),
+                        std::move(names),
+                        std::move(cellvars),
+                        std::move(freevars),
+                        std::move(instructions),
+                        std::move(lines));
+    }
+
+    CodeObject *Runtime::new_code(std::string name,
+                                  std::string filename,
+                                  std::uint32_t arg_count,
+                                  std::uint32_t kwonly_arg_count,
+                                  std::uint32_t flags,
+                                  std::vector<Object *> varnames,
+                                  std::vector<Object *> constants,
+                                  std::vector<Object *> names,
+                                  std::vector<Object *> cellvars,
+                                  std::vector<Object *> freevars,
+                                  std::vector<Instruction> instructions,
+                                  std::vector<std::uint32_t> lines)
+    {
         return allocate<CodeObject>(code_type_,
                                     std::move(name),
                                     std::move(filename),
                                     arg_count,
+                                    kwonly_arg_count,
                                     flags,
                                     std::move(varnames),
                                     std::move(constants),

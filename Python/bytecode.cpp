@@ -48,6 +48,12 @@ namespace cxxpython
                 require_code_instance(runtime, instance, "co_argcount")->arg_count()));
         }
 
+        Object *code_kwonlyargcount_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            return runtime.new_int(static_cast<std::int64_t>(
+                require_code_instance(runtime, instance, "co_kwonlyargcount")->kwonly_arg_count()));
+        }
+
         Object *code_flags_getter(Runtime &runtime, Object *instance, TypeObject *)
         {
             return runtime.new_int(static_cast<std::int64_t>(
@@ -175,6 +181,11 @@ namespace cxxpython
                                                       type,
                                                       code_argcount_getter,
                                                       nullptr));
+        type->dict->set(runtime.new_str("co_kwonlyargcount"),
+                        runtime.new_getset_descriptor("co_kwonlyargcount",
+                                                      type,
+                                                      code_kwonlyargcount_getter,
+                                                      nullptr));
         type->dict->set(runtime.new_str("co_flags"),
                         runtime.new_getset_descriptor("co_flags",
                                                       type,
@@ -221,6 +232,7 @@ namespace cxxpython
                            std::string name,
                            std::string filename,
                            std::uint32_t arg_count,
+                           std::uint32_t kwonly_arg_count,
                            CodeObject::Flags flags,
                            std::vector<Object *> varnames,
                            std::vector<Object *> constants,
@@ -233,6 +245,7 @@ namespace cxxpython
           name_(std::move(name)),
           filename_(std::move(filename)),
           arg_count_(arg_count),
+          kwonly_arg_count_(kwonly_arg_count),
           flags_(flags),
           varnames_(std::move(varnames)),
           constants_(std::move(constants)),
@@ -328,6 +341,11 @@ namespace cxxpython
         return arg_count_;
     }
 
+    std::uint32_t CodeObject::kwonly_arg_count() const noexcept
+    {
+        return kwonly_arg_count_;
+    }
+
     CodeObject::Flags CodeObject::flags() const noexcept
     {
         return flags_;
@@ -345,12 +363,12 @@ namespace cxxpython
 
     std::uint32_t CodeObject::varargs_index() const noexcept
     {
-        return arg_count_;
+        return arg_count_ + kwonly_arg_count_;
     }
 
     std::uint32_t CodeObject::varkeywords_index() const noexcept
     {
-        return arg_count_ + (has_varargs() ? 1U : 0U);
+        return arg_count_ + kwonly_arg_count_ + (has_varargs() ? 1U : 0U);
     }
 
     const std::vector<Object *> &CodeObject::varnames() const noexcept
@@ -574,7 +592,10 @@ namespace cxxpython
                 instruction.operand & MakeFunctionClosureCountMask;
             const bool has_defaults =
                 (instruction.operand & MakeFunctionHasDefaults) != 0;
-            return 1 - 1 - static_cast<int>(closure_count != 0) - static_cast<int>(has_defaults);
+            const bool has_kwdefaults =
+                (instruction.operand & MakeFunctionHasKwDefaults) != 0;
+            return 1 - 1 - static_cast<int>(closure_count != 0) -
+                   static_cast<int>(has_defaults) - static_cast<int>(has_kwdefaults);
         }
         case Opcode::MakeClass:
             return -2;

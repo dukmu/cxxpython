@@ -1255,11 +1255,23 @@ namespace cxxpython
                     instruction.operand & MakeFunctionClosureCountMask;
                 const bool has_defaults =
                     (instruction.operand & MakeFunctionHasDefaults) != 0;
+                const bool has_kwdefaults =
+                    (instruction.operand & MakeFunctionHasKwDefaults) != 0;
                 Object *code_object = frame->pop();
                 auto *function_code = dynamic_cast<CodeObject *>(code_object);
                 if (!function_code)
                     throw BytecodeError("MAKE_FUNCTION requires a code object");
                 auto code_root = runtime_.root(function_code);
+                DictObject *kwdefaults = nullptr;
+                std::vector<Rooted<Object>> kwdefaults_roots;
+                if (has_kwdefaults)
+                {
+                    Object *kwdefaults_object = frame->pop();
+                    kwdefaults = dynamic_cast<DictObject *>(kwdefaults_object);
+                    if (!kwdefaults)
+                        throw BytecodeError("MAKE_FUNCTION keyword defaults require a dict");
+                    add_temporary_root(runtime_, kwdefaults_roots, kwdefaults);
+                }
                 TupleObject *defaults = nullptr;
                 std::vector<Rooted<Object>> defaults_roots;
                 if (has_defaults)
@@ -1290,7 +1302,13 @@ namespace cxxpython
                     }
                 }
                 PythonFunctionObject *function =
-                    runtime_.new_function(function_code->name(), function_code, &globals, defaults, std::move(closure));
+                    runtime_.new_function(
+                        function_code->name(),
+                        function_code,
+                        &globals,
+                        defaults,
+                        kwdefaults,
+                        std::move(closure));
                 auto function_root = runtime_.root(function);
                 frame->push(function);
                 break;
