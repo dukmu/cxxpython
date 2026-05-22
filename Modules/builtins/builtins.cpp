@@ -145,6 +145,12 @@ namespace cxxpython
                 "($module, object, name, value, /)",
             },
             {
+                "delattr",
+                builtin_delattr,
+                "Delete the named attribute from an object.",
+                "($module, object, name, /)",
+            },
+            {
                 "hasattr",
                 builtin_hasattr,
                 "Return whether an object has the named attribute.",

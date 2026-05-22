@@ -263,6 +263,15 @@ namespace cxxpython
         return runtime.none();
     }
 
+    Object *builtin_delattr(Runtime &runtime, const CallArguments &args)
+    {
+        require_no_keywords(&runtime, "delattr", args);
+        require_positional_count(&runtime, "delattr", args, 2);
+        StrObject *name = require_attribute_name(runtime, "delattr", args.positional[1]);
+        object_delete_attr(args.positional[0], name);
+        return runtime.none();
+    }
+
     Object *builtin_hasattr(Runtime &runtime, const CallArguments &args)
     {
         require_no_keywords(&runtime, "hasattr", args);

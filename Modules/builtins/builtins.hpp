@@ -31,6 +31,7 @@ namespace cxxpython
     Object *builtin_vars(Runtime &runtime, const CallArguments &args);
     Object *builtin_getattr(Runtime &runtime, const CallArguments &args);
     Object *builtin_setattr(Runtime &runtime, const CallArguments &args);
+    Object *builtin_delattr(Runtime &runtime, const CallArguments &args);
     Object *builtin_hasattr(Runtime &runtime, const CallArguments &args);
     Object *builtin_help(Runtime &runtime, const CallArguments &args);
 

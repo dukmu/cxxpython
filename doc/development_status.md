@@ -1,5 +1,48 @@
 # Development Status
 
+## 2026-05-22 Reflection `delattr` Slice
+
+Review focus:
+
+- Finish the reflection builtin family (`getattr`, `setattr`, `delattr`,
+  `hasattr`) through the central object attribute protocol.
+- Avoid duplicating deletion semantics in the builtin layer; descriptor and
+  `__delattr__` behavior must stay owned by `object_delete_attr`.
+
+Completed:
+
+- Added builtin `delattr` with native metadata, `__doc__`, and
+  `__text_signature__`.
+- Implemented `delattr(object, name)` as a thin protocol call into
+  `object_delete_attr`.
+- Extended Python golden coverage for normal instance attribute deletion,
+  custom `__delattr__` hooks, builtin discovery through `dir(__builtins__)`,
+  and introspection metadata.
+
+Design notes:
+
+- The builtin mirrors `setattr`: it validates only the public builtin
+  boundary (`name` must be `str`, no keywords) and delegates the semantic
+  work to the object layer.
+- This keeps future descriptor delete hooks, compact builtin rejection, heap
+  instance dictionaries, and script-visible `object.__delattr__` on the same
+  path.
+
+Known debt and next risk:
+
+- `help()` is still a small native metadata printer. It should move toward a
+  script-side `pydoc`/`site` path once import startup policy is ready.
+- Reflection builtins still use hand-written argument validation; a
+  CPython-style generated metadata/parser layer remains the healthier long
+  term shape.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/cxxpython Tests/python/builtin_reflection.py`
+- `build/cxxpython Tests/python/builtins.py`
+- `ctest --test-dir build --output-on-failure`
+
 ## 2026-05-22 REPL Block Submission Slice
 
 Review focus:
