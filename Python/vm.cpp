@@ -1257,11 +1257,23 @@ namespace cxxpython
                     (instruction.operand & MakeFunctionHasDefaults) != 0;
                 const bool has_kwdefaults =
                     (instruction.operand & MakeFunctionHasKwDefaults) != 0;
+                const bool has_annotations =
+                    (instruction.operand & MakeFunctionHasAnnotations) != 0;
                 Object *code_object = frame->pop();
                 auto *function_code = dynamic_cast<CodeObject *>(code_object);
                 if (!function_code)
                     throw BytecodeError("MAKE_FUNCTION requires a code object");
                 auto code_root = runtime_.root(function_code);
+                DictObject *annotations = nullptr;
+                std::vector<Rooted<Object>> annotations_roots;
+                if (has_annotations)
+                {
+                    Object *annotations_object = frame->pop();
+                    annotations = dynamic_cast<DictObject *>(annotations_object);
+                    if (!annotations)
+                        throw BytecodeError("MAKE_FUNCTION annotations require a dict");
+                    add_temporary_root(runtime_, annotations_roots, annotations);
+                }
                 DictObject *kwdefaults = nullptr;
                 std::vector<Rooted<Object>> kwdefaults_roots;
                 if (has_kwdefaults)
@@ -1308,6 +1320,7 @@ namespace cxxpython
                         &globals,
                         defaults,
                         kwdefaults,
+                        annotations,
                         std::move(closure));
                 auto function_root = runtime_.root(function);
                 frame->push(function);

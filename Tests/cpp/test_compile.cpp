@@ -1481,6 +1481,49 @@ TEST(Compile, CompilesPositionalOnlyArguments)
     EXPECT_EQ(result->value, 7);
 }
 
+TEST(Compile, CompilesFunctionAnnotations)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(
+        runtime,
+        "Alias = 'alias'\n"
+        "def annotated(value: Alias) -> Alias:\n"
+        "    'docs'\n"
+        "    return value\n",
+        "script.py");
+    ASSERT_NE(code, nullptr);
+
+    bool saw_annotations = false;
+    for (const cxxpython::Instruction &instruction : code->instructions())
+    {
+        if (instruction.opcode == cxxpython::Opcode::MakeFunction &&
+            (instruction.operand & cxxpython::MakeFunctionHasAnnotations) != 0)
+        {
+            saw_annotations = true;
+        }
+    }
+    EXPECT_TRUE(saw_annotations);
+
+    EXPECT_EQ(vm.execute(*code, *globals), runtime.none());
+    auto *function = dynamic_cast<cxxpython::PythonFunctionObject *>(globals->get(runtime.new_str("annotated")));
+    ASSERT_NE(function, nullptr);
+    ASSERT_NE(function->annotations(), nullptr);
+    auto *value_annotation =
+        dynamic_cast<cxxpython::StrObject *>(function->annotations()->get(runtime.new_str("value")));
+    auto *return_annotation =
+        dynamic_cast<cxxpython::StrObject *>(function->annotations()->get(runtime.new_str("return")));
+    ASSERT_NE(value_annotation, nullptr);
+    ASSERT_NE(return_annotation, nullptr);
+    EXPECT_EQ(value_annotation->value, "alias");
+    EXPECT_EQ(return_annotation->value, "alias");
+    auto *doc = dynamic_cast<cxxpython::StrObject *>(function->doc());
+    ASSERT_NE(doc, nullptr);
+    EXPECT_EQ(doc->value, "docs");
+}
+
 TEST(Compile, CompilesCallSiteArgumentUnpacking)
 {
     cxxpython::Runtime runtime;

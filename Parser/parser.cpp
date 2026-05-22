@@ -728,6 +728,12 @@ namespace cxxpython::compiler_internal
                             raise_at(peek(), "expected parameter name");
                         std::string param = advance().lexeme;
                         ensure_unique_parameter(params, param, previous());
+                        std::unique_ptr<Expr> annotation;
+                        if (peek().kind == TokenKind::Colon)
+                        {
+                            advance();
+                            annotation = parse_expression_only();
+                        }
                         std::unique_ptr<Expr> default_value;
                         if (!is_varargs && !is_varkeywords && peek().kind == TokenKind::Equal)
                         {
@@ -741,19 +747,33 @@ namespace cxxpython::compiler_internal
                             raise_at(previous(), "non-default argument follows default argument");
                         }
                         if (is_varkeywords)
+                        {
+                            params.varkeywords_annotation = std::move(annotation);
                             params.varkeywords = std::move(param);
+                        }
                         else if (is_varargs)
+                        {
+                            params.varargs_annotation = std::move(annotation);
                             params.varargs = std::move(param);
+                        }
                         else if (keyword_only_section)
                         {
                             params.keyword_only.push_back(
                                 FunctionParameters::KeywordOnlyParameter{
                                     std::move(param),
                                     std::move(default_value),
+                                    std::move(annotation),
                                 });
                         }
                         else
                         {
+                            if (annotation)
+                            {
+                                params.annotations.push_back(FunctionParameters::Annotation{
+                                    param,
+                                    std::move(annotation),
+                                });
+                            }
                             params.positional.push_back(std::move(param));
                             if (default_value)
                                 params.defaults.push_back(std::move(default_value));
@@ -768,6 +788,12 @@ namespace cxxpython::compiler_internal
                     }
                 }
                 consume(TokenKind::RightParen, "expected ')' after parameters");
+                std::unique_ptr<Expr> return_annotation;
+                if (peek().kind == TokenKind::Arrow)
+                {
+                    advance();
+                    return_annotation = parse_expression_only();
+                }
                 consume(TokenKind::Colon, "expected ':' after function signature");
 
                 FunctionDepthGuard guard(function_depth_);
@@ -775,6 +801,7 @@ namespace cxxpython::compiler_internal
                 auto statement = std::make_unique<FunctionDefStmt>(
                     std::move(name),
                     std::move(params),
+                    std::move(return_annotation),
                     std::move(body),
                     std::move(decorators));
                 statement->line = def_token.line;
@@ -1463,6 +1490,7 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Newline:
                 case TokenKind::Plus:
                 case TokenKind::Minus:
+                case TokenKind::Arrow:
                 case TokenKind::Star:
                 case TokenKind::DoubleStar:
                 case TokenKind::Slash:
@@ -1583,6 +1611,7 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Identifier:
                 case TokenKind::Plus:
                 case TokenKind::Minus:
+                case TokenKind::Arrow:
                 case TokenKind::Tilde:
                 case TokenKind::LeftParen:
                 case TokenKind::LeftBracket:
@@ -1686,6 +1715,7 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Identifier:
                 case TokenKind::Plus:
                 case TokenKind::Minus:
+                case TokenKind::Arrow:
                 case TokenKind::Star:
                 case TokenKind::DoubleStar:
                 case TokenKind::Slash:
@@ -1756,6 +1786,7 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Identifier:
                 case TokenKind::Plus:
                 case TokenKind::Minus:
+                case TokenKind::Arrow:
                 case TokenKind::Star:
                 case TokenKind::DoubleStar:
                 case TokenKind::Slash:

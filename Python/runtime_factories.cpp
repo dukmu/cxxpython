@@ -223,6 +223,7 @@ namespace cxxpython
                                                 DictObject *globals,
                                                 TupleObject *defaults,
                                                 DictObject *kwdefaults,
+                                                DictObject *annotations,
                                                 std::vector<CellObject *> closure)
     {
         if (!code)
@@ -240,6 +241,7 @@ namespace cxxpython
             globals,
             defaults,
             kwdefaults,
+            annotations,
             std::move(closure));
     }
 
@@ -248,7 +250,7 @@ namespace cxxpython
                                                 DictObject *globals,
                                                 std::vector<CellObject *> closure)
     {
-        return new_function(std::move(name), code, globals, nullptr, nullptr, std::move(closure));
+        return new_function(std::move(name), code, globals, nullptr, nullptr, nullptr, std::move(closure));
     }
 
     CellObject *Runtime::new_cell(Object *value)

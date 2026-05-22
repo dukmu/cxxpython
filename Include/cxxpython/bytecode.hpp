@@ -91,8 +91,9 @@ namespace cxxpython
 
     constexpr std::uint32_t MakeFunctionHasDefaults = 1U << 31;
     constexpr std::uint32_t MakeFunctionHasKwDefaults = 1U << 30;
+    constexpr std::uint32_t MakeFunctionHasAnnotations = 1U << 29;
     constexpr std::uint32_t MakeFunctionClosureCountMask =
-        ~(MakeFunctionHasDefaults | MakeFunctionHasKwDefaults);
+        ~(MakeFunctionHasDefaults | MakeFunctionHasKwDefaults | MakeFunctionHasAnnotations);
 
     class CodeObject final : public Object
     {

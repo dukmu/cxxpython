@@ -44,8 +44,19 @@ namespace cxxpython
 
             CodeObject *build_exec(const compiler_internal::Module &module)
             {
+                bool skipped_docstring = false;
                 for (const auto &statement : module.statements)
+                {
+                    if (!skipped_docstring && is_doc_string_statement(statement.get()))
+                    {
+                        StatementLineGuard line(*this, *statement);
+                        emit_doc_assignment(statement.get());
+                        skipped_docstring = true;
+                        continue;
+                    }
+                    skipped_docstring = true;
                     statement->accept(*this);
+                }
                 emit_constant(runtime_.none());
                 emit({Opcode::ReturnValue, 0});
                 return runtime_.new_code("<module>",
@@ -59,8 +70,17 @@ namespace cxxpython
             CodeObject *build_function(const compiler_internal::FunctionDefStmt &function)
             {
                 emit_function_doc_constant(function);
+                bool skipped_docstring = false;
                 for (const auto &statement : function.body)
+                {
+                    if (!skipped_docstring && is_doc_string_statement(statement.get()))
+                    {
+                        skipped_docstring = true;
+                        continue;
+                    }
+                    skipped_docstring = true;
                     statement->accept(*this);
+                }
                 emit_constant(runtime_.none());
                 emit({Opcode::ReturnValue, 0});
                 return runtime_.new_code(function.name,
@@ -80,8 +100,19 @@ namespace cxxpython
 
             CodeObject *build_class(const compiler_internal::ClassDefStmt &klass)
             {
+                bool skipped_docstring = false;
                 for (const auto &statement : klass.body)
+                {
+                    if (!skipped_docstring && is_doc_string_statement(statement.get()))
+                    {
+                        StatementLineGuard line(*this, *statement);
+                        emit_doc_assignment(statement.get());
+                        skipped_docstring = true;
+                        continue;
+                    }
+                    skipped_docstring = true;
                     statement->accept(*this);
+                }
                 if (symbols_.is_cellvar("__class__"))
                 {
                     emit({
@@ -587,6 +618,27 @@ namespace cxxpython
                 constants_.push_back(doc);
             }
 
+            bool is_doc_string_statement(const compiler_internal::Stmt *statement) const
+            {
+                auto *expr_statement = dynamic_cast<const compiler_internal::ExprStmt *>(statement);
+                if (!expr_statement)
+                    return false;
+                return dynamic_cast<const compiler_internal::StringExpr *>(
+                           expr_statement->expression.get()) != nullptr;
+            }
+
+            void emit_doc_assignment(const compiler_internal::Stmt *statement)
+            {
+                auto *expr_statement = dynamic_cast<const compiler_internal::ExprStmt *>(statement);
+                auto *string_expr = dynamic_cast<const compiler_internal::StringExpr *>(
+                    expr_statement->expression.get());
+                emit_constant(runtime_.new_str(string_expr->value));
+                emit({
+                    Opcode::StoreName,
+                    static_cast<std::uint32_t>(ensure_name_index("__doc__")),
+                });
+            }
+
             void visit(const compiler_internal::ExprStmt &statement) override
             {
                 StatementLineGuard line(*this, statement);
@@ -912,6 +964,46 @@ namespace cxxpython
                         keyword_default_count,
                     });
                 }
+                std::uint32_t annotation_count = 0;
+                for (const auto &annotation : statement.params.annotations)
+                {
+                    emit_constant(runtime_.new_str(annotation.name));
+                    annotation.value->accept(*this);
+                    ++annotation_count;
+                }
+                if (statement.params.varargs_annotation)
+                {
+                    emit_constant(runtime_.new_str(*statement.params.varargs));
+                    statement.params.varargs_annotation->accept(*this);
+                    ++annotation_count;
+                }
+                for (const auto &parameter : statement.params.keyword_only)
+                {
+                    if (!parameter.annotation)
+                        continue;
+                    emit_constant(runtime_.new_str(parameter.name));
+                    parameter.annotation->accept(*this);
+                    ++annotation_count;
+                }
+                if (statement.params.varkeywords_annotation)
+                {
+                    emit_constant(runtime_.new_str(*statement.params.varkeywords));
+                    statement.params.varkeywords_annotation->accept(*this);
+                    ++annotation_count;
+                }
+                if (statement.return_annotation)
+                {
+                    emit_constant(runtime_.new_str("return"));
+                    statement.return_annotation->accept(*this);
+                    ++annotation_count;
+                }
+                if (annotation_count != 0)
+                {
+                    emit({
+                        Opcode::BuildMap,
+                        annotation_count,
+                    });
+                }
                 CodeObject *code = function_builder.build_function(statement);
                 emit_constant(code);
                 std::uint32_t operand =
@@ -920,6 +1012,8 @@ namespace cxxpython
                     operand |= MakeFunctionHasDefaults;
                 if (keyword_default_count != 0)
                     operand |= MakeFunctionHasKwDefaults;
+                if (annotation_count != 0)
+                    operand |= MakeFunctionHasAnnotations;
                 emit({
                     Opcode::MakeFunction,
                     operand,

@@ -273,11 +273,21 @@ namespace cxxpython
                     decorator->accept(*this);
                 for (const auto &default_value : statement.params.defaults)
                     default_value->accept(*this);
+                for (const auto &annotation : statement.params.annotations)
+                    annotation.value->accept(*this);
                 for (const auto &parameter : statement.params.keyword_only)
                 {
                     if (parameter.default_value)
                         parameter.default_value->accept(*this);
+                    if (parameter.annotation)
+                        parameter.annotation->accept(*this);
                 }
+                if (statement.params.varargs_annotation)
+                    statement.params.varargs_annotation->accept(*this);
+                if (statement.params.varkeywords_annotation)
+                    statement.params.varkeywords_annotation->accept(*this);
+                if (statement.return_annotation)
+                    statement.return_annotation->accept(*this);
                 (void)symbols_.add_name(statement.name);
             }
 
@@ -852,11 +862,21 @@ namespace cxxpython
                     decorator->accept(*this);
                 for (const auto &default_value : statement.params.defaults)
                     default_value->accept(*this);
+                for (const auto &annotation : statement.params.annotations)
+                    annotation.value->accept(*this);
                 for (const auto &parameter : statement.params.keyword_only)
                 {
                     if (parameter.default_value)
                         parameter.default_value->accept(*this);
+                    if (parameter.annotation)
+                        parameter.annotation->accept(*this);
                 }
+                if (statement.params.varargs_annotation)
+                    statement.params.varargs_annotation->accept(*this);
+                if (statement.params.varkeywords_annotation)
+                    statement.params.varkeywords_annotation->accept(*this);
+                if (statement.return_annotation)
+                    statement.return_annotation->accept(*this);
             }
 
             void visit(const compiler_internal::ClassDefStmt &statement) override

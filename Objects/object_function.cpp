@@ -58,6 +58,8 @@ namespace cxxpython
                 visitor(function->defaults());
             if (function->kwdefaults())
                 visitor(function->kwdefaults());
+            if (function->annotations())
+                visitor(function->annotations());
             for (CellObject *cell : function->closure())
             {
                 if (cell)
@@ -227,6 +229,33 @@ namespace cxxpython
             return doc ? doc : runtime.none();
         }
 
+        void function_doc_setter(Runtime &runtime, Object *instance, Object *value)
+        {
+            require_function_instance(runtime, instance, "__doc__")->set_doc(value ? value : runtime.none());
+        }
+
+        Object *function_annotations_getter(Runtime &runtime, Object *instance, TypeObject *)
+        {
+            PythonFunctionObject *function = require_function_instance(runtime, instance, "__annotations__");
+            if (!function->annotations())
+                function->set_annotations(runtime.new_dict());
+            return function->annotations();
+        }
+
+        void function_annotations_setter(Runtime &runtime, Object *instance, Object *value)
+        {
+            PythonFunctionObject *function = require_function_instance(runtime, instance, "__annotations__");
+            if (!value || value == runtime.none())
+            {
+                function->set_annotations(nullptr);
+                return;
+            }
+            auto *annotations = dynamic_cast<DictObject *>(value);
+            if (!annotations)
+                raise_type_error(&runtime, "__annotations__ must be set to a dict or None");
+            function->set_annotations(annotations);
+        }
+
         Object *function_text_signature_getter(Runtime &runtime, Object *instance, TypeObject *)
         {
             return runtime.new_str(require_function_instance(runtime, instance, "__text_signature__")->text_signature());
@@ -239,6 +268,7 @@ namespace cxxpython
                                                DictObject *globals,
                                                TupleObject *defaults,
                                                DictObject *kwdefaults,
+                                               DictObject *annotations,
                                                std::vector<CellObject *> closure)
         : Object(type),
           name_(std::move(name)),
@@ -246,6 +276,7 @@ namespace cxxpython
           globals_(globals),
           defaults_(defaults),
           kwdefaults_(kwdefaults),
+          annotations_(annotations),
           doc_(nullptr),
           closure_(std::move(closure))
     {
@@ -264,6 +295,11 @@ namespace cxxpython
     Object *PythonFunctionObject::doc() const noexcept
     {
         return doc_;
+    }
+
+    void PythonFunctionObject::set_doc(Object *doc) noexcept
+    {
+        doc_ = doc;
     }
 
     std::string PythonFunctionObject::text_signature() const
@@ -347,6 +383,16 @@ namespace cxxpython
     void PythonFunctionObject::set_kwdefaults(DictObject *kwdefaults)
     {
         kwdefaults_ = kwdefaults;
+    }
+
+    DictObject *PythonFunctionObject::annotations() const noexcept
+    {
+        return annotations_;
+    }
+
+    void PythonFunctionObject::set_annotations(DictObject *annotations)
+    {
+        annotations_ = annotations;
     }
 
     const std::vector<CellObject *> &PythonFunctionObject::closure() const noexcept
@@ -583,7 +629,12 @@ namespace cxxpython
                         runtime.new_getset_descriptor("__doc__",
                                                       type,
                                                       function_doc_getter,
-                                                      nullptr));
+                                                      function_doc_setter));
+        type->dict->set(runtime.new_str("__annotations__"),
+                        runtime.new_getset_descriptor("__annotations__",
+                                                      type,
+                                                      function_annotations_getter,
+                                                      function_annotations_setter));
         type->dict->set(runtime.new_str("__text_signature__"),
                         runtime.new_getset_descriptor("__text_signature__",
                                                       type,

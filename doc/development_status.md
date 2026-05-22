@@ -1,5 +1,69 @@
 # Development Status
 
+## 2026-05-22 Function Annotation And Docstring Slice
+
+Review focus:
+
+- Finish another piece of CPython-like callable metadata before expanding
+  `inspect`, builtin reflection, and stdlib-facing function APIs.
+- Keep annotations as normal runtime-evaluated Python expressions instead of
+  parser-only strings or VM shortcuts.
+- Make docstrings visible at module, class, and function level while keeping
+  function `co_consts[0]` aligned with CPython's metadata convention.
+
+Completed:
+
+- Added lexer/parser support for parameter annotations and return annotations,
+  including `->` in function signatures.
+- Extended the function AST and symbol analysis so annotation expressions
+  participate in normal name resolution, defaults/free-variable discovery, and
+  definition-time evaluation.
+- Added a `MAKE_FUNCTION` annotations flag and VM stack handling for the
+  function annotations dictionary.
+- PythonFunctionObject now stores, traverses, and exposes mutable
+  `__annotations__`; assigning `None` clears back to a lazily recreated dict.
+- Function `__doc__` is writable and still seeded from the first function-body
+  string literal.
+- Function body docstring statements are no longer emitted as runtime `PopTop`
+  expression statements.
+- Module and class leading string literals now initialize `__doc__` in the
+  corresponding namespace and are not emitted as ordinary expression
+  statements.
+- Annotation dictionary insertion order now follows source parameter order:
+  positional, `*args`, keyword-only, `**kwargs`, then `return`.
+- Added C++ compile/bytecode tests and a Python golden script covering
+  annotations, closure-visible annotation evaluation, mutable metadata, and
+  module/class/function docstrings.
+
+Design notes:
+
+- Annotation storage is mutable function state, not CodeObject state, matching
+  the `__annotations__` model and leaving CodeObject responsible only for
+  immutable signature layout.
+- The compiler emits annotation expressions before the code object and lets VM
+  `MAKE_FUNCTION` assemble the final PythonFunctionObject. This keeps VM
+  behavior declarative and avoids embedding parser knowledge in the runtime.
+- Module/class docstrings are lowered to namespace stores because those scopes
+  expose `__doc__` through ordinary mapping semantics.
+
+Known debt and next risk:
+
+- Postponed annotation evaluation (`from __future__ import annotations`) is
+  not implemented.
+- Class and module `__annotations__` are still missing; adding annotated
+  assignment should introduce them through the same namespace path.
+- `inspect.signature()` still returns text metadata rather than real
+  `Signature`/`Parameter` objects.
+- Invalid annotation grammar diagnostics are still basic and should improve as
+  the parser approaches a fuller Python grammar.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/cxxpython Tests/python/function_annotations.py`
+- `build/test_core_objects --gtest_filter=PythonScripts.RunsGoldenFiles:Compile.CompilesFunctionAnnotations:Bytecode.MetadataNamesAndStackEffects`
+- `ctest --test-dir build --output-on-failure`
+
 ## 2026-05-22 Positional-Only Function Signature Slice
 
 Review focus:

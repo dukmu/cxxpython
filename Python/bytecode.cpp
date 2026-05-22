@@ -614,8 +614,11 @@ namespace cxxpython
                 (instruction.operand & MakeFunctionHasDefaults) != 0;
             const bool has_kwdefaults =
                 (instruction.operand & MakeFunctionHasKwDefaults) != 0;
+            const bool has_annotations =
+                (instruction.operand & MakeFunctionHasAnnotations) != 0;
             return 1 - 1 - static_cast<int>(closure_count != 0) -
-                   static_cast<int>(has_defaults) - static_cast<int>(has_kwdefaults);
+                   static_cast<int>(has_defaults) - static_cast<int>(has_kwdefaults) -
+                   static_cast<int>(has_annotations);
         }
         case Opcode::MakeClass:
             return -2;

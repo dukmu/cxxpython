@@ -116,6 +116,7 @@ namespace cxxpython::compiler_internal
         Identifier,
         Plus,
         Minus,
+        Arrow,
         Star,
         DoubleStar,
         Slash,
@@ -942,28 +943,40 @@ namespace cxxpython::compiler_internal
 
     struct FunctionParameters final
     {
+        struct Annotation final
+        {
+            std::string name;
+            std::unique_ptr<Expr> value;
+        };
+
         struct KeywordOnlyParameter final
         {
             std::string name;
             std::unique_ptr<Expr> default_value;
+            std::unique_ptr<Expr> annotation;
         };
 
         std::vector<std::string> positional;
         std::uint32_t positional_only_count = 0;
         std::vector<std::unique_ptr<Expr>> defaults;
+        std::vector<Annotation> annotations;
         std::vector<KeywordOnlyParameter> keyword_only;
         std::optional<std::string> varargs;
+        std::unique_ptr<Expr> varargs_annotation;
         std::optional<std::string> varkeywords;
+        std::unique_ptr<Expr> varkeywords_annotation;
     };
 
     struct FunctionDefStmt final : Stmt
     {
         FunctionDefStmt(std::string name_in,
                         FunctionParameters params_in,
+                        std::unique_ptr<Expr> return_annotation_in,
                         std::vector<std::unique_ptr<Stmt>> body_in,
                         std::vector<std::unique_ptr<Expr>> decorators_in = {})
             : name(std::move(name_in)),
               params(std::move(params_in)),
+              return_annotation(std::move(return_annotation_in)),
               body(std::move(body_in)),
               decorators(std::move(decorators_in))
         {
@@ -971,6 +984,7 @@ namespace cxxpython::compiler_internal
 
         std::string name;
         FunctionParameters params;
+        std::unique_ptr<Expr> return_annotation;
         std::vector<std::unique_ptr<Stmt>> body;
         std::vector<std::unique_ptr<Expr>> decorators;
 

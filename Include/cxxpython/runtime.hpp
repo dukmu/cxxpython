@@ -187,6 +187,7 @@ namespace cxxpython
                                            DictObject *globals,
                                            TupleObject *defaults = nullptr,
                                            DictObject *kwdefaults = nullptr,
+                                           DictObject *annotations = nullptr,
                                            std::vector<CellObject *> closure = {});
         PythonFunctionObject *new_function(std::string name,
                                            CodeObject *code,

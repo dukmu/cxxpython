@@ -360,7 +360,13 @@ namespace cxxpython::compiler_internal
 
             if (ch == '-')
             {
-                if (index + 1 < source.size() && source[index + 1] == '=')
+                if (index + 1 < source.size() && source[index + 1] == '>')
+                {
+                    tokens.push_back(Token{TokenKind::Arrow, "->", 0, line, column});
+                    index += 2;
+                    column += 2;
+                }
+                else if (index + 1 < source.size() && source[index + 1] == '=')
                 {
                     tokens.push_back(Token{TokenKind::MinusEqual, "-=", 0, line, column});
                     index += 2;
