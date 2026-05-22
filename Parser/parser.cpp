@@ -81,6 +81,27 @@ namespace cxxpython::compiler_internal
                 std::size_t &depth_;
             };
 
+            class ClassDepthGuard final
+            {
+            public:
+                explicit ClassDepthGuard(std::size_t &depth)
+                    : depth_(depth)
+                {
+                    ++depth_;
+                }
+
+                ~ClassDepthGuard()
+                {
+                    --depth_;
+                }
+
+                ClassDepthGuard(const ClassDepthGuard &) = delete;
+                ClassDepthGuard &operator=(const ClassDepthGuard &) = delete;
+
+            private:
+                std::size_t &depth_;
+            };
+
             class LoopDepthGuard final
             {
             public:
@@ -381,8 +402,18 @@ namespace cxxpython::compiler_internal
                 consume(TokenKind::Import, "expected import after from module name");
 
                 std::vector<ImportAlias> aliases;
+                bool import_star = false;
+                if (peek().kind == TokenKind::Star)
+                {
+                    if (function_depth_ != 0 || class_depth_ != 0)
+                        raise_at(peek(), "import * only allowed at module level");
+                    advance();
+                    import_star = true;
+                }
                 while (true)
                 {
+                    if (import_star)
+                        break;
                     if (peek().kind != TokenKind::Identifier)
                         raise_at(peek(), "expected name in from import statement");
                     std::string name = advance().lexeme;
@@ -404,7 +435,10 @@ namespace cxxpython::compiler_internal
                         break;
                     advance();
                 }
-                auto statement = std::make_unique<FromImportStmt>(std::move(module), std::move(aliases));
+                auto statement = std::make_unique<FromImportStmt>(
+                    std::move(module),
+                    std::move(aliases),
+                    import_star);
                 statement->line = from_token.line;
                 return ParsedStatement{
                     std::move(statement),
@@ -696,6 +730,7 @@ namespace cxxpython::compiler_internal
                     consume(TokenKind::RightParen, "expected ')' after class bases");
                 }
                 consume(TokenKind::Colon, "expected ':' after class name");
+                ClassDepthGuard guard(class_depth_);
                 std::vector<std::unique_ptr<Stmt>> body = parse_suite("expected newline after class definition");
                 auto statement = std::make_unique<ClassDefStmt>(
                     std::move(name),
@@ -1538,6 +1573,7 @@ namespace cxxpython::compiler_internal
             std::string filename_;
             std::size_t index_ = 0;
             std::size_t function_depth_ = 0;
+            std::size_t class_depth_ = 0;
             std::size_t loop_depth_ = 0;
         };
     }

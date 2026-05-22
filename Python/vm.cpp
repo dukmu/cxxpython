@@ -1,5 +1,7 @@
 #include "cxxpython/vm.hpp"
 
+#include "../Objects/object_utils.hpp"
+
 #include <sstream>
 #include <utility>
 
@@ -124,6 +126,72 @@ namespace cxxpython
         {
             if (object)
                 roots.push_back(runtime.root(object));
+        }
+
+        bool is_attribute_error(Runtime &runtime, const PythonError &error)
+        {
+            return error.type() && is_subclass(error.type(), runtime.attribute_error_type());
+        }
+
+        Object *try_get_attr(Runtime &runtime, Object *object, const char *name)
+        {
+            try
+            {
+                return object_get_attr(object, name);
+            }
+            catch (const PythonError &error)
+            {
+                if (is_attribute_error(runtime, error))
+                    return nullptr;
+                throw;
+            }
+        }
+
+        void import_public_module_names(ModuleObject &module, DictObject &target)
+        {
+            for (const DictObject::Entry &entry : module.dict()->entries())
+            {
+                auto *name = dynamic_cast<StrObject *>(entry.key);
+                if (!name || (!name->value.empty() && name->value.front() == '_'))
+                    continue;
+                target.set(name, entry.value);
+            }
+        }
+
+        void import_all_names(Runtime &runtime, Object *module, Object *all_names, DictObject &target)
+        {
+            std::vector<Object *> names = collect_iterable_items(&runtime, all_names);
+            std::vector<Rooted<Object>> roots;
+            roots.reserve(names.size());
+            for (Object *name_object : names)
+                add_temporary_root(runtime, roots, name_object);
+
+            for (Object *name_object : names)
+            {
+                auto *name = dynamic_cast<StrObject *>(name_object);
+                if (!name)
+                    raise_type_error(&runtime, "module __all__ entries must be str");
+                Object *value = object_get_attr(module, name);
+                auto value_root = runtime.root(value);
+                target.set(name, value_root.get());
+            }
+        }
+
+        void import_star(Runtime &runtime, Object *module, DictObject &target)
+        {
+            if (!module)
+                raise_import_error(&runtime, "import * received null module");
+            auto module_root = runtime.root(module);
+            if (Object *all_names = try_get_attr(runtime, module_root.get(), "__all__"))
+            {
+                auto all_root = runtime.root(all_names);
+                import_all_names(runtime, module_root.get(), all_root.get(), target);
+                return;
+            }
+            auto *module_object = dynamic_cast<ModuleObject *>(module_root.get());
+            if (!module_object)
+                raise_type_error(&runtime, "import * requires a module object without __all__");
+            import_public_module_names(*module_object, target);
         }
 
         class ActiveFrame final
@@ -1127,6 +1195,12 @@ namespace cxxpython
                 Object *callable = frame->pop();
                 auto callable_root = runtime_.root(callable);
                 frame->push(object_call(callable, CallArguments{std::move(args), keywords}));
+                break;
+            }
+            case Opcode::ImportStar:
+            {
+                Object *module = frame->pop();
+                import_star(runtime_, module, *frame->locals());
                 break;
             }
             case Opcode::SetupExcept:

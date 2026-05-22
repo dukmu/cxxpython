@@ -56,6 +56,7 @@ namespace cxxpython
         MakeClass,
         Call,
         CallKw,
+        ImportStar,
         SetupExcept,
         SetupFinally,
         PopExcept,

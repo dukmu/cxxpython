@@ -1,5 +1,58 @@
 # Development Status
 
+## 2026-05-22 Star Import and `__all__` Protocol Slice
+
+Review focus:
+
+- Turn stdlib `__all__` from passive metadata into real import semantics.
+- Keep star-import behavior in parser/compiler/VM import execution, not hidden
+  in `__import__` special cases.
+- Preserve module-level symbol analysis and reject scope shapes that are not
+  implemented safely yet.
+
+Completed:
+
+- Added AST support for `from module import *`.
+- Added parser validation that `import *` is only accepted at module level.
+- Added `IMPORT_STAR` bytecode metadata and VM dispatch.
+- Implemented CPython-shaped star import behavior:
+  - prefer module `__all__`;
+  - require `__all__` entries to be strings;
+  - import each named attribute through normal attribute lookup;
+  - when `__all__` is absent, import public module dictionary names and skip
+    names beginning with `_`.
+- Added Python golden coverage for `__all__` exports, public-name fallback,
+  private-name skipping, and invalid nested `import *`.
+
+Design notes:
+
+- `__import__` still returns modules according to the normal fromlist rule.
+  The namespace mutation belongs to `IMPORT_STAR`, which has access to the
+  executing frame and can update the correct locals dictionary.
+- Star import is restricted to module scope for now. That avoids corrupting the
+  current symbol-table model for function fast locals and class namespace
+  execution.
+
+Known debt and next risk:
+
+- `IMPORT_STAR` currently uses the shared iterable collection helper for
+  `__all__`; this is acceptable with today's non-moving allocation model, but
+  a future GC pressure slice should replace returned raw-vector helpers with a
+  rooted iterator-consumption API.
+- Relative imports, package `__path__` multi-entry search, boolean `and/or`,
+  `while`, and augmented assignment remain the next parser/import gaps.
+- Several object-layer files still include `vm.hpp`; continue moving VM-shaped
+  behavior behind Runtime/Python-layer helpers.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/cxxpython Tests/python/import_star.py`
+- `build/test_core_objects '--gtest_filter=Bytecode.MetadataNamesAndStackEffects:PythonScripts.RunsGoldenFiles'`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all 195 tests pass.
+
 ## 2026-05-22 Descriptor Layer Split Slice
 
 Review focus:

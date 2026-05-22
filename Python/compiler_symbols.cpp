@@ -220,6 +220,8 @@ namespace cxxpython
             void visit(const compiler_internal::FromImportStmt &statement) override
             {
                 (void)symbols_.add_name("__import__");
+                if (statement.import_star)
+                    return;
                 for (const compiler_internal::ImportAlias &alias : statement.aliases)
                 {
                     (void)symbols_.add_name(alias.name);
@@ -373,6 +375,8 @@ namespace cxxpython
 
             void visit(const compiler_internal::FromImportStmt &statement) override
             {
+                if (statement.import_star)
+                    return;
                 for (const compiler_internal::ImportAlias &alias : statement.aliases)
                 {
                     if (symbols_.is_global(alias.binding) || symbols_.is_nonlocal(alias.binding))

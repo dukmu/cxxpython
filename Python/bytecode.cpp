@@ -364,6 +364,8 @@ namespace cxxpython
             return "CALL";
         case Opcode::CallKw:
             return "CALL_KW";
+        case Opcode::ImportStar:
+            return "IMPORT_STAR";
         case Opcode::SetupExcept:
             return "SETUP_EXCEPT";
         case Opcode::SetupFinally:
@@ -428,6 +430,7 @@ namespace cxxpython
         case Opcode::StoreFast:
         case Opcode::StoreDeref:
         case Opcode::PopTop:
+        case Opcode::ImportStar:
         case Opcode::DeleteAttr:
         case Opcode::PopJumpIfFalse:
         case Opcode::PopJumpIfTrue:

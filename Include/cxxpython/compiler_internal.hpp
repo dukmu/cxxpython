@@ -803,13 +803,14 @@ namespace cxxpython::compiler_internal
 
     struct FromImportStmt final : Stmt
     {
-        FromImportStmt(std::string module_in, std::vector<ImportAlias> aliases_in)
-            : module(std::move(module_in)), aliases(std::move(aliases_in))
+        FromImportStmt(std::string module_in, std::vector<ImportAlias> aliases_in, bool import_star_in = false)
+            : module(std::move(module_in)), aliases(std::move(aliases_in)), import_star(import_star_in)
         {
         }
 
         std::string module;
         std::vector<ImportAlias> aliases;
+        bool import_star = false;
 
         void accept(StmtVisitor &visitor) const override
         {

@@ -51,6 +51,7 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::MakeClass), "MAKE_CLASS");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::Call), "CALL");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::CallKw), "CALL_KW");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::ImportStar), "IMPORT_STAR");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::SetupExcept), "SETUP_EXCEPT");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::SetupFinally), "SETUP_FINALLY");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::PopExcept), "POP_EXCEPT");
@@ -110,6 +111,7 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::Call, 2}), -2);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::CallKw, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::CallKw, 2}), -3);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::ImportStar, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::SetupExcept, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::SetupFinally, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::PopExcept, 0}), 0);

@@ -651,6 +651,13 @@ namespace cxxpython
             void visit(const compiler_internal::FromImportStmt &statement) override
             {
                 StatementLineGuard line(*this, statement);
+                if (statement.import_star)
+                {
+                    emit_import_call(statement.module, runtime_.new_tuple({runtime_.new_str("*")}));
+                    emit({Opcode::ImportStar, 0});
+                    return;
+                }
+
                 std::vector<Object *> fromlist;
                 fromlist.reserve(statement.aliases.size());
                 for (const compiler_internal::ImportAlias &alias : statement.aliases)
