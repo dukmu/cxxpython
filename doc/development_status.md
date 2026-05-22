@@ -1,5 +1,53 @@
 # Development Status
 
+## 2026-05-22 Heap Truth Length Slot Refresh Slice
+
+Review focus:
+
+- Continue the heap special-method refresh work beyond iterators.
+- Make `len(x)`, `bool(x)`, and truth-control opcodes respect Python-defined
+  `__len__` and `__bool__` on heap classes through the same `TypeSlots`
+  protocol path used by builtins and VM control flow.
+- Preserve CPython-like precedence: `__bool__` controls truth first, otherwise
+  `__len__` may decide truth by zero/non-zero length.
+
+Completed:
+
+- Extended heap slot refresh to populate `TypeSlots::length` from `__len__`.
+- Extended heap slot refresh to populate `TypeSlots::truth` from `__bool__`
+  or, when only `__len__` is present, from length truth.
+- Added heap thunks that call Python-defined special methods through normal
+  descriptor binding and `object_call`.
+- Validated special method return types:
+  - `__len__` must return a non-negative int;
+  - `__bool__` must return the actual bool singletons.
+- Added Python golden coverage for `len()`, `bool()`, `if`, runtime
+  assignment/deletion of `__len__`, and invalid return types.
+
+Design notes:
+
+- `object_length(...)`, `is_true(...)`, VM jumps, `bool()`, and builtins all
+  continue to share the same slot-backed object protocol.
+- The temporary const-cast inside heap slot thunks is constrained to calling
+  Python methods from const-shaped slot signatures; the object protocol itself
+  remains the behavioral source of truth.
+- Slot refresh is now useful enough to justify a declarative slot spec table in
+  a future cleanup.
+
+Known debt and next risk:
+
+- `__getitem__`, `__setitem__`, `__delitem__`, `__contains__`, arithmetic,
+  comparison, and `__call__` heap special methods are still not refreshed.
+- Return-type errors are semantically correct but not yet message-compatible
+  with CPython.
+- Subclass slot invalidation after base mutation remains unresolved.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter=PythonScripts.RunsGoldenFiles`
+- `ctest --test-dir build --output-on-failure`
+
 ## 2026-05-22 Heap Iterator Slot Refresh Slice
 
 Review focus:

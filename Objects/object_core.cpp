@@ -100,6 +100,44 @@ namespace cxxpython
             return type && type->dict && type->dict->contains(type->runtime()->new_str(name));
         }
 
+        Object *call_heap_special_no_args(Object &object, const char *name)
+        {
+            Object *method = object_get_attr(&object, name);
+            auto method_root = object.runtime()->root(method);
+            return object_call(method_root.get(), {});
+        }
+
+        std::size_t heap_length_slot(const Object &object)
+        {
+            auto &mutable_object = const_cast<Object &>(object);
+            Object *result = call_heap_special_no_args(mutable_object, "__len__");
+            auto result_root = object.runtime()->root(result);
+            auto *length = dynamic_cast<IntObject *>(result_root.get());
+            if (!length)
+                raise_type_error(object.runtime(), "__len__() should return int");
+            if (length->value < 0)
+                raise_value_error(object.runtime(), "__len__() should return >= 0");
+            return static_cast<std::size_t>(length->value);
+        }
+
+        bool heap_truth_slot(const Object &object)
+        {
+            auto &mutable_object = const_cast<Object &>(object);
+            if (type_dict_contains(mutable_object.type(), "__bool__"))
+            {
+                Object *result = call_heap_special_no_args(mutable_object, "__bool__");
+                auto result_root = object.runtime()->root(result);
+                if (result_root.get() == object.runtime()->true_value())
+                    return true;
+                if (result_root.get() == object.runtime()->false_value())
+                    return false;
+                raise_type_error(object.runtime(), "__bool__() should return bool");
+            }
+            if (mutable_object.type() && mutable_object.type()->slots.length)
+                return mutable_object.type()->slots.length(object) != 0;
+            return default_truth(object);
+        }
+
         Object *object_getattribute_method(Runtime &runtime, Object *self, ObjectSpan args)
         {
             if (args.size() != 1)
@@ -1002,6 +1040,15 @@ namespace cxxpython
             return;
         type->slots.iter = type->base ? type->base->slots.iter : nullptr;
         type->slots.iternext = type->base ? type->base->slots.iternext : nullptr;
+        type->slots.length = type->base ? type->base->slots.length : nullptr;
+        type->slots.truth = type->base ? type->base->slots.truth : default_truth;
+        if (type_dict_contains(type, "__len__"))
+        {
+            type->slots.length = heap_length_slot;
+            type->slots.truth = heap_truth_slot;
+        }
+        if (type_dict_contains(type, "__bool__"))
+            type->slots.truth = heap_truth_slot;
         if (type_dict_contains(type, "__iter__"))
             type->slots.iter = heap_iter_slot;
         if (type_dict_contains(type, "__next__"))
