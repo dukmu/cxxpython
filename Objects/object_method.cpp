@@ -1,6 +1,5 @@
 #include "cxxpython/object.hpp"
 #include "cxxpython/runtime.hpp"
-#include "cxxpython/vm.hpp"
 
 #include "object_utils.hpp"
 
@@ -247,19 +246,6 @@ namespace cxxpython
             return integer;
         }
 
-        Object *active_module_name(Runtime &runtime)
-        {
-            VirtualMachine *vm = runtime.active_vm();
-            Frame *frame = vm ? vm->thread_state().current_frame() : nullptr;
-            DictObject *globals = frame ? frame->globals() : nullptr;
-            if (globals)
-            {
-                if (auto *name = dynamic_cast<StrObject *>(globals->get(runtime.new_str("__name__"))))
-                    return name;
-            }
-            return runtime.new_str("builtins");
-        }
-
         TypeObject *type_from_three_args(Runtime &runtime, TypeObject *metaclass, ObjectSpan args)
         {
             if (args.size() != 3)
@@ -288,8 +274,7 @@ namespace cxxpython
             request.name = name->value;
             request.bases = std::move(bases);
             request.namespace_dict = namespace_dict;
-            if (auto *module = dynamic_cast<StrObject *>(active_module_name(runtime)))
-                request.module_fallback = module->value;
+            request.module_fallback = runtime.active_module_name("builtins");
             request.qualname = name->value;
             request.explicit_metaclass = metaclass == runtime.type_type() ? nullptr : metaclass;
             return runtime.new_class(std::move(request));

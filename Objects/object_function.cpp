@@ -1,6 +1,6 @@
 #include "cxxpython/object.hpp"
+#include "cxxpython/bytecode.hpp"
 #include "cxxpython/runtime.hpp"
-#include "cxxpython/vm.hpp"
 
 #include "object_utils.hpp"
 
@@ -252,18 +252,7 @@ namespace cxxpython
             locals->set(varname_at(code_, code_->varkeywords_index()), keyword_locals);
         }
 
-        ExecutionRequest request{
-            .code = code_,
-            .locals = locals,
-            .globals = globals_,
-            .builtins = runtime()->builtins_dict(),
-            .closure = closure_,
-            .mode = ExecutionMode::Function,
-        };
-        if (VirtualMachine *active_vm = runtime()->active_vm())
-            return active_vm->execute(request);
-        VirtualMachine vm(*runtime());
-        return vm.execute(request);
+        return runtime()->call_python_function(this, locals);
     }
 
     PythonMethodObject::PythonMethodObject(TypeObject *type, Object *callable, Object *self)

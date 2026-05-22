@@ -1,6 +1,5 @@
 #include "cxxpython/object.hpp"
 #include "cxxpython/runtime.hpp"
-#include "cxxpython/vm.hpp"
 
 #include "object_utils.hpp"
 
@@ -113,19 +112,6 @@ namespace cxxpython
             require_no_positional(type.runtime(), type_qualified_name(&type), args);
         }
 
-        std::string active_module_name(Runtime &runtime)
-        {
-            VirtualMachine *vm = runtime.active_vm();
-            Frame *frame = vm ? vm->thread_state().current_frame() : nullptr;
-            DictObject *globals = frame ? frame->globals() : nullptr;
-            if (globals)
-            {
-                if (auto *name = dynamic_cast<StrObject *>(globals->get(runtime.new_str("__name__"))))
-                    return name->value;
-            }
-            return "builtins";
-        }
-
         TypeObject *type_new_from_three_args(TypeObject &metaclass, const CallArguments &args)
         {
             Runtime *runtime = metaclass.runtime();
@@ -152,7 +138,7 @@ namespace cxxpython
             request.name = name->value;
             request.bases = std::move(bases);
             request.namespace_dict = namespace_dict;
-            request.module_fallback = active_module_name(*runtime);
+            request.module_fallback = runtime->active_module_name("builtins");
             request.qualname = name->value;
             request.explicit_metaclass = &metaclass == runtime->type_type() ? nullptr : &metaclass;
             return runtime->new_class(std::move(request));

@@ -1,5 +1,65 @@
 # Development Status
 
+## 2026-05-22 Object Runtime Execution Boundary Slice
+
+Review focus:
+
+- Remove unnecessary direct `vm.hpp` dependencies from foundational object
+  implementations.
+- Keep execution-aware behavior available through narrow Runtime APIs rather
+  than letting object files reach into VM/thread/frame internals.
+- Preserve behavior for Python function calls, `type(...)`/`type.__new__`, and
+  zero-argument `super()`.
+
+Completed:
+
+- Added `Python/runtime_execution.cpp` as the execution bridge owned by the
+  Python/runtime layer.
+- Added Runtime-facing helpers:
+  - `Runtime::active_module_name(...)`;
+  - `Runtime::call_python_function(...)`;
+  - `Runtime::new_zero_argument_super()`.
+- Removed direct `cxxpython/vm.hpp` includes from:
+  - `Objects/object_core.cpp`;
+  - `Objects/object_function.cpp`;
+  - `Objects/object_method.cpp`;
+  - `Objects/object_super.cpp`.
+- Moved frame inspection for active module names and zero-argument `super()`
+  out of object files and into the runtime execution bridge.
+- Kept Python function argument binding in `PythonFunctionObject`, but moved
+  actual code execution through `Runtime::call_python_function`.
+
+Design notes:
+
+- Object files still know about `Runtime` as the allocator/protocol owner, but
+  they no longer depend on the concrete VM class or thread-state layout.
+- `super(type, obj)` remains an object-level constructor path because it only
+  validates object/type relationships. Only zero-argument `super()` requires
+  frame inspection, so only that path crosses into the runtime execution bridge.
+- Native modules such as `sys` and `_collections` may still include `vm.hpp`
+  because their public APIs intentionally expose execution/frame state. This
+  slice targeted foundational `Objects/` layering.
+
+Known debt and next risk:
+
+- `Python/bltinmodule.cpp` still contains a broad mix of builtin policy,
+  import policy, and execution helpers. Split builtin groups or move more
+  import policy toward script-level importlib once the script substrate is
+  ready.
+- `Python/runtime_factories.cpp` still includes VM details for class body
+  execution. That is Python/runtime policy, but it should be watched as class
+  construction grows.
+- The root/handle story for temporary iterable collection remains important
+  before stronger GC pressure.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects '--gtest_filter=Functions.*:Compile.CompilesMinimalClassDefinitions:Compile.ClassInstantiationCallsPythonInit:Compile.ClassDefinitionsSelectInheritedMetaclass:Bytecode.MakeClassUsesEvaluatedBases:PythonScripts.RunsGoldenFiles'`
+- `ctest --test-dir build --output-on-failure`
+
+Result: all 199 tests pass.
+
 ## 2026-05-22 Relative Import and Package Path Slice
 
 Review focus:

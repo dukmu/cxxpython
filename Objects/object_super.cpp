@@ -1,6 +1,5 @@
 #include "cxxpython/object.hpp"
 #include "cxxpython/runtime.hpp"
-#include "cxxpython/vm.hpp"
 
 #include "object_utils.hpp"
 
@@ -43,21 +42,6 @@ namespace cxxpython
             return object_type;
         }
 
-        CellObject *find_class_cell(Frame *frame)
-        {
-            if (!frame || !frame->code())
-                return nullptr;
-            const std::vector<Object *> &freevars = frame->code()->freevars();
-            for (std::size_t index = 0; index < freevars.size(); ++index)
-            {
-                auto *name = dynamic_cast<StrObject *>(freevars[index]);
-                if (!name || name->value != "__class__")
-                    continue;
-                return frame->cell(frame->code()->cellvars().size() + index);
-            }
-            return nullptr;
-        }
-
         Object *super_new(TypeObject &type, const CallArguments &args)
         {
             Runtime *runtime = type.runtime();
@@ -66,26 +50,7 @@ namespace cxxpython
 
             if (args.positional.empty())
             {
-                VirtualMachine *vm = runtime->active_vm();
-                Frame *frame = vm ? vm->thread_state().current_frame() : nullptr;
-                if (!frame)
-                    raise_type_error(runtime, "super(): no current frame");
-                CellObject *class_cell = find_class_cell(frame);
-                if (!class_cell || class_cell->is_empty())
-                    raise_type_error(runtime, "super(): __class__ cell not found");
-                auto *start_type = dynamic_cast<TypeObject *>(class_cell->value());
-                if (!start_type)
-                    raise_type_error(runtime, "super(): __class__ cell is not a type");
-                if (frame->code()->varnames().empty())
-                    raise_type_error(runtime, "super(): no arguments");
-                auto *first_arg_name = dynamic_cast<StrObject *>(frame->code()->varnames()[0]);
-                if (!first_arg_name)
-                    throw BytecodeError("super() first argument metadata must be a str");
-                Object *first_arg = frame->locals()->get(first_arg_name);
-                if (!first_arg)
-                    raise_type_error(runtime, "super(): arg[0] deleted");
-                TypeObject *object_type = resolve_super_object_type(*runtime, start_type, first_arg);
-                return runtime->new_super(start_type, first_arg, object_type);
+                return runtime->new_zero_argument_super();
             }
 
             if (args.positional.size() != 2)

@@ -16,6 +16,7 @@ add_library(cxxpython_core
     Python/runtime_factories.cpp
     Python/runtime_roots.cpp
     Python/runtime_type_descriptors.cpp
+    Python/runtime_execution.cpp
     Python/bltinmodule.cpp
     Python/import.cpp
     Python/import_find.cpp

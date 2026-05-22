@@ -141,6 +141,7 @@ namespace cxxpython
         void set_stdout(std::ostream &stream) noexcept;
         VirtualMachine *active_vm() const noexcept;
         void set_active_vm(VirtualMachine *vm) noexcept;
+        std::string active_module_name(std::string fallback = "builtins");
 
         IntObject *new_int(std::int64_t value);
         StrObject *new_str(std::string value);
@@ -173,8 +174,10 @@ namespace cxxpython
                                            CodeObject *code,
                                            DictObject *globals,
                                            std::vector<CellObject *> closure = {});
+        Object *call_python_function(PythonFunctionObject *function, DictObject *locals);
         CellObject *new_cell(Object *value = nullptr);
         SuperObject *new_super(TypeObject *start_type, Object *object, TypeObject *object_type);
+        SuperObject *new_zero_argument_super();
         PythonMethodObject *new_method(Object *callable, Object *self);
         MethodDescriptorObject *new_method_descriptor(std::string name,
                                                        TypeObject *owner,
