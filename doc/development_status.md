@@ -1,5 +1,51 @@
 # Development Status
 
+## 2026-05-22 Signal Native Module Slice
+
+Review focus:
+
+- Extend POSIX-adjacent substrate support in a CPython-shaped way: `signal`
+  is a separate native module, not an extra branch inside `posix`.
+- Keep the C++ surface minimal and honest while exposing real module metadata,
+  constants, signatures, and handler state through normal module dictionaries.
+
+Completed:
+
+- Added native `signal` module registration alongside `sys`, `gc`, `posix`,
+  `_io`, and `_collections`.
+- Added `signal.signal`, `signal.getsignal`, and `signal.raise_signal`.
+- Added POSIX signal constants when available, including `SIGINT`,
+  `SIGTERM`, `SIGUSR1`, and `SIGUSR2`, plus `SIG_DFL` and `SIG_IGN`.
+- Updated `sys.builtin_module_names` and C++ module import coverage.
+- Added Python golden coverage for module docstring, constants, signatures,
+  custom handler installation, retrieval, `raise_signal`, restoration, and
+  argument validation.
+
+Design notes:
+
+- Custom Python handlers are stored in the module-level handler table and
+  invoked through normal `object_call`. The native C signal trampoline is
+  intentionally tiny and only marks pending state; synchronous
+  `raise_signal()` invokes the Python handler directly for deterministic
+  testing.
+- Full asynchronous delivery still needs VM checkpoint integration. That is a
+  runtime/thread-state feature, not something that belongs inside `posix`.
+
+Known debt and next risk:
+
+- Deliver pending OS signals at VM safe points and translate `SIGINT` into
+  `KeyboardInterrupt` once that exception type exists.
+- Add `Signals` enum compatibility and richer constants after enum/class
+  support is strong enough.
+- `signal.alarm`, `pthread_sigmask`, and wakeup-fd style APIs should wait for
+  the broader POSIX/threading substrate.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/cxxpython Tests/python/signal_module.py`
+- `ctest --test-dir build --output-on-failure`
+
 ## 2026-05-22 Lambda Expression Slice
 
 Review focus:

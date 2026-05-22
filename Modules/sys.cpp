@@ -83,6 +83,7 @@ namespace cxxpython
                 runtime.new_str("builtins"),
                 runtime.new_str("gc"),
                 runtime.new_str("posix"),
+                runtime.new_str("signal"),
                 runtime.new_str("sys"),
             };
             return runtime.new_tuple(std::move(names));

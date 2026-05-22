@@ -36,6 +36,7 @@ add_library(cxxpython_core
     Modules/sys.cpp
     Modules/gc.cpp
     Modules/posix.cpp
+    Modules/signal.cpp
     Modules/_io.cpp
     Modules/_collections.cpp
     Objects/object_core.cpp

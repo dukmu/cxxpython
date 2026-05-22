@@ -73,6 +73,7 @@ namespace cxxpython
     void initialize_sys_module(Runtime &runtime, ModuleObject &module);
     void initialize_gc_module(Runtime &runtime, ModuleObject &module);
     void initialize_posix_module(Runtime &runtime, ModuleObject &module);
+    void initialize_signal_module(Runtime &runtime, ModuleObject &module);
     void initialize_io_module(Runtime &runtime, ModuleObject &module);
     void initialize_collections_module(Runtime &runtime, ModuleObject &module);
 }

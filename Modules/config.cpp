@@ -14,6 +14,7 @@ namespace cxxpython
             "_io",
             "gc",
             "posix",
+            "signal",
             "sys",
         };
     }
@@ -42,6 +43,8 @@ namespace cxxpython
             initialize_io_module(runtime, *module);
         else if (name == "posix")
             initialize_posix_module(runtime, *module);
+        else if (name == "signal")
+            initialize_signal_module(runtime, *module);
         else if (name == "_collections")
             initialize_collections_module(runtime, *module);
         return module;

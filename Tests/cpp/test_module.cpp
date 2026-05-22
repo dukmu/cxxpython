@@ -562,6 +562,7 @@ TEST(Module, ImportsStdlibModulesFromLibPath)
     cxxpython::ModuleObject *collections = runtime.import_module("collections");
     cxxpython::ModuleObject *sys = runtime.import_module("sys");
     cxxpython::ModuleObject *posix = runtime.import_module("posix");
+    cxxpython::ModuleObject *signal = runtime.import_module("signal");
     cxxpython::ModuleObject *io = runtime.import_module("_io");
 
     ASSERT_NE(inspect, nullptr);
@@ -569,12 +570,14 @@ TEST(Module, ImportsStdlibModulesFromLibPath)
     ASSERT_NE(collections, nullptr);
     ASSERT_NE(sys, nullptr);
     ASSERT_NE(posix, nullptr);
+    ASSERT_NE(signal, nullptr);
     ASSERT_NE(io, nullptr);
     EXPECT_EQ(runtime.modules_dict()->get(runtime.new_str("inspect")), inspect);
     EXPECT_EQ(runtime.modules_dict()->get(runtime.new_str("gc")), gc);
     EXPECT_EQ(runtime.modules_dict()->get(runtime.new_str("collections")), collections);
     EXPECT_EQ(runtime.modules_dict()->get(runtime.new_str("sys")), sys);
     EXPECT_EQ(runtime.modules_dict()->get(runtime.new_str("posix")), posix);
+    EXPECT_EQ(runtime.modules_dict()->get(runtime.new_str("signal")), signal);
     EXPECT_EQ(runtime.modules_dict()->get(runtime.new_str("_io")), io);
 
     EXPECT_NE(inspect->dict()->get(runtime.new_str("currentframe")), nullptr);
@@ -582,6 +585,7 @@ TEST(Module, ImportsStdlibModulesFromLibPath)
     EXPECT_NE(collections->dict()->get(runtime.new_str("namedtuple")), nullptr);
     EXPECT_NE(sys->dict()->get(runtime.new_str("argv")), nullptr);
     EXPECT_NE(posix->dict()->get(runtime.new_str("getcwd")), nullptr);
+    EXPECT_NE(signal->dict()->get(runtime.new_str("signal")), nullptr);
     EXPECT_NE(io->dict()->get(runtime.new_str("TextIOWrapper")), nullptr);
 
     auto *getframe_signature = dynamic_cast<cxxpython::StrObject *>(
@@ -590,6 +594,8 @@ TEST(Module, ImportsStdlibModulesFromLibPath)
         cxxpython::object_get_attr(gc->dict()->get(runtime.new_str("collect")), "__doc__"));
     auto *posix_signature = dynamic_cast<cxxpython::StrObject *>(
         cxxpython::object_get_attr(posix->dict()->get(runtime.new_str("listdir")), "__text_signature__"));
+    auto *signal_signature = dynamic_cast<cxxpython::StrObject *>(
+        cxxpython::object_get_attr(signal->dict()->get(runtime.new_str("signal")), "__text_signature__"));
     auto *io_signature = dynamic_cast<cxxpython::StrObject *>(
         cxxpython::object_get_attr(io->dict()->get(runtime.new_str("open")), "__text_signature__"));
     auto *namedtuple_doc = dynamic_cast<cxxpython::StrObject *>(
@@ -597,11 +603,13 @@ TEST(Module, ImportsStdlibModulesFromLibPath)
     ASSERT_NE(getframe_signature, nullptr);
     ASSERT_NE(gc_doc, nullptr);
     ASSERT_NE(posix_signature, nullptr);
+    ASSERT_NE(signal_signature, nullptr);
     ASSERT_NE(io_signature, nullptr);
     ASSERT_NE(namedtuple_doc, nullptr);
     EXPECT_EQ(getframe_signature->value, "($module, depth=0, /)");
     EXPECT_NE(gc_doc->value.find("garbage collection"), std::string::npos);
     EXPECT_EQ(posix_signature->value, "($module, path='.', /)");
+    EXPECT_EQ(signal_signature->value, "($module, signalnum, handler, /)");
     EXPECT_EQ(io_signature->value, "($module, file, mode='r', /)");
     EXPECT_NE(namedtuple_doc->value.find("tuple subclass"), std::string::npos);
 
