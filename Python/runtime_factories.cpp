@@ -204,6 +204,11 @@ namespace cxxpython
             std::move(owned_stream));
     }
 
+    ThreadLockObject *Runtime::new_thread_lock()
+    {
+        return allocate<ThreadLockObject>(thread_lock_type_);
+    }
+
     ModuleObject *Runtime::new_module(std::string name, std::string filename)
     {
         DictObject *dict = new_dict();

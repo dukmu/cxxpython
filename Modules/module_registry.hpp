@@ -77,5 +77,6 @@ namespace cxxpython
     void deliver_pending_signals(Runtime &runtime);
     void initialize_io_module(Runtime &runtime, ModuleObject &module);
     void initialize_collections_module(Runtime &runtime, ModuleObject &module);
+    void initialize_thread_module(Runtime &runtime, ModuleObject &module);
     void initialize_tokenize_module(Runtime &runtime, ModuleObject &module);
 }

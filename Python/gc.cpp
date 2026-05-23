@@ -19,10 +19,9 @@ namespace cxxpython
                 worklist.push_back(object);
         };
 
-        for (Object *root : roots_)
-            enqueue(root);
-        if (active_vm_)
-            active_vm_->thread_state().visit_frames(enqueue);
+        visit_roots(enqueue);
+        if (VirtualMachine *vm = active_vm())
+            vm->thread_state().visit_frames(enqueue);
 
         while (!worklist.empty())
         {
@@ -31,13 +30,17 @@ namespace cxxpython
             object->visit_children(enqueue);
         }
 
-        roots_.erase(std::remove_if(roots_.begin(),
-                                    roots_.end(),
-                                    [&marked](Object *root) {
-                                        return !root || marked.find(root) == marked.end();
-                                    }),
-                     roots_.end());
+        {
+            std::scoped_lock lock(roots_mutex_);
+            roots_.erase(std::remove_if(roots_.begin(),
+                                        roots_.end(),
+                                        [&marked](Object *root) {
+                                            return !root || marked.find(root) == marked.end();
+                                        }),
+                         roots_.end());
+        }
 
+        std::scoped_lock lock(heap_mutex_);
         const std::size_t before = heap_.size();
         heap_.erase(std::remove_if(heap_.begin(),
                                    heap_.end(),

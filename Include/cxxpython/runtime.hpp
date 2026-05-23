@@ -2,6 +2,7 @@
 
 #include <iosfwd>
 #include <memory>
+#include <mutex>
 #include <string>
 #include <string_view>
 #include <functional>
@@ -106,6 +107,7 @@ namespace cxxpython
         TypeObject *map_type() const noexcept;
         TypeObject *filter_type() const noexcept;
         TypeObject *text_io_type() const noexcept;
+        TypeObject *thread_lock_type() const noexcept;
         TypeObject *module_type() const noexcept;
         TypeObject *native_function_type() const noexcept;
         TypeObject *function_type() const noexcept;
@@ -181,6 +183,7 @@ namespace cxxpython
                                   std::ostream *output,
                                   bool owns_streams,
                                   std::unique_ptr<std::iostream> owned_stream = nullptr);
+        ThreadLockObject *new_thread_lock();
         TextIOObject *stdin_object() const noexcept;
         TextIOObject *stdout_object() const noexcept;
         TextIOObject *stderr_object() const noexcept;
@@ -357,6 +360,7 @@ namespace cxxpython
             auto object = std::make_unique<T>(std::forward<Args>(args)...);
             T *raw = object.get();
             raw->set_runtime(this);
+            std::scoped_lock lock(heap_mutex_);
             heap_.push_back(std::move(object));
             return raw;
         }
@@ -392,6 +396,8 @@ namespace cxxpython
 
         std::vector<std::unique_ptr<Object>> heap_;
         std::vector<Object *> roots_;
+        mutable std::recursive_mutex heap_mutex_;
+        mutable std::recursive_mutex roots_mutex_;
 
         TypeObject *object_type_ = nullptr;
         TypeObject *type_type_ = nullptr;
@@ -416,6 +422,7 @@ namespace cxxpython
         TypeObject *map_type_ = nullptr;
         TypeObject *filter_type_ = nullptr;
         TypeObject *text_io_type_ = nullptr;
+        TypeObject *thread_lock_type_ = nullptr;
         TypeObject *module_type_ = nullptr;
         TypeObject *native_function_type_ = nullptr;
         TypeObject *function_type_ = nullptr;
@@ -466,7 +473,6 @@ namespace cxxpython
         std::vector<std::string> module_search_paths_;
         std::vector<std::string> program_arguments_;
         std::ostream *stdout_ = nullptr;
-        VirtualMachine *active_vm_ = nullptr;
     };
 
     template <class T>

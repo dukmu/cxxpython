@@ -1,5 +1,63 @@
 # Development Status
 
+## 2026-05-23 Free-Threaded Thread Substrate Slice
+
+Review focus:
+
+- Align the architecture with CPython's free-threaded direction rather than
+  adding a process-wide VM/GIL execution lock.
+- Add real OS-thread execution while clearly documenting the remaining
+  synchronization work needed for full shared-mutable-object safety.
+
+Completed:
+
+- Added native `_thread` builtin extension module.
+- Added `_thread.start_new_thread(function, args, kwargs=None)` using detached
+  `std::thread` and no global VM execution lock.
+- Added `_thread.get_ident()`, `_thread.exit()`, `_thread.allocate_lock()`, and
+  `_thread.LockType`.
+- Added builtin `_thread.lock` object with `acquire(blocking=True)`,
+  `release()`, and `locked()`.
+- Added `Lib/threading.py` with minimal `Thread`, `Lock`, `get_ident`, and
+  `current_thread` facade.
+- Made `Runtime::active_vm()` thread-local so frame/exception/trace
+  introspection observes the current OS thread.
+- Added runtime-local locking around heap allocation and root registration.
+- Added Python golden coverage for `_thread` and `threading.Thread`.
+
+Design notes:
+
+- This is a free-threaded substrate, not a complete CPython-compatible
+  threading library yet.  It deliberately avoids a global bytecode execution
+  lock.
+- `_thread.lock` is a primitive lock that can be released by another thread,
+  matching the behavior needed for low-level `_thread` and simple
+  script-level `join()`.
+- The heap/root mutexes protect runtime registries.  They do not make all
+  object operations safe under concurrent mutation.
+
+Known debt and next risk:
+
+- `dict`, `list`, module dictionaries, type dictionaries, and instance
+  dictionaries still need per-object synchronization or another explicit
+  free-threaded mutation strategy.
+- GC currently snapshots only runtime roots and the calling thread's active VM;
+  it needs all-thread-state registration and a stop-the-world or
+  concurrent-safe protocol before collection is safe during live multithreaded
+  mutation.
+- Imports and `sys.modules` are not yet coherent under concurrent import.
+- `threading` lacks many CPython features: timeout joins, daemon state,
+  exception hooks, conditions, events, RLock, local storage, and enumerate.
+- Coroutine/generator support is still separate work; it requires suspended
+  frame objects and VM resume semantics.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/cxxpython Tests/python/thread_lowlevel.py`
+- `build/cxxpython Tests/python/threading_module.py`
+- `build/cxxpython Tests/python/stdlib_modules.py`
+
 ## 2026-05-23 Process Exec And Site Exit Slice
 
 Review focus:

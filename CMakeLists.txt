@@ -39,6 +39,7 @@ add_library(cxxpython_core
     Modules/signal.cpp
     Modules/_io.cpp
     Modules/_collections.cpp
+    Modules/_thread.cpp
     Modules/_tokenize.cpp
     Objects/object_core.cpp
     Objects/object_primitives.cpp
@@ -73,7 +74,8 @@ target_compile_options(cxxpython_core PRIVATE
     -Wpedantic
     -Werror
 )
-target_link_libraries(cxxpython_core PUBLIC ${CMAKE_DL_LIBS})
+find_package(Threads REQUIRED)
+target_link_libraries(cxxpython_core PUBLIC ${CMAKE_DL_LIBS} Threads::Threads)
 target_compile_definitions(cxxpython_core PRIVATE
     CXXPYTHON_STDLIB_DIR=\"${CMAKE_CURRENT_SOURCE_DIR}/Lib\"
 )

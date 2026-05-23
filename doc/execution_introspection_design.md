@@ -127,21 +127,48 @@ commands, source display, and interaction policy belong in scripts.
 
 ## Threading Model
 
-Initial model:
+Target model:
 
-- Introduce `InterpreterState` and `ThreadState`.
-- Keep active frame, recursion depth, and current handled exception in
-  `ThreadState`; add trace function and pending async events there when those
-  features arrive.
-- Keep a process-level GIL at first so object layout and GC remain correct.
+- Track CPython's free-threaded direction rather than building new public APIs
+  around a process-wide execution lock.
+- No global VM/GIL lock should be required to execute Python bytecode in two OS
+  threads.  Any temporary lock must be local to a data structure or runtime
+  registry and must not serialize all bytecode execution.
+- Keep active VM/frame state thread-local.  `sys._getframe()`,
+  `sys.exc_info()`, and tracing observe the current OS thread's VM state.
+- Keep active frame, recursion depth, current handled exception, trace
+  function, and pending async events in `ThreadState`.
+- Protect runtime registries (`heap_`, root lists, module maps, import state)
+  explicitly.  Current heap/root locking is only the first boundary; module and
+  import mutation still need finer synchronization.
+- Mutable containers need per-object synchronization or another explicit
+  free-threaded strategy before unsynchronized shared mutation is supported.
+- GC must grow a stop-the-world or concurrent-safe root snapshot protocol
+  before it can safely run while other threads mutate object graphs.
 - Route signals to the main interpreter/thread state, matching CPython's
   high-level behavior.
 
+Current substrate:
+
+- `_thread` is a native builtin extension module.
+- `_thread.start_new_thread()` launches a real detached OS thread and calls
+  `function(*args, **kwargs)` without a global VM execution lock.
+- `_thread.allocate_lock()` returns a primitive lock object that can be
+  released by another thread, which is required for script-level `join()`.
+- `Lib/threading.py` provides a small `Thread`, `Lock`, `get_ident`, and
+  `current_thread` facade over `_thread`.
+- Runtime heap allocation and root registration are protected by runtime-local
+  mutexes.  This does not yet make every object operation thread-safe.
+
 Future true parallelism:
 
-- Do not promise GIL-free execution until object allocation, GC roots, module
-  state, extension APIs, and ref/handle policy are designed for it.
-- Multiple interpreters can arrive before true shared-heap parallelism if
+- Finish per-object synchronization for `dict`, `list`, instance dictionaries,
+  module dictionaries, and type dictionaries.
+- Make imports and `sys.modules` coherent under concurrent import.
+- Extend GC to visit all live thread states and to coordinate with mutators.
+- Specify extension API thread-safety rules before exposing a stable C/C++ ABI
+  for free-threaded extensions.
+- Multiple interpreters can arrive before fully shared-heap parallelism if
   module state and builtins are interpreter-local.
 
 ## Coroutine And Generator Model

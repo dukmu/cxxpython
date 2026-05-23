@@ -222,6 +222,7 @@ namespace cxxpython
         initialize_slice_type_methods(*this, slice_type_);
         initialize_code_type_methods(*this, code_type_);
         initialize_text_io_methods(*this, text_io_type_);
+        initialize_thread_lock_methods(*this, thread_lock_type_);
         initialize_property_type_methods(*this, property_type_);
     }
 }

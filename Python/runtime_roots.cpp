@@ -9,11 +9,13 @@ namespace cxxpython
     {
         if (!object)
             return;
+        std::scoped_lock lock(roots_mutex_);
         roots_.push_back(object);
     }
 
     void Runtime::remove_root(Object *object)
     {
+        std::scoped_lock lock(roots_mutex_);
         const auto found = std::find(roots_.begin(), roots_.end(), object);
         if (found != roots_.end())
             roots_.erase(found);
@@ -21,6 +23,7 @@ namespace cxxpython
 
     void Runtime::visit_roots(const std::function<void(Object *)> &visitor) const
     {
+        std::scoped_lock lock(roots_mutex_);
         for (Object *root : roots_)
         {
             if (root)
@@ -30,6 +33,7 @@ namespace cxxpython
 
     void Runtime::visit_heap(const std::function<void(Object *)> &visitor) const
     {
+        std::scoped_lock lock(heap_mutex_);
         for (const auto &object : heap_)
         {
             if (object)
@@ -39,11 +43,13 @@ namespace cxxpython
 
     std::size_t Runtime::heap_size() const noexcept
     {
+        std::scoped_lock lock(heap_mutex_);
         return heap_.size();
     }
 
     std::size_t Runtime::root_count() const noexcept
     {
+        std::scoped_lock lock(roots_mutex_);
         return roots_.size();
     }
 
@@ -165,6 +171,7 @@ namespace cxxpython
         initialize_type_dict(map_type_);
         initialize_type_dict(filter_type_);
         initialize_type_dict(text_io_type_);
+        initialize_type_dict(thread_lock_type_);
         initialize_type_dict(module_type_);
         initialize_type_dict(native_function_type_);
         initialize_type_dict(function_type_);

@@ -3,9 +3,11 @@
 #include <cstdint>
 #include <functional>
 #include <exception>
+#include <condition_variable>
 #include <iostream>
 #include <limits>
 #include <memory>
+#include <mutex>
 #include <span>
 #include <string>
 #include <utility>
@@ -46,6 +48,7 @@ namespace cxxpython
     class CellObject;
     class SuperObject;
     class TextIOObject;
+    class ThreadLockObject;
 
     using VisitChildren = std::function<void(Object *)>;
     using ObjectSpan = std::span<Object *const>;
@@ -540,6 +543,21 @@ namespace cxxpython
         std::unique_ptr<std::iostream> owned_stream_;
     };
 
+    class ThreadLockObject final : public Object
+    {
+    public:
+        explicit ThreadLockObject(TypeObject *type);
+
+        bool acquire(bool blocking);
+        void release();
+        bool locked() const;
+
+    private:
+        mutable std::mutex mutex_;
+        std::condition_variable condition_;
+        bool locked_ = false;
+    };
+
     class ModuleObject final : public Object
     {
     public:
@@ -912,6 +930,7 @@ namespace cxxpython
     TypeSlots make_map_slots();
     TypeSlots make_filter_slots();
     TypeSlots make_text_io_slots();
+    TypeSlots make_thread_lock_slots();
     TypeSlots make_module_slots();
     TypeSlots make_native_function_slots();
     TypeSlots make_function_slots();
@@ -930,6 +949,7 @@ namespace cxxpython
     TypeSlots make_cell_slots();
     TypeSlots make_super_slots();
     void initialize_text_io_methods(Runtime &runtime, TypeObject *type);
+    void initialize_thread_lock_methods(Runtime &runtime, TypeObject *type);
 
     [[noreturn]] void raise_type_error(Runtime *runtime, std::string message);
     [[noreturn]] void raise_value_error(Runtime *runtime, std::string message);

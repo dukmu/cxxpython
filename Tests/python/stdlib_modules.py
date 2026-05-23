@@ -8,12 +8,14 @@ import io
 import posixpath
 import _io
 import _collections
+import _thread
 import _tokenize
 import token
 import tokenize
 import traceback
 import linecache
 import dis
+import threading
 
 print(type(inspect))
 print(type(gc))
@@ -23,6 +25,7 @@ print(inspect.getdoc(gc).__contains__('garbage collector'))
 print(inspect.getdoc(posix).__contains__('operating-system'))
 print(inspect.getdoc(_io).__contains__('native stream'))
 print(inspect.getdoc(_collections).__contains__('collection helpers'))
+print(inspect.getdoc(_thread).__contains__('OS threads'))
 print(inspect.getdoc(_tokenize).__contains__('tokenizer substrate'))
 print(inspect.getdoc(os).__contains__('operating-system interfaces'))
 print(inspect.getdoc(io).__contains__('Core stream'))
@@ -32,6 +35,7 @@ print(inspect.getdoc(tokenize).__contains__('Tokenization helpers'))
 print(inspect.getdoc(traceback).__contains__('Format and print stack traces'))
 print(inspect.getdoc(linecache).__contains__('Cache source lines'))
 print(inspect.getdoc(dis).__contains__('cxxpython bytecode'))
+print(inspect.getdoc(threading).__contains__('Thread objects'))
 print(token.tok_name[token.NAME])
 print(token.EXACT_TOKEN_TYPES['='])
 print(tokenize.NAME)
@@ -43,9 +47,11 @@ print(traceback.__all__.__contains__('print_exception'))
 print(linecache.__all__.__contains__('getline'))
 print(dis.__all__.__contains__('get_instructions'))
 print(dis.__all__.__contains__('Bytecode'))
+print(threading.__all__.__contains__('Thread'))
 print(gc.__file__)
 print(sys.builtin_module_names.__contains__('_inspect'))
 print(sys.builtin_module_names.__contains__('_tokenize'))
+print(sys.builtin_module_names.__contains__('_thread'))
 print(inspect.signature(sys._getframe))
 print(inspect.getdoc(sys._getframe).__contains__('frame object'))
 print(inspect.signature(sys.exc_info))

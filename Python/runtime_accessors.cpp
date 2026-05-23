@@ -2,6 +2,11 @@
 
 namespace cxxpython
 {
+    namespace
+    {
+        thread_local VirtualMachine *thread_active_vm = nullptr;
+    }
+
     TypeObject *Runtime::object_type() const noexcept
     {
         return object_type_;
@@ -115,6 +120,11 @@ namespace cxxpython
     TypeObject *Runtime::text_io_type() const noexcept
     {
         return text_io_type_;
+    }
+
+    TypeObject *Runtime::thread_lock_type() const noexcept
+    {
+        return thread_lock_type_;
     }
 
     TypeObject *Runtime::module_type() const noexcept
@@ -359,11 +369,11 @@ namespace cxxpython
 
     VirtualMachine *Runtime::active_vm() const noexcept
     {
-        return active_vm_;
+        return thread_active_vm;
     }
 
     void Runtime::set_active_vm(VirtualMachine *vm) noexcept
     {
-        active_vm_ = vm;
+        thread_active_vm = vm;
     }
 }

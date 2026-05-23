@@ -32,6 +32,7 @@ namespace cxxpython
         map_type_ = allocate_type("map");
         filter_type_ = allocate_type("filter");
         text_io_type_ = allocate_type("_io.TextIOWrapper");
+        thread_lock_type_ = allocate_type("_thread.lock");
         module_type_ = allocate_type("module");
         native_function_type_ = allocate_type("builtin_function_or_method");
         function_type_ = allocate_type("function");
@@ -88,6 +89,7 @@ namespace cxxpython
         map_type_->slots = make_map_slots();
         filter_type_->slots = make_filter_slots();
         text_io_type_->slots = make_text_io_slots();
+        thread_lock_type_->slots = make_thread_lock_slots();
         module_type_->slots = make_module_slots();
         native_function_type_->slots = make_native_function_slots();
         function_type_->slots = make_function_slots();
@@ -144,6 +146,7 @@ namespace cxxpython
         map_type_->set_type(type_type_);
         filter_type_->set_type(type_type_);
         text_io_type_->set_type(type_type_);
+        thread_lock_type_->set_type(type_type_);
         module_type_->set_type(type_type_);
         native_function_type_->set_type(type_type_);
         function_type_->set_type(type_type_);
@@ -203,6 +206,7 @@ namespace cxxpython
         initialize_type(map_type_, object_type_);
         initialize_type(filter_type_, object_type_);
         initialize_type(text_io_type_, object_type_);
+        initialize_type(thread_lock_type_, object_type_);
         initialize_type(module_type_, object_type_);
         initialize_type(native_function_type_, object_type_);
         initialize_type(function_type_, object_type_);
@@ -259,6 +263,7 @@ namespace cxxpython
         map_type_->solid_base = map_type_;
         filter_type_->solid_base = filter_type_;
         text_io_type_->solid_base = text_io_type_;
+        thread_lock_type_->solid_base = thread_lock_type_;
         module_type_->solid_base = module_type_;
         native_function_type_->solid_base = native_function_type_;
         function_type_->solid_base = function_type_;
@@ -323,6 +328,7 @@ namespace cxxpython
         add_root(map_type_);
         add_root(filter_type_);
         add_root(text_io_type_);
+        add_root(thread_lock_type_);
         add_root(module_type_);
         add_root(native_function_type_);
         add_root(function_type_);

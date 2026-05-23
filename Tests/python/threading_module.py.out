@@ -1,0 +1,13 @@
+<class 'module'>
+True
+True
+True
+<class '_thread.lock'>
+<class 'int'>
+MainThread
+<class 'int'>
+False
+<class 'int'>
+False
+['worker-done']
+<class 'ValueError'>

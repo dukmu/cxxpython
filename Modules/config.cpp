@@ -12,6 +12,7 @@ namespace cxxpython
         constexpr std::array builtin_extension_modules{
             "_collections",
             "_io",
+            "_thread",
             "_tokenize",
             "gc",
             "posix",
@@ -48,6 +49,8 @@ namespace cxxpython
             initialize_signal_module(runtime, *module);
         else if (name == "_collections")
             initialize_collections_module(runtime, *module);
+        else if (name == "_thread")
+            initialize_thread_module(runtime, *module);
         else if (name == "_tokenize")
             initialize_tokenize_module(runtime, *module);
         return module;
