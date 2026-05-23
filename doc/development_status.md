@@ -1,5 +1,44 @@
 # Development Status
 
+## 2026-05-23 IO Context Manager Slice
+
+Review focus:
+
+- After adding `with` syntax, make resource-owning native objects expose the
+  standard context-manager protocol instead of forcing manual close paths.
+- Keep script modules using the public protocol, so future resource types are
+  exercised through normal Python code.
+
+Completed:
+
+- Added `_io.TextIOWrapper.__enter__()` returning the open stream.
+- Added `_io.TextIOWrapper.__exit__(exc_type, exc, traceback)` closing the
+  stream and returning `False`.
+- Updated `Lib/linecache.py` to use `with io.open(...)` for source loading.
+- Extended `Tests/python/io_module.py` coverage for write/read context-manager
+  behavior and automatic close on block exit.
+
+Design notes:
+
+- `_io.TextIOWrapper` is still a native substrate, matching CPython's layering,
+  but cleanup policy now follows the script-visible context-manager protocol.
+- `_thread.lock` and `_io.TextIOWrapper` are the current native context-manager
+  types.  Additional native resource types should add `__enter__/__exit__`
+  when they own a close/release operation.
+
+Known debt and next risk:
+
+- `_io` is still stream-backed rather than fd-backed over the POSIX substrate;
+  this remains a layering debt to solve after fd/stat/errno support is stronger.
+- The next free-threaded step remains object-level synchronization for mutable
+  containers and module/type dictionaries.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/cxxpython Tests/python/io_module.py`
+- `build/test_core_objects --gtest_filter='Module.ImportsStdlibModulesFromLibPath'`
+
 ## 2026-05-23 Context Managers And Thread-State Roots Slice
 
 Review focus:

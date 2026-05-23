@@ -136,6 +136,22 @@ namespace cxxpython
             return as_text_io(runtime, self)->closed() ? runtime.true_value() : runtime.false_value();
         }
 
+        Object *text_io_enter_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (!args.empty())
+                raise_type_error(&runtime, "TextIOWrapper.__enter__() takes exactly zero arguments");
+            ensure_open(&runtime, as_text_io(runtime, self));
+            return self;
+        }
+
+        Object *text_io_exit_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (args.size() != 3)
+                raise_type_error(&runtime, "TextIOWrapper.__exit__() takes exactly three arguments");
+            as_text_io(runtime, self)->close();
+            return runtime.false_value();
+        }
+
         struct NativeMethodDef
         {
             const char *name;
@@ -180,6 +196,18 @@ namespace cxxpython
                 text_io_closed_method,
                 "Return True if the stream is closed.",
                 "($self, /)",
+            },
+            {
+                "__enter__",
+                text_io_enter_method,
+                "Return the open stream for context-manager use.",
+                "($self, /)",
+            },
+            {
+                "__exit__",
+                text_io_exit_method,
+                "Close the stream when leaving a with statement.",
+                "($self, exc_type, exc, traceback, /)",
             },
         };
 

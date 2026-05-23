@@ -68,13 +68,10 @@ def updatecache(filename, module_globals=None):
     if not isinstance(filename, str):
         return []
     try:
-        stream = io.open(filename, 'r')
+        with io.open(filename, 'r') as stream:
+            text = stream.read()
     except OSError:
         return []
-    try:
-        text = stream.read()
-    finally:
-        stream.close()
     lines = _split_lines(text)
     cache[filename] = lines
     return lines
