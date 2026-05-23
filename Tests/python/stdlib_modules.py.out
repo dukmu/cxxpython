@@ -14,10 +14,12 @@ True
 True
 True
 True
+True
 NAME
 22
 1
 54
+True
 True
 True
 True
@@ -72,6 +74,9 @@ True
 <class 'tuple'>
 ($self, /)
 True
+($self, /)
+True
+<class 'dis.Instruction'>
 function_metadata
 function_metadata
 __main__

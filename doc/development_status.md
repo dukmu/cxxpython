@@ -1,5 +1,47 @@
 # Development Status
 
+## 2026-05-23 Disassembly Substrate Slice
+
+Review focus:
+
+- Advance `dis` without exposing `_opcode` or pretending cxxpython's opcode
+  numbers match CPython's bytecode table.
+- Keep native code as a fact provider and formatting/policy in script code.
+
+Completed:
+
+- Added `code._cxx_instructions()` as an explicitly private code-object method
+  returning `(offset, opname, opcode, arg, starts_line, stack_effect)` records.
+- Added `Lib/dis.py` with `Instruction`, `get_instructions()`, and `dis()`.
+- `dis.get_instructions()` accepts code objects and Python functions.
+- Added Python golden coverage for instruction metadata, script formatting,
+  and the private code-object instruction source.
+- Extended stdlib introspection coverage for `dis` and
+  `code._cxx_instructions()`.
+
+Design notes:
+
+- The opcode numbers and offsets are cxxpython-private instruction indexes,
+  not CPython bytecode offsets.  This is documented in `Lib/dis.py`.
+- `_opcode` remains absent; it should only be added if a CPython-compatible
+  opcode table is intentionally supported.
+
+Known debt and next risk:
+
+- `Instruction.argval`, `argrepr`, `is_jump_target`, and `positions` are
+  placeholders over the current private instruction records.
+- Jump-target marking and richer arg decoding should be added before `pdb`
+  consumes `dis` heavily.
+- Real traceback objects and source positions remain the next debugger-facing
+  substrate.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/cxxpython Tests/python/dis_module.py`
+- `build/cxxpython Tests/python/stdlib_modules.py`
+- `ctest --test-dir build -R "Bytecode|PythonScripts" --output-on-failure`
+
 ## 2026-05-23 Thread Exception State Slice
 
 Review focus:

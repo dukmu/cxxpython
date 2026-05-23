@@ -13,6 +13,7 @@ import token
 import tokenize
 import traceback
 import linecache
+import dis
 
 print(type(inspect))
 print(type(gc))
@@ -30,6 +31,7 @@ print(inspect.getdoc(posixpath).__contains__('POSIX paths'))
 print(inspect.getdoc(tokenize).__contains__('Tokenization helpers'))
 print(inspect.getdoc(traceback).__contains__('Format and print stack traces'))
 print(inspect.getdoc(linecache).__contains__('Cache source lines'))
+print(inspect.getdoc(dis).__contains__('cxxpython bytecode'))
 print(token.tok_name[token.NAME])
 print(token.EXACT_TOKEN_TYPES['='])
 print(tokenize.NAME)
@@ -39,6 +41,7 @@ print(collections.__all__.__contains__('namedtuple'))
 print(tokenize.__all__.__contains__('generate_tokens'))
 print(traceback.__all__.__contains__('print_exception'))
 print(linecache.__all__.__contains__('getline'))
+print(dis.__all__.__contains__('get_instructions'))
 print(gc.__file__)
 print(sys.builtin_module_names.__contains__('_inspect'))
 print(sys.builtin_module_names.__contains__('_tokenize'))
@@ -90,6 +93,9 @@ print(type(frame.f_code.co_names))
 print(type(frame.f_code.co_varnames))
 print(inspect.signature(type(frame.f_code).co_lines))
 print(inspect.getdoc(type(frame.f_code).co_lines).__contains__('source line'))
+print(inspect.signature(type(frame.f_code)._cxx_instructions))
+print(inspect.getdoc(type(frame.f_code)._cxx_instructions).__contains__('private instruction'))
+print(type(list(dis.get_instructions(frame.f_code))[0]))
 
 def function_metadata():
     return 'ok'

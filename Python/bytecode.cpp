@@ -194,6 +194,46 @@ namespace cxxpython
             auto lines_root = runtime.root(lines);
             return object_iter(lines_root.get());
         }
+
+        Object *code_cxx_instructions_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (!args.empty())
+                raise_type_error(&runtime, "code._cxx_instructions() takes no arguments");
+            CodeObject *code = require_code_instance(runtime, self, "_cxx_instructions");
+            std::vector<Object *> entries;
+            entries.reserve(code->instructions().size());
+            std::vector<Rooted<Object>> roots;
+            roots.reserve(code->instructions().size() * 7);
+            std::uint32_t previous_line = 0;
+            for (std::size_t index = 0; index < code->instructions().size(); ++index)
+            {
+                const Instruction instruction = code->instructions()[index];
+                const std::uint32_t line = code->line_for_instruction(index);
+                Object *offset = runtime.new_int(static_cast<std::int64_t>(index));
+                Object *opname = runtime.new_str(opcode_name(instruction.opcode));
+                Object *opcode = runtime.new_int(static_cast<std::int64_t>(instruction.opcode));
+                Object *arg = runtime.new_int(static_cast<std::int64_t>(instruction.operand));
+                Object *starts_line =
+                    (line != 0 && line != previous_line)
+                        ? static_cast<Object *>(runtime.new_int(static_cast<std::int64_t>(line)))
+                        : static_cast<Object *>(runtime.none());
+                Object *effect = runtime.new_int(static_cast<std::int64_t>(stack_effect(instruction)));
+                roots.push_back(runtime.root(offset));
+                roots.push_back(runtime.root(opname));
+                roots.push_back(runtime.root(opcode));
+                roots.push_back(runtime.root(arg));
+                roots.push_back(runtime.root(starts_line));
+                roots.push_back(runtime.root(effect));
+                Object *entry = runtime.new_tuple({offset, opname, opcode, arg, starts_line, effect});
+                roots.push_back(runtime.root(entry));
+                entries.push_back(entry);
+                if (line != 0)
+                    previous_line = line;
+            }
+            Object *instructions = runtime.new_list(std::move(entries));
+            auto instructions_root = runtime.root(instructions);
+            return object_iter(instructions_root.get());
+        }
     }
 
     void initialize_code_type_descriptors(Runtime &runtime, TypeObject *type)
@@ -272,6 +312,12 @@ namespace cxxpython
                                                       type,
                                                       code_lines_method,
                                                       "Return an iterator over bytecode offset and source line ranges.",
+                                                      "($self, /)"));
+        type->dict->set(runtime.new_str("_cxx_instructions"),
+                        runtime.new_method_descriptor("_cxx_instructions",
+                                                      type,
+                                                      code_cxx_instructions_method,
+                                                      "Return cxxpython-private instruction records for disassembly.",
                                                       "($self, /)"));
     }
 

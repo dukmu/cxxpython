@@ -1,0 +1,16 @@
+<class 'module'>
+True
+True
+True
+True
+<class 'dis.Instruction'>
+LOAD_FAST
+<class 'int'>
+<class 'int'>
+0
+True
+RETURN_VALUE
+None
+True
+True
+True

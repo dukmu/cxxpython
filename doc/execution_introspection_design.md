@@ -11,6 +11,8 @@ Current state:
 
 - `CodeObject` exposes basic metadata (`co_name`, `co_filename`, arg counts,
   names, varnames, constants, stack size, first line, and `co_lines()`).
+- `CodeObject._cxx_instructions()` exposes a cxxpython-private instruction
+  stream for script-level `dis`.
 - `Frame` exposes `f_code`, `f_locals`, `f_globals`, `f_builtins`,
   `f_lasti`, and `f_lineno`.
 - `ThreadState` owns a handled-exception stack used by `sys.exc_info()`.
@@ -90,6 +92,9 @@ Required substrate before `Lib/dis.py`:
   next acceptable step is a clearly named instruction iterator on code objects
   or a CPython-compatible opcode table, not an `_opcode` module over private
   enum values.
+- `Lib/dis.py` now consumes `code._cxx_instructions()`.  Its opcode numbers
+  and offsets are explicitly cxxpython-private and must not be exported
+  through CPython's `_opcode` compatibility surface.
 
 Acceptance tests:
 
