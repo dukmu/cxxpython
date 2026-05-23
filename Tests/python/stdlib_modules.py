@@ -9,6 +9,7 @@ import posixpath
 import _io
 import _collections
 import _tokenize
+import token
 import tokenize
 import traceback
 
@@ -27,6 +28,10 @@ print(inspect.getdoc(collections).__contains__('Container datatypes'))
 print(inspect.getdoc(posixpath).__contains__('POSIX paths'))
 print(inspect.getdoc(tokenize).__contains__('Tokenization helpers'))
 print(inspect.getdoc(traceback).__contains__('Format and print stack traces'))
+print(token.tok_name[token.NAME])
+print(token.EXACT_TOKEN_TYPES['='])
+print(tokenize.NAME)
+print(tokenize.OP)
 print(inspect.__all__.__contains__('currentframe'))
 print(collections.__all__.__contains__('namedtuple'))
 print(tokenize.__all__.__contains__('generate_tokens'))
@@ -52,8 +57,8 @@ print(inspect.getdoc(posixpath.basename).__contains__('final component'))
 print(inspect.getdoc(inspect.signature).__contains__('text signature'))
 print(inspect.signature(collections.namedtuple))
 print(inspect.getdoc(collections.namedtuple).__contains__('tuple subclass'))
-print(inspect.signature(_tokenize.tokens))
-print(inspect.getdoc(_tokenize.tokens).__contains__('token stream'))
+print(inspect.signature(_tokenize.TokenizerIter))
+print(inspect.getdoc(_tokenize.TokenizerIter).__contains__('tokenizer records'))
 
 frame = inspect.currentframe()
 print(type(frame))

@@ -34,14 +34,19 @@ Target shape:
 Current state:
 
 - The native compiler has a real lexer/parser and bytecode builder.
-- `_tokenize.tokens(source, filename)` now exposes the compiler token stream
-  as real data from the native tokenizer.
-- `Lib/tokenize.py` is the script facade and returns `TokenInfo` records.
+- `_tokenize.TokenizerIter(source)` now exposes tokenizer records using the
+  CPython private-module entrypoint name instead of an invented helper.
+- `Lib/token.py` defines CPython token constants for the supported tokenizer
+  surface.
+- `Lib/tokenize.py` is the script facade and returns `TokenInfo` records whose
+  `type` values are numeric token constants.  Operators are reported as
+  `OP`; `TokenInfo.exact_type` returns the exact operator token.
 
 Target shape:
 
-- Add `Lib/token.py` constants and map tokenizer kinds to stable token numbers
-  once the public token set is ready.
+- Expand `Lib/tokenize.py` toward CPython's full bytes/readline, encoding,
+  comments, `NL`, and `untokenize` behavior only as the underlying `bytes`,
+  encoding, and regex/string infrastructure becomes real.
 - Add an `_ast` substrate only when AST nodes are real script-visible objects,
   not dictionaries or lossy tuples.
 - Add `Lib/ast.py` as the public parser API over `_ast.parse()`.
@@ -61,11 +66,16 @@ Rules:
 
 Required substrate before `Lib/dis.py`:
 
-- Expose bytecode instructions as script-visible records through a small
-  native `_opcode` or code-object method.
+- Expose bytecode instructions as script-visible records only after deciding
+  whether this VM's bytecode is a CPython-compatible public format or a
+  cxxpython-private code-object API.
 - Preserve opcode names, operands, stack effects, and source line mapping.
 - Keep formatting and command-line behavior in `Lib/dis.py`; native code only
   supplies facts.
+- Do not expose `_opcode` as a thin wrapper over the internal VM enum unless
+  its numeric opcode table is intentionally aligned with CPython.  CPython has
+  `_opcode`, but a same-name module with incompatible opcode numbers is worse
+  than an absent module.
 
 Acceptance tests:
 

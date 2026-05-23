@@ -1,5 +1,49 @@
 # Development Status
 
+## 2026-05-23 Token Public API Correction
+
+Review focus:
+
+- Correct the tokenizer public surface so it does not leak internal lexer
+  enum names as strings.
+- Avoid exposing `_opcode`/`opcode` until opcode numbers and bytecode format
+  have an explicit compatibility decision.
+
+Completed:
+
+- Added `Lib/token.py` with CPython token constants, `tok_name`,
+  `EXACT_TOKEN_TYPES`, `ISTERMINAL`, `ISNONTERMINAL`, and `ISEOF`.
+- Reworked `Lib/tokenize.py` so `TokenInfo.type` is a numeric token constant,
+  keywords tokenize as `NAME`, operators tokenize as `OP`, and
+  `TokenInfo.exact_type` reports the exact operator token.
+- Replaced invented `_tokenize.tokens(...)` with `_tokenize.TokenizerIter(...)`
+  to follow CPython's private tokenizer entrypoint name.
+- Removed the now-unused `token_kind_name()` helper from the public compiler
+  internal header and lexer implementation.
+- Added `Tests/python/token_module.py` and strengthened tokenizer golden
+  coverage around token constants, zero-based columns, `OP`, and
+  `exact_type`.
+
+Design notes:
+
+- `_tokenize.TokenizerIter` is still a minimal substrate over source strings;
+  bytes, encoding detection, comments, `NL`, and `untokenize` should wait for
+  the real underlying string/bytes/regex pieces.
+- `_opcode` was deliberately not added in this correction.  CPython has an
+  `_opcode` module, but exposing the cxxpython internal enum under that name
+  would create a false compatibility contract for `opcode`, `dis`, and `pdb`.
+  The next `dis` substrate must first decide whether code objects expose a
+  CPython-compatible bytecode table or a clearly private cxxpython instruction
+  view.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/cxxpython Tests/python/tokenize_module.py`
+- `build/cxxpython Tests/python/token_module.py`
+- `build/cxxpython Tests/python/stdlib_modules.py`
+- `ctest --test-dir build --output-on-failure`
+
 ## 2026-05-23 Traceback And Tokenizer Exposure Slice
 
 Review focus:
@@ -28,9 +72,8 @@ Completed:
 - Fixed a bootstrap debt in `Runtime::initialize_type_dicts()` where recently
   added core types (`reversed`, slot-wrapper types, and `KeyboardInterrupt`)
   could be used before their dictionaries existed.
-- Added native `_tokenize.tokens(source, filename)` over the real compiler
-  lexer and `Lib/tokenize.py` as the script-level facade returning
-  `TokenInfo` records.
+- Added native tokenizer exposure and `Lib/tokenize.py` as the script-level
+  facade returning `TokenInfo` records.
 - Added golden coverage for string methods, `reversed`, `traceback`, and
   `tokenize`, and extended stdlib introspection coverage.
 - Added `doc/execution_introspection_design.md` for traceback objects,
@@ -55,8 +98,8 @@ Known debt and next risk:
 - Real traceback objects (`tb_next`, `tb_frame`, `tb_lasti`, `tb_lineno`),
   exception chaining, and thread-state exception storage remain the next
   diagnostic substrate.
-- `Lib/tokenize.py` needs CPython token constants, exact token mapping, and
-  bytes/readline compatibility once `bytes` exists.
+- `Lib/tokenize.py` still needs bytes/readline encoding behavior, comments,
+  `NL`, and `untokenize` once `bytes`, regex, and richer string support exist.
 - Parser script exposure should be through `_ast`/`ast.py`; do not expose
   private C++ parser structs.
 - `dis` needs a script-visible instruction API over `CodeObject` before

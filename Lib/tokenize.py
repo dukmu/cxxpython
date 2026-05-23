@@ -6,49 +6,59 @@ The public surface intentionally starts small but follows CPython's shape:
 records, while ``tokenize(source)`` is a convenience helper for source strings.
 """
 
-from collections import namedtuple
 import _tokenize
+from collections import namedtuple
+import token
 
-__all__ = ['TokenInfo', 'generate_tokens', 'tokenize']
+__all__ = []
+for _name in token.__all__:
+    __all__.append(_name)
+__all__.append('TokenInfo')
+__all__.append('generate_tokens')
+__all__.append('tokenize')
+for _name in token.__all__:
+    globals()[_name] = getattr(token, _name)
 
 TokenInfo = namedtuple('TokenInfo', 'type string start end line')
 
 
-def _line_at(lines, number):
-    if number <= 0:
-        return ''
-    if number > len(lines):
-        return ''
-    return lines[number - 1]
+def _token_info_exact_type(self):
+    if self.type == token.OP and self.string in token.EXACT_TOKEN_TYPES:
+        return token.EXACT_TOKEN_TYPES[self.string]
+    return self.type
 
 
-def _tokens_from_source(source, filename):
-    lines = []
-    current = ''
-    for ch in source:
-        current = current + ch
-        if ch == '\n':
-            lines.append(current)
-            current = ''
-    if current != '':
-        lines.append(current)
+TokenInfo.exact_type = property(_token_info_exact_type)
+
+
+def _public_type(exact_type):
+    for text in token.EXACT_TOKEN_TYPES:
+        if exact_type == token.EXACT_TOKEN_TYPES[text]:
+            return token.OP
+    return exact_type
+
+
+def _tokens_from_source(source):
     result = []
-    for raw in _tokenize.tokens(source, filename):
-        kind = raw[0]
-        text = raw[1]
-        row = raw[2]
-        column = raw[3]
-        result.append(TokenInfo(kind,
+    for raw in _tokenize.TokenizerIter(source):
+        text = raw[0]
+        exact_type = raw[1]
+        start_row = raw[2]
+        end_row = raw[3]
+        start_column = raw[4]
+        end_column = raw[5]
+        line = raw[6]
+        result.append(TokenInfo(_public_type(exact_type),
                                 text,
-                                (row, column),
-                                (row, column + len(text)),
-                                _line_at(lines, row)))
+                                (start_row, start_column),
+                                (end_row, end_column),
+                                line))
     return result
 
 
-def tokenize(source, filename='<string>'):
-    """Return TokenInfo records for a source string."""
-    return _tokens_from_source(source, filename)
+def tokenize(readline):
+    """Tokenize source read from a readline-style callable."""
+    return generate_tokens(readline)
 
 
 def generate_tokens(readline):
@@ -59,4 +69,4 @@ def generate_tokens(readline):
         if line == '':
             break
         source = source + line
-    return _tokens_from_source(source, '<string>')
+    return _tokens_from_source(source)

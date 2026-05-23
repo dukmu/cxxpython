@@ -189,7 +189,6 @@ namespace cxxpython::compiler_internal
         std::size_t column = 1;
     };
 
-    const char *token_kind_name(TokenKind kind);
     std::vector<Token> lex_source(Runtime &runtime, std::string_view source, std::string filename);
 
     struct Expr
