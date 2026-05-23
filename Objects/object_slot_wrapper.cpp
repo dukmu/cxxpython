@@ -427,6 +427,7 @@ namespace cxxpython
         initialize_int_slot_wrappers(*this, int_type_);
         initialize_bool_slot_wrappers(*this, bool_type_);
         initialize_str_slot_wrappers(*this, str_type_);
+        initialize_bytes_slot_wrappers(*this, bytes_type_);
         initialize_list_slot_wrappers(*this, list_type_);
         initialize_tuple_slot_wrappers(*this, tuple_type_);
         initialize_slice_slot_wrappers(*this, slice_type_);

@@ -149,6 +149,7 @@ namespace cxxpython
         initialize_type_dict(int_type_);
         initialize_type_dict(bool_type_);
         initialize_type_dict(str_type_);
+        initialize_type_dict(bytes_type_);
         initialize_type_dict(list_type_);
         initialize_type_dict(tuple_type_);
         initialize_type_dict(slice_type_);
@@ -193,6 +194,7 @@ namespace cxxpython
         initialize_type_dict(attribute_error_type_);
         initialize_type_dict(import_error_type_);
         initialize_type_dict(os_error_type_);
+        initialize_type_dict(system_exit_type_);
         initialize_type_dict(keyboard_interrupt_type_);
         initialize_type_dict(stop_iteration_type_);
     }

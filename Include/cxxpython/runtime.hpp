@@ -90,6 +90,7 @@ namespace cxxpython
         TypeObject *int_type() const noexcept;
         TypeObject *bool_type() const noexcept;
         TypeObject *str_type() const noexcept;
+        TypeObject *bytes_type() const noexcept;
         TypeObject *list_type() const noexcept;
         TypeObject *tuple_type() const noexcept;
         TypeObject *slice_type() const noexcept;
@@ -134,6 +135,7 @@ namespace cxxpython
         TypeObject *attribute_error_type() const noexcept;
         TypeObject *import_error_type() const noexcept;
         TypeObject *os_error_type() const noexcept;
+        TypeObject *system_exit_type() const noexcept;
         TypeObject *keyboard_interrupt_type() const noexcept;
         TypeObject *stop_iteration_type() const noexcept;
 
@@ -157,6 +159,7 @@ namespace cxxpython
 
         IntObject *new_int(std::int64_t value);
         StrObject *new_str(std::string value);
+        BytesObject *new_bytes(std::string value);
         ListObject *new_list(std::vector<Object *> items);
         TupleObject *new_tuple(std::vector<Object *> items);
         SliceObject *new_slice(Object *start, Object *stop, Object *step);
@@ -397,6 +400,7 @@ namespace cxxpython
         TypeObject *int_type_ = nullptr;
         TypeObject *bool_type_ = nullptr;
         TypeObject *str_type_ = nullptr;
+        TypeObject *bytes_type_ = nullptr;
         TypeObject *list_type_ = nullptr;
         TypeObject *tuple_type_ = nullptr;
         TypeObject *slice_type_ = nullptr;
@@ -441,6 +445,7 @@ namespace cxxpython
         TypeObject *attribute_error_type_ = nullptr;
         TypeObject *import_error_type_ = nullptr;
         TypeObject *os_error_type_ = nullptr;
+        TypeObject *system_exit_type_ = nullptr;
         TypeObject *keyboard_interrupt_type_ = nullptr;
         TypeObject *stop_iteration_type_ = nullptr;
 

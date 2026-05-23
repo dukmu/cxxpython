@@ -13,7 +13,7 @@ Instruction = namedtuple(
     'opname opcode arg argval argrepr offset starts_line is_jump_target positions',
 )
 
-__all__ = ['Instruction', 'dis', 'get_instructions']
+__all__ = ['Bytecode', 'Instruction', 'dis', 'get_instructions']
 
 _JUMP_OPNAMES = [
     'FOR_ITER',
@@ -52,8 +52,16 @@ _DEREF_OPNAMES = [
     'LOAD_CLOSURE',
 ]
 
+_BINARY_OP_NAMES = ['+', '-', '*', '/', '//', '%', '**']
+_UNARY_OP_NAMES = ['+', '-', '~', 'not']
+_COMPARE_OP_NAMES = ['==', '!=', '<', '<=', '>', '>=', 'is', 'is not', 'in', 'not in']
+
 
 def _get_code_object(x):
+    try:
+        return x.codeobj
+    except AttributeError:
+        pass
     try:
         return x.__code__
     except AttributeError:
@@ -85,6 +93,23 @@ def _resolve_arg(code, opname, arg):
     if opname in _DEREF_OPNAMES:
         value = _safe_index(_deref_names(code), arg)
         return (value, str(value))
+    if opname == 'BINARY_OP' or opname == 'INPLACE_BINARY_OP':
+        value = _safe_index(_BINARY_OP_NAMES, arg)
+        if value is None:
+            return (arg, str(arg))
+        return (value, value)
+    if opname == 'UNARY_OP':
+        value = _safe_index(_UNARY_OP_NAMES, arg)
+        if value is None:
+            return (arg, str(arg))
+        return (value, value)
+    if opname == 'COMPARE_OP':
+        value = _safe_index(_COMPARE_OP_NAMES, arg)
+        if value is None:
+            return (arg, str(arg))
+        return (value, value)
+    if opname == 'FORMAT_VALUE':
+        return (arg, '')
     if opname in _JUMP_OPNAMES:
         return (arg, 'to ' + str(arg))
     return (arg, str(arg))
@@ -127,6 +152,37 @@ def get_instructions(x):
     return iter(instructions)
 
 
+def _pad_left(text, width):
+    text = str(text)
+    while len(text) < width:
+        text = ' ' + text
+    return text
+
+
+def _pad_right(text, width):
+    text = str(text)
+    while len(text) < width:
+        text = text + ' '
+    return text
+
+
+def _format_instruction(instruction):
+    line = ''
+    if instruction.starts_line is not None:
+        line = str(instruction.starts_line)
+    marker = '  '
+    if instruction.is_jump_target:
+        marker = '>>'
+    text = _pad_left(line, 3) + ' ' + marker + ' '
+    text = text + _pad_left(instruction.offset, 4) + ' '
+    text = text + _pad_right(instruction.opname, 22)
+    if instruction.arg is not None:
+        text = text + _pad_left(instruction.arg, 4)
+        if instruction.argrepr:
+            text = text + ' (' + instruction.argrepr + ')'
+    return text
+
+
 def dis(x=None, file=None):
     """Disassemble a code object or function."""
     if x is None:
@@ -134,13 +190,22 @@ def dis(x=None, file=None):
     if file is None:
         file = sys.stdout
     for instruction in get_instructions(x):
-        line = ''
-        if instruction.starts_line is not None:
-            line = str(instruction.starts_line)
-        marker = '  '
-        if instruction.is_jump_target:
-            marker = '>>'
-        file.write(marker + ' ' + str(instruction.offset) + ' ' + line + ' ' +
-                   instruction.opname + ' ' + instruction.argrepr + '\n')
+        file.write(_format_instruction(instruction) + '\n')
     file.flush()
     return None
+
+
+class Bytecode:
+    """Bytecode analysis for a function or code object."""
+
+    def __init__(self, x):
+        self.codeobj = _get_code_object(x)
+
+    def __iter__(self):
+        return get_instructions(self.codeobj)
+
+    def dis(self):
+        result = ''
+        for instruction in self:
+            result = result + _format_instruction(instruction) + '\n'
+        return result

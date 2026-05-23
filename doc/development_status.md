@@ -1,5 +1,116 @@
 # Development Status
 
+## 2026-05-23 Process Exec And Site Exit Slice
+
+Review focus:
+
+- Keep process replacement in the native POSIX substrate, while keeping
+  `spawn*` policy in script-level `os.py`.
+- Do not claim thread or coroutine support before the scheduler/execution model
+  exists.
+- Match CPython layering for `exit`/`quit`: startup imports `site`, and `site`
+  injects helpers that raise `SystemExit`; `os._exit` remains the immediate
+  POSIX process exit.
+
+Completed:
+
+- Added builtin `SystemExit` as an exception type and exposed it through
+  `builtins`.
+- Added `Lib/site.py` with `Quitter`, `exit`, and `quit`.
+- Updated the CLI startup path to import `site` for scripts and REPL sessions.
+- Mapped `SystemExit` to process status without traceback in script and REPL
+  execution.
+- Added heap-type `__repr__` slot refresh so script-defined objects such as
+  `site.Quitter` affect `repr()` and REPL display.
+- Added native `posix.system`, `execv`, `execve`, `execvp`, and `execvpe`.
+- Added script-level `os.execl*`, `os.execv*`, `os.spawnl*`, `os.spawnv*`,
+  `os.system`, and `P_WAIT`/`P_NOWAIT`.
+- Added golden coverage for process replacement, `spawn*`, `os.system`,
+  `SystemExit`, and CLI exit status handling.
+
+Design notes:
+
+- `exec*` functions only return on failure, raising `OSError`, matching the
+  process-replacement contract.
+- `spawn*` is implemented in `Lib/os.py` using `fork`, `exec*`, `waitpid`, and
+  `_exit(127)` in the child when replacement fails.
+- `os._exit()` and `exit()` are intentionally different APIs: `_exit` exits the
+  process immediately; `exit`/`quit` raise `SystemExit` and allow normal CLI
+  status mapping.
+
+Known debt and next risk:
+
+- Python threads are not yet supported. Current `ThreadState` is VM state for a
+  single execution thread plus tracing/introspection roots.
+- Coroutines/generators are not yet supported; the parser/VM have no suspended
+  frame model.
+- `_io.open` still uses a direct C++ stream backend. CPython's `_io` is native,
+  but this project should migrate it to an fd-backed native substrate over the
+  same POSIX semantics instead of keeping an unrelated file path.
+- `execvpe` performs a minimal PATH search; richer errno behavior can be
+  tightened as `errno` and `stat/access` support matures.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/cxxpython Tests/python/site_exit.py`
+- `build/cxxpython Tests/python/process_exec_spawn.py`
+- `build/cxxpython Tests/python/posix_process.py`
+- `build/cxxpython Tests/python/stdlib_modules.py`
+- `build/test_core_objects --gtest_filter='Cli.MapsExitHelperToProcessStatus:Cli.MapsSystemExitToProcessStatusWithoutTraceback:Cli.ReplExitHelperReturnsStatus'`
+
+## 2026-05-23 Bytes And POSIX FD Slice
+
+Review focus:
+
+- Avoid implementing POSIX byte IO through `str`.  Add `bytes` first, then
+  expose real file-descriptor syscalls over bytes.
+- Continue moving `dis` toward CPython's script-level functionality and
+  formatting while keeping cxxpython opcode numbers private.
+
+Completed:
+
+- Added immutable builtin `bytes` as a core sequence type.
+- Implemented `bytes()`, `bytes(int)`, `bytes(iterable-of-int)`, and
+  `bytes(str, encoding)` for the supported byte-oriented string substrate.
+- Added bytes repr, hash, equality/order comparison, truth, concatenation,
+  length, indexing, slicing, containment, iteration, and `decode()`.
+- Added real POSIX `fork`, `waitpid`, `_exit`, `pipe`, `close`, `dup`,
+  `dup2`, `open`, `read`, and `write` native module functions.
+- Added POSIX constants for `WNOHANG` and basic `O_*` open flags.
+- Mapped the new POSIX functions and constants through script-level `Lib/os.py`.
+- Extended `dis` with CPython-like column formatting and a script-level
+  `Bytecode` wrapper exposing iteration and `dis()` text.
+- Added Python golden coverage for `bytes`, POSIX process/fd behavior, and
+  richer `dis` output/metadata.
+
+Design notes:
+
+- `posix.read()` returns `bytes`, and `posix.write()` accepts `bytes`.  This
+  keeps file-descriptor IO from borrowing text semantics.
+- `open/read/write` are real syscalls. Higher-level file policy remains in
+  `_io`/`io.py`; `subprocess.py` and `multiprocessing.py` should later build
+  on the process primitives instead of native shortcut objects.
+- `Lib/dis.py` still consumes `code._cxx_instructions()` and does not export
+  CPython-incompatible opcode numbers through `_opcode`.
+
+Known debt and next risk:
+
+- `bytes` is still byte-oriented and lacks much of CPython's method surface
+  (`find`, `split`, `join`, `startswith`, `endswith`, `hex`, etc.).
+- POSIX still needs `stat/fstat/lstat`, errno mapping, exec/env mutation,
+  and richer fd/file helpers.
+- Threading still has `ThreadState` and tracing, but not OS-thread execution
+  or a public `threading` module.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/cxxpython Tests/python/bytes_builtin.py`
+- `build/cxxpython Tests/python/posix_process.py`
+- `build/cxxpython Tests/python/dis_module.py`
+- `build/cxxpython Tests/python/stdlib_modules.py`
+
 ## 2026-05-23 Trace Hook Substrate Slice
 
 Review focus:

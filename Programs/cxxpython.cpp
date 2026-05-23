@@ -45,6 +45,46 @@ namespace
         std::cerr << error.type_name() << ": " << error.what() << "\n";
     }
 
+    bool is_system_exit(cxxpython::Runtime &runtime, const cxxpython::PythonError &error)
+    {
+        return error.type() && cxxpython::is_subclass(error.type(), runtime.system_exit_type());
+    }
+
+    int system_exit_status(cxxpython::Runtime &runtime, const cxxpython::PythonError &error)
+    {
+        cxxpython::ExceptionObject *exception = error.value();
+        if (!exception || !exception->args() || exception->args()->items().empty())
+            return 0;
+        cxxpython::Object *code = exception->args()->items()[0];
+        if (!code || code == runtime.none())
+            return 0;
+        if (auto *integer = dynamic_cast<cxxpython::IntObject *>(code))
+            return static_cast<int>(integer->value);
+        std::cerr << cxxpython::object_str(code) << "\n";
+        return 1;
+    }
+
+    bool import_site(cxxpython::Runtime &runtime)
+    {
+        try
+        {
+            (void)runtime.import_module("site");
+            return true;
+        }
+        catch (const cxxpython::PythonError &error)
+        {
+            if (is_system_exit(runtime, error))
+                return false;
+            print_python_error(error);
+            return false;
+        }
+        catch (const cxxpython::BytecodeError &error)
+        {
+            std::cerr << "BytecodeError: " << error.what() << "\n";
+            return false;
+        }
+    }
+
     bool should_use_readline() noexcept
     {
         return isatty(STDIN_FILENO) != 0 && isatty(STDOUT_FILENO) != 0;
@@ -79,6 +119,8 @@ namespace
     {
         std::cout << "cxxpython 0.1.0-dev\n";
         runtime.add_module_search_path(std::filesystem::current_path().string());
+        if (!import_site(runtime))
+            return 1;
         cxxpython::ModuleObject *module = runtime.new_module("__main__", "<stdin>");
         auto module_root = runtime.root(module);
         const bool interactive = should_use_readline();
@@ -133,6 +175,8 @@ namespace
             }
             catch (const cxxpython::PythonError &error)
             {
+                if (is_system_exit(runtime, error))
+                    return system_exit_status(runtime, error);
                 print_python_error(error);
                 pending_block = false;
             }
@@ -153,6 +197,8 @@ namespace
             }
             catch (const cxxpython::PythonError &error)
             {
+                if (is_system_exit(runtime, error))
+                    return system_exit_status(runtime, error);
                 print_python_error(error);
                 return 1;
             }
@@ -195,6 +241,8 @@ int main(int argc, char **argv)
         {
             cxxpython::VirtualMachine vm(runtime);
             runtime.add_module_search_path(std::filesystem::path(argv[1]).parent_path().string());
+            if (!import_site(runtime))
+                return 1;
             cxxpython::ModuleObject *module = runtime.new_module("__main__", argv[1]);
             cxxpython::CodeObject *code = cxxpython::compile_exec_input(runtime, source, argv[1]);
             (void)vm.execute(cxxpython::ExecutionRequest{
@@ -210,6 +258,8 @@ int main(int argc, char **argv)
         }
         catch (const cxxpython::PythonError &error)
         {
+            if (is_system_exit(runtime, error))
+                return system_exit_status(runtime, error);
             print_python_error(error);
             return 1;
         }

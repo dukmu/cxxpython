@@ -236,6 +236,7 @@ namespace cxxpython
         install_builtin_constant(*this, dict, "AttributeError", attribute_error_type_);
         install_builtin_constant(*this, dict, "ImportError", import_error_type_);
         install_builtin_constant(*this, dict, "OSError", os_error_type_);
+        install_builtin_constant(*this, dict, "SystemExit", system_exit_type_);
         install_builtin_constant(*this, dict, "KeyboardInterrupt", keyboard_interrupt_type_);
         install_builtin_constant(*this, dict, "StopIteration", stop_iteration_type_);
         install_builtin_constant(*this, dict, "None", none_);
@@ -246,6 +247,7 @@ namespace cxxpython
         install_builtin_constant(*this, dict, "int", int_type_);
         install_builtin_constant(*this, dict, "bool", bool_type_);
         install_builtin_constant(*this, dict, "str", str_type_);
+        install_builtin_constant(*this, dict, "bytes", bytes_type_);
         install_builtin_constant(*this, dict, "list", list_type_);
         install_builtin_constant(*this, dict, "tuple", tuple_type_);
         install_builtin_constant(*this, dict, "slice", slice_type_);

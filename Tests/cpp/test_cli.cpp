@@ -102,6 +102,32 @@ TEST(Cli, ReportsSyntaxErrorsWithLocation)
     std::filesystem::remove(script);
 }
 
+TEST(Cli, MapsExitHelperToProcessStatus)
+{
+    const std::filesystem::path script =
+        test_process::write_script("cxxpython_cli_exit_helper.py", "exit(7)\n");
+
+    const test_process::CommandResult result =
+        test_process::run_command(std::string(CXXPYTHON_PROGRAM_PATH) + " " + test_process::shell_quote(script));
+
+    EXPECT_EQ(result.exit_code, 7);
+    EXPECT_EQ(result.output, "");
+    std::filesystem::remove(script);
+}
+
+TEST(Cli, MapsSystemExitToProcessStatusWithoutTraceback)
+{
+    const std::filesystem::path script =
+        test_process::write_script("cxxpython_cli_system_exit.py", "raise SystemExit(3)\n");
+
+    const test_process::CommandResult result =
+        test_process::run_command(std::string(CXXPYTHON_PROGRAM_PATH) + " " + test_process::shell_quote(script));
+
+    EXPECT_EQ(result.exit_code, 3);
+    EXPECT_EQ(result.output, "");
+    std::filesystem::remove(script);
+}
+
 TEST(Cli, RunsInteractiveReplFromStandardInput)
 {
     const test_process::CommandResult result = test_process::run_command(
@@ -142,5 +168,16 @@ TEST(Cli, RequiresBlankLineToSubmitInteractiveBlocks)
     EXPECT_EQ(result.output,
               "cxxpython 0.1.0-dev\n"
               ">>> ... ... >>> 1\n"
+              ">>> ");
+}
+
+TEST(Cli, ReplExitHelperReturnsStatus)
+{
+    const test_process::CommandResult result =
+        test_process::run_command("printf \"%s\\n\" \"exit(4)\" | " + std::string(CXXPYTHON_PROGRAM_PATH));
+
+    EXPECT_EQ(result.exit_code, 4);
+    EXPECT_EQ(result.output,
+              "cxxpython 0.1.0-dev\n"
               ">>> ");
 }

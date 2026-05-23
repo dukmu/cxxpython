@@ -132,6 +132,17 @@ namespace cxxpython
             return call_heap_special_no_args(object, "__next__");
         }
 
+        std::string heap_repr_slot(const Object &object)
+        {
+            auto &mutable_object = const_cast<Object &>(object);
+            Object *result = call_heap_special_no_args(mutable_object, "__repr__");
+            auto result_root = object.runtime()->root(result);
+            auto *text = dynamic_cast<StrObject *>(result_root.get());
+            if (!text)
+                raise_type_error(object.runtime(), "__repr__() should return str");
+            return text->value;
+        }
+
         std::size_t heap_length_slot(const Object &object)
         {
             auto &mutable_object = const_cast<Object &>(object);
@@ -1282,6 +1293,7 @@ namespace cxxpython
     {
         if (!type || (type->flags & TypeFlagHeapType) == 0)
             return;
+        inherit_heap_slot(type, &TypeSlots::repr, default_repr);
         inherit_heap_slot(type, &TypeSlots::iter);
         inherit_heap_slot(type, &TypeSlots::iternext);
         inherit_heap_slot(type, &TypeSlots::length);
@@ -1301,6 +1313,7 @@ namespace cxxpython
             type->slots.length = heap_length_slot;
             type->slots.truth = heap_truth_slot;
         }
+        override_heap_slot_if_present(type, "__repr__", &TypeSlots::repr, heap_repr_slot);
         override_heap_slot_if_present(type, "__bool__", &TypeSlots::truth, heap_truth_slot);
         override_heap_slot_if_present(type, "__iter__", &TypeSlots::iter, heap_iter_slot);
         override_heap_slot_if_present(type, "__next__", &TypeSlots::iternext, heap_iternext_slot);

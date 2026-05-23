@@ -37,6 +37,11 @@ namespace cxxpython
         return str_type_;
     }
 
+    TypeObject *Runtime::bytes_type() const noexcept
+    {
+        return bytes_type_;
+    }
+
     TypeObject *Runtime::list_type() const noexcept
     {
         return list_type_;
@@ -255,6 +260,11 @@ namespace cxxpython
     TypeObject *Runtime::os_error_type() const noexcept
     {
         return os_error_type_;
+    }
+
+    TypeObject *Runtime::system_exit_type() const noexcept
+    {
+        return system_exit_type_;
     }
 
     TypeObject *Runtime::keyboard_interrupt_type() const noexcept

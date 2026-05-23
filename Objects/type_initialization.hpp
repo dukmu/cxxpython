@@ -18,6 +18,7 @@ namespace cxxpython
     void initialize_type_type_methods(Runtime &runtime, TypeObject *type);
     void initialize_int_type_methods(Runtime &runtime, TypeObject *type);
     void initialize_str_type_methods(Runtime &runtime, TypeObject *type);
+    void initialize_bytes_type_methods(Runtime &runtime, TypeObject *type);
     void initialize_list_type_methods(Runtime &runtime, TypeObject *type);
     void initialize_slice_type_methods(Runtime &runtime, TypeObject *type);
     void initialize_code_type_methods(Runtime &runtime, TypeObject *type);
@@ -40,6 +41,7 @@ namespace cxxpython
     void initialize_int_slot_wrappers(Runtime &runtime, TypeObject *type);
     void initialize_bool_slot_wrappers(Runtime &runtime, TypeObject *type);
     void initialize_str_slot_wrappers(Runtime &runtime, TypeObject *type);
+    void initialize_bytes_slot_wrappers(Runtime &runtime, TypeObject *type);
     void initialize_list_slot_wrappers(Runtime &runtime, TypeObject *type);
     void initialize_tuple_slot_wrappers(Runtime &runtime, TypeObject *type);
     void initialize_slice_slot_wrappers(Runtime &runtime, TypeObject *type);

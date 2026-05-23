@@ -16,6 +16,7 @@ namespace cxxpython
         int_type_ = allocate_type("int");
         bool_type_ = allocate_type("bool");
         str_type_ = allocate_type("str");
+        bytes_type_ = allocate_type("bytes");
         list_type_ = allocate_type("list");
         tuple_type_ = allocate_type("tuple");
         slice_type_ = allocate_type("slice");
@@ -60,6 +61,7 @@ namespace cxxpython
         attribute_error_type_ = allocate_type("AttributeError");
         import_error_type_ = allocate_type("ImportError");
         os_error_type_ = allocate_type("OSError");
+        system_exit_type_ = allocate_type("SystemExit");
         keyboard_interrupt_type_ = allocate_type("KeyboardInterrupt");
         stop_iteration_type_ = allocate_type("StopIteration");
 
@@ -70,6 +72,7 @@ namespace cxxpython
         int_type_->slots = make_int_slots();
         bool_type_->slots = make_bool_slots();
         str_type_->slots = make_str_slots();
+        bytes_type_->slots = make_bytes_slots();
         list_type_->slots = make_list_slots();
         tuple_type_->slots = make_tuple_slots();
         slice_type_->slots = make_slice_slots();
@@ -114,6 +117,7 @@ namespace cxxpython
         attribute_error_type_->slots = make_exception_slots();
         import_error_type_->slots = make_exception_slots();
         os_error_type_->slots = make_exception_slots();
+        system_exit_type_->slots = make_exception_slots();
         keyboard_interrupt_type_->slots = make_exception_slots();
         stop_iteration_type_->slots = make_exception_slots();
 
@@ -124,6 +128,7 @@ namespace cxxpython
         int_type_->set_type(type_type_);
         bool_type_->set_type(type_type_);
         str_type_->set_type(type_type_);
+        bytes_type_->set_type(type_type_);
         list_type_->set_type(type_type_);
         tuple_type_->set_type(type_type_);
         slice_type_->set_type(type_type_);
@@ -168,6 +173,7 @@ namespace cxxpython
         attribute_error_type_->set_type(type_type_);
         import_error_type_->set_type(type_type_);
         os_error_type_->set_type(type_type_);
+        system_exit_type_->set_type(type_type_);
         keyboard_interrupt_type_->set_type(type_type_);
         stop_iteration_type_->set_type(type_type_);
 
@@ -181,6 +187,7 @@ namespace cxxpython
         initialize_type(int_type_, object_type_);
         initialize_type(bool_type_, int_type_);
         initialize_type(str_type_, object_type_);
+        initialize_type(bytes_type_, object_type_);
         initialize_type(list_type_, object_type_);
         initialize_type(tuple_type_, object_type_);
         initialize_type(slice_type_, object_type_);
@@ -225,6 +232,7 @@ namespace cxxpython
         initialize_type(attribute_error_type_, exception_type_);
         initialize_type(import_error_type_, exception_type_);
         initialize_type(os_error_type_, exception_type_);
+        initialize_type(system_exit_type_, base_exception_type_);
         initialize_type(keyboard_interrupt_type_, base_exception_type_);
         initialize_type(stop_iteration_type_, exception_type_);
 
@@ -235,6 +243,7 @@ namespace cxxpython
         int_type_->solid_base = int_type_;
         bool_type_->solid_base = int_type_;
         str_type_->solid_base = str_type_;
+        bytes_type_->solid_base = bytes_type_;
         list_type_->solid_base = list_type_;
         tuple_type_->solid_base = tuple_type_;
         slice_type_->solid_base = slice_type_;
@@ -279,6 +288,7 @@ namespace cxxpython
         attribute_error_type_->solid_base = base_exception_type_;
         import_error_type_->solid_base = base_exception_type_;
         os_error_type_->solid_base = base_exception_type_;
+        system_exit_type_->solid_base = base_exception_type_;
         keyboard_interrupt_type_->solid_base = base_exception_type_;
         stop_iteration_type_->solid_base = base_exception_type_;
 
@@ -297,6 +307,7 @@ namespace cxxpython
         add_root(int_type_);
         add_root(bool_type_);
         add_root(str_type_);
+        add_root(bytes_type_);
         add_root(list_type_);
         add_root(tuple_type_);
         add_root(slice_type_);
@@ -341,6 +352,7 @@ namespace cxxpython
         add_root(attribute_error_type_);
         add_root(import_error_type_);
         add_root(os_error_type_);
+        add_root(system_exit_type_);
         add_root(keyboard_interrupt_type_);
         add_root(stop_iteration_type_);
         add_root(none_);

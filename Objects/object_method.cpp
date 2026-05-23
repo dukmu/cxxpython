@@ -217,6 +217,7 @@ namespace cxxpython
         initialize_type_type_methods(*this, type_type_);
         initialize_int_type_methods(*this, int_type_);
         initialize_str_type_methods(*this, str_type_);
+        initialize_bytes_type_methods(*this, bytes_type_);
         initialize_list_type_methods(*this, list_type_);
         initialize_slice_type_methods(*this, slice_type_);
         initialize_code_type_methods(*this, code_type_);

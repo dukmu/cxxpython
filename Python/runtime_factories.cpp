@@ -91,6 +91,11 @@ namespace cxxpython
         return allocate<StrObject>(str_type_, std::move(value));
     }
 
+    BytesObject *Runtime::new_bytes(std::string value)
+    {
+        return allocate<BytesObject>(bytes_type_, std::move(value));
+    }
+
     ListObject *Runtime::new_list(std::vector<Object *> items)
     {
         return allocate<ListObject>(list_type_, std::move(items));

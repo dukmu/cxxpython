@@ -19,6 +19,7 @@ namespace cxxpython
     class CodeObject;
     class Frame;
     class NotImplementedObject;
+    class BytesObject;
     class ListObject;
     class SliceObject;
     class DictObject;
@@ -269,6 +270,14 @@ namespace cxxpython
     {
     public:
         StrObject(TypeObject *type, std::string value);
+
+        std::string value;
+    };
+
+    class BytesObject final : public Object
+    {
+    public:
+        BytesObject(TypeObject *type, std::string value);
 
         std::string value;
     };
@@ -887,6 +896,7 @@ namespace cxxpython
     TypeSlots make_int_slots();
     TypeSlots make_bool_slots();
     TypeSlots make_str_slots();
+    TypeSlots make_bytes_slots();
     TypeSlots make_list_slots();
     TypeSlots make_tuple_slots();
     TypeSlots make_slice_slots();

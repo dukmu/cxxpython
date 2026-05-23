@@ -1,0 +1,21 @@
+<class 'bytes'>
+b''
+b'abc'
+b'A\x00\xff'
+3
+97
+99
+b'bc'
+[97, 98, 99]
+True
+True
+True
+True
+True
+3
+True
+True
+True
+<class 'TypeError'>
+<class 'ValueError'>
+<class 'TypeError'>

@@ -101,6 +101,8 @@ class InteractiveInterpreter:
     def runcode(self, code):
         try:
             exec(code, self.locals)
+        except SystemExit as exc:
+            raise exc
         except BaseException as exc:
             self.showtraceback(exc)
 
@@ -123,6 +125,8 @@ class InteractiveInterpreter:
                 return False
             except SyntaxError:
                 pass
+            except SystemExit as exc:
+                raise exc
             except BaseException as exc:
                 self.showtraceback(exc)
                 return False

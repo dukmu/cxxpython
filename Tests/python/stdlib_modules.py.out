@@ -25,6 +25,7 @@ True
 True
 True
 True
+True
 <stdlib>
 False
 True
@@ -41,6 +42,29 @@ True
 ($module, /)
 ($module, /)
 ($module, pid, signal, /)
+($module, /)
+($module, pid, options, /)
+($module, /)
+($module, fd, count, /)
+($module, fd, data, /)
+($module, path, flags, mode=0o777, /)
+($module, command, /)
+($module, path, argv, /)
+($module, path, argv, env, /)
+($module, file, argv, /)
+($module, file, argv, env, /)
+True
+True
+True
+($self, encoding='utf-8', /)
+True
+True
+True
+True
+True
+True
+True
+True
 True
 True
 ($module, file, mode='r', /)

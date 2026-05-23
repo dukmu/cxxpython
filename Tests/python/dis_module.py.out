@@ -3,6 +3,7 @@ True
 True
 True
 True
+True
 <class 'dis.Instruction'>
 LOAD_FAST
 <class 'int'>
@@ -17,9 +18,20 @@ True
 True
 True
 True
+True
+True
+True
+True
 None
 True
 True
+True
+True
+True
+True
+True
+True
+<class 'dis.Bytecode'>
 True
 True
 True

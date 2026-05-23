@@ -326,6 +326,243 @@ namespace cxxpython
             validate_str_constructor_args(object.runtime(), args);
         }
 
+        std::string bytes_repr_value(const std::string &value)
+        {
+            constexpr char hex[] = "0123456789abcdef";
+            std::string result = "b'";
+            for (unsigned char byte : value)
+            {
+                if (byte == '\'')
+                    result += "\\'";
+                else if (byte == '\\')
+                    result += "\\\\";
+                else if (byte == '\n')
+                    result += "\\n";
+                else if (byte == '\r')
+                    result += "\\r";
+                else if (byte == '\t')
+                    result += "\\t";
+                else if (byte >= 32 && byte < 127)
+                    result.push_back(static_cast<char>(byte));
+                else
+                {
+                    result += "\\x";
+                    result.push_back(hex[byte >> 4]);
+                    result.push_back(hex[byte & 0x0f]);
+                }
+            }
+            result += "'";
+            return result;
+        }
+
+        std::string bytes_repr(const Object &object)
+        {
+            return bytes_repr_value(static_cast<const BytesObject *>(&object)->value);
+        }
+
+        std::int64_t bytes_hash(const Object &object)
+        {
+            return static_cast<std::int64_t>(std::hash<std::string>{}(static_cast<const BytesObject *>(&object)->value));
+        }
+
+        bool bytes_equal(const Object &left, const Object &right)
+        {
+            auto *right_bytes = dynamic_cast<const BytesObject *>(&right);
+            return right_bytes && static_cast<const BytesObject *>(&left)->value == right_bytes->value;
+        }
+
+        bool bytes_truth(const Object &object)
+        {
+            return !static_cast<const BytesObject *>(&object)->value.empty();
+        }
+
+        Object *bytes_rich_compare(const Object &left, const Object &right, RichCompareOp op)
+        {
+            auto *right_bytes = dynamic_cast<const BytesObject *>(&right);
+            if (!right_bytes)
+                return left.runtime()->not_implemented();
+            const std::string &left_value = static_cast<const BytesObject *>(&left)->value;
+            const std::string &right_value = right_bytes->value;
+            switch (op)
+            {
+            case RichCompareOp::Equal:
+                return bool_result(left.runtime(), left_value == right_value);
+            case RichCompareOp::NotEqual:
+                return bool_result(left.runtime(), left_value != right_value);
+            case RichCompareOp::Less:
+                return bool_result(left.runtime(), left_value < right_value);
+            case RichCompareOp::LessEqual:
+                return bool_result(left.runtime(), left_value <= right_value);
+            case RichCompareOp::Greater:
+                return bool_result(left.runtime(), left_value > right_value);
+            case RichCompareOp::GreaterEqual:
+                return bool_result(left.runtime(), left_value >= right_value);
+            }
+            return left.runtime()->not_implemented();
+        }
+
+        Object *bytes_binary_op(const Object &left, const Object &right, BinaryOp op)
+        {
+            auto *right_bytes = dynamic_cast<const BytesObject *>(&right);
+            if (!right_bytes || op != BinaryOp::Add)
+                return left.runtime()->not_implemented();
+            auto *left_bytes = static_cast<const BytesObject *>(&left);
+            return left.runtime()->new_bytes(left_bytes->value + right_bytes->value);
+        }
+
+        std::size_t bytes_length(const Object &object)
+        {
+            return static_cast<const BytesObject *>(&object)->value.size();
+        }
+
+        Object *bytes_getitem(Object &object, Object *key)
+        {
+            auto &bytes = static_cast<BytesObject &>(object);
+            if (auto *slice = dynamic_cast<SliceObject *>(key))
+            {
+                SliceRange range = normalize_slice(*object.runtime(), *slice, static_cast<std::int64_t>(bytes.value.size()));
+                std::string result;
+                result.reserve(range.length);
+                std::int64_t index = range.start;
+                for (std::size_t count = 0; count < range.length; ++count)
+                {
+                    result.push_back(bytes.value[static_cast<std::size_t>(index)]);
+                    index += range.step;
+                }
+                return object.runtime()->new_bytes(std::move(result));
+            }
+            auto *index = dynamic_cast<IntObject *>(key);
+            if (!index)
+                raise_type_error(object.runtime(), "bytes indices must be integers or slices");
+            const std::int64_t size = static_cast<std::int64_t>(bytes.value.size());
+            const std::int64_t resolved = index->value < 0 ? size + index->value : index->value;
+            if (resolved < 0 || resolved >= size)
+                raise_index_error(object.runtime(), "index out of range");
+            const auto byte = static_cast<unsigned char>(bytes.value[static_cast<std::size_t>(resolved)]);
+            return object.runtime()->new_int(static_cast<std::int64_t>(byte));
+        }
+
+        bool bytes_contains(Object &object, Object *key)
+        {
+            const std::string &haystack = static_cast<BytesObject *>(&object)->value;
+            if (auto *integer = dynamic_cast<IntObject *>(key))
+            {
+                if (integer->value < 0 || integer->value > 255)
+                    raise_value_error(object.runtime(), "byte must be in range(0, 256)");
+                const char needle = static_cast<char>(integer->value);
+                return haystack.find(needle) != std::string::npos;
+            }
+            auto *needle = dynamic_cast<BytesObject *>(key);
+            if (!needle)
+                raise_type_error(object.runtime(), "'in <bytes>' requires int or bytes as left operand");
+            return haystack.find(needle->value) != std::string::npos;
+        }
+
+        Object *bytes_iter(Object &object)
+        {
+            return object.runtime()->new_sequence_iterator(&object);
+        }
+
+        void append_byte_from_int(Runtime *runtime, std::string &result, Object *object)
+        {
+            auto *integer = dynamic_cast<IntObject *>(object);
+            if (!integer)
+                raise_type_error(runtime, "'bytes' object cannot interpret item as an integer");
+            if (integer->value < 0 || integer->value > 255)
+                raise_value_error(runtime, "bytes must be in range(0, 256)");
+            result.push_back(static_cast<char>(integer->value));
+        }
+
+        std::string bytes_from_iterable(Runtime *runtime, Object *iterable)
+        {
+            std::string result;
+            for (Object *item : collect_iterable_items(runtime, iterable))
+                append_byte_from_int(runtime, result, item);
+            return result;
+        }
+
+        std::string bytes_from_str(Runtime *runtime, const StrObject *text, const StrObject *encoding)
+        {
+            if (!encoding)
+                raise_type_error(runtime, "string argument without an encoding");
+            if (encoding->value != "utf-8" && encoding->value != "UTF-8" && encoding->value != "ascii")
+                raise_value_error(runtime, "unknown encoding: " + encoding->value);
+            if (encoding->value == "ascii")
+            {
+                for (unsigned char byte : text->value)
+                {
+                    if (byte >= 128)
+                        raise_value_error(runtime, "'ascii' codec can't encode character");
+                }
+            }
+            return text->value;
+        }
+
+        Object *bytes_new(TypeObject &type, const CallArguments &args)
+        {
+            Runtime *runtime = type.runtime();
+            require_no_keywords(runtime, "bytes", args);
+            require_positional_at_most(runtime, "bytes", args, 2);
+            if (args.positional.empty())
+                return runtime->allocate<BytesObject>(&type, "");
+
+            Object *source = args.positional[0];
+            if (auto *bytes = dynamic_cast<BytesObject *>(source))
+            {
+                if (args.positional.size() != 1)
+                    raise_type_error(runtime, "encoding without a string argument");
+                return runtime->allocate<BytesObject>(&type, bytes->value);
+            }
+            if (auto *text = dynamic_cast<StrObject *>(source))
+            {
+                auto *encoding = args.positional.size() == 2 ? dynamic_cast<StrObject *>(args.positional[1]) : nullptr;
+                if (args.positional.size() == 2 && !encoding)
+                    raise_type_error(runtime, "bytes() encoding must be str");
+                return runtime->allocate<BytesObject>(&type, bytes_from_str(runtime, text, encoding));
+            }
+            if (args.positional.size() == 2)
+                raise_type_error(runtime, "encoding without a string argument");
+            if (auto *size = dynamic_cast<IntObject *>(source))
+            {
+                if (size->value < 0)
+                    raise_value_error(runtime, "negative count");
+                return runtime->allocate<BytesObject>(&type, std::string(static_cast<std::size_t>(size->value), '\0'));
+            }
+            return runtime->allocate<BytesObject>(&type, bytes_from_iterable(runtime, source));
+        }
+
+        void bytes_init(Object &object, const CallArguments &args)
+        {
+            require_no_keywords(object.runtime(), "bytes", args);
+            require_positional_at_most(object.runtime(), "bytes", args, 2);
+        }
+
+        BytesObject *require_bytes_receiver(Runtime &runtime, Object *self, const char *method_name)
+        {
+            auto *bytes = dynamic_cast<BytesObject *>(self);
+            if (!bytes)
+                raise_type_error(&runtime, std::string(method_name) + " receiver does not have bytes layout");
+            return bytes;
+        }
+
+        Object *bytes_decode_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (args.size() > 1)
+                raise_type_error(&runtime, "bytes.decode() takes at most one argument");
+            const BytesObject *bytes = require_bytes_receiver(runtime, self, "bytes.decode()");
+            const StrObject *encoding = nullptr;
+            if (!args.empty())
+            {
+                encoding = dynamic_cast<StrObject *>(args[0]);
+                if (!encoding)
+                    raise_type_error(&runtime, "bytes.decode() encoding must be str");
+            }
+            StrObject default_encoding(runtime.str_type(), "utf-8");
+            return runtime.new_str(bytes_from_str(&runtime,
+                                                  runtime.new_str(bytes->value),
+                                                  encoding ? encoding : &default_encoding));
+        }
+
         StrObject *require_str_receiver(Runtime &runtime, Object *self, const char *method_name)
         {
             auto *text = dynamic_cast<StrObject *>(self);
@@ -510,6 +747,11 @@ namespace cxxpython
     {
     }
 
+    BytesObject::BytesObject(TypeObject *type, std::string value)
+        : Object(type), value(std::move(value))
+    {
+    }
+
     TypeSlots make_none_slots()
     {
         return TypeSlots{
@@ -583,6 +825,25 @@ namespace cxxpython
         };
     }
 
+    TypeSlots make_bytes_slots()
+    {
+        return TypeSlots{
+            .repr = bytes_repr,
+            .hash = bytes_hash,
+            .equal = bytes_equal,
+            .rich_compare = bytes_rich_compare,
+            .truth = bytes_truth,
+            .traverse = default_traverse,
+            .binary_op = bytes_binary_op,
+            .length = bytes_length,
+            .getitem = bytes_getitem,
+            .contains = bytes_contains,
+            .iter = bytes_iter,
+            .new_object = bytes_new,
+            .init = bytes_init,
+        };
+    }
+
     void initialize_none_slot_wrappers(Runtime &, TypeObject *type)
     {
         add_common_object_slot_wrappers(type, true);
@@ -643,6 +904,16 @@ namespace cxxpython
                                                       "($self, chars=None, /)"));
     }
 
+    void initialize_bytes_type_methods(Runtime &runtime, TypeObject *type)
+    {
+        type->dict->set(runtime.new_str("decode"),
+                        runtime.new_method_descriptor("decode",
+                                                      type,
+                                                      bytes_decode_method,
+                                                      "Decode the bytes using the given encoding.",
+                                                      "($self, encoding='utf-8', /)"));
+    }
+
     void initialize_int_slot_wrappers(Runtime &, TypeObject *type)
     {
         add_common_object_slot_wrappers(type, true);
@@ -658,6 +929,14 @@ namespace cxxpython
     }
 
     void initialize_str_slot_wrappers(Runtime &, TypeObject *type)
+    {
+        add_common_object_slot_wrappers(type, true);
+        add_order_slot_wrappers(type);
+        add_slot_wrapper(type, "__add__", SlotWrapperKind::BinaryOp, BinaryOp::Add);
+        add_sequence_slot_wrappers(type, false);
+    }
+
+    void initialize_bytes_slot_wrappers(Runtime &, TypeObject *type)
     {
         add_common_object_slot_wrappers(type, true);
         add_order_slot_wrappers(type);
