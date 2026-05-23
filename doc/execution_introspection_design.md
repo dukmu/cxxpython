@@ -96,12 +96,14 @@ Required substrate before `Lib/dis.py`:
 - `Lib/dis.py` now consumes `code._cxx_instructions()`.  Its opcode numbers
   and offsets are explicitly cxxpython-private and must not be exported
   through CPython's `_opcode` compatibility surface.
+- `Lib/dis.py` resolves `argval`/`argrepr` for the currently exposed operand
+  families and marks jump targets in script code.
 
 Acceptance tests:
 
 - `dis.get_instructions(func)` yields instruction objects in bytecode order.
-- Each instruction exposes `opname`, `opcode`, `arg`, `offset`, and
-  `starts_line`.
+- Each instruction exposes `opname`, `opcode`, `arg`, `argval`, `argrepr`,
+  `offset`, `starts_line`, and `is_jump_target`.
 - `dis.dis(func)` prints through script code and matches the supported subset.
 
 ## `pdb` Preparation

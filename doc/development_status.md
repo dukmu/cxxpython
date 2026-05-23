@@ -1,5 +1,43 @@
 # Development Status
 
+## 2026-05-23 Dis Argument Decoding Slice
+
+Review focus:
+
+- Improve the script-level `dis` module without exposing incompatible
+  CPython `_opcode` tables.
+- Keep opcode facts native and decoding/formatting policy in `Lib/dis.py`.
+
+Completed:
+
+- Added script-side jump target detection for cxxpython private instruction
+  offsets.
+- Decoded `Instruction.argval` and `argrepr` for constants, names, fast
+  locals, deref variables, and jump targets.
+- Marked `Instruction.is_jump_target` for target offsets.
+- Updated `dis.dis()` output to show jump target markers while keeping opcode
+  numbers and offsets explicitly private to cxxpython.
+- Expanded Python golden coverage for varname decoding, constant decoding,
+  jump target decoding, and formatted output markers.
+
+Design notes:
+
+- `Lib/dis.py` continues to consume `code._cxx_instructions()`. This is a
+  private cxxpython code-object view, not a CPython bytecode contract.
+- `_opcode` remains intentionally absent.
+
+Known debt and next risk:
+
+- `Instruction.positions` is still `None`; richer source positions should be
+  driven by code-object line/position tables.
+- `COMPARE_OP`, `BINARY_OP`, and call/build operands can get friendlier
+  argreprs as their public enum/name tables stabilize.
+- `pdb` still needs a `sys.settrace()` substrate in `ThreadState`.
+
+Verification:
+
+- `build/cxxpython Tests/python/dis_module.py`
+
 ## 2026-05-23 Traceback Object Slice
 
 Review focus:

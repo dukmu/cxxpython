@@ -9,8 +9,17 @@ LOAD_FAST
 <class 'int'>
 0
 True
+True
+True
 RETURN_VALUE
+True
+True
+True
+True
+True
 None
+True
+True
 True
 True
 True
