@@ -22,12 +22,18 @@ Current state:
   `tb_lineno`.
 - `Lib/traceback.py` formats traceback objects and caller-provided filtered
   lists.  This keeps formatting policy out of the CLI and REPL.
+- `ThreadState` stores a global trace function exposed through
+  `sys.settrace()` / `sys.gettrace()`.
+- VM safe points emit `call`, `line`, `return`, and `exception` trace events
+  with recursion suppression while trace callbacks run.
 - `Lib/linecache.py` provides script-level source-line caching for traceback
   and future debugger display.  Freshness checks are conservative until
   `posix.stat` is exposed.
 
 Target shape:
 
+- Add frame-level trace controls (`f_trace`, `f_trace_lines`,
+  `f_trace_opcodes`) and profile hooks.
 - Add exception chaining fields (`__context__`, `__cause__`, and
   `__suppress_context__`) and writable traceback assignment.
 - Keep `traceback.py` as the public formatter over the object model.
@@ -108,11 +114,12 @@ Acceptance tests:
 
 ## `pdb` Preparation
 
-Required substrate before `Lib/pdb.py`:
+Current substrate before `Lib/pdb.py`:
 
-- Real traceback object chain.
-- Frame locals/globals/builtins already visible.
-- A tracing hook in thread-state, shaped like `sys.settrace()`.
+- Real traceback object chain is present.
+- Frame locals/globals/builtins are visible.
+- A tracing hook in thread-state, shaped like `sys.settrace()`, is present
+  for `call`, `line`, `return`, and `exception` events.
 - Breakpoint state and stepping policy in script code.
 
 Native code should only call trace hooks at VM safe points.  Breakpoint

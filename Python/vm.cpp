@@ -89,6 +89,8 @@ namespace cxxpython
             frame->visit_stack(visitor);
             if (frame->pending_control_value())
                 visitor(frame->pending_control_value());
+            if (frame->trace_function())
+                visitor(frame->trace_function());
         }
 
         std::int64_t frame_hash(const Object &object)
@@ -174,6 +176,58 @@ namespace cxxpython
                 TracebackObject *traceback = runtime.new_traceback(current, &frame, instruction_index, line);
                 value->prepend_traceback(traceback);
             }
+        }
+
+        Object *normalize_trace_result(Runtime &runtime, Object *result)
+        {
+            if (!result || result == runtime.none())
+                return nullptr;
+            return result;
+        }
+
+        class TraceCallGuard final
+        {
+        public:
+            explicit TraceCallGuard(ThreadState &thread)
+                : thread_(thread)
+            {
+                thread_.enter_tracing();
+            }
+
+            ~TraceCallGuard()
+            {
+                thread_.leave_tracing();
+            }
+
+            TraceCallGuard(const TraceCallGuard &) = delete;
+            TraceCallGuard &operator=(const TraceCallGuard &) = delete;
+
+        private:
+            ThreadState &thread_;
+        };
+
+        Object *call_trace_function(Runtime &runtime,
+                                    ThreadState &thread,
+                                    Object *trace_function,
+                                    Frame &frame,
+                                    const char *event,
+                                    Object *arg)
+        {
+            if (!trace_function || thread.is_tracing())
+                return nullptr;
+            auto trace_root = runtime.root(trace_function);
+            auto frame_root = runtime.root(&frame);
+            auto event_root = runtime.root(runtime.new_str(event));
+            Object *resolved_arg = arg ? arg : static_cast<Object *>(runtime.none());
+            auto arg_root = runtime.root(resolved_arg);
+            TraceCallGuard guard(thread);
+            Object *result = object_call(trace_root.get(), {frame_root.get(), event_root.get(), arg_root.get()});
+            return normalize_trace_result(runtime, result);
+        }
+
+        void set_frame_trace_from_result(Frame &frame, Object *result) noexcept
+        {
+            frame.set_trace_function(result);
         }
 
         void add_temporary_root(Runtime &runtime, std::vector<Rooted<Object>> &roots, Object *object)
@@ -560,6 +614,16 @@ namespace cxxpython
         pending_control_target_ = 0;
     }
 
+    Object *Frame::trace_function() const noexcept
+    {
+        return trace_function_;
+    }
+
+    void Frame::set_trace_function(Object *trace_function) noexcept
+    {
+        trace_function_ = trace_function;
+    }
+
     InterpreterState::InterpreterState(Runtime &runtime)
         : runtime_(runtime)
     {
@@ -647,6 +711,32 @@ namespace cxxpython
             handled_exceptions_.resize(depth);
     }
 
+    Object *ThreadState::trace_function() const noexcept
+    {
+        return trace_function_;
+    }
+
+    void ThreadState::set_trace_function(Object *trace_function) noexcept
+    {
+        trace_function_ = trace_function;
+    }
+
+    bool ThreadState::is_tracing() const noexcept
+    {
+        return trace_depth_ != 0;
+    }
+
+    void ThreadState::enter_tracing() noexcept
+    {
+        ++trace_depth_;
+    }
+
+    void ThreadState::leave_tracing() noexcept
+    {
+        if (trace_depth_ != 0)
+            --trace_depth_;
+    }
+
     void ThreadState::visit_frames(const VisitChildren &visitor) const
     {
         for (Frame *frame : frames_)
@@ -659,6 +749,8 @@ namespace cxxpython
             if (exception)
                 visitor(exception);
         }
+        if (trace_function_)
+            visitor(trace_function_);
     }
 
     VirtualMachine::VirtualMachine(Runtime &runtime)
@@ -724,12 +816,31 @@ namespace cxxpython
         DictObject &builtins = *builtins_dict;
         Frame *frame = runtime_.new_frame(&code, &locals, &globals, &builtins, request.closure);
         ActiveFrame active_frame(thread_, *frame);
+        if (Object *global_trace = thread_.trace_function())
+            set_frame_trace_from_result(*frame, call_trace_function(runtime_,
+                                                                    thread_,
+                                                                    global_trace,
+                                                                    *frame,
+                                                                    "call",
+                                                                    runtime_.none()));
+        std::uint32_t last_traced_line = 0;
         while (frame->instruction_pointer() < code.instructions().size())
         {
             const Instruction instruction = code.instructions()[frame->instruction_pointer()];
             frame->advance();
             try
             {
+            const std::uint32_t current_line = code.line_for_instruction(frame->last_instruction_index());
+            if (frame->trace_function() && current_line != 0 && current_line != last_traced_line)
+            {
+                last_traced_line = current_line;
+                set_frame_trace_from_result(*frame, call_trace_function(runtime_,
+                                                                        thread_,
+                                                                        frame->trace_function(),
+                                                                        *frame,
+                                                                        "line",
+                                                                        runtime_.none()));
+            }
             deliver_pending_signals(runtime_);
             switch (instruction.opcode)
             {
@@ -1587,6 +1698,13 @@ namespace cxxpython
                 }
                 if (jumped_to_finally)
                     continue;
+                if (frame->trace_function())
+                    (void)call_trace_function(runtime_,
+                                              thread_,
+                                              frame->trace_function(),
+                                              *frame,
+                                              "return",
+                                              value_root.get());
                 return value;
             }
             default:
@@ -1596,6 +1714,24 @@ namespace cxxpython
             catch (const PythonError &error)
             {
                 attach_source_location(runtime_, error, *frame, code, frame->last_instruction_index());
+                if (frame->trace_function() && error.value())
+                {
+                    ExceptionObject *exception = error.value();
+                    auto exception_root = runtime_.root(exception);
+                    Object *traceback = exception->traceback() ? static_cast<Object *>(exception->traceback())
+                                                               : static_cast<Object *>(runtime_.none());
+                    auto traceback_root = runtime_.root(traceback);
+                    Object *event_arg = runtime_.new_tuple({exception_root->type(),
+                                                            exception_root.get(),
+                                                            traceback_root.get()});
+                    auto event_arg_root = runtime_.root(event_arg);
+                    set_frame_trace_from_result(*frame, call_trace_function(runtime_,
+                                                                            thread_,
+                                                                            frame->trace_function(),
+                                                                            *frame,
+                                                                            "exception",
+                                                                            event_arg_root.get()));
+                }
                 if (frame->has_exception_handler())
                 {
                     const std::size_t target = frame->pop_exception_handler();

@@ -75,6 +75,8 @@ namespace cxxpython
         Object *pending_control_value() const noexcept;
         std::size_t pending_control_target() const noexcept;
         void clear_pending_control() noexcept;
+        Object *trace_function() const noexcept;
+        void set_trace_function(Object *trace_function) noexcept;
 
     private:
         CodeObject *code_;
@@ -89,6 +91,7 @@ namespace cxxpython
         PendingControlKind pending_control_kind_ = PendingControlKind::None;
         Object *pending_control_value_ = nullptr;
         std::size_t pending_control_target_ = 0;
+        Object *trace_function_ = nullptr;
     };
 
     class InterpreterState final
@@ -120,12 +123,19 @@ namespace cxxpython
         ExceptionObject *current_exception() const noexcept;
         std::size_t handled_exception_depth() const noexcept;
         void restore_handled_exception_depth(std::size_t depth);
+        Object *trace_function() const noexcept;
+        void set_trace_function(Object *trace_function) noexcept;
+        bool is_tracing() const noexcept;
+        void enter_tracing() noexcept;
+        void leave_tracing() noexcept;
         void visit_frames(const VisitChildren &visitor) const;
 
     private:
         InterpreterState &interpreter_;
         std::vector<Frame *> frames_;
         std::vector<ExceptionObject *> handled_exceptions_;
+        Object *trace_function_ = nullptr;
+        std::size_t trace_depth_ = 0;
     };
 
     enum class ExecutionMode : std::uint8_t

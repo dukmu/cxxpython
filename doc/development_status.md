@@ -1,5 +1,49 @@
 # Development Status
 
+## 2026-05-23 Trace Hook Substrate Slice
+
+Review focus:
+
+- Add the first debugger trace hook substrate after traceback objects became
+  real.
+- Keep native VM responsibility limited to safe-point event delivery; `pdb`
+  policy remains script-side.
+
+Completed:
+
+- Added thread-level trace function storage to `ThreadState` with GC
+  traversal.
+- Added frame-local trace function storage so a `call` trace result controls
+  subsequent `line`, `return`, and `exception` events for that frame.
+- Added recursion suppression while invoking trace functions, preventing trace
+  callbacks from tracing their own execution.
+- Added VM safe-point trace events for `call`, line changes, normal `return`,
+  and Python `exception` propagation.
+- Added `sys.gettrace()` and `sys.settrace()` with CPython-shaped signatures.
+- Added Python golden coverage for trace installation, function call tracing,
+  line events, return arguments, exception arguments, and cleanup.
+
+Design notes:
+
+- Trace callbacks receive `(frame, event, arg)`. Exception events pass
+  `(type, value, traceback)` using the real traceback object chain.
+- This is the substrate for `pdb`; breakpoints, stepping policy, and command
+  loops should live in `Lib/pdb.py`.
+
+Known debt and next risk:
+
+- Frame attributes such as writable `f_trace`, `f_trace_lines`, and
+  `f_trace_opcodes` are still missing.
+- Profile hooks (`sys.setprofile`) and opcode-level tracing are not present.
+- Generators/coroutines will need trace event behavior when frame suspension
+  arrives.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/cxxpython Tests/python/sys_trace.py`
+- `build/cxxpython Tests/python/stdlib_modules.py`
+
 ## 2026-05-23 Dis Argument Decoding Slice
 
 Review focus:

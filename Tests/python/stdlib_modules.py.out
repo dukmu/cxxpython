@@ -32,6 +32,10 @@ True
 True
 ($module, /)
 True
+($module, /)
+True
+($module, function, /)
+True
 ($module, generation=None, /)
 True
 ($module, /)

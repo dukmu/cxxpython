@@ -48,6 +48,28 @@ namespace cxxpython
             return runtime.new_tuple({exception_root->type(), exception_root.get(), traceback_root.get()});
         }
 
+        Object *sys_gettrace(Runtime &runtime, const CallArguments &args)
+        {
+            require_no_keywords(&runtime, "gettrace", args);
+            require_positional_count(&runtime, "gettrace", args, 0);
+            VirtualMachine *vm = runtime.active_vm();
+            Object *trace = vm ? vm->thread_state().trace_function() : nullptr;
+            return trace ? trace : static_cast<Object *>(runtime.none());
+        }
+
+        Object *sys_settrace(Runtime &runtime, const CallArguments &args)
+        {
+            require_no_keywords(&runtime, "settrace", args);
+            require_positional_count(&runtime, "settrace", args, 1);
+            VirtualMachine *vm = runtime.active_vm();
+            Object *trace = args.positional[0];
+            if (trace != runtime.none() && (!trace->type() || !trace->type()->slots.call))
+                raise_type_error(&runtime, "settrace() argument must be callable or None");
+            if (vm)
+                vm->thread_state().set_trace_function(trace == runtime.none() ? nullptr : trace);
+            return runtime.none();
+        }
+
         Object *sys_implementation(Runtime &runtime, const CallArguments &args)
         {
             require_no_keywords(&runtime, "implementation", args);
@@ -146,6 +168,18 @@ namespace cxxpython
                 sys_exc_info,
                 "Return information about the exception currently being handled.",
                 "($module, /)",
+            },
+            {
+                "gettrace",
+                sys_gettrace,
+                "Return the global debug trace function.",
+                "($module, /)",
+            },
+            {
+                "settrace",
+                sys_settrace,
+                "Set the global debug trace function.",
+                "($module, function, /)",
             },
         };
 
