@@ -24,6 +24,7 @@ except TypeError as exc:
     print(lines[0].__contains__('Traceback'))
     print(text.__contains__('traceback_module.py'))
     print(text.__contains__('fail'))
+    print(text.__contains__('len(1)'))
     print(text.__contains__('TypeError'))
     print(traceback.format_tb(exc.__traceback__)[0].__contains__('File'))
     writer = Writer()

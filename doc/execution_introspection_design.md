@@ -17,6 +17,9 @@ Current state:
   `(filename, line, name)` tuples.
 - `Lib/traceback.py` formats that seed.  This keeps formatting policy out of
   the CLI and REPL, but it is not the final object model.
+- `Lib/linecache.py` provides script-level source-line caching for traceback
+  and future debugger display.  Freshness checks are conservative until
+  `posix.stat` is exposed.
 
 Target shape:
 
@@ -28,6 +31,8 @@ Target shape:
   thread-state, not as process-global ad hoc storage.
 - Preserve line-table data in `CodeObject` so `pdb`, traceback, and `dis`
   share the same instruction-to-source mapping.
+- Keep source loading in `linecache.py`; native code should expose only real
+  filesystem/import-loader facts such as stat metadata and loader source.
 - `co_lines()` currently reports instruction-index ranges rather than CPython
   byte offsets because cxxpython bytecode is not yet a CPython-compatible
   byte stream.  Keep this explicitly documented until a public bytecode format

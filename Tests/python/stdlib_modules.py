@@ -12,6 +12,7 @@ import _tokenize
 import token
 import tokenize
 import traceback
+import linecache
 
 print(type(inspect))
 print(type(gc))
@@ -28,6 +29,7 @@ print(inspect.getdoc(collections).__contains__('Container datatypes'))
 print(inspect.getdoc(posixpath).__contains__('POSIX paths'))
 print(inspect.getdoc(tokenize).__contains__('Tokenization helpers'))
 print(inspect.getdoc(traceback).__contains__('Format and print stack traces'))
+print(inspect.getdoc(linecache).__contains__('Cache source lines'))
 print(token.tok_name[token.NAME])
 print(token.EXACT_TOKEN_TYPES['='])
 print(tokenize.NAME)
@@ -36,6 +38,7 @@ print(inspect.__all__.__contains__('currentframe'))
 print(collections.__all__.__contains__('namedtuple'))
 print(tokenize.__all__.__contains__('generate_tokens'))
 print(traceback.__all__.__contains__('print_exception'))
+print(linecache.__all__.__contains__('getline'))
 print(gc.__file__)
 print(sys.builtin_module_names.__contains__('_inspect'))
 print(sys.builtin_module_names.__contains__('_tokenize'))
@@ -59,6 +62,8 @@ print(inspect.signature(collections.namedtuple))
 print(inspect.getdoc(collections.namedtuple).__contains__('tuple subclass'))
 print(inspect.signature(_tokenize.TokenizerIter))
 print(inspect.getdoc(_tokenize.TokenizerIter).__contains__('tokenizer records'))
+print(inspect.getdoc(linecache.getline).__contains__('Get a line'))
+print(linecache.getline(__file__, 1) == 'import inspect\n')
 
 frame = inspect.currentframe()
 print(type(frame))

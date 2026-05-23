@@ -7,6 +7,7 @@ requiring the CLI or REPL to own traceback formatting.
 """
 
 import sys
+import linecache
 
 __all__ = ['format_exception', 'format_tb', 'print_exception', 'print_tb']
 
@@ -29,7 +30,35 @@ def _exception_message(exc):
 
 
 def _format_entry(entry):
-    return '  File "' + entry[0] + '", line ' + str(entry[1]) + ', in ' + entry[2] + '\n'
+    result = '  File "' + entry[0] + '", line ' + str(entry[1]) + ', in ' + entry[2] + '\n'
+    source = linecache.getline(entry[0], entry[1])
+    if source:
+        result = result + '    ' + _trim_source_line(source) + '\n'
+    return result
+
+
+def _is_leading_space(character):
+    return character == ' ' or character == '\t'
+
+
+def _is_trailing_space(character):
+    return character == ' ' or character == '\t' or character == '\n' or character == '\r'
+
+
+def _trim_source_line(line):
+    start = 0
+    stop = len(line)
+    while start < stop:
+        if _is_leading_space(line[start]):
+            start = start + 1
+        else:
+            break
+    while stop > start:
+        if _is_trailing_space(line[stop - 1]):
+            stop = stop - 1
+        else:
+            break
+    return line[start:stop]
 
 
 def format_tb(tb):

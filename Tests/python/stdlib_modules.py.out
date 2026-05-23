@@ -13,10 +13,12 @@ True
 True
 True
 True
+True
 NAME
 22
 1
 54
+True
 True
 True
 True
@@ -43,6 +45,8 @@ True
 ($module, typename, field_names, /)
 True
 ($module, source, /)
+True
+True
 True
 <class 'frame'>
 True

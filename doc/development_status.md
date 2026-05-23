@@ -1,5 +1,50 @@
 # Development Status
 
+## 2026-05-23 Linecache And Traceback Source Slice
+
+Review focus:
+
+- Support traceback, future `pdb`, and source display through CPython's
+  script-level `linecache` module instead of adding native shortcuts.
+- Keep file caching honest while `posix.stat` is still absent.
+
+Completed:
+
+- Added `Lib/linecache.py` with `getline`, `getlines`, `clearcache`,
+  `checkcache`, `updatecache`, and `lazycache`.
+- `linecache` reads through the existing script-visible `io.open` substrate
+  and caches lists of physical source lines.
+- `checkcache()` conservatively invalidates entries because the runtime does
+  not yet expose stat size/mtime metadata.
+- Updated `Lib/traceback.py` to include source lines via `linecache.getline`.
+- Added golden coverage for `linecache` loading, cache invalidation, missing
+  files, and traceback source-line formatting.
+- Extended stdlib introspection coverage for `linecache`.
+
+Design notes:
+
+- `lazycache()` currently returns `False`; loader-backed lazy source retrieval
+  should wait for a real importlib loader/resource protocol.
+- `linecache` intentionally does not add a C++ module.  Native support should
+  grow through CPython-shaped substrates such as `posix.stat` and richer
+  import loaders, with public policy remaining in `Lib/`.
+- The implementation exposed an existing parser gap: unary `not` is not yet
+  accepted in all expression positions, so the module avoids relying on it.
+  That parser debt remains tracked for the control-expression pass.
+
+Known debt and next risk:
+
+- Add `posix.stat`/`os.stat` and stat result objects before implementing real
+  freshness checks.
+- Add importlib loader source APIs before enabling `lazycache`.
+- Real traceback objects remain necessary before `pdb` and `sys.exc_info()`.
+
+Verification:
+
+- `build/cxxpython Tests/python/linecache_module.py`
+- `build/cxxpython Tests/python/traceback_module.py`
+- `build/cxxpython Tests/python/stdlib_modules.py`
+
 ## 2026-05-23 Token Public API Correction
 
 Review focus:
