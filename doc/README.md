@@ -9,6 +9,9 @@ This directory records the restart plan for the new `cxxpython` repository.
 - [开发路线图](development_plan.md): milestone plan and acceptance criteria.
 - [底层基建设计](bottom_substrate_design.md): execution, class construction,
   import, closures, slice, buffer, IO, and traceback substrate plan.
+- [执行内省与并发设计](execution_introspection_design.md): traceback,
+  lexer/parser script exposure, `dis`/`pdb` preparation, and the initial
+  threading/coroutine/process model.
 
 The goal is not to preserve the old implementation. The goal is to preserve
 hard-earned knowledge while designing a cleaner, more complete Python 3 runtime

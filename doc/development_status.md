@@ -1,5 +1,83 @@
 # Development Status
 
+## 2026-05-23 Traceback And Tokenizer Exposure Slice
+
+Review focus:
+
+- Remove the REPL traceback dependency on mutating `BaseException.__traceback__`.
+- Close the immediate `Lib/code.py` debt by adding ordinary `str` methods and
+  `reversed()` instead of local workarounds.
+- Start script-visible lexer exposure in a CPython-shaped way so future
+  `dis`, `pdb`, `traceback`, and parser work can consume public object-space
+  APIs.
+- Record the initial threading, coroutine, and POSIX process design before
+  adding more native hooks.
+
+Completed:
+
+- Added `Lib/traceback.py` with `format_tb`, `print_tb`,
+  `format_exception`, and `print_exception`.  The formatter accepts an
+  optional traceback seed so callers can filter frames without mutating
+  exceptions.
+- Updated `Lib/code.py` to delegate exception display to `traceback.py` and
+  to use `'\n'.join(...)` for source buffering.
+- Added `str.join`, `str.startswith`, and `str.endswith` as normal
+  method descriptors on `str`.
+- Added a `reversed` builtin that honors `__reversed__` first and otherwise
+  falls back to a real reverse iterator type with traversal and slot wrappers.
+- Fixed a bootstrap debt in `Runtime::initialize_type_dicts()` where recently
+  added core types (`reversed`, slot-wrapper types, and `KeyboardInterrupt`)
+  could be used before their dictionaries existed.
+- Added native `_tokenize.tokens(source, filename)` over the real compiler
+  lexer and `Lib/tokenize.py` as the script-level facade returning
+  `TokenInfo` records.
+- Added golden coverage for string methods, `reversed`, `traceback`, and
+  `tokenize`, and extended stdlib introspection coverage.
+- Added `doc/execution_introspection_design.md` for traceback objects,
+  lexer/parser exposure, `dis`/`pdb`, threading, coroutine, and POSIX process
+  direction.
+
+Design notes:
+
+- `_tokenize` is a narrow CPython-style substrate module: it exposes facts from
+  the native lexer, while public tokenization policy lives in `Lib/tokenize.py`.
+- The tokenizer facade deliberately returns stable script objects rather than
+  exposing parser AST internals.  `_ast`/`ast.py` should arrive only when AST
+  node objects are real and stable.
+- `Lib/traceback.py` still consumes the current tuple-list traceback seed.
+  This is a stepping stone toward real traceback objects, not the final model.
+- The reverse iterator uses the generic sequence protocol (`__len__` and
+  `__getitem__` slots), keeping `reversed()` out of list/tuple/string special
+  cases.
+
+Known debt and next risk:
+
+- Real traceback objects (`tb_next`, `tb_frame`, `tb_lasti`, `tb_lineno`),
+  exception chaining, and thread-state exception storage remain the next
+  diagnostic substrate.
+- `Lib/tokenize.py` needs CPython token constants, exact token mapping, and
+  bytes/readline compatibility once `bytes` exists.
+- Parser script exposure should be through `_ast`/`ast.py`; do not expose
+  private C++ parser structs.
+- `dis` needs a script-visible instruction API over `CodeObject` before
+  `Lib/dis.py`.
+- Thread/coroutine/process work must first split `Runtime` state into
+  `InterpreterState` and `ThreadState`; signals are still process-global
+  pending flags.
+- `re` and richer string methods remain open stdlib/type work.  Keep regex
+  engine substrate native only if it matches CPython's `_sre`-like layering;
+  keep public `re.py` script-side.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/cxxpython Tests/python/str_builtin.py`
+- `build/cxxpython Tests/python/reversed_builtin.py`
+- `build/cxxpython Tests/python/traceback_module.py`
+- `build/cxxpython Tests/python/tokenize_module.py`
+- `build/cxxpython Tests/python/stdlib_modules.py`
+- `ctest --test-dir build --output-on-failure`
+
 ## 2026-05-22 Script-Layer REPL Slice
 
 Review focus:

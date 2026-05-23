@@ -324,6 +324,79 @@ namespace cxxpython
             validate_str_constructor_args(object.runtime(), args);
         }
 
+        StrObject *require_str_receiver(Runtime &runtime, Object *self, const char *method_name)
+        {
+            auto *text = dynamic_cast<StrObject *>(self);
+            if (!text)
+                raise_type_error(&runtime, std::string(method_name) + " receiver does not have str layout");
+            return text;
+        }
+
+        StrObject *require_str_argument(Runtime &runtime, Object *object, const char *message)
+        {
+            auto *text = dynamic_cast<StrObject *>(object);
+            if (!text)
+                raise_type_error(&runtime, message);
+            return text;
+        }
+
+        Object *str_join_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (args.size() != 1)
+                raise_type_error(&runtime, "str.join() takes exactly one argument");
+            const std::string &separator = require_str_receiver(runtime, self, "str.join()")->value;
+            Object *iterator = object_iter(args[0]);
+            auto iterator_root = runtime.root(iterator);
+            std::string result;
+            bool first = true;
+            while (true)
+            {
+                try
+                {
+                    Object *item = object_next(iterator_root.get());
+                    auto item_root = runtime.root(item);
+                    auto *text = dynamic_cast<StrObject *>(item_root.get());
+                    if (!text)
+                        raise_type_error(&runtime, "sequence item is not str");
+                    if (!first)
+                        result += separator;
+                    first = false;
+                    result += text->value;
+                }
+                catch (const PythonError &error)
+                {
+                    if (error.type() == runtime.stop_iteration_type())
+                        break;
+                    throw;
+                }
+            }
+            return runtime.new_str(std::move(result));
+        }
+
+        Object *str_startswith_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (args.size() != 1)
+                raise_type_error(&runtime, "str.startswith() takes exactly one argument");
+            const std::string &value = require_str_receiver(runtime, self, "str.startswith()")->value;
+            const std::string &prefix =
+                require_str_argument(runtime, args[0], "startswith first arg must be str")->value;
+            return value.rfind(prefix, 0) == 0 ? runtime.true_value() : runtime.false_value();
+        }
+
+        Object *str_endswith_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (args.size() != 1)
+                raise_type_error(&runtime, "str.endswith() takes exactly one argument");
+            const std::string &value = require_str_receiver(runtime, self, "str.endswith()")->value;
+            const std::string &suffix =
+                require_str_argument(runtime, args[0], "endswith first arg must be str")->value;
+            if (suffix.size() > value.size())
+                return runtime.false_value();
+            return value.compare(value.size() - suffix.size(), suffix.size(), suffix) == 0
+                       ? runtime.true_value()
+                       : runtime.false_value();
+        }
+
         Object *int_bool_method(Runtime &runtime, Object *self, ObjectSpan args)
         {
             if (!args.empty())
@@ -458,6 +531,28 @@ namespace cxxpython
                         runtime.new_method_descriptor("__int__", type, int_identity_method));
         type->dict->set(runtime.new_str("__index__"),
                         runtime.new_method_descriptor("__index__", type, int_identity_method));
+    }
+
+    void initialize_str_type_methods(Runtime &runtime, TypeObject *type)
+    {
+        type->dict->set(runtime.new_str("join"),
+                        runtime.new_method_descriptor("join",
+                                                      type,
+                                                      str_join_method,
+                                                      "Concatenate an iterable of strings.",
+                                                      "($self, iterable, /)"));
+        type->dict->set(runtime.new_str("startswith"),
+                        runtime.new_method_descriptor("startswith",
+                                                      type,
+                                                      str_startswith_method,
+                                                      "Return True if the string starts with the prefix.",
+                                                      "($self, prefix, /)"));
+        type->dict->set(runtime.new_str("endswith"),
+                        runtime.new_method_descriptor("endswith",
+                                                      type,
+                                                      str_endswith_method,
+                                                      "Return True if the string ends with the suffix.",
+                                                      "($self, suffix, /)"));
     }
 
     void initialize_int_slot_wrappers(Runtime &, TypeObject *type)

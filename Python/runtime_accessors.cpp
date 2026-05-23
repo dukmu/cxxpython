@@ -72,6 +72,11 @@ namespace cxxpython
         return dict_key_iterator_type_;
     }
 
+    TypeObject *Runtime::reverse_iterator_type() const noexcept
+    {
+        return reverse_iterator_type_;
+    }
+
     TypeObject *Runtime::range_type() const noexcept
     {
         return range_type_;

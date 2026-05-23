@@ -8,6 +8,9 @@ import io
 import posixpath
 import _io
 import _collections
+import _tokenize
+import tokenize
+import traceback
 
 print(type(inspect))
 print(type(gc))
@@ -17,14 +20,20 @@ print(inspect.getdoc(gc).__contains__('garbage collector'))
 print(inspect.getdoc(posix).__contains__('operating-system'))
 print(inspect.getdoc(_io).__contains__('native stream'))
 print(inspect.getdoc(_collections).__contains__('collection helpers'))
+print(inspect.getdoc(_tokenize).__contains__('tokenizer substrate'))
 print(inspect.getdoc(os).__contains__('operating-system interfaces'))
 print(inspect.getdoc(io).__contains__('Core stream'))
 print(inspect.getdoc(collections).__contains__('Container datatypes'))
 print(inspect.getdoc(posixpath).__contains__('POSIX paths'))
+print(inspect.getdoc(tokenize).__contains__('Tokenization helpers'))
+print(inspect.getdoc(traceback).__contains__('Format and print stack traces'))
 print(inspect.__all__.__contains__('currentframe'))
 print(collections.__all__.__contains__('namedtuple'))
+print(tokenize.__all__.__contains__('generate_tokens'))
+print(traceback.__all__.__contains__('print_exception'))
 print(gc.__file__)
 print(sys.builtin_module_names.__contains__('_inspect'))
+print(sys.builtin_module_names.__contains__('_tokenize'))
 print(inspect.signature(sys._getframe))
 print(inspect.getdoc(sys._getframe).__contains__('frame object'))
 print(inspect.signature(gc.collect))
@@ -43,6 +52,8 @@ print(inspect.getdoc(posixpath.basename).__contains__('final component'))
 print(inspect.getdoc(inspect.signature).__contains__('text signature'))
 print(inspect.signature(collections.namedtuple))
 print(inspect.getdoc(collections.namedtuple).__contains__('tuple subclass'))
+print(inspect.signature(_tokenize.tokens))
+print(inspect.getdoc(_tokenize.tokens).__contains__('token stream'))
 
 frame = inspect.currentframe()
 print(type(frame))

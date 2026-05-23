@@ -37,6 +37,12 @@ namespace cxxpython
                 "($module, iterator, /)",
             },
             {
+                "reversed",
+                builtin_reversed,
+                "Return a reverse iterator over a sequence.",
+                "($module, sequence, /)",
+            },
+            {
                 "repr",
                 builtin_repr,
                 "Return the canonical string representation of an object.",

@@ -16,6 +16,7 @@ namespace cxxpython
     void initialize_object_type_methods(Runtime &runtime, TypeObject *type);
     void initialize_type_type_methods(Runtime &runtime, TypeObject *type);
     void initialize_int_type_methods(Runtime &runtime, TypeObject *type);
+    void initialize_str_type_methods(Runtime &runtime, TypeObject *type);
     void initialize_list_type_methods(Runtime &runtime, TypeObject *type);
     void initialize_slice_type_methods(Runtime &runtime, TypeObject *type);
     void initialize_property_type_methods(Runtime &runtime, TypeObject *type);

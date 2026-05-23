@@ -97,6 +97,7 @@ namespace cxxpython
         TypeObject *mappingproxy_type() const noexcept;
         TypeObject *sequence_iterator_type() const noexcept;
         TypeObject *dict_key_iterator_type() const noexcept;
+        TypeObject *reverse_iterator_type() const noexcept;
         TypeObject *range_type() const noexcept;
         TypeObject *range_iterator_type() const noexcept;
         TypeObject *enumerate_type() const noexcept;
@@ -162,6 +163,7 @@ namespace cxxpython
         MappingProxyObject *new_mappingproxy(DictObject *mapping);
         SequenceIteratorObject *new_sequence_iterator(Object *sequence);
         DictKeyIteratorObject *new_dict_key_iterator(DictObject *dict);
+        ReverseIteratorObject *new_reverse_iterator(Object *sequence);
         RangeObject *new_range(std::int64_t start, std::int64_t stop, std::int64_t step);
         RangeIteratorObject *new_range_iterator(std::int64_t current,
                                                 std::int64_t step,
@@ -397,6 +399,7 @@ namespace cxxpython
         TypeObject *mappingproxy_type_ = nullptr;
         TypeObject *sequence_iterator_type_ = nullptr;
         TypeObject *dict_key_iterator_type_ = nullptr;
+        TypeObject *reverse_iterator_type_ = nullptr;
         TypeObject *range_type_ = nullptr;
         TypeObject *range_iterator_type_ = nullptr;
         TypeObject *enumerate_type_ = nullptr;

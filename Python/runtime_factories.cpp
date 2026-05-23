@@ -136,6 +136,14 @@ namespace cxxpython
         return allocate<DictKeyIteratorObject>(dict_key_iterator_type_, dict);
     }
 
+    ReverseIteratorObject *Runtime::new_reverse_iterator(Object *sequence)
+    {
+        if (!sequence)
+            raise_type_error(this, "reversed() argument cannot be null");
+        const std::size_t length = object_length(sequence);
+        return allocate<ReverseIteratorObject>(reverse_iterator_type_, sequence, length);
+    }
+
     RangeObject *Runtime::new_range(std::int64_t start, std::int64_t stop, std::int64_t step)
     {
         if (step == 0)

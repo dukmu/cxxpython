@@ -156,6 +156,7 @@ namespace cxxpython
         initialize_type_dict(mappingproxy_type_);
         initialize_type_dict(sequence_iterator_type_);
         initialize_type_dict(dict_key_iterator_type_);
+        initialize_type_dict(reverse_iterator_type_);
         initialize_type_dict(range_type_);
         initialize_type_dict(range_iterator_type_);
         initialize_type_dict(enumerate_type_);
@@ -170,6 +171,8 @@ namespace cxxpython
         initialize_type_dict(super_type_);
         initialize_type_dict(method_type_);
         initialize_type_dict(method_descriptor_type_);
+        initialize_type_dict(slot_wrapper_type_);
+        initialize_type_dict(bound_slot_wrapper_type_);
         initialize_type_dict(getset_descriptor_type_);
         initialize_type_dict(property_type_);
         initialize_type_dict(staticmethod_type_);
@@ -189,6 +192,7 @@ namespace cxxpython
         initialize_type_dict(attribute_error_type_);
         initialize_type_dict(import_error_type_);
         initialize_type_dict(os_error_type_);
+        initialize_type_dict(keyboard_interrupt_type_);
         initialize_type_dict(stop_iteration_type_);
     }
 

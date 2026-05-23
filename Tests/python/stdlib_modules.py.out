@@ -12,8 +12,14 @@ True
 True
 True
 True
+True
+True
+True
+True
+True
 <stdlib>
 False
+True
 ($module, depth=0, /)
 True
 ($module, generation=None, /)
@@ -31,6 +37,8 @@ True
 True
 True
 ($module, typename, field_names, /)
+True
+($module, source, filename='<string>', /)
 True
 <class 'frame'>
 True

@@ -56,6 +56,25 @@ namespace cxxpython
             (void)iterator.consume_index();
             return dict->entries()[index].key;
         }
+
+        void reverse_iterator_traverse(const Object &object, const VisitChildren &visitor)
+        {
+            auto *iterator = static_cast<const ReverseIteratorObject *>(&object);
+            if (iterator->sequence())
+                visitor(iterator->sequence());
+        }
+
+        Object *reverse_iterator_next(Object &object)
+        {
+            auto &iterator = static_cast<ReverseIteratorObject &>(object);
+            Object *sequence = iterator.sequence();
+            if (!sequence || iterator.next_index() == 0)
+                raise_stop_iteration(object.runtime());
+
+            IntObject *key = object.runtime()->new_int(static_cast<std::int64_t>(iterator.consume_index()));
+            auto key_root = object.runtime()->root(key);
+            return object_get_item(sequence, key_root.get());
+        }
     }
 
     SequenceIteratorObject::SequenceIteratorObject(TypeObject *type, Object *sequence)
@@ -98,6 +117,26 @@ namespace cxxpython
         return index_++;
     }
 
+    ReverseIteratorObject::ReverseIteratorObject(TypeObject *type, Object *sequence, std::size_t next_index)
+        : Object(type), sequence_(sequence), next_index_(next_index)
+    {
+    }
+
+    Object *ReverseIteratorObject::sequence() const noexcept
+    {
+        return sequence_;
+    }
+
+    std::size_t ReverseIteratorObject::next_index() const noexcept
+    {
+        return next_index_;
+    }
+
+    std::size_t ReverseIteratorObject::consume_index() noexcept
+    {
+        return --next_index_;
+    }
+
     TypeSlots make_sequence_iterator_slots()
     {
         return TypeSlots{
@@ -121,6 +160,19 @@ namespace cxxpython
             .traverse = dict_key_iterator_traverse,
             .iter = iterator_iter,
             .iternext = dict_key_iterator_next,
+        };
+    }
+
+    TypeSlots make_reverse_iterator_slots()
+    {
+        return TypeSlots{
+            .repr = default_repr,
+            .hash = default_hash,
+            .equal = default_equal,
+            .truth = default_truth,
+            .traverse = reverse_iterator_traverse,
+            .iter = iterator_iter,
+            .iternext = reverse_iterator_next,
         };
     }
 

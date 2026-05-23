@@ -39,6 +39,7 @@ add_library(cxxpython_core
     Modules/signal.cpp
     Modules/_io.cpp
     Modules/_collections.cpp
+    Modules/_tokenize.cpp
     Objects/object_core.cpp
     Objects/object_primitives.cpp
     Objects/object_sequences.cpp

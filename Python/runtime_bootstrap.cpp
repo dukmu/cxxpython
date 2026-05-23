@@ -23,6 +23,7 @@ namespace cxxpython
         mappingproxy_type_ = allocate_type("mappingproxy");
         sequence_iterator_type_ = allocate_type("iterator");
         dict_key_iterator_type_ = allocate_type("dict_keyiterator");
+        reverse_iterator_type_ = allocate_type("reversed");
         range_type_ = allocate_type("range");
         range_iterator_type_ = allocate_type("range_iterator");
         enumerate_type_ = allocate_type("enumerate");
@@ -75,6 +76,7 @@ namespace cxxpython
         mappingproxy_type_->slots = make_mappingproxy_slots();
         sequence_iterator_type_->slots = make_sequence_iterator_slots();
         dict_key_iterator_type_->slots = make_dict_key_iterator_slots();
+        reverse_iterator_type_->slots = make_reverse_iterator_slots();
         range_type_->slots = make_range_slots();
         range_iterator_type_->slots = make_range_iterator_slots();
         enumerate_type_->slots = make_enumerate_slots();
@@ -127,6 +129,7 @@ namespace cxxpython
         mappingproxy_type_->set_type(type_type_);
         sequence_iterator_type_->set_type(type_type_);
         dict_key_iterator_type_->set_type(type_type_);
+        reverse_iterator_type_->set_type(type_type_);
         range_type_->set_type(type_type_);
         range_iterator_type_->set_type(type_type_);
         enumerate_type_->set_type(type_type_);
@@ -182,6 +185,7 @@ namespace cxxpython
         initialize_type(mappingproxy_type_, object_type_);
         initialize_type(sequence_iterator_type_, object_type_);
         initialize_type(dict_key_iterator_type_, object_type_);
+        initialize_type(reverse_iterator_type_, object_type_);
         initialize_type(range_type_, object_type_);
         initialize_type(range_iterator_type_, object_type_);
         initialize_type(enumerate_type_, object_type_);
@@ -234,6 +238,7 @@ namespace cxxpython
         mappingproxy_type_->solid_base = mappingproxy_type_;
         sequence_iterator_type_->solid_base = sequence_iterator_type_;
         dict_key_iterator_type_->solid_base = dict_key_iterator_type_;
+        reverse_iterator_type_->solid_base = reverse_iterator_type_;
         range_type_->solid_base = range_type_;
         range_iterator_type_->solid_base = range_iterator_type_;
         enumerate_type_->solid_base = enumerate_type_;
@@ -294,6 +299,7 @@ namespace cxxpython
         add_root(mappingproxy_type_);
         add_root(sequence_iterator_type_);
         add_root(dict_key_iterator_type_);
+        add_root(reverse_iterator_type_);
         add_root(range_type_);
         add_root(range_iterator_type_);
         add_root(enumerate_type_);

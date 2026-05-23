@@ -24,6 +24,7 @@ namespace cxxpython
     class MappingProxyObject;
     class SequenceIteratorObject;
     class DictKeyIteratorObject;
+    class ReverseIteratorObject;
     class RangeObject;
     class RangeIteratorObject;
     class EnumerateObject;
@@ -388,6 +389,20 @@ namespace cxxpython
     private:
         DictObject *dict_;
         std::size_t index_ = 0;
+    };
+
+    class ReverseIteratorObject final : public Object
+    {
+    public:
+        ReverseIteratorObject(TypeObject *type, Object *sequence, std::size_t next_index);
+
+        Object *sequence() const noexcept;
+        std::size_t next_index() const noexcept;
+        std::size_t consume_index() noexcept;
+
+    private:
+        Object *sequence_;
+        std::size_t next_index_;
     };
 
     class RangeObject final : public Object
@@ -852,6 +867,7 @@ namespace cxxpython
     TypeSlots make_mappingproxy_slots();
     TypeSlots make_sequence_iterator_slots();
     TypeSlots make_dict_key_iterator_slots();
+    TypeSlots make_reverse_iterator_slots();
     TypeSlots make_range_slots();
     TypeSlots make_range_iterator_slots();
     TypeSlots make_enumerate_slots();

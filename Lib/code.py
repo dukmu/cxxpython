@@ -8,6 +8,7 @@ that behavior in ``Programs/cxxpython.cpp``.
 """
 
 import sys
+import traceback
 
 __all__ = ['InteractiveConsole', 'InteractiveInterpreter', 'compile_command', 'interact']
 
@@ -17,23 +18,6 @@ def _write(stream, text):
     stream.flush()
 
 
-def _exception_type_name(exc):
-    cls = exc.__class__
-    try:
-        return cls.__name__
-    except AttributeError:
-        return cls.__qualname__
-
-
-def _exception_message(exc):
-    args = exc.args
-    if len(args) == 0:
-        return ''
-    if len(args) == 1:
-        return str(args[0])
-    return str(args)
-
-
 def _is_internal_frame(entry):
     return entry[0] == __file__
 
@@ -41,29 +25,18 @@ def _is_internal_frame(entry):
 def _print_exception(exc, stream=None):
     if stream is None:
         stream = sys.stderr
-    traceback = exc.__traceback__
+    entries = exc.__traceback__
     visible = []
-    for entry in traceback:
+    for entry in entries:
         if _is_internal_frame(entry):
             pass
         else:
             visible.append(entry)
-    if len(visible) != 0:
-        _write(stream, 'Traceback (most recent call last):\n')
-        index = len(visible) - 1
-        while index >= 0:
-            entry = visible[index]
-            _write(stream, '  File "' + entry[0] + '", line ' + str(entry[1]) + ', in ' + entry[2] + '\n')
-            index = index - 1
-    message = _exception_message(exc)
-    if message:
-        _write(stream, _exception_type_name(exc) + ': ' + message + '\n')
-    else:
-        _write(stream, _exception_type_name(exc) + '\n')
+    traceback.print_exception(exc, stream, visible)
 
 
 def _is_incomplete_syntax_error(exc):
-    message = _exception_message(exc)
+    message = str(exc)
     if 'expected indented block' in message:
         return True
     if 'expected except after try block' in message:
@@ -76,15 +49,7 @@ def _is_incomplete_syntax_error(exc):
 
 
 def _source_from_buffer(buffer):
-    source = ''
-    first = True
-    for line in buffer:
-        if first:
-            first = False
-        else:
-            source = source + '\n'
-        source = source + line
-    return source + '\n'
+    return '\n'.join(buffer) + '\n'
 
 
 def compile_command(source, filename='<input>', symbol='single'):

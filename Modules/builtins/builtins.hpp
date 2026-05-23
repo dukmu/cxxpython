@@ -11,6 +11,7 @@ namespace cxxpython
     Object *builtin_len(Runtime &runtime, const CallArguments &args);
     Object *builtin_iter(Runtime &runtime, const CallArguments &args);
     Object *builtin_next(Runtime &runtime, const CallArguments &args);
+    Object *builtin_reversed(Runtime &runtime, const CallArguments &args);
     Object *builtin_repr(Runtime &runtime, const CallArguments &args);
     Object *builtin_hash(Runtime &runtime, const CallArguments &args);
     Object *builtin_all(Runtime &runtime, const CallArguments &args);

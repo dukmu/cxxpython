@@ -152,6 +152,26 @@ namespace cxxpython
         return object_next(args.positional[0]);
     }
 
+    Object *builtin_reversed(Runtime &runtime, const CallArguments &args)
+    {
+        require_no_keywords(&runtime, "reversed", args);
+        require_positional_count(&runtime, "reversed", args, 1);
+        StrObject *name = runtime.new_str("__reversed__");
+        auto name_root = runtime.root(name);
+        try
+        {
+            Object *method = object_get_attr(args.positional[0], name_root.get());
+            auto method_root = runtime.root(method);
+            return object_call(method_root.get(), {});
+        }
+        catch (const PythonError &error)
+        {
+            if (!error.type() || !is_subclass(error.type(), runtime.attribute_error_type()))
+                throw;
+        }
+        return runtime.new_reverse_iterator(args.positional[0]);
+    }
+
     Object *builtin_repr(Runtime &runtime, const CallArguments &args)
     {
         require_no_keywords(&runtime, "repr", args);

@@ -80,6 +80,7 @@ namespace cxxpython
             std::vector<Object *> names{
                 runtime.new_str("_io"),
                 runtime.new_str("_collections"),
+                runtime.new_str("_tokenize"),
                 runtime.new_str("builtins"),
                 runtime.new_str("gc"),
                 runtime.new_str("posix"),

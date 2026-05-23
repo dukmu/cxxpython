@@ -434,6 +434,7 @@ namespace cxxpython
         initialize_mappingproxy_slot_wrappers(*this, mappingproxy_type_);
         initialize_iterator_slot_wrappers(*this, sequence_iterator_type_);
         initialize_iterator_slot_wrappers(*this, dict_key_iterator_type_);
+        initialize_iterator_slot_wrappers(*this, reverse_iterator_type_);
         initialize_range_slot_wrappers(*this, range_type_);
         initialize_range_iterator_slot_wrappers(*this, range_iterator_type_);
         initialize_enumerate_slot_wrappers(*this, enumerate_type_);
