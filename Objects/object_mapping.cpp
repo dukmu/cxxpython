@@ -16,7 +16,7 @@ namespace cxxpython
             auto *dict = static_cast<const DictObject *>(&object);
             std::ostringstream out;
             out << "{";
-            const auto &entries = dict->entries();
+            const std::vector<DictObject::Entry> entries = dict->entries();
             for (std::size_t i = 0; i < entries.size(); ++i)
             {
                 if (i != 0)
@@ -36,9 +36,12 @@ namespace cxxpython
         {
             auto *left_dict = static_cast<const DictObject *>(&left);
             auto *right_dict = dynamic_cast<const DictObject *>(&right);
-            if (!right_dict || left_dict->entries().size() != right_dict->entries().size())
+            if (!right_dict)
                 return false;
-            for (const DictObject::Entry &entry : left_dict->entries())
+            const std::vector<DictObject::Entry> left_entries = left_dict->entries();
+            if (left_entries.size() != right_dict->size())
+                return false;
+            for (const DictObject::Entry &entry : left_entries)
             {
                 Object *right_value = right_dict->get(entry.key);
                 if (!right_value || !object_equal(entry.value, right_value))
@@ -199,6 +202,7 @@ namespace cxxpython
         if (!key)
             raise_type_error(runtime(), "dict key cannot be null");
 
+        std::scoped_lock lock(mutex_);
         const std::int64_t key_hash = object_hash(key);
         const SlotSearch search = find_slot(key, key_hash);
         if (!search.found)
@@ -213,6 +217,7 @@ namespace cxxpython
         if (!value)
             raise_type_error(runtime(), "dict value cannot be null");
 
+        std::scoped_lock lock(mutex_);
         const std::int64_t key_hash = object_hash(key);
         ensure_index_capacity();
         SlotSearch search = find_slot(key, key_hash);
@@ -232,6 +237,7 @@ namespace cxxpython
         if (!key)
             raise_type_error(runtime(), "dict key cannot be null");
 
+        std::scoped_lock lock(mutex_);
         const std::int64_t key_hash = object_hash(key);
         const SlotSearch search = find_slot(key, key_hash);
         if (!search.found)
@@ -242,13 +248,15 @@ namespace cxxpython
         return true;
     }
 
-    std::size_t DictObject::size() const noexcept
+    std::size_t DictObject::size() const
     {
+        std::scoped_lock lock(mutex_);
         return entries_.size();
     }
 
-    const std::vector<DictObject::Entry> &DictObject::entries() const noexcept
+    std::vector<DictObject::Entry> DictObject::entries() const
     {
+        std::scoped_lock lock(mutex_);
         return entries_;
     }
 

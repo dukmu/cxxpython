@@ -1,5 +1,48 @@
 # Development Status
 
+## 2026-05-23 Mutable Container Synchronization Slice
+
+Review focus:
+
+- Continue the free-threaded runtime path by protecting the mutable builtin
+  containers that back user data, module dictionaries, type dictionaries, and
+  instance dictionaries.
+- Avoid a VM-wide execution lock; synchronization belongs to the object whose
+  layout is being read or mutated.
+
+Completed:
+
+- Added per-object recursive mutexes to `list` and `dict`.
+- Protected `list.append`, item get/set/delete, size, and item snapshot reads.
+- Protected `dict.get`, `set`, `erase`, size, entry snapshots, and hash-table
+  reindexing.
+- Changed `ListObject::items()` and `DictObject::entries()` to return
+  snapshots rather than references to internal vectors.
+- Added C++ concurrent mutation tests for list append and dict set.
+
+Design notes:
+
+- Snapshot reads deliberately trade some copying for correctness at the current
+  stage.  This prevents callers from retaining internal vector references while
+  another thread mutates the container.
+- The locks are object-local and do not serialize unrelated bytecode execution.
+- `tuple` remains immutable and does not need the same mutation lock.
+
+Known debt and next risk:
+
+- Iterators currently see snapshots through the public container accessors, but
+  they do not yet implement CPython-style mutation detection.
+- Type dictionaries, module dictionaries, and instance dictionaries now benefit
+  from `dict`'s structural lock, but higher-level operations that combine
+  multiple lookups/sets may still need protocol-level locking.
+- GC still needs automatic scheduling and mutator coordination; this slice only
+  makes container structural mutation safer.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter='CoreObjects.ListAppendIsProtectedForConcurrentMutation:CoreObjects.DictSetIsProtectedForConcurrentMutation:CoreObjects.ListSemantics:CoreObjects.DictGrowsAndHandlesHashCollisions'`
+
 ## 2026-05-23 IO Context Manager Slice
 
 Review focus:

@@ -294,12 +294,13 @@ namespace cxxpython
         Object *get(std::int64_t index) const;
         void set(std::int64_t index, Object *item);
         void erase(std::int64_t index);
-        const std::vector<Object *> &items() const noexcept;
-        std::size_t size() const noexcept;
+        std::vector<Object *> items() const;
+        std::size_t size() const;
 
     private:
         std::size_t normalize_index(std::int64_t index) const;
 
+        mutable std::recursive_mutex mutex_;
         std::vector<Object *> items_;
     };
 
@@ -346,8 +347,8 @@ namespace cxxpython
         Object *get(Object *key) const;
         void set(Object *key, Object *value);
         bool erase(Object *key);
-        std::size_t size() const noexcept;
-        const std::vector<Entry> &entries() const noexcept;
+        std::size_t size() const;
+        std::vector<Entry> entries() const;
 
     private:
         struct SlotSearch
@@ -362,6 +363,7 @@ namespace cxxpython
         void ensure_index_capacity();
         void rebuild_indices(std::size_t capacity);
 
+        mutable std::recursive_mutex mutex_;
         std::vector<Entry> entries_;
         std::vector<std::size_t> indices_;
     };

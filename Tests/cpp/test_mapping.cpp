@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <thread>
+
 #include "cxxpython/runtime.hpp"
 #include "test_support.hpp"
 
@@ -199,4 +201,34 @@ TEST(CoreObjects, DictRaisesPythonErrors)
         EXPECT_EQ(error.value()->type(), runtime.type_error_type());
         EXPECT_EQ(error.value()->message(), "unhashable type: 'dict'");
     }
+}
+
+TEST(CoreObjects, DictSetIsProtectedForConcurrentMutation)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::DictObject *dict = runtime.new_dict();
+    std::vector<cxxpython::Object *> keys;
+    std::vector<cxxpython::Object *> values;
+    keys.reserve(200);
+    values.reserve(200);
+    for (int i = 0; i < 200; ++i)
+    {
+        keys.push_back(runtime.new_str("key-" + std::to_string(i)));
+        values.push_back(runtime.new_int(i));
+    }
+
+    std::thread first([&] {
+        for (int i = 0; i < 100; ++i)
+            dict->set(keys[static_cast<std::size_t>(i)], values[static_cast<std::size_t>(i)]);
+    });
+    std::thread second([&] {
+        for (int i = 100; i < 200; ++i)
+            dict->set(keys[static_cast<std::size_t>(i)], values[static_cast<std::size_t>(i)]);
+    });
+    first.join();
+    second.join();
+
+    EXPECT_EQ(dict->size(), 200U);
+    for (int i = 0; i < 200; ++i)
+        EXPECT_EQ(dict->get(keys[static_cast<std::size_t>(i)]), values[static_cast<std::size_t>(i)]);
 }

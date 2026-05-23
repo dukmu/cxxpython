@@ -15,13 +15,14 @@ namespace cxxpython
         std::string list_repr(const Object &object)
         {
             auto *list = static_cast<const ListObject *>(&object);
+            const std::vector<Object *> items = list->items();
             std::ostringstream out;
             out << "[";
-            for (std::size_t i = 0; i < list->items().size(); ++i)
+            for (std::size_t i = 0; i < items.size(); ++i)
             {
                 if (i != 0)
                     out << ", ";
-                out << object_repr(list->items()[i]);
+                out << object_repr(items[i]);
             }
             out << "]";
             return out.str();
@@ -36,11 +37,15 @@ namespace cxxpython
         {
             auto *left_list = static_cast<const ListObject *>(&left);
             auto *right_list = dynamic_cast<const ListObject *>(&right);
-            if (!right_list || left_list->items().size() != right_list->items().size())
+            if (!right_list)
                 return false;
-            for (std::size_t i = 0; i < left_list->items().size(); ++i)
+            const std::vector<Object *> left_items = left_list->items();
+            const std::vector<Object *> right_items = right_list->items();
+            if (left_items.size() != right_items.size())
+                return false;
+            for (std::size_t i = 0; i < left_items.size(); ++i)
             {
-                if (!object_equal(left_list->items()[i], right_list->items()[i]))
+                if (!object_equal(left_items[i], right_items[i]))
                     return false;
             }
             return true;
@@ -283,11 +288,13 @@ namespace cxxpython
     {
         if (!item)
             raise_type_error(runtime(), "list item cannot be null");
+        std::scoped_lock lock(mutex_);
         items_.push_back(item);
     }
 
     Object *ListObject::get(std::int64_t index) const
     {
+        std::scoped_lock lock(mutex_);
         return items_[normalize_index(index)];
     }
 
@@ -295,21 +302,25 @@ namespace cxxpython
     {
         if (!item)
             raise_type_error(runtime(), "list item cannot be null");
+        std::scoped_lock lock(mutex_);
         items_[normalize_index(index)] = item;
     }
 
     void ListObject::erase(std::int64_t index)
     {
+        std::scoped_lock lock(mutex_);
         items_.erase(items_.begin() + static_cast<std::ptrdiff_t>(normalize_index(index)));
     }
 
-    const std::vector<Object *> &ListObject::items() const noexcept
+    std::vector<Object *> ListObject::items() const
     {
+        std::scoped_lock lock(mutex_);
         return items_;
     }
 
-    std::size_t ListObject::size() const noexcept
+    std::size_t ListObject::size() const
     {
+        std::scoped_lock lock(mutex_);
         return items_.size();
     }
 

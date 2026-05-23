@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <thread>
+
 #include "cxxpython/runtime.hpp"
 #include "test_support.hpp"
 
@@ -626,4 +628,27 @@ TEST(CoreObjects, ListAppendDescriptorValidatesReceiverAndArguments)
         EXPECT_EQ(error.type(), runtime.type_error_type());
         EXPECT_STREQ(error.what(), "list.append() takes exactly one argument (0 given)");
     }
+}
+
+TEST(CoreObjects, ListAppendIsProtectedForConcurrentMutation)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::ListObject *list = runtime.new_list({});
+    std::vector<cxxpython::Object *> values;
+    values.reserve(200);
+    for (int i = 0; i < 200; ++i)
+        values.push_back(runtime.new_int(i));
+
+    std::thread first([&] {
+        for (int i = 0; i < 100; ++i)
+            list->append(values[static_cast<std::size_t>(i)]);
+    });
+    std::thread second([&] {
+        for (int i = 100; i < 200; ++i)
+            list->append(values[static_cast<std::size_t>(i)]);
+    });
+    first.join();
+    second.join();
+
+    EXPECT_EQ(list->size(), 200U);
 }
