@@ -1178,6 +1178,26 @@ TEST(Bytecode, ThreadStateVisitsActiveFramesAsRoots)
     EXPECT_EQ(vm.thread_state().frame_depth(), 0U);
 }
 
+TEST(Bytecode, ThreadStateVisitsHandledExceptionsAsRoots)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::ExceptionObject *exception = runtime.new_exception(runtime.type_error_type(), "handled");
+
+    vm.thread_state().push_handled_exception(exception);
+
+    std::vector<cxxpython::Object *> roots;
+    vm.thread_state().visit_frames([&roots](cxxpython::Object *object)
+                                   { roots.push_back(object); });
+
+    ASSERT_EQ(roots.size(), 1U);
+    EXPECT_EQ(roots[0], exception);
+    EXPECT_EQ(vm.thread_state().current_exception(), exception);
+
+    vm.thread_state().pop_handled_exception();
+    EXPECT_EQ(vm.thread_state().current_exception(), nullptr);
+}
+
 TEST(Bytecode, EnforcesFrameAndValueStackDepthLimits)
 {
     cxxpython::Runtime runtime;

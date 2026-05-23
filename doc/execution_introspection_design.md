@@ -13,6 +13,7 @@ Current state:
   names, varnames, constants, stack size, first line, and `co_lines()`).
 - `Frame` exposes `f_code`, `f_locals`, `f_globals`, `f_builtins`,
   `f_lasti`, and `f_lineno`.
+- `ThreadState` owns a handled-exception stack used by `sys.exc_info()`.
 - `BaseException.__traceback__` is a script-visible list of
   `(filename, line, name)` tuples.
 - `Lib/traceback.py` formats that seed.  This keeps formatting policy out of
@@ -27,8 +28,8 @@ Target shape:
   `tb_lasti`, and `tb_lineno`.
 - Attach traceback objects while exceptions propagate through VM frames.
 - Keep `traceback.py` as the public formatter over the object model.
-- Add `sys.exc_info()` only after exception state is represented in
-  thread-state, not as process-global ad hoc storage.
+- Keep `sys.exc_info()` backed by thread-state.  Its traceback element is a
+  transitional traceback seed until real traceback objects are implemented.
 - Preserve line-table data in `CodeObject` so `pdb`, traceback, and `dis`
   share the same instruction-to-source mapping.
 - Keep source loading in `linecache.py`; native code should expose only real
@@ -114,8 +115,9 @@ commands, source display, and interaction policy belong in scripts.
 Initial model:
 
 - Introduce `InterpreterState` and `ThreadState`.
-- Move active frame, recursion depth, current exception, trace function, and
-  pending async events into `ThreadState`.
+- Keep active frame, recursion depth, and current handled exception in
+  `ThreadState`; add trace function and pending async events there when those
+  features arrive.
 - Keep a process-level GIL at first so object layout and GC remain correct.
 - Route signals to the main interpreter/thread state, matching CPython's
   high-level behavior.

@@ -241,13 +241,16 @@ namespace cxxpython
         {
         public:
             ActiveFrame(ThreadState &thread, Frame &frame)
-                : thread_(thread), frame_(frame)
+                : thread_(thread),
+                  frame_(frame),
+                  handled_exception_depth_(thread.handled_exception_depth())
             {
                 thread_.push_frame(&frame_);
             }
 
             ~ActiveFrame()
             {
+                thread_.restore_handled_exception_depth(handled_exception_depth_);
                 thread_.pop_frame(&frame_);
             }
 
@@ -257,6 +260,7 @@ namespace cxxpython
         private:
             ThreadState &thread_;
             Frame &frame_;
+            std::size_t handled_exception_depth_;
         };
 
         class ActiveVirtualMachine final
@@ -600,12 +604,49 @@ namespace cxxpython
         return frames_.size();
     }
 
+    void ThreadState::push_handled_exception(ExceptionObject *exception)
+    {
+        if (!exception)
+            throw BytecodeError("cannot push null handled exception");
+        handled_exceptions_.push_back(exception);
+    }
+
+    void ThreadState::pop_handled_exception()
+    {
+        if (handled_exceptions_.empty())
+            throw BytecodeError("handled exception stack underflow");
+        handled_exceptions_.pop_back();
+    }
+
+    ExceptionObject *ThreadState::current_exception() const noexcept
+    {
+        if (handled_exceptions_.empty())
+            return nullptr;
+        return handled_exceptions_.back();
+    }
+
+    std::size_t ThreadState::handled_exception_depth() const noexcept
+    {
+        return handled_exceptions_.size();
+    }
+
+    void ThreadState::restore_handled_exception_depth(std::size_t depth)
+    {
+        if (depth < handled_exceptions_.size())
+            handled_exceptions_.resize(depth);
+    }
+
     void ThreadState::visit_frames(const VisitChildren &visitor) const
     {
         for (Frame *frame : frames_)
         {
             if (frame)
                 visitor(frame);
+        }
+        for (ExceptionObject *exception : handled_exceptions_)
+        {
+            if (exception)
+                visitor(exception);
         }
     }
 
@@ -1445,7 +1486,10 @@ namespace cxxpython
             }
             case Opcode::PopExcept:
             {
-                (void)frame->pop_exception_handler();
+                if (frame->has_exception_handler())
+                    (void)frame->pop_exception_handler();
+                else
+                    thread_.pop_handled_exception();
                 break;
             }
             case Opcode::PopFinally:
@@ -1545,10 +1589,12 @@ namespace cxxpython
                 {
                     const std::size_t target = frame->pop_exception_handler();
                     frame->clear_stack();
-                    if (error.value())
-                        frame->push(error.value());
-                    else
-                        frame->push(runtime_.new_exception(runtime_.exception_type(), "unknown exception"));
+                    ExceptionObject *handled_exception = error.value();
+                    if (!handled_exception)
+                        handled_exception = runtime_.new_exception(runtime_.exception_type(), "unknown exception");
+                    auto handled_root = runtime_.root(handled_exception);
+                    thread_.push_handled_exception(handled_exception);
+                    frame->push(handled_exception);
                     jump_to(*frame, code, static_cast<std::uint32_t>(target));
                     continue;
                 }

@@ -927,6 +927,7 @@ namespace cxxpython
                         emit({Opcode::PopTop, 0});
                         for (const auto &item : handler.body)
                             item->accept(*this);
+                        emit({Opcode::PopExcept, 0});
                         if (has_finally)
                             emit({Opcode::PopFinally, 0});
                         handler_exit_jumps.push_back(emit_jump(Opcode::JumpAbsolute));

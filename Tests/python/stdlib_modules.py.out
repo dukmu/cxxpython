@@ -28,6 +28,8 @@ False
 True
 ($module, depth=0, /)
 True
+($module, /)
+True
 ($module, generation=None, /)
 True
 ($module, /)

@@ -1,5 +1,56 @@
 # Development Status
 
+## 2026-05-23 Thread Exception State Slice
+
+Review focus:
+
+- Move handled exception state into `ThreadState` so debugging APIs and future
+  OS-thread execution do not rely on process-global or frame-local shortcuts.
+- Add CPython-shaped `sys.exc_info()` without pretending the traceback object
+  model is complete.
+
+Completed:
+
+- Added a handled-exception stack to `ThreadState`, with GC traversal and
+  frame-scope restoration.
+- Updated VM exception dispatch to push the handled exception when entering an
+  `except` handler.
+- Extended `POP_EXCEPT` so it pops either an active exception handler block on
+  the protected-body path or the current handled exception on handler exit.
+- Updated try/except lowering to emit `POP_EXCEPT` after handler bodies.
+- Added native `sys.exc_info()` returning `(type, value, traceback_seed)`;
+  the third element is still the current list-based traceback seed.
+- Added Python golden coverage for no-exception state, active exception state,
+  visibility through nested calls, nested handler restoration, and cleanup
+  after handler exit.
+- Extended stdlib introspection coverage for `sys.exc_info`.
+
+Design notes:
+
+- This is the first concrete step toward thread-local exception state for
+  `pdb`, tracing, and future multi-threading.
+- `sys.exc_info()[2]` remains a list of `(filename, line, name)` tuples until
+  real traceback objects exist.  The API shape is CPython-like, but the
+  traceback representation is still explicitly transitional.
+
+Known debt and next risk:
+
+- Real traceback objects (`tb_next`, `tb_frame`, `tb_lasti`, `tb_lineno`) are
+  still required before `pdb` and richer `traceback.py` compatibility.
+- Exception context/cause and bare `raise` are still missing.
+- Tracing hooks should be added to `ThreadState` only after traceback objects
+  and exception state are stable.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/cxxpython Tests/python/sys_exc_info.py`
+- `build/cxxpython Tests/python/try_finally.py`
+- `build/cxxpython Tests/python/stdlib_modules.py`
+- `build/test_core_objects --gtest_filter=Bytecode.ThreadStateVisitsHandledExceptionsAsRoots`
+- `ctest --test-dir build -R "Compile|Bytecode|PythonScripts" --output-on-failure`
+- `ctest --test-dir build --output-on-failure`
+
 ## 2026-05-23 String Strip Methods Slice
 
 Review focus:
@@ -114,7 +165,8 @@ Known debt and next risk:
 - Add `posix.stat`/`os.stat` and stat result objects before implementing real
   freshness checks.
 - Add importlib loader source APIs before enabling `lazycache`.
-- Real traceback objects remain necessary before `pdb` and `sys.exc_info()`.
+- Real traceback objects remain necessary before `pdb` and richer
+  `sys.exc_info()` traceback compatibility.
 
 Verification:
 

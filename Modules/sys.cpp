@@ -34,6 +34,20 @@ namespace cxxpython
             return frame;
         }
 
+        Object *sys_exc_info(Runtime &runtime, const CallArguments &args)
+        {
+            require_no_keywords(&runtime, "exc_info", args);
+            require_positional_count(&runtime, "exc_info", args, 0);
+            VirtualMachine *vm = runtime.active_vm();
+            ExceptionObject *exception = vm ? vm->thread_state().current_exception() : nullptr;
+            if (!exception)
+                return runtime.new_tuple({runtime.none(), runtime.none(), runtime.none()});
+            auto exception_root = runtime.root(exception);
+            Object *traceback = object_get_attr(exception_root.get(), "__traceback__");
+            auto traceback_root = runtime.root(traceback);
+            return runtime.new_tuple({exception_root->type(), exception_root.get(), traceback_root.get()});
+        }
+
         Object *sys_implementation(Runtime &runtime, const CallArguments &args)
         {
             require_no_keywords(&runtime, "implementation", args);
@@ -126,6 +140,12 @@ namespace cxxpython
                 sys_getframe,
                 "Return a frame object from the call stack.",
                 "($module, depth=0, /)",
+            },
+            {
+                "exc_info",
+                sys_exc_info,
+                "Return information about the exception currently being handled.",
+                "($module, /)",
             },
         };
 

@@ -115,11 +115,17 @@ namespace cxxpython
         Frame *current_frame() const noexcept;
         Frame *frame_at_depth(std::size_t depth) const noexcept;
         std::size_t frame_depth() const noexcept;
+        void push_handled_exception(ExceptionObject *exception);
+        void pop_handled_exception();
+        ExceptionObject *current_exception() const noexcept;
+        std::size_t handled_exception_depth() const noexcept;
+        void restore_handled_exception_depth(std::size_t depth);
         void visit_frames(const VisitChildren &visitor) const;
 
     private:
         InterpreterState &interpreter_;
         std::vector<Frame *> frames_;
+        std::vector<ExceptionObject *> handled_exceptions_;
     };
 
     enum class ExecutionMode : std::uint8_t
