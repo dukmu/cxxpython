@@ -22,6 +22,7 @@ namespace cxxpython
     class NativeFunctionObject;
     class PythonFunctionObject;
     class PythonMethodObject;
+    class ThreadState;
     class VirtualMachine;
     template <class T>
     class Rooted;
@@ -349,6 +350,9 @@ namespace cxxpython
         template <class T>
         Rooted<T> root(T *object);
         void visit_roots(const std::function<void(Object *)> &visitor) const;
+        void register_thread_state(ThreadState *thread);
+        void unregister_thread_state(ThreadState *thread);
+        void visit_thread_states(const std::function<void(ThreadState &)> &visitor) const;
         void visit_heap(const std::function<void(Object *)> &visitor) const;
         std::size_t heap_size() const noexcept;
         std::size_t root_count() const noexcept;
@@ -398,6 +402,8 @@ namespace cxxpython
         std::vector<Object *> roots_;
         mutable std::recursive_mutex heap_mutex_;
         mutable std::recursive_mutex roots_mutex_;
+        mutable std::recursive_mutex thread_states_mutex_;
+        std::vector<ThreadState *> thread_states_;
 
         TypeObject *object_type_ = nullptr;
         TypeObject *type_type_ = nullptr;

@@ -141,6 +141,8 @@ namespace cxxpython::compiler_internal
                     return parse_for_statement();
                 if (peek().kind == TokenKind::While)
                     return parse_while_statement();
+                if (peek().kind == TokenKind::With)
+                    return parse_with_statement();
                 if (peek().kind == TokenKind::Try)
                     return parse_try_statement();
                 if (peek().kind == TokenKind::Def)
@@ -660,6 +662,35 @@ namespace cxxpython::compiler_internal
                     std::move(body),
                     std::move(else_body));
                 statement->line = while_token.line;
+                return ParsedStatement{
+                    std::move(statement),
+                    true,
+                };
+            }
+
+            ParsedStatement parse_with_statement()
+            {
+                const Token &with_token = advance();
+                std::vector<WithItem> items;
+                while (true)
+                {
+                    std::unique_ptr<Expr> context = parse_expression_only();
+                    std::unique_ptr<AssignTarget> target;
+                    if (peek().kind == TokenKind::As)
+                    {
+                        const Token &as_token = advance();
+                        target = make_assignment_target(parse_expression_only(), as_token);
+                    }
+                    items.emplace_back(std::move(context), std::move(target));
+                    if (peek().kind != TokenKind::Comma)
+                        break;
+                    advance();
+                }
+                consume(TokenKind::Colon, "expected ':' after with statement");
+                auto statement = std::make_unique<WithStmt>(
+                    std::move(items),
+                    parse_suite("expected newline after with statement"));
+                statement->line = with_token.line;
                 return ParsedStatement{
                     std::move(statement),
                     true,
@@ -1547,6 +1578,7 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Else:
                 case TokenKind::For:
                 case TokenKind::While:
+                case TokenKind::With:
                 case TokenKind::Break:
                 case TokenKind::Continue:
                 case TokenKind::Def:
@@ -1650,6 +1682,7 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Lambda:
                 case TokenKind::For:
                 case TokenKind::While:
+                case TokenKind::With:
                 case TokenKind::Def:
                 case TokenKind::Return:
                 case TokenKind::Raise:
@@ -1771,6 +1804,7 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Else:
                 case TokenKind::For:
                 case TokenKind::While:
+                case TokenKind::With:
                 case TokenKind::Break:
                 case TokenKind::Continue:
                 case TokenKind::Def:
@@ -1846,6 +1880,7 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Else:
                 case TokenKind::For:
                 case TokenKind::While:
+                case TokenKind::With:
                 case TokenKind::Break:
                 case TokenKind::Continue:
                 case TokenKind::Def:

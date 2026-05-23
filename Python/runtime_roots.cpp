@@ -31,6 +31,32 @@ namespace cxxpython
         }
     }
 
+    void Runtime::register_thread_state(ThreadState *thread)
+    {
+        if (!thread)
+            return;
+        std::scoped_lock lock(thread_states_mutex_);
+        thread_states_.push_back(thread);
+    }
+
+    void Runtime::unregister_thread_state(ThreadState *thread)
+    {
+        std::scoped_lock lock(thread_states_mutex_);
+        const auto found = std::find(thread_states_.begin(), thread_states_.end(), thread);
+        if (found != thread_states_.end())
+            thread_states_.erase(found);
+    }
+
+    void Runtime::visit_thread_states(const std::function<void(ThreadState &)> &visitor) const
+    {
+        std::scoped_lock lock(thread_states_mutex_);
+        for (ThreadState *thread : thread_states_)
+        {
+            if (thread)
+                visitor(*thread);
+        }
+    }
+
     void Runtime::visit_heap(const std::function<void(Object *)> &visitor) const
     {
         std::scoped_lock lock(heap_mutex_);

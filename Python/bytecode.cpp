@@ -647,6 +647,8 @@ namespace cxxpython
             return "CHECK_EXCEPTION_MATCH";
         case Opcode::RaiseValue:
             return "RAISE_VALUE";
+        case Opcode::WithExit:
+            return "WITH_EXIT";
         case Opcode::EndFinally:
             return "END_FINALLY";
         case Opcode::ReturnValue:
@@ -748,6 +750,8 @@ namespace cxxpython
             return -static_cast<int>(instruction.operand) - 1;
         case Opcode::CallEx:
             return -2;
+        case Opcode::WithExit:
+            return -1;
         case Opcode::ReturnValue:
         case Opcode::RaiseValue:
             return -1;

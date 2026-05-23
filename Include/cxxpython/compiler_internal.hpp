@@ -42,6 +42,7 @@ namespace cxxpython::compiler_internal
     struct IfStmt;
     struct ForStmt;
     struct WhileStmt;
+    struct WithStmt;
     struct PassStmt;
     struct BreakStmt;
     struct ContinueStmt;
@@ -96,6 +97,7 @@ namespace cxxpython::compiler_internal
         virtual void visit(const IfStmt &statement) = 0;
         virtual void visit(const ForStmt &statement) = 0;
         virtual void visit(const WhileStmt &statement) = 0;
+        virtual void visit(const WithStmt &statement) = 0;
         virtual void visit(const PassStmt &statement) = 0;
         virtual void visit(const BreakStmt &statement) = 0;
         virtual void visit(const ContinueStmt &statement) = 0;
@@ -149,6 +151,7 @@ namespace cxxpython::compiler_internal
         Else,
         For,
         While,
+        With,
         Break,
         Continue,
         Def,
@@ -802,6 +805,33 @@ namespace cxxpython::compiler_internal
         std::unique_ptr<Expr> condition;
         std::vector<std::unique_ptr<Stmt>> body;
         std::vector<std::unique_ptr<Stmt>> else_body;
+
+        void accept(StmtVisitor &visitor) const override
+        {
+            visitor.visit(*this);
+        }
+    };
+
+    struct WithItem final
+    {
+        WithItem(std::unique_ptr<Expr> context_in, std::unique_ptr<AssignTarget> target_in)
+            : context(std::move(context_in)), target(std::move(target_in))
+        {
+        }
+
+        std::unique_ptr<Expr> context;
+        std::unique_ptr<AssignTarget> target;
+    };
+
+    struct WithStmt final : Stmt
+    {
+        WithStmt(std::vector<WithItem> items_in, std::vector<std::unique_ptr<Stmt>> body_in)
+            : items(std::move(items_in)), body(std::move(body_in))
+        {
+        }
+
+        std::vector<WithItem> items;
+        std::vector<std::unique_ptr<Stmt>> body;
 
         void accept(StmtVisitor &visitor) const override
         {

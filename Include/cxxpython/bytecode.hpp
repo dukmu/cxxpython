@@ -68,6 +68,7 @@ namespace cxxpython
         PopFinally,
         CheckExceptionMatch,
         RaiseValue,
+        WithExit,
         EndFinally,
         ReturnValue,
     };

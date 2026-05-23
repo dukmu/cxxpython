@@ -72,6 +72,22 @@ namespace cxxpython
                        : static_cast<Object *>(runtime.false_value());
         }
 
+        Object *lock_enter_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (!args.empty())
+                raise_type_error(&runtime, "lock.__enter__() takes exactly zero arguments");
+            require_lock(runtime, self, "lock.__enter__")->acquire(true);
+            return self;
+        }
+
+        Object *lock_exit_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (args.size() != 3)
+                raise_type_error(&runtime, "lock.__exit__() takes exactly three arguments");
+            require_lock(runtime, self, "lock.__exit__")->release();
+            return runtime.false_value();
+        }
+
         Object *thread_allocate_lock(Runtime &runtime, const CallArguments &args)
         {
             require_no_keywords(&runtime, "allocate_lock", args);
@@ -247,6 +263,18 @@ namespace cxxpython
                                                       lock_locked_method,
                                                       "Return whether the lock is acquired.",
                                                       "($self, /)"));
+        type->dict->set(runtime.new_str("__enter__"),
+                        runtime.new_method_descriptor("__enter__",
+                                                      type,
+                                                      lock_enter_method,
+                                                      "Acquire the lock and return it.",
+                                                      "($self, /)"));
+        type->dict->set(runtime.new_str("__exit__"),
+                        runtime.new_method_descriptor("__exit__",
+                                                      type,
+                                                      lock_exit_method,
+                                                      "Release the lock.",
+                                                      "($self, exc_type, exc, traceback, /)"));
     }
 
     void initialize_thread_module(Runtime &runtime, ModuleObject &module)

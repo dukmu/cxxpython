@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cstddef>
+#include <mutex>
 #include <vector>
 
 #include "cxxpython/bytecode.hpp"
@@ -111,6 +112,7 @@ namespace cxxpython
         static constexpr std::size_t MaxFrameDepth = 1000;
 
         explicit ThreadState(InterpreterState &interpreter);
+        ~ThreadState();
 
         InterpreterState &interpreter() const noexcept;
         void push_frame(Frame *frame);
@@ -132,6 +134,7 @@ namespace cxxpython
 
     private:
         InterpreterState &interpreter_;
+        mutable std::recursive_mutex mutex_;
         std::vector<Frame *> frames_;
         std::vector<ExceptionObject *> handled_exceptions_;
         Object *trace_function_ = nullptr;

@@ -795,6 +795,14 @@ namespace cxxpython
                     patch_jump(jump, loop.break_target);
             }
 
+            void visit(const compiler_internal::WithStmt &statement) override
+            {
+                StatementLineGuard line(*this, statement);
+                if (statement.items.empty())
+                    raise_syntax_error(&runtime_, "with statement requires at least one context manager");
+                emit_with_item(statement, 0);
+            }
+
             void visit(const compiler_internal::PassStmt &statement) override
             {
                 StatementLineGuard line(*this, statement);
@@ -1164,6 +1172,86 @@ namespace cxxpython
                 emit({Opcode::Call, 5});
             }
 
+            void emit_with_item(const compiler_internal::WithStmt &statement, std::size_t index)
+            {
+                const compiler_internal::WithItem &item = statement.items[index];
+                const std::string exit_name = "$with_exit_" + std::to_string(next_with_temp_++);
+                const std::string value_name = "$with_value_" + std::to_string(next_with_temp_++);
+
+                item.context->accept(*this);
+                emit({Opcode::DupTop, 0});
+                emit({
+                    Opcode::LoadAttr,
+                    static_cast<std::uint32_t>(ensure_name_index("__exit__")),
+                });
+                emit_store_hidden_name(exit_name);
+                emit({
+                    Opcode::LoadAttr,
+                    static_cast<std::uint32_t>(ensure_name_index("__enter__")),
+                });
+                emit({Opcode::Call, 0});
+                emit_store_hidden_name(value_name);
+
+                const std::size_t setup_finally = emit_jump(Opcode::SetupFinally);
+                if (item.target)
+                    emit_assign_hidden_value_to_target(*item.target, value_name);
+                emit_delete_hidden_name(value_name);
+
+                if (index + 1 < statement.items.size())
+                {
+                    emit_with_item(statement, index + 1);
+                }
+                else
+                {
+                    for (const auto &body_statement : statement.body)
+                        body_statement->accept(*this);
+                }
+
+                emit({Opcode::PopFinally, 0});
+                emit_load_hidden_name(exit_name);
+                emit({Opcode::WithExit, 0});
+                const std::size_t exit_jump = emit_jump(Opcode::JumpAbsolute);
+
+                const std::size_t finally_start = instructions_.size();
+                patch_jump(setup_finally, finally_start);
+                emit_load_hidden_name(exit_name);
+                emit({Opcode::WithExit, 0});
+                emit({Opcode::EndFinally, 0});
+
+                patch_jump(exit_jump, instructions_.size());
+                emit_delete_hidden_name(exit_name);
+            }
+
+            void emit_assign_hidden_value_to_target(const compiler_internal::AssignTarget &target,
+                                                    const std::string &value_name)
+            {
+                if (auto *name = dynamic_cast<const compiler_internal::NameTarget *>(&target))
+                {
+                    emit_load_hidden_name(value_name);
+                    emit_store_name(name->name);
+                    return;
+                }
+                if (auto *attribute = dynamic_cast<const compiler_internal::AttributeTarget *>(&target))
+                {
+                    attribute->object->accept(*this);
+                    emit_load_hidden_name(value_name);
+                    emit({
+                        Opcode::StoreAttr,
+                        static_cast<std::uint32_t>(name_index(attribute->name)),
+                    });
+                    return;
+                }
+                if (auto *subscript = dynamic_cast<const compiler_internal::SubscriptTarget *>(&target))
+                {
+                    subscript->object->accept(*this);
+                    subscript->key->accept(*this);
+                    emit_load_hidden_name(value_name);
+                    emit({Opcode::StoreSubscr, 0});
+                    return;
+                }
+                raise_syntax_error(&runtime_, "invalid with assignment target");
+            }
+
             void emit_load_dotted_tail(std::string_view module_name)
             {
                 std::size_t start = module_name.find('.');
@@ -1411,6 +1499,30 @@ namespace cxxpython
                 });
             }
 
+            void emit_load_hidden_name(const std::string &name)
+            {
+                emit({
+                    Opcode::LoadName,
+                    static_cast<std::uint32_t>(ensure_name_index(name)),
+                });
+            }
+
+            void emit_store_hidden_name(const std::string &name)
+            {
+                emit({
+                    Opcode::StoreName,
+                    static_cast<std::uint32_t>(ensure_name_index(name)),
+                });
+            }
+
+            void emit_delete_hidden_name(const std::string &name)
+            {
+                emit({
+                    Opcode::DeleteName,
+                    static_cast<std::uint32_t>(ensure_name_index(name)),
+                });
+            }
+
             void emit_load_name(const std::string &name)
             {
                 if (symbols_.scope() == SymbolScope::Function && symbols_.is_global(name))
@@ -1547,6 +1659,7 @@ namespace cxxpython
             std::vector<std::uint32_t> lines_;
             std::vector<LoopControl> loop_stack_;
             std::uint32_t current_line_ = 1;
+            std::size_t next_with_temp_ = 0;
             const compiler_internal::Expr *pending_assignment_value_ = nullptr;
             bool deleting_target_ = false;
         };

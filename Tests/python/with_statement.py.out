@@ -1,0 +1,20 @@
+True
+False
+enter a
+value a
+exit a True
+enter boom
+exit boom False
+ValueError('bad')
+False
+caught ValueError('bad')
+enter suppress
+exit suppress False
+ValueError('hidden')
+False
+after suppress
+enter outer
+enter inner
+value outer / value inner
+exit inner True
+exit outer True

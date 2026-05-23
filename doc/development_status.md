@@ -1,5 +1,66 @@
 # Development Status
 
+## 2026-05-23 Context Managers And Thread-State Roots Slice
+
+Review focus:
+
+- Add `with` before growing more concurrent code, so lock usage and resource
+  cleanup can use Python's standard context-manager protocol instead of
+  ad-hoc acquire/release patterns.
+- Continue moving the runtime toward a real free-threaded model without adding
+  a process-wide execution lock.
+
+Completed:
+
+- Added lexer/parser/AST/compiler support for `with` statements, including
+  multiple context managers and `as` assignment targets.
+- Added VM `WITH_EXIT` dispatch that calls `__exit__(type, value, traceback)`
+  for exception exits, `__exit__(None, None, None)` for non-exception exits,
+  and suppresses exceptions when `__exit__` returns a truthy value.
+- Added `_thread.lock.__enter__()` and `_thread.lock.__exit__()` so primitive
+  locks work with `with lock:`.
+- Added runtime registration for all live `ThreadState` objects.
+- Added per-`ThreadState` mutex protection for frame, handled-exception, and
+  trace state stacks.
+- Changed GC root discovery to visit every registered `ThreadState`, not only
+  the current thread-local active VM.
+- Added Python golden coverage for context manager normal, exceptional,
+  suppression, nested-manager, and lock-context paths.
+- Added C++ coverage that registered thread states expose active frames as
+  roots across OS threads.
+
+Design notes:
+
+- `with` is implemented as VM-level control flow over the existing finally
+  machinery plus a focused `WITH_EXIT` opcode.  This keeps context-manager
+  semantics centralized and avoids parser-level source rewriting.
+- `_thread.lock` remains a primitive lock, not an owner-tracking reentrant
+  lock.  Higher-level `RLock`, `Condition`, and `Event` belong in
+  `Lib/threading.py` once the object-synchronization substrate is stronger.
+- Thread-state registration is a root-snapshot boundary, not a full
+  stop-the-world collector.  It removes the previous single-active-VM blind
+  spot but does not yet make GC safe against arbitrary concurrent object graph
+  mutation.
+
+Known debt and next risk:
+
+- Mutable object layouts (`dict`, `list`, module dicts, type dicts, and
+  instance dicts) still need explicit per-object synchronization or another
+  documented free-threaded mutation strategy.
+- GC still needs a mutator coordination protocol before collection can safely
+  run while other threads are actively changing object graphs.
+- Import state and `sys.modules` still need coherent locking for concurrent
+  import.
+- `threading` still lacks CPython-level higher primitives and timeout
+  behavior.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter='Bytecode.MetadataNamesAndStackEffects:Bytecode.RuntimeVisitsRegisteredThreadStatesAsRoots'`
+- `build/cxxpython Tests/python/with_statement.py`
+- `build/cxxpython Tests/python/threading_module.py`
+
 ## 2026-05-23 Free-Threaded Thread Substrate Slice
 
 Review focus:

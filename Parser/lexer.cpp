@@ -281,6 +281,8 @@ namespace cxxpython::compiler_internal
                     kind = TokenKind::For;
                 else if (lexeme == "while")
                     kind = TokenKind::While;
+                else if (lexeme == "with")
+                    kind = TokenKind::With;
                 else if (lexeme == "break")
                     kind = TokenKind::Break;
                 else if (lexeme == "continue")

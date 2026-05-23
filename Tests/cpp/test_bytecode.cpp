@@ -1,6 +1,10 @@
 #include <gtest/gtest.h>
 
+#include <algorithm>
+#include <condition_variable>
+#include <mutex>
 #include <sstream>
+#include <thread>
 
 #include "cxxpython/vm.hpp"
 #include "test_support.hpp"
@@ -63,6 +67,7 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::PopFinally), "POP_FINALLY");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::CheckExceptionMatch), "CHECK_EXCEPTION_MATCH");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::RaiseValue), "RAISE_VALUE");
+    EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::WithExit), "WITH_EXIT");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::EndFinally), "END_FINALLY");
     EXPECT_STREQ(cxxpython::opcode_name(cxxpython::Opcode::ReturnValue), "RETURN_VALUE");
 
@@ -137,6 +142,7 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::PopFinally, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::CheckExceptionMatch, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::RaiseValue, 0}), -1);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::WithExit, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::EndFinally, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::ReturnValue, 0}), -1);
 }
@@ -1196,6 +1202,59 @@ TEST(Bytecode, ThreadStateVisitsHandledExceptionsAsRoots)
 
     vm.thread_state().pop_handled_exception();
     EXPECT_EQ(vm.thread_state().current_exception(), nullptr);
+}
+
+TEST(Bytecode, RuntimeVisitsRegisteredThreadStatesAsRoots)
+{
+    cxxpython::Runtime runtime;
+    std::mutex mutex;
+    std::condition_variable condition;
+    bool ready = false;
+    bool finish = false;
+    cxxpython::Frame *worker_frame = nullptr;
+
+    std::thread worker([&] {
+        cxxpython::VirtualMachine vm(runtime);
+        cxxpython::DictObject *locals = runtime.new_dict();
+        cxxpython::DictObject *globals = runtime.new_dict();
+        cxxpython::DictObject *builtins = runtime.builtins_dict();
+        cxxpython::CodeObject *code = runtime.new_code({runtime.none()},
+                                                       {{cxxpython::Opcode::LoadConst, 0},
+                                                        {cxxpython::Opcode::ReturnValue, 0}});
+        cxxpython::Frame *frame = runtime.new_frame(code, locals, globals, builtins);
+        vm.thread_state().push_frame(frame);
+        {
+            std::scoped_lock lock(mutex);
+            worker_frame = frame;
+            ready = true;
+        }
+        condition.notify_one();
+        {
+            std::unique_lock lock(mutex);
+            condition.wait(lock, [&] { return finish; });
+        }
+        vm.thread_state().pop_frame(frame);
+    });
+
+    {
+        std::unique_lock lock(mutex);
+        condition.wait(lock, [&] { return ready; });
+    }
+
+    std::vector<cxxpython::Object *> roots;
+    runtime.visit_thread_states([&roots](cxxpython::ThreadState &thread) {
+        thread.visit_frames([&roots](cxxpython::Object *object) {
+            roots.push_back(object);
+        });
+    });
+    EXPECT_NE(std::find(roots.begin(), roots.end(), worker_frame), roots.end());
+
+    {
+        std::scoped_lock lock(mutex);
+        finish = true;
+    }
+    condition.notify_one();
+    worker.join();
 }
 
 TEST(Bytecode, EnforcesFrameAndValueStackDepthLimits)

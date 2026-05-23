@@ -204,6 +204,20 @@ namespace cxxpython
                     item->accept(*this);
             }
 
+            void visit(const compiler_internal::WithStmt &statement) override
+            {
+                (void)symbols_.add_name("__enter__");
+                (void)symbols_.add_name("__exit__");
+                for (const compiler_internal::WithItem &item : statement.items)
+                {
+                    item.context->accept(*this);
+                    if (item.target)
+                        item.target->accept(*this);
+                }
+                for (const auto &body_item : statement.body)
+                    body_item->accept(*this);
+            }
+
             void visit(const compiler_internal::PassStmt &statement) override
             {
                 (void)statement;
@@ -390,6 +404,17 @@ namespace cxxpython
                     item->accept(*this);
             }
 
+            void visit(const compiler_internal::WithStmt &statement) override
+            {
+                for (const compiler_internal::WithItem &item : statement.items)
+                {
+                    if (item.target)
+                        item.target->accept(*this);
+                }
+                for (const auto &body_item : statement.body)
+                    body_item->accept(*this);
+            }
+
             void visit(const compiler_internal::PassStmt &statement) override
             {
                 (void)statement;
@@ -529,6 +554,12 @@ namespace cxxpython
                 for (const auto &item : statement.body)
                     item->accept(*this);
                 for (const auto &item : statement.else_body)
+                    item->accept(*this);
+            }
+
+            void visit(const compiler_internal::WithStmt &statement) override
+            {
+                for (const auto &item : statement.body)
                     item->accept(*this);
             }
 
@@ -815,6 +846,18 @@ namespace cxxpython
                     item->accept(*this);
                 for (const auto &item : statement.else_body)
                     item->accept(*this);
+            }
+
+            void visit(const compiler_internal::WithStmt &statement) override
+            {
+                for (const compiler_internal::WithItem &item : statement.items)
+                {
+                    item.context->accept(*this);
+                    if (item.target)
+                        item.target->accept(*this);
+                }
+                for (const auto &body_item : statement.body)
+                    body_item->accept(*this);
             }
 
             void visit(const compiler_internal::PassStmt &statement) override
@@ -1111,6 +1154,14 @@ namespace cxxpython
                     item->accept(*this);
                 for (const auto &item : statement.else_body)
                     item->accept(*this);
+            }
+
+            void visit(const compiler_internal::WithStmt &statement) override
+            {
+                for (const compiler_internal::WithItem &item : statement.items)
+                    item.context->accept(*this);
+                for (const auto &body_item : statement.body)
+                    body_item->accept(*this);
             }
 
             void visit(const compiler_internal::PassStmt &statement) override

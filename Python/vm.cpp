@@ -637,6 +637,12 @@ namespace cxxpython
     ThreadState::ThreadState(InterpreterState &interpreter)
         : interpreter_(interpreter)
     {
+        interpreter_.runtime().register_thread_state(this);
+    }
+
+    ThreadState::~ThreadState()
+    {
+        interpreter_.runtime().unregister_thread_state(this);
     }
 
     InterpreterState &ThreadState::interpreter() const noexcept
@@ -648,6 +654,7 @@ namespace cxxpython
     {
         if (!frame)
             throw BytecodeError("cannot push null frame");
+        std::scoped_lock lock(mutex_);
         if (frames_.size() >= MaxFrameDepth)
             raise_recursion_error(&interpreter_.runtime(), "maximum recursion depth exceeded");
         frames_.push_back(frame);
@@ -655,6 +662,7 @@ namespace cxxpython
 
     void ThreadState::pop_frame(Frame *frame)
     {
+        std::scoped_lock lock(mutex_);
         if (frames_.empty() || frames_.back() != frame)
             throw BytecodeError("frame stack discipline violation");
         frames_.pop_back();
@@ -662,6 +670,7 @@ namespace cxxpython
 
     Frame *ThreadState::current_frame() const noexcept
     {
+        std::scoped_lock lock(mutex_);
         if (frames_.empty())
             return nullptr;
         return frames_.back();
@@ -669,6 +678,7 @@ namespace cxxpython
 
     Frame *ThreadState::frame_at_depth(std::size_t depth) const noexcept
     {
+        std::scoped_lock lock(mutex_);
         if (depth >= frames_.size())
             return nullptr;
         return frames_[frames_.size() - 1 - depth];
@@ -676,6 +686,7 @@ namespace cxxpython
 
     std::size_t ThreadState::frame_depth() const noexcept
     {
+        std::scoped_lock lock(mutex_);
         return frames_.size();
     }
 
@@ -683,11 +694,13 @@ namespace cxxpython
     {
         if (!exception)
             throw BytecodeError("cannot push null handled exception");
+        std::scoped_lock lock(mutex_);
         handled_exceptions_.push_back(exception);
     }
 
     void ThreadState::pop_handled_exception()
     {
+        std::scoped_lock lock(mutex_);
         if (handled_exceptions_.empty())
             throw BytecodeError("handled exception stack underflow");
         handled_exceptions_.pop_back();
@@ -695,6 +708,7 @@ namespace cxxpython
 
     ExceptionObject *ThreadState::current_exception() const noexcept
     {
+        std::scoped_lock lock(mutex_);
         if (handled_exceptions_.empty())
             return nullptr;
         return handled_exceptions_.back();
@@ -702,43 +716,51 @@ namespace cxxpython
 
     std::size_t ThreadState::handled_exception_depth() const noexcept
     {
+        std::scoped_lock lock(mutex_);
         return handled_exceptions_.size();
     }
 
     void ThreadState::restore_handled_exception_depth(std::size_t depth)
     {
+        std::scoped_lock lock(mutex_);
         if (depth < handled_exceptions_.size())
             handled_exceptions_.resize(depth);
     }
 
     Object *ThreadState::trace_function() const noexcept
     {
+        std::scoped_lock lock(mutex_);
         return trace_function_;
     }
 
     void ThreadState::set_trace_function(Object *trace_function) noexcept
     {
+        std::scoped_lock lock(mutex_);
         trace_function_ = trace_function;
     }
 
     bool ThreadState::is_tracing() const noexcept
     {
+        std::scoped_lock lock(mutex_);
         return trace_depth_ != 0;
     }
 
     void ThreadState::enter_tracing() noexcept
     {
+        std::scoped_lock lock(mutex_);
         ++trace_depth_;
     }
 
     void ThreadState::leave_tracing() noexcept
     {
+        std::scoped_lock lock(mutex_);
         if (trace_depth_ != 0)
             --trace_depth_;
     }
 
     void ThreadState::visit_frames(const VisitChildren &visitor) const
     {
+        std::scoped_lock lock(mutex_);
         for (Frame *frame : frames_)
         {
             if (frame)
@@ -1641,6 +1663,39 @@ namespace cxxpython
                 if (!exception_object)
                     raise_type_error(&runtime_, "exceptions must derive from BaseException");
                 throw PythonError(exception_object);
+            }
+            case Opcode::WithExit:
+            {
+                Object *exit_callable = frame->pop();
+                auto exit_root = runtime_.root(exit_callable);
+                std::vector<Object *> exit_args;
+                exit_args.reserve(3);
+                if (frame->pending_control_kind() == PendingControlKind::Exception)
+                {
+                    auto *exception = dynamic_cast<ExceptionObject *>(frame->pending_control_value());
+                    if (!exception)
+                        raise_type_error(&runtime_, "with handler stored non-exception pending state");
+                    Object *traceback = exception->traceback()
+                                            ? static_cast<Object *>(exception->traceback())
+                                            : static_cast<Object *>(runtime_.none());
+                    exit_args.push_back(exception->type());
+                    exit_args.push_back(exception);
+                    exit_args.push_back(traceback);
+                }
+                else
+                {
+                    exit_args.push_back(runtime_.none());
+                    exit_args.push_back(runtime_.none());
+                    exit_args.push_back(runtime_.none());
+                }
+                Object *result = object_call(exit_root.get(), exit_args);
+                auto result_root = runtime_.root(result);
+                if (frame->pending_control_kind() == PendingControlKind::Exception &&
+                    is_true(result_root.get()))
+                {
+                    frame->clear_pending_control();
+                }
+                break;
             }
             case Opcode::EndFinally:
             {

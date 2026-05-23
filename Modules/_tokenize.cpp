@@ -90,6 +90,7 @@ namespace cxxpython
             case TokenKind::Else:
             case TokenKind::For:
             case TokenKind::While:
+            case TokenKind::With:
             case TokenKind::Break:
             case TokenKind::Continue:
             case TokenKind::Def:

@@ -20,8 +20,9 @@ namespace cxxpython
         };
 
         visit_roots(enqueue);
-        if (VirtualMachine *vm = active_vm())
-            vm->thread_state().visit_frames(enqueue);
+        visit_thread_states([&enqueue](ThreadState &thread) {
+            thread.visit_frames(enqueue);
+        });
 
         while (!worklist.empty())
         {

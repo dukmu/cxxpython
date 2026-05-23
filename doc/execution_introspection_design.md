@@ -155,17 +155,25 @@ Current substrate:
   `function(*args, **kwargs)` without a global VM execution lock.
 - `_thread.allocate_lock()` returns a primitive lock object that can be
   released by another thread, which is required for script-level `join()`.
+- `_thread.lock` implements `__enter__` and `__exit__`, so lock-guarded code
+  can use Python's standard `with lock:` form.
 - `Lib/threading.py` provides a small `Thread`, `Lock`, `get_ident`, and
   `current_thread` facade over `_thread`.
 - Runtime heap allocation and root registration are protected by runtime-local
   mutexes.  This does not yet make every object operation thread-safe.
+- Every live `ThreadState` registers with `Runtime`; GC root discovery now
+  visits all registered thread states instead of only the current thread-local
+  active VM.
+- `ThreadState` protects its frame stack, handled-exception stack, and trace
+  state with a local mutex.
 
 Future true parallelism:
 
 - Finish per-object synchronization for `dict`, `list`, instance dictionaries,
   module dictionaries, and type dictionaries.
 - Make imports and `sys.modules` coherent under concurrent import.
-- Extend GC to visit all live thread states and to coordinate with mutators.
+- Extend GC from all-thread-state root discovery to a real mutator
+  coordination protocol.
 - Specify extension API thread-safety rules before exposing a stable C/C++ ABI
   for free-threaded extensions.
 - Multiple interpreters can arrive before fully shared-heap parallelism if
