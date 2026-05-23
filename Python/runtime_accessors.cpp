@@ -187,6 +187,11 @@ namespace cxxpython
         return frame_type_;
     }
 
+    TypeObject *Runtime::traceback_type() const noexcept
+    {
+        return traceback_type_;
+    }
+
     TypeObject *Runtime::base_exception_type() const noexcept
     {
         return base_exception_type_;

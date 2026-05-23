@@ -13,6 +13,7 @@ namespace cxxpython
         initialize_method_descriptor_type_descriptors(*this, method_descriptor_type_);
         initialize_function_type_descriptors(*this, function_type_);
         initialize_frame_type_descriptors(*this, frame_type_);
+        initialize_traceback_type_descriptors(*this, traceback_type_);
         initialize_exception_type_descriptors(*this, base_exception_type_);
     }
 }

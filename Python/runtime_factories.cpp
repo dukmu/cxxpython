@@ -592,6 +592,16 @@ namespace cxxpython
                                std::move(cells));
     }
 
+    TracebackObject *Runtime::new_traceback(TracebackObject *next,
+                                            Frame *frame,
+                                            std::size_t last_instruction_index,
+                                            std::uint32_t line)
+    {
+        if (!frame)
+            throw BytecodeError("traceback requires a frame");
+        return allocate<TracebackObject>(traceback_type_, next, frame, last_instruction_index, line);
+    }
+
     TypeObject *Runtime::new_heap_type(std::string name, TypeObject *base, TypeSlots slots)
     {
         TypeObject *type = allocate_type(std::move(name));

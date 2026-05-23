@@ -17,6 +17,7 @@ namespace cxxpython
     class Object;
     class TypeObject;
     class CodeObject;
+    class Frame;
     class NotImplementedObject;
     class ListObject;
     class SliceObject;
@@ -39,6 +40,7 @@ namespace cxxpython
     class PropertyObject;
     class StaticMethodObject;
     class ClassMethodObject;
+    class TracebackObject;
     class PythonFunctionObject;
     class CellObject;
     class SuperObject;
@@ -787,6 +789,27 @@ namespace cxxpython
         Object *callable_;
     };
 
+    class TracebackObject final : public Object
+    {
+    public:
+        TracebackObject(TypeObject *type,
+                        TracebackObject *next,
+                        Frame *frame,
+                        std::size_t last_instruction_index,
+                        std::uint32_t line);
+
+        TracebackObject *next() const noexcept;
+        Frame *frame() const noexcept;
+        std::size_t last_instruction_index() const noexcept;
+        std::uint32_t line() const noexcept;
+
+    private:
+        TracebackObject *next_ = nullptr;
+        Frame *frame_ = nullptr;
+        std::size_t last_instruction_index_ = 0;
+        std::uint32_t line_ = 0;
+    };
+
     class ExceptionObject final : public Object
     {
     public:
@@ -808,6 +831,8 @@ namespace cxxpython
         void set_source_location(std::string filename, std::uint32_t line, std::string name);
         void add_traceback_entry(std::string filename, std::uint32_t line, std::string name);
         const std::vector<TracebackEntry> &traceback_entries() const noexcept;
+        TracebackObject *traceback() const noexcept;
+        void prepend_traceback(TracebackObject *traceback) noexcept;
 
     private:
         TupleObject *args_;
@@ -816,6 +841,7 @@ namespace cxxpython
         std::string source_name_;
         std::uint32_t source_line_ = 0;
         std::vector<TracebackEntry> traceback_;
+        TracebackObject *traceback_head_ = nullptr;
     };
 
     bool is_subclass(const TypeObject *derived, const TypeObject *base) noexcept;
@@ -887,6 +913,7 @@ namespace cxxpython
     TypeSlots make_property_slots();
     TypeSlots make_staticmethod_slots();
     TypeSlots make_classmethod_slots();
+    TypeSlots make_traceback_slots();
     TypeSlots make_exception_slots();
     TypeSlots make_code_slots();
     TypeSlots make_frame_slots();

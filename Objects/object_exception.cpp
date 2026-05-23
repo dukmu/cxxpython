@@ -33,6 +33,8 @@ namespace cxxpython
             auto *error = static_cast<const ExceptionObject *>(&object);
             if (error->args())
                 visitor(error->args());
+            if (error->traceback())
+                visitor(error->traceback());
         }
 
         ExceptionObject *require_exception(Runtime &runtime, Object *instance, const char *name)
@@ -52,22 +54,7 @@ namespace cxxpython
         Object *exception_traceback_getter(Runtime &runtime, Object *instance, TypeObject *)
         {
             ExceptionObject *error = require_exception(runtime, instance, "__traceback__");
-            std::vector<Object *> entries;
-            entries.reserve(error->traceback_entries().size());
-            std::vector<Rooted<Object>> roots;
-            for (const ExceptionObject::TracebackEntry &entry : error->traceback_entries())
-            {
-                Object *filename = runtime.new_str(entry.filename);
-                Object *line = runtime.new_int(static_cast<std::int64_t>(entry.line));
-                Object *name = runtime.new_str(entry.name);
-                roots.push_back(runtime.root(filename));
-                roots.push_back(runtime.root(line));
-                roots.push_back(runtime.root(name));
-                Object *tuple = runtime.new_tuple({filename, line, name});
-                roots.push_back(runtime.root(tuple));
-                entries.push_back(tuple);
-            }
-            return runtime.new_list(std::move(entries));
+            return error->traceback() ? static_cast<Object *>(error->traceback()) : static_cast<Object *>(runtime.none());
         }
 
         Object *exception_new(TypeObject &type, const CallArguments &args)
@@ -146,6 +133,16 @@ namespace cxxpython
     const std::vector<ExceptionObject::TracebackEntry> &ExceptionObject::traceback_entries() const noexcept
     {
         return traceback_;
+    }
+
+    TracebackObject *ExceptionObject::traceback() const noexcept
+    {
+        return traceback_head_;
+    }
+
+    void ExceptionObject::prepend_traceback(TracebackObject *traceback) noexcept
+    {
+        traceback_head_ = traceback;
     }
 
     TypeSlots make_exception_slots()

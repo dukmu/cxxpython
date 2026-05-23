@@ -445,6 +445,12 @@ TEST(Compile, EmitsLineTableAndAttachesRuntimeErrorLocation)
         EXPECT_EQ(error.value()->traceback_entries()[0].filename, "script.py");
         EXPECT_EQ(error.value()->traceback_entries()[0].name, "<module>");
         EXPECT_EQ(error.value()->traceback_entries()[0].line, 2U);
+        auto *traceback = error.value()->traceback();
+        ASSERT_NE(traceback, nullptr);
+        ASSERT_NE(traceback->frame(), nullptr);
+        EXPECT_EQ(traceback->frame()->code()->name(), "<module>");
+        EXPECT_EQ(traceback->line(), 2U);
+        EXPECT_EQ(traceback->next(), nullptr);
     }
 }
 
@@ -480,6 +486,16 @@ TEST(Compile, KeepsInnerFunctionRuntimeErrorLocation)
         EXPECT_EQ(error.value()->traceback_entries()[1].filename, "script.py");
         EXPECT_EQ(error.value()->traceback_entries()[1].name, "<module>");
         EXPECT_EQ(error.value()->traceback_entries()[1].line, 4U);
+        auto *traceback = error.value()->traceback();
+        ASSERT_NE(traceback, nullptr);
+        ASSERT_NE(traceback->frame(), nullptr);
+        EXPECT_EQ(traceback->frame()->code()->name(), "<module>");
+        EXPECT_EQ(traceback->line(), 4U);
+        ASSERT_NE(traceback->next(), nullptr);
+        ASSERT_NE(traceback->next()->frame(), nullptr);
+        EXPECT_EQ(traceback->next()->frame()->code()->name(), "fail");
+        EXPECT_EQ(traceback->next()->line(), 3U);
+        EXPECT_EQ(traceback->next()->next(), nullptr);
     }
 }
 

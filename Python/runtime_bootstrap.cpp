@@ -46,6 +46,7 @@ namespace cxxpython
         classmethod_type_ = allocate_type("classmethod");
         code_type_ = allocate_type("code");
         frame_type_ = allocate_type("frame");
+        traceback_type_ = allocate_type("traceback");
         base_exception_type_ = allocate_type("BaseException");
         exception_type_ = allocate_type("Exception");
         type_error_type_ = allocate_type("TypeError");
@@ -99,6 +100,7 @@ namespace cxxpython
         classmethod_type_->slots = make_classmethod_slots();
         code_type_->slots = make_code_slots();
         frame_type_->slots = make_frame_slots();
+        traceback_type_->slots = make_traceback_slots();
         base_exception_type_->slots = make_exception_slots();
         exception_type_->slots = make_exception_slots();
         type_error_type_->slots = make_exception_slots();
@@ -152,6 +154,7 @@ namespace cxxpython
         classmethod_type_->set_type(type_type_);
         code_type_->set_type(type_type_);
         frame_type_->set_type(type_type_);
+        traceback_type_->set_type(type_type_);
         base_exception_type_->set_type(type_type_);
         exception_type_->set_type(type_type_);
         type_error_type_->set_type(type_type_);
@@ -208,6 +211,7 @@ namespace cxxpython
         initialize_type(classmethod_type_, object_type_);
         initialize_type(code_type_, object_type_);
         initialize_type(frame_type_, object_type_);
+        initialize_type(traceback_type_, object_type_);
         initialize_type(base_exception_type_, object_type_);
         initialize_type(exception_type_, base_exception_type_);
         initialize_type(type_error_type_, exception_type_);
@@ -261,6 +265,7 @@ namespace cxxpython
         classmethod_type_->solid_base = classmethod_type_;
         code_type_->solid_base = code_type_;
         frame_type_->solid_base = frame_type_;
+        traceback_type_->solid_base = traceback_type_;
         base_exception_type_->solid_base = base_exception_type_;
         exception_type_->solid_base = base_exception_type_;
         type_error_type_->solid_base = base_exception_type_;
@@ -322,6 +327,7 @@ namespace cxxpython
         add_root(classmethod_type_);
         add_root(code_type_);
         add_root(frame_type_);
+        add_root(traceback_type_);
         add_root(base_exception_type_);
         add_root(exception_type_);
         add_root(type_error_type_);

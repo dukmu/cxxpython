@@ -1,9 +1,8 @@
 """Format and print stack traces.
 
-The runtime currently exposes ``BaseException.__traceback__`` as a list of
-``(filename, line, name)`` tuples.  This module is the script-level policy
-layer over that seed; the object representation can grow later without
-requiring the CLI or REPL to own traceback formatting.
+The runtime exposes traceback objects with ``tb_next``, ``tb_frame``,
+``tb_lasti``, and ``tb_lineno``.  This module owns formatting policy over that
+object model so the CLI and REPL do not hard-code traceback display.
 """
 
 import sys
@@ -29,6 +28,38 @@ def _exception_message(exc):
     return str(args)
 
 
+def _entry_from_traceback(tb):
+    frame = tb.tb_frame
+    code = frame.f_code
+    return (code.co_filename, tb.tb_lineno, code.co_name)
+
+
+def _normalize_entry(entry):
+    try:
+        return _entry_from_traceback(entry)
+    except AttributeError:
+        return entry
+
+
+def _entries_from_tb(tb):
+    if tb is None:
+        return []
+    try:
+        tb.tb_frame
+    except AttributeError:
+        entries = []
+        for entry in tb:
+            entries.append(_normalize_entry(entry))
+        return entries
+
+    entries = []
+    current = tb
+    while current is not None:
+        entries.append(_entry_from_traceback(current))
+        current = current.tb_next
+    return entries
+
+
 def _format_entry(entry):
     result = '  File "' + entry[0] + '", line ' + str(entry[1]) + ', in ' + entry[2] + '\n'
     source = linecache.getline(entry[0], entry[1])
@@ -40,7 +71,7 @@ def _format_entry(entry):
 def format_tb(tb):
     """Return a list of strings for traceback entries."""
     lines = []
-    for entry in reversed(tb):
+    for entry in _entries_from_tb(tb):
         lines.append(_format_entry(entry))
     return lines
 
@@ -59,10 +90,11 @@ def format_exception(exc, tb=None):
     lines = []
     if tb is None:
         tb = exc.__traceback__
-    if len(tb) != 0:
+    entries = _entries_from_tb(tb)
+    if len(entries) != 0:
         lines.append('Traceback (most recent call last):\n')
-        for line in format_tb(tb):
-            lines.append(line)
+        for entry in entries:
+            lines.append(_format_entry(entry))
     message = _exception_message(exc)
     if message:
         lines.append(_exception_type_name(exc) + ': ' + message + '\n')

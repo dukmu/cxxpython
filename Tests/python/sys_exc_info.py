@@ -14,7 +14,8 @@ except TypeError as outer:
     print(info[0] is TypeError)
     print(info[1] is outer)
     print(type(info[2]))
-    print(len(info[2]) > 0)
+    print(info[2].tb_frame.f_code.co_name == '<module>')
+    print(info[2].tb_lineno > 0)
     print(current_exception_value() is outer)
     try:
         raise ValueError('inner')

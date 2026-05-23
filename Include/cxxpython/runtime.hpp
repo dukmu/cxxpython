@@ -120,6 +120,7 @@ namespace cxxpython
         TypeObject *classmethod_type() const noexcept;
         TypeObject *code_type() const noexcept;
         TypeObject *frame_type() const noexcept;
+        TypeObject *traceback_type() const noexcept;
         TypeObject *base_exception_type() const noexcept;
         TypeObject *exception_type() const noexcept;
         TypeObject *type_error_type() const noexcept;
@@ -296,6 +297,10 @@ namespace cxxpython
                          DictObject *globals = nullptr,
                          DictObject *builtins = nullptr,
                          std::vector<CellObject *> closure = {});
+        TracebackObject *new_traceback(TracebackObject *next,
+                                       Frame *frame,
+                                       std::size_t last_instruction_index,
+                                       std::uint32_t line);
         TypeObject *new_heap_type(std::string name, TypeObject *base, TypeSlots slots = {});
         Object *new_plain_instance(TypeObject *type);
         DictObject *prepare_class_namespace(const ClassConstructionRequest &request);
@@ -422,6 +427,7 @@ namespace cxxpython
         TypeObject *classmethod_type_ = nullptr;
         TypeObject *code_type_ = nullptr;
         TypeObject *frame_type_ = nullptr;
+        TypeObject *traceback_type_ = nullptr;
         TypeObject *base_exception_type_ = nullptr;
         TypeObject *exception_type_ = nullptr;
         TypeObject *type_error_type_ = nullptr;

@@ -8,6 +8,7 @@ namespace cxxpython
     void initialize_type_type_descriptors(Runtime &runtime, TypeObject *type);
     void initialize_code_type_descriptors(Runtime &runtime, TypeObject *type);
     void initialize_frame_type_descriptors(Runtime &runtime, TypeObject *type);
+    void initialize_traceback_type_descriptors(Runtime &runtime, TypeObject *type);
     void initialize_native_function_type_descriptors(Runtime &runtime, TypeObject *type);
     void initialize_method_descriptor_type_descriptors(Runtime &runtime, TypeObject *type);
     void initialize_function_type_descriptors(Runtime &runtime, TypeObject *type);
@@ -51,4 +52,6 @@ namespace cxxpython
     void initialize_zip_slot_wrappers(Runtime &runtime, TypeObject *type);
     void initialize_map_slot_wrappers(Runtime &runtime, TypeObject *type);
     void initialize_filter_slot_wrappers(Runtime &runtime, TypeObject *type);
+
+    TypeSlots make_traceback_slots();
 }

@@ -1,5 +1,57 @@
 # Development Status
 
+## 2026-05-23 Traceback Object Slice
+
+Review focus:
+
+- Replace the transitional list-based `BaseException.__traceback__` seed with
+  a real traceback object chain for `pdb`, `traceback`, and frame
+  introspection.
+- Keep traceback formatting in `Lib/traceback.py`; native code only attaches
+  frame, instruction, and line facts while exceptions propagate.
+
+Completed:
+
+- Added a builtin `traceback` object layout with `tb_next`, `tb_frame`,
+  `tb_lasti`, and `tb_lineno` descriptors.
+- Added `Runtime::new_traceback()` and wired `traceback` into runtime type
+  allocation, dictionaries, descriptors, traversal, and roots.
+- Updated `ExceptionObject` so `__traceback__` returns a traceback object or
+  `None`, while retaining the older C++ `traceback_entries()` seed for focused
+  host-side tests during migration.
+- Updated VM exception propagation to prepend traceback objects as exceptions
+  cross frames, producing an outer-to-inner chain like CPython.
+- Updated `Lib/traceback.py` and `Lib/code.py` to consume traceback objects
+  and still accept caller-provided filtered lists.
+- Updated `sys.exc_info()` and traceback golden tests to assert the new object
+  model.
+
+Design notes:
+
+- The native traceback object is intentionally small and CPython-shaped. It
+  does not format messages, inspect source files, or own REPL filtering
+  policy.
+- `Lib/traceback.py` now normalizes either a traceback chain or a filtered list
+  of traceback objects, keeping script callers in control of presentation.
+- The retained `traceback_entries()` C++ helper is transitional test support;
+  new script-visible behavior should use traceback objects.
+
+Known debt and next risk:
+
+- Exception chaining (`__context__`, `__cause__`, `__suppress_context__`) and
+  writable traceback assignment are still missing.
+- `pdb` still needs a `ThreadState` trace hook shaped like `sys.settrace()`.
+- The remaining traceback source-position work is richer position metadata,
+  not another list seed.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/cxxpython Tests/python/traceback_module.py`
+- `build/cxxpython Tests/python/sys_exc_info.py`
+- `build/cxxpython Tests/python/stdlib_modules.py`
+- `build/test_core_objects --gtest_filter='Compile.EmitsLineTableAndAttachesRuntimeErrorLocation:Compile.KeepsInnerFunctionRuntimeErrorLocation'`
+
 ## 2026-05-23 Disassembly Substrate Slice
 
 Review focus:

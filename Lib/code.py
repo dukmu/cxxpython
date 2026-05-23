@@ -18,20 +18,19 @@ def _write(stream, text):
     stream.flush()
 
 
-def _is_internal_frame(entry):
-    return entry[0] == __file__
+def _is_internal_traceback(tb):
+    return tb.tb_frame.f_code.co_filename == __file__
 
 
 def _print_exception(exc, stream=None):
     if stream is None:
         stream = sys.stderr
-    entries = exc.__traceback__
     visible = []
-    for entry in entries:
-        if _is_internal_frame(entry):
-            pass
-        else:
-            visible.append(entry)
+    current = exc.__traceback__
+    while current is not None:
+        if not _is_internal_traceback(current):
+            visible.append(current)
+        current = current.tb_next
     traceback.print_exception(exc, stream, visible)
 
 

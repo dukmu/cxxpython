@@ -179,6 +179,7 @@ namespace cxxpython
         initialize_type_dict(classmethod_type_);
         initialize_type_dict(code_type_);
         initialize_type_dict(frame_type_);
+        initialize_type_dict(traceback_type_);
         initialize_type_dict(base_exception_type_);
         initialize_type_dict(exception_type_);
         initialize_type_dict(type_error_type_);

@@ -16,22 +16,23 @@ Current state:
 - `Frame` exposes `f_code`, `f_locals`, `f_globals`, `f_builtins`,
   `f_lasti`, and `f_lineno`.
 - `ThreadState` owns a handled-exception stack used by `sys.exc_info()`.
-- `BaseException.__traceback__` is a script-visible list of
-  `(filename, line, name)` tuples.
-- `Lib/traceback.py` formats that seed.  This keeps formatting policy out of
-  the CLI and REPL, but it is not the final object model.
+- `BaseException.__traceback__` returns a real traceback object chain or
+  `None`.
+- Traceback objects expose `tb_next`, `tb_frame`, `tb_lasti`, and
+  `tb_lineno`.
+- `Lib/traceback.py` formats traceback objects and caller-provided filtered
+  lists.  This keeps formatting policy out of the CLI and REPL.
 - `Lib/linecache.py` provides script-level source-line caching for traceback
   and future debugger display.  Freshness checks are conservative until
   `posix.stat` is exposed.
 
 Target shape:
 
-- Add a real `traceback` object type with `tb_next`, `tb_frame`,
-  `tb_lasti`, and `tb_lineno`.
-- Attach traceback objects while exceptions propagate through VM frames.
+- Add exception chaining fields (`__context__`, `__cause__`, and
+  `__suppress_context__`) and writable traceback assignment.
 - Keep `traceback.py` as the public formatter over the object model.
-- Keep `sys.exc_info()` backed by thread-state.  Its traceback element is a
-  transitional traceback seed until real traceback objects are implemented.
+- Keep `sys.exc_info()` backed by thread-state.  Its traceback element is now
+  the handled exception's traceback object.
 - Preserve line-table data in `CodeObject` so `pdb`, traceback, and `dis`
   share the same instruction-to-source mapping.
 - Keep source loading in `linecache.py`; native code should expose only real

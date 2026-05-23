@@ -155,14 +155,25 @@ namespace cxxpython
             return "__main__";
         }
 
-        void attach_source_location(const PythonError &error, const CodeObject &code, std::size_t instruction_index)
+        void attach_source_location(Runtime &runtime,
+                                    const PythonError &error,
+                                    Frame &frame,
+                                    const CodeObject &code,
+                                    std::size_t instruction_index)
         {
             ExceptionObject *value = error.value();
             if (!value)
                 return;
             const std::uint32_t line = code.line_for_instruction(instruction_index);
             if (line != 0)
+            {
                 value->add_traceback_entry(code.filename(), line, code.name());
+                TracebackObject *current = value->traceback();
+                if (current && current->frame() == &frame && current->last_instruction_index() == instruction_index)
+                    return;
+                TracebackObject *traceback = runtime.new_traceback(current, &frame, instruction_index, line);
+                value->prepend_traceback(traceback);
+            }
         }
 
         void add_temporary_root(Runtime &runtime, std::vector<Rooted<Object>> &roots, Object *object)
@@ -1584,7 +1595,7 @@ namespace cxxpython
             }
             catch (const PythonError &error)
             {
-                attach_source_location(error, code, frame->last_instruction_index());
+                attach_source_location(runtime_, error, *frame, code, frame->last_instruction_index());
                 if (frame->has_exception_handler())
                 {
                     const std::size_t target = frame->pop_exception_handler();

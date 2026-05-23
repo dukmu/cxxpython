@@ -27,9 +27,13 @@ except TypeError as exc:
     print(text.__contains__('len(1)'))
     print(text.__contains__('TypeError'))
     print(traceback.format_tb(exc.__traceback__)[0].__contains__('File'))
+    print(exc.__traceback__.tb_frame.f_code.co_name == '<module>')
+    print(exc.__traceback__.tb_next.tb_frame.f_code.co_name == 'fail')
+    print(exc.__traceback__.tb_lasti >= 0)
+    print(exc.__traceback__.tb_lineno > 0)
     writer = Writer()
     traceback.print_exception(exc, writer)
     print(writer.text == text)
-    filtered = [exc.__traceback__[0]]
+    filtered = [exc.__traceback__]
     filtered_lines = traceback.format_exception(exc, filtered)
     print(len(filtered_lines) < len(lines))
