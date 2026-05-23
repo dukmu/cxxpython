@@ -661,6 +661,14 @@ TEST(Bytecode, ExecutesGenericUnaryOp)
     auto *invert_result = dynamic_cast<cxxpython::IntObject *>(vm.execute(*invert));
     ASSERT_NE(invert_result, nullptr);
     EXPECT_EQ(invert_result->value, -2);
+
+    cxxpython::CodeObject *logical_not = runtime.new_code(
+        {runtime.new_int(0)},
+        {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::UnaryOp, static_cast<std::uint32_t>(cxxpython::UnaryOp::Not)},
+         {cxxpython::Opcode::ReturnValue, 0}});
+
+    EXPECT_EQ(vm.execute(*logical_not), runtime.true_value());
 }
 
 TEST(Bytecode, ExecutesGenericBinaryOp)

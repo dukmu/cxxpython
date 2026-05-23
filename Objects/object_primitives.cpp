@@ -135,6 +135,8 @@ namespace cxxpython
                 return operand.runtime()->new_int(-value->value);
             case UnaryOp::Invert:
                 return operand.runtime()->new_int(~value->value);
+            case UnaryOp::Not:
+                return is_true(&operand) ? operand.runtime()->false_value() : operand.runtime()->true_value();
             }
             raise_unsupported_unary_op(operand, op);
         }

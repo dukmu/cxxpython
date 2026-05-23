@@ -271,6 +271,8 @@ namespace cxxpython
                 return "__neg__";
             case UnaryOp::Invert:
                 return "__invert__";
+            case UnaryOp::Not:
+                return nullptr;
             }
             return nullptr;
         }
@@ -1099,6 +1101,9 @@ namespace cxxpython
     {
         if (!operand)
             raise_type_error(nullptr, unsupported_unary_op_message(op, nullptr));
+
+        if (op == UnaryOp::Not)
+            return is_true(operand) ? operand->runtime()->false_value() : operand->runtime()->true_value();
 
         if (operand->type() && operand->type()->slots.unary_op)
         {

@@ -993,15 +993,25 @@ namespace cxxpython::compiler_internal
             std::unique_ptr<Expr> parse_and_expression()
             {
                 std::vector<std::unique_ptr<Expr>> values;
-                values.push_back(parse_comparison());
+                values.push_back(parse_not_expression());
                 while (peek().kind == TokenKind::And)
                 {
                     advance();
-                    values.push_back(parse_comparison());
+                    values.push_back(parse_not_expression());
                 }
                 if (values.size() == 1)
                     return std::move(values.front());
                 return std::make_unique<BoolExpr>(BoolOp::And, std::move(values));
+            }
+
+            std::unique_ptr<Expr> parse_not_expression()
+            {
+                if (peek().kind == TokenKind::Not)
+                {
+                    advance();
+                    return std::make_unique<UnaryExpr>(UnaryOp::Not, parse_not_expression());
+                }
+                return parse_comparison();
             }
 
             std::unique_ptr<Expr> parse_comparison()

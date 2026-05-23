@@ -104,6 +104,27 @@ TEST(Compile, CompilesUnaryOperators)
     EXPECT_EQ(result->value, -8);
 }
 
+TEST(Compile, CompilesLogicalNotWithPythonPrecedence)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+
+    cxxpython::CodeObject *simple = cxxpython::compile_eval_input(runtime, "not 0");
+    ASSERT_NE(simple, nullptr);
+    ASSERT_EQ(simple->instructions().size(), 3U);
+    EXPECT_EQ(simple->instructions()[1].opcode, cxxpython::Opcode::UnaryOp);
+    EXPECT_EQ(simple->instructions()[1].operand, static_cast<std::uint32_t>(cxxpython::UnaryOp::Not));
+    EXPECT_EQ(vm.execute(*simple), runtime.true_value());
+
+    cxxpython::CodeObject *comparison = cxxpython::compile_eval_input(runtime, "not 1 == 1");
+    ASSERT_NE(comparison, nullptr);
+    EXPECT_EQ(vm.execute(*comparison), runtime.false_value());
+
+    cxxpython::CodeObject *boolean = cxxpython::compile_eval_input(runtime, "not False and not ''");
+    ASSERT_NE(boolean, nullptr);
+    EXPECT_EQ(vm.execute(*boolean), runtime.true_value());
+}
+
 TEST(Compile, CompilesStringLiteralAndAddition)
 {
     cxxpython::Runtime runtime;

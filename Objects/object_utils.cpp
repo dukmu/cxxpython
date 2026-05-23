@@ -195,6 +195,8 @@ namespace cxxpython
             return "-";
         case UnaryOp::Invert:
             return "~";
+        case UnaryOp::Not:
+            return "not";
         }
         return "?";
     }

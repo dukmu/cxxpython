@@ -1,5 +1,46 @@
 # Development Status
 
+## 2026-05-23 Logical Not Parser Slice
+
+Review focus:
+
+- Remove the parser/VM debt that forced script modules to avoid normal
+  `if not ...` expressions.
+- Preserve Python's `not` semantics as truth-protocol logic, not as a
+  user-overridable numeric slot.
+
+Completed:
+
+- Added parser support for recursive `not_test` precedence:
+  `not` binds looser than comparisons and tighter than `and`.
+- Added `UnaryOp::Not` bytecode execution through `object_unary_op`.
+- Implemented `not` via `is_true()` before any type unary slot dispatch, so no
+  fake `__not__` slot is introduced.
+- Restored `Lib/linecache.py` to the straightforward `if not isinstance(...)`
+  form that originally exposed the debt.
+- Added C++ compiler/bytecode coverage and Python golden coverage for
+  `not True`, `not False`, string truth, and `not ... in ...` precedence.
+
+Design notes:
+
+- `UnaryOp::Not` is a VM-level unary operation only.  Slot wrappers still
+  expose `__pos__`, `__neg__`, and `__invert__`, matching Python's data model.
+- Future public `dis` work must keep this distinction visible: `UNARY_NOT`
+  style behavior is not a type slot.
+
+Known debt and next risk:
+
+- Parser expression coverage still needs continued pressure from stdlib code:
+  richer comprehensions, generator expressions, `yield`, and assignment
+  expressions remain future work.
+
+Verification:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build -R "Compile|Bytecode|PythonScripts" --output-on-failure`
+- `build/cxxpython Tests/python/control_bool.py`
+- `build/cxxpython Tests/python/linecache_module.py`
+
 ## 2026-05-23 Linecache And Traceback Source Slice
 
 Review focus:
@@ -28,9 +69,8 @@ Design notes:
 - `linecache` intentionally does not add a C++ module.  Native support should
   grow through CPython-shaped substrates such as `posix.stat` and richer
   import loaders, with public policy remaining in `Lib/`.
-- The implementation exposed an existing parser gap: unary `not` is not yet
-  accepted in all expression positions, so the module avoids relying on it.
-  That parser debt remains tracked for the control-expression pass.
+- The implementation exposed an existing parser gap around unary `not`; that
+  gap is now covered by the Logical Not Parser Slice above.
 
 Known debt and next risk:
 

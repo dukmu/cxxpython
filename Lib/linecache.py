@@ -65,19 +65,19 @@ def checkcache(filename=None):
 
 def updatecache(filename, module_globals=None):
     """Update the cache for a file and return its lines."""
-    if isinstance(filename, str):
-        try:
-            stream = io.open(filename, 'r')
-        except OSError:
-            return []
-        try:
-            text = stream.read()
-        finally:
-            stream.close()
-        lines = _split_lines(text)
-        cache[filename] = lines
-        return lines
-    return []
+    if not isinstance(filename, str):
+        return []
+    try:
+        stream = io.open(filename, 'r')
+    except OSError:
+        return []
+    try:
+        text = stream.read()
+    finally:
+        stream.close()
+    lines = _split_lines(text)
+    cache[filename] = lines
+    return lines
 
 
 def lazycache(filename, module_globals):

@@ -27,7 +27,7 @@ namespace cxxpython
 
         UnaryOp decode_unary_op(std::uint32_t operand)
         {
-            if (operand > static_cast<std::uint32_t>(UnaryOp::Invert))
+            if (operand > static_cast<std::uint32_t>(UnaryOp::Not))
                 throw BytecodeError("UNARY_OP operand out of range");
             return static_cast<UnaryOp>(operand);
         }

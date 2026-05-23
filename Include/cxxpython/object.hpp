@@ -104,6 +104,7 @@ namespace cxxpython
         Positive,
         Negative,
         Invert,
+        Not,
     };
 
     enum class SlotWrapperKind : std::uint8_t
