@@ -39,6 +39,8 @@ True
 True
 ($self, /)
 True
+($self, chars=None, /)
+True
 True
 True
 True

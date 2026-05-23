@@ -1,5 +1,42 @@
 # Development Status
 
+## 2026-05-23 String Strip Methods Slice
+
+Review focus:
+
+- Continue filling foundational `str` methods needed by script stdlib modules.
+- Replace local source-line trimming code in `traceback.py` with normal string
+  APIs.
+
+Completed:
+
+- Added `str.strip`, `str.lstrip`, and `str.rstrip` method descriptors.
+- Supported CPython-shaped optional `chars=None`; default stripping removes
+  ASCII whitespace characters, and an explicit character set removes only
+  those characters.
+- Updated `Lib/traceback.py` to use `source.strip()` for source display.
+- Added Python golden coverage for default stripping, explicit character
+  sets, `None`, empty character sets, and type errors.
+- Extended stdlib introspection coverage for `str.strip` docstring/signature.
+
+Design notes:
+
+- This is still byte-oriented string behavior, matching the current runtime
+  string representation.  Full Unicode whitespace/category semantics should
+  arrive with the broader Unicode string design rather than local tables.
+
+Known debt and next risk:
+
+- More `str` methods remain important for script-first stdlib growth:
+  `split`, `rsplit`, `splitlines`, `find`, `replace`, `lower`, `upper`, and
+  formatting helpers.
+
+Verification:
+
+- `build/cxxpython Tests/python/str_builtin.py`
+- `build/cxxpython Tests/python/traceback_module.py`
+- `build/cxxpython Tests/python/stdlib_modules.py`
+
 ## 2026-05-23 Logical Not Parser Slice
 
 Review focus:

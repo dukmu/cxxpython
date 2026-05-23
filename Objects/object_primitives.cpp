@@ -342,6 +342,59 @@ namespace cxxpython
             return text;
         }
 
+        bool is_default_strip_character(char character)
+        {
+            return character == ' ' ||
+                   character == '\t' ||
+                   character == '\n' ||
+                   character == '\r' ||
+                   character == '\v' ||
+                   character == '\f';
+        }
+
+        bool should_strip_character(char character, const StrObject *chars)
+        {
+            if (!chars)
+                return is_default_strip_character(character);
+            return chars->value.find(character) != std::string::npos;
+        }
+
+        const StrObject *strip_chars_argument(Runtime &runtime, ObjectSpan args, const char *method_name)
+        {
+            if (args.size() > 1)
+                raise_type_error(&runtime, std::string(method_name) + "() takes at most one argument");
+            if (args.empty() || args[0] == runtime.none())
+                return nullptr;
+            auto *chars = dynamic_cast<StrObject *>(args[0]);
+            if (!chars)
+                raise_type_error(&runtime, std::string(method_name) + "() argument must be str or None");
+            return chars;
+        }
+
+        Object *strip_impl(Runtime &runtime,
+                           Object *self,
+                           ObjectSpan args,
+                           const char *method_name,
+                           bool left,
+                           bool right)
+        {
+            const std::string &value = require_str_receiver(runtime, self, method_name)->value;
+            const StrObject *chars = strip_chars_argument(runtime, args, method_name);
+            std::size_t start = 0;
+            std::size_t stop = value.size();
+            if (left)
+            {
+                while (start < stop && should_strip_character(value[start], chars))
+                    ++start;
+            }
+            if (right)
+            {
+                while (stop > start && should_strip_character(value[stop - 1], chars))
+                    --stop;
+            }
+            return runtime.new_str(value.substr(start, stop - start));
+        }
+
         Object *str_join_method(Runtime &runtime, Object *self, ObjectSpan args)
         {
             if (args.size() != 1)
@@ -397,6 +450,21 @@ namespace cxxpython
             return value.compare(value.size() - suffix.size(), suffix.size(), suffix) == 0
                        ? runtime.true_value()
                        : runtime.false_value();
+        }
+
+        Object *str_strip_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            return strip_impl(runtime, self, args, "str.strip", true, true);
+        }
+
+        Object *str_lstrip_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            return strip_impl(runtime, self, args, "str.lstrip", true, false);
+        }
+
+        Object *str_rstrip_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            return strip_impl(runtime, self, args, "str.rstrip", false, true);
         }
 
         Object *int_bool_method(Runtime &runtime, Object *self, ObjectSpan args)
@@ -555,6 +623,24 @@ namespace cxxpython
                                                       str_endswith_method,
                                                       "Return True if the string ends with the suffix.",
                                                       "($self, suffix, /)"));
+        type->dict->set(runtime.new_str("strip"),
+                        runtime.new_method_descriptor("strip",
+                                                      type,
+                                                      str_strip_method,
+                                                      "Return a copy with leading and trailing characters removed.",
+                                                      "($self, chars=None, /)"));
+        type->dict->set(runtime.new_str("lstrip"),
+                        runtime.new_method_descriptor("lstrip",
+                                                      type,
+                                                      str_lstrip_method,
+                                                      "Return a copy with leading characters removed.",
+                                                      "($self, chars=None, /)"));
+        type->dict->set(runtime.new_str("rstrip"),
+                        runtime.new_method_descriptor("rstrip",
+                                                      type,
+                                                      str_rstrip_method,
+                                                      "Return a copy with trailing characters removed.",
+                                                      "($self, chars=None, /)"));
     }
 
     void initialize_int_slot_wrappers(Runtime &, TypeObject *type)
