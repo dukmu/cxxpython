@@ -2,7 +2,11 @@
 True
 True
 True
+True
+True
+True
 <class '_thread.lock'>
+<class 'threading.RLock'>
 <class 'int'>
 MainThread
 <class 'int'>
@@ -11,3 +15,8 @@ False
 False
 ['worker-done']
 <class 'ValueError'>
+False
+['notify', 'notified']
+False
+True
+True

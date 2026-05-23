@@ -1,5 +1,47 @@
 # Development Status
 
+## 2026-05-23 Threading Synchronization Primitives Slice
+
+Review focus:
+
+- Build higher-level thread synchronization in script code over the native
+  `_thread.lock` substrate, matching the CPython layering principle.
+- Make lock-guarded user code use normal context-manager syntax.
+
+Completed:
+
+- Added script-level `threading.RLock` with owner tracking, recursive acquire,
+  release validation, and `with` support.
+- Added script-level `threading.Condition` using primitive waiter locks,
+  including `wait()`, `notify()`, `notify_all()`, and `with` support.
+- Added script-level `threading.Event` over `Condition`.
+- Extended `threading.__all__` and Python golden coverage for nested reentrant
+  locking, condition notification, and event wait/set behavior.
+
+Design notes:
+
+- `_thread.lock` remains the native irreducible primitive.  `RLock`,
+  `Condition`, and `Event` are script-level policy, as in CPython's general
+  layering.
+- Timeout arguments are deliberately rejected for now instead of being faked.
+  They should be implemented after a real `time`/monotonic sleep substrate is
+  available.
+
+Known debt and next risk:
+
+- `threading.Thread` still lacks timeout joins, daemon flags, exception hooks,
+  `enumerate()`, and richer lifecycle state.
+- Condition fairness is minimal.  Per-waiter primitive locks give correct
+  blocking/notification behavior, but scheduler policy remains the host OS
+  thread scheduler.
+- GC still needs mutator coordination before automatic collection is safe
+  under arbitrary concurrent object graph mutation.
+
+Verification:
+
+- `build/cxxpython Tests/python/threading_module.py`
+- `ctest --test-dir build -R 'PythonScripts' --output-on-failure`
+
 ## 2026-05-23 Import Registry Synchronization Slice
 
 Review focus:

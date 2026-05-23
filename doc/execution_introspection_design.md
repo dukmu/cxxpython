@@ -159,6 +159,9 @@ Current substrate:
   can use Python's standard `with lock:` form.
 - `Lib/threading.py` provides a small `Thread`, `Lock`, `get_ident`, and
   `current_thread` facade over `_thread`.
+- `Lib/threading.py` now also provides script-level `RLock`, `Condition`, and
+  `Event` over primitive `_thread.lock` waiters.  Timeout behavior is
+  intentionally absent until the runtime has a real `time`/sleep substrate.
 - Runtime heap allocation and root registration are protected by runtime-local
   mutexes.  This does not yet make every object operation thread-safe.
 - Every live `ThreadState` registers with `Runtime`; GC root discovery now
