@@ -47,6 +47,11 @@ namespace cxxpython
             thread_states_.erase(found);
     }
 
+    void Runtime::notify_gc_safepoint_change()
+    {
+        gc_condition_.notify_all();
+    }
+
     void Runtime::visit_thread_states(const std::function<void(ThreadState &)> &visitor) const
     {
         std::scoped_lock lock(thread_states_mutex_);

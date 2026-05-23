@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <condition_variable>
 #include <iosfwd>
 #include <memory>
 #include <mutex>
@@ -155,7 +156,7 @@ namespace cxxpython
         std::vector<std::string> program_arguments() const;
         void set_program_arguments(std::vector<std::string> args);
         std::size_t collect_garbage();
-        std::size_t collect_garbage_if_requested();
+        std::size_t collect_garbage_if_requested(ThreadState &current_thread);
         bool garbage_collection_enabled() const noexcept;
         void enable_garbage_collection() noexcept;
         void disable_garbage_collection() noexcept;
@@ -360,6 +361,7 @@ namespace cxxpython
         void visit_roots(const std::function<void(Object *)> &visitor) const;
         void register_thread_state(ThreadState *thread);
         void unregister_thread_state(ThreadState *thread);
+        void notify_gc_safepoint_change();
         void visit_thread_states(const std::function<void(ThreadState &)> &visitor) const;
         void visit_heap(const std::function<void(Object *)> &visitor) const;
         std::size_t heap_size() const noexcept;
@@ -405,6 +407,9 @@ namespace cxxpython
                                          ModuleLoadSpec &storage,
                                          const std::vector<std::string> *package_paths = nullptr,
                                          std::string_view search_name = {});
+        std::size_t collect_garbage_unlocked();
+        std::size_t collect_garbage_at_safepoint(ThreadState &current_thread, bool force);
+        bool all_other_active_threads_at_gc_safepoint(ThreadState &current_thread) const;
         ModuleObject *load_module_from_spec(const ModuleLoadSpec &spec);
         ModuleObject *load_extension_module_from_spec(const ModuleLoadSpec &spec);
         TypeObject *importlib_type_for_loader(std::string_view loader_name);
@@ -420,6 +425,8 @@ namespace cxxpython
         mutable std::recursive_mutex roots_mutex_;
         mutable std::recursive_mutex thread_states_mutex_;
         mutable std::recursive_mutex gc_mutex_;
+        mutable std::recursive_mutex gc_coordination_mutex_;
+        std::condition_variable_any gc_condition_;
         mutable std::recursive_mutex import_mutex_;
         mutable std::recursive_mutex runtime_state_mutex_;
         std::vector<ThreadState *> thread_states_;
@@ -427,6 +434,7 @@ namespace cxxpython
         std::atomic_bool gc_requested_{false};
         std::atomic_size_t allocations_since_gc_{0};
         std::atomic_size_t gc_threshold_{1024};
+        bool gc_stop_requested_ = false;
 
         TypeObject *object_type_ = nullptr;
         TypeObject *type_type_ = nullptr;

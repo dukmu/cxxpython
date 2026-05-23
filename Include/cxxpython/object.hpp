@@ -890,6 +890,7 @@ namespace cxxpython
     void object_set_item(Object *object, Object *key, Object *value);
     void object_delete_item(Object *object, Object *key);
     bool object_contains(Object *object, Object *key);
+    Object *object_format(Object *object, StrObject *format_spec);
     Object *object_iter(Object *object);
     Object *object_next(Object *iterator);
     SliceRange normalize_slice(Runtime &runtime, const SliceObject &slice, std::int64_t sequence_length);

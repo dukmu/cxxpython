@@ -45,3 +45,12 @@ print(console.push('missing'))
 print(err.text.__contains__('Traceback (most recent call last):'))
 print(err.text.__contains__('File "<console-test>", line 1, in '))
 print(err.text.__contains__("NameError: name 'missing' is not defined"))
+err.text = ''
+
+print(console.push("f'{broken"))
+print(console.more)
+print(err.text.__contains__('unterminated string literal'))
+err.text = ''
+print(console.push('f"{0}"'))
+print(out.text == "'0'\n")
+out.text = ''

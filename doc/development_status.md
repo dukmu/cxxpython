@@ -1,5 +1,52 @@
 # Development Status
 
+## 2026-05-24 REPL Formatting And GC Coordination Fixes
+
+Review focus:
+
+- Fix REPL f-string behavior without papering over parser errors.
+- Make automatic GC safe when multiple OS threads execute bytecode
+  concurrently.
+
+Completed:
+
+- Added `object_format()` as the shared formatting entry point for
+  `FORMAT_VALUE` and `format()`.
+- Changed formatting to use special-method lookup on `type(value)` and call
+  `__format__(value, spec)`, so type objects such as `int` format correctly.
+- Stopped treating ordinary `unterminated string literal` errors as incomplete
+  REPL input.  A bad one-line string now reports immediately and clears the
+  interactive buffer.
+- Added thread-state GC safe-point flags and a runtime stop-the-world
+  coordination path for automatic collection.
+- Marked threads blocked in `_thread.lock.acquire()` as GC safe-points while
+  they are parked, and fixed non-blocking acquire on an unlocked lock.
+
+Design notes:
+
+- GC coordination remains safe-point based.  It does not add a global bytecode
+  execution lock; threads run concurrently until a collection is requested.
+- Script-level locks still own multi-step user invariants.  Runtime
+  synchronization only protects interpreter memory safety and internal
+  registries.
+- Native calls that can block for a long time still need explicit safe-point
+  hooks when they are added.
+
+Known debt and next risk:
+
+- GC is still single-generation mark/sweep behind a CPython-shaped API.
+- Long-running native/POSIX operations need a consistent "parked at
+  safe-point" guard abstraction instead of ad-hoc marking in each call site.
+- The next threading work should add timeout-aware waits once a real time
+  substrate exists.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/cxxpython Tests/python/code_module.py`
+- `build/test_core_objects --gtest_filter='Compile.CompilesAndExecutesBasicFString'`
+- `build/cxxpython build/test.py`
+
 ## 2026-05-23 Threading Synchronization Primitives Slice
 
 Review focus:

@@ -130,6 +130,8 @@ namespace cxxpython
         bool is_tracing() const noexcept;
         void enter_tracing() noexcept;
         void leave_tracing() noexcept;
+        bool at_gc_safepoint() const noexcept;
+        void set_gc_safepoint(bool at_safepoint) noexcept;
         void visit_frames(const VisitChildren &visitor) const;
 
     private:
@@ -139,6 +141,7 @@ namespace cxxpython
         std::vector<ExceptionObject *> handled_exceptions_;
         Object *trace_function_ = nullptr;
         std::size_t trace_depth_ = 0;
+        bool at_gc_safepoint_ = false;
     };
 
     enum class ExecutionMode : std::uint8_t

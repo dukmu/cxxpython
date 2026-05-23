@@ -42,8 +42,6 @@ def _is_incomplete_syntax_error(exc):
         return True
     if 'expected except or finally after try block' in message:
         return True
-    if 'unterminated string literal' in message:
-        return True
     return False
 
 

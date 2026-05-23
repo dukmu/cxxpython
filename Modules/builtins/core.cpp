@@ -262,10 +262,9 @@ namespace cxxpython
         auto value_root = runtime.root(value);
         Object *spec = args.positional.size() == 2 ? args.positional[1] : runtime.new_str("");
         auto spec_root = runtime.root(spec);
-        if (!dynamic_cast<StrObject *>(spec_root.get()))
+        auto *format_spec = dynamic_cast<StrObject *>(spec_root.get());
+        if (!format_spec)
             raise_type_error(&runtime, "format() argument 2 must be str");
-        Object *format_method = object_get_attr(value_root.get(), "__format__");
-        auto method_root = runtime.root(format_method);
-        return object_call(method_root.get(), {spec_root.get()});
+        return object_format(value_root.get(), format_spec);
     }
 }

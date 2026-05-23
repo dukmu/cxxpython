@@ -1,6 +1,7 @@
 #include "module_registry.hpp"
 
 #include "cxxpython/runtime.hpp"
+#include "cxxpython/vm.hpp"
 
 #include "../Objects/object_utils.hpp"
 
@@ -209,9 +210,24 @@ namespace cxxpython
     bool ThreadLockObject::acquire(bool blocking)
     {
         std::unique_lock lock(mutex_);
-        if (!blocking && locked_)
-            return false;
+        if (!blocking)
+        {
+            if (locked_)
+                return false;
+            locked_ = true;
+            return true;
+        }
+        VirtualMachine *vm = runtime()->active_vm();
+        ThreadState *thread = vm ? &vm->thread_state() : nullptr;
+        bool parked_for_gc = false;
+        if (thread && locked_)
+        {
+            thread->set_gc_safepoint(true);
+            parked_for_gc = true;
+        }
         condition_.wait(lock, [this] { return !locked_; });
+        if (parked_for_gc)
+            thread->set_gc_safepoint(false);
         locked_ = true;
         return true;
     }

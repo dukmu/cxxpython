@@ -758,6 +758,21 @@ namespace cxxpython
             --trace_depth_;
     }
 
+    bool ThreadState::at_gc_safepoint() const noexcept
+    {
+        std::scoped_lock lock(mutex_);
+        return at_gc_safepoint_;
+    }
+
+    void ThreadState::set_gc_safepoint(bool at_safepoint) noexcept
+    {
+        {
+            std::scoped_lock lock(mutex_);
+            at_gc_safepoint_ = at_safepoint;
+        }
+        interpreter_.runtime().notify_gc_safepoint_change();
+    }
+
     void ThreadState::visit_frames(const VisitChildren &visitor) const
     {
         std::scoped_lock lock(mutex_);
@@ -848,7 +863,7 @@ namespace cxxpython
         std::uint32_t last_traced_line = 0;
         while (frame->instruction_pointer() < code.instructions().size())
         {
-            (void)runtime_.collect_garbage_if_requested();
+            (void)runtime_.collect_garbage_if_requested(thread_);
             const Instruction instruction = code.instructions()[frame->instruction_pointer()];
             frame->advance();
             try
@@ -1145,12 +1160,8 @@ namespace cxxpython
                 auto value_root = runtime_.root(value);
                 StrObject *spec = runtime_.new_str("");
                 auto spec_root = runtime_.root(spec);
-                Object *method = object_get_attr(value_root.get(), "__format__");
-                auto method_root = runtime_.root(method);
-                Object *formatted = object_call(method_root.get(), {spec_root.get()});
+                Object *formatted = object_format(value_root.get(), spec_root.get());
                 auto formatted_root = runtime_.root(formatted);
-                if (!dynamic_cast<StrObject *>(formatted_root.get()))
-                    raise_type_error(&runtime_, "__format__ must return str");
                 frame->push(formatted_root.get());
                 break;
             }

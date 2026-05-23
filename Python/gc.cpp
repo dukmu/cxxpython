@@ -9,6 +9,13 @@ namespace cxxpython
 {
     std::size_t Runtime::collect_garbage()
     {
+        if (VirtualMachine *vm = active_vm())
+            return collect_garbage_at_safepoint(vm->thread_state(), true);
+        return collect_garbage_unlocked();
+    }
+
+    std::size_t Runtime::collect_garbage_unlocked()
+    {
         std::scoped_lock collection_lock(gc_mutex_);
         std::unordered_set<Object *> marked;
         std::vector<Object *> worklist;
@@ -56,14 +63,66 @@ namespace cxxpython
         return collected;
     }
 
-    std::size_t Runtime::collect_garbage_if_requested()
+    std::size_t Runtime::collect_garbage_if_requested(ThreadState &current_thread)
     {
         if (!gc_enabled_.load(std::memory_order_relaxed) ||
             !gc_requested_.load(std::memory_order_relaxed))
         {
             return 0;
         }
-        return collect_garbage();
+        return collect_garbage_at_safepoint(current_thread, false);
+    }
+
+    bool Runtime::all_other_active_threads_at_gc_safepoint(ThreadState &current_thread) const
+    {
+        std::scoped_lock lock(thread_states_mutex_);
+        for (ThreadState *thread : thread_states_)
+        {
+            if (!thread || thread == &current_thread)
+                continue;
+            if (thread->frame_depth() == 0)
+                continue;
+            if (!thread->at_gc_safepoint())
+                return false;
+        }
+        return true;
+    }
+
+    std::size_t Runtime::collect_garbage_at_safepoint(ThreadState &current_thread, bool force)
+    {
+        std::unique_lock lock(gc_coordination_mutex_);
+        if (gc_stop_requested_)
+        {
+            current_thread.set_gc_safepoint(true);
+            gc_condition_.notify_all();
+            gc_condition_.wait(lock, [this] { return !gc_stop_requested_; });
+            current_thread.set_gc_safepoint(false);
+            return 0;
+        }
+
+        if (!force &&
+            (!gc_enabled_.load(std::memory_order_relaxed) ||
+             !gc_requested_.load(std::memory_order_relaxed)))
+        {
+            return 0;
+        }
+
+        gc_stop_requested_ = true;
+        current_thread.set_gc_safepoint(true);
+        gc_condition_.notify_all();
+        gc_condition_.wait(lock, [this, &current_thread] {
+            return all_other_active_threads_at_gc_safepoint(current_thread);
+        });
+        lock.unlock();
+
+        const std::size_t collected = collect_garbage_unlocked();
+
+        lock.lock();
+        current_thread.set_gc_safepoint(false);
+        gc_stop_requested_ = false;
+        lock.unlock();
+        gc_condition_.notify_all();
+        return collected;
     }
 
     bool Runtime::garbage_collection_enabled() const noexcept

@@ -2123,6 +2123,20 @@ TEST(Compile, CompilesAndExecutesBasicFString)
     auto *escaped = dynamic_cast<cxxpython::StrObject *>(globals->get(runtime.new_str("escaped")));
     ASSERT_NE(escaped, nullptr);
     EXPECT_EQ(escaped->value, "{Ada}");
+
+    cxxpython::CodeObject *type_code = cxxpython::compile_exec_input(
+        runtime,
+        "type_value = f'{int}'\n"
+        "format_value = format(int)\n",
+        "script.py");
+    ASSERT_NE(type_code, nullptr);
+    EXPECT_EQ(vm.execute(*type_code, *globals), runtime.none());
+    auto *type_value = dynamic_cast<cxxpython::StrObject *>(globals->get(runtime.new_str("type_value")));
+    ASSERT_NE(type_value, nullptr);
+    EXPECT_EQ(type_value->value, "<class 'int'>");
+    auto *format_value = dynamic_cast<cxxpython::StrObject *>(globals->get(runtime.new_str("format_value")));
+    ASSERT_NE(format_value, nullptr);
+    EXPECT_EQ(format_value->value, "<class 'int'>");
 }
 
 TEST(Compile, CompilesAndExecutesFStringConversionsAndFormatSpec)

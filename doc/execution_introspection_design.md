@@ -172,6 +172,10 @@ Current substrate:
 - Allocation records GC pressure and requests automatic collection once the
   configured threshold is reached.  The VM services that request only at
   instruction safe points, where frames and operand stacks are visible as roots.
+- Automatic GC now coordinates a stop-the-world safe-point: the collecting
+  thread requests a stop, other active VM threads park at opcode boundaries,
+  and blocked `_thread.lock.acquire()` calls mark their thread state as parked
+  while waiting.
 - `list` and `dict` have object-local structural locks.  Their public snapshot
   accessors no longer expose internal vector references to mutating callers.
 - Import has a runtime-local import lock around module lookup, discovery,
@@ -186,8 +190,8 @@ Future true parallelism:
   module dictionaries, and type dictionaries.
 - Refine import synchronization from the current coarse import-subsystem lock
   to per-module locks and explicit in-progress module state.
-- Extend GC from all-thread-state root discovery and safe-point-triggered
-  collection to a real mutator coordination protocol.
+- Extend GC from the current safe-point stop-the-world protocol toward cleaner
+  parked-native-call guards and, later, generational or concurrent strategies.
 - Specify extension API thread-safety rules before exposing a stable C/C++ ABI
   for free-threaded extensions.
 - Multiple interpreters can arrive before fully shared-heap parallelism if

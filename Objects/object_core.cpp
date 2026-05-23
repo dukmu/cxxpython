@@ -1237,6 +1237,32 @@ namespace cxxpython
         raise_type_error(object->runtime(), message.str());
     }
 
+    Object *object_format(Object *object, StrObject *format_spec)
+    {
+        if (!object || !format_spec)
+            raise_type_error(object ? object->runtime() : (format_spec ? format_spec->runtime() : nullptr),
+                             "format value and spec cannot be null");
+        Runtime *runtime = object->runtime();
+        auto object_root = runtime->root(object);
+        auto spec_root = runtime->root(format_spec);
+        StrObject *name = runtime->new_str("__format__");
+        auto name_root = runtime->root(name);
+        Object *method = type_lookup_attribute(object_root->type(), name_root.get());
+        if (!method)
+        {
+            std::ostringstream message;
+            message << "'" << type_qualified_name(object_root->type())
+                    << "' object has no __format__ method";
+            raise_type_error(runtime, message.str());
+        }
+        auto method_root = runtime->root(method);
+        Object *formatted = object_call(method_root.get(), {object_root.get(), spec_root.get()});
+        auto formatted_root = runtime->root(formatted);
+        if (!dynamic_cast<StrObject *>(formatted_root.get()))
+            raise_type_error(runtime, "__format__ must return str");
+        return formatted_root.get();
+    }
+
     Object *object_iter(Object *object)
     {
         if (!object)
