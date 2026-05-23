@@ -1,5 +1,55 @@
 # Development Status
 
+## 2026-05-23 Import Registry Synchronization Slice
+
+Review focus:
+
+- Continue the free-threaded runtime work by protecting import registry
+  mutations without introducing a process-wide bytecode execution lock.
+- Avoid exposing references to runtime-owned vectors while another thread may
+  mutate search path or argv state.
+
+Completed:
+
+- Added a runtime-local import mutex around `Runtime::import_module()`,
+  covering cache lookup, module discovery, circular-import registration,
+  module execution, final registry insertion, and failure cleanup.
+- Protected `Runtime::new_module()` registry insertion under the same import
+  mutex.
+- Changed `Runtime::module_search_paths()` and
+  `Runtime::program_arguments()` to return snapshots.
+- Updated native `sys` initialization helpers to build `sys.path` and
+  `sys.argv` from one coherent snapshot each.
+- Added C++ coverage that concurrent imports of the same source module share
+  the same `sys.modules` entry.
+
+Design notes:
+
+- This is an import-subsystem lock, not a global VM lock.  Two OS threads can
+  still execute bytecode concurrently outside import.
+- Holding the import lock during source module execution preserves the current
+  circular-import behavior and prevents duplicate module objects for one
+  import name.  A later CPython-shaped refinement can replace this with
+  per-module import locks and explicit in-progress module state.
+- `sys.modules` remains the public module dictionary, so script-level direct
+  mutation is still possible.  The dict itself is structurally locked, while
+  import machinery now has a coherent critical section for its own multi-step
+  operations.
+
+Known debt and next risk:
+
+- Import locking is coarse.  Per-module locks and waiting state are the next
+  scalability step.
+- Extension-module initialization still needs documented free-threaded ABI
+  rules.
+- GC still needs mutator coordination before automatic collection is safe
+  under arbitrary concurrent object graph mutation.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/test_core_objects --gtest_filter='Module.ConcurrentImportsShareSingleModuleRegistryEntry:Module.ImportsPythonModulesThroughRuntimeRegistry:Module.ImportsPackagesAndDottedSubmodules'`
+
 ## 2026-05-23 Automatic GC Safe-Point Slice
 
 Review focus:

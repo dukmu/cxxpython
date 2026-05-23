@@ -150,9 +150,9 @@ namespace cxxpython
         ModuleObject *builtins_module() const noexcept;
         DictObject *builtins_dict() const noexcept;
         DictObject *modules_dict() const noexcept;
-        const std::vector<std::string> &module_search_paths() const noexcept;
+        std::vector<std::string> module_search_paths() const;
         void add_module_search_path(std::string path);
-        const std::vector<std::string> &program_arguments() const noexcept;
+        std::vector<std::string> program_arguments() const;
         void set_program_arguments(std::vector<std::string> args);
         std::size_t collect_garbage();
         std::size_t collect_garbage_if_requested();
@@ -420,6 +420,8 @@ namespace cxxpython
         mutable std::recursive_mutex roots_mutex_;
         mutable std::recursive_mutex thread_states_mutex_;
         mutable std::recursive_mutex gc_mutex_;
+        mutable std::recursive_mutex import_mutex_;
+        mutable std::recursive_mutex runtime_state_mutex_;
         std::vector<ThreadState *> thread_states_;
         std::atomic_bool gc_enabled_{true};
         std::atomic_bool gc_requested_{false};

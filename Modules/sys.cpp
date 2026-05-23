@@ -84,9 +84,10 @@ namespace cxxpython
         {
             require_no_keywords(&runtime, "argv", args);
             require_positional_count(&runtime, "argv", args, 0);
+            std::vector<std::string> arguments = runtime.program_arguments();
             std::vector<Object *> argv;
-            argv.reserve(runtime.program_arguments().size());
-            for (const std::string &arg : runtime.program_arguments())
+            argv.reserve(arguments.size());
+            for (const std::string &arg : arguments)
                 argv.push_back(runtime.new_str(arg));
             return runtime.new_list(std::move(argv));
         }
@@ -95,9 +96,10 @@ namespace cxxpython
         {
             require_no_keywords(&runtime, "path", args);
             require_positional_count(&runtime, "path", args, 0);
+            std::vector<std::string> search_paths = runtime.module_search_paths();
             std::vector<Object *> path;
-            path.reserve(runtime.module_search_paths().size());
-            for (const std::string &entry : runtime.module_search_paths())
+            path.reserve(search_paths.size());
+            for (const std::string &entry : search_paths)
                 path.push_back(runtime.new_str(entry));
             return runtime.new_list(std::move(path));
         }

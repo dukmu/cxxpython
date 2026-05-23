@@ -171,12 +171,18 @@ Current substrate:
   instruction safe points, where frames and operand stacks are visible as roots.
 - `list` and `dict` have object-local structural locks.  Their public snapshot
   accessors no longer expose internal vector references to mutating callers.
+- Import has a runtime-local import lock around module lookup, discovery,
+  execution, `sys.modules` registration, and failure cleanup.  This is a
+  subsystem lock, not a bytecode execution lock.
+- `sys.path` and `sys.argv` are produced from runtime snapshots rather than
+  references into runtime-owned vectors.
 
 Future true parallelism:
 
 - Finish per-object synchronization for `dict`, `list`, instance dictionaries,
   module dictionaries, and type dictionaries.
-- Make imports and `sys.modules` coherent under concurrent import.
+- Refine import synchronization from the current coarse import-subsystem lock
+  to per-module locks and explicit in-progress module state.
 - Extend GC from all-thread-state root discovery and safe-point-triggered
   collection to a real mutator coordination protocol.
 - Specify extension API thread-safety rules before exposing a stable C/C++ ABI

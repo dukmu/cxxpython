@@ -219,6 +219,7 @@ namespace cxxpython
 
     ModuleObject *Runtime::import_module(std::string name)
     {
+        std::scoped_lock import_lock(import_mutex_);
         if (!modules_)
             raise_import_error(this, "module registry is not initialized");
         if (!is_supported_module_name(name))

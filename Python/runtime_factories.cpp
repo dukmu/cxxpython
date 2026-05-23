@@ -220,7 +220,10 @@ namespace cxxpython
             dict->set(new_str("__builtins__"), builtins_module_);
         ModuleObject *module = allocate<ModuleObject>(module_type_, name, std::move(filename), dict);
         if (modules_)
+        {
+            std::scoped_lock lock(import_mutex_);
             modules_->set(new_str(name), module);
+        }
         return module;
     }
 

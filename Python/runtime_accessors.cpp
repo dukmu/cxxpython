@@ -337,23 +337,27 @@ namespace cxxpython
         return modules_;
     }
 
-    const std::vector<std::string> &Runtime::module_search_paths() const noexcept
+    std::vector<std::string> Runtime::module_search_paths() const
     {
+        std::scoped_lock lock(import_mutex_);
         return module_search_paths_;
     }
 
     void Runtime::add_module_search_path(std::string path)
     {
+        std::scoped_lock lock(import_mutex_);
         module_search_paths_.insert(module_search_paths_.begin(), std::move(path));
     }
 
-    const std::vector<std::string> &Runtime::program_arguments() const noexcept
+    std::vector<std::string> Runtime::program_arguments() const
     {
+        std::scoped_lock lock(runtime_state_mutex_);
         return program_arguments_;
     }
 
     void Runtime::set_program_arguments(std::vector<std::string> args)
     {
+        std::scoped_lock lock(runtime_state_mutex_);
         program_arguments_ = std::move(args);
     }
 

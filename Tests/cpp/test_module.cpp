@@ -1,8 +1,11 @@
 #include <gtest/gtest.h>
 
 #include <csignal>
+#include <array>
+#include <exception>
 #include <filesystem>
 #include <fstream>
+#include <thread>
 
 #include "cxxpython/compiler.hpp"
 #include "cxxpython/vm.hpp"
@@ -172,6 +175,59 @@ TEST(Module, ImportsPythonModulesThroughRuntimeRegistry)
     EXPECT_EQ(module->dict()->get(runtime.new_str("has_location")), runtime.true_value());
     EXPECT_EQ(package->value, "");
     EXPECT_EQ(runtime.import_module("cxxpython_import_runtime_module"), module);
+
+    std::filesystem::remove(module_path);
+}
+
+TEST(Module, ConcurrentImportsShareSingleModuleRegistryEntry)
+{
+    cxxpython::Runtime runtime;
+    const std::filesystem::path directory = std::filesystem::temp_directory_path();
+    const std::filesystem::path module_path = directory / "cxxpython_concurrent_import_module.py";
+    {
+        std::ofstream file(module_path, std::ios::binary);
+        file << "value = 'loaded:' + __name__\n";
+    }
+
+    runtime.add_module_search_path(directory.string());
+
+    std::array<cxxpython::ModuleObject *, 2> modules{nullptr, nullptr};
+    std::array<std::exception_ptr, 2> errors{};
+    std::thread first([&] {
+        try
+        {
+            modules[0] = runtime.import_module("cxxpython_concurrent_import_module");
+        }
+        catch (...)
+        {
+            errors[0] = std::current_exception();
+        }
+    });
+    std::thread second([&] {
+        try
+        {
+            modules[1] = runtime.import_module("cxxpython_concurrent_import_module");
+        }
+        catch (...)
+        {
+            errors[1] = std::current_exception();
+        }
+    });
+
+    first.join();
+    second.join();
+    if (errors[0])
+        std::rethrow_exception(errors[0]);
+    if (errors[1])
+        std::rethrow_exception(errors[1]);
+
+    ASSERT_NE(modules[0], nullptr);
+    EXPECT_EQ(modules[0], modules[1]);
+    EXPECT_EQ(runtime.modules_dict()->get(runtime.new_str("cxxpython_concurrent_import_module")), modules[0]);
+
+    auto *value = dynamic_cast<cxxpython::StrObject *>(modules[0]->dict()->get(runtime.new_str("value")));
+    ASSERT_NE(value, nullptr);
+    EXPECT_EQ(value->value, "loaded:cxxpython_concurrent_import_module");
 
     std::filesystem::remove(module_path);
 }
