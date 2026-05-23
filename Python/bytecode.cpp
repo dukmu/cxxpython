@@ -168,6 +168,32 @@ namespace cxxpython
                     visitor(freevar);
             }
         }
+
+        Object *code_lines_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (!args.empty())
+                raise_type_error(&runtime, "code.co_lines() takes no arguments");
+            CodeObject *code = require_code_instance(runtime, self, "co_lines");
+            std::vector<Object *> entries;
+            entries.reserve(code->instructions().size());
+            std::vector<Rooted<Object>> roots;
+            roots.reserve(code->instructions().size() * 4);
+            for (std::size_t index = 0; index < code->instructions().size(); ++index)
+            {
+                Object *start = runtime.new_int(static_cast<std::int64_t>(index));
+                Object *end = runtime.new_int(static_cast<std::int64_t>(index + 1));
+                Object *line = runtime.new_int(static_cast<std::int64_t>(code->line_for_instruction(index)));
+                roots.push_back(runtime.root(start));
+                roots.push_back(runtime.root(end));
+                roots.push_back(runtime.root(line));
+                Object *entry = runtime.new_tuple({start, end, line});
+                roots.push_back(runtime.root(entry));
+                entries.push_back(entry);
+            }
+            Object *lines = runtime.new_list(std::move(entries));
+            auto lines_root = runtime.root(lines);
+            return object_iter(lines_root.get());
+        }
     }
 
     void initialize_code_type_descriptors(Runtime &runtime, TypeObject *type)
@@ -237,6 +263,16 @@ namespace cxxpython
                                                       type,
                                                       code_firstlineno_getter,
                                                       nullptr));
+    }
+
+    void initialize_code_type_methods(Runtime &runtime, TypeObject *type)
+    {
+        type->dict->set(runtime.new_str("co_lines"),
+                        runtime.new_method_descriptor("co_lines",
+                                                      type,
+                                                      code_lines_method,
+                                                      "Return an iterator over bytecode offset and source line ranges.",
+                                                      "($self, /)"));
     }
 
     CodeObject::CodeObject(TypeObject *type,

@@ -19,6 +19,7 @@ namespace cxxpython
     void initialize_str_type_methods(Runtime &runtime, TypeObject *type);
     void initialize_list_type_methods(Runtime &runtime, TypeObject *type);
     void initialize_slice_type_methods(Runtime &runtime, TypeObject *type);
+    void initialize_code_type_methods(Runtime &runtime, TypeObject *type);
     void initialize_property_type_methods(Runtime &runtime, TypeObject *type);
 
     void add_slot_wrapper(TypeObject *type,

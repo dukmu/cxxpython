@@ -44,6 +44,39 @@ Verification:
 - `build/cxxpython Tests/python/stdlib_modules.py`
 - `ctest --test-dir build --output-on-failure`
 
+## 2026-05-23 Code Line Table API Slice
+
+Review focus:
+
+- Advance `dis`/`pdb` substrate through a real CPython code-object API rather
+  than an incompatible `_opcode` facade.
+
+Completed:
+
+- Added `code.co_lines()` as a method descriptor on code objects.
+- `co_lines()` returns an iterator of `(start, end, line)` tuples over the
+  current instruction line table.
+- Added Python golden coverage for `co_lines()` and stdlib introspection of
+  its docstring/signature.
+
+Design notes:
+
+- CPython's `co_lines()` reports bytecode offset ranges.  cxxpython currently
+  reports instruction-index ranges because its bytecode is not a
+  CPython-compatible byte stream.  This keeps the API shape useful for
+  traceback/disassembly preparation without pretending opcode numeric
+  compatibility.
+- `_opcode` remains intentionally absent until the project either aligns
+  opcode numbers with CPython or exposes a clearly private cxxpython
+  instruction view.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/cxxpython Tests/python/code_object_lines.py`
+- `build/cxxpython Tests/python/stdlib_modules.py`
+- `ctest --test-dir build --output-on-failure`
+
 ## 2026-05-23 Traceback And Tokenizer Exposure Slice
 
 Review focus:

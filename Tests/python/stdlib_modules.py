@@ -79,6 +79,8 @@ print(frame.f_code.co_stacksize >= 1)
 print(type(frame.f_code.co_consts))
 print(type(frame.f_code.co_names))
 print(type(frame.f_code.co_varnames))
+print(inspect.signature(type(frame.f_code).co_lines))
+print(inspect.getdoc(type(frame.f_code).co_lines).__contains__('source line'))
 
 def function_metadata():
     return 'ok'

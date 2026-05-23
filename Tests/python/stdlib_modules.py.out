@@ -62,6 +62,8 @@ True
 <class 'tuple'>
 <class 'tuple'>
 <class 'tuple'>
+($self, /)
+True
 function_metadata
 function_metadata
 __main__

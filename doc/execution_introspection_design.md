@@ -10,7 +10,7 @@ modules own public policy.
 Current state:
 
 - `CodeObject` exposes basic metadata (`co_name`, `co_filename`, arg counts,
-  names, varnames, constants, stack size, and first line).
+  names, varnames, constants, stack size, first line, and `co_lines()`).
 - `Frame` exposes `f_code`, `f_locals`, `f_globals`, `f_builtins`,
   `f_lasti`, and `f_lineno`.
 - `BaseException.__traceback__` is a script-visible list of
@@ -28,6 +28,10 @@ Target shape:
   thread-state, not as process-global ad hoc storage.
 - Preserve line-table data in `CodeObject` so `pdb`, traceback, and `dis`
   share the same instruction-to-source mapping.
+- `co_lines()` currently reports instruction-index ranges rather than CPython
+  byte offsets because cxxpython bytecode is not yet a CPython-compatible
+  byte stream.  Keep this explicitly documented until a public bytecode format
+  decision is made.
 
 ## Lexer, Parser, And Script Exposure
 
@@ -76,6 +80,10 @@ Required substrate before `Lib/dis.py`:
   its numeric opcode table is intentionally aligned with CPython.  CPython has
   `_opcode`, but a same-name module with incompatible opcode numbers is worse
   than an absent module.
+- `code.co_lines()` is now the first public line-table API for this path; the
+  next acceptable step is a clearly named instruction iterator on code objects
+  or a CPython-compatible opcode table, not an `_opcode` module over private
+  enum values.
 
 Acceptance tests:
 
