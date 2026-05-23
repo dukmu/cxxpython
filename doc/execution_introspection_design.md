@@ -166,14 +166,19 @@ Current substrate:
   active VM.
 - `ThreadState` protects its frame stack, handled-exception stack, and trace
   state with a local mutex.
+- Allocation records GC pressure and requests automatic collection once the
+  configured threshold is reached.  The VM services that request only at
+  instruction safe points, where frames and operand stacks are visible as roots.
+- `list` and `dict` have object-local structural locks.  Their public snapshot
+  accessors no longer expose internal vector references to mutating callers.
 
 Future true parallelism:
 
 - Finish per-object synchronization for `dict`, `list`, instance dictionaries,
   module dictionaries, and type dictionaries.
 - Make imports and `sys.modules` coherent under concurrent import.
-- Extend GC from all-thread-state root discovery to a real mutator
-  coordination protocol.
+- Extend GC from all-thread-state root discovery and safe-point-triggered
+  collection to a real mutator coordination protocol.
 - Specify extension API thread-safety rules before exposing a stable C/C++ ABI
   for free-threaded extensions.
 - Multiple interpreters can arrive before fully shared-heap parallelism if

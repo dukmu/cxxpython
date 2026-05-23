@@ -25,10 +25,34 @@ namespace cxxpython
             require_no_keywords(&runtime, "get_count", args);
             require_positional_count(&runtime, "get_count", args, 0);
             return runtime.new_tuple({
-                runtime.new_int(static_cast<std::int64_t>(runtime.heap_size())),
+                runtime.new_int(static_cast<std::int64_t>(runtime.garbage_collection_count())),
                 runtime.new_int(static_cast<std::int64_t>(runtime.root_count())),
                 runtime.new_int(0),
             });
+        }
+
+        Object *gc_get_threshold(Runtime &runtime, const CallArguments &args)
+        {
+            require_no_keywords(&runtime, "get_threshold", args);
+            require_positional_count(&runtime, "get_threshold", args, 0);
+            return runtime.new_tuple({
+                runtime.new_int(static_cast<std::int64_t>(runtime.garbage_collection_threshold())),
+                runtime.new_int(0),
+                runtime.new_int(0),
+            });
+        }
+
+        Object *gc_set_threshold(Runtime &runtime, const CallArguments &args)
+        {
+            require_no_keywords(&runtime, "set_threshold", args);
+            require_positional_range(&runtime, "set_threshold", args, 1, 3);
+            auto *threshold = dynamic_cast<IntObject *>(args.positional[0]);
+            if (!threshold)
+                raise_type_error(&runtime, "set_threshold() threshold0 must be int");
+            if (threshold->value < 0)
+                raise_value_error(&runtime, "threshold must be non-negative");
+            runtime.set_garbage_collection_threshold(static_cast<std::size_t>(threshold->value));
+            return runtime.none();
         }
 
         Object *gc_get_objects(Runtime &runtime, const CallArguments &args)
@@ -47,13 +71,14 @@ namespace cxxpython
         {
             require_no_keywords(&runtime, "isenabled", args);
             require_positional_count(&runtime, "isenabled", args, 0);
-            return runtime.true_value();
+            return runtime.garbage_collection_enabled() ? runtime.true_value() : runtime.false_value();
         }
 
         Object *gc_enable(Runtime &runtime, const CallArguments &args)
         {
             require_no_keywords(&runtime, "enable", args);
             require_positional_count(&runtime, "enable", args, 0);
+            runtime.enable_garbage_collection();
             return runtime.none();
         }
 
@@ -61,6 +86,7 @@ namespace cxxpython
         {
             require_no_keywords(&runtime, "disable", args);
             require_positional_count(&runtime, "disable", args, 0);
+            runtime.disable_garbage_collection();
             return runtime.none();
         }
 
@@ -82,6 +108,18 @@ namespace cxxpython
                 gc_get_objects,
                 "Return objects tracked by the collector.",
                 "($module, /)",
+            },
+            {
+                "get_threshold",
+                gc_get_threshold,
+                "Return the automatic collection thresholds.",
+                "($module, /)",
+            },
+            {
+                "set_threshold",
+                gc_set_threshold,
+                "Set the automatic collection threshold.",
+                "($module, threshold0, threshold1=0, threshold2=0, /)",
             },
             {
                 "isenabled",

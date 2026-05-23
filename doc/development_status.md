@@ -1,5 +1,49 @@
 # Development Status
 
+## 2026-05-23 Automatic GC Safe-Point Slice
+
+Review focus:
+
+- Add automatic GC without collecting during raw allocation, where newly
+  created objects may not yet be on a VM stack or in a root guard.
+- Keep collection at VM safe points so frame stacks, handled exceptions, and
+  operand stacks are visible as roots.
+
+Completed:
+
+- Added runtime allocation counting and an automatic collection request flag.
+- Added `Runtime::collect_garbage_if_requested()` and invoked it at the VM
+  instruction safe point before dispatching the next opcode.
+- Added `gc.enable()`, `gc.disable()`, `gc.isenabled()`,
+  `gc.get_threshold()`, and `gc.set_threshold()` state backed by `Runtime`.
+- Changed `gc.get_count()` to report the allocation counter rather than heap
+  size.
+- Added Python golden coverage for automatic threshold behavior and
+  enable/disable state.
+
+Design notes:
+
+- `allocate()` only records pressure and requests collection.  It deliberately
+  does not run the collector directly.
+- A threshold of zero disables automatic collection requests, matching
+  CPython's high-level behavior for generation 0.
+- The collector still needs a stronger mutator coordination protocol before it
+  is safe under arbitrary live concurrent mutation.
+
+Known debt and next risk:
+
+- Automatic collection currently runs only at VM safe points.  Long-running
+  native loops still need explicit safe-point hooks.
+- `gc` exposes a CPython-shaped three-generation API surface, but the runtime
+  is still a single-generation mark/sweep collector.
+- The next concurrency work should coordinate GC with mutators and tighten
+  import/module registry locking.
+
+Verification:
+
+- `cmake --build build -j2`
+- `build/cxxpython Tests/python/gc_auto.py`
+
 ## 2026-05-23 Mutable Container Synchronization Slice
 
 Review focus:

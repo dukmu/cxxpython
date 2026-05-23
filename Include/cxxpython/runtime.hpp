@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <iosfwd>
 #include <memory>
 #include <mutex>
@@ -154,6 +155,13 @@ namespace cxxpython
         const std::vector<std::string> &program_arguments() const noexcept;
         void set_program_arguments(std::vector<std::string> args);
         std::size_t collect_garbage();
+        std::size_t collect_garbage_if_requested();
+        bool garbage_collection_enabled() const noexcept;
+        void enable_garbage_collection() noexcept;
+        void disable_garbage_collection() noexcept;
+        std::size_t garbage_collection_count() const noexcept;
+        std::size_t garbage_collection_threshold() const noexcept;
+        void set_garbage_collection_threshold(std::size_t threshold) noexcept;
         std::ostream &stdout_stream() const noexcept;
         void set_stdout(std::ostream &stream) noexcept;
         VirtualMachine *active_vm() const noexcept;
@@ -366,6 +374,14 @@ namespace cxxpython
             raw->set_runtime(this);
             std::scoped_lock lock(heap_mutex_);
             heap_.push_back(std::move(object));
+            if (gc_enabled_.load(std::memory_order_relaxed))
+            {
+                const std::size_t count =
+                    allocations_since_gc_.fetch_add(1, std::memory_order_relaxed) + 1;
+                const std::size_t threshold = gc_threshold_.load(std::memory_order_relaxed);
+                if (threshold != 0 && count >= threshold)
+                    gc_requested_.store(true, std::memory_order_relaxed);
+            }
             return raw;
         }
 
@@ -403,7 +419,12 @@ namespace cxxpython
         mutable std::recursive_mutex heap_mutex_;
         mutable std::recursive_mutex roots_mutex_;
         mutable std::recursive_mutex thread_states_mutex_;
+        mutable std::recursive_mutex gc_mutex_;
         std::vector<ThreadState *> thread_states_;
+        std::atomic_bool gc_enabled_{true};
+        std::atomic_bool gc_requested_{false};
+        std::atomic_size_t allocations_since_gc_{0};
+        std::atomic_size_t gc_threshold_{1024};
 
         TypeObject *object_type_ = nullptr;
         TypeObject *type_type_ = nullptr;

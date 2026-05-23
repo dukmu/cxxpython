@@ -848,6 +848,7 @@ namespace cxxpython
         std::uint32_t last_traced_line = 0;
         while (frame->instruction_pointer() < code.instructions().size())
         {
+            (void)runtime_.collect_garbage_if_requested();
             const Instruction instruction = code.instructions()[frame->instruction_pointer()];
             frame->advance();
             try

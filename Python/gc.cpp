@@ -9,6 +9,7 @@ namespace cxxpython
 {
     std::size_t Runtime::collect_garbage()
     {
+        std::scoped_lock collection_lock(gc_mutex_);
         std::unordered_set<Object *> marked;
         std::vector<Object *> worklist;
 
@@ -49,6 +50,54 @@ namespace cxxpython
                                        return !object || marked.find(object.get()) == marked.end();
                                    }),
                     heap_.end());
-        return before - heap_.size();
+        const std::size_t collected = before - heap_.size();
+        allocations_since_gc_.store(0, std::memory_order_relaxed);
+        gc_requested_.store(false, std::memory_order_relaxed);
+        return collected;
+    }
+
+    std::size_t Runtime::collect_garbage_if_requested()
+    {
+        if (!gc_enabled_.load(std::memory_order_relaxed) ||
+            !gc_requested_.load(std::memory_order_relaxed))
+        {
+            return 0;
+        }
+        return collect_garbage();
+    }
+
+    bool Runtime::garbage_collection_enabled() const noexcept
+    {
+        return gc_enabled_.load(std::memory_order_relaxed);
+    }
+
+    void Runtime::enable_garbage_collection() noexcept
+    {
+        gc_enabled_.store(true, std::memory_order_relaxed);
+    }
+
+    void Runtime::disable_garbage_collection() noexcept
+    {
+        gc_enabled_.store(false, std::memory_order_relaxed);
+    }
+
+    std::size_t Runtime::garbage_collection_count() const noexcept
+    {
+        return allocations_since_gc_.load(std::memory_order_relaxed);
+    }
+
+    std::size_t Runtime::garbage_collection_threshold() const noexcept
+    {
+        return gc_threshold_.load(std::memory_order_relaxed);
+    }
+
+    void Runtime::set_garbage_collection_threshold(std::size_t threshold) noexcept
+    {
+        gc_threshold_.store(threshold, std::memory_order_relaxed);
+        if (threshold != 0 &&
+            allocations_since_gc_.load(std::memory_order_relaxed) >= threshold)
+        {
+            gc_requested_.store(true, std::memory_order_relaxed);
+        }
     }
 }
