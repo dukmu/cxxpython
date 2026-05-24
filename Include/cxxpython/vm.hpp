@@ -132,13 +132,17 @@ namespace cxxpython
         void leave_tracing() noexcept;
         bool at_gc_safepoint() const noexcept;
         void set_gc_safepoint(bool at_safepoint) noexcept;
+        void add_temporary_root(Object *object);
+        void remove_temporary_root(Object *object);
         void visit_frames(const VisitChildren &visitor) const;
+        void visit_temporary_roots(const VisitChildren &visitor) const;
 
     private:
         InterpreterState &interpreter_;
         mutable std::recursive_mutex mutex_;
         std::vector<Frame *> frames_;
         std::vector<ExceptionObject *> handled_exceptions_;
+        std::vector<Object *> temporary_roots_;
         Object *trace_function_ = nullptr;
         std::size_t trace_depth_ = 0;
         bool at_gc_safepoint_ = false;

@@ -48,6 +48,55 @@ Verification:
 - `./build/cxxpython Tests/python/for_break_continue_else.py`
 - `./build/cxxpython Tests/python/for_break_continue_finally.py`
 - `./build/cxxpython Tests/python/nested_loop_break_definition.py`
+
+
+## 2026-05-24 Thread Local Root Pressure Slice
+
+Review focus:
+
+- Reduce the hottest global lock in multithreaded CPU-bound execution.
+- Keep GC-visible temporary roots without forcing every `Rooted<T>` to hit a
+  process-wide mutex.
+- Preserve `_thread.start_new_thread()` behavior while lowering interpreter
+  contention.
+
+Completed:
+
+- Moved temporary `Rooted<T>` tracking onto the active `ThreadState` when a VM
+  is present.
+- Kept the existing global root set for explicit cross-thread retention and
+  bootstrap roots.
+- Extended GC marking to visit thread-local temporary roots.
+- Kept `_thread.start_new_thread()` on explicit global roots because those
+  objects are retained by one thread and released by another.
+- Added a thread-pressure golden that exercises many temporary allocations on a
+  worker thread.
+
+Design notes:
+
+- Temporary roots are an execution concern, not a global runtime concern.
+- GC must still see them, but hot-path object formatting, construction, and
+  tracing should not serialize on the same mutex as cross-thread retention.
+- The next round should measure whether the remaining contention is in `heap`
+  allocation, GC safepoints, or object-level locks.
+
+Known debt and next risk:
+
+- The runtime still uses a single heap mutex, so allocation contention may be
+  the next limiter after root contention is reduced.
+- GC safepoint coordination is still global and may dominate under frequent
+  collection.
+- Object-level locks are still necessary for mutable containers and should be
+  revisited separately from interpreter roots.
+
+Verification:
+
+- `cmake --build build -j2`
+- `./build/cxxpython Tests/python/thread_lowlevel.py`
+- `./build/cxxpython Tests/python/threading_module.py`
+- `./build/cxxpython Tests/python/thread_root_pressure.py`
+- `./build/test_core_objects --gtest_filter='PythonScripts.RunsGoldenFiles'`
+- `./build/cxxpython build/test2.py multi 10000`
 - Pending: rerun after `sys.exit()` addition.
 - Pending: rerun after `int(float)` addition.
 - Pending: rerun after `float.__format__()` addition.

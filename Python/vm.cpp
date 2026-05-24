@@ -773,6 +773,24 @@ namespace cxxpython
         interpreter_.runtime().notify_gc_safepoint_change();
     }
 
+    void ThreadState::add_temporary_root(Object *object)
+    {
+        if (!object)
+            return;
+        std::scoped_lock lock(mutex_);
+        temporary_roots_.push_back(object);
+    }
+
+    void ThreadState::remove_temporary_root(Object *object)
+    {
+        if (!object)
+            return;
+        std::scoped_lock lock(mutex_);
+        const auto found = std::find(temporary_roots_.begin(), temporary_roots_.end(), object);
+        if (found != temporary_roots_.end())
+            temporary_roots_.erase(found);
+    }
+
     void ThreadState::visit_frames(const VisitChildren &visitor) const
     {
         std::scoped_lock lock(mutex_);
@@ -788,6 +806,16 @@ namespace cxxpython
         }
         if (trace_function_)
             visitor(trace_function_);
+    }
+
+    void ThreadState::visit_temporary_roots(const VisitChildren &visitor) const
+    {
+        std::scoped_lock lock(mutex_);
+        for (Object *object : temporary_roots_)
+        {
+            if (object)
+                visitor(object);
+        }
     }
 
     VirtualMachine::VirtualMachine(Runtime &runtime)

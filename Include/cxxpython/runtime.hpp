@@ -362,6 +362,8 @@ namespace cxxpython
 
         void add_root(Object *object);
         void remove_root(Object *object);
+        bool add_temporary_root(Object *object);
+        void remove_temporary_root(Object *object, bool is_thread_local);
         template <class T>
         Rooted<T> root(T *object);
         void visit_roots(const std::function<void(Object *)> &visitor) const;
@@ -528,7 +530,7 @@ namespace cxxpython
             : runtime_(&runtime), object_(object)
         {
             static_assert(std::is_base_of_v<Object, T>);
-            runtime_->add_root(object_);
+            thread_local_root_ = runtime_->add_temporary_root(object_);
         }
 
         ~Rooted()
@@ -540,10 +542,11 @@ namespace cxxpython
         Rooted &operator=(const Rooted &) = delete;
 
         Rooted(Rooted &&other) noexcept
-            : runtime_(other.runtime_), object_(other.object_)
+            : runtime_(other.runtime_), object_(other.object_), thread_local_root_(other.thread_local_root_)
         {
             other.runtime_ = nullptr;
             other.object_ = nullptr;
+            other.thread_local_root_ = false;
         }
 
         Rooted &operator=(Rooted &&other) noexcept
@@ -553,8 +556,10 @@ namespace cxxpython
                 reset();
                 runtime_ = other.runtime_;
                 object_ = other.object_;
+                thread_local_root_ = other.thread_local_root_;
                 other.runtime_ = nullptr;
                 other.object_ = nullptr;
+                other.thread_local_root_ = false;
             }
             return *this;
         }
@@ -582,14 +587,16 @@ namespace cxxpython
         void reset() noexcept
         {
             if (runtime_ && object_)
-                runtime_->remove_root(object_);
+                runtime_->remove_temporary_root(object_, thread_local_root_);
             runtime_ = nullptr;
             object_ = nullptr;
+            thread_local_root_ = false;
         }
 
     private:
         Runtime *runtime_;
         T *object_;
+        bool thread_local_root_ = false;
     };
 
     template <class T>

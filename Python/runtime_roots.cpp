@@ -1,4 +1,5 @@
 #include "cxxpython/runtime.hpp"
+#include "cxxpython/vm.hpp"
 
 #include <algorithm>
 #include <sstream>
@@ -19,6 +20,32 @@ namespace cxxpython
         const auto found = std::find(roots_.begin(), roots_.end(), object);
         if (found != roots_.end())
             roots_.erase(found);
+    }
+
+    bool Runtime::add_temporary_root(Object *object)
+    {
+        if (!object)
+            return false;
+        if (VirtualMachine *vm = active_vm())
+        {
+            vm->thread_state().add_temporary_root(object);
+            return true;
+        }
+        add_root(object);
+        return false;
+    }
+
+    void Runtime::remove_temporary_root(Object *object, bool is_thread_local)
+    {
+        if (!object)
+            return;
+        if (is_thread_local)
+        {
+            if (VirtualMachine *vm = active_vm())
+                vm->thread_state().remove_temporary_root(object);
+            return;
+        }
+        remove_root(object);
     }
 
     void Runtime::visit_roots(const std::function<void(Object *)> &visitor) const

@@ -30,6 +30,7 @@ namespace cxxpython
         visit_roots(enqueue);
         visit_thread_states([&enqueue](ThreadState &thread) {
             thread.visit_frames(enqueue);
+            thread.visit_temporary_roots(enqueue);
         });
 
         while (!worklist.empty())
