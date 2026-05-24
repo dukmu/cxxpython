@@ -91,6 +91,7 @@ namespace cxxpython
         TypeObject *type_type() const noexcept;
         TypeObject *none_type() const noexcept;
         TypeObject *not_implemented_type() const noexcept;
+        TypeObject *float_type() const noexcept;
         TypeObject *int_type() const noexcept;
         TypeObject *bool_type() const noexcept;
         TypeObject *str_type() const noexcept;
@@ -170,6 +171,7 @@ namespace cxxpython
         std::string active_module_name(std::string fallback = "builtins");
 
         IntObject *new_int(std::int64_t value);
+        FloatObject *new_float(double value);
         StrObject *new_str(std::string value);
         BytesObject *new_bytes(std::string value);
         ListObject *new_list(std::vector<Object *> items);
@@ -440,6 +442,7 @@ namespace cxxpython
         TypeObject *type_type_ = nullptr;
         TypeObject *none_type_ = nullptr;
         TypeObject *not_implemented_type_ = nullptr;
+        TypeObject *float_type_ = nullptr;
         TypeObject *int_type_ = nullptr;
         TypeObject *bool_type_ = nullptr;
         TypeObject *str_type_ = nullptr;
@@ -495,6 +498,7 @@ namespace cxxpython
 
         NoneObject *none_ = nullptr;
         NotImplementedObject *not_implemented_ = nullptr;
+        FloatObject *float_ = nullptr;
         BoolObject *true_ = nullptr;
         BoolObject *false_ = nullptr;
         TextIOObject *stdin_object_ = nullptr;

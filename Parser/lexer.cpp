@@ -180,14 +180,14 @@ namespace cxxpython::compiler_internal
                     if (indentation > current)
                     {
                         indent_stack.push_back(indentation);
-                        tokens.push_back(Token{TokenKind::Indent, "", 0, indent_line, indent_column});
+                        tokens.push_back(Token(TokenKind::Indent, "", 0, indent_line, indent_column));
                     }
                     else if (indentation < current)
                     {
                         while (indent_stack.size() > 1 && indentation < indent_stack.back())
                         {
                             indent_stack.pop_back();
-                            tokens.push_back(Token{TokenKind::Dedent, "", 0, indent_line, indent_column});
+                            tokens.push_back(Token(TokenKind::Dedent, "", 0, indent_line, indent_column));
                         }
                         if (indentation != indent_stack.back())
                             raise_at(runtime, filename, indent_line, indent_column, "unindent does not match any outer indentation level");
@@ -213,7 +213,7 @@ namespace cxxpython::compiler_internal
             if (ch == '\n')
             {
                 if (nesting == 0)
-                    tokens.push_back(Token{TokenKind::Newline, "\n", 0, line, column});
+                    tokens.push_back(Token(TokenKind::Newline, "\n", 0, line, column));
                 advance_one();
                 at_line_start = true;
                 continue;
@@ -224,7 +224,7 @@ namespace cxxpython::compiler_internal
                 if (index + 1 < source.size() && source[index + 1] == '\n')
                     ++index;
                 if (nesting == 0)
-                    tokens.push_back(Token{TokenKind::Newline, "\n", 0, line, column});
+                    tokens.push_back(Token(TokenKind::Newline, "\n", 0, line, column));
                 advance_one();
                 at_line_start = true;
                 continue;
@@ -234,13 +234,58 @@ namespace cxxpython::compiler_internal
             {
                 const std::size_t start = index;
                 const std::size_t start_column = column;
+                bool seen_dot = false;
+                bool seen_exponent = false;
                 while (index < source.size() && std::isdigit(static_cast<unsigned char>(source[index])) != 0)
                 {
                     ++index;
                     ++column;
                 }
+                if (index < source.size() && source[index] == '.')
+                {
+                    seen_dot = true;
+                    ++index;
+                    ++column;
+                    while (index < source.size() && std::isdigit(static_cast<unsigned char>(source[index])) != 0)
+                    {
+                        ++index;
+                        ++column;
+                    }
+                }
+                if (index < source.size() && (source[index] == 'e' || source[index] == 'E'))
+                {
+                    seen_exponent = true;
+                    ++index;
+                    ++column;
+                    if (index < source.size() && (source[index] == '+' || source[index] == '-'))
+                    {
+                        ++index;
+                        ++column;
+                    }
+                    while (index < source.size() && std::isdigit(static_cast<unsigned char>(source[index])) != 0)
+                    {
+                        ++index;
+                        ++column;
+                    }
+                }
                 const std::string lexeme(source.substr(start, index - start));
-                tokens.push_back(Token{TokenKind::Integer, lexeme, parse_integer(runtime, lexeme), line, start_column});
+                if (seen_dot || seen_exponent)
+                {
+                    tokens.push_back(Token(TokenKind::Float,
+                                           lexeme,
+                                           0,
+                                           line,
+                                           start_column,
+                                           std::stod(lexeme)));
+                }
+                else
+                {
+                    tokens.push_back(Token(TokenKind::Integer,
+                                           lexeme,
+                                           parse_integer(runtime, lexeme),
+                                           line,
+                                           start_column));
+                }
                 continue;
             }
 
@@ -249,11 +294,11 @@ namespace cxxpython::compiler_internal
                 const std::size_t start_line = line;
                 const std::size_t start_column = column;
                 advance_one();
-                tokens.push_back(Token{TokenKind::FString,
+                tokens.push_back(Token(TokenKind::FString,
                                        scan_string(source[index], start_line, start_column),
                                        0,
                                        start_line,
-                                       start_column});
+                                       start_column));
                 continue;
             }
 
@@ -333,7 +378,7 @@ namespace cxxpython::compiler_internal
                     kind = TokenKind::FalseLiteral;
                 else if (lexeme == "None")
                     kind = TokenKind::NoneLiteral;
-                tokens.push_back(Token{kind, lexeme, 0, line, start_column});
+                tokens.push_back(Token(kind, lexeme, 0, line, start_column));
                 continue;
             }
 
@@ -341,7 +386,7 @@ namespace cxxpython::compiler_internal
             {
                 const std::size_t start_line = line;
                 const std::size_t start_column = column;
-                tokens.push_back(Token{TokenKind::String, scan_string(ch, start_line, start_column), 0, start_line, start_column});
+                tokens.push_back(Token(TokenKind::String, scan_string(ch, start_line, start_column), 0, start_line, start_column));
                 continue;
             }
 
@@ -349,13 +394,13 @@ namespace cxxpython::compiler_internal
             {
                 if (index + 1 < source.size() && source[index + 1] == '=')
                 {
-                    tokens.push_back(Token{TokenKind::PlusEqual, "+=", 0, line, column});
+                    tokens.push_back(Token(TokenKind::PlusEqual, "+=", 0, line, column));
                     index += 2;
                     column += 2;
                 }
                 else
                 {
-                    tokens.push_back(Token{TokenKind::Plus, "+", 0, line, column});
+                    tokens.push_back(Token(TokenKind::Plus, "+", 0, line, column));
                     ++index;
                     ++column;
                 }
@@ -366,19 +411,19 @@ namespace cxxpython::compiler_internal
             {
                 if (index + 1 < source.size() && source[index + 1] == '>')
                 {
-                    tokens.push_back(Token{TokenKind::Arrow, "->", 0, line, column});
+                    tokens.push_back(Token(TokenKind::Arrow, "->", 0, line, column));
                     index += 2;
                     column += 2;
                 }
                 else if (index + 1 < source.size() && source[index + 1] == '=')
                 {
-                    tokens.push_back(Token{TokenKind::MinusEqual, "-=", 0, line, column});
+                    tokens.push_back(Token(TokenKind::MinusEqual, "-=", 0, line, column));
                     index += 2;
                     column += 2;
                 }
                 else
                 {
-                    tokens.push_back(Token{TokenKind::Minus, "-", 0, line, column});
+                    tokens.push_back(Token(TokenKind::Minus, "-", 0, line, column));
                     ++index;
                     ++column;
                 }
@@ -389,19 +434,19 @@ namespace cxxpython::compiler_internal
             {
                 if (index + 1 < source.size() && source[index + 1] == '*')
                 {
-                    tokens.push_back(Token{TokenKind::DoubleStar, "**", 0, line, column});
+                    tokens.push_back(Token(TokenKind::DoubleStar, "**", 0, line, column));
                     index += 2;
                     column += 2;
                 }
                 else if (index + 1 < source.size() && source[index + 1] == '=')
                 {
-                    tokens.push_back(Token{TokenKind::StarEqual, "*=", 0, line, column});
+                    tokens.push_back(Token(TokenKind::StarEqual, "*=", 0, line, column));
                     index += 2;
                     column += 2;
                 }
                 else
                 {
-                    tokens.push_back(Token{TokenKind::Star, "*", 0, line, column});
+                    tokens.push_back(Token(TokenKind::Star, "*", 0, line, column));
                     ++index;
                     ++column;
                 }
@@ -410,7 +455,7 @@ namespace cxxpython::compiler_internal
 
             if (ch == '~')
             {
-                tokens.push_back(Token{TokenKind::Tilde, "~", 0, line, column});
+                tokens.push_back(Token(TokenKind::Tilde, "~", 0, line, column));
                 ++index;
                 ++column;
                 continue;
@@ -418,15 +463,171 @@ namespace cxxpython::compiler_internal
 
             if (ch == '/')
             {
-                tokens.push_back(Token{TokenKind::Slash, "/", 0, line, column});
-                ++index;
-                ++column;
+                if (index + 1 < source.size() && source[index + 1] == '/')
+                {
+                    if (index + 2 < source.size() && source[index + 2] == '=')
+                    {
+                        tokens.push_back(Token(TokenKind::DoubleSlashEqual, "//=", 0, line, column));
+                        index += 3;
+                        column += 3;
+                    }
+                    else
+                    {
+                        tokens.push_back(Token(TokenKind::DoubleSlash, "//", 0, line, column));
+                        index += 2;
+                        column += 2;
+                    }
+                }
+                else if (index + 1 < source.size() && source[index + 1] == '=')
+                {
+                    tokens.push_back(Token(TokenKind::SlashEqual, "/=", 0, line, column));
+                    index += 2;
+                    column += 2;
+                }
+                else
+                {
+                    tokens.push_back(Token(TokenKind::Slash, "/", 0, line, column));
+                    ++index;
+                    ++column;
+                }
+                continue;
+            }
+
+            if (ch == '%')
+            {
+                if (index + 1 < source.size() && source[index + 1] == '=')
+                {
+                    tokens.push_back(Token(TokenKind::PercentEqual, "%=", 0, line, column));
+                    index += 2;
+                    column += 2;
+                }
+                else
+                {
+                    tokens.push_back(Token(TokenKind::Percent, "%", 0, line, column));
+                    ++index;
+                    ++column;
+                }
+                continue;
+            }
+
+            if (ch == '<')
+            {
+                if (index + 1 < source.size() && source[index + 1] == '<')
+                {
+                    if (index + 2 < source.size() && source[index + 2] == '=')
+                    {
+                        tokens.push_back(Token(TokenKind::LeftShiftEqual, "<<=", 0, line, column));
+                        index += 3;
+                        column += 3;
+                    }
+                    else
+                    {
+                        tokens.push_back(Token(TokenKind::LeftShift, "<<", 0, line, column));
+                        index += 2;
+                        column += 2;
+                    }
+                }
+                else if (index + 1 < source.size() && source[index + 1] == '=')
+                {
+                    tokens.push_back(Token(TokenKind::LessEqual, "<=", 0, line, column));
+                    index += 2;
+                    column += 2;
+                }
+                else
+                {
+                    tokens.push_back(Token(TokenKind::Less, "<", 0, line, column));
+                    ++index;
+                    ++column;
+                }
+                continue;
+            }
+
+            if (ch == '&')
+            {
+                if (index + 1 < source.size() && source[index + 1] == '=')
+                {
+                    tokens.push_back(Token(TokenKind::AmpersandEqual, "&=", 0, line, column));
+                    index += 2;
+                    column += 2;
+                }
+                else
+                {
+                    tokens.push_back(Token(TokenKind::Ampersand, "&", 0, line, column));
+                    ++index;
+                    ++column;
+                }
+                continue;
+            }
+
+            if (ch == '^')
+            {
+                if (index + 1 < source.size() && source[index + 1] == '=')
+                {
+                    tokens.push_back(Token(TokenKind::CaretEqual, "^=", 0, line, column));
+                    index += 2;
+                    column += 2;
+                }
+                else
+                {
+                    tokens.push_back(Token(TokenKind::Caret, "^", 0, line, column));
+                    ++index;
+                    ++column;
+                }
+                continue;
+            }
+
+            if (ch == '|')
+            {
+                if (index + 1 < source.size() && source[index + 1] == '=')
+                {
+                    tokens.push_back(Token(TokenKind::PipeEqual, "|=", 0, line, column));
+                    index += 2;
+                    column += 2;
+                }
+                else
+                {
+                    tokens.push_back(Token(TokenKind::Pipe, "|", 0, line, column));
+                    ++index;
+                    ++column;
+                }
+                continue;
+            }
+
+            if (ch == '>')
+            {
+                if (index + 1 < source.size() && source[index + 1] == '>')
+                {
+                    if (index + 2 < source.size() && source[index + 2] == '=')
+                    {
+                        tokens.push_back(Token(TokenKind::RightShiftEqual, ">>=", 0, line, column));
+                        index += 3;
+                        column += 3;
+                    }
+                    else
+                    {
+                        tokens.push_back(Token(TokenKind::RightShift, ">>", 0, line, column));
+                        index += 2;
+                        column += 2;
+                    }
+                }
+                else if (index + 1 < source.size() && source[index + 1] == '=')
+                {
+                    tokens.push_back(Token(TokenKind::GreaterEqual, ">=", 0, line, column));
+                    index += 2;
+                    column += 2;
+                }
+                else
+                {
+                    tokens.push_back(Token(TokenKind::Greater, ">", 0, line, column));
+                    ++index;
+                    ++column;
+                }
                 continue;
             }
 
             if (ch == '@')
             {
-                tokens.push_back(Token{TokenKind::At, "@", 0, line, column});
+                tokens.push_back(Token(TokenKind::At, "@", 0, line, column));
                 ++index;
                 ++column;
                 continue;
@@ -434,7 +635,7 @@ namespace cxxpython::compiler_internal
 
             if (ch == '(')
             {
-                tokens.push_back(Token{TokenKind::LeftParen, "(", 0, line, column});
+                tokens.push_back(Token(TokenKind::LeftParen, "(", 0, line, column));
                 ++nesting;
                 ++index;
                 ++column;
@@ -443,7 +644,7 @@ namespace cxxpython::compiler_internal
 
             if (ch == ')')
             {
-                tokens.push_back(Token{TokenKind::RightParen, ")", 0, line, column});
+                tokens.push_back(Token(TokenKind::RightParen, ")", 0, line, column));
                 if (nesting != 0)
                     --nesting;
                 ++index;
@@ -453,7 +654,7 @@ namespace cxxpython::compiler_internal
 
             if (ch == ',')
             {
-                tokens.push_back(Token{TokenKind::Comma, ",", 0, line, column});
+                tokens.push_back(Token(TokenKind::Comma, ",", 0, line, column));
                 ++index;
                 ++column;
                 continue;
@@ -461,7 +662,7 @@ namespace cxxpython::compiler_internal
 
             if (ch == '.')
             {
-                tokens.push_back(Token{TokenKind::Dot, ".", 0, line, column});
+                tokens.push_back(Token(TokenKind::Dot, ".", 0, line, column));
                 ++index;
                 ++column;
                 continue;
@@ -469,7 +670,7 @@ namespace cxxpython::compiler_internal
 
             if (ch == '[')
             {
-                tokens.push_back(Token{TokenKind::LeftBracket, "[", 0, line, column});
+                tokens.push_back(Token(TokenKind::LeftBracket, "[", 0, line, column));
                 ++nesting;
                 ++index;
                 ++column;
@@ -478,7 +679,7 @@ namespace cxxpython::compiler_internal
 
             if (ch == ']')
             {
-                tokens.push_back(Token{TokenKind::RightBracket, "]", 0, line, column});
+                tokens.push_back(Token(TokenKind::RightBracket, "]", 0, line, column));
                 if (nesting != 0)
                     --nesting;
                 ++index;
@@ -488,7 +689,7 @@ namespace cxxpython::compiler_internal
 
             if (ch == '{')
             {
-                tokens.push_back(Token{TokenKind::LeftBrace, "{", 0, line, column});
+                tokens.push_back(Token(TokenKind::LeftBrace, "{", 0, line, column));
                 ++nesting;
                 ++index;
                 ++column;
@@ -497,7 +698,7 @@ namespace cxxpython::compiler_internal
 
             if (ch == '}')
             {
-                tokens.push_back(Token{TokenKind::RightBrace, "}", 0, line, column});
+                tokens.push_back(Token(TokenKind::RightBrace, "}", 0, line, column));
                 if (nesting != 0)
                     --nesting;
                 ++index;
@@ -507,7 +708,7 @@ namespace cxxpython::compiler_internal
 
             if (ch == ':')
             {
-                tokens.push_back(Token{TokenKind::Colon, ":", 0, line, column});
+                tokens.push_back(Token(TokenKind::Colon, ":", 0, line, column));
                 ++index;
                 ++column;
                 continue;
@@ -515,7 +716,7 @@ namespace cxxpython::compiler_internal
 
             if (ch == ';')
             {
-                tokens.push_back(Token{TokenKind::Semicolon, ";", 0, line, column});
+                tokens.push_back(Token(TokenKind::Semicolon, ";", 0, line, column));
                 ++index;
                 ++column;
                 continue;
@@ -525,13 +726,13 @@ namespace cxxpython::compiler_internal
             {
                 if (index + 1 < source.size() && source[index + 1] == '=')
                 {
-                    tokens.push_back(Token{TokenKind::EqualEqual, "==", 0, line, column});
+                    tokens.push_back(Token(TokenKind::EqualEqual, "==", 0, line, column));
                     index += 2;
                     column += 2;
                 }
                 else
                 {
-                    tokens.push_back(Token{TokenKind::Equal, "=", 0, line, column});
+                    tokens.push_back(Token(TokenKind::Equal, "=", 0, line, column));
                     ++index;
                     ++column;
                 }
@@ -540,45 +741,12 @@ namespace cxxpython::compiler_internal
 
             if (ch == '!' && index + 1 < source.size() && source[index + 1] == '=')
             {
-                tokens.push_back(Token{TokenKind::BangEqual, "!=", 0, line, column});
+                tokens.push_back(Token(TokenKind::BangEqual, "!=", 0, line, column));
                 index += 2;
                 column += 2;
                 continue;
             }
 
-            if (ch == '<')
-            {
-                if (index + 1 < source.size() && source[index + 1] == '=')
-                {
-                    tokens.push_back(Token{TokenKind::LessEqual, "<=", 0, line, column});
-                    index += 2;
-                    column += 2;
-                }
-                else
-                {
-                    tokens.push_back(Token{TokenKind::Less, "<", 0, line, column});
-                    ++index;
-                    ++column;
-                }
-                continue;
-            }
-
-            if (ch == '>')
-            {
-                if (index + 1 < source.size() && source[index + 1] == '=')
-                {
-                    tokens.push_back(Token{TokenKind::GreaterEqual, ">=", 0, line, column});
-                    index += 2;
-                    column += 2;
-                }
-                else
-                {
-                    tokens.push_back(Token{TokenKind::Greater, ">", 0, line, column});
-                    ++index;
-                    ++column;
-                }
-                continue;
-            }
 
             raise_at(runtime, filename, line, column, "unexpected character");
         }
@@ -586,9 +754,9 @@ namespace cxxpython::compiler_internal
         while (indent_stack.size() > 1)
         {
             indent_stack.pop_back();
-            tokens.push_back(Token{TokenKind::Dedent, "", 0, line, column});
+        tokens.push_back(Token(TokenKind::Dedent, "", 0, line, column));
         }
-        tokens.push_back(Token{TokenKind::End, "", 0, line, column});
+        tokens.push_back(Token(TokenKind::End, "", 0, line, column));
         return tokens;
     }
 }

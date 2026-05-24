@@ -13,6 +13,7 @@ namespace cxxpython
         type_type_ = allocate_type("type");
         none_type_ = allocate_type("NoneType");
         not_implemented_type_ = allocate_type("NotImplementedType");
+        float_type_ = allocate_type("float");
         int_type_ = allocate_type("int");
         bool_type_ = allocate_type("bool");
         str_type_ = allocate_type("str");
@@ -70,6 +71,7 @@ namespace cxxpython
         type_type_->slots = make_type_slots();
         none_type_->slots = make_none_slots();
         not_implemented_type_->slots = make_not_implemented_slots();
+        float_type_->slots = make_float_slots();
         int_type_->slots = make_int_slots();
         bool_type_->slots = make_bool_slots();
         str_type_->slots = make_str_slots();
@@ -127,6 +129,7 @@ namespace cxxpython
         type_type_->set_type(type_type_);
         none_type_->set_type(type_type_);
         not_implemented_type_->set_type(type_type_);
+        float_type_->set_type(type_type_);
         int_type_->set_type(type_type_);
         bool_type_->set_type(type_type_);
         str_type_->set_type(type_type_);
@@ -187,6 +190,7 @@ namespace cxxpython
         initialize_type(type_type_, object_type_);
         initialize_type(none_type_, object_type_);
         initialize_type(not_implemented_type_, object_type_);
+        initialize_type(float_type_, object_type_);
         initialize_type(int_type_, object_type_);
         initialize_type(bool_type_, int_type_);
         initialize_type(str_type_, object_type_);
@@ -244,6 +248,7 @@ namespace cxxpython
         type_type_->solid_base = type_type_;
         none_type_->solid_base = none_type_;
         not_implemented_type_->solid_base = not_implemented_type_;
+        float_type_->solid_base = float_type_;
         int_type_->solid_base = int_type_;
         bool_type_->solid_base = int_type_;
         str_type_->solid_base = str_type_;
@@ -309,6 +314,7 @@ namespace cxxpython
         add_root(type_type_);
         add_root(none_type_);
         add_root(not_implemented_type_);
+        add_root(float_type_);
         add_root(int_type_);
         add_root(bool_type_);
         add_root(str_type_);
@@ -363,6 +369,7 @@ namespace cxxpython
         add_root(stop_iteration_type_);
         add_root(none_);
         add_root(not_implemented_);
+        add_root(float_);
         add_root(true_);
         add_root(false_);
         add_root(stdin_object_);

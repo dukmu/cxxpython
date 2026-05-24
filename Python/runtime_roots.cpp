@@ -183,6 +183,7 @@ namespace cxxpython
         initialize_type_dict(type_type_);
         initialize_type_dict(none_type_);
         initialize_type_dict(not_implemented_type_);
+        initialize_type_dict(float_type_);
         initialize_type_dict(int_type_);
         initialize_type_dict(bool_type_);
         initialize_type_dict(str_type_);

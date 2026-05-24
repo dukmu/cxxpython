@@ -401,6 +401,15 @@ namespace cxxpython
         add_slot_wrapper(type, "__add__", SlotWrapperKind::BinaryOp, BinaryOp::Add);
         add_slot_wrapper(type, "__sub__", SlotWrapperKind::BinaryOp, BinaryOp::Subtract);
         add_slot_wrapper(type, "__mul__", SlotWrapperKind::BinaryOp, BinaryOp::Multiply);
+        add_slot_wrapper(type, "__truediv__", SlotWrapperKind::BinaryOp, BinaryOp::TrueDivide);
+        add_slot_wrapper(type, "__floordiv__", SlotWrapperKind::BinaryOp, BinaryOp::FloorDivide);
+        add_slot_wrapper(type, "__mod__", SlotWrapperKind::BinaryOp, BinaryOp::Modulo);
+        add_slot_wrapper(type, "__pow__", SlotWrapperKind::BinaryOp, BinaryOp::Power);
+        add_slot_wrapper(type, "__lshift__", SlotWrapperKind::BinaryOp, BinaryOp::ShiftLeft);
+        add_slot_wrapper(type, "__rshift__", SlotWrapperKind::BinaryOp, BinaryOp::ShiftRight);
+        add_slot_wrapper(type, "__and__", SlotWrapperKind::BinaryOp, BinaryOp::BitAnd);
+        add_slot_wrapper(type, "__xor__", SlotWrapperKind::BinaryOp, BinaryOp::BitXor);
+        add_slot_wrapper(type, "__or__", SlotWrapperKind::BinaryOp, BinaryOp::BitOr);
         add_slot_wrapper(type, "__pos__", SlotWrapperKind::UnaryOp, BinaryOp::Add, UnaryOp::Positive);
         add_slot_wrapper(type, "__neg__", SlotWrapperKind::UnaryOp, BinaryOp::Add, UnaryOp::Negative);
         add_slot_wrapper(type, "__invert__", SlotWrapperKind::UnaryOp, BinaryOp::Add, UnaryOp::Invert);
@@ -424,6 +433,7 @@ namespace cxxpython
         initialize_object_slot_wrappers(*this, object_type_);
         initialize_none_slot_wrappers(*this, none_type_);
         initialize_not_implemented_slot_wrappers(*this, not_implemented_type_);
+        initialize_float_slot_wrappers(*this, float_type_);
         initialize_int_slot_wrappers(*this, int_type_);
         initialize_bool_slot_wrappers(*this, bool_type_);
         initialize_str_slot_wrappers(*this, str_type_);

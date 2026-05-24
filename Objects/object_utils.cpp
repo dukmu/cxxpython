@@ -168,6 +168,16 @@ namespace cxxpython
             return "%";
         case BinaryOp::Power:
             return "**";
+        case BinaryOp::ShiftLeft:
+            return "<<";
+        case BinaryOp::ShiftRight:
+            return ">>";
+        case BinaryOp::BitAnd:
+            return "&";
+        case BinaryOp::BitXor:
+            return "^";
+        case BinaryOp::BitOr:
+            return "|";
         }
         return "?";
     }

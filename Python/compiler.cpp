@@ -165,6 +165,11 @@ namespace cxxpython
                 emit_constant(runtime_.new_int(expression.value));
             }
 
+            void visit(const compiler_internal::FloatExpr &expression) override
+            {
+                emit_constant(runtime_.new_float(expression.value));
+            }
+
             void visit(const compiler_internal::StringExpr &expression) override
             {
                 emit_constant(runtime_.new_str(expression.value));

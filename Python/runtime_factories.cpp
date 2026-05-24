@@ -86,6 +86,11 @@ namespace cxxpython
         return allocate<IntObject>(int_type_, value);
     }
 
+    FloatObject *Runtime::new_float(double value)
+    {
+        return allocate<FloatObject>(float_type_, value);
+    }
+
     StrObject *Runtime::new_str(std::string value)
     {
         return allocate<StrObject>(str_type_, std::move(value));

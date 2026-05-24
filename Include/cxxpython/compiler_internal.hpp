@@ -15,6 +15,7 @@
 namespace cxxpython::compiler_internal
 {
     struct IntegerExpr;
+    struct FloatExpr;
     struct StringExpr;
     struct FStringExpr;
     struct UnaryExpr;
@@ -60,6 +61,7 @@ namespace cxxpython::compiler_internal
     {
         virtual ~ExprVisitor() = default;
         virtual void visit(const IntegerExpr &expression) = 0;
+        virtual void visit(const FloatExpr &expression) = 0;
         virtual void visit(const StringExpr &expression) = 0;
         virtual void visit(const FStringExpr &expression) = 0;
         virtual void visit(const UnaryExpr &expression) = 0;
@@ -115,6 +117,7 @@ namespace cxxpython::compiler_internal
     enum class TokenKind
     {
         Integer,
+        Float,
         String,
         FString,
         Identifier,
@@ -124,7 +127,14 @@ namespace cxxpython::compiler_internal
         Star,
         DoubleStar,
         Slash,
+        DoubleSlash,
+        Percent,
         At,
+        LeftShift,
+        RightShift,
+        Ampersand,
+        Caret,
+        Pipe,
         Tilde,
         LeftParen,
         RightParen,
@@ -140,6 +150,14 @@ namespace cxxpython::compiler_internal
         PlusEqual,
         MinusEqual,
         StarEqual,
+        SlashEqual,
+        PercentEqual,
+        DoubleSlashEqual,
+        LeftShiftEqual,
+        RightShiftEqual,
+        AmpersandEqual,
+        CaretEqual,
+        PipeEqual,
         EqualEqual,
         BangEqual,
         Less,
@@ -185,11 +203,42 @@ namespace cxxpython::compiler_internal
 
     struct Token
     {
+        Token() = default;
+
+        Token(TokenKind kind_in,
+              std::string lexeme_in,
+              std::int64_t int_value_in,
+              std::size_t line_in,
+              std::size_t column_in)
+            : kind(kind_in),
+              lexeme(std::move(lexeme_in)),
+              int_value(int_value_in),
+              line(line_in),
+              column(column_in)
+        {
+        }
+
+        Token(TokenKind kind_in,
+              std::string lexeme_in,
+              std::int64_t int_value_in,
+              std::size_t line_in,
+              std::size_t column_in,
+              double float_value_in)
+            : kind(kind_in),
+              lexeme(std::move(lexeme_in)),
+              int_value(int_value_in),
+              line(line_in),
+              column(column_in),
+              float_value(float_value_in)
+        {
+        }
+
         TokenKind kind;
         std::string lexeme;
         std::int64_t int_value = 0;
         std::size_t line = 1;
         std::size_t column = 1;
+        double float_value = 0.0;
     };
 
     std::vector<Token> lex_source(Runtime &runtime, std::string_view source, std::string filename);
@@ -234,6 +283,21 @@ namespace cxxpython::compiler_internal
         }
 
         std::int64_t value;
+
+        void accept(ExprVisitor &visitor) const override
+        {
+            visitor.visit(*this);
+        }
+    };
+
+    struct FloatExpr final : Expr
+    {
+        explicit FloatExpr(double value_in)
+            : value(value_in)
+        {
+        }
+
+        double value;
 
         void accept(ExprVisitor &visitor) const override
         {

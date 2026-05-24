@@ -234,6 +234,17 @@ namespace cxxpython
         return total_root.get();
     }
 
+    Object *builtin_divmod(Runtime &runtime, const CallArguments &args)
+    {
+        require_no_keywords(&runtime, "divmod", args);
+        require_positional_count(&runtime, "divmod", args, 2);
+        Object *result = object_binary_op(args.positional[0], args.positional[1], BinaryOp::FloorDivide);
+        auto result_root = runtime.root(result);
+        Object *remainder = object_binary_op(args.positional[0], args.positional[1], BinaryOp::Modulo);
+        auto remainder_root = runtime.root(remainder);
+        return runtime.new_tuple({result_root.get(), remainder_root.get()});
+    }
+
     Object *builtin_min(Runtime &runtime, const CallArguments &args)
     {
         return select_extreme(runtime, "min", args, RichCompareOp::Less);

@@ -224,6 +224,16 @@ namespace cxxpython
                 return "__mod__";
             case BinaryOp::Power:
                 return "__pow__";
+            case BinaryOp::ShiftLeft:
+                return "__lshift__";
+            case BinaryOp::ShiftRight:
+                return "__rshift__";
+            case BinaryOp::BitAnd:
+                return "__and__";
+            case BinaryOp::BitXor:
+                return "__xor__";
+            case BinaryOp::BitOr:
+                return "__or__";
             }
             return nullptr;
         }
@@ -246,6 +256,16 @@ namespace cxxpython
                 return "__rmod__";
             case BinaryOp::Power:
                 return "__rpow__";
+            case BinaryOp::ShiftLeft:
+                return "__rlshift__";
+            case BinaryOp::ShiftRight:
+                return "__rrshift__";
+            case BinaryOp::BitAnd:
+                return "__rand__";
+            case BinaryOp::BitXor:
+                return "__rxor__";
+            case BinaryOp::BitOr:
+                return "__ror__";
             }
             return nullptr;
         }
@@ -268,6 +288,16 @@ namespace cxxpython
                 return "__imod__";
             case BinaryOp::Power:
                 return "__ipow__";
+            case BinaryOp::ShiftLeft:
+                return "__ilshift__";
+            case BinaryOp::ShiftRight:
+                return "__irshift__";
+            case BinaryOp::BitAnd:
+                return "__iand__";
+            case BinaryOp::BitXor:
+                return "__ixor__";
+            case BinaryOp::BitOr:
+                return "__ior__";
             }
             return nullptr;
         }
@@ -1358,6 +1388,11 @@ namespace cxxpython
             "__floordiv__",
             "__mod__",
             "__pow__",
+            "__lshift__",
+            "__rshift__",
+            "__and__",
+            "__xor__",
+            "__or__",
         };
         static constexpr const char *reflected_binary_methods[] = {
             "__radd__",
@@ -1367,6 +1402,11 @@ namespace cxxpython
             "__rfloordiv__",
             "__rmod__",
             "__rpow__",
+            "__rlshift__",
+            "__rrshift__",
+            "__rand__",
+            "__rxor__",
+            "__ror__",
         };
         static constexpr const char *inplace_binary_methods[] = {
             "__iadd__",
@@ -1376,6 +1416,11 @@ namespace cxxpython
             "__ifloordiv__",
             "__imod__",
             "__ipow__",
+            "__ilshift__",
+            "__irshift__",
+            "__iand__",
+            "__ixor__",
+            "__ior__",
         };
         static constexpr const char *unary_methods[] = {
             "__pos__",

@@ -5,6 +5,9 @@
 #include "type_initialization.hpp"
 
 #include <charconv>
+#include <cmath>
+#include <limits>
+#include <sstream>
 #include <utility>
 
 namespace cxxpython
@@ -45,6 +48,135 @@ namespace cxxpython
             return &left == &right;
         }
 
+        std::string float_repr(const Object &object)
+        {
+            std::ostringstream out;
+            out << static_cast<const FloatObject *>(&object)->value;
+            std::string text = out.str();
+            if (text.find('.') == std::string::npos &&
+                text.find('e') == std::string::npos &&
+                text.find('E') == std::string::npos)
+                text += ".0";
+            return text;
+        }
+
+        std::int64_t float_hash(const Object &object)
+        {
+            const double value = static_cast<const FloatObject *>(&object)->value;
+            if (value == 0.0)
+                return 0;
+            if (std::isnan(value))
+                return 0;
+            if (std::isinf(value))
+                return value > 0 ? 314159 : -314159;
+            return static_cast<std::int64_t>(std::hash<double>{}(value));
+        }
+
+        bool float_equal(const Object &left, const Object &right)
+        {
+            const double left_value = static_cast<const FloatObject *>(&left)->value;
+            if (auto *right_float = dynamic_cast<const FloatObject *>(&right))
+                return left_value == right_float->value;
+            if (auto *right_int = dynamic_cast<const IntObject *>(&right))
+                return left_value == static_cast<double>(right_int->value);
+            return false;
+        }
+
+        bool float_truth(const Object &object)
+        {
+            return static_cast<const FloatObject *>(&object)->value != 0.0;
+        }
+
+        Object *bool_result(Runtime *runtime, bool value);
+
+        Object *float_rich_compare(const Object &left, const Object &right, RichCompareOp op)
+        {
+            const double left_value = static_cast<const FloatObject *>(&left)->value;
+            double right_value = 0.0;
+            if (auto *right_float = dynamic_cast<const FloatObject *>(&right))
+                right_value = right_float->value;
+            else if (auto *right_int = dynamic_cast<const IntObject *>(&right))
+                right_value = static_cast<double>(right_int->value);
+            else
+                return left.runtime()->not_implemented();
+            switch (op)
+            {
+            case RichCompareOp::Equal:
+                return bool_result(left.runtime(), left_value == right_value);
+            case RichCompareOp::NotEqual:
+                return bool_result(left.runtime(), left_value != right_value);
+            case RichCompareOp::Less:
+                return bool_result(left.runtime(), left_value < right_value);
+            case RichCompareOp::LessEqual:
+                return bool_result(left.runtime(), left_value <= right_value);
+            case RichCompareOp::Greater:
+                return bool_result(left.runtime(), left_value > right_value);
+            case RichCompareOp::GreaterEqual:
+                return bool_result(left.runtime(), left_value >= right_value);
+            }
+            return left.runtime()->not_implemented();
+        }
+
+        Object *float_binary_op(const Object &left, const Object &right, BinaryOp op)
+        {
+            const auto *left_float = static_cast<const FloatObject *>(&left);
+            double right_value = 0.0;
+            if (auto *right_float = dynamic_cast<const FloatObject *>(&right))
+                right_value = right_float->value;
+            else if (auto *right_int = dynamic_cast<const IntObject *>(&right))
+                right_value = static_cast<double>(right_int->value);
+            else
+                return left.runtime()->not_implemented();
+
+            switch (op)
+            {
+            case BinaryOp::Add:
+                return left.runtime()->new_float(left_float->value + right_value);
+            case BinaryOp::Subtract:
+                return left.runtime()->new_float(left_float->value - right_value);
+            case BinaryOp::Multiply:
+                return left.runtime()->new_float(left_float->value * right_value);
+            case BinaryOp::TrueDivide:
+                if (right_value == 0.0)
+                    raise_value_error(left.runtime(), "division by zero");
+                return left.runtime()->new_float(left_float->value / right_value);
+            case BinaryOp::FloorDivide:
+                if (right_value == 0.0)
+                    raise_value_error(left.runtime(), "division by zero");
+                return left.runtime()->new_float(std::floor(left_float->value / right_value));
+            case BinaryOp::Modulo:
+                if (right_value == 0.0)
+                    raise_value_error(left.runtime(), "division by zero");
+                return left.runtime()->new_float(std::fmod(left_float->value, right_value));
+            case BinaryOp::Power:
+                return left.runtime()->new_float(std::pow(left_float->value, right_value));
+            case BinaryOp::ShiftLeft:
+            case BinaryOp::ShiftRight:
+            case BinaryOp::BitAnd:
+            case BinaryOp::BitXor:
+            case BinaryOp::BitOr:
+                return left.runtime()->not_implemented();
+            }
+            return left.runtime()->not_implemented();
+        }
+
+        Object *float_unary_op(const Object &operand, UnaryOp op)
+        {
+            const auto *value = static_cast<const FloatObject *>(&operand);
+            switch (op)
+            {
+            case UnaryOp::Positive:
+                return operand.runtime()->new_float(value->value);
+            case UnaryOp::Negative:
+                return operand.runtime()->new_float(-value->value);
+            case UnaryOp::Invert:
+                return operand.runtime()->not_implemented();
+            case UnaryOp::Not:
+                return is_true(&operand) ? operand.runtime()->false_value() : operand.runtime()->true_value();
+            }
+            return operand.runtime()->not_implemented();
+        }
+
         std::string int_repr(const Object &object)
         {
             return std::to_string(static_cast<const IntObject *>(&object)->value);
@@ -53,6 +185,23 @@ namespace cxxpython
         std::int64_t int_hash(const Object &object)
         {
             return static_cast<const IntObject *>(&object)->value;
+        }
+
+        std::int64_t floor_div_int(std::int64_t left, std::int64_t right)
+        {
+            std::int64_t quotient = left / right;
+            std::int64_t remainder = left % right;
+            if (remainder != 0 && ((remainder > 0) != (right > 0)))
+                --quotient;
+            return quotient;
+        }
+
+        std::int64_t modulo_int(std::int64_t left, std::int64_t right)
+        {
+            std::int64_t remainder = left % right;
+            if (remainder != 0 && ((remainder > 0) != (right > 0)))
+                remainder += right;
+            return remainder;
         }
 
         bool int_equal(const Object &left, const Object &right)
@@ -103,6 +252,40 @@ namespace cxxpython
 
         Object *int_binary_op(const Object &left, const Object &right, BinaryOp op)
         {
+            if (dynamic_cast<const FloatObject *>(&right))
+            {
+                const double left_value = static_cast<double>(static_cast<const IntObject *>(&left)->value);
+                const double right_value = static_cast<const FloatObject *>(&right)->value;
+                switch (op)
+                {
+                case BinaryOp::Add:
+                    return left.runtime()->new_float(left_value + right_value);
+                case BinaryOp::Subtract:
+                    return left.runtime()->new_float(left_value - right_value);
+                case BinaryOp::Multiply:
+                    return left.runtime()->new_float(left_value * right_value);
+                case BinaryOp::TrueDivide:
+                    if (right_value == 0.0)
+                        raise_value_error(left.runtime(), "division by zero");
+                    return left.runtime()->new_float(left_value / right_value);
+                case BinaryOp::FloorDivide:
+                    if (right_value == 0.0)
+                        raise_value_error(left.runtime(), "division by zero");
+                    return left.runtime()->new_int(static_cast<std::int64_t>(std::floor(left_value / right_value)));
+                case BinaryOp::Modulo:
+                    if (right_value == 0.0)
+                        raise_value_error(left.runtime(), "division by zero");
+                    return left.runtime()->new_float(std::fmod(left_value, right_value));
+                case BinaryOp::Power:
+                    return left.runtime()->new_float(std::pow(left_value, right_value));
+                case BinaryOp::ShiftLeft:
+                case BinaryOp::ShiftRight:
+                case BinaryOp::BitAnd:
+                case BinaryOp::BitXor:
+                case BinaryOp::BitOr:
+                    return left.runtime()->not_implemented();
+                }
+            }
             auto *right_int = dynamic_cast<const IntObject *>(&right);
             if (!right_int)
                 return left.runtime()->not_implemented();
@@ -116,12 +299,51 @@ namespace cxxpython
             case BinaryOp::Multiply:
                 return left.runtime()->new_int(left_int->value * right_int->value);
             case BinaryOp::TrueDivide:
+                if (right_int->value == 0)
+                    raise_value_error(left.runtime(), "division by zero");
+                return left.runtime()->new_float(static_cast<double>(left_int->value) /
+                                                 static_cast<double>(right_int->value));
             case BinaryOp::FloorDivide:
+                if (right_int->value == 0)
+                    raise_value_error(left.runtime(), "division by zero");
+                return left.runtime()->new_int(floor_div_int(left_int->value, right_int->value));
             case BinaryOp::Modulo:
+                if (right_int->value == 0)
+                    raise_value_error(left.runtime(), "integer modulo by zero");
+                return left.runtime()->new_int(modulo_int(left_int->value, right_int->value));
             case BinaryOp::Power:
-                break;
+                return left.runtime()->new_int(static_cast<std::int64_t>(
+                    std::pow(static_cast<double>(left_int->value), static_cast<double>(right_int->value))));
+            case BinaryOp::ShiftLeft:
+                if (right_int->value < 0)
+                    raise_value_error(left.runtime(), "negative shift count");
+                return left.runtime()->new_int(left_int->value << right_int->value);
+            case BinaryOp::ShiftRight:
+                if (right_int->value < 0)
+                    raise_value_error(left.runtime(), "negative shift count");
+                return left.runtime()->new_int(left_int->value >> right_int->value);
+            case BinaryOp::BitAnd:
+                return left.runtime()->new_int(left_int->value & right_int->value);
+            case BinaryOp::BitXor:
+                return left.runtime()->new_int(left_int->value ^ right_int->value);
+            case BinaryOp::BitOr:
+                return left.runtime()->new_int(left_int->value | right_int->value);
             }
             return left.runtime()->not_implemented();
+        }
+
+        Object *int_divmod_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (args.size() != 1)
+                raise_type_error(&runtime, "int.__divmod__() takes exactly one argument");
+            auto *left = dynamic_cast<IntObject *>(self);
+            auto *right = dynamic_cast<IntObject *>(args[0]);
+            if (!left || !right)
+                raise_type_error(&runtime, "int.__divmod__() receiver and argument must have int layout");
+            if (right->value == 0)
+                raise_value_error(&runtime, "division by zero");
+            return runtime.new_tuple({runtime.new_int(floor_div_int(left->value, right->value)),
+                                      runtime.new_int(modulo_int(left->value, right->value))});
         }
 
         Object *int_unary_op(const Object &operand, UnaryOp op)
@@ -176,6 +398,57 @@ namespace cxxpython
         {
             require_no_keywords(object.runtime(), "int", args);
             require_positional_at_most(object.runtime(), "int", args, 1);
+        }
+
+        double float_constructor_value(Runtime *runtime, Object *object)
+        {
+            if (auto *value = dynamic_cast<FloatObject *>(object))
+                return value->value;
+            if (auto *integer = dynamic_cast<IntObject *>(object))
+                return static_cast<double>(integer->value);
+            if (auto *text = dynamic_cast<StrObject *>(object))
+            {
+                try
+                {
+                    return std::stod(text->value);
+                }
+                catch (const std::exception &)
+                {
+                    raise_value_error(runtime, "could not convert string to float: '" + text->value + "'");
+                }
+            }
+            raise_type_error(runtime, "float() argument must be a string or a real number");
+        }
+
+        Object *float_new(TypeObject &type, const CallArguments &args)
+        {
+            require_no_keywords(type.runtime(), "float", args);
+            require_positional_at_most(type.runtime(), "float", args, 1);
+            const double value = args.positional.empty() ? 0.0 : float_constructor_value(type.runtime(), args.positional[0]);
+            return type.runtime()->allocate<FloatObject>(&type, value);
+        }
+
+        void float_init(Object &object, const CallArguments &args)
+        {
+            require_no_keywords(object.runtime(), "float", args);
+            require_positional_at_most(object.runtime(), "float", args, 1);
+        }
+
+        Object *float_bool_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (!args.empty())
+                raise_type_error(&runtime, "float.__bool__() takes exactly zero arguments");
+            return is_true(self) ? runtime.true_value() : runtime.false_value();
+        }
+
+        Object *float_float_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (!args.empty())
+                raise_type_error(&runtime, "float.__float__() takes exactly zero arguments");
+            auto *number = dynamic_cast<FloatObject *>(self);
+            if (!number)
+                raise_type_error(&runtime, "float conversion receiver does not have float layout");
+            return number;
         }
 
         std::string bool_repr(const Object &object)
@@ -732,6 +1005,11 @@ namespace cxxpython
     {
     }
 
+    FloatObject::FloatObject(TypeObject *type, double value)
+        : Object(type), value(value)
+    {
+    }
+
     IntObject::IntObject(TypeObject *type, std::int64_t value)
         : Object(type), value(value)
     {
@@ -771,6 +1049,22 @@ namespace cxxpython
             .equal = not_implemented_equal,
             .truth = default_truth,
             .traverse = default_traverse,
+        };
+    }
+
+    TypeSlots make_float_slots()
+    {
+        return TypeSlots{
+            .repr = float_repr,
+            .hash = float_hash,
+            .equal = float_equal,
+            .rich_compare = float_rich_compare,
+            .truth = float_truth,
+            .traverse = default_traverse,
+            .binary_op = float_binary_op,
+            .unary_op = float_unary_op,
+            .new_object = float_new,
+            .init = float_init,
         };
     }
 
@@ -862,6 +1156,20 @@ namespace cxxpython
                         runtime.new_method_descriptor("__int__", type, int_identity_method));
         type->dict->set(runtime.new_str("__index__"),
                         runtime.new_method_descriptor("__index__", type, int_identity_method));
+        type->dict->set(runtime.new_str("__divmod__"),
+                        runtime.new_method_descriptor("__divmod__",
+                                                      type,
+                                                      int_divmod_method,
+                                                      "Return the pair (a // b, a % b).",
+                                                      "($self, value, /)"));
+    }
+
+    void initialize_float_type_methods(Runtime &runtime, TypeObject *type)
+    {
+        type->dict->set(runtime.new_str("__bool__"),
+                        runtime.new_method_descriptor("__bool__", type, float_bool_method));
+        type->dict->set(runtime.new_str("__float__"),
+                        runtime.new_method_descriptor("__float__", type, float_float_method));
     }
 
     void initialize_str_type_methods(Runtime &runtime, TypeObject *type)
@@ -915,6 +1223,16 @@ namespace cxxpython
     }
 
     void initialize_int_slot_wrappers(Runtime &, TypeObject *type)
+    {
+        add_common_object_slot_wrappers(type, true);
+        add_order_slot_wrappers(type);
+        add_numeric_slot_wrappers(type);
+        add_slot_wrapper(type, "__and__", SlotWrapperKind::BinaryOp, BinaryOp::BitAnd);
+        add_slot_wrapper(type, "__xor__", SlotWrapperKind::BinaryOp, BinaryOp::BitXor);
+        add_slot_wrapper(type, "__or__", SlotWrapperKind::BinaryOp, BinaryOp::BitOr);
+    }
+
+    void initialize_float_slot_wrappers(Runtime &, TypeObject *type)
     {
         add_common_object_slot_wrappers(type, true);
         add_order_slot_wrappers(type);

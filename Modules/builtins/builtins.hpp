@@ -17,6 +17,7 @@ namespace cxxpython
     Object *builtin_all(Runtime &runtime, const CallArguments &args);
     Object *builtin_any(Runtime &runtime, const CallArguments &args);
     Object *builtin_sum(Runtime &runtime, const CallArguments &args);
+    Object *builtin_divmod(Runtime &runtime, const CallArguments &args);
     Object *builtin_min(Runtime &runtime, const CallArguments &args);
     Object *builtin_max(Runtime &runtime, const CallArguments &args);
     Object *builtin_sorted(Runtime &runtime, const CallArguments &args);

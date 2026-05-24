@@ -1,5 +1,45 @@
 # Development Status
 
+
+## 2026-05-24 Float And Arithmetic Core Slice
+
+Review focus:
+
+- Land native float support without turning it into a script shim.
+- Complete the basic arithmetic operator family for ints/floats and keep builtins aligned.
+
+Completed:
+
+- Added native `float` objects, constructor support, lexer/parser handling for
+  float literals, and compiler/runtime emission.
+- Expanded numeric operators to include `/`, `//`, `%`, `**`, `<<`, `>>`, `&`,
+  `^`, and `|`.
+- Added Python-style floor division, modulo, and `divmod()` semantics for ints.
+- Registered `float` and `divmod` in builtins and added golden coverage for
+  arithmetic and bitwise expressions.
+- Updated `_tokenize` exports to keep tokenizer metadata in sync with the lexer.
+
+Design notes:
+
+- `float` stays a core native type because it is part of the language substrate.
+- Builtins should expose core types and core numeric helpers directly, not via
+  script-level aliases.
+- Operator support needs to stay symmetrical across lexer, parser, bytecode,
+  VM, slot wrappers, and builtins.
+
+Known debt and next risk:
+
+- `re` is still missing and should be added as a proper module entry, not as a
+  fake object.
+- `pow()` and a few related numeric helpers are still not exposed as builtins.
+- There is still no `ZeroDivisionError` type; division failures use the current
+  value-error path.
+
+Verification:
+
+- `cmake --build build -j2`
+- `./build/cxxpython Tests/python/arithmetic.py`
+
 ## 2026-05-24 REPL Formatting And GC Coordination Fixes
 
 Review focus:

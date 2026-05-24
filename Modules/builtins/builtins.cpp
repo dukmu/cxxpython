@@ -73,6 +73,12 @@ namespace cxxpython
                 "($module, iterable, start=0, /)",
             },
             {
+                "divmod",
+                builtin_divmod,
+                "Return the quotient and remainder of a division.",
+                "($module, x, y, /)",
+            },
+            {
                 "min",
                 builtin_min,
                 "Return the smallest item.",
@@ -244,6 +250,7 @@ namespace cxxpython
         install_builtin_constant(*this, dict, "False", false_);
         install_builtin_constant(*this, dict, "object", object_type_);
         install_builtin_constant(*this, dict, "type", type_type_);
+        install_builtin_constant(*this, dict, "float", float_type_);
         install_builtin_constant(*this, dict, "int", int_type_);
         install_builtin_constant(*this, dict, "bool", bool_type_);
         install_builtin_constant(*this, dict, "str", str_type_);

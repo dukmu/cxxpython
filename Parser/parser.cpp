@@ -1010,15 +1010,51 @@ namespace cxxpython::compiler_internal
             std::unique_ptr<Expr> parse_or_expression()
             {
                 std::vector<std::unique_ptr<Expr>> values;
-                values.push_back(parse_and_expression());
+                values.push_back(parse_bitwise_or_expression());
                 while (peek().kind == TokenKind::Or)
                 {
                     advance();
-                    values.push_back(parse_and_expression());
+                    values.push_back(parse_bitwise_or_expression());
                 }
                 if (values.size() == 1)
                     return std::move(values.front());
                 return std::make_unique<BoolExpr>(BoolOp::Or, std::move(values));
+            }
+
+            std::unique_ptr<Expr> parse_bitwise_or_expression()
+            {
+                std::unique_ptr<Expr> left = parse_bitwise_xor_expression();
+                while (peek().kind == TokenKind::Pipe)
+                {
+                    advance();
+                    std::unique_ptr<Expr> right = parse_bitwise_xor_expression();
+                    left = std::make_unique<BinaryExpr>(std::move(left), BinaryOp::BitOr, std::move(right));
+                }
+                return left;
+            }
+
+            std::unique_ptr<Expr> parse_bitwise_xor_expression()
+            {
+                std::unique_ptr<Expr> left = parse_bitwise_and_expression();
+                while (peek().kind == TokenKind::Caret)
+                {
+                    advance();
+                    std::unique_ptr<Expr> right = parse_bitwise_and_expression();
+                    left = std::make_unique<BinaryExpr>(std::move(left), BinaryOp::BitXor, std::move(right));
+                }
+                return left;
+            }
+
+            std::unique_ptr<Expr> parse_bitwise_and_expression()
+            {
+                std::unique_ptr<Expr> left = parse_and_expression();
+                while (peek().kind == TokenKind::Ampersand)
+                {
+                    advance();
+                    std::unique_ptr<Expr> right = parse_and_expression();
+                    left = std::make_unique<BinaryExpr>(std::move(left), BinaryOp::BitAnd, std::move(right));
+                }
+                return left;
             }
 
             std::unique_ptr<Expr> parse_and_expression()
@@ -1063,12 +1099,25 @@ namespace cxxpython::compiler_internal
 
             std::unique_ptr<Expr> parse_sum()
             {
-                std::unique_ptr<Expr> left = parse_term();
+                std::unique_ptr<Expr> left = parse_shift();
                 while (peek().kind == TokenKind::Plus || peek().kind == TokenKind::Minus)
                 {
                     const TokenKind op_kind = advance().kind;
-                    std::unique_ptr<Expr> right = parse_term();
+                    std::unique_ptr<Expr> right = parse_shift();
                     const BinaryOp op = op_kind == TokenKind::Plus ? BinaryOp::Add : BinaryOp::Subtract;
+                    left = std::make_unique<BinaryExpr>(std::move(left), op, std::move(right));
+                }
+                return left;
+            }
+
+            std::unique_ptr<Expr> parse_shift()
+            {
+                std::unique_ptr<Expr> left = parse_term();
+                while (peek().kind == TokenKind::LeftShift || peek().kind == TokenKind::RightShift)
+                {
+                    const TokenKind op_kind = advance().kind;
+                    std::unique_ptr<Expr> right = parse_term();
+                    const BinaryOp op = op_kind == TokenKind::LeftShift ? BinaryOp::ShiftLeft : BinaryOp::ShiftRight;
                     left = std::make_unique<BinaryExpr>(std::move(left), op, std::move(right));
                 }
                 return left;
@@ -1076,13 +1125,36 @@ namespace cxxpython::compiler_internal
 
             std::unique_ptr<Expr> parse_term()
             {
-                std::unique_ptr<Expr> left = parse_unary();
-                while (peek().kind == TokenKind::Star)
+                std::unique_ptr<Expr> left = parse_factor();
+                while (peek().kind == TokenKind::Star ||
+                       peek().kind == TokenKind::Slash ||
+                       peek().kind == TokenKind::DoubleSlash ||
+                       peek().kind == TokenKind::Percent)
+                {
+                    const TokenKind op_kind = advance().kind;
+                    std::unique_ptr<Expr> right = parse_factor();
+                    BinaryOp op = BinaryOp::Multiply;
+                    if (op_kind == TokenKind::Star)
+                        op = BinaryOp::Multiply;
+                    else if (op_kind == TokenKind::Slash)
+                        op = BinaryOp::TrueDivide;
+                    else if (op_kind == TokenKind::DoubleSlash)
+                        op = BinaryOp::FloorDivide;
+                    else if (op_kind == TokenKind::Percent)
+                        op = BinaryOp::Modulo;
+                    left = std::make_unique<BinaryExpr>(std::move(left), op, std::move(right));
+                }
+                return left;
+            }
+
+            std::unique_ptr<Expr> parse_factor()
+            {
+                if (peek().kind == TokenKind::DoubleStar)
                 {
                     advance();
-                    std::unique_ptr<Expr> right = parse_unary();
-                    left = std::make_unique<BinaryExpr>(std::move(left), BinaryOp::Multiply, std::move(right));
+                    raise_at(previous(), "unexpected '**'");
                 }
+                std::unique_ptr<Expr> left = parse_unary();
                 return left;
             }
 
@@ -1100,7 +1172,14 @@ namespace cxxpython::compiler_internal
                         op = UnaryOp::Negative;
                     return std::make_unique<UnaryExpr>(op, parse_unary());
                 }
-                return parse_postfix();
+                std::unique_ptr<Expr> left = parse_postfix();
+                if (peek().kind == TokenKind::DoubleStar)
+                {
+                    advance();
+                    std::unique_ptr<Expr> right = parse_factor();
+                    left = std::make_unique<BinaryExpr>(std::move(left), BinaryOp::Power, std::move(right));
+                }
+                return left;
             }
 
             std::unique_ptr<Expr> parse_postfix()
@@ -1525,6 +1604,8 @@ namespace cxxpython::compiler_internal
                 {
                 case TokenKind::Integer:
                     return std::make_unique<IntegerExpr>(advance().int_value);
+                case TokenKind::Float:
+                    return std::make_unique<FloatExpr>(advance().float_value);
                 case TokenKind::String:
                     return std::make_unique<StringExpr>(advance().lexeme);
                 case TokenKind::FString:
@@ -1554,6 +1635,21 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Star:
                 case TokenKind::DoubleStar:
                 case TokenKind::Slash:
+                case TokenKind::SlashEqual:
+                case TokenKind::DoubleSlash:
+                case TokenKind::DoubleSlashEqual:
+                case TokenKind::Percent:
+                case TokenKind::PercentEqual:
+                case TokenKind::LeftShift:
+                case TokenKind::LeftShiftEqual:
+                case TokenKind::RightShift:
+                case TokenKind::RightShiftEqual:
+                case TokenKind::Ampersand:
+                case TokenKind::AmpersandEqual:
+                case TokenKind::Caret:
+                case TokenKind::CaretEqual:
+                case TokenKind::Pipe:
+                case TokenKind::PipeEqual:
                 case TokenKind::At:
                 case TokenKind::Tilde:
                 case TokenKind::RightParen:
@@ -1660,7 +1756,15 @@ namespace cxxpython::compiler_internal
                 const TokenKind kind = peek().kind;
                 return kind == TokenKind::PlusEqual ||
                        kind == TokenKind::MinusEqual ||
-                       kind == TokenKind::StarEqual;
+                       kind == TokenKind::StarEqual ||
+                       kind == TokenKind::SlashEqual ||
+                       kind == TokenKind::DoubleSlashEqual ||
+                       kind == TokenKind::PercentEqual ||
+                       kind == TokenKind::LeftShiftEqual ||
+                       kind == TokenKind::RightShiftEqual ||
+                       kind == TokenKind::AmpersandEqual ||
+                       kind == TokenKind::CaretEqual ||
+                       kind == TokenKind::PipeEqual;
             }
 
             bool starts_statement() const
@@ -1668,6 +1772,7 @@ namespace cxxpython::compiler_internal
                 switch (peek().kind)
                 {
                 case TokenKind::Integer:
+                case TokenKind::Float:
                 case TokenKind::String:
                 case TokenKind::FString:
                 case TokenKind::Identifier:
@@ -1703,6 +1808,15 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Star:
                 case TokenKind::DoubleStar:
                 case TokenKind::Slash:
+                case TokenKind::SlashEqual:
+                case TokenKind::DoubleSlash:
+                case TokenKind::DoubleSlashEqual:
+                case TokenKind::Percent:
+                case TokenKind::PercentEqual:
+                case TokenKind::LeftShift:
+                case TokenKind::LeftShiftEqual:
+                case TokenKind::RightShift:
+                case TokenKind::RightShiftEqual:
                 case TokenKind::At:
                 case TokenKind::RightParen:
                 case TokenKind::Comma:
@@ -1721,6 +1835,12 @@ namespace cxxpython::compiler_internal
                 case TokenKind::LessEqual:
                 case TokenKind::Greater:
                 case TokenKind::GreaterEqual:
+                case TokenKind::Ampersand:
+                case TokenKind::AmpersandEqual:
+                case TokenKind::Caret:
+                case TokenKind::CaretEqual:
+                case TokenKind::Pipe:
+                case TokenKind::PipeEqual:
                 case TokenKind::Elif:
                 case TokenKind::Else:
                 case TokenKind::Except:
@@ -1774,6 +1894,7 @@ namespace cxxpython::compiler_internal
                     }
                     break;
                 case TokenKind::Integer:
+                case TokenKind::Float:
                 case TokenKind::String:
                 case TokenKind::FString:
                 case TokenKind::Identifier:
@@ -1783,6 +1904,21 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Star:
                 case TokenKind::DoubleStar:
                 case TokenKind::Slash:
+                case TokenKind::SlashEqual:
+                case TokenKind::DoubleSlash:
+                case TokenKind::DoubleSlashEqual:
+                case TokenKind::Percent:
+                case TokenKind::PercentEqual:
+                case TokenKind::LeftShift:
+                case TokenKind::LeftShiftEqual:
+                case TokenKind::RightShift:
+                case TokenKind::RightShiftEqual:
+                case TokenKind::Ampersand:
+                case TokenKind::AmpersandEqual:
+                case TokenKind::Caret:
+                case TokenKind::CaretEqual:
+                case TokenKind::Pipe:
+                case TokenKind::PipeEqual:
                 case TokenKind::At:
                 case TokenKind::Tilde:
                 case TokenKind::LeftParen:
@@ -1846,7 +1982,24 @@ namespace cxxpython::compiler_internal
                     return BinaryOp::Subtract;
                 case TokenKind::StarEqual:
                     return BinaryOp::Multiply;
+                case TokenKind::SlashEqual:
+                    return BinaryOp::TrueDivide;
+                case TokenKind::DoubleSlashEqual:
+                    return BinaryOp::FloorDivide;
+                case TokenKind::PercentEqual:
+                    return BinaryOp::Modulo;
+                case TokenKind::LeftShiftEqual:
+                    return BinaryOp::ShiftLeft;
+                case TokenKind::RightShiftEqual:
+                    return BinaryOp::ShiftRight;
+                case TokenKind::AmpersandEqual:
+                    return BinaryOp::BitAnd;
+                case TokenKind::CaretEqual:
+                    return BinaryOp::BitXor;
+                case TokenKind::PipeEqual:
+                    return BinaryOp::BitOr;
                 case TokenKind::Integer:
+                case TokenKind::Float:
                 case TokenKind::String:
                 case TokenKind::FString:
                 case TokenKind::Identifier:
@@ -1856,6 +2009,13 @@ namespace cxxpython::compiler_internal
                 case TokenKind::Star:
                 case TokenKind::DoubleStar:
                 case TokenKind::Slash:
+                case TokenKind::DoubleSlash:
+                case TokenKind::Percent:
+                case TokenKind::LeftShift:
+                case TokenKind::RightShift:
+                case TokenKind::Ampersand:
+                case TokenKind::Caret:
+                case TokenKind::Pipe:
                 case TokenKind::At:
                 case TokenKind::Tilde:
                 case TokenKind::LeftParen:

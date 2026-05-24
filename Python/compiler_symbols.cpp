@@ -21,6 +21,11 @@ namespace cxxpython
                 (void)expression;
             }
 
+            void visit(const compiler_internal::FloatExpr &expression) override
+            {
+                (void)expression;
+            }
+
             void visit(const compiler_internal::StringExpr &expression) override
             {
                 (void)expression;
@@ -661,6 +666,11 @@ namespace cxxpython
                 (void)expression;
             }
 
+            void visit(const compiler_internal::FloatExpr &expression) override
+            {
+                (void)expression;
+            }
+
             void visit(const compiler_internal::StringExpr &expression) override
             {
                 (void)expression;
@@ -992,6 +1002,11 @@ namespace cxxpython
         {
         public:
             void visit(const compiler_internal::IntegerExpr &expression) override
+            {
+                (void)expression;
+            }
+
+            void visit(const compiler_internal::FloatExpr &expression) override
             {
                 (void)expression;
             }

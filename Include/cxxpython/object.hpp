@@ -103,6 +103,11 @@ namespace cxxpython
         FloorDivide,
         Modulo,
         Power,
+        ShiftLeft,
+        ShiftRight,
+        BitAnd,
+        BitXor,
+        BitOr,
     };
 
     enum class UnaryOp : std::uint8_t
@@ -253,6 +258,14 @@ namespace cxxpython
     {
     public:
         explicit NotImplementedObject(TypeObject *type);
+    };
+
+    class FloatObject final : public Object
+    {
+    public:
+        FloatObject(TypeObject *type, double value);
+
+        double value;
     };
 
     class IntObject : public Object
@@ -914,6 +927,7 @@ namespace cxxpython
     TypeSlots make_type_slots();
     TypeSlots make_none_slots();
     TypeSlots make_not_implemented_slots();
+    TypeSlots make_float_slots();
     TypeSlots make_int_slots();
     TypeSlots make_bool_slots();
     TypeSlots make_str_slots();

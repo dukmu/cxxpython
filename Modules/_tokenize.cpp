@@ -80,6 +80,7 @@ namespace cxxpython
             switch (kind)
             {
             case TokenKind::Integer:
+            case TokenKind::Float:
                 return NUMBER;
             case TokenKind::String:
             case TokenKind::FString:
@@ -129,6 +130,20 @@ namespace cxxpython
                 return DOUBLESTAR;
             case TokenKind::Slash:
                 return SLASH;
+            case TokenKind::DoubleSlash:
+                return SLASH;
+            case TokenKind::Percent:
+                return SLASH;
+            case TokenKind::LeftShift:
+                return SLASH;
+            case TokenKind::RightShift:
+                return SLASH;
+            case TokenKind::Ampersand:
+                return SLASH;
+            case TokenKind::Caret:
+                return SLASH;
+            case TokenKind::Pipe:
+                return SLASH;
             case TokenKind::At:
                 return AT;
             case TokenKind::Tilde:
@@ -161,6 +176,22 @@ namespace cxxpython
                 return MINEQUAL;
             case TokenKind::StarEqual:
                 return STAREQUAL;
+            case TokenKind::SlashEqual:
+                return SLASH;
+            case TokenKind::DoubleSlashEqual:
+                return SLASH;
+            case TokenKind::PercentEqual:
+                return SLASH;
+            case TokenKind::LeftShiftEqual:
+                return SLASH;
+            case TokenKind::RightShiftEqual:
+                return SLASH;
+            case TokenKind::AmpersandEqual:
+                return SLASH;
+            case TokenKind::CaretEqual:
+                return SLASH;
+            case TokenKind::PipeEqual:
+                return SLASH;
             case TokenKind::EqualEqual:
                 return EQEQUAL;
             case TokenKind::BangEqual:

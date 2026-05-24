@@ -297,6 +297,11 @@ namespace cxxpython
         return not_implemented_;
     }
 
+    TypeObject *Runtime::float_type() const noexcept
+    {
+        return float_type_;
+    }
+
     BoolObject *Runtime::true_value() const noexcept
     {
         return true_;

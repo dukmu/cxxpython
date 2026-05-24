@@ -20,7 +20,7 @@ namespace cxxpython
 
         BinaryOp decode_binary_op(std::uint32_t operand)
         {
-            if (operand > static_cast<std::uint32_t>(BinaryOp::Power))
+            if (operand > static_cast<std::uint32_t>(BinaryOp::BitOr))
                 throw BytecodeError("BINARY_OP operand out of range");
             return static_cast<BinaryOp>(operand);
         }
