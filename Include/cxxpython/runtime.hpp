@@ -386,18 +386,34 @@ namespace cxxpython
             raw->set_runtime(this);
             std::scoped_lock lock(heap_mutex_);
             heap_.push_back(std::move(object));
-            if (gc_enabled_.load(std::memory_order_relaxed))
+            if constexpr (counts_toward_automatic_gc<T>())
             {
-                const std::size_t count =
-                    allocations_since_gc_.fetch_add(1, std::memory_order_relaxed) + 1;
-                const std::size_t threshold = gc_threshold_.load(std::memory_order_relaxed);
-                if (threshold != 0 && count >= threshold)
-                    gc_requested_.store(true, std::memory_order_relaxed);
+                if (gc_enabled_.load(std::memory_order_relaxed))
+                {
+                    const std::size_t count =
+                        allocations_since_gc_.fetch_add(1, std::memory_order_relaxed) + 1;
+                    const std::size_t threshold = gc_threshold_.load(std::memory_order_relaxed);
+                    if (threshold != 0 && count >= threshold)
+                        gc_requested_.store(true, std::memory_order_relaxed);
+                }
             }
             return raw;
         }
 
     private:
+        template <class T>
+        static constexpr bool counts_toward_automatic_gc() noexcept
+        {
+            using U = std::remove_cv_t<T>;
+            return !std::is_same_v<U, IntObject> &&
+                   !std::is_same_v<U, BoolObject> &&
+                   !std::is_same_v<U, FloatObject> &&
+                   !std::is_same_v<U, StrObject> &&
+                   !std::is_same_v<U, BytesObject> &&
+                   !std::is_same_v<U, RangeObject> &&
+                   !std::is_same_v<U, RangeIteratorObject>;
+        }
+
         TypeObject *allocate_type(std::string name);
         void initialize_type(TypeObject *type, TypeObject *base);
         void initialize_type(TypeObject *type, const std::vector<TypeObject *> &bases);

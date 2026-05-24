@@ -577,6 +577,12 @@ TEST(Module, BuiltinCoreConstructorsCreateProtocolObjects)
     ASSERT_NE(from_bool, nullptr);
     EXPECT_EQ(from_bool->type(), runtime.int_type());
     EXPECT_EQ(from_bool->value, 1);
+    EXPECT_EQ(from_bool, runtime.new_int(1));
+
+    auto *from_float =
+        dynamic_cast<cxxpython::IntObject *>(cxxpython::object_call(runtime.int_type(), {runtime.new_float(1.9)}));
+    ASSERT_NE(from_float, nullptr);
+    EXPECT_EQ(from_float, runtime.new_int(1));
 
     auto *from_str =
         dynamic_cast<cxxpython::IntObject *>(cxxpython::object_call(runtime.int_type(), {runtime.new_str("-42")}));

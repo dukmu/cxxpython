@@ -26,6 +26,7 @@ add_library(cxxpython_core
     Python/bytecode.cpp
     Python/compiler_symbols.cpp
     Python/compiler.cpp
+    Python/vm_fastpaths.cpp
     Python/vm.cpp
     Modules/builtins/builtins.cpp
     Modules/builtins/core.cpp

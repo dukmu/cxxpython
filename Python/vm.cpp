@@ -3,6 +3,7 @@
 #include "../Objects/object_utils.hpp"
 #include "../Objects/type_initialization.hpp"
 #include "../Modules/module_registry.hpp"
+#include "vm_fastpaths.hpp"
 
 #include <sstream>
 #include <utility>
@@ -449,6 +450,7 @@ namespace cxxpython
             throw BytecodeError("frame requires builtins");
         if (cells_.size() != code_->cellvars().size() + code_->freevars().size())
             throw BytecodeError("frame cell count does not match code metadata");
+        stack_.reserve(code_->stack_size());
         for (std::size_t index = 0; index < code_->varnames().size(); ++index)
         {
             auto *name = dynamic_cast<StrObject *>(code_->varnames()[index]);
@@ -1258,6 +1260,11 @@ namespace cxxpython
                 const BinaryOp op = decode_binary_op(instruction.operand);
                 Object *right = frame->pop();
                 Object *left = frame->pop();
+                if (Object *result = vm_fastpath::try_binary_op(runtime_, left, right, op))
+                {
+                    frame->push(result);
+                    break;
+                }
                 auto right_root = runtime_.root(right);
                 auto left_root = runtime_.root(left);
                 frame->push(object_binary_op(left, right, op));
@@ -1268,6 +1275,11 @@ namespace cxxpython
                 const BinaryOp op = decode_binary_op(instruction.operand);
                 Object *right = frame->pop();
                 Object *left = frame->pop();
+                if (Object *result = vm_fastpath::try_binary_op(runtime_, left, right, op))
+                {
+                    frame->push(result);
+                    break;
+                }
                 auto right_root = runtime_.root(right);
                 auto left_root = runtime_.root(left);
                 frame->push(object_inplace_binary_op(left, right, op));
@@ -1452,6 +1464,12 @@ namespace cxxpython
                 case ComparisonOp::LessEqual:
                 case ComparisonOp::Greater:
                 case ComparisonOp::GreaterEqual:
+                    if (Object *result = vm_fastpath::try_compare_op(
+                            runtime_, left, right, static_cast<RichCompareOp>(op)))
+                    {
+                        frame->push(result);
+                        break;
+                    }
                     frame->push(object_rich_compare(left, right, static_cast<RichCompareOp>(op)));
                     break;
                 case ComparisonOp::Is:
@@ -1479,6 +1497,19 @@ namespace cxxpython
             case Opcode::ForIter:
             {
                 Object *iterator = frame->pop();
+                if (iterator && iterator->type() == runtime_.range_iterator_type())
+                {
+                    auto *range_iterator = static_cast<RangeIteratorObject *>(iterator);
+                    if (range_iterator->remaining() == 0)
+                    {
+                        jump_to(*frame, code, instruction.operand);
+                        break;
+                    }
+                    const std::int64_t value = range_iterator->consume_value();
+                    frame->push(iterator);
+                    frame->push(runtime_.new_int(value));
+                    break;
+                }
                 auto iterator_root = runtime_.root(iterator);
                 try
                 {
@@ -1543,6 +1574,13 @@ namespace cxxpython
             case Opcode::PopJumpIfFalse:
             {
                 Object *condition = frame->pop();
+                bool truth = false;
+                if (vm_fastpath::try_truth(runtime_, condition, truth))
+                {
+                    if (!truth)
+                        jump_to(*frame, code, instruction.operand);
+                    break;
+                }
                 auto condition_root = runtime_.root(condition);
                 if (!is_true(condition))
                     jump_to(*frame, code, instruction.operand);
@@ -1551,6 +1589,13 @@ namespace cxxpython
             case Opcode::PopJumpIfTrue:
             {
                 Object *condition = frame->pop();
+                bool truth = false;
+                if (vm_fastpath::try_truth(runtime_, condition, truth))
+                {
+                    if (truth)
+                        jump_to(*frame, code, instruction.operand);
+                    break;
+                }
                 auto condition_root = runtime_.root(condition);
                 if (is_true(condition))
                     jump_to(*frame, code, instruction.operand);
@@ -1559,6 +1604,16 @@ namespace cxxpython
             case Opcode::JumpIfFalseOrPop:
             {
                 Object *condition = frame->pop();
+                bool truth = false;
+                if (vm_fastpath::try_truth(runtime_, condition, truth))
+                {
+                    if (!truth)
+                    {
+                        frame->push(condition);
+                        jump_to(*frame, code, instruction.operand);
+                    }
+                    break;
+                }
                 auto condition_root = runtime_.root(condition);
                 if (!is_true(condition))
                 {
@@ -1683,14 +1738,19 @@ namespace cxxpython
             case Opcode::Call:
             {
                 std::vector<Object *> args(instruction.operand);
+                for (std::size_t index = args.size(); index > 0; --index)
+                    args[index - 1] = frame->pop();
+                Object *callable = frame->pop();
+                if (Object *result =
+                        vm_fastpath::try_builtin_call(runtime_, callable, ObjectSpan(args.data(), args.size())))
+                {
+                    frame->push(result);
+                    break;
+                }
                 std::vector<Rooted<Object>> roots;
                 roots.reserve(args.size());
-                for (std::size_t index = args.size(); index > 0; --index)
-                {
-                    args[index - 1] = frame->pop();
-                    add_temporary_root(runtime_, roots, args[index - 1]);
-                }
-                Object *callable = frame->pop();
+                for (Object *arg : args)
+                    add_temporary_root(runtime_, roots, arg);
                 auto callable_root = runtime_.root(callable);
                 frame->push(object_call(callable, args));
                 break;

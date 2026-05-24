@@ -394,6 +394,8 @@ namespace cxxpython
             const std::int64_t value = args.positional.empty()
                                            ? 0
                                            : int_constructor_value(type.runtime(), args.positional[0]);
+            if (&type == type.runtime()->int_type())
+                return type.runtime()->new_int(value);
             return type.runtime()->allocate<IntObject>(&type, value);
         }
 
@@ -428,6 +430,8 @@ namespace cxxpython
             require_no_keywords(type.runtime(), "float", args);
             require_positional_at_most(type.runtime(), "float", args, 1);
             const double value = args.positional.empty() ? 0.0 : float_constructor_value(type.runtime(), args.positional[0]);
+            if (&type == type.runtime()->float_type())
+                return type.runtime()->new_float(value);
             return type.runtime()->allocate<FloatObject>(&type, value);
         }
 

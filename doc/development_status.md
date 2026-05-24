@@ -1,6 +1,69 @@
 # Development Status
 
 
+## 2026-05-24 VM Numeric Hot Path Slice
+
+Review focus:
+
+- Explain why CPU-bound numeric Python code was still much slower than CPython.
+- Reduce VM dispatch, RTTI, temporary-root, and automatic-GC overhead on the
+  hottest exact builtin paths without changing user-defined type semantics.
+- Keep the optimization organized as VM infrastructure rather than a pile of
+  ad hoc special cases in the evaluator loop.
+
+Completed:
+
+- Added internal VM fast paths for exact builtin `int`/`bool`/`float`
+  arithmetic and rich comparisons.
+- Added direct truth checks for exact `bool`, `None`, `int`, and `float` in
+  jump opcodes.
+- Added direct `range_iterator` handling in `FOR_ITER`, avoiding the generic
+  iterator protocol and StopIteration exception path for normal loop progress.
+- Added direct VM call paths for exact builtin `int()`, `float()`, and
+  `range()` when their arguments have exact builtin numeric layout.
+- Fixed builtin `int()` and `float()` construction so exact builtin calls use
+  `Runtime::new_int()` / `Runtime::new_float()` instead of bypassing the small
+  int cache through direct allocation.
+- Split the optimization helpers into `Python/vm_fastpaths.cpp` and
+  `Python/vm_fastpaths.hpp` to keep `vm.cpp` focused on dispatch.
+- Changed automatic GC accounting so atomic/leaf objects such as `int`,
+  `float`, `str`, `bytes`, `range`, and `range_iterator` remain heap-owned but
+  do not trigger periodic cycle-collection scans. This matches the design
+  direction of tracking container-like objects for cycle pressure rather than
+  every boxed numeric temporary.
+
+Performance notes:
+
+- Local `build/test2.py single 1000000` improved from about `26.75s` reported
+  by the user to about `14.36s`.
+- Local `build/test2.py multi 1000000` improved from about `11.28s` reported
+  by the user to about `6.62s`.
+- `perf record` still shows the remaining wall time dominated by
+  `VirtualMachine::execute`, dynamic casts, temporary roots, stack push/pop, and
+  boxed numeric allocation.
+
+Known debt and next risk:
+
+- The next major speed step should not be another cache-size tweak. It should
+  be a principled value representation plan: tagged/immediate small integers or
+  an unboxed VM stack/local specialization with well-defined GC visibility.
+- `CALL` still allocates an argument vector and generic calls still root every
+  argument. A future vectorcall-style calling convention should remove that
+  overhead while preserving GC safety.
+- Heap allocation still uses one runtime heap mutex. Multithreaded numeric code
+  will keep hitting contention until allocation becomes thread-local or arena
+  based.
+- Fast paths must remain exact-layout only; heap subclasses and overridden
+  slots must continue through the normal object protocol.
+
+Verification:
+
+- `cmake --build build -j2`
+- `./build/test_core_objects --gtest_filter='Bytecode.CallsCallableObjectsThroughTypeSlot:Bytecode.CallOpcodeRootsCallableAndArgumentsAcrossDispatch:CoreObjects.RuntimeBootstrapsBuiltinTypes:CoreObjects.ReprAndExceptionObjects:PythonScripts.RunsGoldenFiles'`
+- `./build/cxxpython Tests/python/arithmetic.py`
+- `ctest --test-dir build --output-on-failure`
+
+
 ## 2026-05-24 Nested Loop Break Stack Repair Slice
 
 Review focus:
