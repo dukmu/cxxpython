@@ -66,11 +66,8 @@ namespace cxxpython
 
     std::size_t Runtime::collect_garbage_if_requested(ThreadState &current_thread)
     {
-        if (!gc_enabled_.load(std::memory_order_relaxed) ||
-            !gc_requested_.load(std::memory_order_relaxed))
-        {
+        if (!garbage_collection_requested())
             return 0;
-        }
         return collect_garbage_at_safepoint(current_thread, false);
     }
 

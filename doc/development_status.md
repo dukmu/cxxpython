@@ -5655,6 +5655,47 @@ Verification:
 
 Result: all tests pass.
 
+## 2026-05-24 VM Hot Path Guard Slice
+
+Review focus:
+
+- Reduce per-instruction overhead that does no work in the common case.
+- Preserve GC safepoint and tracing semantics while avoiding unnecessary helper
+  calls and line-table lookups.
+
+Completed:
+
+- Added `Runtime::garbage_collection_requested()` as a cheap hot-path predicate.
+- VM dispatch now enters GC coordination only when a collection has actually
+  been requested.
+- VM dispatch now computes instruction line numbers only when frame tracing is
+  active.
+
+Design notes:
+
+- This keeps the VM loop shaped around explicit safe points while making the
+  no-work path cheap.
+- The change is deliberately semantic-neutral: GC collection and trace events
+  still happen at the same bytecode boundary when requested/enabled.
+
+Known debt and next risk:
+
+- Signal, GC, tracing, and future pending calls still need a single coherent
+  eval-breaker abstraction.
+- Large temporary integers and floats still allocate through the shared heap.
+
+Verification:
+
+- `cmake --build build -j$(nproc)`
+- `./build/test_core_objects --gtest_filter='Module.SignalDeliveryRaisesKeyboardInterruptAtSafePoints:PythonScripts.RunsGoldenFiles'`
+- `./build/cxxpython Tests/python/thread_lowlevel.py`
+- `./build/cxxpython Tests/python/threading_module.py`
+- `./build/cxxpython Tests/python/thread_root_pressure.py`
+- `./build/cxxpython build/test2.py single 10000`
+- `./build/cxxpython build/test2.py multi 10000` repeated 30 times
+
+Result: all tests pass.
+
 ## 2026-05-24 Signal Eval Breaker Fast Path Slice
 
 Review focus:

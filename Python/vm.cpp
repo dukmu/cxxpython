@@ -891,21 +891,26 @@ namespace cxxpython
         std::uint32_t last_traced_line = 0;
         while (frame->instruction_pointer() < code.instructions().size())
         {
-            (void)runtime_.collect_garbage_if_requested(thread_);
+            if (runtime_.garbage_collection_requested())
+                (void)runtime_.collect_garbage_if_requested(thread_);
             const Instruction instruction = code.instructions()[frame->instruction_pointer()];
             frame->advance();
             try
             {
-            const std::uint32_t current_line = code.line_for_instruction(frame->last_instruction_index());
-            if (frame->trace_function() && current_line != 0 && current_line != last_traced_line)
+            if (Object *trace_function = frame->trace_function())
             {
-                last_traced_line = current_line;
-                set_frame_trace_from_result(*frame, call_trace_function(runtime_,
-                                                                        thread_,
-                                                                        frame->trace_function(),
-                                                                        *frame,
-                                                                        "line",
-                                                                        runtime_.none()));
+                const std::uint32_t current_line =
+                    code.line_for_instruction(frame->last_instruction_index());
+                if (current_line != 0 && current_line != last_traced_line)
+                {
+                    last_traced_line = current_line;
+                    set_frame_trace_from_result(*frame, call_trace_function(runtime_,
+                                                                            thread_,
+                                                                            trace_function,
+                                                                            *frame,
+                                                                            "line",
+                                                                            runtime_.none()));
+                }
             }
             deliver_pending_signals(runtime_);
             switch (instruction.opcode)

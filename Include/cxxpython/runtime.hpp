@@ -160,6 +160,7 @@ namespace cxxpython
         void set_program_arguments(std::vector<std::string> args);
         std::size_t collect_garbage();
         std::size_t collect_garbage_if_requested(ThreadState &current_thread);
+        bool garbage_collection_requested() const noexcept;
         bool garbage_collection_enabled() const noexcept;
         void enable_garbage_collection() noexcept;
         void disable_garbage_collection() noexcept;
@@ -610,5 +611,11 @@ namespace cxxpython
     Rooted<T> Runtime::root(T *object)
     {
         return Rooted<T>(*this, object);
+    }
+
+    inline bool Runtime::garbage_collection_requested() const noexcept
+    {
+        return gc_enabled_.load(std::memory_order_relaxed) &&
+               gc_requested_.load(std::memory_order_relaxed);
     }
 }
