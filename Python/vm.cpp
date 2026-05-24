@@ -230,6 +230,42 @@ namespace cxxpython
             frame.set_trace_function(result);
         }
 
+        bool eval_breaker_requested(Runtime &runtime, Frame &frame) noexcept
+        {
+            return runtime.garbage_collection_requested() ||
+                   frame.trace_function() ||
+                   pending_signal_delivery_requested();
+        }
+
+        void handle_eval_breaker(Runtime &runtime,
+                                 ThreadState &thread,
+                                 CodeObject &code,
+                                 Frame &frame,
+                                 std::uint32_t &last_traced_line)
+        {
+            if (runtime.garbage_collection_requested())
+                (void)runtime.collect_garbage_if_requested(thread);
+
+            if (Object *trace_function = frame.trace_function())
+            {
+                const std::uint32_t current_line =
+                    code.line_for_instruction(frame.last_instruction_index());
+                if (current_line != 0 && current_line != last_traced_line)
+                {
+                    last_traced_line = current_line;
+                    set_frame_trace_from_result(frame, call_trace_function(runtime,
+                                                                           thread,
+                                                                           trace_function,
+                                                                           frame,
+                                                                           "line",
+                                                                           runtime.none()));
+                }
+            }
+
+            if (pending_signal_delivery_requested())
+                deliver_pending_signals(runtime);
+        }
+
         void add_temporary_root(Runtime &runtime, std::vector<Rooted<Object>> &roots, Object *object)
         {
             if (object)
@@ -891,28 +927,12 @@ namespace cxxpython
         std::uint32_t last_traced_line = 0;
         while (frame->instruction_pointer() < code.instructions().size())
         {
-            if (runtime_.garbage_collection_requested())
-                (void)runtime_.collect_garbage_if_requested(thread_);
             const Instruction instruction = code.instructions()[frame->instruction_pointer()];
             frame->advance();
             try
             {
-            if (Object *trace_function = frame->trace_function())
-            {
-                const std::uint32_t current_line =
-                    code.line_for_instruction(frame->last_instruction_index());
-                if (current_line != 0 && current_line != last_traced_line)
-                {
-                    last_traced_line = current_line;
-                    set_frame_trace_from_result(*frame, call_trace_function(runtime_,
-                                                                            thread_,
-                                                                            trace_function,
-                                                                            *frame,
-                                                                            "line",
-                                                                            runtime_.none()));
-                }
-            }
-            deliver_pending_signals(runtime_);
+            if (eval_breaker_requested(runtime_, *frame))
+                handle_eval_breaker(runtime_, thread_, code, *frame, last_traced_line);
             switch (instruction.opcode)
             {
             case Opcode::LoadConst:

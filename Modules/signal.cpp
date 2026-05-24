@@ -90,11 +90,6 @@ namespace cxxpython
             return std::nullopt;
         }
 
-        bool has_pending_signals() noexcept
-        {
-            return pending_signal_flag != 0;
-        }
-
         Object *current_frame_object(Runtime &runtime)
         {
             if (VirtualMachine *vm = runtime.active_vm())
@@ -280,9 +275,14 @@ namespace cxxpython
         dict->set(runtime.new_str("__all__"), runtime.new_list(std::move(exports)));
     }
 
+    bool pending_signal_delivery_requested() noexcept
+    {
+        return pending_signal_flag != 0;
+    }
+
     void deliver_pending_signals(Runtime &runtime)
     {
-        if (!has_pending_signals())
+        if (!pending_signal_delivery_requested())
             return;
         while (std::optional<int> signum = take_pending_signal())
         {

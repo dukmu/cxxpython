@@ -74,6 +74,7 @@ namespace cxxpython
     void initialize_gc_module(Runtime &runtime, ModuleObject &module);
     void initialize_posix_module(Runtime &runtime, ModuleObject &module);
     void initialize_signal_module(Runtime &runtime, ModuleObject &module);
+    bool pending_signal_delivery_requested() noexcept;
     void deliver_pending_signals(Runtime &runtime);
     void initialize_io_module(Runtime &runtime, ModuleObject &module);
     void initialize_collections_module(Runtime &runtime, ModuleObject &module);

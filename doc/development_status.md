@@ -5655,6 +5655,52 @@ Verification:
 
 Result: all tests pass.
 
+## 2026-05-24 Unified Eval Breaker Entry Slice
+
+Review focus:
+
+- Stop growing independent VM-loop checks for GC, tracing, signals, and future
+  pending work.
+- Keep the bytecode safe point explicit while moving subsystem details behind a
+  single eval-breaker entry.
+
+Completed:
+
+- Exposed `pending_signal_delivery_requested()` as the signal module's cheap
+  pending-work predicate.
+- Added `eval_breaker_requested()` and `handle_eval_breaker()` in the VM.
+- Routed GC collection, line tracing, and signal delivery through that single
+  handler.
+
+Design notes:
+
+- The VM hot loop now has one structural place for safe-point work. This makes
+  future pending calls, thread cancellation, coroutine scheduling, and async
+  wakeups much easier to integrate without scattering more checks.
+- Signal internals stay in `Modules/signal.cpp`; VM only consumes a compact
+  predicate and the delivery function.
+
+Known debt and next risk:
+
+- The eval-breaker flag itself is still computed from multiple predicates. A
+  later runtime-level bitset can make this cheaper and provide a natural home
+  for pending calls.
+- Larger temporary numeric values still hit the shared runtime heap.
+
+Verification:
+
+- `cmake --build build -j$(nproc)`
+- `./build/test_core_objects --gtest_filter='Module.SignalDeliveryRaisesKeyboardInterruptAtSafePoints:PythonScripts.RunsGoldenFiles'`
+- `./build/cxxpython Tests/python/signal_module.py`
+- `./build/cxxpython Tests/python/sys_trace.py`
+- `./build/cxxpython Tests/python/thread_lowlevel.py`
+- `./build/cxxpython Tests/python/threading_module.py`
+- `./build/cxxpython Tests/python/thread_root_pressure.py`
+- `./build/cxxpython build/test2.py single 10000`
+- `./build/cxxpython build/test2.py multi 10000` repeated 30 times
+
+Result: all tests pass.
+
 ## 2026-05-24 VM Hot Path Guard Slice
 
 Review focus:
