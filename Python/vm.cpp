@@ -12,9 +12,9 @@ namespace cxxpython
 {
     namespace
     {
-        void jump_to(Frame &frame, const CodeObject &code, std::uint32_t target)
+        void jump_to(Frame &frame, std::size_t instruction_count, std::uint32_t target)
         {
-            if (target >= code.instructions().size())
+            if (target >= instruction_count)
                 throw BytecodeError("jump target out of range");
             frame.jump_to(target);
         }
@@ -983,6 +983,8 @@ namespace cxxpython
         DictObject &locals = *request.locals;
         DictObject &globals = *request.globals;
         DictObject &builtins = *builtins_dict;
+        const std::vector<Instruction> &instructions = code.instructions();
+        const std::size_t instruction_count = instructions.size();
         Frame *frame = runtime_.new_frame(&code, &locals, &globals, &builtins, request.closure);
         ActiveFrame active_frame(thread_, *frame);
         if (Object *global_trace = thread_.trace_function())
@@ -993,9 +995,9 @@ namespace cxxpython
                                                                     "call",
                                                                     runtime_.none()));
         std::uint32_t last_traced_line = 0;
-        while (frame->instruction_pointer() < code.instructions().size())
+        while (frame->instruction_pointer() < instruction_count)
         {
-            const Instruction instruction = code.instructions()[frame->instruction_pointer()];
+            const Instruction instruction = instructions[frame->instruction_pointer()];
             frame->advance();
             try
             {
@@ -1502,7 +1504,7 @@ namespace cxxpython
                     auto *range_iterator = static_cast<RangeIteratorObject *>(iterator);
                     if (range_iterator->remaining() == 0)
                     {
-                        jump_to(*frame, code, instruction.operand);
+                        jump_to(*frame, instruction_count, instruction.operand);
                         break;
                     }
                     const std::int64_t value = range_iterator->consume_value();
@@ -1522,7 +1524,7 @@ namespace cxxpython
                 {
                     if (error.type() && is_subclass(error.type(), runtime_.stop_iteration_type()))
                     {
-                        jump_to(*frame, code, instruction.operand);
+                        jump_to(*frame, instruction_count, instruction.operand);
                         break;
                     }
                     throw;
@@ -1539,13 +1541,13 @@ namespace cxxpython
                         continue;
                     frame->clear_stack();
                     frame->set_pending_break(instruction.operand);
-                    jump_to(*frame, code, static_cast<std::uint32_t>(handler.target));
+                    jump_to(*frame, instruction_count, static_cast<std::uint32_t>(handler.target));
                     jumped_to_finally = true;
                     break;
                 }
                 if (jumped_to_finally)
                     continue;
-                jump_to(*frame, code, instruction.operand);
+                jump_to(*frame, instruction_count, instruction.operand);
                 break;
             }
             case Opcode::ContinueLoop:
@@ -1557,18 +1559,18 @@ namespace cxxpython
                     if (handler.kind == FrameBlockKind::Except)
                         continue;
                     frame->set_pending_continue(instruction.operand);
-                    jump_to(*frame, code, static_cast<std::uint32_t>(handler.target));
+                    jump_to(*frame, instruction_count, static_cast<std::uint32_t>(handler.target));
                     jumped_to_finally = true;
                     break;
                 }
                 if (jumped_to_finally)
                     continue;
-                jump_to(*frame, code, instruction.operand);
+                jump_to(*frame, instruction_count, instruction.operand);
                 break;
             }
             case Opcode::JumpAbsolute:
             {
-                jump_to(*frame, code, instruction.operand);
+                jump_to(*frame, instruction_count, instruction.operand);
                 break;
             }
             case Opcode::PopJumpIfFalse:
@@ -1578,12 +1580,12 @@ namespace cxxpython
                 if (vm_fastpath::try_truth(runtime_, condition, truth))
                 {
                     if (!truth)
-                        jump_to(*frame, code, instruction.operand);
+                        jump_to(*frame, instruction_count, instruction.operand);
                     break;
                 }
                 auto condition_root = runtime_.root(condition);
                 if (!is_true(condition))
-                    jump_to(*frame, code, instruction.operand);
+                    jump_to(*frame, instruction_count, instruction.operand);
                 break;
             }
             case Opcode::PopJumpIfTrue:
@@ -1593,12 +1595,12 @@ namespace cxxpython
                 if (vm_fastpath::try_truth(runtime_, condition, truth))
                 {
                     if (truth)
-                        jump_to(*frame, code, instruction.operand);
+                        jump_to(*frame, instruction_count, instruction.operand);
                     break;
                 }
                 auto condition_root = runtime_.root(condition);
                 if (is_true(condition))
-                    jump_to(*frame, code, instruction.operand);
+                    jump_to(*frame, instruction_count, instruction.operand);
                 break;
             }
             case Opcode::JumpIfFalseOrPop:
@@ -1610,7 +1612,7 @@ namespace cxxpython
                     if (!truth)
                     {
                         frame->push(condition);
-                        jump_to(*frame, code, instruction.operand);
+                        jump_to(*frame, instruction_count, instruction.operand);
                     }
                     break;
                 }
@@ -1618,7 +1620,7 @@ namespace cxxpython
                 if (!is_true(condition))
                 {
                     frame->push(condition);
-                    jump_to(*frame, code, instruction.operand);
+                    jump_to(*frame, instruction_count, instruction.operand);
                 }
                 break;
             }
@@ -1913,14 +1915,14 @@ namespace cxxpython
                 {
                     const std::size_t target = frame->pending_control_target();
                     frame->clear_pending_control();
-                    jump_to(*frame, code, static_cast<std::uint32_t>(target));
+                    jump_to(*frame, instruction_count, static_cast<std::uint32_t>(target));
                     continue;
                 }
                 case PendingControlKind::Continue:
                 {
                     const std::size_t target = frame->pending_control_target();
                     frame->clear_pending_control();
-                    jump_to(*frame, code, static_cast<std::uint32_t>(target));
+                    jump_to(*frame, instruction_count, static_cast<std::uint32_t>(target));
                     continue;
                 }
                 }
@@ -1938,7 +1940,7 @@ namespace cxxpython
                         continue;
                     frame->clear_stack();
                     frame->set_pending_return(value);
-                    jump_to(*frame, code, static_cast<std::uint32_t>(handler.target));
+                    jump_to(*frame, instruction_count, static_cast<std::uint32_t>(handler.target));
                     jumped_to_finally = true;
                     break;
                 }
@@ -1988,7 +1990,7 @@ namespace cxxpython
                     auto handled_root = runtime_.root(handled_exception);
                     thread_.push_handled_exception(handled_exception);
                     frame->push(handled_exception);
-                    jump_to(*frame, code, static_cast<std::uint32_t>(target));
+                    jump_to(*frame, instruction_count, static_cast<std::uint32_t>(target));
                     continue;
                 }
                 if (frame->has_finally_handler())
@@ -1999,7 +2001,7 @@ namespace cxxpython
                     if (!pending_exception)
                         pending_exception = runtime_.new_exception(runtime_.exception_type(), "unknown exception");
                     frame->set_pending_exception(pending_exception);
-                    jump_to(*frame, code, static_cast<std::uint32_t>(target));
+                    jump_to(*frame, instruction_count, static_cast<std::uint32_t>(target));
                     continue;
                 }
                 throw;

@@ -1,6 +1,7 @@
 """Thread objects built on the low-level _thread substrate."""
 
 import _thread
+import traceback
 
 __all__ = [
     'Thread',
@@ -207,6 +208,8 @@ class Thread:
         try:
             if self._target is not None:
                 self._target(*self._args, **self._kwargs)
+        except Exception as e:
+            traceback.print_exception(e)
         finally:
             self._done.release()
 
