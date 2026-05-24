@@ -5655,6 +5655,46 @@ Verification:
 
 Result: all tests pass.
 
+## 2026-05-24 Signal Eval Breaker Fast Path Slice
+
+Review focus:
+
+- Remove unconditional signal-table scans from the VM bytecode hot path.
+- Preserve signal delivery at bytecode safe points without spreading signal
+  state checks through the VM dispatch loop.
+
+Completed:
+
+- Added a `sig_atomic_t` pending-signal flag owned by the native signal module.
+- Native signal handlers set both the per-signal pending slot and the compact
+  pending flag.
+- `deliver_pending_signals()` now returns immediately when no signal work is
+  pending, and clears the flag only after the pending table has been drained.
+
+Design notes:
+
+- This keeps the eval-breaker shape local to the signal subsystem: VM still has
+  one delivery call at the safe point, while the no-signal path avoids module
+  lookup and pending-table scanning.
+- `sig_atomic_t` is intentionally used instead of C++ library atomics inside the
+  native signal trampoline.
+
+Known debt and next risk:
+
+- GC still has its own hot-path requested check. It should eventually join a
+  unified eval-breaker model with signals, tracing, and pending calls.
+- Larger arithmetic results still allocate through the shared runtime heap.
+
+Verification:
+
+- `cmake --build build -j$(nproc)`
+- `./build/cxxpython Tests/python/signal_module.py`
+- `./build/test_core_objects --gtest_filter='Module.SignalDeliveryRaisesKeyboardInterruptAtSafePoints:PythonScripts.RunsGoldenFiles'`
+- `./build/cxxpython build/test2.py single 10000`
+- `./build/cxxpython build/test2.py multi 10000` repeated 40 times
+
+Result: all tests pass.
+
 ## 2026-05-24 Small Int Cache Slice
 
 Review focus:

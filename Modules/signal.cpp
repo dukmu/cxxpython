@@ -20,11 +20,15 @@ namespace cxxpython
         constexpr int signal_ignore = 1;
 
         std::array<volatile std::sig_atomic_t, 128> pending_signals{};
+        volatile std::sig_atomic_t pending_signal_flag = 0;
 
         void signal_trampoline(int signum)
         {
             if (signum >= 0 && static_cast<std::size_t>(signum) < pending_signals.size())
+            {
                 pending_signals[static_cast<std::size_t>(signum)] = 1;
+                pending_signal_flag = 1;
+            }
         }
 
         int require_signal_number(Runtime &runtime, const char *callable, Object *object)
@@ -82,7 +86,13 @@ namespace cxxpython
                 pending_signals[index] = 0;
                 return static_cast<int>(index);
             }
+            pending_signal_flag = 0;
             return std::nullopt;
+        }
+
+        bool has_pending_signals() noexcept
+        {
+            return pending_signal_flag != 0;
         }
 
         Object *current_frame_object(Runtime &runtime)
@@ -272,6 +282,8 @@ namespace cxxpython
 
     void deliver_pending_signals(Runtime &runtime)
     {
+        if (!has_pending_signals())
+            return;
         while (std::optional<int> signum = take_pending_signal())
         {
             if (!signal_module(runtime))
