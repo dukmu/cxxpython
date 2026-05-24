@@ -182,7 +182,9 @@ namespace cxxpython
     {
         require_no_keywords(&runtime, "locals", args);
         require_positional_count(&runtime, "locals", args, 0);
-        return current_frame_or_error(runtime, "locals")->locals();
+        Frame *frame = current_frame_or_error(runtime, "locals");
+        frame->sync_fast_locals_to_dict();
+        return frame->locals();
     }
 
     Object *builtin_dir(Runtime &runtime, const CallArguments &args)
@@ -193,7 +195,9 @@ namespace cxxpython
         std::set<std::string> names;
         if (args.positional.empty())
         {
-            collect_dict_names(names, current_frame_or_error(runtime, "dir")->locals());
+            Frame *frame = current_frame_or_error(runtime, "dir");
+            frame->sync_fast_locals_to_dict();
+            collect_dict_names(names, frame->locals());
         }
         else
         {
@@ -221,7 +225,11 @@ namespace cxxpython
         require_no_keywords(&runtime, "vars", args);
         require_positional_at_most(&runtime, "vars", args, 1);
         if (args.positional.empty())
-            return current_frame_or_error(runtime, "vars")->locals();
+        {
+            Frame *frame = current_frame_or_error(runtime, "vars");
+            frame->sync_fast_locals_to_dict();
+            return frame->locals();
+        }
 
         Object *object = args.positional[0];
         auto object_root = runtime.root(object);

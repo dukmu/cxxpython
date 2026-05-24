@@ -5655,6 +5655,56 @@ Verification:
 
 Result: all tests pass.
 
+## 2026-05-24 Fast Locals Frame Storage Slice
+
+Review focus:
+
+- Remove dict/hash work from `LOAD_FAST`, `STORE_FAST`, and `DELETE_FAST` in
+  function-heavy loops.
+- Preserve Python-visible `locals()`/`frame.f_locals` behavior with an explicit
+  synchronization boundary.
+
+Completed:
+
+- Added a `Frame` fast-locals vector sized from `CodeObject::varnames()`.
+- `LOAD_FAST`, `STORE_FAST`, and `DELETE_FAST` now use the frame vector instead
+  of dictionary lookup/mutation.
+- Added `Frame::sync_fast_locals_to_dict()` and call it from `f_locals`,
+  `locals()`, `vars()`, and zero-argument `dir()`.
+- Updated zero-argument `super()` to read the first argument directly from fast
+  locals.
+- Added C++ regression tests for fast-local initialization, lazy dict sync, and
+  GC traversal reachability.
+
+Design notes:
+
+- Fast locals are the authoritative execution storage; the locals dict is a
+  Python-facing view synchronized when requested.
+- Frame traversal visits fast locals directly so GC does not depend on the
+  synchronized dict view.
+
+Known debt and next risk:
+
+- `import *` still writes directly into the locals dict. Function-scope
+  `import *` needs either syntax rejection or explicit fast-locals invalidation.
+- Cell variables still mirror through cells plus selected locals writes; closure
+  semantics should be revisited once class/function scoping grows further.
+- Numeric temporaries outside small-int range and floats still allocate through
+  the shared runtime heap.
+
+Verification:
+
+- `cmake --build build -j$(nproc)`
+- `./build/test_core_objects --gtest_filter='Bytecode.FrameObjectsTrackCodeAndStackReferences:Bytecode.FrameFastLocalsMirrorLocalsDictionary:Bytecode.FrameTraversalVisitsFastLocals:PythonScripts.RunsGoldenFiles'`
+- `./build/test_core_objects --gtest_filter='Compile.*Fast*:Compile.*Local*:Compile.*Function*'`
+- `./build/cxxpython Tests/python/sys_trace.py`
+- `./build/cxxpython Tests/python/builtins_introspection.py`
+- `./build/cxxpython Tests/python/threading_module.py`
+- `./build/cxxpython Tests/python/thread_root_pressure.py`
+- `./build/cxxpython build/test2.py multi 10000` repeated 30 times
+
+Result: all tests pass.
+
 ## 2026-05-24 Unified Eval Breaker Entry Slice
 
 Review focus:

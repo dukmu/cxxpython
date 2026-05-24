@@ -914,6 +914,78 @@ TEST(Bytecode, FrameObjectsTrackCodeAndStackReferences)
     EXPECT_EQ(visited[4], value);
 }
 
+TEST(Bytecode, FrameFastLocalsMirrorLocalsDictionary)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::StrObject *name = runtime.new_str("x");
+    cxxpython::IntObject *initial = runtime.new_int(7);
+    cxxpython::IntObject *replacement = runtime.new_int(9);
+    cxxpython::DictObject *locals = runtime.new_dict();
+    cxxpython::DictObject *globals = runtime.new_dict();
+    cxxpython::DictObject *builtins = runtime.new_dict();
+    locals->set(name, initial);
+    cxxpython::CodeObject *code = runtime.new_code(
+        "fast",
+        "fast.py",
+        0,
+        0,
+        0,
+        0,
+        {name},
+        {runtime.none()},
+        {},
+        {},
+        {},
+        {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::ReturnValue, 0}});
+    cxxpython::Frame *frame = runtime.new_frame(code, locals, globals, builtins);
+
+    EXPECT_EQ(frame->fast_local(0), initial);
+    frame->set_fast_local(0, replacement);
+    EXPECT_EQ(frame->fast_local(0), replacement);
+    EXPECT_EQ(locals->get(name), initial);
+    frame->sync_fast_locals_to_dict();
+    EXPECT_EQ(locals->get(name), replacement);
+    EXPECT_TRUE(frame->delete_fast_local(0));
+    EXPECT_EQ(frame->fast_local(0), nullptr);
+    EXPECT_EQ(locals->get(name), replacement);
+    frame->sync_fast_locals_to_dict();
+    EXPECT_EQ(locals->get(name), nullptr);
+    EXPECT_FALSE(frame->delete_fast_local(0));
+}
+
+TEST(Bytecode, FrameTraversalVisitsFastLocals)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::StrObject *name = runtime.new_str("x");
+    cxxpython::IntObject *value = runtime.new_int(7);
+    cxxpython::DictObject *locals = runtime.new_dict();
+    cxxpython::DictObject *globals = runtime.new_dict();
+    cxxpython::DictObject *builtins = runtime.new_dict();
+    locals->set(name, value);
+    cxxpython::CodeObject *code = runtime.new_code(
+        "fast",
+        "fast.py",
+        0,
+        0,
+        0,
+        0,
+        {name},
+        {runtime.none()},
+        {},
+        {},
+        {},
+        {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::ReturnValue, 0}});
+    cxxpython::Frame *frame = runtime.new_frame(code, locals, globals, builtins);
+
+    std::vector<cxxpython::Object *> visited;
+    frame->visit_children([&visited](cxxpython::Object *object)
+                          { visited.push_back(object); });
+
+    EXPECT_NE(std::find(visited.begin(), visited.end(), value), visited.end());
+}
+
 TEST(Bytecode, LoadNameResolvesLocalsGlobalsThenBuiltins)
 {
     cxxpython::Runtime runtime;

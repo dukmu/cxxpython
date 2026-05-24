@@ -86,6 +86,7 @@ namespace cxxpython
                 visitor(frame->builtins());
             for (std::size_t index = 0; index < frame->cell_count(); ++index)
                 visitor(frame->cell(index));
+            frame->visit_fast_locals(visitor);
             frame->visit_stack(visitor);
             if (frame->pending_control_value())
                 visitor(frame->pending_control_value());
@@ -124,7 +125,9 @@ namespace cxxpython
 
         Object *frame_locals_getter(Runtime &runtime, Object *instance, TypeObject *)
         {
-            return require_frame_instance(runtime, instance, "f_locals")->locals();
+            Frame *frame = require_frame_instance(runtime, instance, "f_locals");
+            frame->sync_fast_locals_to_dict();
+            return frame->locals();
         }
 
         Object *frame_globals_getter(Runtime &runtime, Object *instance, TypeObject *)
@@ -433,7 +436,8 @@ namespace cxxpython
           locals_(locals),
           globals_(globals),
           builtins_(builtins),
-          cells_(std::move(cells))
+          cells_(std::move(cells)),
+          fast_locals_(code ? code->varnames().size() : 0, nullptr)
     {
         if (!code_)
             throw BytecodeError("frame requires a code object");
@@ -445,6 +449,13 @@ namespace cxxpython
             throw BytecodeError("frame requires builtins");
         if (cells_.size() != code_->cellvars().size() + code_->freevars().size())
             throw BytecodeError("frame cell count does not match code metadata");
+        for (std::size_t index = 0; index < code_->varnames().size(); ++index)
+        {
+            auto *name = dynamic_cast<StrObject *>(code_->varnames()[index]);
+            if (!name)
+                throw BytecodeError("frame varname must be a str");
+            fast_locals_[index] = locals_->get(name);
+        }
     }
 
     CodeObject *Frame::code() const noexcept
@@ -477,6 +488,52 @@ namespace cxxpython
     std::size_t Frame::cell_count() const noexcept
     {
         return cells_.size();
+    }
+
+    Object *Frame::fast_local(std::size_t index) const
+    {
+        if (index >= fast_locals_.size())
+            throw BytecodeError("fast local index out of range");
+        return fast_locals_[index];
+    }
+
+    void Frame::set_fast_local(std::size_t index, Object *value)
+    {
+        if (index >= fast_locals_.size())
+            throw BytecodeError("fast local index out of range");
+        if (!value)
+            throw BytecodeError("cannot assign null fast local");
+        auto *name = dynamic_cast<StrObject *>(code_->varnames()[index]);
+        if (!name)
+            throw BytecodeError("fast local name must be a str");
+        fast_locals_[index] = value;
+    }
+
+    bool Frame::delete_fast_local(std::size_t index)
+    {
+        if (index >= fast_locals_.size())
+            throw BytecodeError("fast local index out of range");
+        if (!fast_locals_[index])
+            return false;
+        auto *name = dynamic_cast<StrObject *>(code_->varnames()[index]);
+        if (!name)
+            throw BytecodeError("fast local name must be a str");
+        fast_locals_[index] = nullptr;
+        return true;
+    }
+
+    void Frame::sync_fast_locals_to_dict()
+    {
+        for (std::size_t index = 0; index < fast_locals_.size(); ++index)
+        {
+            auto *name = dynamic_cast<StrObject *>(code_->varnames()[index]);
+            if (!name)
+                throw BytecodeError("fast local name must be a str");
+            if (Object *value = fast_locals_[index])
+                locals_->set(name, value);
+            else
+                (void)locals_->erase(name);
+        }
     }
 
     std::size_t Frame::instruction_pointer() const noexcept
@@ -556,6 +613,15 @@ namespace cxxpython
     void Frame::visit_stack(const VisitChildren &visitor) const
     {
         for (Object *object : stack_)
+        {
+            if (object)
+                visitor(object);
+        }
+    }
+
+    void Frame::visit_fast_locals(const VisitChildren &visitor) const
+    {
+        for (Object *object : fast_locals_)
         {
             if (object)
                 visitor(object);
@@ -1027,7 +1093,7 @@ namespace cxxpython
                 auto *name = dynamic_cast<StrObject *>(code.varnames()[instruction.operand]);
                 if (!name)
                     throw BytecodeError("LOAD_FAST requires a str varname");
-                Object *value = locals.get(name);
+                Object *value = frame->fast_local(instruction.operand);
                 if (!value)
                     raise_unbound_local_error(
                         &runtime_,
@@ -1045,7 +1111,7 @@ namespace cxxpython
                     throw BytecodeError("STORE_FAST requires a str varname");
                 Object *value = frame->pop();
                 auto value_root = runtime_.root(value);
-                locals.set(name, value);
+                frame->set_fast_local(instruction.operand, value);
                 break;
             }
             case Opcode::DeleteFast:
@@ -1055,7 +1121,7 @@ namespace cxxpython
                 auto *name = dynamic_cast<StrObject *>(code.varnames()[instruction.operand]);
                 if (!name)
                     throw BytecodeError("DELETE_FAST requires a str varname");
-                if (!locals.erase(name))
+                if (!frame->delete_fast_local(instruction.operand))
                     raise_unbound_local_error(
                         &runtime_,
                         "cannot delete local variable '" + name->value +

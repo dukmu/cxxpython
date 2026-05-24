@@ -48,6 +48,10 @@ namespace cxxpython
         DictObject *builtins() const noexcept;
         CellObject *cell(std::size_t index) const;
         std::size_t cell_count() const noexcept;
+        Object *fast_local(std::size_t index) const;
+        void set_fast_local(std::size_t index, Object *value);
+        bool delete_fast_local(std::size_t index);
+        void sync_fast_locals_to_dict();
         std::size_t instruction_pointer() const noexcept;
         std::size_t last_instruction_index() const noexcept;
         void advance() noexcept;
@@ -59,6 +63,7 @@ namespace cxxpython
         void clear_stack() noexcept;
         std::size_t stack_size() const noexcept;
         void visit_stack(const VisitChildren &visitor) const;
+        void visit_fast_locals(const VisitChildren &visitor) const;
         void push_exception_handler(std::size_t target);
         std::size_t pop_exception_handler();
         bool has_exception_handler() const noexcept;
@@ -85,6 +90,7 @@ namespace cxxpython
         DictObject *globals_;
         DictObject *builtins_;
         std::vector<CellObject *> cells_;
+        std::vector<Object *> fast_locals_;
         std::size_t ip_ = 0;
         std::size_t last_ip_ = 0;
         std::vector<Object *> stack_;

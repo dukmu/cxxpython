@@ -130,4 +130,4 @@ def build_body():
     value = 'from-build-class'
 
 BuiltByBuiltin = __build_class__(build_body, 'BuiltByBuiltin')
-print(BuiltByBuiltin.value)
+print(BuiltByBuiltin.__name__)

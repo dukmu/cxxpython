@@ -63,7 +63,7 @@ namespace cxxpython
         auto *first_arg_name = dynamic_cast<StrObject *>(frame->code()->varnames()[0]);
         if (!first_arg_name)
             throw BytecodeError("super() first argument metadata must be a str");
-        Object *first_arg = frame->locals()->get(first_arg_name);
+        Object *first_arg = frame->fast_local(0);
         if (!first_arg)
             raise_type_error(this, "super(): arg[0] deleted");
 
