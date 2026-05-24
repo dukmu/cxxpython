@@ -1,6 +1,47 @@
 # Development Status
 
 
+## 2026-05-24 Native Time And Regex Substrate Slice
+
+Review focus:
+
+- Add `time` as a real native module.
+- Add `re` with CPython-like layering: native `_re` substrate plus script `Lib/re.py`.
+- Keep module APIs and docstrings aligned with the actual runtime surface.
+
+Completed:
+
+- Added native `time` module with `time()`, `sleep()`, `monotonic()`, and
+  exported `__all__`.
+- Added native `_re` substrate module with module-local `Pattern` and `Match`
+  types.
+- Added script-level `Lib/re.py` that re-exports the native substrate in a
+  CPython-shaped API.
+- Added golden tests for `time` and `re`.
+- Registered the new native modules in the built-in extension registry and
+  `sys.builtin_module_names`.
+
+Design notes:
+
+- `time` belongs in the native substrate because it is a host-clock primitive.
+- `re` should keep its storage and match state in module-private native types,
+  not in `runtime` headers or generic object headers.
+- The public `re` module should stay script-level wherever possible.
+
+Known debt and next risk:
+
+- `re` only covers a small substring/search/match subset so far.
+- `time` is intentionally minimal and still lacks the broader CPython API.
+- The module registry is growing, so the next step should be to keep native
+  modules narrowly scoped and script wrappers thin.
+
+Verification:
+
+- `cmake --build build -j2`
+- `./build/cxxpython Tests/python/re_module.py`
+- `./build/cxxpython Tests/python/time_module.py`
+
+
 ## 2026-05-24 Float And Arithmetic Core Slice
 
 Review focus:

@@ -118,6 +118,7 @@ namespace cxxpython
             std::vector<Object *> names{
                 runtime.new_str("_io"),
                 runtime.new_str("_collections"),
+                runtime.new_str("_re"),
                 runtime.new_str("_thread"),
                 runtime.new_str("_tokenize"),
                 runtime.new_str("builtins"),
@@ -125,6 +126,7 @@ namespace cxxpython
                 runtime.new_str("posix"),
                 runtime.new_str("signal"),
                 runtime.new_str("sys"),
+                runtime.new_str("time"),
             };
             return runtime.new_tuple(std::move(names));
         }

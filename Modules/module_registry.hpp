@@ -79,4 +79,6 @@ namespace cxxpython
     void initialize_collections_module(Runtime &runtime, ModuleObject &module);
     void initialize_thread_module(Runtime &runtime, ModuleObject &module);
     void initialize_tokenize_module(Runtime &runtime, ModuleObject &module);
+    void initialize_time_module(Runtime &runtime, ModuleObject &module);
+    void initialize_regex_module(Runtime &runtime, ModuleObject &module);
 }

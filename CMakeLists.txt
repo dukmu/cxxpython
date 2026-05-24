@@ -37,8 +37,10 @@ add_library(cxxpython_core
     Modules/gc.cpp
     Modules/posix.cpp
     Modules/signal.cpp
+    Modules/time.cpp
     Modules/_io.cpp
     Modules/_collections.cpp
+    Modules/_re.cpp
     Modules/_thread.cpp
     Modules/_tokenize.cpp
     Objects/object_core.cpp

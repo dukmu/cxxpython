@@ -1,0 +1,12 @@
+<class 'module'>
+True
+True
+True
+True
+<class '_re.Pattern'>
+<class '_re.Pattern'>
+<class '_re.Match'>
+<re.Match object; span=(0, 2)>
+<re.Match object; span=(0, 2)>
+None
+<re.Match object; span=(1, 2)>
