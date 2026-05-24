@@ -101,6 +101,9 @@ TEST(CoreObjects, ReprAndExceptionObjects)
     EXPECT_EQ(cxxpython::object_str(runtime.new_str("hello")), "hello");
     EXPECT_EQ(cxxpython::object_str(runtime.new_int(7)), "7");
     EXPECT_EQ(cxxpython::object_repr(runtime.type_type()), "<class 'type'>");
+    EXPECT_EQ(runtime.new_int(-5), runtime.new_int(-5));
+    EXPECT_EQ(runtime.new_int(256), runtime.new_int(256));
+    EXPECT_NE(runtime.new_int(257), runtime.new_int(257));
 
     cxxpython::ExceptionObject *manual_error =
         runtime.new_exception(runtime.type_error_type(), "bad\\operand\n");

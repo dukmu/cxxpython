@@ -5655,6 +5655,46 @@ Verification:
 
 Result: all tests pass.
 
+## 2026-05-24 Small Int Cache Slice
+
+Review focus:
+
+- Reduce hot-path allocation pressure from short-lived integer results.
+- Keep thread safety in the runtime object model instead of adding broad
+  per-object locks or script-level synchronization around arithmetic.
+
+Completed:
+
+- Added a runtime-owned small-int cache for the immutable range `[-5, 256]`.
+- Cached integers are created during bootstrap, rooted once, and reused by
+  `Runtime::new_int()`.
+- Added a bootstrap regression test for identity reuse at the cache boundaries.
+
+Design notes:
+
+- This follows the CPython-shaped optimization where common immutable integers
+  are runtime singletons.
+- The change reduces global heap lock contention without changing integer
+  semantics or adding locks to individual immutable objects.
+
+Known debt and next risk:
+
+- Arithmetic outside the cache range still allocates through the global heap.
+- A larger allocator redesign should be deliberate and measured; blindly adding
+  per-object locks would make CPU-bound code worse.
+
+Verification:
+
+- `cmake --build build -j$(nproc)`
+- `./build/test_core_objects --gtest_filter='CoreObjects.ReprAndExceptionObjects:PythonScripts.RunsGoldenFiles'`
+- `./build/cxxpython Tests/python/thread_lowlevel.py`
+- `./build/cxxpython Tests/python/threading_module.py`
+- `./build/cxxpython Tests/python/thread_root_pressure.py`
+- `./build/cxxpython build/test2.py single 10000`
+- `./build/cxxpython build/test2.py multi 10000` repeated 20 times
+
+Result: all tests pass.
+
 ## 2026-05-19 Property Descriptor Builtin
 
 Pre-change review:

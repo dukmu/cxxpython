@@ -13,6 +13,7 @@
 #include <vector>
 #include <filesystem>
 #include <optional>
+#include <array>
 
 #include "cxxpython/object.hpp"
 
@@ -427,6 +428,11 @@ namespace cxxpython
 
         friend class VirtualMachine;
 
+        static constexpr std::int64_t small_int_min_ = -5;
+        static constexpr std::int64_t small_int_max_ = 256;
+        static constexpr std::size_t small_int_count_ =
+            static_cast<std::size_t>(small_int_max_ - small_int_min_ + 1);
+
         std::vector<std::unique_ptr<Object>> heap_;
         std::vector<Object *> roots_;
         mutable std::recursive_mutex heap_mutex_;
@@ -507,6 +513,7 @@ namespace cxxpython
         FloatObject *float_ = nullptr;
         BoolObject *true_ = nullptr;
         BoolObject *false_ = nullptr;
+        std::array<IntObject *, small_int_count_> small_ints_{};
         TextIOObject *stdin_object_ = nullptr;
         TextIOObject *stdout_object_ = nullptr;
         TextIOObject *stderr_object_ = nullptr;

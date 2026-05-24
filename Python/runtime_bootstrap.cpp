@@ -306,6 +306,11 @@ namespace cxxpython
         not_implemented_ = allocate<NotImplementedObject>(not_implemented_type_);
         true_ = allocate<BoolObject>(bool_type_, true);
         false_ = allocate<BoolObject>(bool_type_, false);
+        for (std::int64_t value = small_int_min_; value <= small_int_max_; ++value)
+        {
+            small_ints_[static_cast<std::size_t>(value - small_int_min_)] =
+                allocate<IntObject>(int_type_, value);
+        }
         stdin_object_ = new_text_io("<stdin>", &std::cin, nullptr, false);
         stdout_object_ = new_text_io("<stdout>", nullptr, &std::cout, false);
         stderr_object_ = new_text_io("<stderr>", nullptr, &std::cerr, false);
@@ -372,6 +377,8 @@ namespace cxxpython
         add_root(float_);
         add_root(true_);
         add_root(false_);
+        for (IntObject *small_int : small_ints_)
+            add_root(small_int);
         add_root(stdin_object_);
         add_root(stdout_object_);
         add_root(stderr_object_);

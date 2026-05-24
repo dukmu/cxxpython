@@ -83,6 +83,8 @@ namespace cxxpython
 
     IntObject *Runtime::new_int(std::int64_t value)
     {
+        if (value >= small_int_min_ && value <= small_int_max_)
+            return small_ints_[static_cast<std::size_t>(value - small_int_min_)];
         return allocate<IntObject>(int_type_, value);
     }
 
