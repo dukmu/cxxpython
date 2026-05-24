@@ -70,6 +70,14 @@ namespace cxxpython
             return runtime.none();
         }
 
+        Object *sys_exit(Runtime &runtime, const CallArguments &args)
+        {
+            require_no_keywords(&runtime, "exit", args);
+            require_positional_at_most(&runtime, "exit", args, 1);
+            Object *code = args.positional.empty() ? static_cast<Object *>(runtime.none()) : args.positional[0];
+            throw PythonError(runtime.new_exception(runtime.system_exit_type(), std::vector<Object *>{code}));
+        }
+
         Object *sys_implementation(Runtime &runtime, const CallArguments &args)
         {
             require_no_keywords(&runtime, "implementation", args);
@@ -185,6 +193,12 @@ namespace cxxpython
                 sys_settrace,
                 "Set the global debug trace function.",
                 "($module, function, /)",
+            },
+            {
+                "exit",
+                sys_exit,
+                "Exit by raising SystemExit.",
+                "($module, status=None, /)",
             },
         };
 

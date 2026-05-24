@@ -1,9 +1,25 @@
 #include <gtest/gtest.h>
 
 #include <filesystem>
+#include <fstream>
 #include <string>
+#include <vector>
 
 #include "test_process.hpp"
+
+namespace
+{
+    std::string program_with_args(const std::vector<std::string> &args)
+    {
+        std::string command = CXXPYTHON_PROGRAM_PATH;
+        for (const std::string &arg : args)
+        {
+            command.push_back(' ');
+            command += test_process::shell_quote(arg);
+        }
+        return command;
+    }
+}
 
 TEST(Cli, ExecutesScriptFile)
 {
@@ -32,6 +48,57 @@ TEST(Cli, ExecutesBuiltinPrintThroughScriptPath)
     EXPECT_EQ(result.exit_code, 0);
     EXPECT_EQ(result.output, "hello 42\n");
     std::filesystem::remove(script);
+}
+
+TEST(Cli, PassesScriptPathAndArgumentsToSysArgv)
+{
+    const std::filesystem::path script = test_process::write_script(
+        "cxxpython_cli_sys_argv.py",
+        "import sys\n"
+        "print(sys.argv[0])\n"
+        "print(sys.argv[1])\n"
+        "print(sys.argv[2])\n");
+
+    const test_process::CommandResult result =
+        test_process::run_command(program_with_args({script.string(), "alpha", "beta"}));
+
+    EXPECT_EQ(result.exit_code, 0);
+    EXPECT_EQ(result.output,
+              script.string() + "\n"
+              "alpha\n"
+              "beta\n");
+    std::filesystem::remove(script);
+}
+
+TEST(Cli, SupportsModuleExecutionWithDashM)
+{
+    const std::filesystem::path directory = std::filesystem::temp_directory_path();
+    const std::filesystem::path module = std::filesystem::absolute(directory / "cxxpython_cli_module_runner.py");
+
+    std::ofstream(module) << "import sys\n"
+                          "print(__name__)\n"
+                          "print(__package__)\n"
+                          "print(__spec__.name)\n"
+                          "print(__spec__.origin)\n"
+                          "print(sys.path[0])\n"
+                          "print(sys.argv[0])\n"
+                          "print(sys.argv[1])\n";
+
+    const test_process::CommandResult result =
+        test_process::run_command("cd " + test_process::shell_quote(directory) + " && " +
+                                  program_with_args({"-m", "cxxpython_cli_module_runner", "tail"}));
+
+    EXPECT_EQ(result.exit_code, 0);
+    EXPECT_EQ(result.output,
+              std::string("__main__\n") +
+                  "\n" +
+                  "cxxpython_cli_module_runner\n" +
+                  std::filesystem::absolute(module).string() + "\n" +
+                  directory.string() + "\n" +
+                  std::filesystem::absolute(module).string() + "\n" +
+                  "tail\n");
+
+    std::filesystem::remove(module);
 }
 
 TEST(Cli, ImportsSiblingPythonModule)

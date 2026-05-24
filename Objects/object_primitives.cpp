@@ -6,6 +6,7 @@
 
 #include <charconv>
 #include <cmath>
+#include <iomanip>
 #include <limits>
 #include <sstream>
 #include <utility>
@@ -378,6 +379,8 @@ namespace cxxpython
         {
             if (auto *integer = dynamic_cast<IntObject *>(object))
                 return integer->value;
+            if (auto *floating = dynamic_cast<FloatObject *>(object))
+                return static_cast<std::int64_t>(std::trunc(floating->value));
             if (auto *text = dynamic_cast<StrObject *>(object))
                 return parse_int_literal(runtime, text);
             raise_type_error(runtime,
@@ -449,6 +452,49 @@ namespace cxxpython
             if (!number)
                 raise_type_error(&runtime, "float conversion receiver does not have float layout");
             return number;
+        }
+
+        Object *float_int_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (!args.empty())
+                raise_type_error(&runtime, "float.__int__() takes exactly zero arguments");
+            auto *number = dynamic_cast<FloatObject *>(self);
+            if (!number)
+                raise_type_error(&runtime, "float conversion receiver does not have float layout");
+            return runtime.new_int(static_cast<std::int64_t>(std::trunc(number->value)));
+        }
+
+        Object *float_format_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (args.size() != 1)
+                raise_type_error(&runtime, "float.__format__() takes exactly one argument");
+            auto *number = dynamic_cast<FloatObject *>(self);
+            if (!number)
+                raise_type_error(&runtime, "float format receiver does not have float layout");
+            auto *format_spec = dynamic_cast<StrObject *>(args[0]);
+            if (!format_spec)
+                raise_type_error(&runtime, "format specifier must be a string");
+
+            const std::string &spec = format_spec->value;
+            if (spec.empty())
+                return runtime.new_str(float_repr(*number));
+
+            if (spec.size() >= 2 && spec.front() == '.' &&
+                (spec.back() == 'f' || spec.back() == 'F'))
+            {
+                const std::string precision_text = spec.substr(1, spec.size() - 2);
+                std::int64_t precision = 0;
+                const char *begin = precision_text.data();
+                const char *end = begin + precision_text.size();
+                const auto [position, error] = std::from_chars(begin, end, precision);
+                if (error != std::errc{} || position != end || precision < 0)
+                    raise_value_error(&runtime, "invalid format precision");
+                std::ostringstream out;
+                out << std::fixed << std::setprecision(static_cast<int>(precision)) << number->value;
+                return runtime.new_str(out.str());
+            }
+
+            raise_type_error(&runtime, "unsupported format string passed to float.__format__");
         }
 
         std::string bool_repr(const Object &object)
@@ -1168,8 +1214,12 @@ namespace cxxpython
     {
         type->dict->set(runtime.new_str("__bool__"),
                         runtime.new_method_descriptor("__bool__", type, float_bool_method));
+        type->dict->set(runtime.new_str("__int__"),
+                        runtime.new_method_descriptor("__int__", type, float_int_method));
         type->dict->set(runtime.new_str("__float__"),
                         runtime.new_method_descriptor("__float__", type, float_float_method));
+        type->dict->set(runtime.new_str("__format__"),
+                        runtime.new_method_descriptor("__format__", type, float_format_method));
     }
 
     void initialize_str_type_methods(Runtime &runtime, TypeObject *type)

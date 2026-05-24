@@ -99,13 +99,14 @@ namespace cxxpython
             std::filesystem::path package_candidate = std::filesystem::path(search_path) / package_relative;
             if (std::filesystem::is_regular_file(package_candidate))
             {
+                const std::filesystem::path absolute = std::filesystem::absolute(package_candidate).lexically_normal();
                 storage = ModuleLoadSpec{
                     .name = std::string(name),
-                    .filename = package_candidate.string(),
-                    .origin = package_candidate.string(),
+                    .filename = absolute.string(),
+                    .origin = absolute.string(),
                     .loader_name = "SourceFileLoader",
                     .package = std::string(name),
-                    .package_dir = package_candidate.parent_path().string(),
+                    .package_dir = absolute.parent_path().string(),
                     .is_package = true,
                     .kind = ModuleLoadKind::Source,
                 };
@@ -115,10 +116,11 @@ namespace cxxpython
             std::filesystem::path source_candidate = std::filesystem::path(search_path) / source_relative;
             if (std::filesystem::is_regular_file(source_candidate))
             {
+                const std::filesystem::path absolute = std::filesystem::absolute(source_candidate).lexically_normal();
                 storage = ModuleLoadSpec{
                     .name = std::string(name),
-                    .filename = source_candidate.string(),
-                    .origin = source_candidate.string(),
+                    .filename = absolute.string(),
+                    .origin = absolute.string(),
                     .loader_name = "SourceFileLoader",
                     .package = package_name_for(name),
                     .package_dir = "",
@@ -131,10 +133,11 @@ namespace cxxpython
             std::filesystem::path extension_candidate = std::filesystem::path(search_path) / extension_relative;
             if (std::filesystem::is_regular_file(extension_candidate))
             {
+                const std::filesystem::path absolute = std::filesystem::absolute(extension_candidate).lexically_normal();
                 storage = ModuleLoadSpec{
                     .name = std::string(name),
-                    .filename = extension_candidate.string(),
-                    .origin = extension_candidate.string(),
+                    .filename = absolute.string(),
+                    .origin = absolute.string(),
                     .loader_name = "ExtensionFileLoader",
                     .package = package_name_for(name),
                     .package_dir = "",
@@ -146,5 +149,15 @@ namespace cxxpython
         }
 
         return nullptr;
+    }
+
+    std::optional<ModuleLoadSpec> Runtime::resolve_module_spec(std::string_view name,
+                                                                const std::vector<std::string> *package_paths,
+                                                                std::string_view search_name)
+    {
+        ModuleLoadSpec storage;
+        if (ModuleLoadSpec *spec = find_module_spec(name, storage, package_paths, search_name))
+            return *spec;
+        return std::nullopt;
     }
 }

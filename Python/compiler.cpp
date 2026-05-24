@@ -14,6 +14,12 @@ namespace cxxpython
                                       public compiler_internal::TargetVisitor,
                                       public compiler_internal::StmtVisitor
         {
+            enum class LoopKind
+            {
+                For,
+                While,
+            };
+
         public:
             BytecodeBuilder(Runtime &runtime,
                             const SymbolTable &symbols,
@@ -740,6 +746,7 @@ namespace cxxpython
                 const std::size_t loop_start = instructions_.size();
                 const std::size_t exit_jump = emit_jump(Opcode::ForIter);
                 loop_stack_.push_back(LoopControl{
+                    .kind = LoopKind::For,
                     .start = loop_start,
                     .continue_target = loop_start,
                     .break_target = 0,
@@ -774,6 +781,7 @@ namespace cxxpython
                 statement.condition->accept(*this);
                 const std::size_t exit_jump = emit_jump(Opcode::PopJumpIfFalse);
                 loop_stack_.push_back(LoopControl{
+                    .kind = LoopKind::While,
                     .start = loop_start,
                     .continue_target = loop_start,
                     .break_target = 0,
@@ -818,6 +826,8 @@ namespace cxxpython
                 StatementLineGuard line(*this, statement);
                 if (loop_stack_.empty())
                     raise_syntax_error(&runtime_, "'break' outside loop");
+                if (loop_stack_.back().kind == LoopKind::For)
+                    emit({Opcode::PopTop, 0});
                 loop_stack_.back().break_jumps.push_back(emit_jump(Opcode::BreakLoop));
             }
 
@@ -1581,6 +1591,7 @@ namespace cxxpython
 
             struct LoopControl final
             {
+                LoopKind kind = LoopKind::While;
                 std::size_t start = 0;
                 std::size_t continue_target = 0;
                 std::size_t break_target = 0;

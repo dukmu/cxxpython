@@ -1,4 +1,4 @@
-"""Regular expression operations built on the native _re substrate."""
+"""Support for regular expression operations."""
 
 import _re
 

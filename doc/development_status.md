@@ -1,6 +1,102 @@
 # Development Status
 
 
+## 2026-05-24 Nested Loop Break Stack Repair Slice
+
+Review focus:
+
+- Diagnose the compile-time hang triggered by nested `for` loops with `break`.
+- Keep loop control flow consistent with the VM's block/unwind model.
+- Add a regression that fails on function definition, not only runtime execution.
+
+Completed:
+
+- Fixed `break` in `for` loops to release the active iterator before emitting
+  the loop exit jump.
+- Kept `while` loop break handling unchanged.
+- Added a golden Python regression that defines a nested-loop function with
+  `break` and only prints after the function body is compiled successfully.
+- Added `sys.exit()` as the standard module entry point for raising
+  `SystemExit`, matching the already-supported `site.exit` helper behavior.
+- Completed the immediate numeric conversion gap exposed by `count_primes`:
+  `int(float)` and `float.__int__()` now truncate toward zero.
+- Added a minimal `float.__format__()` path for empty specs and fixed-point
+  precision specs so the launcher and f-strings can format runtime values.
+
+Design notes:
+
+- `for` loops own an implicit iterator slot on the value stack.
+- `break` out of `for` must consume that iterator before leaving the loop
+  frame state.
+- The compiler should model loop-kind differences explicitly instead of
+  relying on generic break patching.
+
+Known debt and next risk:
+
+- The stack-analysis path for control flow still deserves broader stress
+  coverage, especially around `try/finally` and nested loop exits.
+- `continue` semantics in loop-unwind contexts should be reviewed with the
+  same rigor as `break`.
+- Script-level wrappers can still drift from their native substrate's docstring
+  and `__all__` surface, so the public module shape should stay under test.
+- The next step after this fix should be to rerun the Python golden suite and
+  then continue tightening control-flow and builtins debt.
+
+Verification:
+
+- `cmake --build build -j2`
+- `./build/cxxpython Tests/python/for_break_continue_else.py`
+- `./build/cxxpython Tests/python/for_break_continue_finally.py`
+- `./build/cxxpython Tests/python/nested_loop_break_definition.py`
+- Pending: rerun after `sys.exit()` addition.
+- Pending: rerun after `int(float)` addition.
+- Pending: rerun after `float.__format__()` addition.
+
+
+## 2026-05-24 CLI Argument And Module Execution Slice
+
+Review focus:
+
+- Bring the launcher closer to CPython's `sys.argv`, `sys.path`, script, and
+  `-m` module execution behavior.
+- Keep REPL bootstrapping separate from script/module execution.
+- Preserve import/search-path initialization in the launcher instead of
+  scattering it across runtime helpers.
+
+Completed:
+
+- Added CLI argument parsing for REPL, script execution, and `-m` module
+  execution.
+- Script execution now initializes `sys.argv[0]` to the script path and adds
+  the script directory to the front of module search paths.
+- `-m` execution now resolves the target module to a source file, runs it as
+  `__main__`, and uses the resolved file path for `sys.argv[0]`.
+- Module resolution now normalizes source, package, and extension paths to
+  absolute canonical-looking paths.
+- Added CLI tests that lock script `sys.argv`, `-m` execution, and the existing
+  REPL behavior.
+
+Design notes:
+
+- Launcher-owned setup keeps `Runtime` focused on import and execution, not
+  command-line parsing policy.
+- `sys.path[0]` should be set by the execution mode, not inferred later by
+  import code.
+- `-m` must resolve to the module file first, then execute as `__main__`.
+
+Known debt and next risk:
+
+- `-m` currently targets source modules only.
+- `-c` and other CPython launcher modes are still absent.
+- REPL bootstrapping still has some CPython gaps around startup metadata and
+  interactive edge cases.
+
+Verification:
+
+- `cmake --build build -j2`
+- `./build/test_core_objects --gtest_filter='Cli.*'`
+
+
 ## 2026-05-24 Native Time And Regex Substrate Slice
 
 Review focus:

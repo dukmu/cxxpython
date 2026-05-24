@@ -12,6 +12,7 @@
 #include <utility>
 #include <vector>
 #include <filesystem>
+#include <optional>
 
 #include "cxxpython/object.hpp"
 
@@ -334,6 +335,9 @@ namespace cxxpython
         TypeObject *build_class(const ClassBuildRequest &request);
         Object *import_name(const ImportRequest &request);
         ModuleObject *import_module(std::string name);
+        std::optional<ModuleLoadSpec> resolve_module_spec(std::string_view name,
+                                                          const std::vector<std::string> *package_paths = nullptr,
+                                                          std::string_view search_name = {});
         Object *new_module_loader_object(const ModuleLoadSpec &spec);
         Object *new_module_spec_object(const ModuleLoadSpec &spec, Object *loader);
         void initialize_module_import_metadata(ModuleObject *module,

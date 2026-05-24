@@ -1,10 +1,12 @@
-#include <iostream>
-#include <fstream>
-#include <cstdlib>
 #include <filesystem>
+#include <fstream>
+#include <iostream>
 #include <optional>
+#include <stdexcept>
 #include <sstream>
+#include <string>
 #include <string_view>
+#include <vector>
 #include <unistd.h>
 
 #include "cxxpython/compiler.hpp"
@@ -18,7 +20,22 @@
 
 namespace
 {
-    bool read_file(const char *path, std::string &out)
+    enum class RunMode
+    {
+        Repl,
+        Script,
+        Module,
+    };
+
+    struct CliOptions
+    {
+        RunMode mode = RunMode::Repl;
+        std::optional<std::string> script_path;
+        std::optional<std::string> module_name;
+        std::vector<std::string> passthrough_args;
+    };
+
+    bool read_file(const std::filesystem::path &path, std::string &out)
     {
         std::ifstream file(path, std::ios::binary);
         if (!file)
@@ -115,10 +132,82 @@ namespace
         return line;
     }
 
+    std::filesystem::path script_directory(const std::filesystem::path &path)
+    {
+        if (path.has_parent_path())
+            return std::filesystem::absolute(path.parent_path());
+        return std::filesystem::current_path();
+    }
+
+    std::vector<std::string> argv_with_program(const std::vector<std::string> &argv, const std::string &program)
+    {
+        std::vector<std::string> result;
+        result.reserve(argv.size());
+        result.push_back(program);
+        for (std::size_t index = 1; index < argv.size(); ++index)
+            result.push_back(argv[index]);
+        return result;
+    }
+
+    std::vector<std::string> argv_for_module(const std::string &module_filename,
+                                             const std::vector<std::string> &argv)
+    {
+        std::vector<std::string> result;
+        result.reserve(argv.size());
+        result.push_back(module_filename);
+        for (std::size_t index = 1; index < argv.size(); ++index)
+            result.push_back(argv[index]);
+        return result;
+    }
+
+    void configure_sys_state(cxxpython::Runtime &runtime,
+                             const std::vector<std::string> &argv,
+                             const std::filesystem::path &path0,
+                             bool prepend_path0)
+    {
+        runtime.set_program_arguments(argv);
+        if (prepend_path0)
+            runtime.add_module_search_path(path0.string());
+    }
+
+    CliOptions parse_cli(int argc, char **argv)
+    {
+        CliOptions options;
+        options.passthrough_args.reserve(static_cast<std::size_t>(argc > 0 ? argc : 0));
+        for (int index = 0; index < argc; ++index)
+            options.passthrough_args.push_back(argv[index] ? argv[index] : "");
+
+        if (argc == 1)
+            return options;
+
+        if (std::string_view(argv[1]) == "-m")
+        {
+            if (argc < 3)
+                throw std::runtime_error("cxxpython: -m requires a module name");
+            options.mode = RunMode::Module;
+            options.module_name = argv[2];
+            std::vector<std::string> module_argv;
+            module_argv.push_back(argv[2]);
+            for (int index = 3; index < argc; ++index)
+                module_argv.push_back(argv[index] ? argv[index] : "");
+            options.passthrough_args = std::move(module_argv);
+            return options;
+        }
+
+        options.mode = RunMode::Script;
+        options.script_path = argv[1];
+        std::vector<std::string> script_argv;
+        script_argv.push_back(argv[1]);
+        for (int index = 2; index < argc; ++index)
+            script_argv.push_back(argv[index] ? argv[index] : "");
+        options.passthrough_args = std::move(script_argv);
+        return options;
+    }
+
     int run_repl(cxxpython::Runtime &runtime)
     {
         std::cout << "cxxpython 0.1.0-dev\n";
-        runtime.add_module_search_path(std::filesystem::current_path().string());
+        configure_sys_state(runtime, {"-"}, std::filesystem::current_path(), false);
         if (!import_site(runtime))
             return 1;
         cxxpython::ModuleObject *module = runtime.new_module("__main__", "<stdin>");
@@ -133,11 +222,10 @@ namespace
         }
 #endif
 
-        cxxpython::ModuleObject *code_module = nullptr;
         cxxpython::Object *console = nullptr;
         try
         {
-            code_module = runtime.import_module("code");
+            cxxpython::ModuleObject *code_module = runtime.import_module("code");
             auto code_module_root = runtime.root(code_module);
             cxxpython::Object *console_type = cxxpython::object_get_attr(code_module_root.get(), "InteractiveConsole");
             auto console_type_root = runtime.root(console_type);
@@ -206,45 +294,25 @@ namespace
 
         return 0;
     }
-}
 
-int main(int argc, char **argv)
-{
-    cxxpython::Runtime runtime;
-    std::vector<std::string> program_args;
-    program_args.reserve(static_cast<std::size_t>(argc));
-    for (int index = 0; index < argc; ++index)
-        program_args.push_back(argv[index] ? argv[index] : "");
-    runtime.set_program_arguments(std::move(program_args));
-
-    if (argc == 2 && std::string_view(argv[1]) == "--version")
-    {
-        std::cout << "cxxpython 0.1.0-dev\n";
-        return 0;
-    }
-
-    if (argc == 1)
-    {
-        return run_repl(runtime);
-    }
-
-    if (argc == 2)
+    int run_script(cxxpython::Runtime &runtime, const std::filesystem::path &script_path, const std::vector<std::string> &argv)
     {
         std::string source;
-        if (!read_file(argv[1], source))
+        if (!read_file(script_path, source))
         {
-            std::cerr << "cxxpython: cannot open file: " << argv[1] << "\n";
+            std::cerr << "cxxpython: cannot open file: " << script_path.string() << "\n";
             return 2;
         }
+
+        configure_sys_state(runtime, argv_with_program(argv, script_path.string()), script_directory(script_path), true);
+        if (!import_site(runtime))
+            return 1;
 
         try
         {
             cxxpython::VirtualMachine vm(runtime);
-            runtime.add_module_search_path(std::filesystem::path(argv[1]).parent_path().string());
-            if (!import_site(runtime))
-                return 1;
-            cxxpython::ModuleObject *module = runtime.new_module("__main__", argv[1]);
-            cxxpython::CodeObject *code = cxxpython::compile_exec_input(runtime, source, argv[1]);
+            cxxpython::ModuleObject *module = runtime.new_module("__main__", script_path.string());
+            cxxpython::CodeObject *code = cxxpython::compile_exec_input(runtime, source, script_path.string());
             (void)vm.execute(cxxpython::ExecutionRequest{
                 .code = code,
                 .locals = module->dict(),
@@ -270,6 +338,96 @@ int main(int argc, char **argv)
         }
     }
 
-    std::cerr << "usage: cxxpython [--version] [script.py]\n";
-    return 2;
+    int run_module(cxxpython::Runtime &runtime, const std::string &module_name, const std::vector<std::string> &argv)
+    {
+        std::string target_name = module_name;
+        auto spec = runtime.resolve_module_spec(target_name);
+        if (spec && spec->is_package)
+        {
+            target_name = module_name + ".__main__";
+            spec = runtime.resolve_module_spec(target_name);
+        }
+        if (!spec.has_value())
+        {
+            std::cerr << "cxxpython: No module named " << module_name << "\n";
+            return 1;
+        }
+        if (spec->kind != cxxpython::ModuleLoadKind::Source)
+        {
+            std::cerr << "cxxpython: module execution currently requires a source module\n";
+            return 1;
+        }
+
+        try
+        {
+            std::vector<std::string> module_argv = argv_for_module(spec->filename, argv);
+            configure_sys_state(runtime, module_argv, std::filesystem::current_path(), true);
+            if (!import_site(runtime))
+                return 1;
+
+            cxxpython::VirtualMachine vm(runtime);
+            cxxpython::ModuleObject *module = runtime.new_module("__main__", spec->filename);
+            std::string source;
+            if (!read_file(spec->filename, source))
+            {
+                std::cerr << "cxxpython: cannot open file: " << spec->filename << "\n";
+                return 2;
+            }
+            cxxpython::CodeObject *code = cxxpython::compile_exec_input(runtime, source, spec->filename);
+            cxxpython::Object *loader = runtime.new_module_loader_object(*spec);
+            auto loader_root = runtime.root(loader);
+            cxxpython::Object *module_spec = runtime.new_module_spec_object(*spec, loader_root.get());
+            auto module_spec_root = runtime.root(module_spec);
+            runtime.initialize_module_import_metadata(module, *spec, loader_root.get(), module_spec_root.get());
+            (void)vm.execute(cxxpython::ExecutionRequest{
+                .code = code,
+                .locals = module->dict(),
+                .globals = module->dict(),
+                .builtins = runtime.builtins_dict(),
+                .module = module,
+                .closure = {},
+                .mode = cxxpython::ExecutionMode::Module,
+            });
+            return 0;
+        }
+        catch (const cxxpython::PythonError &error)
+        {
+            if (is_system_exit(runtime, error))
+                return system_exit_status(runtime, error);
+            print_python_error(error);
+            return 1;
+        }
+        catch (const cxxpython::BytecodeError &error)
+        {
+            std::cerr << "BytecodeError: " << error.what() << "\n";
+            return 1;
+        }
+    }
+}
+
+int main(int argc, char **argv)
+{
+    cxxpython::Runtime runtime;
+
+    try
+    {
+        if (argc == 2 && std::string_view(argv[1]) == "--version")
+        {
+            std::cout << "cxxpython 0.1.0-dev\n";
+            return 0;
+        }
+
+        const CliOptions options = parse_cli(argc, argv);
+
+        if (options.mode == RunMode::Repl)
+            return run_repl(runtime);
+        if (options.mode == RunMode::Script)
+            return run_script(runtime, *options.script_path, options.passthrough_args);
+        return run_module(runtime, *options.module_name, options.passthrough_args);
+    }
+    catch (const std::exception &error)
+    {
+        std::cerr << "cxxpython: " << error.what() << "\n";
+        return 2;
+    }
 }
