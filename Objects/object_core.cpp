@@ -973,6 +973,8 @@ namespace cxxpython
 
     void Object::visit_children(const VisitChildren &visitor) const
     {
+        if (type_)
+            visitor(type_);
         if (type_ && type_->slots.traverse)
             type_->slots.traverse(*this, visitor);
         else
@@ -1167,12 +1169,32 @@ namespace cxxpython
         if (!callable)
             raise_type_error(nullptr, "'<null>' object is not callable");
 
-        if (callable->type() && callable->type()->slots.call)
-            return callable->type()->slots.call(*callable, args);
+        Runtime *runtime = callable->runtime();
+        std::optional<Rooted<Object>> callable_root;
+        std::vector<Rooted<Object>> positional_roots;
+        positional_roots.reserve(args.positional.size());
+        std::vector<Object *> positional = args.positional;
+        if (runtime)
+            callable_root.emplace(runtime->root(callable));
+        for (Object *arg : positional)
+        {
+            if (runtime)
+                positional_roots.emplace_back(runtime->root(arg));
+        }
+        DictObject *keywords = args.keywords;
+        std::optional<Rooted<DictObject>> keyword_roots;
+        if (runtime && keywords)
+            keyword_roots.emplace(runtime->root(keywords));
+        CallArguments rooted_args{std::move(positional), keyword_roots ? keyword_roots->get() : keywords};
+
+        Object *call_target = callable_root ? callable_root->get() : callable;
+        if (call_target && call_target->type() && call_target->type()->slots.call)
+            return call_target->type()->slots.call(*call_target, rooted_args);
 
         std::ostringstream message;
-        message << "'" << type_qualified_name(callable->type()) << "' object is not callable";
-        raise_type_error(callable->runtime(), message.str());
+        message << "'" << type_qualified_name(call_target ? call_target->type() : callable->type())
+                << "' object is not callable";
+        raise_type_error(runtime, message.str());
     }
 
     std::size_t object_length(Object *object)
@@ -1593,29 +1615,42 @@ namespace cxxpython
             raise_attribute_error(object ? object->runtime() : (name ? name->runtime() : nullptr),
                                   "'<null>' object has no attribute '<null>'");
 
+        Runtime *runtime = object->runtime();
+        std::optional<Rooted<Object>> object_root;
+        std::optional<Rooted<StrObject>> name_root;
+        Object *target = object;
+        StrObject *attr = name;
+        if (runtime)
+        {
+            object_root.emplace(runtime->root(object));
+            name_root.emplace(runtime->root(name));
+            target = object_root->get();
+            attr = name_root->get();
+        }
+
         try
         {
-            if (Object *override_result = call_getattribute_override(object, name))
+            if (Object *override_result = call_getattribute_override(target, attr))
                 return override_result;
         }
         catch (const PythonError &error)
         {
             if (!is_attribute_error(error))
                 throw;
-            if (Object *fallback_result = call_getattr_fallback(object, name))
+            if (Object *fallback_result = call_getattr_fallback(target, attr))
                 return fallback_result;
             throw;
         }
 
         try
         {
-            return object_get_attr_default(object, name);
+            return object_get_attr_default(target, attr);
         }
         catch (const PythonError &error)
         {
             if (!is_attribute_error(error))
                 throw;
-            if (Object *fallback_result = call_getattr_fallback(object, name))
+            if (Object *fallback_result = call_getattr_fallback(target, attr))
                 return fallback_result;
             throw;
         }
@@ -1626,7 +1661,9 @@ namespace cxxpython
         Runtime *runtime = object ? object->runtime() : nullptr;
         if (!runtime)
             raise_attribute_error(nullptr, "'<null>' object has no attribute '" + name + "'");
-        return object_get_attr(object, runtime->new_str(name));
+        auto object_root = runtime->root(object);
+        auto name_root = runtime->root(runtime->new_str(name));
+        return object_get_attr(object_root.get(), name_root.get());
     }
 
     void object_set_attr_default(Object *object, StrObject *name, Object *value)
@@ -1694,7 +1731,9 @@ namespace cxxpython
         Runtime *runtime = object ? object->runtime() : nullptr;
         if (!runtime)
             raise_attribute_error(nullptr, "'<null>' object has no attribute '" + name + "'");
-        object_set_attr(object, runtime->new_str(name), value);
+        auto object_root = runtime->root(object);
+        auto name_root = runtime->root(runtime->new_str(name));
+        object_set_attr(object_root.get(), name_root.get(), value);
     }
 
     void object_delete_attr_default(Object *object, StrObject *name)

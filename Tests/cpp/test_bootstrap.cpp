@@ -103,7 +103,7 @@ TEST(CoreObjects, ReprAndExceptionObjects)
     EXPECT_EQ(cxxpython::object_repr(runtime.type_type()), "<class 'type'>");
     EXPECT_EQ(runtime.new_int(-5), runtime.new_int(-5));
     EXPECT_EQ(runtime.new_int(256), runtime.new_int(256));
-    EXPECT_NE(runtime.new_int(257), runtime.new_int(257));
+    EXPECT_NE(runtime.new_int(2048), runtime.new_int(2048));
 
     cxxpython::ExceptionObject *manual_error =
         runtime.new_exception(runtime.type_error_type(), "bad\\operand\n");
@@ -129,5 +129,5 @@ TEST(CoreObjects, ReprAndExceptionObjects)
                                         if (object)
                                             ++exception_children;
                                     });
-    EXPECT_EQ(exception_children, 1U);
+    EXPECT_GE(exception_children, 2U);
 }

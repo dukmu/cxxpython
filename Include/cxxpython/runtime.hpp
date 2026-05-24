@@ -429,8 +429,8 @@ namespace cxxpython
 
         friend class VirtualMachine;
 
-        static constexpr std::int64_t small_int_min_ = -5;
-        static constexpr std::int64_t small_int_max_ = 256;
+        static constexpr std::int64_t small_int_min_ = -1024;
+        static constexpr std::int64_t small_int_max_ = 1024;
         static constexpr std::size_t small_int_count_ =
             static_cast<std::size_t>(small_int_max_ - small_int_min_ + 1);
 

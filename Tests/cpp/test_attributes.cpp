@@ -156,8 +156,9 @@ TEST(Attributes, TypeDictIsExposedAsMappingProxy)
     std::vector<cxxpython::Object *> children;
     proxy->visit_children([&children](cxxpython::Object *object)
                           { children.push_back(object); });
-    ASSERT_EQ(children.size(), 1U);
-    EXPECT_EQ(children[0], runtime.list_type()->dict);
+    ASSERT_EQ(children.size(), 2U);
+    EXPECT_EQ(children[0], runtime.mappingproxy_type());
+    EXPECT_EQ(children[1], runtime.list_type()->dict);
 
     try
     {
@@ -246,8 +247,9 @@ TEST(Attributes, StoresAndReadsInstanceDictionaries)
     std::vector<cxxpython::Object *> children;
     instance->visit_children([&children](cxxpython::Object *object)
                              { children.push_back(object); });
-    ASSERT_EQ(children.size(), 1U);
-    EXPECT_EQ(children[0], instance->instance_dict());
+    ASSERT_EQ(children.size(), 2U);
+    EXPECT_EQ(children[0], custom_type);
+    EXPECT_EQ(children[1], instance->instance_dict());
 }
 
 TEST(Attributes, BuiltinCompactInstancesRejectArbitraryAttributes)
@@ -700,9 +702,10 @@ TEST(Attributes, PropertyObjectsUseDescriptorProtocol)
     std::vector<cxxpython::Object *> children;
     property->visit_children([&children](cxxpython::Object *object)
                              { children.push_back(object); });
-    ASSERT_EQ(children.size(), 2U);
-    EXPECT_EQ(children[0], getter);
-    EXPECT_EQ(children[1], setter);
+    ASSERT_EQ(children.size(), 3U);
+    EXPECT_EQ(children[0], runtime.property_type());
+    EXPECT_EQ(children[1], getter);
+    EXPECT_EQ(children[2], setter);
 }
 
 TEST(Attributes, PropertyDeleterUsesDescriptorDeleteProtocol)
@@ -863,8 +866,9 @@ TEST(Attributes, StaticMethodObjectsReturnWrappedCallable)
     std::vector<cxxpython::Object *> children;
     descriptor->visit_children([&children](cxxpython::Object *object)
                                { children.push_back(object); });
-    ASSERT_EQ(children.size(), 1U);
-    EXPECT_EQ(children[0], callable);
+    ASSERT_EQ(children.size(), 2U);
+    EXPECT_EQ(children[0], runtime.staticmethod_type());
+    EXPECT_EQ(children[1], callable);
 }
 
 TEST(Attributes, ClassMethodObjectsBindOwnerType)
@@ -903,8 +907,9 @@ TEST(Attributes, ClassMethodObjectsBindOwnerType)
     std::vector<cxxpython::Object *> children;
     descriptor->visit_children([&children](cxxpython::Object *object)
                                { children.push_back(object); });
-    ASSERT_EQ(children.size(), 1U);
-    EXPECT_EQ(children[0], callable);
+    ASSERT_EQ(children.size(), 2U);
+    EXPECT_EQ(children[0], runtime.classmethod_type());
+    EXPECT_EQ(children[1], callable);
 }
 
 TEST(Attributes, RaisesAttributeErrorForMissingAttribute)

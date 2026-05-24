@@ -31,9 +31,10 @@ TEST(Functions, CallsPythonFunctionObjectsWithCapturedGlobals)
     std::vector<cxxpython::Object *> children;
     function->visit_children([&children](cxxpython::Object *object)
                              { children.push_back(object); });
-    ASSERT_EQ(children.size(), 2U);
-    EXPECT_EQ(children[0], code);
-    EXPECT_EQ(children[1], globals);
+    ASSERT_EQ(children.size(), 3U);
+    EXPECT_EQ(children[0], runtime.function_type());
+    EXPECT_EQ(children[1], code);
+    EXPECT_EQ(children[2], globals);
 
     try
     {
@@ -45,6 +46,25 @@ TEST(Functions, CallsPythonFunctionObjectsWithCapturedGlobals)
         EXPECT_EQ(error.type(), runtime.type_error_type());
         EXPECT_STREQ(error.what(), "f() takes 0 positional arguments but 1 argument was given");
     }
+}
+
+TEST(Functions, FunctionInstancesRetainTheirTypesAcrossAttributeLookup)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::DictObject *globals = runtime.new_dict();
+    cxxpython::CodeObject *code = runtime.new_code(
+        "f",
+        "test.py",
+        {},
+        {runtime.new_str("answer")},
+        {{cxxpython::Opcode::LoadName, 0},
+         {cxxpython::Opcode::ReturnValue, 0}});
+    cxxpython::PythonFunctionObject *function = runtime.new_function("f", code, globals);
+    cxxpython::Object *answer = runtime.new_str("from-globals");
+    globals->set(runtime.new_str("answer"), answer);
+
+    EXPECT_EQ(cxxpython::object_get_attr(function, "__text_signature__")->repr(), "'()'");
+    EXPECT_EQ(cxxpython::object_call(function, {}), answer);
 }
 
 TEST(Functions, PythonFunctionsBindAsMethodsThroughDescriptorProtocol)
@@ -78,9 +98,10 @@ TEST(Functions, PythonFunctionsBindAsMethodsThroughDescriptorProtocol)
     std::vector<cxxpython::Object *> children;
     bound->visit_children([&children](cxxpython::Object *object)
                           { children.push_back(object); });
-    ASSERT_EQ(children.size(), 2U);
-    EXPECT_EQ(children[0], function);
-    EXPECT_EQ(children[1], instance);
+    ASSERT_EQ(children.size(), 3U);
+    EXPECT_EQ(children[0], runtime.method_type());
+    EXPECT_EQ(children[1], function);
+    EXPECT_EQ(children[2], instance);
     EXPECT_EQ(cxxpython::object_call(bound, {}), instance);
 }
 

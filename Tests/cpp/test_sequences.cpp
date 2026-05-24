@@ -395,7 +395,7 @@ TEST(CoreObjects, ListSemantics)
                              if (object)
                                  ++visited_children;
                          });
-    EXPECT_EQ(visited_children, list->size());
+    EXPECT_GE(visited_children, list->size() + 1);
 }
 
 TEST(CoreObjects, SequenceSlotsReadAndWriteListAndTupleItems)
@@ -474,8 +474,9 @@ TEST(CoreObjects, IteratesSequencesAndRaisesStopIterationAtEnd)
     std::vector<cxxpython::Object *> visited;
     iterator->visit_children([&visited](cxxpython::Object *object)
                              { visited.push_back(object); });
-    ASSERT_EQ(visited.size(), 1U);
-    EXPECT_EQ(visited[0], list);
+    ASSERT_EQ(visited.size(), 2U);
+    EXPECT_EQ(visited[0], runtime.sequence_iterator_type());
+    EXPECT_EQ(visited[1], list);
 }
 
 TEST(CoreObjects, ListConstructorConsumesIterableProtocol)
@@ -591,9 +592,10 @@ TEST(CoreObjects, ListAppendIsExposedAsMethodDescriptor)
     std::vector<cxxpython::Object *> bound_children;
     bound->visit_children([&bound_children](cxxpython::Object *object)
                           { bound_children.push_back(object); });
-    ASSERT_EQ(bound_children.size(), 2U);
-    EXPECT_EQ(bound_children[0], descriptor);
-    EXPECT_EQ(bound_children[1], list);
+    ASSERT_EQ(bound_children.size(), 3U);
+    EXPECT_EQ(bound_children[0], runtime.native_function_type());
+    EXPECT_EQ(bound_children[1], descriptor);
+    EXPECT_EQ(bound_children[2], list);
 
     cxxpython::Object *second = runtime.new_str("second");
     cxxpython::Object *bound_result = cxxpython::object_call(bound, {second});

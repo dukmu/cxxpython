@@ -795,9 +795,10 @@ TEST(Bytecode, CodeObjectsTraverseReferencedConstants)
     code->visit_children([&visited](cxxpython::Object *object)
                          { visited.push_back(object); });
 
-    ASSERT_EQ(visited.size(), 2U);
-    EXPECT_EQ(visited[0], first);
-    EXPECT_EQ(visited[1], second);
+    ASSERT_EQ(visited.size(), 3U);
+    EXPECT_EQ(visited[0], runtime.code_type());
+    EXPECT_EQ(visited[1], first);
+    EXPECT_EQ(visited[2], second);
     EXPECT_EQ(code->repr().find("<code object <module> at "), 0U);
     EXPECT_NE(code->repr().find("file '<string>'"), std::string::npos);
 }
@@ -835,11 +836,12 @@ TEST(Bytecode, CodeObjectsExposeArgumentMetadata)
     code->visit_children([&visited](cxxpython::Object *object)
                          { visited.push_back(object); });
 
-    ASSERT_EQ(visited.size(), 4U);
-    EXPECT_EQ(visited[0], constant);
-    EXPECT_EQ(visited[1], global_name);
-    EXPECT_EQ(visited[2], self_name);
-    EXPECT_EQ(visited[3], value_name);
+    ASSERT_EQ(visited.size(), 5U);
+    EXPECT_EQ(visited[0], runtime.code_type());
+    EXPECT_EQ(visited[1], constant);
+    EXPECT_EQ(visited[2], global_name);
+    EXPECT_EQ(visited[3], self_name);
+    EXPECT_EQ(visited[4], value_name);
 }
 
 TEST(Bytecode, CodeObjectsExposeInstructionLineTable)
@@ -906,12 +908,13 @@ TEST(Bytecode, FrameObjectsTrackCodeAndStackReferences)
     frame->visit_children([&visited](cxxpython::Object *object)
                           { visited.push_back(object); });
 
-    ASSERT_EQ(visited.size(), 5U);
-    EXPECT_EQ(visited[0], code);
-    EXPECT_EQ(visited[1], locals);
-    EXPECT_EQ(visited[2], globals);
-    EXPECT_EQ(visited[3], builtins);
-    EXPECT_EQ(visited[4], value);
+    ASSERT_EQ(visited.size(), 6U);
+    EXPECT_EQ(visited[0], runtime.frame_type());
+    EXPECT_EQ(visited[1], code);
+    EXPECT_EQ(visited[2], locals);
+    EXPECT_EQ(visited[3], globals);
+    EXPECT_EQ(visited[4], builtins);
+    EXPECT_EQ(visited[5], value);
 }
 
 TEST(Bytecode, FrameFastLocalsMirrorLocalsDictionary)
@@ -983,6 +986,7 @@ TEST(Bytecode, FrameTraversalVisitsFastLocals)
     frame->visit_children([&visited](cxxpython::Object *object)
                           { visited.push_back(object); });
 
+    EXPECT_NE(std::find(visited.begin(), visited.end(), runtime.frame_type()), visited.end());
     EXPECT_NE(std::find(visited.begin(), visited.end(), value), visited.end());
 }
 
@@ -1131,7 +1135,19 @@ TEST(Bytecode, CallOpcodeRootsCallableAndArgumentsAcrossDispatch)
                                                   const cxxpython::CallArguments &args)
         {
             EXPECT_EQ(args.positional.size(), 2U);
-            EXPECT_GE(runtime.root_count(), baseline_roots + 3U);
+            cxxpython::VirtualMachine *active = runtime.active_vm();
+            EXPECT_NE(active, nullptr);
+            if (!active)
+                return result;
+            std::size_t temporary_root_count = 0;
+            active->thread_state().visit_temporary_roots(
+                [&temporary_root_count](cxxpython::Object *object)
+                {
+                    if (object)
+                        ++temporary_root_count;
+                });
+            EXPECT_GE(temporary_root_count, 3U);
+            EXPECT_EQ(runtime.root_count(), baseline_roots);
             observed_roots = true;
             return result;
         });
@@ -1245,12 +1261,13 @@ TEST(Bytecode, ThreadStateVisitsActiveFramesAsRoots)
     std::vector<cxxpython::Object *> frame_children;
     active_roots[0]->visit_children([&frame_children](cxxpython::Object *object)
                                     { frame_children.push_back(object); });
-    ASSERT_EQ(frame_children.size(), 5U);
-    EXPECT_EQ(frame_children[0], code);
-    EXPECT_EQ(frame_children[1], locals);
-    EXPECT_EQ(frame_children[2], globals);
-    EXPECT_EQ(frame_children[3], builtins);
-    EXPECT_EQ(frame_children[4], value);
+    ASSERT_EQ(frame_children.size(), 6U);
+    EXPECT_EQ(frame_children[0], runtime.frame_type());
+    EXPECT_EQ(frame_children[1], code);
+    EXPECT_EQ(frame_children[2], locals);
+    EXPECT_EQ(frame_children[3], globals);
+    EXPECT_EQ(frame_children[4], builtins);
+    EXPECT_EQ(frame_children[5], value);
 
     vm.thread_state().pop_frame(frame);
     EXPECT_EQ(vm.thread_state().frame_depth(), 0U);

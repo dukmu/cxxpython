@@ -746,6 +746,7 @@ TEST(Module, TraversesModuleDictionary)
     module->visit_children([&visited](cxxpython::Object *object)
                            { visited.push_back(object); });
 
-    ASSERT_EQ(visited.size(), 1U);
-    EXPECT_EQ(visited[0], module->dict());
+    ASSERT_EQ(visited.size(), 2U);
+    EXPECT_EQ(visited[0], runtime.module_type());
+    EXPECT_EQ(visited[1], module->dict());
 }
