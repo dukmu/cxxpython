@@ -2,6 +2,7 @@
 #include "cxxpython/vm.hpp"
 
 #include <algorithm>
+#include <iterator>
 #include <sstream>
 
 namespace cxxpython
@@ -17,9 +18,9 @@ namespace cxxpython
     void Runtime::remove_root(Object *object)
     {
         std::scoped_lock lock(roots_mutex_);
-        const auto found = std::find(roots_.begin(), roots_.end(), object);
-        if (found != roots_.end())
-            roots_.erase(found);
+        const auto found = std::find(roots_.rbegin(), roots_.rend(), object);
+        if (found != roots_.rend())
+            roots_.erase(std::next(found).base());
     }
 
     bool Runtime::add_temporary_root(Object *object)

@@ -120,7 +120,9 @@ namespace cxxpython
         Object *namedtuple_new(TypeObject &type, const CallArguments &args)
         {
             validate_namedtuple_ctor(type, args);
-            return type.runtime()->allocate<TupleObject>(&type, args.positional);
+            return type.runtime()->allocate<TupleObject>(
+                &type,
+                std::vector<Object *>(args.positional.begin(), args.positional.end()));
         }
 
         void namedtuple_init(Object &object, const CallArguments &args)

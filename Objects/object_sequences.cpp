@@ -166,6 +166,63 @@ namespace cxxpython
             return runtime.none();
         }
 
+        ListObject *require_list(Runtime &runtime, Object *self, const char *name)
+        {
+            auto *list = dynamic_cast<ListObject *>(self);
+            if (!list)
+                raise_type_error(&runtime, std::string(name) + " receiver does not have list layout");
+            return list;
+        }
+
+        Object *list_extend_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (args.size() != 1)
+                raise_type_error(&runtime, "list.extend() takes exactly one argument");
+            ListObject *list = require_list(runtime, self, "list.extend");
+            std::vector<Object *> items = collect_iterable_items(&runtime, args[0]);
+            for (Object *item : items)
+                list->append(item);
+            return runtime.none();
+        }
+
+        Object *list_pop_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (args.size() > 1)
+                raise_type_error(&runtime, "list.pop() takes at most one argument");
+            ListObject *list = require_list(runtime, self, "list.pop");
+            if (list->size() == 0)
+                raise_index_error(&runtime, "pop from empty list");
+            std::int64_t index = -1;
+            if (args.size() == 1)
+            {
+                auto *index_object = dynamic_cast<IntObject *>(args[0]);
+                if (!index_object)
+                    raise_type_error(&runtime, "list.pop() index must be an integer");
+                index = index_object->value;
+            }
+            Object *item = list->get(index);
+            auto item_root = runtime.root(item);
+            list->erase(index);
+            return item_root.get();
+        }
+
+        Object *list_clear_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (!args.empty())
+                raise_type_error(&runtime, "list.clear() takes exactly zero arguments");
+            ListObject *list = require_list(runtime, self, "list.clear");
+            while (list->size() != 0)
+                list->erase(-1);
+            return runtime.none();
+        }
+
+        Object *list_copy_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (!args.empty())
+                raise_type_error(&runtime, "list.copy() takes exactly zero arguments");
+            return runtime.new_list(require_list(runtime, self, "list.copy")->items());
+        }
+
         std::string tuple_repr(const Object &object)
         {
             auto *tuple = static_cast<const TupleObject *>(&object);
@@ -394,6 +451,14 @@ namespace cxxpython
                                                       list_append_method,
                                                       "Append object to the end of the list.",
                                                       "($self, object, /)"));
+        type->dict->set(runtime.new_str("extend"),
+                        runtime.new_method_descriptor("extend", type, list_extend_method));
+        type->dict->set(runtime.new_str("pop"),
+                        runtime.new_method_descriptor("pop", type, list_pop_method));
+        type->dict->set(runtime.new_str("clear"),
+                        runtime.new_method_descriptor("clear", type, list_clear_method));
+        type->dict->set(runtime.new_str("copy"),
+                        runtime.new_method_descriptor("copy", type, list_copy_method));
     }
 
     void initialize_list_slot_wrappers(Runtime &, TypeObject *type)

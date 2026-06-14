@@ -89,7 +89,9 @@ namespace cxxpython
             bound_args.reserve(args.positional.size() + 1);
             bound_args.push_back(method->self());
             bound_args.insert(bound_args.end(), args.positional.begin(), args.positional.end());
-            return object_call(method->callable(), CallArguments{std::move(bound_args), args.keywords});
+            return object_call(
+                method->callable(),
+                CallArguments{ObjectSpan(bound_args.data(), bound_args.size()), args.keywords});
         }
 
         Object *function_get(Object &object, Object *instance, TypeObject *owner)
@@ -402,6 +404,11 @@ namespace cxxpython
 
     Object *PythonFunctionObject::call(const CallArguments &args)
     {
+        return call_rooted(ObjectSpan(args.positional.data(), args.positional.size()), args.keywords);
+    }
+
+    Object *PythonFunctionObject::call_rooted(ObjectSpan positional, DictObject *keywords)
+    {
         DictObject *locals = runtime()->new_dict();
         const std::uint32_t expected = code_->arg_count();
         const std::uint32_t keyword_only_count = code_->kwonly_arg_count();
@@ -410,21 +417,21 @@ namespace cxxpython
 
         std::vector<bool> bound(expected, false);
         std::vector<bool> keyword_only_bound(keyword_only_count, false);
-        const std::size_t direct_count = std::min<std::size_t>(args.positional.size(), expected);
+        const std::size_t direct_count = std::min<std::size_t>(positional.size(), expected);
         for (std::size_t index = 0; index < direct_count; ++index)
         {
-            locals->set(varname_at(code_, static_cast<std::uint32_t>(index)), args.positional[index]);
+            locals->set(varname_at(code_, static_cast<std::uint32_t>(index)), positional[index]);
             bound[index] = true;
         }
 
-        if (args.positional.size() > expected)
+        if (positional.size() > expected)
         {
             if (!code_->has_varargs())
-                raise_positional_count_error(runtime(), name_, expected, args.positional.size());
+                raise_positional_count_error(runtime(), name_, expected, positional.size());
             std::vector<Object *> extras;
-            extras.reserve(args.positional.size() - expected);
-            for (std::size_t index = expected; index < args.positional.size(); ++index)
-                extras.push_back(args.positional[index]);
+            extras.reserve(positional.size() - expected);
+            for (std::size_t index = expected; index < positional.size(); ++index)
+                extras.push_back(positional[index]);
             locals->set(varname_at(code_, code_->varargs_index()), runtime()->new_tuple(std::move(extras)));
         }
         else if (code_->has_varargs())
@@ -433,9 +440,9 @@ namespace cxxpython
         }
 
         DictObject *keyword_locals = code_->has_varkeywords() ? runtime()->new_dict() : nullptr;
-        if (args.keywords)
+        if (keywords)
         {
-            for (const DictObject::Entry &entry : args.keywords->entries())
+            for (const DictObject::Entry &entry : keywords->entries())
             {
                 auto *keyword_name = dynamic_cast<StrObject *>(entry.key);
                 if (!keyword_name)

@@ -1,6 +1,57 @@
 # Development Status
 
 
+## 2026-06-14 VM Thread And Call Stability Slice
+
+Review focus:
+
+- Make GC thread parking explicit enough to distinguish opcode safe points from
+  native blocking waits.
+- Reduce VM call overhead without weakening temporary-root safety.
+- Keep small-integer cache GC ownership locked down by focused tests.
+
+Completed:
+
+- Replaced the boolean thread GC safe-point flag with `ThreadGCState` and an
+  RAII `ThreadGCStateGuard`.
+- Marked blocking `_thread.lock.acquire()` waits as `NativeWait` using the guard,
+  so the previous state is restored even through future early exits.
+- Added `object_call_rooted()` for VM-owned rooted call operands, avoiding the
+  public `object_call()` path's second round of per-argument temporary roots.
+- Added a direct rooted `PythonFunctionObject` call path over `ObjectSpan`, so
+  VM calls to Python functions no longer copy positional arguments only to pass
+  through the generic slot ABI.
+- Converted `CallArguments` itself to span-backed storage and removed the old
+  public vector-based `object_call()` overload.  Owning copies are now explicit
+  at the few object-construction boundaries that need them.
+- Shortened the heap allocation critical section so automatic-GC accounting runs
+  outside `heap_mutex_`.
+- Changed root removal to search from the back, matching nested RAII root guard
+  lifetimes.
+- Added focused tests for GC state restoration, small-integer cache rooting, and
+  GC while another thread is parked in a native lock wait.
+- Added focused script coverage for missing builtin container methods and filled
+  common `dict`/`list` method gaps visible through `dir()`.
+
+Known debt and next risk:
+
+- Heap allocation still uses one runtime heap vector and mutex. A real arena or
+  thread-local allocation buffer needs a GC-visible ownership design before it
+  is safe to implement.
+- Generic native/builtin calls now consume span-backed `CallArguments`; remaining
+  copies are intentional storage boundaries such as exception args and tuple/list
+  construction.
+- The collector is still tracing-only, single-generation, and stop-the-world.
+  Without reference counts or escape/share metadata, it cannot prove an object
+  graph is thread-private.
+- This slice improves coordination and hot-path overhead, but it does not make
+  mutable object protocols fully free-threaded.
+
+Verification:
+
+- Pending final build, focused tests, golden script tests, and full `ctest`.
+
+
 ## 2026-05-24 VM Numeric Hot Path Slice
 
 Review focus:

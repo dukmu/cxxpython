@@ -4,6 +4,7 @@
 #include <functional>
 #include <exception>
 #include <condition_variable>
+#include <initializer_list>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -55,12 +56,55 @@ namespace cxxpython
 
     struct CallArguments
     {
-        CallArguments(std::vector<Object *> positional_in, DictObject *keywords_in)
-            : positional(std::move(positional_in)), keywords(keywords_in)
+        CallArguments() = default;
+
+        CallArguments(ObjectSpan positional_in, DictObject *keywords_in = nullptr)
+            : positional(positional_in), keywords(keywords_in)
         {
         }
 
-        std::vector<Object *> positional;
+        CallArguments(const CallArguments &other)
+            : positional_storage(other.positional.begin(), other.positional.end()),
+              positional(positional_storage.data(), positional_storage.size()),
+              keywords(other.keywords)
+        {
+        }
+
+        CallArguments &operator=(const CallArguments &other)
+        {
+            if (this != &other)
+            {
+                positional_storage.assign(other.positional.begin(), other.positional.end());
+                positional = ObjectSpan(positional_storage.data(), positional_storage.size());
+                keywords = other.keywords;
+            }
+            return *this;
+        }
+
+        CallArguments(CallArguments &&other) noexcept
+            : positional_storage(std::move(other.positional_storage)),
+              positional(positional_storage.empty()
+                             ? other.positional
+                             : ObjectSpan(positional_storage.data(), positional_storage.size())),
+              keywords(other.keywords)
+        {
+        }
+
+        CallArguments &operator=(CallArguments &&other) noexcept
+        {
+            if (this != &other)
+            {
+                positional_storage = std::move(other.positional_storage);
+                positional = positional_storage.empty()
+                                 ? other.positional
+                                 : ObjectSpan(positional_storage.data(), positional_storage.size());
+                keywords = other.keywords;
+            }
+            return *this;
+        }
+
+        std::vector<Object *> positional_storage;
+        ObjectSpan positional;
         DictObject *keywords = nullptr;
     };
 
@@ -635,6 +679,7 @@ namespace cxxpython
         void set_annotations(DictObject *annotations);
         const std::vector<CellObject *> &closure() const noexcept;
         Object *call(const CallArguments &args);
+        Object *call_rooted(ObjectSpan positional, DictObject *keywords);
 
     private:
         std::string name_;
@@ -897,7 +942,8 @@ namespace cxxpython
     Object *object_inplace_binary_op(Object *left, Object *right, BinaryOp op);
     Object *object_unary_op(Object *operand, UnaryOp op);
     Object *object_call(Object *callable, const CallArguments &args);
-    Object *object_call(Object *callable, const std::vector<Object *> &args);
+    Object *object_call(Object *callable, std::initializer_list<Object *> args);
+    Object *object_call_rooted(Object *callable, ObjectSpan positional, DictObject *keywords = nullptr);
     std::size_t object_length(Object *object);
     Object *object_get_item(Object *object, Object *key);
     void object_set_item(Object *object, Object *key, Object *value);

@@ -131,3 +131,25 @@ TEST(CoreObjects, ReprAndExceptionObjects)
                                     });
     EXPECT_GE(exception_children, 2U);
 }
+
+TEST(CoreObjects, SmallIntegerCacheIsRootedAcrossGarbageCollection)
+{
+    cxxpython::Runtime runtime;
+
+    cxxpython::IntObject *cached = runtime.new_int(256);
+    cxxpython::IntObject *negative_cached = runtime.new_int(-5);
+    cxxpython::IntObject *uncached = runtime.new_int(2048);
+
+    std::vector<cxxpython::Object *> roots;
+    runtime.visit_roots([&roots](cxxpython::Object *object)
+                        { roots.push_back(object); });
+
+    EXPECT_NE(std::find(roots.begin(), roots.end(), cached), roots.end());
+    EXPECT_NE(std::find(roots.begin(), roots.end(), negative_cached), roots.end());
+    EXPECT_EQ(std::find(roots.begin(), roots.end(), uncached), roots.end());
+
+    (void)runtime.collect_garbage();
+
+    EXPECT_EQ(runtime.new_int(256), cached);
+    EXPECT_EQ(runtime.new_int(-5), negative_cached);
+}

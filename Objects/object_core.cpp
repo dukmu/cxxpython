@@ -39,12 +39,15 @@ namespace cxxpython
             return object_call(callable, {name});
         }
 
-        Object *call_attribute_hook(Object *hook, Object *instance, TypeObject *owner, const std::vector<Object *> &args)
+        Object *call_attribute_hook(Object *hook,
+                                    Object *instance,
+                                    TypeObject *owner,
+                                    std::initializer_list<Object *> args)
         {
             if (!hook)
                 return nullptr;
             Object *callable = apply_descriptor(hook, instance, owner);
-            return object_call(callable, args);
+            return object_call(callable, CallArguments{args, nullptr});
         }
 
         std::string type_repr(const Object &object)
@@ -119,7 +122,7 @@ namespace cxxpython
 
         Object *call_heap_special_no_args(Object &object, const char *name)
         {
-            return call_heap_special(object, name, CallArguments{{}, nullptr});
+            return call_heap_special(object, name, CallArguments{});
         }
 
         Object *heap_iter_slot(Object &object)
@@ -177,7 +180,8 @@ namespace cxxpython
         Object *call_heap_special_one_arg(Object &object, const char *name, Object *arg)
         {
             auto arg_root = object.runtime()->root(arg);
-            return call_heap_special(object, name, CallArguments{{arg_root.get()}, nullptr});
+            Object *args[] = {arg_root.get()};
+            return call_heap_special(object, name, CallArguments{ObjectSpan(args, 1), nullptr});
         }
 
         Object *heap_getitem_slot(Object &object, Object *key)
@@ -189,9 +193,10 @@ namespace cxxpython
         {
             auto key_root = object.runtime()->root(key);
             auto value_root = object.runtime()->root(value);
+            Object *args[] = {key_root.get(), value_root.get()};
             (void)call_heap_special(object,
                                     "__setitem__",
-                                    CallArguments{{key_root.get(), value_root.get()}, nullptr});
+                                    CallArguments{ObjectSpan(args, 2), nullptr});
         }
 
         void heap_delitem_slot(Object &object, Object *key)
@@ -703,7 +708,7 @@ namespace cxxpython
         Object *type_call_method(Runtime &, Object *self, ObjectSpan args)
         {
             std::vector<Object *> positional(args.begin(), args.end());
-            return object_call(self, CallArguments{std::move(positional), nullptr});
+            return object_call(self, CallArguments{ObjectSpan(positional.data(), positional.size()), nullptr});
         }
 
         Object *type_new_method(Runtime &runtime, Object *self, ObjectSpan args)
@@ -1159,9 +1164,28 @@ namespace cxxpython
         raise_type_error(operand->runtime(), unsupported_unary_op_message(op, operand));
     }
 
-    Object *object_call(Object *callable, const std::vector<Object *> &args)
+    Object *object_call(Object *callable, std::initializer_list<Object *> args)
     {
-        return object_call(callable, CallArguments{args, nullptr});
+        return object_call(callable, CallArguments{ObjectSpan(args.begin(), args.size()), nullptr});
+    }
+
+    Object *object_call_rooted(Object *callable, ObjectSpan positional, DictObject *keywords)
+    {
+        if (!callable)
+            raise_type_error(nullptr, "'<null>' object is not callable");
+
+        Runtime *runtime = callable->runtime();
+        if (auto *function = dynamic_cast<PythonFunctionObject *>(callable))
+            return function->call_rooted(positional, keywords);
+
+        CallArguments rooted_args{positional, keywords};
+        if (callable->type() && callable->type()->slots.call)
+            return callable->type()->slots.call(*callable, rooted_args);
+
+        std::ostringstream message;
+        message << "'" << type_qualified_name(callable->type())
+                << "' object is not callable";
+        raise_type_error(runtime, message.str());
     }
 
     Object *object_call(Object *callable, const CallArguments &args)
@@ -1173,7 +1197,7 @@ namespace cxxpython
         std::optional<Rooted<Object>> callable_root;
         std::vector<Rooted<Object>> positional_roots;
         positional_roots.reserve(args.positional.size());
-        std::vector<Object *> positional = args.positional;
+        std::vector<Object *> positional(args.positional.begin(), args.positional.end());
         if (runtime)
             callable_root.emplace(runtime->root(callable));
         for (Object *arg : positional)
@@ -1185,7 +1209,7 @@ namespace cxxpython
         std::optional<Rooted<DictObject>> keyword_roots;
         if (runtime && keywords)
             keyword_roots.emplace(runtime->root(keywords));
-        CallArguments rooted_args{std::move(positional), keyword_roots ? keyword_roots->get() : keywords};
+        CallArguments rooted_args{ObjectSpan(positional.data(), positional.size()), keyword_roots ? keyword_roots->get() : keywords};
 
         Object *call_target = callable_root ? callable_root->get() : callable;
         if (call_target && call_target->type() && call_target->type()->slots.call)

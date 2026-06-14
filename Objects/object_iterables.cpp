@@ -251,7 +251,9 @@ namespace cxxpython
                 args.push_back(item);
             }
             auto callable_root = object.runtime()->root(map.callable());
-            return object_call(callable_root.get(), args);
+            return object_call(
+                callable_root.get(),
+                CallArguments{ObjectSpan(args.data(), args.size()), nullptr});
         }
 
         Object *map_new(TypeObject &type, const CallArguments &args)

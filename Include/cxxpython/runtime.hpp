@@ -384,8 +384,10 @@ namespace cxxpython
             auto object = std::make_unique<T>(std::forward<Args>(args)...);
             T *raw = object.get();
             raw->set_runtime(this);
-            std::scoped_lock lock(heap_mutex_);
-            heap_.push_back(std::move(object));
+            {
+                std::scoped_lock lock(heap_mutex_);
+                heap_.push_back(std::move(object));
+            }
             if constexpr (counts_toward_automatic_gc<T>())
             {
                 if (gc_enabled_.load(std::memory_order_relaxed))

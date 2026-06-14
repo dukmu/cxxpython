@@ -557,7 +557,7 @@ TEST(Attributes, SlotWrappersRejectWrongReceiversAndKeywords)
     try
     {
         (void)cxxpython::object_call(cxxpython::object_get_attr(runtime.new_list({}), "__len__"),
-                                     cxxpython::CallArguments{{}, keywords});
+                                      cxxpython::CallArguments{cxxpython::ObjectSpan{}, keywords});
         FAIL() << "expected PythonError";
     }
     catch (const cxxpython::PythonError &error)

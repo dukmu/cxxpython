@@ -99,6 +99,93 @@ namespace cxxpython
             return dict.contains(key);
         }
 
+        DictObject *require_dict(Runtime &runtime, Object *self, const char *name)
+        {
+            auto *dict = dynamic_cast<DictObject *>(self);
+            if (!dict)
+                raise_type_error(&runtime, std::string(name) + " receiver does not have dict layout");
+            return dict;
+        }
+
+        Object *dict_keys_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (!args.empty())
+                raise_type_error(&runtime, "dict.keys() takes exactly zero arguments");
+            std::vector<Object *> keys;
+            for (const DictObject::Entry &entry : require_dict(runtime, self, "dict.keys")->entries())
+                keys.push_back(entry.key);
+            return runtime.new_list(std::move(keys));
+        }
+
+        Object *dict_values_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (!args.empty())
+                raise_type_error(&runtime, "dict.values() takes exactly zero arguments");
+            std::vector<Object *> values;
+            for (const DictObject::Entry &entry : require_dict(runtime, self, "dict.values")->entries())
+                values.push_back(entry.value);
+            return runtime.new_list(std::move(values));
+        }
+
+        Object *dict_items_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (!args.empty())
+                raise_type_error(&runtime, "dict.items() takes exactly zero arguments");
+            std::vector<Object *> items;
+            for (const DictObject::Entry &entry : require_dict(runtime, self, "dict.items")->entries())
+                items.push_back(runtime.new_tuple({entry.key, entry.value}));
+            return runtime.new_list(std::move(items));
+        }
+
+        Object *dict_get_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (args.empty() || args.size() > 2)
+                raise_type_error(&runtime, "dict.get() takes one or two arguments");
+            Object *value = require_dict(runtime, self, "dict.get")->get(args[0]);
+            if (value)
+                return value;
+            return args.size() == 2 ? args[1] : static_cast<Object *>(runtime.none());
+        }
+
+        Object *dict_pop_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (args.empty() || args.size() > 2)
+                raise_type_error(&runtime, "dict.pop() takes one or two arguments");
+            DictObject *dict = require_dict(runtime, self, "dict.pop");
+            Object *value = dict->get(args[0]);
+            if (value)
+            {
+                auto value_root = runtime.root(value);
+                (void)dict->erase(args[0]);
+                return value_root.get();
+            }
+            if (args.size() == 2)
+                return args[1];
+            raise_key_error(&runtime, args[0]);
+        }
+
+        Object *dict_clear_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (!args.empty())
+                raise_type_error(&runtime, "dict.clear() takes exactly zero arguments");
+            DictObject *dict = require_dict(runtime, self, "dict.clear");
+            std::vector<DictObject::Entry> entries = dict->entries();
+            for (const DictObject::Entry &entry : entries)
+                (void)dict->erase(entry.key);
+            return runtime.none();
+        }
+
+        Object *dict_copy_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (!args.empty())
+                raise_type_error(&runtime, "dict.copy() takes exactly zero arguments");
+            DictObject *copy = runtime.new_dict();
+            auto copy_root = runtime.root(copy);
+            for (const DictObject::Entry &entry : require_dict(runtime, self, "dict.copy")->entries())
+                copy->set(entry.key, entry.value);
+            return copy_root.get();
+        }
+
         Object *dict_iter(Object &object)
         {
             return object.runtime()->new_dict_key_iterator(static_cast<DictObject *>(&object));
@@ -359,6 +446,24 @@ namespace cxxpython
     {
         add_common_object_slot_wrappers(type, false);
         add_sequence_slot_wrappers(type, true);
+    }
+
+    void initialize_dict_type_methods(Runtime &runtime, TypeObject *type)
+    {
+        type->dict->set(runtime.new_str("keys"),
+                        runtime.new_method_descriptor("keys", type, dict_keys_method));
+        type->dict->set(runtime.new_str("items"),
+                        runtime.new_method_descriptor("items", type, dict_items_method));
+        type->dict->set(runtime.new_str("values"),
+                        runtime.new_method_descriptor("values", type, dict_values_method));
+        type->dict->set(runtime.new_str("get"),
+                        runtime.new_method_descriptor("get", type, dict_get_method));
+        type->dict->set(runtime.new_str("pop"),
+                        runtime.new_method_descriptor("pop", type, dict_pop_method));
+        type->dict->set(runtime.new_str("clear"),
+                        runtime.new_method_descriptor("clear", type, dict_clear_method));
+        type->dict->set(runtime.new_str("copy"),
+                        runtime.new_method_descriptor("copy", type, dict_copy_method));
     }
 
     void initialize_mappingproxy_slot_wrappers(Runtime &, TypeObject *type)

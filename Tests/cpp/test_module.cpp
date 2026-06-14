@@ -526,7 +526,7 @@ TEST(Module, BuiltinConstructorsUseSharedNativeArgumentValidation)
 
     try
     {
-        (void)cxxpython::object_call(runtime.str_type(), cxxpython::CallArguments{{}, keywords});
+        (void)cxxpython::object_call(runtime.str_type(), cxxpython::CallArguments{cxxpython::ObjectSpan{}, keywords});
         FAIL() << "expected PythonError";
     }
     catch (const cxxpython::PythonError &error)

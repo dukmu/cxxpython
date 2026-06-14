@@ -207,8 +207,11 @@ TEST(Functions, PythonFunctionBindsVarargsAndVarkeywords)
     cxxpython::DictObject *keywords = runtime.new_dict();
     cxxpython::Object *extra = runtime.new_str("extra");
     keywords->set(runtime.new_str("extra"), extra);
+    cxxpython::Object *keyword_args[] = {first};
     auto *kwargs_dict = dynamic_cast<cxxpython::DictObject *>(
-        cxxpython::object_call(collect_kwargs, cxxpython::CallArguments{{first}, keywords}));
+        cxxpython::object_call(
+            collect_kwargs,
+            cxxpython::CallArguments{cxxpython::ObjectSpan(keyword_args, 1), keywords}));
     ASSERT_NE(kwargs_dict, nullptr);
     EXPECT_EQ(kwargs_dict->get(runtime.new_str("extra")), extra);
 }
@@ -231,12 +234,12 @@ TEST(Functions, PythonFunctionBindsKeywordArgumentsToParameters)
     cxxpython::Object *value = runtime.new_str("kw");
     cxxpython::DictObject *keywords = runtime.new_dict();
     keywords->set(runtime.new_str("value"), value);
-    EXPECT_EQ(cxxpython::object_call(function, cxxpython::CallArguments{{}, keywords}), value);
+    EXPECT_EQ(cxxpython::object_call(function, cxxpython::CallArguments{cxxpython::ObjectSpan{}, keywords}), value);
 
     keywords->set(runtime.new_str("other"), value);
     try
     {
-        (void)cxxpython::object_call(function, cxxpython::CallArguments{{}, keywords});
+        (void)cxxpython::object_call(function, cxxpython::CallArguments{cxxpython::ObjectSpan{}, keywords});
         FAIL() << "expected PythonError";
     }
     catch (const cxxpython::PythonError &error)

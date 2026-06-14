@@ -24,6 +24,13 @@ namespace cxxpython
         Finally,
     };
 
+    enum class ThreadGCState : std::uint8_t
+    {
+        Running,
+        OpcodeSafepoint,
+        NativeWait,
+    };
+
     struct FrameBlockHandler
     {
         FrameBlockKind kind;
@@ -138,6 +145,8 @@ namespace cxxpython
         void leave_tracing() noexcept;
         bool at_gc_safepoint() const noexcept;
         void set_gc_safepoint(bool at_safepoint) noexcept;
+        ThreadGCState gc_state() const noexcept;
+        void set_gc_state(ThreadGCState state) noexcept;
         void add_temporary_root(Object *object);
         void remove_temporary_root(Object *object);
         void visit_frames(const VisitChildren &visitor) const;
@@ -151,7 +160,21 @@ namespace cxxpython
         std::vector<Object *> temporary_roots_;
         Object *trace_function_ = nullptr;
         std::size_t trace_depth_ = 0;
-        bool at_gc_safepoint_ = false;
+        ThreadGCState gc_state_ = ThreadGCState::Running;
+    };
+
+    class ThreadGCStateGuard final
+    {
+    public:
+        ThreadGCStateGuard(ThreadState &thread, ThreadGCState state) noexcept;
+        ~ThreadGCStateGuard();
+
+        ThreadGCStateGuard(const ThreadGCStateGuard &) = delete;
+        ThreadGCStateGuard &operator=(const ThreadGCStateGuard &) = delete;
+
+    private:
+        ThreadState &thread_;
+        ThreadGCState previous_;
     };
 
     enum class ExecutionMode : std::uint8_t

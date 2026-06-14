@@ -91,10 +91,9 @@ namespace cxxpython
         std::unique_lock lock(gc_coordination_mutex_);
         if (gc_stop_requested_)
         {
-            current_thread.set_gc_safepoint(true);
+            ThreadGCStateGuard safepoint(current_thread, ThreadGCState::OpcodeSafepoint);
             gc_condition_.notify_all();
             gc_condition_.wait(lock, [this] { return !gc_stop_requested_; });
-            current_thread.set_gc_safepoint(false);
             return 0;
         }
 
@@ -106,7 +105,7 @@ namespace cxxpython
         }
 
         gc_stop_requested_ = true;
-        current_thread.set_gc_safepoint(true);
+        ThreadGCStateGuard safepoint(current_thread, ThreadGCState::OpcodeSafepoint);
         gc_condition_.notify_all();
         gc_condition_.wait(lock, [this, &current_thread] {
             return all_other_active_threads_at_gc_safepoint(current_thread);
@@ -116,7 +115,6 @@ namespace cxxpython
         const std::size_t collected = collect_garbage_unlocked();
 
         lock.lock();
-        current_thread.set_gc_safepoint(false);
         gc_stop_requested_ = false;
         lock.unlock();
         gc_condition_.notify_all();

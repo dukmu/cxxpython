@@ -60,7 +60,9 @@ namespace cxxpython
         Object *exception_new(TypeObject &type, const CallArguments &args)
         {
             require_no_keywords(type.runtime(), type_qualified_name(&type), args);
-            return type.runtime()->new_exception(&type, args.positional);
+            return type.runtime()->new_exception(
+                &type,
+                std::vector<Object *>(args.positional.begin(), args.positional.end()));
         }
 
         void exception_init(Object &object, const CallArguments &args)

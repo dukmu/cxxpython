@@ -5,6 +5,8 @@
 #include "../Modules/module_registry.hpp"
 #include "vm_fastpaths.hpp"
 
+#include <algorithm>
+#include <iterator>
 #include <sstream>
 #include <utility>
 
@@ -865,16 +867,38 @@ namespace cxxpython
     bool ThreadState::at_gc_safepoint() const noexcept
     {
         std::scoped_lock lock(mutex_);
-        return at_gc_safepoint_;
+        return gc_state_ != ThreadGCState::Running;
     }
 
     void ThreadState::set_gc_safepoint(bool at_safepoint) noexcept
     {
+        set_gc_state(at_safepoint ? ThreadGCState::OpcodeSafepoint : ThreadGCState::Running);
+    }
+
+    ThreadGCState ThreadState::gc_state() const noexcept
+    {
+        std::scoped_lock lock(mutex_);
+        return gc_state_;
+    }
+
+    void ThreadState::set_gc_state(ThreadGCState state) noexcept
+    {
         {
             std::scoped_lock lock(mutex_);
-            at_gc_safepoint_ = at_safepoint;
+            gc_state_ = state;
         }
         interpreter_.runtime().notify_gc_safepoint_change();
+    }
+
+    ThreadGCStateGuard::ThreadGCStateGuard(ThreadState &thread, ThreadGCState state) noexcept
+        : thread_(thread), previous_(thread.gc_state())
+    {
+        thread_.set_gc_state(state);
+    }
+
+    ThreadGCStateGuard::~ThreadGCStateGuard()
+    {
+        thread_.set_gc_state(previous_);
     }
 
     void ThreadState::add_temporary_root(Object *object)
@@ -890,9 +914,9 @@ namespace cxxpython
         if (!object)
             return;
         std::scoped_lock lock(mutex_);
-        const auto found = std::find(temporary_roots_.begin(), temporary_roots_.end(), object);
-        if (found != temporary_roots_.end())
-            temporary_roots_.erase(found);
+        const auto found = std::find(temporary_roots_.rbegin(), temporary_roots_.rend(), object);
+        if (found != temporary_roots_.rend())
+            temporary_roots_.erase(std::next(found).base());
     }
 
     void ThreadState::visit_frames(const VisitChildren &visitor) const
@@ -1754,7 +1778,7 @@ namespace cxxpython
                 for (Object *arg : args)
                     add_temporary_root(runtime_, roots, arg);
                 auto callable_root = runtime_.root(callable);
-                frame->push(object_call(callable, args));
+                frame->push(object_call_rooted(callable_root.get(), ObjectSpan(args.data(), args.size())));
                 break;
             }
             case Opcode::CallKw:
@@ -1774,7 +1798,7 @@ namespace cxxpython
                 }
                 Object *callable = frame->pop();
                 auto callable_root = runtime_.root(callable);
-                frame->push(object_call(callable, CallArguments{std::move(args), keywords}));
+                frame->push(object_call_rooted(callable_root.get(), ObjectSpan(args.data(), args.size()), keywords_root.get()));
                 break;
             }
             case Opcode::CallEx:
@@ -1798,7 +1822,7 @@ namespace cxxpython
                 roots.reserve(args.size());
                 for (Object *arg : args)
                     add_temporary_root(runtime_, roots, arg);
-                frame->push(object_call(callable, CallArguments{std::move(args), keywords}));
+                frame->push(object_call_rooted(callable_root.get(), ObjectSpan(args.data(), args.size()), keywords_root.get()));
                 break;
             }
             case Opcode::ImportStar:
@@ -1881,7 +1905,9 @@ namespace cxxpython
                     exit_args.push_back(runtime_.none());
                     exit_args.push_back(runtime_.none());
                 }
-                Object *result = object_call(exit_root.get(), exit_args);
+                Object *result = object_call(
+                    exit_root.get(),
+                    CallArguments{ObjectSpan(exit_args.data(), exit_args.size()), nullptr});
                 auto result_root = runtime_.root(result);
                 if (frame->pending_control_kind() == PendingControlKind::Exception &&
                     is_true(result_root.get()))

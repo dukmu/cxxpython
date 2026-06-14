@@ -146,7 +146,9 @@ namespace cxxpython
                 try
                 {
                     std::vector<Object *> positional = thread_args->items();
-                    (void)object_call(callable, CallArguments{std::move(positional), thread_kwargs});
+                    (void)object_call(
+                        callable,
+                        CallArguments{ObjectSpan(positional.data(), positional.size()), thread_kwargs});
                 }
                 catch (const PythonError &error)
                 {
@@ -219,15 +221,15 @@ namespace cxxpython
         }
         VirtualMachine *vm = runtime()->active_vm();
         ThreadState *thread = vm ? &vm->thread_state() : nullptr;
-        bool parked_for_gc = false;
         if (thread && locked_)
         {
-            thread->set_gc_safepoint(true);
-            parked_for_gc = true;
+            ThreadGCStateGuard parked(*thread, ThreadGCState::NativeWait);
+            condition_.wait(lock, [this] { return !locked_; });
         }
-        condition_.wait(lock, [this] { return !locked_; });
-        if (parked_for_gc)
-            thread->set_gc_safepoint(false);
+        else
+        {
+            condition_.wait(lock, [this] { return !locked_; });
+        }
         locked_ = true;
         return true;
     }
