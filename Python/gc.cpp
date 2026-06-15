@@ -94,9 +94,25 @@ namespace cxxpython
 
     std::size_t Runtime::collect_garbage_if_requested(ThreadState &current_thread)
     {
-        if (!garbage_collection_requested())
+        if (!garbage_collection_requested() && !garbage_collection_stop_requested())
             return 0;
         return collect_garbage_at_safepoint(current_thread, false);
+    }
+
+    void Runtime::wait_for_garbage_collection_stop()
+    {
+        if (!garbage_collection_stop_requested())
+            return;
+        if (VirtualMachine *vm = active_vm())
+        {
+            (void)collect_garbage_at_safepoint(vm->thread_state(), false);
+            return;
+        }
+
+        std::unique_lock lock(gc_coordination_mutex_);
+        gc_condition_.wait(lock, [this] {
+            return !gc_stop_requested_.load(std::memory_order_acquire);
+        });
     }
 
     bool Runtime::all_other_active_threads_at_gc_safepoint(ThreadState &current_thread) const
@@ -117,11 +133,13 @@ namespace cxxpython
     std::size_t Runtime::collect_garbage_at_safepoint(ThreadState &current_thread, bool force)
     {
         std::unique_lock lock(gc_coordination_mutex_);
-        if (gc_stop_requested_)
+        if (gc_stop_requested_.load(std::memory_order_acquire))
         {
             ThreadGCStateGuard safepoint(current_thread, ThreadGCState::OpcodeSafepoint);
             gc_condition_.notify_all();
-            gc_condition_.wait(lock, [this] { return !gc_stop_requested_; });
+            gc_condition_.wait(lock, [this] {
+                return !gc_stop_requested_.load(std::memory_order_acquire);
+            });
             return 0;
         }
 
@@ -132,7 +150,7 @@ namespace cxxpython
             return 0;
         }
 
-        gc_stop_requested_ = true;
+        gc_stop_requested_.store(true, std::memory_order_release);
         ThreadGCStateGuard safepoint(current_thread, ThreadGCState::OpcodeSafepoint);
         gc_condition_.notify_all();
         gc_condition_.wait(lock, [this, &current_thread] {
@@ -143,7 +161,7 @@ namespace cxxpython
         const std::size_t collected = collect_garbage_unlocked(force);
 
         lock.lock();
-        gc_stop_requested_ = false;
+        gc_stop_requested_.store(false, std::memory_order_release);
         lock.unlock();
         gc_condition_.notify_all();
         return collected;

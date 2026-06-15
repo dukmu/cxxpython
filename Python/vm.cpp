@@ -249,6 +249,7 @@ namespace cxxpython
         bool eval_breaker_requested(Runtime &runtime, Frame &frame) noexcept
         {
             return runtime.garbage_collection_requested() ||
+                   runtime.garbage_collection_stop_requested() ||
                    frame.trace_function() ||
                    pending_signal_delivery_requested();
         }
@@ -844,6 +845,7 @@ namespace cxxpython
         if (frames_.size() >= MaxFrameDepth)
             raise_recursion_error(&interpreter_.runtime(), "maximum recursion depth exceeded");
         frames_.push_back(frame);
+        interpreter_.runtime().notify_gc_safepoint_change();
     }
 
     void ThreadState::pop_frame(Frame *frame)
@@ -851,6 +853,7 @@ namespace cxxpython
         if (frames_.empty() || frames_.back() != frame)
             throw BytecodeError("frame stack discipline violation");
         frames_.pop_back();
+        interpreter_.runtime().notify_gc_safepoint_change();
     }
 
     Frame *ThreadState::current_frame() const noexcept

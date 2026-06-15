@@ -167,6 +167,7 @@ namespace cxxpython
         std::size_t collect_garbage();
         std::size_t collect_garbage_if_requested(ThreadState &current_thread);
         bool garbage_collection_requested() const noexcept;
+        bool garbage_collection_stop_requested() const noexcept;
         bool garbage_collection_enabled() const noexcept;
         void enable_garbage_collection() noexcept;
         void disable_garbage_collection() noexcept;
@@ -387,6 +388,8 @@ namespace cxxpython
         T *allocate(Args &&...args)
         {
             static_assert(std::is_base_of_v<Object, T>);
+            if (gc_stop_requested_.load(std::memory_order_acquire))
+                wait_for_garbage_collection_stop();
             auto object = std::make_unique<T>(std::forward<Args>(args)...);
             T *raw = object.get();
             raw->set_runtime(this);
@@ -428,6 +431,7 @@ namespace cxxpython
         std::size_t collect_garbage_unlocked(bool collect_old);
         std::size_t collect_garbage_at_safepoint(ThreadState &current_thread, bool force);
         bool all_other_active_threads_at_gc_safepoint(ThreadState &current_thread) const;
+        void wait_for_garbage_collection_stop();
         ModuleObject *load_module_from_spec(const ModuleLoadSpec &spec);
         ModuleObject *load_extension_module_from_spec(const ModuleLoadSpec &spec);
         TypeObject *importlib_type_for_loader(std::string_view loader_name);
@@ -457,7 +461,7 @@ namespace cxxpython
         std::atomic_bool gc_requested_{false};
         std::atomic_size_t allocations_since_gc_{0};
         std::atomic_size_t gc_threshold_{65536};
-        bool gc_stop_requested_ = false;
+        std::atomic_bool gc_stop_requested_{false};
 
         TypeObject *object_type_ = nullptr;
         TypeObject *type_type_ = nullptr;
@@ -625,5 +629,10 @@ namespace cxxpython
     {
         return gc_enabled_.load(std::memory_order_relaxed) &&
                gc_requested_.load(std::memory_order_relaxed);
+    }
+
+    inline bool Runtime::garbage_collection_stop_requested() const noexcept
+    {
+        return gc_stop_requested_.load(std::memory_order_acquire);
     }
 }
