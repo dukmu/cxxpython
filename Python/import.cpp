@@ -196,12 +196,14 @@ namespace cxxpython
 
     Object *Runtime::import_name(const ImportRequest &request)
     {
+        auto fromlist_root = root(request.fromlist);
+        auto globals_root = root(request.globals);
         const std::string absolute_name = resolve_import_name(*this, request);
         ModuleObject *module = import_module(absolute_name);
         auto module_root = root(module);
-        if (request.fromlist && request.fromlist != none() && is_true(request.fromlist))
+        if (fromlist_root.get() && fromlist_root.get() != none() && is_true(fromlist_root.get()))
         {
-            load_fromlist_children(*this, absolute_name, module_root.get(), request.fromlist);
+            load_fromlist_children(*this, absolute_name, module_root.get(), fromlist_root.get());
             return module_root.get();
         }
 

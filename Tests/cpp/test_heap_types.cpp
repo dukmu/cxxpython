@@ -117,6 +117,26 @@ TEST(CoreObjects, TypeFlagsSeparateCompactBuiltinsFromHeapInstances)
     EXPECT_EQ(int_child->solid_base, runtime.int_type());
 }
 
+TEST(CoreObjects, TypeObjectsOwnBaseMroDictAndBasesTupleReferences)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::TypeObject *base = runtime.new_heap_type("Base", runtime.object_type());
+    const std::size_t base_refs_before_child = base->ref_count();
+    ASSERT_NE(base->dict, nullptr);
+    EXPECT_GE(base->ref_count(), 1U);
+    EXPECT_GE(base->dict->ref_count(), 1U);
+
+    cxxpython::TypeObject *child = runtime.new_heap_type("Child", base);
+    EXPECT_EQ(child->base, base);
+    ASSERT_EQ(child->bases.size(), 1U);
+    EXPECT_EQ(child->bases[0], base);
+    ASSERT_EQ(child->mro.size(), 3U);
+    EXPECT_EQ(child->mro[0], child);
+    EXPECT_EQ(child->mro[1], base);
+    EXPECT_EQ(child->mro[2], runtime.object_type());
+    EXPECT_EQ(base->ref_count(), base_refs_before_child + 3U);
+}
+
 TEST(CoreObjects, ClassCreationRejectsIncompatibleNativeLayouts)
 {
     cxxpython::Runtime runtime;
@@ -524,23 +544,31 @@ TEST(CoreObjects, ScopedRootGuardsProtectTemporaries)
     cxxpython::StrObject *value = runtime.new_str("temporary");
     const std::size_t baseline = runtime.root_count();
 
+    EXPECT_EQ(value->ref_count(), 0U);
+
     {
         auto first = runtime.root(value);
         EXPECT_EQ(first.get(), value);
+        EXPECT_EQ(value->ref_count(), 0U);
         EXPECT_EQ(runtime.root_count(), baseline + 1);
 
         {
             auto second = runtime.root(value);
+            EXPECT_EQ(value->ref_count(), 0U);
             EXPECT_EQ(runtime.root_count(), baseline + 2);
             auto moved = std::move(second);
             EXPECT_EQ(moved.get(), value);
+            EXPECT_EQ(value->ref_count(), 0U);
             EXPECT_EQ(runtime.root_count(), baseline + 2);
         }
 
+        EXPECT_EQ(value->ref_count(), 0U);
         EXPECT_EQ(runtime.root_count(), baseline + 1);
         first.reset();
+        EXPECT_EQ(value->ref_count(), 0U);
         EXPECT_EQ(runtime.root_count(), baseline);
     }
 
+    EXPECT_EQ(value->ref_count(), 0U);
     EXPECT_EQ(runtime.root_count(), baseline);
 }

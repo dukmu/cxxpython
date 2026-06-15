@@ -32,6 +32,19 @@ namespace cxxpython
     CellObject::CellObject(TypeObject *type, Object *value)
         : Object(type), value_(value)
     {
+        if (value_)
+            value_->incref();
+    }
+
+    CellObject::~CellObject()
+    {
+        clear_references();
+    }
+
+    void CellObject::clear_references()
+    {
+        CXXPYTHON_CLEAR_REF(value_);
+        Object::clear_references();
     }
 
     Object *CellObject::value() const noexcept
@@ -41,6 +54,10 @@ namespace cxxpython
 
     void CellObject::set_value(Object *value) noexcept
     {
+        if (value)
+            value->incref();
+        if (value_)
+            value_->decref();
         value_ = value;
     }
 

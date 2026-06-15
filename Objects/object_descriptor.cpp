@@ -62,6 +62,19 @@ namespace cxxpython
           getter_(std::move(getter)),
           setter_(std::move(setter))
     {
+        if (owner_)
+            owner_->incref();
+    }
+
+    GetSetDescriptorObject::~GetSetDescriptorObject()
+    {
+        clear_references();
+    }
+
+    void GetSetDescriptorObject::clear_references()
+    {
+        CXXPYTHON_CLEAR_REF(owner_);
+        Object::clear_references();
     }
 
     const std::string &GetSetDescriptorObject::name() const noexcept

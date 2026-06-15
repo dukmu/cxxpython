@@ -6,6 +6,7 @@
 
 #include <sstream>
 #include <stdexcept>
+#include <utility>
 
 namespace cxxpython
 {
@@ -899,8 +900,76 @@ namespace cxxpython
     }
 
     PythonError::PythonError(ExceptionObject *value)
-        : value_(value), what_(value ? value->message() : "")
+        : value_(value), runtime_(value ? value->runtime() : nullptr), what_(value ? value->message() : "")
     {
+        if (value_)
+        {
+            value_->incref();
+            runtime_->add_root(value_);
+        }
+    }
+
+    PythonError::PythonError(const PythonError &other)
+        : value_(other.value_), runtime_(other.runtime_), what_(other.what_)
+    {
+        if (value_)
+        {
+            value_->incref();
+            runtime_->add_root(value_);
+        }
+    }
+
+    PythonError::PythonError(PythonError &&other) noexcept
+        : value_(other.value_), runtime_(other.runtime_), what_(std::move(other.what_))
+    {
+        other.value_ = nullptr;
+        other.runtime_ = nullptr;
+    }
+
+    PythonError::~PythonError()
+    {
+        if (value_)
+        {
+            runtime_->remove_root(value_);
+            value_->decref();
+        }
+    }
+
+    PythonError &PythonError::operator=(const PythonError &other)
+    {
+        if (this == &other)
+            return *this;
+        if (other.value_)
+        {
+            other.value_->incref();
+            other.runtime_->add_root(other.value_);
+        }
+        if (value_)
+        {
+            runtime_->remove_root(value_);
+            value_->decref();
+        }
+        value_ = other.value_;
+        runtime_ = other.runtime_;
+        what_ = other.what_;
+        return *this;
+    }
+
+    PythonError &PythonError::operator=(PythonError &&other) noexcept
+    {
+        if (this == &other)
+            return *this;
+        if (value_)
+        {
+            runtime_->remove_root(value_);
+            value_->decref();
+        }
+        value_ = other.value_;
+        runtime_ = other.runtime_;
+        what_ = std::move(other.what_);
+        other.value_ = nullptr;
+        other.runtime_ = nullptr;
+        return *this;
     }
 
     ExceptionObject *PythonError::value() const noexcept
@@ -926,6 +995,19 @@ namespace cxxpython
     Object::Object(TypeObject *type)
         : type_(type)
     {
+        if (type_)
+            type_->incref();
+    }
+
+    Object::~Object()
+    {
+        clear_references();
+    }
+
+    void Object::clear_references()
+    {
+        CXXPYTHON_CLEAR_REF(instance_dict_);
+        CXXPYTHON_CLEAR_REF(type_);
     }
 
     TypeObject *Object::type() const noexcept
@@ -943,8 +1025,46 @@ namespace cxxpython
         runtime_ = runtime;
     }
 
+    void Object::incref() noexcept
+    {
+        ref_count_.fetch_add(1, std::memory_order_relaxed);
+    }
+
+    void Object::decref() noexcept
+    {
+        std::size_t current = ref_count_.load(std::memory_order_relaxed);
+        while (current != 0 &&
+               !ref_count_.compare_exchange_weak(current,
+                                                current - 1,
+                                                std::memory_order_relaxed,
+                                                std::memory_order_relaxed))
+        {
+        }
+    }
+
+    std::size_t Object::ref_count() const noexcept
+    {
+        return ref_count_.load(std::memory_order_relaxed);
+    }
+
+    GCGeneration Object::gc_generation() const noexcept
+    {
+        return gc_generation_;
+    }
+
+    void Object::promote_gc_generation() noexcept
+    {
+        gc_generation_ = GCGeneration::Old;
+    }
+
     void Object::set_type(TypeObject *type) noexcept
     {
+        if (type == type_)
+            return;
+        if (type)
+            type->incref();
+        if (type_)
+            type_->decref();
         type_ = type;
     }
 
@@ -995,12 +1115,76 @@ namespace cxxpython
 
     void Object::set_instance_dict(DictObject *dict) noexcept
     {
+        if (dict == instance_dict_)
+            return;
+        if (dict)
+            dict->incref();
+        if (instance_dict_)
+            instance_dict_->decref();
         instance_dict_ = dict;
     }
 
     TypeObject::TypeObject(std::string name)
         : Object(nullptr), name(std::move(name))
     {
+    }
+
+    TypeObject::~TypeObject()
+    {
+        clear_references();
+    }
+
+    void TypeObject::clear_references()
+    {
+        CXXPYTHON_CLEAR_REF(dict);
+        for (TypeObject *item : mro)
+        {
+            if (item)
+                item->decref();
+        }
+        mro.clear();
+        for (TypeObject *item : bases)
+        {
+            if (item)
+                item->decref();
+        }
+        bases.clear();
+        CXXPYTHON_CLEAR_REF(solid_base);
+        CXXPYTHON_CLEAR_REF(base);
+        Object::clear_references();
+    }
+
+    void TypeObject::set_base(TypeObject *value) noexcept
+    {
+        if (value == base)
+            return;
+        if (value)
+            value->incref();
+        if (base)
+            base->decref();
+        base = value;
+    }
+
+    void TypeObject::set_solid_base(TypeObject *value) noexcept
+    {
+        if (value == solid_base)
+            return;
+        if (value)
+            value->incref();
+        if (solid_base)
+            solid_base->decref();
+        solid_base = value;
+    }
+
+    void TypeObject::set_dict(DictObject *value) noexcept
+    {
+        if (value == dict)
+            return;
+        if (value)
+            value->incref();
+        if (dict)
+            dict->decref();
+        dict = value;
     }
 
     bool is_subclass(const TypeObject *derived, const TypeObject *base) noexcept

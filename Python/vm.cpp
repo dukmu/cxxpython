@@ -455,13 +455,42 @@ namespace cxxpython
             throw BytecodeError("frame requires builtins");
         if (cells_.size() != code_->cellvars().size() + code_->freevars().size())
             throw BytecodeError("frame cell count does not match code metadata");
+        code_->incref();
+        locals_->incref();
+        globals_->incref();
+        builtins_->incref();
+        for (CellObject *cell : cells_)
+        {
+            if (cell)
+                cell->incref();
+        }
         stack_.reserve(code_->stack_size());
         for (std::size_t index = 0; index < code_->varnames().size(); ++index)
         {
             StrObject *name = code_->varnames()[index];
             fast_local_names_[index] = name;
             fast_locals_[index] = locals_->get(name);
+            if (fast_locals_[index])
+                fast_locals_[index]->incref();
         }
+    }
+
+    Frame::~Frame()
+    {
+        clear_references();
+    }
+
+    void Frame::clear_references()
+    {
+        CXXPYTHON_CLEAR_VECTOR_REF(fast_locals_);
+        CXXPYTHON_CLEAR_VECTOR_REF(cells_);
+        CXXPYTHON_CLEAR_REF(trace_function_);
+        CXXPYTHON_CLEAR_REF(pending_control_value_);
+        CXXPYTHON_CLEAR_REF(builtins_);
+        CXXPYTHON_CLEAR_REF(globals_);
+        CXXPYTHON_CLEAR_REF(locals_);
+        CXXPYTHON_CLEAR_REF(code_);
+        Object::clear_references();
     }
 
     CodeObject *Frame::code() const noexcept
@@ -516,7 +545,11 @@ namespace cxxpython
             throw BytecodeError("fast local index out of range");
         if (!value)
             throw BytecodeError("cannot assign null fast local");
+        Object *previous = fast_locals_[index];
+        value->incref();
         fast_locals_[index] = value;
+        if (previous)
+            previous->decref();
     }
 
     bool Frame::delete_fast_local(std::size_t index)
@@ -525,7 +558,9 @@ namespace cxxpython
             throw BytecodeError("fast local index out of range");
         if (!fast_locals_[index])
             return false;
+        Object *previous = fast_locals_[index];
         fast_locals_[index] = nullptr;
+        previous->decref();
         return true;
     }
 
@@ -687,6 +722,10 @@ namespace cxxpython
 
     void Frame::set_pending_return(Object *value)
     {
+        if (value)
+            value->incref();
+        if (pending_control_value_)
+            pending_control_value_->decref();
         pending_control_kind_ = PendingControlKind::Return;
         pending_control_value_ = value;
         pending_control_target_ = 0;
@@ -694,6 +733,10 @@ namespace cxxpython
 
     void Frame::set_pending_exception(ExceptionObject *value)
     {
+        if (value)
+            value->incref();
+        if (pending_control_value_)
+            pending_control_value_->decref();
         pending_control_kind_ = PendingControlKind::Exception;
         pending_control_value_ = value;
         pending_control_target_ = 0;
@@ -730,6 +773,8 @@ namespace cxxpython
 
     void Frame::clear_pending_control() noexcept
     {
+        if (pending_control_value_)
+            pending_control_value_->decref();
         pending_control_kind_ = PendingControlKind::None;
         pending_control_value_ = nullptr;
         pending_control_target_ = 0;
@@ -742,6 +787,12 @@ namespace cxxpython
 
     void Frame::set_trace_function(Object *trace_function) noexcept
     {
+        if (trace_function == trace_function_)
+            return;
+        if (trace_function)
+            trace_function->incref();
+        if (trace_function_)
+            trace_function_->decref();
         trace_function_ = trace_function;
     }
 
@@ -763,6 +814,13 @@ namespace cxxpython
 
     ThreadState::~ThreadState()
     {
+        for (ExceptionObject *exception : handled_exceptions_)
+        {
+            if (exception)
+                exception->decref();
+        }
+        if (trace_function_)
+            trace_function_->decref();
         interpreter_.runtime().unregister_thread_state(this);
     }
 
@@ -816,7 +874,16 @@ namespace cxxpython
         if (!exception)
             throw BytecodeError("cannot push null handled exception");
         std::scoped_lock lock(mutex_);
-        handled_exceptions_.push_back(exception);
+        exception->incref();
+        try
+        {
+            handled_exceptions_.push_back(exception);
+        }
+        catch (...)
+        {
+            exception->decref();
+            throw;
+        }
     }
 
     void ThreadState::pop_handled_exception()
@@ -824,7 +891,9 @@ namespace cxxpython
         std::scoped_lock lock(mutex_);
         if (handled_exceptions_.empty())
             throw BytecodeError("handled exception stack underflow");
+        ExceptionObject *exception = handled_exceptions_.back();
         handled_exceptions_.pop_back();
+        exception->decref();
     }
 
     ExceptionObject *ThreadState::current_exception() const noexcept
@@ -845,7 +914,14 @@ namespace cxxpython
     {
         std::scoped_lock lock(mutex_);
         if (depth < handled_exceptions_.size())
+        {
+            for (std::size_t index = depth; index < handled_exceptions_.size(); ++index)
+            {
+                if (handled_exceptions_[index])
+                    handled_exceptions_[index]->decref();
+            }
             handled_exceptions_.resize(depth);
+        }
     }
 
     Object *ThreadState::trace_function() const noexcept
@@ -857,6 +933,12 @@ namespace cxxpython
     void ThreadState::set_trace_function(Object *trace_function) noexcept
     {
         std::scoped_lock lock(mutex_);
+        if (trace_function == trace_function_)
+            return;
+        if (trace_function)
+            trace_function->incref();
+        if (trace_function_)
+            trace_function_->decref();
         trace_function_ = trace_function;
     }
 
@@ -916,22 +998,22 @@ namespace cxxpython
         thread_.set_gc_state(previous_);
     }
 
-    void ThreadState::add_temporary_root(Object *object)
+    std::size_t ThreadState::add_temporary_root(Object *object)
     {
         if (!object)
-            return;
-        std::scoped_lock lock(mutex_);
+            return static_cast<std::size_t>(-1);
         temporary_roots_.push_back(object);
+        return temporary_roots_.size() - 1;
     }
 
-    void ThreadState::remove_temporary_root(Object *object)
+    void ThreadState::remove_temporary_root(std::size_t index, Object *object)
     {
         if (!object)
             return;
-        std::scoped_lock lock(mutex_);
-        const auto found = std::find(temporary_roots_.rbegin(), temporary_roots_.rend(), object);
-        if (found != temporary_roots_.rend())
-            temporary_roots_.erase(std::next(found).base());
+        if (index < temporary_roots_.size() && temporary_roots_[index] == object)
+            temporary_roots_[index] = nullptr;
+        while (!temporary_roots_.empty() && temporary_roots_.back() == nullptr)
+            temporary_roots_.pop_back();
     }
 
     void ThreadState::visit_frames(const VisitChildren &visitor) const
@@ -1167,7 +1249,6 @@ target_load_fast:
 target_store_fast:
             {
                 Object *value = frame->pop();
-                auto value_root = runtime_.root(value);
                 frame->set_fast_local(instruction.operand, value);
                 continue;
             }
@@ -1292,7 +1373,6 @@ target_call:
 target_return_value:
             {
                 Object *value = frame->pop();
-                auto value_root = runtime_.root(value);
                 bool jumped_to_finally = false;
                 while (frame->has_block_handler())
                 {
@@ -1308,12 +1388,15 @@ target_return_value:
                 if (jumped_to_finally)
                     continue;
                 if (frame->trace_function())
+                {
+                    auto value_root = runtime_.root(value);
                     (void)call_trace_function(runtime_,
                                               thread_,
                                               frame->trace_function(),
                                               *frame,
                                               "return",
                                               value_root.get());
+                }
                 return value;
             }
 
@@ -1411,7 +1494,6 @@ target_slow:
             case Opcode::StoreFast:
             {
                 Object *value = frame->pop();
-                auto value_root = runtime_.root(value);
                 frame->set_fast_local(instruction.operand, value);
                 break;
             }
@@ -1741,8 +1823,6 @@ target_slow:
                 const ComparisonOp op = decode_comparison_op(instruction.operand);
                 Object *right = frame->pop();
                 Object *left = frame->pop();
-                auto right_root = runtime_.root(right);
-                auto left_root = runtime_.root(left);
                 switch (op)
                 {
                 case ComparisonOp::Equal:
@@ -1757,7 +1837,11 @@ target_slow:
                         frame->push(result);
                         break;
                     }
-                    frame->push(object_rich_compare(left, right, static_cast<RichCompareOp>(op)));
+                    {
+                        auto right_root = runtime_.root(right);
+                        auto left_root = runtime_.root(left);
+                        frame->push(object_rich_compare(left, right, static_cast<RichCompareOp>(op)));
+                    }
                     break;
                 case ComparisonOp::Is:
                     frame->push(left == right ? runtime_.true_value() : runtime_.false_value());
@@ -1766,11 +1850,19 @@ target_slow:
                     frame->push(left != right ? runtime_.true_value() : runtime_.false_value());
                     break;
                 case ComparisonOp::In:
+                {
+                    auto right_root = runtime_.root(right);
+                    auto left_root = runtime_.root(left);
                     frame->push(object_contains(right, left) ? runtime_.true_value() : runtime_.false_value());
                     break;
+                }
                 case ComparisonOp::NotIn:
+                {
+                    auto right_root = runtime_.root(right);
+                    auto left_root = runtime_.root(left);
                     frame->push(object_contains(right, left) ? runtime_.false_value() : runtime_.true_value());
                     break;
+                }
                 }
                 break;
             }
@@ -2217,7 +2309,6 @@ target_slow:
             case Opcode::ReturnValue:
             {
                 Object *value = frame->pop();
-                auto value_root = runtime_.root(value);
                 bool jumped_to_finally = false;
                 while (frame->has_block_handler())
                 {
@@ -2233,12 +2324,15 @@ target_slow:
                 if (jumped_to_finally)
                     continue;
                 if (frame->trace_function())
+                {
+                    auto value_root = runtime_.root(value);
                     (void)call_trace_function(runtime_,
                                               thread_,
                                               frame->trace_function(),
                                               *frame,
                                               "return",
                                               value_root.get());
+                }
                 return value;
             }
             default:

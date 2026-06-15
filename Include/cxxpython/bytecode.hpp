@@ -118,6 +118,8 @@ namespace cxxpython
                    std::vector<StrObject *> freevars,
                    std::vector<Instruction> instructions,
                    std::vector<std::uint32_t> lines = {});
+        ~CodeObject() override;
+        void clear_references() override;
 
         const std::string &name() const noexcept;
         const std::string &filename() const noexcept;

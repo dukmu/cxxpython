@@ -23,30 +23,33 @@ namespace cxxpython
             roots_.erase(std::next(found).base());
     }
 
-    bool Runtime::add_temporary_root(Object *object)
+    TemporaryRootHandle Runtime::add_temporary_root(Object *object)
     {
         if (!object)
-            return false;
+            return {};
         if (VirtualMachine *vm = active_vm())
-        {
-            vm->thread_state().add_temporary_root(object);
-            return true;
-        }
-        add_root(object);
-        return false;
+            return TemporaryRootHandle{true, vm->thread_state().add_temporary_root(object)};
+
+        std::scoped_lock lock(roots_mutex_);
+        roots_.push_back(object);
+        return TemporaryRootHandle{false, roots_.size() - 1};
     }
 
-    void Runtime::remove_temporary_root(Object *object, bool is_thread_local)
+    void Runtime::remove_temporary_root(Object *object, TemporaryRootHandle handle)
     {
         if (!object)
             return;
-        if (is_thread_local)
+        if (handle.is_thread_local)
         {
             if (VirtualMachine *vm = active_vm())
-                vm->thread_state().remove_temporary_root(object);
+                vm->thread_state().remove_temporary_root(handle.index, object);
             return;
         }
-        remove_root(object);
+        std::scoped_lock lock(roots_mutex_);
+        if (handle.index < roots_.size() && roots_[handle.index] == object)
+            roots_[handle.index] = nullptr;
+        while (!roots_.empty() && roots_.back() == nullptr)
+            roots_.pop_back();
     }
 
     void Runtime::visit_roots(const std::function<void(Object *)> &visitor) const
@@ -109,7 +112,9 @@ namespace cxxpython
     std::size_t Runtime::root_count() const noexcept
     {
         std::scoped_lock lock(roots_mutex_);
-        return roots_.size();
+        return static_cast<std::size_t>(std::count_if(roots_.begin(), roots_.end(), [](Object *root) {
+            return root != nullptr;
+        }));
     }
 
     TypeObject *Runtime::allocate_type(std::string name)
@@ -124,10 +129,10 @@ namespace cxxpython
 
     void Runtime::initialize_type(TypeObject *type, const std::vector<TypeObject *> &bases)
     {
-        type->base = bases.empty() ? nullptr : bases[0];
-        type->bases = bases;
-        type->mro.clear();
-        type->mro.push_back(type);
+        TypeObject *new_base = bases.empty() ? nullptr : bases[0];
+        std::vector<TypeObject *> new_bases = bases;
+        std::vector<TypeObject *> new_mro;
+        new_mro.push_back(type);
 
         std::vector<std::vector<TypeObject *>> sequences;
         sequences.reserve(bases.size() + 1);
@@ -155,7 +160,7 @@ namespace cxxpython
                                            { return sequence.empty(); }),
                             sequences.end());
             if (sequences.empty())
-                return;
+                break;
 
             TypeObject *candidate = nullptr;
             for (const std::vector<TypeObject *> &sequence : sequences)
@@ -186,13 +191,35 @@ namespace cxxpython
                 raise_type_error(this, message.str());
             }
 
-            type->mro.push_back(candidate);
+            new_mro.push_back(candidate);
             for (std::vector<TypeObject *> &sequence : sequences)
             {
                 if (!sequence.empty() && sequence.front() == candidate)
                     sequence.erase(sequence.begin());
             }
         }
+
+        if (new_base)
+            new_base->incref();
+        for (TypeObject *base : bases)
+            base->incref();
+        for (TypeObject *item : new_mro)
+            item->incref();
+
+        TypeObject *old_base = type->base;
+        std::vector<TypeObject *> old_bases = std::move(type->bases);
+        std::vector<TypeObject *> old_mro = std::move(type->mro);
+
+        type->base = new_base;
+        type->bases = std::move(new_bases);
+        type->mro = std::move(new_mro);
+
+        for (TypeObject *item : old_mro)
+            item->decref();
+        for (TypeObject *base : old_bases)
+            base->decref();
+        if (old_base)
+            old_base->decref();
     }
 
     void Runtime::initialize_type_dict(TypeObject *type)
@@ -202,7 +229,7 @@ namespace cxxpython
         DictObject *dict = new_dict();
         dict->set(new_str("__name__"), new_str(type->name));
         dict->set(new_str("__module__"), new_str(type->module));
-        type->dict = dict;
+        type->set_dict(dict);
     }
 
     void Runtime::initialize_type_dicts()

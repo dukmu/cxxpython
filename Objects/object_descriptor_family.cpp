@@ -15,22 +15,6 @@ namespace cxxpython
             require_positional_count(runtime, name, args, 1);
         }
 
-        std::int64_t identity_hash(const Object &object)
-        {
-            return reinterpret_cast<std::intptr_t>(&object);
-        }
-
-        bool identity_equal(const Object &left, const Object &right)
-        {
-            return &left == &right;
-        }
-
-        bool always_true(const Object &object)
-        {
-            (void)object;
-            return true;
-        }
-
         std::string staticmethod_repr(const Object &object)
         {
             auto *method = static_cast<const StaticMethodObject *>(&object);
@@ -99,6 +83,19 @@ namespace cxxpython
     StaticMethodObject::StaticMethodObject(TypeObject *type, Object *callable)
         : Object(type), callable_(callable)
     {
+        if (callable_)
+            callable_->incref();
+    }
+
+    StaticMethodObject::~StaticMethodObject()
+    {
+        clear_references();
+    }
+
+    void StaticMethodObject::clear_references()
+    {
+        CXXPYTHON_CLEAR_REF(callable_);
+        Object::clear_references();
     }
 
     Object *StaticMethodObject::callable() const noexcept
@@ -109,6 +106,19 @@ namespace cxxpython
     ClassMethodObject::ClassMethodObject(TypeObject *type, Object *callable)
         : Object(type), callable_(callable)
     {
+        if (callable_)
+            callable_->incref();
+    }
+
+    ClassMethodObject::~ClassMethodObject()
+    {
+        clear_references();
+    }
+
+    void ClassMethodObject::clear_references()
+    {
+        CXXPYTHON_CLEAR_REF(callable_);
+        Object::clear_references();
     }
 
     Object *ClassMethodObject::callable() const noexcept

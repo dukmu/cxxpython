@@ -14,6 +14,9 @@ namespace cxxpython
     std::int64_t default_hash(const Object &object);
     bool default_equal(const Object &left, const Object &right);
     bool default_truth(const Object &object);
+    std::int64_t identity_hash(const Object &object);
+    bool identity_equal(const Object &left, const Object &right);
+    bool always_true(const Object &object);
     void default_traverse(const Object &object, const VisitChildren &visitor);
     std::vector<Object *> collect_iterable_items(Runtime *runtime, Object *iterable);
     bool has_keyword_arguments(const CallArguments &args) noexcept;

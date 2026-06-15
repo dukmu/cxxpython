@@ -31,22 +31,6 @@ namespace cxxpython
                    object_repr(method->self()) + ">";
         }
 
-        std::int64_t identity_hash(const Object &object)
-        {
-            return reinterpret_cast<std::intptr_t>(&object);
-        }
-
-        bool identity_equal(const Object &left, const Object &right)
-        {
-            return &left == &right;
-        }
-
-        bool always_true(const Object &object)
-        {
-            (void)object;
-            return true;
-        }
-
         void function_traverse(const Object &object, const VisitChildren &visitor)
         {
             auto *function = static_cast<const PythonFunctionObject *>(&object);
@@ -279,11 +263,45 @@ namespace cxxpython
           doc_(nullptr),
           closure_(std::move(closure))
     {
+        if (code_)
+            code_->incref();
+        if (globals_)
+            globals_->incref();
+        if (defaults_)
+            defaults_->incref();
+        if (kwdefaults_)
+            kwdefaults_->incref();
+        if (annotations_)
+            annotations_->incref();
         if (code_ && !code_->constants().empty())
         {
             if (dynamic_cast<StrObject *>(code_->constants().front()))
                 doc_ = code_->constants().front();
         }
+        if (doc_)
+            doc_->incref();
+        for (CellObject *cell : closure_)
+        {
+            if (cell)
+                cell->incref();
+        }
+    }
+
+    PythonFunctionObject::~PythonFunctionObject()
+    {
+        clear_references();
+    }
+
+    void PythonFunctionObject::clear_references()
+    {
+        CXXPYTHON_CLEAR_VECTOR_REF(closure_);
+        CXXPYTHON_CLEAR_REF(doc_);
+        CXXPYTHON_CLEAR_REF(annotations_);
+        CXXPYTHON_CLEAR_REF(kwdefaults_);
+        CXXPYTHON_CLEAR_REF(defaults_);
+        CXXPYTHON_CLEAR_REF(globals_);
+        CXXPYTHON_CLEAR_REF(code_);
+        Object::clear_references();
     }
 
     const std::string &PythonFunctionObject::name() const noexcept
@@ -298,6 +316,10 @@ namespace cxxpython
 
     void PythonFunctionObject::set_doc(Object *doc) noexcept
     {
+        if (doc)
+            doc->incref();
+        if (doc_)
+            doc_->decref();
         doc_ = doc;
     }
 
@@ -371,6 +393,10 @@ namespace cxxpython
     {
         if (defaults && defaults->size() > code_->arg_count())
             raise_type_error(runtime(), "__defaults__ length exceeds positional arguments");
+        if (defaults)
+            defaults->incref();
+        if (defaults_)
+            defaults_->decref();
         defaults_ = defaults;
     }
 
@@ -381,6 +407,10 @@ namespace cxxpython
 
     void PythonFunctionObject::set_kwdefaults(DictObject *kwdefaults)
     {
+        if (kwdefaults)
+            kwdefaults->incref();
+        if (kwdefaults_)
+            kwdefaults_->decref();
         kwdefaults_ = kwdefaults;
     }
 
@@ -391,6 +421,10 @@ namespace cxxpython
 
     void PythonFunctionObject::set_annotations(DictObject *annotations)
     {
+        if (annotations)
+            annotations->incref();
+        if (annotations_)
+            annotations_->decref();
         annotations_ = annotations;
     }
 
@@ -550,6 +584,22 @@ namespace cxxpython
     PythonMethodObject::PythonMethodObject(TypeObject *type, Object *callable, Object *self)
         : Object(type), callable_(callable), self_(self)
     {
+        if (callable_)
+            callable_->incref();
+        if (self_)
+            self_->incref();
+    }
+
+    PythonMethodObject::~PythonMethodObject()
+    {
+        clear_references();
+    }
+
+    void PythonMethodObject::clear_references()
+    {
+        CXXPYTHON_CLEAR_REF(self_);
+        CXXPYTHON_CLEAR_REF(callable_);
+        Object::clear_references();
     }
 
     PythonFunctionObject *PythonMethodObject::function() const noexcept

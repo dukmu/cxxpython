@@ -242,6 +242,7 @@ TEST(Attributes, StoresAndReadsInstanceDictionaries)
     cxxpython::object_set_attr(instance, "name", instance_value);
 
     ASSERT_NE(instance->instance_dict(), nullptr);
+    EXPECT_EQ(instance->instance_dict()->ref_count(), 1U);
     EXPECT_EQ(cxxpython::object_get_attr(instance, "name"), instance_value);
 
     std::vector<cxxpython::Object *> children;
@@ -686,6 +687,8 @@ TEST(Attributes, PropertyObjectsUseDescriptorProtocol)
             return set_marker;
         });
     cxxpython::PropertyObject *property = runtime.new_property(getter, setter);
+    EXPECT_EQ(getter->ref_count(), 1U);
+    EXPECT_EQ(setter->ref_count(), 1U);
     owner_type->dict->set(runtime.new_str("field"), property);
     cxxpython::Object *instance = runtime.allocate<cxxpython::Object>(owner_type);
     cxxpython::Object *value = runtime.new_str("new-value");
@@ -730,6 +733,8 @@ TEST(Attributes, PropertyDeleterUsesDescriptorDeleteProtocol)
             return runtime.none();
         });
     cxxpython::PropertyObject *property = runtime.new_property(getter, nullptr, deleter);
+    EXPECT_EQ(getter->ref_count(), 1U);
+    EXPECT_EQ(deleter->ref_count(), 1U);
     owner_type->dict->set(runtime.new_str("field"), property);
     cxxpython::Object *instance = runtime.allocate<cxxpython::Object>(owner_type);
 
@@ -853,6 +858,7 @@ TEST(Attributes, StaticMethodObjectsReturnWrappedCallable)
             return result;
         });
     cxxpython::StaticMethodObject *descriptor = runtime.new_staticmethod(callable);
+    EXPECT_EQ(callable->ref_count(), 1U);
     owner_type->dict->set(runtime.new_str("utility"), descriptor);
     cxxpython::Object *instance = runtime.allocate<cxxpython::Object>(owner_type);
 
@@ -887,6 +893,7 @@ TEST(Attributes, ClassMethodObjectsBindOwnerType)
             return result;
         });
     cxxpython::ClassMethodObject *descriptor = runtime.new_classmethod(callable);
+    EXPECT_EQ(callable->ref_count(), 1U);
     owner_type->dict->set(runtime.new_str("factory"), descriptor);
     cxxpython::Object *instance = runtime.allocate<cxxpython::Object>(owner_type);
 

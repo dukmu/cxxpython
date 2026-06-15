@@ -406,6 +406,19 @@ namespace cxxpython
     EnumerateObject::EnumerateObject(TypeObject *type, Object *iterator, std::int64_t next_index)
         : Object(type), iterator_(iterator), next_index_(next_index)
     {
+        if (iterator_)
+            iterator_->incref();
+    }
+
+    EnumerateObject::~EnumerateObject()
+    {
+        clear_references();
+    }
+
+    void EnumerateObject::clear_references()
+    {
+        CXXPYTHON_CLEAR_REF(iterator_);
+        Object::clear_references();
     }
 
     Object *EnumerateObject::iterator() const noexcept
@@ -421,6 +434,22 @@ namespace cxxpython
     ZipObject::ZipObject(TypeObject *type, std::vector<Object *> iterators)
         : Object(type), iterators_(std::move(iterators))
     {
+        for (Object *iterator : iterators_)
+        {
+            if (iterator)
+                iterator->incref();
+        }
+    }
+
+    ZipObject::~ZipObject()
+    {
+        clear_references();
+    }
+
+    void ZipObject::clear_references()
+    {
+        CXXPYTHON_CLEAR_VECTOR_REF(iterators_);
+        Object::clear_references();
     }
 
     const std::vector<Object *> &ZipObject::iterators() const noexcept
@@ -431,6 +460,25 @@ namespace cxxpython
     MapObject::MapObject(TypeObject *type, Object *callable, std::vector<Object *> iterators)
         : Object(type), callable_(callable), iterators_(std::move(iterators))
     {
+        if (callable_)
+            callable_->incref();
+        for (Object *iterator : iterators_)
+        {
+            if (iterator)
+                iterator->incref();
+        }
+    }
+
+    MapObject::~MapObject()
+    {
+        clear_references();
+    }
+
+    void MapObject::clear_references()
+    {
+        CXXPYTHON_CLEAR_VECTOR_REF(iterators_);
+        CXXPYTHON_CLEAR_REF(callable_);
+        Object::clear_references();
     }
 
     Object *MapObject::callable() const noexcept
@@ -446,6 +494,22 @@ namespace cxxpython
     FilterObject::FilterObject(TypeObject *type, Object *callable, Object *iterator)
         : Object(type), callable_(callable), iterator_(iterator)
     {
+        if (callable_)
+            callable_->incref();
+        if (iterator_)
+            iterator_->incref();
+    }
+
+    FilterObject::~FilterObject()
+    {
+        clear_references();
+    }
+
+    void FilterObject::clear_references()
+    {
+        CXXPYTHON_CLEAR_REF(iterator_);
+        CXXPYTHON_CLEAR_REF(callable_);
+        Object::clear_references();
     }
 
     Object *FilterObject::callable() const noexcept

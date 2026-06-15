@@ -135,6 +135,25 @@ namespace cxxpython
     SliceObject::SliceObject(TypeObject *type, Object *start, Object *stop, Object *step)
         : Object(type), start_(start), stop_(stop), step_(step)
     {
+        if (start_)
+            start_->incref();
+        if (stop_)
+            stop_->incref();
+        if (step_)
+            step_->incref();
+    }
+
+    SliceObject::~SliceObject()
+    {
+        clear_references();
+    }
+
+    void SliceObject::clear_references()
+    {
+        CXXPYTHON_CLEAR_REF(step_);
+        CXXPYTHON_CLEAR_REF(stop_);
+        CXXPYTHON_CLEAR_REF(start_);
+        Object::clear_references();
     }
 
     Object *SliceObject::start() const noexcept

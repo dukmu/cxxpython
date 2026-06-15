@@ -80,6 +80,19 @@ namespace cxxpython
     SequenceIteratorObject::SequenceIteratorObject(TypeObject *type, Object *sequence)
         : Object(type), sequence_(sequence)
     {
+        if (sequence_)
+            sequence_->incref();
+    }
+
+    SequenceIteratorObject::~SequenceIteratorObject()
+    {
+        clear_references();
+    }
+
+    void SequenceIteratorObject::clear_references()
+    {
+        CXXPYTHON_CLEAR_REF(sequence_);
+        Object::clear_references();
     }
 
     Object *SequenceIteratorObject::sequence() const noexcept
@@ -100,6 +113,19 @@ namespace cxxpython
     DictKeyIteratorObject::DictKeyIteratorObject(TypeObject *type, DictObject *dict)
         : Object(type), dict_(dict)
     {
+        if (dict_)
+            dict_->incref();
+    }
+
+    DictKeyIteratorObject::~DictKeyIteratorObject()
+    {
+        clear_references();
+    }
+
+    void DictKeyIteratorObject::clear_references()
+    {
+        CXXPYTHON_CLEAR_REF(dict_);
+        Object::clear_references();
     }
 
     DictObject *DictKeyIteratorObject::dict() const noexcept
@@ -120,6 +146,19 @@ namespace cxxpython
     ReverseIteratorObject::ReverseIteratorObject(TypeObject *type, Object *sequence, std::size_t next_index)
         : Object(type), sequence_(sequence), next_index_(next_index)
     {
+        if (sequence_)
+            sequence_->incref();
+    }
+
+    ReverseIteratorObject::~ReverseIteratorObject()
+    {
+        clear_references();
+    }
+
+    void ReverseIteratorObject::clear_references()
+    {
+        CXXPYTHON_CLEAR_REF(sequence_);
+        Object::clear_references();
     }
 
     Object *ReverseIteratorObject::sequence() const noexcept

@@ -188,6 +188,28 @@ namespace cxxpython
           deleter_(deleter),
           doc_(doc)
     {
+        if (getter_)
+            getter_->incref();
+        if (setter_)
+            setter_->incref();
+        if (deleter_)
+            deleter_->incref();
+        if (doc_)
+            doc_->incref();
+    }
+
+    PropertyObject::~PropertyObject()
+    {
+        clear_references();
+    }
+
+    void PropertyObject::clear_references()
+    {
+        CXXPYTHON_CLEAR_REF(getter_);
+        CXXPYTHON_CLEAR_REF(setter_);
+        CXXPYTHON_CLEAR_REF(deleter_);
+        CXXPYTHON_CLEAR_REF(doc_);
+        Object::clear_references();
     }
 
     Object *PropertyObject::getter() const noexcept

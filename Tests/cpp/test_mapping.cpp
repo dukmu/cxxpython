@@ -90,6 +90,51 @@ TEST(CoreObjects, MappingSlotsReadWriteAndContainDictItems)
     }
 }
 
+TEST(CoreObjects, DictOwnsKeyAndValueReferences)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::DictObject *dict = runtime.new_dict();
+    cxxpython::Object *key = runtime.new_str("key");
+    cxxpython::Object *value = runtime.new_str("value");
+    cxxpython::Object *replacement = runtime.new_str("replacement");
+
+    EXPECT_EQ(key->ref_count(), 0U);
+    EXPECT_EQ(value->ref_count(), 0U);
+    dict->set(key, value);
+    EXPECT_EQ(key->ref_count(), 1U);
+    EXPECT_EQ(value->ref_count(), 1U);
+
+    dict->set(key, replacement);
+    EXPECT_EQ(key->ref_count(), 1U);
+    EXPECT_EQ(value->ref_count(), 0U);
+    EXPECT_EQ(replacement->ref_count(), 1U);
+
+    cxxpython::DictObject *copy = runtime.new_dict();
+    copy->set(key, replacement);
+    EXPECT_EQ(key->ref_count(), 2U);
+    EXPECT_EQ(replacement->ref_count(), 2U);
+
+    EXPECT_TRUE(dict->erase(key));
+    EXPECT_EQ(key->ref_count(), 1U);
+    EXPECT_EQ(replacement->ref_count(), 1U);
+
+    EXPECT_TRUE(copy->erase(key));
+    EXPECT_EQ(key->ref_count(), 0U);
+    EXPECT_EQ(replacement->ref_count(), 0U);
+}
+
+TEST(CoreObjects, DictKeyIteratorOwnsReferencedDict)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::DictObject *dict = runtime.new_dict();
+    dict->set(runtime.new_str("key"), runtime.new_int(1));
+
+    EXPECT_EQ(dict->ref_count(), 0U);
+    cxxpython::Object *iterator = cxxpython::object_iter(dict);
+    EXPECT_EQ(iterator->ref_count(), 0U);
+    EXPECT_EQ(dict->ref_count(), 1U);
+}
+
 TEST(CoreObjects, MappingProxySlotsReadAndContainWrappedDictItems)
 {
     cxxpython::Runtime runtime;
@@ -97,6 +142,8 @@ TEST(CoreObjects, MappingProxySlotsReadAndContainWrappedDictItems)
     cxxpython::Object *key = runtime.new_str("key");
     cxxpython::Object *value = runtime.new_str("value");
     cxxpython::MappingProxyObject *proxy = runtime.new_mappingproxy(dict);
+
+    EXPECT_EQ(dict->ref_count(), 1U);
 
     EXPECT_EQ(cxxpython::object_length(proxy), 0);
     EXPECT_FALSE(cxxpython::object_contains(proxy, key));

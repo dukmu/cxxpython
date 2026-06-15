@@ -398,6 +398,77 @@ TEST(CoreObjects, ListSemantics)
     EXPECT_GE(visited_children, list->size() + 1);
 }
 
+TEST(CoreObjects, ListOwnsElementReferences)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::Object *first = runtime.new_str("first");
+    cxxpython::Object *second = runtime.new_str("second");
+    cxxpython::Object *third = runtime.new_str("third");
+
+    EXPECT_EQ(first->ref_count(), 0U);
+    cxxpython::ListObject *list = runtime.new_list({first});
+    EXPECT_EQ(first->ref_count(), 1U);
+
+    list->append(second);
+    EXPECT_EQ(second->ref_count(), 1U);
+
+    list->set(0, third);
+    EXPECT_EQ(first->ref_count(), 0U);
+    EXPECT_EQ(third->ref_count(), 1U);
+
+    cxxpython::ListObject *copy = runtime.new_list(list->items());
+    EXPECT_EQ(second->ref_count(), 2U);
+    EXPECT_EQ(third->ref_count(), 2U);
+
+    copy->erase(0);
+    EXPECT_EQ(third->ref_count(), 1U);
+    EXPECT_EQ(second->ref_count(), 2U);
+
+    list->erase(-1);
+    EXPECT_EQ(second->ref_count(), 1U);
+    EXPECT_EQ(third->ref_count(), 1U);
+
+    list->erase(0);
+    EXPECT_EQ(third->ref_count(), 0U);
+    EXPECT_EQ(second->ref_count(), 1U);
+}
+
+TEST(CoreObjects, TupleOwnsElementReferences)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::Object *first = runtime.new_str("first");
+    cxxpython::Object *second = runtime.new_str("second");
+
+    EXPECT_EQ(first->ref_count(), 0U);
+    EXPECT_EQ(second->ref_count(), 0U);
+    cxxpython::TupleObject *tuple = runtime.new_tuple({first, second});
+    EXPECT_EQ(first->ref_count(), 1U);
+    EXPECT_EQ(second->ref_count(), 1U);
+
+    cxxpython::TupleObject *copy = runtime.new_tuple(tuple->items());
+    EXPECT_EQ(copy->size(), 2U);
+    EXPECT_EQ(first->ref_count(), 2U);
+    EXPECT_EQ(second->ref_count(), 2U);
+}
+
+TEST(CoreObjects, SliceOwnsComponentReferences)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::Object *start = runtime.new_int(1);
+    cxxpython::Object *stop = runtime.new_int(5);
+    cxxpython::Object *step = runtime.new_int(2);
+
+    EXPECT_EQ(start->ref_count(), 0U);
+    EXPECT_EQ(stop->ref_count(), 0U);
+    EXPECT_EQ(step->ref_count(), 0U);
+
+    cxxpython::SliceObject *slice = runtime.new_slice(start, stop, step);
+    EXPECT_EQ(slice->ref_count(), 0U);
+    EXPECT_EQ(start->ref_count(), 1U);
+    EXPECT_EQ(stop->ref_count(), 1U);
+    EXPECT_EQ(step->ref_count(), 1U);
+}
+
 TEST(CoreObjects, SequenceSlotsReadAndWriteListAndTupleItems)
 {
     cxxpython::Runtime runtime;
@@ -477,6 +548,55 @@ TEST(CoreObjects, IteratesSequencesAndRaisesStopIterationAtEnd)
     ASSERT_EQ(visited.size(), 2U);
     EXPECT_EQ(visited[0], runtime.sequence_iterator_type());
     EXPECT_EQ(visited[1], list);
+}
+
+TEST(CoreObjects, IteratorObjectsOwnReferencedIterables)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::ListObject *list = runtime.new_list({runtime.new_int(1), runtime.new_int(2)});
+
+    EXPECT_EQ(list->ref_count(), 0U);
+    cxxpython::Object *iterator = cxxpython::object_iter(list);
+    EXPECT_EQ(iterator->ref_count(), 0U);
+    EXPECT_EQ(list->ref_count(), 1U);
+
+    cxxpython::Object *reverse = runtime.new_reverse_iterator(list);
+    EXPECT_EQ(reverse->ref_count(), 0U);
+    EXPECT_EQ(list->ref_count(), 2U);
+}
+
+TEST(CoreObjects, IterableAdaptersOwnWrappedIteratorsAndCallables)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::ListObject *left = runtime.new_list({runtime.new_int(1)});
+    cxxpython::ListObject *right = runtime.new_list({runtime.new_int(2)});
+    cxxpython::Object *left_iterator = cxxpython::object_iter(left);
+    cxxpython::Object *right_iterator = cxxpython::object_iter(right);
+    cxxpython::Object *callable = runtime.new_native_function(
+        "identity",
+        [](cxxpython::Runtime &, const cxxpython::CallArguments &args) -> cxxpython::Object *
+        { return args.positional[0]; });
+
+    EXPECT_EQ(left_iterator->ref_count(), 0U);
+    cxxpython::EnumerateObject *enumerate = runtime.new_enumerate(left_iterator, 0);
+    EXPECT_EQ(enumerate->ref_count(), 0U);
+    EXPECT_EQ(left_iterator->ref_count(), 1U);
+
+    cxxpython::ZipObject *zip = runtime.new_zip({left_iterator, right_iterator});
+    EXPECT_EQ(zip->ref_count(), 0U);
+    EXPECT_EQ(left_iterator->ref_count(), 2U);
+    EXPECT_EQ(right_iterator->ref_count(), 1U);
+
+    cxxpython::MapObject *map = runtime.new_map(callable, {left_iterator, right_iterator});
+    EXPECT_EQ(map->ref_count(), 0U);
+    EXPECT_EQ(callable->ref_count(), 1U);
+    EXPECT_EQ(left_iterator->ref_count(), 3U);
+    EXPECT_EQ(right_iterator->ref_count(), 2U);
+
+    cxxpython::FilterObject *filter = runtime.new_filter(callable, left_iterator);
+    EXPECT_EQ(filter->ref_count(), 0U);
+    EXPECT_EQ(callable->ref_count(), 2U);
+    EXPECT_EQ(left_iterator->ref_count(), 4U);
 }
 
 TEST(CoreObjects, ListConstructorConsumesIterableProtocol)

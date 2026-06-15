@@ -27,6 +27,22 @@ namespace cxxpython
         return true;
     }
 
+    std::int64_t identity_hash(const Object &object)
+    {
+        return reinterpret_cast<std::intptr_t>(&object);
+    }
+
+    bool identity_equal(const Object &left, const Object &right)
+    {
+        return &left == &right;
+    }
+
+    bool always_true(const Object &object)
+    {
+        (void)object;
+        return true;
+    }
+
     void default_traverse(const Object &object, const VisitChildren &visitor)
     {
         (void)object;

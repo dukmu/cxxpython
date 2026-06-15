@@ -78,6 +78,25 @@ namespace cxxpython
           object_(object),
           object_type_(object_type)
     {
+        if (start_type_)
+            start_type_->incref();
+        if (object_)
+            object_->incref();
+        if (object_type_)
+            object_type_->incref();
+    }
+
+    SuperObject::~SuperObject()
+    {
+        clear_references();
+    }
+
+    void SuperObject::clear_references()
+    {
+        CXXPYTHON_CLEAR_REF(start_type_);
+        CXXPYTHON_CLEAR_REF(object_);
+        CXXPYTHON_CLEAR_REF(object_type_);
+        Object::clear_references();
     }
 
     TypeObject *SuperObject::start_type() const noexcept

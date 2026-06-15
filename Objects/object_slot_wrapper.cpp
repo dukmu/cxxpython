@@ -22,23 +22,7 @@ namespace cxxpython
             auto *bound = static_cast<const BoundSlotWrapperObject *>(&object);
             return "<method-wrapper '" + bound->wrapper()->name() +
                    "' of " + type_qualified_name(bound->self()->type()) +
-                   " object at " + pointer_hex(bound->self()) + ">";
-        }
-
-        std::int64_t identity_hash(const Object &object)
-        {
-            return reinterpret_cast<std::intptr_t>(&object);
-        }
-
-        bool identity_equal(const Object &left, const Object &right)
-        {
-            return &left == &right;
-        }
-
-        bool always_true(const Object &object)
-        {
-            (void)object;
-            return true;
+                    " object at " + pointer_hex(bound->self()) + ">";
         }
 
         void slot_wrapper_traverse(const Object &object, const VisitChildren &visitor)
@@ -222,6 +206,19 @@ namespace cxxpython
           unary_op_(unary_op),
           rich_compare_op_(rich_compare_op)
     {
+        if (owner_)
+            owner_->incref();
+    }
+
+    SlotWrapperObject::~SlotWrapperObject()
+    {
+        clear_references();
+    }
+
+    void SlotWrapperObject::clear_references()
+    {
+        CXXPYTHON_CLEAR_REF(owner_);
+        Object::clear_references();
     }
 
     const std::string &SlotWrapperObject::name() const noexcept
@@ -326,6 +323,22 @@ namespace cxxpython
     BoundSlotWrapperObject::BoundSlotWrapperObject(TypeObject *type, SlotWrapperObject *wrapper, Object *self)
         : Object(type), wrapper_(wrapper), self_(self)
     {
+        if (wrapper_)
+            wrapper_->incref();
+        if (self_)
+            self_->incref();
+    }
+
+    BoundSlotWrapperObject::~BoundSlotWrapperObject()
+    {
+        clear_references();
+    }
+
+    void BoundSlotWrapperObject::clear_references()
+    {
+        CXXPYTHON_CLEAR_REF(self_);
+        CXXPYTHON_CLEAR_REF(wrapper_);
+        Object::clear_references();
     }
 
     SlotWrapperObject *BoundSlotWrapperObject::wrapper() const noexcept

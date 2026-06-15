@@ -73,6 +73,22 @@ namespace cxxpython
           last_instruction_index_(last_instruction_index),
           line_(line)
     {
+        if (next_)
+            next_->incref();
+        if (frame_)
+            frame_->incref();
+    }
+
+    TracebackObject::~TracebackObject()
+    {
+        clear_references();
+    }
+
+    void TracebackObject::clear_references()
+    {
+        CXXPYTHON_CLEAR_REF(next_);
+        CXXPYTHON_CLEAR_REF(frame_);
+        Object::clear_references();
     }
 
     TracebackObject *TracebackObject::next() const noexcept

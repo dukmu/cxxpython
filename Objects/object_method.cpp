@@ -47,22 +47,6 @@ namespace cxxpython
                    type_qualified_name(method->owner()) + "' objects>";
         }
 
-        std::int64_t identity_hash(const Object &object)
-        {
-            return reinterpret_cast<std::intptr_t>(&object);
-        }
-
-        bool identity_equal(const Object &left, const Object &right)
-        {
-            return &left == &right;
-        }
-
-        bool always_true(const Object &object)
-        {
-            (void)object;
-            return true;
-        }
-
         void method_descriptor_traverse(const Object &object, const VisitChildren &visitor)
         {
             auto *method = static_cast<const MethodDescriptorObject *>(&object);
@@ -100,6 +84,19 @@ namespace cxxpython
           owner_(owner),
           callback_(std::move(callback))
     {
+        if (owner_)
+            owner_->incref();
+    }
+
+    MethodDescriptorObject::~MethodDescriptorObject()
+    {
+        clear_references();
+    }
+
+    void MethodDescriptorObject::clear_references()
+    {
+        CXXPYTHON_CLEAR_REF(owner_);
+        Object::clear_references();
     }
 
     const std::string &MethodDescriptorObject::name() const noexcept
@@ -167,6 +164,22 @@ namespace cxxpython
     BoundMethodObject::BoundMethodObject(TypeObject *type, MethodDescriptorObject *method, Object *self)
         : Object(type), method_(method), self_(self)
     {
+        if (method_)
+            method_->incref();
+        if (self_)
+            self_->incref();
+    }
+
+    BoundMethodObject::~BoundMethodObject()
+    {
+        clear_references();
+    }
+
+    void BoundMethodObject::clear_references()
+    {
+        CXXPYTHON_CLEAR_REF(self_);
+        CXXPYTHON_CLEAR_REF(method_);
+        Object::clear_references();
     }
 
     MethodDescriptorObject *BoundMethodObject::method() const noexcept

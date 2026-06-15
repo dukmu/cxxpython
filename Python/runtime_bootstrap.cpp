@@ -183,9 +183,7 @@ namespace cxxpython
         keyboard_interrupt_type_->set_type(type_type_);
         stop_iteration_type_->set_type(type_type_);
 
-        object_type_->base = nullptr;
-        object_type_->bases = {};
-        object_type_->mro = {object_type_};
+        initialize_type(object_type_, nullptr);
 
         initialize_type(type_type_, object_type_);
         initialize_type(none_type_, object_type_);
@@ -244,63 +242,63 @@ namespace cxxpython
         initialize_type(keyboard_interrupt_type_, base_exception_type_);
         initialize_type(stop_iteration_type_, exception_type_);
 
-        object_type_->solid_base = object_type_;
-        type_type_->solid_base = type_type_;
-        none_type_->solid_base = none_type_;
-        not_implemented_type_->solid_base = not_implemented_type_;
-        float_type_->solid_base = float_type_;
-        int_type_->solid_base = int_type_;
-        bool_type_->solid_base = int_type_;
-        str_type_->solid_base = str_type_;
-        bytes_type_->solid_base = bytes_type_;
-        list_type_->solid_base = list_type_;
-        tuple_type_->solid_base = tuple_type_;
-        slice_type_->solid_base = slice_type_;
-        dict_type_->solid_base = dict_type_;
-        mappingproxy_type_->solid_base = mappingproxy_type_;
-        sequence_iterator_type_->solid_base = sequence_iterator_type_;
-        dict_key_iterator_type_->solid_base = dict_key_iterator_type_;
-        reverse_iterator_type_->solid_base = reverse_iterator_type_;
-        range_type_->solid_base = range_type_;
-        range_iterator_type_->solid_base = range_iterator_type_;
-        enumerate_type_->solid_base = enumerate_type_;
-        zip_type_->solid_base = zip_type_;
-        map_type_->solid_base = map_type_;
-        filter_type_->solid_base = filter_type_;
-        text_io_type_->solid_base = text_io_type_;
-        thread_lock_type_->solid_base = thread_lock_type_;
-        module_type_->solid_base = module_type_;
-        native_function_type_->solid_base = native_function_type_;
-        function_type_->solid_base = function_type_;
-        cell_type_->solid_base = cell_type_;
-        super_type_->solid_base = super_type_;
-        method_type_->solid_base = method_type_;
-        method_descriptor_type_->solid_base = method_descriptor_type_;
-        slot_wrapper_type_->solid_base = slot_wrapper_type_;
-        bound_slot_wrapper_type_->solid_base = bound_slot_wrapper_type_;
-        getset_descriptor_type_->solid_base = getset_descriptor_type_;
-        property_type_->solid_base = property_type_;
-        staticmethod_type_->solid_base = staticmethod_type_;
-        classmethod_type_->solid_base = classmethod_type_;
-        code_type_->solid_base = code_type_;
-        frame_type_->solid_base = frame_type_;
-        traceback_type_->solid_base = traceback_type_;
-        base_exception_type_->solid_base = base_exception_type_;
-        exception_type_->solid_base = base_exception_type_;
-        type_error_type_->solid_base = base_exception_type_;
-        value_error_type_->solid_base = base_exception_type_;
-        index_error_type_->solid_base = base_exception_type_;
-        key_error_type_->solid_base = base_exception_type_;
-        syntax_error_type_->solid_base = base_exception_type_;
-        name_error_type_->solid_base = base_exception_type_;
-        unbound_local_error_type_->solid_base = base_exception_type_;
-        recursion_error_type_->solid_base = base_exception_type_;
-        attribute_error_type_->solid_base = base_exception_type_;
-        import_error_type_->solid_base = base_exception_type_;
-        os_error_type_->solid_base = base_exception_type_;
-        system_exit_type_->solid_base = base_exception_type_;
-        keyboard_interrupt_type_->solid_base = base_exception_type_;
-        stop_iteration_type_->solid_base = base_exception_type_;
+        object_type_->set_solid_base(object_type_);
+        type_type_->set_solid_base(type_type_);
+        none_type_->set_solid_base(none_type_);
+        not_implemented_type_->set_solid_base(not_implemented_type_);
+        float_type_->set_solid_base(float_type_);
+        int_type_->set_solid_base(int_type_);
+        bool_type_->set_solid_base(int_type_);
+        str_type_->set_solid_base(str_type_);
+        bytes_type_->set_solid_base(bytes_type_);
+        list_type_->set_solid_base(list_type_);
+        tuple_type_->set_solid_base(tuple_type_);
+        slice_type_->set_solid_base(slice_type_);
+        dict_type_->set_solid_base(dict_type_);
+        mappingproxy_type_->set_solid_base(mappingproxy_type_);
+        sequence_iterator_type_->set_solid_base(sequence_iterator_type_);
+        dict_key_iterator_type_->set_solid_base(dict_key_iterator_type_);
+        reverse_iterator_type_->set_solid_base(reverse_iterator_type_);
+        range_type_->set_solid_base(range_type_);
+        range_iterator_type_->set_solid_base(range_iterator_type_);
+        enumerate_type_->set_solid_base(enumerate_type_);
+        zip_type_->set_solid_base(zip_type_);
+        map_type_->set_solid_base(map_type_);
+        filter_type_->set_solid_base(filter_type_);
+        text_io_type_->set_solid_base(text_io_type_);
+        thread_lock_type_->set_solid_base(thread_lock_type_);
+        module_type_->set_solid_base(module_type_);
+        native_function_type_->set_solid_base(native_function_type_);
+        function_type_->set_solid_base(function_type_);
+        cell_type_->set_solid_base(cell_type_);
+        super_type_->set_solid_base(super_type_);
+        method_type_->set_solid_base(method_type_);
+        method_descriptor_type_->set_solid_base(method_descriptor_type_);
+        slot_wrapper_type_->set_solid_base(slot_wrapper_type_);
+        bound_slot_wrapper_type_->set_solid_base(bound_slot_wrapper_type_);
+        getset_descriptor_type_->set_solid_base(getset_descriptor_type_);
+        property_type_->set_solid_base(property_type_);
+        staticmethod_type_->set_solid_base(staticmethod_type_);
+        classmethod_type_->set_solid_base(classmethod_type_);
+        code_type_->set_solid_base(code_type_);
+        frame_type_->set_solid_base(frame_type_);
+        traceback_type_->set_solid_base(traceback_type_);
+        base_exception_type_->set_solid_base(base_exception_type_);
+        exception_type_->set_solid_base(base_exception_type_);
+        type_error_type_->set_solid_base(base_exception_type_);
+        value_error_type_->set_solid_base(base_exception_type_);
+        index_error_type_->set_solid_base(base_exception_type_);
+        key_error_type_->set_solid_base(base_exception_type_);
+        syntax_error_type_->set_solid_base(base_exception_type_);
+        name_error_type_->set_solid_base(base_exception_type_);
+        unbound_local_error_type_->set_solid_base(base_exception_type_);
+        recursion_error_type_->set_solid_base(base_exception_type_);
+        attribute_error_type_->set_solid_base(base_exception_type_);
+        import_error_type_->set_solid_base(base_exception_type_);
+        os_error_type_->set_solid_base(base_exception_type_);
+        system_exit_type_->set_solid_base(base_exception_type_);
+        keyboard_interrupt_type_->set_solid_base(base_exception_type_);
+        stop_iteration_type_->set_solid_base(base_exception_type_);
 
         none_ = allocate<NoneObject>(none_type_);
         not_implemented_ = allocate<NotImplementedObject>(not_implemented_type_);
@@ -400,7 +398,8 @@ namespace cxxpython
 
     Runtime::~Runtime()
     {
-        heap_.clear();
+        while (!heap_.empty())
+            heap_.pop_back();
         for (void *handle : extension_handles_)
         {
             if (handle)

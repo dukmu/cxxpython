@@ -271,6 +271,25 @@ namespace cxxpython
         rebuild_indices(8);
     }
 
+    DictObject::~DictObject()
+    {
+        clear_references();
+    }
+
+    void DictObject::clear_references()
+    {
+        for (const Entry &entry : entries_)
+        {
+            if (entry.key)
+                entry.key->decref();
+            if (entry.value)
+                entry.value->decref();
+        }
+        entries_.clear();
+        indices_.clear();
+        Object::clear_references();
+    }
+
     bool DictObject::contains(Object *key) const
     {
         return get(key) != nullptr;
@@ -302,10 +321,17 @@ namespace cxxpython
         SlotSearch search = find_slot(key, key_hash);
         if (search.found)
         {
-            entries_[indices_[search.slot]].value = value;
+            Entry &entry = entries_[indices_[search.slot]];
+            Object *previous = entry.value;
+            value->incref();
+            entry.value = value;
+            if (previous)
+                previous->decref();
             return;
         }
 
+        key->incref();
+        value->incref();
         entries_.push_back(Entry{key, value, key_hash});
         indices_[search.slot] = entries_.size() - 1;
         ensure_index_capacity();
@@ -322,7 +348,13 @@ namespace cxxpython
         if (!search.found)
             return false;
 
-        entries_.erase(entries_.begin() + static_cast<std::ptrdiff_t>(indices_[search.slot]));
+        const std::size_t entry_index = indices_[search.slot];
+        Entry removed = entries_[entry_index];
+        entries_.erase(entries_.begin() + static_cast<std::ptrdiff_t>(entry_index));
+        if (removed.key)
+            removed.key->decref();
+        if (removed.value)
+            removed.value->decref();
         rebuild_indices(indices_.size());
         return true;
     }
@@ -342,6 +374,19 @@ namespace cxxpython
     MappingProxyObject::MappingProxyObject(TypeObject *type, DictObject *mapping)
         : Object(type), mapping_(mapping)
     {
+        if (mapping_)
+            mapping_->incref();
+    }
+
+    MappingProxyObject::~MappingProxyObject()
+    {
+        clear_references();
+    }
+
+    void MappingProxyObject::clear_references()
+    {
+        CXXPYTHON_CLEAR_REF(mapping_);
+        Object::clear_references();
     }
 
     const DictObject *MappingProxyObject::mapping() const noexcept

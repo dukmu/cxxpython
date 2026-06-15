@@ -74,6 +74,20 @@ namespace cxxpython
     ExceptionObject::ExceptionObject(TypeObject *type, TupleObject *args, std::string message)
         : Object(type), args_(args), message_(std::move(message))
     {
+        if (args_)
+            args_->incref();
+    }
+
+    ExceptionObject::~ExceptionObject()
+    {
+        clear_references();
+    }
+
+    void ExceptionObject::clear_references()
+    {
+        CXXPYTHON_CLEAR_REF(traceback_head_);
+        CXXPYTHON_CLEAR_REF(args_);
+        Object::clear_references();
     }
 
     TupleObject *ExceptionObject::args() const noexcept
@@ -144,6 +158,12 @@ namespace cxxpython
 
     void ExceptionObject::prepend_traceback(TracebackObject *traceback) noexcept
     {
+        if (traceback == traceback_head_)
+            return;
+        if (traceback)
+            traceback->incref();
+        if (traceback_head_)
+            traceback_head_->decref();
         traceback_head_ = traceback;
     }
 

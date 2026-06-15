@@ -11,10 +11,10 @@ namespace cxxpython
     {
         if (VirtualMachine *vm = active_vm())
             return collect_garbage_at_safepoint(vm->thread_state(), true);
-        return collect_garbage_unlocked();
+        return collect_garbage_unlocked(true);
     }
 
-    std::size_t Runtime::collect_garbage_unlocked()
+    std::size_t Runtime::collect_garbage_unlocked(bool collect_old)
     {
         std::scoped_lock collection_lock(gc_mutex_);
         std::unordered_set<Object *> marked;
@@ -28,6 +28,14 @@ namespace cxxpython
         };
 
         visit_roots(enqueue);
+        {
+            std::scoped_lock lock(heap_mutex_);
+            for (const auto &object : heap_)
+            {
+                if (object && !collect_old && object->gc_generation() == GCGeneration::Old)
+                    enqueue(object.get());
+            }
+        }
         visit_thread_states([&enqueue](ThreadState &thread) {
             thread.visit_frames(enqueue);
             thread.visit_temporary_roots(enqueue);
@@ -39,6 +47,9 @@ namespace cxxpython
             worklist.pop_back();
             object->visit_children(enqueue);
         }
+
+        for (Object *object : marked)
+            object->promote_gc_generation();
 
         {
             std::scoped_lock lock(roots_mutex_);
@@ -52,11 +63,26 @@ namespace cxxpython
 
         std::scoped_lock lock(heap_mutex_);
         const std::size_t before = heap_.size();
+
+        for (const auto &object : heap_)
+        {
+            if (!object)
+                continue;
+            if (marked.find(object.get()) != marked.end())
+                continue;
+            if (object->ref_count() != 0)
+                object->clear_references();
+        }
+
         heap_.erase(std::remove_if(heap_.begin(),
-                                   heap_.end(),
-                                   [&marked](const std::unique_ptr<Object> &object) {
-                                       return !object || marked.find(object.get()) == marked.end();
-                                   }),
+                                    heap_.end(),
+                                    [&marked, collect_old](const std::unique_ptr<Object> &object) {
+                                        if (!object)
+                                            return true;
+                                        if (!collect_old && object->gc_generation() == GCGeneration::Old)
+                                            return false;
+                                        return marked.find(object.get()) == marked.end();
+                                    }),
                     heap_.end());
         const std::size_t collected = before - heap_.size();
         allocations_since_gc_.store(0, std::memory_order_relaxed);
@@ -112,7 +138,7 @@ namespace cxxpython
         });
         lock.unlock();
 
-        const std::size_t collected = collect_garbage_unlocked();
+        const std::size_t collected = collect_garbage_unlocked(force);
 
         lock.lock();
         gc_stop_requested_ = false;

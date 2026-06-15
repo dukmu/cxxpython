@@ -147,6 +147,44 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::ReturnValue, 0}), -1);
 }
 
+TEST(Bytecode, CodeObjectOwnsMetadataReferences)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::StrObject *varname = runtime.new_str("arg");
+    cxxpython::Object *constant = runtime.new_str("constant");
+    cxxpython::StrObject *name = runtime.new_str("global_name");
+    cxxpython::StrObject *cellvar = runtime.new_str("cell");
+    cxxpython::StrObject *freevar = runtime.new_str("free");
+
+    EXPECT_EQ(varname->ref_count(), 0U);
+    EXPECT_EQ(constant->ref_count(), 0U);
+    EXPECT_EQ(name->ref_count(), 0U);
+    EXPECT_EQ(cellvar->ref_count(), 0U);
+    EXPECT_EQ(freevar->ref_count(), 0U);
+
+    cxxpython::CodeObject *code = runtime.new_code(
+        "fn",
+        "script.py",
+        1,
+        0,
+        0,
+        0,
+        {varname},
+        {constant},
+        {name},
+        {cellvar},
+        {freevar},
+        {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::ReturnValue, 0}});
+
+    EXPECT_EQ(code->ref_count(), 0U);
+    EXPECT_EQ(varname->ref_count(), 1U);
+    EXPECT_EQ(constant->ref_count(), 1U);
+    EXPECT_EQ(name->ref_count(), 1U);
+    EXPECT_EQ(cellvar->ref_count(), 1U);
+    EXPECT_EQ(freevar->ref_count(), 1U);
+}
+
 TEST(Bytecode, DispatchesCompareOpThroughRichCompareProtocol)
 {
     cxxpython::Runtime runtime;
@@ -330,6 +368,24 @@ TEST(Bytecode, DispatchesMakeFunctionWithClosure)
     ASSERT_EQ(function->closure().size(), 1U);
     EXPECT_EQ(function->closure()[0], cell);
     EXPECT_EQ(cxxpython::object_call(function, {}), captured);
+}
+
+TEST(Bytecode, CellOwnsValueReference)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::Object *first = runtime.new_str("first");
+    cxxpython::Object *second = runtime.new_str("second");
+
+    EXPECT_EQ(first->ref_count(), 0U);
+    cxxpython::CellObject *cell = runtime.new_cell(first);
+    EXPECT_EQ(first->ref_count(), 1U);
+
+    cell->set_value(second);
+    EXPECT_EQ(first->ref_count(), 0U);
+    EXPECT_EQ(second->ref_count(), 1U);
+
+    cell->set_value(nullptr);
+    EXPECT_EQ(second->ref_count(), 0U);
 }
 
 TEST(Bytecode, DispatchesMakeClass)
@@ -944,16 +1000,24 @@ TEST(Bytecode, FrameFastLocalsMirrorLocalsDictionary)
     cxxpython::Frame *frame = runtime.new_frame(code, locals, globals, builtins);
 
     EXPECT_EQ(frame->fast_local(0), initial);
+    EXPECT_EQ(initial->ref_count(), 2U);
+    EXPECT_EQ(replacement->ref_count(), 0U);
     frame->set_fast_local(0, replacement);
     EXPECT_EQ(frame->fast_local(0), replacement);
+    EXPECT_EQ(initial->ref_count(), 1U);
+    EXPECT_EQ(replacement->ref_count(), 1U);
     EXPECT_EQ(locals->get(name), initial);
     frame->sync_fast_locals_to_dict();
     EXPECT_EQ(locals->get(name), replacement);
+    EXPECT_EQ(initial->ref_count(), 0U);
+    EXPECT_EQ(replacement->ref_count(), 2U);
     EXPECT_TRUE(frame->delete_fast_local(0));
     EXPECT_EQ(frame->fast_local(0), nullptr);
+    EXPECT_EQ(replacement->ref_count(), 1U);
     EXPECT_EQ(locals->get(name), replacement);
     frame->sync_fast_locals_to_dict();
     EXPECT_EQ(locals->get(name), nullptr);
+    EXPECT_EQ(replacement->ref_count(), 0U);
     EXPECT_FALSE(frame->delete_fast_local(0));
 }
 
@@ -1284,19 +1348,32 @@ TEST(Bytecode, ThreadStateVisitsHandledExceptionsAsRoots)
     cxxpython::Runtime runtime;
     cxxpython::VirtualMachine vm(runtime);
     cxxpython::ExceptionObject *exception = runtime.new_exception(runtime.type_error_type(), "handled");
+    cxxpython::Object *trace = runtime.new_native_function(
+        "trace",
+        [](cxxpython::Runtime &runtime, const cxxpython::CallArguments &)
+        { return runtime.none(); });
 
+    EXPECT_EQ(exception->ref_count(), 0U);
     vm.thread_state().push_handled_exception(exception);
+    EXPECT_EQ(exception->ref_count(), 1U);
+    EXPECT_EQ(trace->ref_count(), 0U);
+    vm.thread_state().set_trace_function(trace);
+    EXPECT_EQ(trace->ref_count(), 1U);
 
     std::vector<cxxpython::Object *> roots;
     vm.thread_state().visit_frames([&roots](cxxpython::Object *object)
                                    { roots.push_back(object); });
 
-    ASSERT_EQ(roots.size(), 1U);
+    ASSERT_EQ(roots.size(), 2U);
     EXPECT_EQ(roots[0], exception);
+    EXPECT_EQ(roots[1], trace);
     EXPECT_EQ(vm.thread_state().current_exception(), exception);
 
     vm.thread_state().pop_handled_exception();
+    EXPECT_EQ(exception->ref_count(), 0U);
     EXPECT_EQ(vm.thread_state().current_exception(), nullptr);
+    vm.thread_state().set_trace_function(nullptr);
+    EXPECT_EQ(trace->ref_count(), 0U);
 }
 
 TEST(Bytecode, ThreadGCStateGuardRestoresPreviousState)

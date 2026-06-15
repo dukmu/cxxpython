@@ -331,6 +331,22 @@ namespace cxxpython
     ListObject::ListObject(TypeObject *type, std::vector<Object *> items)
         : Object(type), items_(std::move(items))
     {
+        for (Object *item : items_)
+        {
+            if (item)
+                item->incref();
+        }
+    }
+
+    ListObject::~ListObject()
+    {
+        clear_references();
+    }
+
+    void ListObject::clear_references()
+    {
+        CXXPYTHON_CLEAR_VECTOR_REF(items_);
+        Object::clear_references();
     }
 
     void ListObject::append(Object *item)
@@ -338,6 +354,7 @@ namespace cxxpython
         if (!item)
             raise_type_error(runtime(), "list item cannot be null");
         std::scoped_lock lock(mutex_);
+        item->incref();
         items_.push_back(item);
     }
 
@@ -352,13 +369,22 @@ namespace cxxpython
         if (!item)
             raise_type_error(runtime(), "list item cannot be null");
         std::scoped_lock lock(mutex_);
-        items_[normalize_index(index)] = item;
+        const std::size_t resolved = normalize_index(index);
+        Object *previous = items_[resolved];
+        item->incref();
+        items_[resolved] = item;
+        if (previous)
+            previous->decref();
     }
 
     void ListObject::erase(std::int64_t index)
     {
         std::scoped_lock lock(mutex_);
-        items_.erase(items_.begin() + static_cast<std::ptrdiff_t>(normalize_index(index)));
+        const std::size_t resolved = normalize_index(index);
+        Object *previous = items_[resolved];
+        items_.erase(items_.begin() + static_cast<std::ptrdiff_t>(resolved));
+        if (previous)
+            previous->decref();
     }
 
     std::vector<Object *> ListObject::items() const
@@ -385,6 +411,22 @@ namespace cxxpython
     TupleObject::TupleObject(TypeObject *type, std::vector<Object *> items)
         : Object(type), items_(std::move(items))
     {
+        for (Object *item : items_)
+        {
+            if (item)
+                item->incref();
+        }
+    }
+
+    TupleObject::~TupleObject()
+    {
+        clear_references();
+    }
+
+    void TupleObject::clear_references()
+    {
+        CXXPYTHON_CLEAR_VECTOR_REF(items_);
+        Object::clear_references();
     }
 
     const std::vector<Object *> &TupleObject::items() const noexcept

@@ -31,6 +31,12 @@ namespace cxxpython
     template <class T>
     class Rooted;
 
+    struct TemporaryRootHandle
+    {
+        bool is_thread_local = false;
+        std::size_t index = static_cast<std::size_t>(-1);
+    };
+
     struct ClassConstructionRequest
     {
         std::string name;
@@ -364,8 +370,8 @@ namespace cxxpython
 
         void add_root(Object *object);
         void remove_root(Object *object);
-        bool add_temporary_root(Object *object);
-        void remove_temporary_root(Object *object, bool is_thread_local);
+        TemporaryRootHandle add_temporary_root(Object *object);
+        void remove_temporary_root(Object *object, TemporaryRootHandle handle);
         template <class T>
         Rooted<T> root(T *object);
         void visit_roots(const std::function<void(Object *)> &visitor) const;
@@ -388,34 +394,18 @@ namespace cxxpython
                 std::scoped_lock lock(heap_mutex_);
                 heap_.push_back(std::move(object));
             }
-            if constexpr (counts_toward_automatic_gc<T>())
+            if (gc_enabled_.load(std::memory_order_relaxed))
             {
-                if (gc_enabled_.load(std::memory_order_relaxed))
-                {
-                    const std::size_t count =
-                        allocations_since_gc_.fetch_add(1, std::memory_order_relaxed) + 1;
-                    const std::size_t threshold = gc_threshold_.load(std::memory_order_relaxed);
-                    if (threshold != 0 && count >= threshold)
-                        gc_requested_.store(true, std::memory_order_relaxed);
-                }
+                const std::size_t count =
+                    allocations_since_gc_.fetch_add(1, std::memory_order_relaxed) + 1;
+                const std::size_t threshold = gc_threshold_.load(std::memory_order_relaxed);
+                if (threshold != 0 && count >= threshold)
+                    gc_requested_.store(true, std::memory_order_relaxed);
             }
             return raw;
         }
 
     private:
-        template <class T>
-        static constexpr bool counts_toward_automatic_gc() noexcept
-        {
-            using U = std::remove_cv_t<T>;
-            return !std::is_same_v<U, IntObject> &&
-                   !std::is_same_v<U, BoolObject> &&
-                   !std::is_same_v<U, FloatObject> &&
-                   !std::is_same_v<U, StrObject> &&
-                   !std::is_same_v<U, BytesObject> &&
-                   !std::is_same_v<U, RangeObject> &&
-                   !std::is_same_v<U, RangeIteratorObject>;
-        }
-
         TypeObject *allocate_type(std::string name);
         void initialize_type(TypeObject *type, TypeObject *base);
         void initialize_type(TypeObject *type, const std::vector<TypeObject *> &bases);
@@ -435,7 +425,7 @@ namespace cxxpython
                                          ModuleLoadSpec &storage,
                                          const std::vector<std::string> *package_paths = nullptr,
                                          std::string_view search_name = {});
-        std::size_t collect_garbage_unlocked();
+        std::size_t collect_garbage_unlocked(bool collect_old);
         std::size_t collect_garbage_at_safepoint(ThreadState &current_thread, bool force);
         bool all_other_active_threads_at_gc_safepoint(ThreadState &current_thread) const;
         ModuleObject *load_module_from_spec(const ModuleLoadSpec &spec);
@@ -466,7 +456,7 @@ namespace cxxpython
         std::atomic_bool gc_enabled_{true};
         std::atomic_bool gc_requested_{false};
         std::atomic_size_t allocations_since_gc_{0};
-        std::atomic_size_t gc_threshold_{1024};
+        std::atomic_size_t gc_threshold_{65536};
         bool gc_stop_requested_ = false;
 
         TypeObject *object_type_ = nullptr;
@@ -556,7 +546,7 @@ namespace cxxpython
             : runtime_(&runtime), object_(object)
         {
             static_assert(std::is_base_of_v<Object, T>);
-            thread_local_root_ = runtime_->add_temporary_root(object_);
+            handle_ = runtime_->add_temporary_root(object_);
         }
 
         ~Rooted()
@@ -568,11 +558,11 @@ namespace cxxpython
         Rooted &operator=(const Rooted &) = delete;
 
         Rooted(Rooted &&other) noexcept
-            : runtime_(other.runtime_), object_(other.object_), thread_local_root_(other.thread_local_root_)
+            : runtime_(other.runtime_), object_(other.object_), handle_(other.handle_)
         {
             other.runtime_ = nullptr;
             other.object_ = nullptr;
-            other.thread_local_root_ = false;
+            other.handle_ = {};
         }
 
         Rooted &operator=(Rooted &&other) noexcept
@@ -582,10 +572,10 @@ namespace cxxpython
                 reset();
                 runtime_ = other.runtime_;
                 object_ = other.object_;
-                thread_local_root_ = other.thread_local_root_;
+                handle_ = other.handle_;
                 other.runtime_ = nullptr;
                 other.object_ = nullptr;
-                other.thread_local_root_ = false;
+                other.handle_ = {};
             }
             return *this;
         }
@@ -613,16 +603,16 @@ namespace cxxpython
         void reset() noexcept
         {
             if (runtime_ && object_)
-                runtime_->remove_temporary_root(object_, thread_local_root_);
+                runtime_->remove_temporary_root(object_, handle_);
             runtime_ = nullptr;
             object_ = nullptr;
-            thread_local_root_ = false;
+            handle_ = {};
         }
 
     private:
         Runtime *runtime_;
         T *object_;
-        bool thread_local_root_ = false;
+        TemporaryRootHandle handle_;
     };
 
     template <class T>

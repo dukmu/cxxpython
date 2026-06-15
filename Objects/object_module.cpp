@@ -44,6 +44,19 @@ namespace cxxpython
     ModuleObject::ModuleObject(TypeObject *type, std::string name, std::string filename, DictObject *dict)
         : Object(type), name_(std::move(name)), filename_(std::move(filename)), dict_(dict)
     {
+        if (dict_)
+            dict_->incref();
+    }
+
+    ModuleObject::~ModuleObject()
+    {
+        clear_references();
+    }
+
+    void ModuleObject::clear_references()
+    {
+        CXXPYTHON_CLEAR_REF(dict_);
+        Object::clear_references();
     }
 
     const std::string &ModuleObject::name() const noexcept

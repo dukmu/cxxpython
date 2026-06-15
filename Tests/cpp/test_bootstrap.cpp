@@ -3,6 +3,7 @@
 #include <algorithm>
 
 #include "cxxpython/runtime.hpp"
+#include "cxxpython/vm.hpp"
 #include "test_support.hpp"
 
 TEST(CoreObjects, RuntimeBootstrapsBuiltinTypes)
@@ -132,6 +133,58 @@ TEST(CoreObjects, ReprAndExceptionObjects)
     EXPECT_GE(exception_children, 2U);
 }
 
+TEST(CoreObjects, ExceptionAndTracebackOwnReferencedObjects)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::CodeObject *code = runtime.new_code(
+        "fn",
+        "script.py",
+        {runtime.none()},
+        {{cxxpython::Opcode::LoadConst, 0},
+         {cxxpython::Opcode::ReturnValue, 0}});
+    cxxpython::Frame *frame = runtime.new_frame(code);
+    cxxpython::TracebackObject *first = runtime.new_traceback(nullptr, frame, 0, 1);
+    cxxpython::TracebackObject *second = runtime.new_traceback(first, frame, 1, 2);
+
+    EXPECT_EQ(frame->ref_count(), 2U);
+    EXPECT_EQ(first->ref_count(), 1U);
+    EXPECT_EQ(second->ref_count(), 0U);
+
+    cxxpython::ExceptionObject *error = runtime.new_exception(runtime.type_error_type(), "boom");
+    ASSERT_NE(error->args(), nullptr);
+    EXPECT_EQ(error->args()->ref_count(), 1U);
+
+    error->prepend_traceback(second);
+    EXPECT_EQ(second->ref_count(), 1U);
+    EXPECT_EQ(error->traceback(), second);
+
+    error->prepend_traceback(nullptr);
+    EXPECT_EQ(second->ref_count(), 0U);
+    EXPECT_EQ(error->traceback(), nullptr);
+}
+
+TEST(CoreObjects, PythonErrorOwnsExceptionValue)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::ExceptionObject *exception = runtime.new_exception(runtime.type_error_type(), "owned");
+
+    EXPECT_EQ(exception->ref_count(), 0U);
+    {
+        cxxpython::PythonError error(exception);
+        EXPECT_EQ(error.value(), exception);
+        EXPECT_EQ(exception->ref_count(), 1U);
+
+        cxxpython::PythonError copy(error);
+        EXPECT_EQ(copy.value(), exception);
+        EXPECT_EQ(exception->ref_count(), 2U);
+
+        cxxpython::PythonError moved(std::move(copy));
+        EXPECT_EQ(moved.value(), exception);
+        EXPECT_EQ(exception->ref_count(), 2U);
+    }
+    EXPECT_EQ(exception->ref_count(), 0U);
+}
+
 TEST(CoreObjects, SmallIntegerCacheIsRootedAcrossGarbageCollection)
 {
     cxxpython::Runtime runtime;
@@ -152,4 +205,67 @@ TEST(CoreObjects, SmallIntegerCacheIsRootedAcrossGarbageCollection)
 
     EXPECT_EQ(runtime.new_int(256), cached);
     EXPECT_EQ(runtime.new_int(-5), negative_cached);
+}
+
+TEST(CoreObjects, PrimitiveHeapObjectsCountTowardAutomaticGarbageCollection)
+{
+    cxxpython::Runtime runtime;
+
+    (void)runtime.collect_garbage();
+    const std::size_t baseline = runtime.garbage_collection_count();
+
+    for (std::int64_t value = 2048; value < 2058; ++value)
+        (void)runtime.new_int(value);
+    (void)runtime.new_float(1.25);
+    (void)runtime.new_str("temporary");
+    (void)runtime.new_bytes("temporary");
+
+    EXPECT_GE(runtime.garbage_collection_count(), baseline + 13U);
+}
+
+TEST(CoreObjects, ReferenceCountsDoNotCreateGarbageCollectionRoots)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::IntObject *value = runtime.new_int(4096);
+    const std::size_t after_allocation = runtime.heap_size();
+
+    EXPECT_EQ(value->ref_count(), 0U);
+    EXPECT_EQ(value->gc_generation(), cxxpython::GCGeneration::Young);
+
+    value->incref();
+    EXPECT_EQ(value->ref_count(), 1U);
+    (void)runtime.collect_garbage();
+    EXPECT_LT(runtime.heap_size(), after_allocation);
+}
+
+TEST(CoreObjects, RootedObjectsAreTemporaryGarbageCollectionRoots)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::IntObject *value = runtime.new_int(4096);
+
+    EXPECT_EQ(value->ref_count(), 0U);
+
+    {
+        auto root = runtime.root(value);
+        EXPECT_EQ(value->ref_count(), 0U);
+        (void)runtime.collect_garbage();
+        EXPECT_EQ(value->ref_count(), 0U);
+        EXPECT_EQ(value->gc_generation(), cxxpython::GCGeneration::Old);
+    }
+
+    EXPECT_EQ(value->ref_count(), 0U);
+}
+
+TEST(CoreObjects, GarbageCollectionCollectsReferenceCycles)
+{
+    cxxpython::Runtime runtime;
+    (void)runtime.collect_garbage();
+    const std::size_t before = runtime.heap_size();
+    cxxpython::ListObject *list = runtime.new_list({});
+    list->append(list);
+    EXPECT_EQ(list->ref_count(), 1U);
+    EXPECT_EQ(runtime.heap_size(), before + 1U);
+
+    (void)runtime.collect_garbage();
+    EXPECT_EQ(runtime.heap_size(), before);
 }

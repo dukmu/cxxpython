@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <functional>
 #include <exception>
+#include <atomic>
 #include <condition_variable>
 #include <initializer_list>
 #include <iostream>
@@ -237,10 +238,21 @@ namespace cxxpython
     constexpr TypeFlags TypeFlagHeapType = 1U << 0;
     constexpr TypeFlags TypeFlagHasInstanceDict = 1U << 1;
 
+    enum class GCGeneration : std::uint8_t
+    {
+        Young,
+        Old,
+    };
+
     class PythonError final : public std::exception
     {
     public:
         explicit PythonError(ExceptionObject *value);
+        PythonError(const PythonError &other);
+        PythonError(PythonError &&other) noexcept;
+        ~PythonError() override;
+        PythonError &operator=(const PythonError &other);
+        PythonError &operator=(PythonError &&other) noexcept;
 
         ExceptionObject *value() const noexcept;
         TypeObject *type() const noexcept;
@@ -249,6 +261,7 @@ namespace cxxpython
 
     private:
         ExceptionObject *value_;
+        Runtime *runtime_ = nullptr;
         std::string what_;
     };
 
@@ -256,10 +269,16 @@ namespace cxxpython
     {
     public:
         explicit Object(TypeObject *type);
-        virtual ~Object() = default;
+        virtual ~Object();
+        virtual void clear_references();
 
         Runtime *runtime() const noexcept;
         void set_runtime(Runtime *runtime) noexcept;
+        void incref() noexcept;
+        void decref() noexcept;
+        std::size_t ref_count() const noexcept;
+        GCGeneration gc_generation() const noexcept;
+        void promote_gc_generation() noexcept;
         TypeObject *type() const noexcept;
         void set_type(TypeObject *type) noexcept;
         std::string repr() const;
@@ -274,12 +293,19 @@ namespace cxxpython
         Runtime *runtime_ = nullptr;
         TypeObject *type_;
         DictObject *instance_dict_ = nullptr;
+        std::atomic_size_t ref_count_{0};
+        GCGeneration gc_generation_ = GCGeneration::Young;
     };
 
     class TypeObject : public Object
     {
     public:
         explicit TypeObject(std::string name);
+        ~TypeObject() override;
+        void clear_references() override;
+        void set_base(TypeObject *base) noexcept;
+        void set_solid_base(TypeObject *solid_base) noexcept;
+        void set_dict(DictObject *dict) noexcept;
 
         std::string name;
         std::string module = "builtins";
@@ -346,6 +372,8 @@ namespace cxxpython
     {
     public:
         ListObject(TypeObject *type, std::vector<Object *> items);
+        ~ListObject() override;
+        void clear_references() override;
 
         void append(Object *item);
         Object *get(std::int64_t index) const;
@@ -365,6 +393,8 @@ namespace cxxpython
     {
     public:
         TupleObject(TypeObject *type, std::vector<Object *> items);
+        ~TupleObject() override;
+        void clear_references() override;
 
         const std::vector<Object *> &items() const noexcept;
         std::size_t size() const noexcept;
@@ -377,6 +407,8 @@ namespace cxxpython
     {
     public:
         SliceObject(TypeObject *type, Object *start, Object *stop, Object *step);
+        ~SliceObject() override;
+        void clear_references() override;
 
         Object *start() const noexcept;
         Object *stop() const noexcept;
@@ -399,6 +431,8 @@ namespace cxxpython
         };
 
         explicit DictObject(TypeObject *type);
+        ~DictObject() override;
+        void clear_references() override;
 
         bool contains(Object *key) const;
         Object *get(Object *key) const;
@@ -429,6 +463,8 @@ namespace cxxpython
     {
     public:
         MappingProxyObject(TypeObject *type, DictObject *mapping);
+        ~MappingProxyObject() override;
+        void clear_references() override;
 
         const DictObject *mapping() const noexcept;
         DictObject *referenced_mapping() const noexcept;
@@ -441,6 +477,8 @@ namespace cxxpython
     {
     public:
         SequenceIteratorObject(TypeObject *type, Object *sequence);
+        ~SequenceIteratorObject() override;
+        void clear_references() override;
 
         Object *sequence() const noexcept;
         std::size_t index() const noexcept;
@@ -455,6 +493,8 @@ namespace cxxpython
     {
     public:
         DictKeyIteratorObject(TypeObject *type, DictObject *dict);
+        ~DictKeyIteratorObject() override;
+        void clear_references() override;
 
         DictObject *dict() const noexcept;
         std::size_t index() const noexcept;
@@ -469,6 +509,8 @@ namespace cxxpython
     {
     public:
         ReverseIteratorObject(TypeObject *type, Object *sequence, std::size_t next_index);
+        ~ReverseIteratorObject() override;
+        void clear_references() override;
 
         Object *sequence() const noexcept;
         std::size_t next_index() const noexcept;
@@ -520,6 +562,8 @@ namespace cxxpython
     {
     public:
         EnumerateObject(TypeObject *type, Object *iterator, std::int64_t next_index);
+        ~EnumerateObject() override;
+        void clear_references() override;
 
         Object *iterator() const noexcept;
         std::int64_t consume_index() noexcept;
@@ -533,6 +577,8 @@ namespace cxxpython
     {
     public:
         ZipObject(TypeObject *type, std::vector<Object *> iterators);
+        ~ZipObject() override;
+        void clear_references() override;
 
         const std::vector<Object *> &iterators() const noexcept;
 
@@ -544,6 +590,8 @@ namespace cxxpython
     {
     public:
         MapObject(TypeObject *type, Object *callable, std::vector<Object *> iterators);
+        ~MapObject() override;
+        void clear_references() override;
 
         Object *callable() const noexcept;
         const std::vector<Object *> &iterators() const noexcept;
@@ -557,6 +605,8 @@ namespace cxxpython
     {
     public:
         FilterObject(TypeObject *type, Object *callable, Object *iterator);
+        ~FilterObject() override;
+        void clear_references() override;
 
         Object *callable() const noexcept;
         Object *iterator() const noexcept;
@@ -621,6 +671,8 @@ namespace cxxpython
     {
     public:
         ModuleObject(TypeObject *type, std::string name, std::string filename, DictObject *dict);
+        ~ModuleObject() override;
+        void clear_references() override;
 
         const std::string &name() const noexcept;
         const std::string &filename() const noexcept;
@@ -664,6 +716,8 @@ namespace cxxpython
                              DictObject *kwdefaults = nullptr,
                              DictObject *annotations = nullptr,
                              std::vector<CellObject *> closure = {});
+        ~PythonFunctionObject() override;
+        void clear_references() override;
 
         const std::string &name() const noexcept;
         Object *doc() const noexcept;
@@ -696,6 +750,8 @@ namespace cxxpython
     {
     public:
         CellObject(TypeObject *type, Object *value);
+        ~CellObject() override;
+        void clear_references() override;
 
         Object *value() const noexcept;
         void set_value(Object *value) noexcept;
@@ -709,6 +765,8 @@ namespace cxxpython
     {
     public:
         SuperObject(TypeObject *type, TypeObject *start_type, Object *object, TypeObject *object_type);
+        ~SuperObject() override;
+        void clear_references() override;
 
         TypeObject *start_type() const noexcept;
         Object *object() const noexcept;
@@ -729,6 +787,8 @@ namespace cxxpython
                                MethodDescriptorCallback callback,
                                std::string doc = "",
                                std::string text_signature = "");
+        ~MethodDescriptorObject() override;
+        void clear_references() override;
 
         const std::string &name() const noexcept;
         const std::string &doc() const noexcept;
@@ -750,6 +810,8 @@ namespace cxxpython
     {
     public:
         PythonMethodObject(TypeObject *type, Object *callable, Object *self);
+        ~PythonMethodObject() override;
+        void clear_references() override;
 
         PythonFunctionObject *function() const noexcept;
         Object *callable() const noexcept;
@@ -764,6 +826,8 @@ namespace cxxpython
     {
     public:
         BoundMethodObject(TypeObject *type, MethodDescriptorObject *method, Object *self);
+        ~BoundMethodObject() override;
+        void clear_references() override;
 
         MethodDescriptorObject *method() const noexcept;
         Object *self() const noexcept;
@@ -783,6 +847,8 @@ namespace cxxpython
                           BinaryOp binary_op = BinaryOp::Add,
                           UnaryOp unary_op = UnaryOp::Positive,
                           RichCompareOp rich_compare_op = RichCompareOp::Equal);
+        ~SlotWrapperObject() override;
+        void clear_references() override;
 
         const std::string &name() const noexcept;
         TypeObject *owner() const noexcept;
@@ -807,6 +873,8 @@ namespace cxxpython
     {
     public:
         BoundSlotWrapperObject(TypeObject *type, SlotWrapperObject *wrapper, Object *self);
+        ~BoundSlotWrapperObject() override;
+        void clear_references() override;
 
         SlotWrapperObject *wrapper() const noexcept;
         Object *self() const noexcept;
@@ -824,6 +892,8 @@ namespace cxxpython
                                TypeObject *owner,
                                GetSetGetter getter,
                                GetSetSetter setter = {});
+        ~GetSetDescriptorObject() override;
+        void clear_references() override;
 
         const std::string &name() const noexcept;
         TypeObject *owner() const noexcept;
@@ -841,6 +911,8 @@ namespace cxxpython
     {
     public:
         PropertyObject(TypeObject *type, Object *getter, Object *setter, Object *deleter, Object *doc);
+        ~PropertyObject() override;
+        void clear_references() override;
 
         Object *getter() const noexcept;
         Object *setter() const noexcept;
@@ -858,6 +930,8 @@ namespace cxxpython
     {
     public:
         StaticMethodObject(TypeObject *type, Object *callable);
+        ~StaticMethodObject() override;
+        void clear_references() override;
 
         Object *callable() const noexcept;
 
@@ -869,6 +943,8 @@ namespace cxxpython
     {
     public:
         ClassMethodObject(TypeObject *type, Object *callable);
+        ~ClassMethodObject() override;
+        void clear_references() override;
 
         Object *callable() const noexcept;
 
@@ -884,6 +960,8 @@ namespace cxxpython
                         Frame *frame,
                         std::size_t last_instruction_index,
                         std::uint32_t line);
+        ~TracebackObject() override;
+        void clear_references() override;
 
         TracebackObject *next() const noexcept;
         Frame *frame() const noexcept;
@@ -908,6 +986,8 @@ namespace cxxpython
         };
 
         ExceptionObject(TypeObject *type, TupleObject *args, std::string message);
+        ~ExceptionObject() override;
+        void clear_references() override;
 
         TupleObject *args() const noexcept;
         const std::string &message() const noexcept;
@@ -1027,3 +1107,15 @@ namespace cxxpython
     [[noreturn]] void raise_keyboard_interrupt(Runtime *runtime);
     [[noreturn]] void raise_stop_iteration(Runtime *runtime);
 }
+
+#define CXXPYTHON_CLEAR_REF(ptr) do { if (ptr) { (ptr)->decref(); (ptr) = nullptr; } } while(0)
+#define CXXPYTHON_CLEAR_VECTOR_REF(vec)                                                      \
+    do                                                                                       \
+    {                                                                                        \
+        for (auto *cxxpython_clear_item_ : (vec))                                            \
+        {                                                                                    \
+            if (cxxpython_clear_item_)                                                       \
+                cxxpython_clear_item_->decref();                                             \
+        }                                                                                    \
+        (vec).clear();                                                                       \
+    } while(0)

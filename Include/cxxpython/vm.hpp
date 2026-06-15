@@ -48,6 +48,8 @@ namespace cxxpython
               DictObject *globals,
               DictObject *builtins,
               std::vector<CellObject *> cells = {});
+        ~Frame() override;
+        void clear_references() override;
 
         CodeObject *code() const noexcept;
         DictObject *locals() const noexcept;
@@ -151,8 +153,8 @@ namespace cxxpython
         void set_gc_safepoint(bool at_safepoint) noexcept;
         ThreadGCState gc_state() const noexcept;
         void set_gc_state(ThreadGCState state) noexcept;
-        void add_temporary_root(Object *object);
-        void remove_temporary_root(Object *object);
+        std::size_t add_temporary_root(Object *object);
+        void remove_temporary_root(std::size_t index, Object *object);
         void visit_frames(const VisitChildren &visitor) const;
         void visit_temporary_roots(const VisitChildren &visitor) const;
 

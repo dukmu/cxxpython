@@ -427,6 +427,46 @@ namespace cxxpython
             }
         }
         stack_size_ = static_cast<std::uint32_t>(max_depth);
+        for (StrObject *varname : varnames_)
+        {
+            if (varname)
+                varname->incref();
+        }
+        for (Object *constant : constants_)
+        {
+            if (constant)
+                constant->incref();
+        }
+        for (StrObject *name : names_)
+        {
+            if (name)
+                name->incref();
+        }
+        for (StrObject *cellvar : cellvars_)
+        {
+            if (cellvar)
+                cellvar->incref();
+        }
+        for (StrObject *freevar : freevars_)
+        {
+            if (freevar)
+                freevar->incref();
+        }
+    }
+
+    CodeObject::~CodeObject()
+    {
+        clear_references();
+    }
+
+    void CodeObject::clear_references()
+    {
+        CXXPYTHON_CLEAR_VECTOR_REF(freevars_);
+        CXXPYTHON_CLEAR_VECTOR_REF(cellvars_);
+        CXXPYTHON_CLEAR_VECTOR_REF(names_);
+        CXXPYTHON_CLEAR_VECTOR_REF(constants_);
+        CXXPYTHON_CLEAR_VECTOR_REF(varnames_);
+        Object::clear_references();
     }
 
     const std::string &CodeObject::name() const noexcept
