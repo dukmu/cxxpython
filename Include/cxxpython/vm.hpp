@@ -160,13 +160,12 @@ namespace cxxpython
 
     private:
         InterpreterState &interpreter_;
-        mutable std::recursive_mutex mutex_;
         std::vector<Frame *> frames_;
         std::vector<ExceptionObject *> handled_exceptions_;
         std::vector<Object *> temporary_roots_;
         Object *trace_function_ = nullptr;
         std::size_t trace_depth_ = 0;
-        ThreadGCState gc_state_ = ThreadGCState::Running;
+        std::atomic<ThreadGCState> gc_state_{ThreadGCState::Running};
     };
 
     class ThreadGCStateGuard final

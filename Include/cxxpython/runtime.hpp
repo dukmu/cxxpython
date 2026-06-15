@@ -444,12 +444,12 @@ namespace cxxpython
 
         std::vector<std::unique_ptr<Object>> heap_;
         std::vector<Object *> roots_;
-        mutable std::recursive_mutex heap_mutex_;
-        mutable std::recursive_mutex roots_mutex_;
-        mutable std::recursive_mutex thread_states_mutex_;
-        mutable std::recursive_mutex gc_mutex_;
-        mutable std::recursive_mutex gc_coordination_mutex_;
-        std::condition_variable_any gc_condition_;
+        mutable std::mutex heap_mutex_;
+        mutable std::mutex roots_mutex_;
+        mutable std::mutex thread_states_mutex_;
+        mutable std::mutex gc_mutex_;
+        mutable std::mutex gc_coordination_mutex_;
+        std::condition_variable gc_condition_;
         mutable std::recursive_mutex import_mutex_;
         mutable std::recursive_mutex runtime_state_mutex_;
         std::vector<ThreadState *> thread_states_;

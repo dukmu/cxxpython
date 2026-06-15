@@ -2,7 +2,6 @@
 #include "cxxpython/vm.hpp"
 
 #include <algorithm>
-#include <unordered_set>
 #include <vector>
 
 namespace cxxpython
@@ -17,14 +16,15 @@ namespace cxxpython
     std::size_t Runtime::collect_garbage_unlocked(bool collect_old)
     {
         std::scoped_lock collection_lock(gc_mutex_);
-        std::unordered_set<Object *> marked;
         std::vector<Object *> worklist;
+        std::vector<Object *> marked_objects;
 
-        auto enqueue = [&marked, &worklist](Object *object) {
-            if (!object)
+        auto enqueue = [&worklist, &marked_objects](Object *object) {
+            if (!object || object->gc_marked())
                 return;
-            if (marked.insert(object).second)
-                worklist.push_back(object);
+            object->gc_mark();
+            worklist.push_back(object);
+            marked_objects.push_back(object);
         };
 
         visit_roots(enqueue);
@@ -48,15 +48,15 @@ namespace cxxpython
             object->visit_children(enqueue);
         }
 
-        for (Object *object : marked)
+        for (Object *object : marked_objects)
             object->promote_gc_generation();
 
         {
             std::scoped_lock lock(roots_mutex_);
             roots_.erase(std::remove_if(roots_.begin(),
                                         roots_.end(),
-                                        [&marked](Object *root) {
-                                            return !root || marked.find(root) == marked.end();
+                                        [](Object *root) {
+                                            return !root || !root->gc_marked();
                                         }),
                          roots_.end());
         }
@@ -66,9 +66,7 @@ namespace cxxpython
 
         for (const auto &object : heap_)
         {
-            if (!object)
-                continue;
-            if (marked.find(object.get()) != marked.end())
+            if (!object || object->gc_marked())
                 continue;
             if (object->ref_count() != 0)
                 object->clear_references();
@@ -76,15 +74,19 @@ namespace cxxpython
 
         heap_.erase(std::remove_if(heap_.begin(),
                                     heap_.end(),
-                                    [&marked, collect_old](const std::unique_ptr<Object> &object) {
+                                    [collect_old](const std::unique_ptr<Object> &object) {
                                         if (!object)
                                             return true;
                                         if (!collect_old && object->gc_generation() == GCGeneration::Old)
                                             return false;
-                                        return marked.find(object.get()) == marked.end();
+                                        return !object->gc_marked();
                                     }),
                     heap_.end());
         const std::size_t collected = before - heap_.size();
+
+        for (Object *object : marked_objects)
+            object->gc_unmark();
+
         allocations_since_gc_.store(0, std::memory_order_relaxed);
         gc_requested_.store(false, std::memory_order_relaxed);
         return collected;

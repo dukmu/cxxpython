@@ -1,6 +1,49 @@
 # Development Status
 
 
+## 2026-06-15 Strong Ownership Migration, GC Clear Phase, and VM/GC Optimization
+
+Review focus:
+
+- Migrate all major object types from GC-trace-only references to explicit
+  ref_count ownership edges, enabling eventual cycle GC compatibility.
+- Add GC clear_references() protocol for safe cycle-breaking before destruction.
+- Remove the temporary ref_count-as-GC-root rule that was masking missing roots.
+- Unify VM dispatch to CPython-style macro-expanded computed goto covering all
+  59 opcodes, eliminating code duplication.
+- Replace GC mark hash-set with per-object mark bit for O(1) marking.
+- Converge locking: remove 5 recursive_mutex, remove ThreadState::mutex_
+  entirely, make gc_state atomic.
+- Simplify decref() from CAS spin-loop to single fetch_sub.
+
+Completed:
+
+- Strong ownership edges added for: TypeObject, Object::type_,
+  Object::instance_dict_, ListObject, TupleObject, SliceObject, DictObject,
+  MappingProxyObject, ModuleObject, CellObject, SuperObject,
+  MethodDescriptorObject, BoundMethodObject, SlotWrapperObject,
+  BoundSlotWrapperObject, GetSetDescriptorObject, PropertyObject,
+  StaticMethodObject, ClassMethodObject, TracebackObject, ExceptionObject,
+  SequenceIteratorObject, DictKeyIteratorObject, ReverseIteratorObject,
+  EnumerateObject, ZipObject, MapObject, FilterObject, PythonFunctionObject,
+  PythonMethodObject, CodeObject, Frame.
+- Virtual clear_references() protocol on all owned-edge classes.
+- GC sweep clear phase for safe cycle collection.
+- PythonError explicit root holding.
+- ThreadState ref_count for handled exceptions and trace function.
+- GC: ref_count-as-root rule removed.
+- VM: CXXPYTHON_OP_LABEL/CXXPYTHON_OP_ENTRY macros, 59/59 computed goto.
+- GC: per-object mark bit (gc_state_ packed byte).
+- Locks: 5x recursive_mutex→mutex, gc_condition_→condition_variable,
+  ThreadState::mutex_ removed, gc_state_→std::atomic.
+- decref(): CAS→fetch_sub single instruction.
+- Code slimming: identity helpers, CLEAR_REF/CLEAR_VECTOR_REF macros.
+- Tests: TypeObject ownership, cycle collection, PythonError, instance dict,
+  thread exceptions, ref_count no longer GC roots.
+
+Verification: ctest 244/244, gc_thread_wait.py passes.
+
+
 ## 2026-06-15 CLI Command And Fast Local Metadata Slice
 
 Review focus:

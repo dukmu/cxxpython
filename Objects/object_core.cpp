@@ -1032,14 +1032,7 @@ namespace cxxpython
 
     void Object::decref() noexcept
     {
-        std::size_t current = ref_count_.load(std::memory_order_relaxed);
-        while (current != 0 &&
-               !ref_count_.compare_exchange_weak(current,
-                                                current - 1,
-                                                std::memory_order_relaxed,
-                                                std::memory_order_relaxed))
-        {
-        }
+        ref_count_.fetch_sub(1, std::memory_order_relaxed);
     }
 
     std::size_t Object::ref_count() const noexcept
@@ -1049,12 +1042,27 @@ namespace cxxpython
 
     GCGeneration Object::gc_generation() const noexcept
     {
-        return gc_generation_;
+        return (gc_state_ & kGcOldBit) ? GCGeneration::Old : GCGeneration::Young;
     }
 
     void Object::promote_gc_generation() noexcept
     {
-        gc_generation_ = GCGeneration::Old;
+        gc_state_ |= kGcOldBit;
+    }
+
+    bool Object::gc_marked() const noexcept
+    {
+        return (gc_state_ & kGcMarkBit) != 0;
+    }
+
+    void Object::gc_mark() noexcept
+    {
+        gc_state_ |= kGcMarkBit;
+    }
+
+    void Object::gc_unmark() noexcept
+    {
+        gc_state_ &= ~kGcMarkBit;
     }
 
     void Object::set_type(TypeObject *type) noexcept

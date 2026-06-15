@@ -279,6 +279,9 @@ namespace cxxpython
         std::size_t ref_count() const noexcept;
         GCGeneration gc_generation() const noexcept;
         void promote_gc_generation() noexcept;
+        bool gc_marked() const noexcept;
+        void gc_mark() noexcept;
+        void gc_unmark() noexcept;
         TypeObject *type() const noexcept;
         void set_type(TypeObject *type) noexcept;
         std::string repr() const;
@@ -294,7 +297,9 @@ namespace cxxpython
         TypeObject *type_;
         DictObject *instance_dict_ = nullptr;
         std::atomic_size_t ref_count_{0};
-        GCGeneration gc_generation_ = GCGeneration::Young;
+        static constexpr std::uint8_t kGcMarkBit = 1U << 0;
+        static constexpr std::uint8_t kGcOldBit = 1U << 1;
+        std::uint8_t gc_state_ = 0;
     };
 
     class TypeObject : public Object

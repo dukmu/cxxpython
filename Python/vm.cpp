@@ -16,6 +16,14 @@ namespace cxxpython
     {
         constexpr std::size_t OpcodeCount = static_cast<std::size_t>(Opcode::ReturnValue) + 1;
 
+#if defined(CXXPYTHON_HAS_COMPUTED_GOTO)
+#define CXXPYTHON_OP_LABEL(opname) cxxpy_label_##opname:
+#define CXXPYTHON_OP_ENTRY(opname) &&cxxpy_label_##opname,
+#else
+#define CXXPYTHON_OP_LABEL(opname)
+#define CXXPYTHON_OP_ENTRY(opname)
+#endif
+
         void jump_to(Frame &frame, std::size_t instruction_count, std::uint32_t target)
         {
             if (target >= instruction_count)
@@ -833,7 +841,6 @@ namespace cxxpython
     {
         if (!frame)
             throw BytecodeError("cannot push null frame");
-        std::scoped_lock lock(mutex_);
         if (frames_.size() >= MaxFrameDepth)
             raise_recursion_error(&interpreter_.runtime(), "maximum recursion depth exceeded");
         frames_.push_back(frame);
@@ -841,7 +848,6 @@ namespace cxxpython
 
     void ThreadState::pop_frame(Frame *frame)
     {
-        std::scoped_lock lock(mutex_);
         if (frames_.empty() || frames_.back() != frame)
             throw BytecodeError("frame stack discipline violation");
         frames_.pop_back();
@@ -849,7 +855,6 @@ namespace cxxpython
 
     Frame *ThreadState::current_frame() const noexcept
     {
-        std::scoped_lock lock(mutex_);
         if (frames_.empty())
             return nullptr;
         return frames_.back();
@@ -857,7 +862,6 @@ namespace cxxpython
 
     Frame *ThreadState::frame_at_depth(std::size_t depth) const noexcept
     {
-        std::scoped_lock lock(mutex_);
         if (depth >= frames_.size())
             return nullptr;
         return frames_[frames_.size() - 1 - depth];
@@ -865,7 +869,6 @@ namespace cxxpython
 
     std::size_t ThreadState::frame_depth() const noexcept
     {
-        std::scoped_lock lock(mutex_);
         return frames_.size();
     }
 
@@ -873,7 +876,6 @@ namespace cxxpython
     {
         if (!exception)
             throw BytecodeError("cannot push null handled exception");
-        std::scoped_lock lock(mutex_);
         exception->incref();
         try
         {
@@ -888,7 +890,6 @@ namespace cxxpython
 
     void ThreadState::pop_handled_exception()
     {
-        std::scoped_lock lock(mutex_);
         if (handled_exceptions_.empty())
             throw BytecodeError("handled exception stack underflow");
         ExceptionObject *exception = handled_exceptions_.back();
@@ -898,7 +899,6 @@ namespace cxxpython
 
     ExceptionObject *ThreadState::current_exception() const noexcept
     {
-        std::scoped_lock lock(mutex_);
         if (handled_exceptions_.empty())
             return nullptr;
         return handled_exceptions_.back();
@@ -906,13 +906,11 @@ namespace cxxpython
 
     std::size_t ThreadState::handled_exception_depth() const noexcept
     {
-        std::scoped_lock lock(mutex_);
         return handled_exceptions_.size();
     }
 
     void ThreadState::restore_handled_exception_depth(std::size_t depth)
     {
-        std::scoped_lock lock(mutex_);
         if (depth < handled_exceptions_.size())
         {
             for (std::size_t index = depth; index < handled_exceptions_.size(); ++index)
@@ -926,13 +924,11 @@ namespace cxxpython
 
     Object *ThreadState::trace_function() const noexcept
     {
-        std::scoped_lock lock(mutex_);
         return trace_function_;
     }
 
     void ThreadState::set_trace_function(Object *trace_function) noexcept
     {
-        std::scoped_lock lock(mutex_);
         if (trace_function == trace_function_)
             return;
         if (trace_function)
@@ -944,27 +940,23 @@ namespace cxxpython
 
     bool ThreadState::is_tracing() const noexcept
     {
-        std::scoped_lock lock(mutex_);
         return trace_depth_ != 0;
     }
 
     void ThreadState::enter_tracing() noexcept
     {
-        std::scoped_lock lock(mutex_);
         ++trace_depth_;
     }
 
     void ThreadState::leave_tracing() noexcept
     {
-        std::scoped_lock lock(mutex_);
         if (trace_depth_ != 0)
             --trace_depth_;
     }
 
     bool ThreadState::at_gc_safepoint() const noexcept
     {
-        std::scoped_lock lock(mutex_);
-        return gc_state_ != ThreadGCState::Running;
+        return gc_state_.load(std::memory_order_acquire) != ThreadGCState::Running;
     }
 
     void ThreadState::set_gc_safepoint(bool at_safepoint) noexcept
@@ -974,16 +966,12 @@ namespace cxxpython
 
     ThreadGCState ThreadState::gc_state() const noexcept
     {
-        std::scoped_lock lock(mutex_);
-        return gc_state_;
+        return gc_state_.load(std::memory_order_acquire);
     }
 
     void ThreadState::set_gc_state(ThreadGCState state) noexcept
     {
-        {
-            std::scoped_lock lock(mutex_);
-            gc_state_ = state;
-        }
+        gc_state_.store(state, std::memory_order_release);
         interpreter_.runtime().notify_gc_safepoint_change();
     }
 
@@ -1018,7 +1006,6 @@ namespace cxxpython
 
     void ThreadState::visit_frames(const VisitChildren &visitor) const
     {
-        std::scoped_lock lock(mutex_);
         for (Frame *frame : frames_)
         {
             if (frame)
@@ -1035,7 +1022,6 @@ namespace cxxpython
 
     void ThreadState::visit_temporary_roots(const VisitChildren &visitor) const
     {
-        std::scoped_lock lock(mutex_);
         for (Object *object : temporary_roots_)
         {
             if (object)
@@ -1125,293 +1111,85 @@ namespace cxxpython
             if (eval_breaker_requested(runtime_, *frame))
                 handle_eval_breaker(runtime_, thread_, code, *frame, last_traced_line);
 #if defined(CXXPYTHON_HAS_COMPUTED_GOTO)
-            static void *dispatch_table[OpcodeCount] = {
-                &&target_load_const,       // LoadConst
-                &&target_load_name,        // LoadName
-                &&target_slow,             // StoreName
-                &&target_slow,             // DeleteName
-                &&target_load_global,      // LoadGlobal
-                &&target_slow,             // StoreGlobal
-                &&target_slow,             // DeleteGlobal
-                &&target_load_fast,        // LoadFast
-                &&target_store_fast,       // StoreFast
-                &&target_slow,             // DeleteFast
-                &&target_slow,             // LoadDeref
-                &&target_slow,             // StoreDeref
-                &&target_slow,             // DeleteDeref
-                &&target_slow,             // LoadClosure
-                &&target_slow,             // LoadAttr
-                &&target_slow,             // StoreAttr
-                &&target_slow,             // DeleteAttr
-                &&target_pop_top,          // PopTop
-                &&target_slow,             // DupTop
-                &&target_slow,             // DupTwo
-                &&target_slow,             // RotTwo
-                &&target_slow,             // RotThree
-                &&target_slow,             // UnaryOp
-                &&target_binary_op,        // BinaryOp
-                &&target_slow,             // InplaceBinaryOp
-                &&target_slow,             // FormatValue
-                &&target_slow,             // BinarySubscr
-                &&target_slow,             // StoreSubscr
-                &&target_slow,             // DeleteSubscr
-                &&target_slow,             // BuildList
-                &&target_slow,             // BuildTuple
-                &&target_slow,             // BuildTupleUnpack
-                &&target_slow,             // BuildMap
-                &&target_slow,             // BuildKwMapUnpack
-                &&target_slow,             // BuildSlice
-                &&target_slow,             // CompareOp
-                &&target_slow,             // GetIter
-                &&target_for_iter,         // ForIter
-                &&target_slow,             // BreakLoop
-                &&target_slow,             // ContinueLoop
-                &&target_jump_absolute,    // JumpAbsolute
-                &&target_pop_jump_if_false,// PopJumpIfFalse
-                &&target_pop_jump_if_true, // PopJumpIfTrue
-                &&target_slow,             // JumpIfFalseOrPop
-                &&target_slow,             // MakeFunction
-                &&target_slow,             // MakeClass
-                &&target_call,             // Call
-                &&target_slow,             // CallKw
-                &&target_slow,             // CallEx
-                &&target_slow,             // ImportStar
-                &&target_slow,             // SetupExcept
-                &&target_slow,             // SetupFinally
-                &&target_slow,             // PopExcept
-                &&target_slow,             // PopFinally
-                &&target_slow,             // CheckExceptionMatch
-                &&target_slow,             // RaiseValue
-                &&target_slow,             // WithExit
-                &&target_slow,             // EndFinally
-                &&target_return_value,     // ReturnValue
-            };
             {
+                static void *dispatch_table[OpcodeCount] = {
+                    CXXPYTHON_OP_ENTRY(LoadConst)
+                    CXXPYTHON_OP_ENTRY(LoadName)
+                    CXXPYTHON_OP_ENTRY(StoreName)
+                    CXXPYTHON_OP_ENTRY(DeleteName)
+                    CXXPYTHON_OP_ENTRY(LoadGlobal)
+                    CXXPYTHON_OP_ENTRY(StoreGlobal)
+                    CXXPYTHON_OP_ENTRY(DeleteGlobal)
+                    CXXPYTHON_OP_ENTRY(LoadFast)
+                    CXXPYTHON_OP_ENTRY(StoreFast)
+                    CXXPYTHON_OP_ENTRY(DeleteFast)
+                    CXXPYTHON_OP_ENTRY(LoadDeref)
+                    CXXPYTHON_OP_ENTRY(StoreDeref)
+                    CXXPYTHON_OP_ENTRY(DeleteDeref)
+                    CXXPYTHON_OP_ENTRY(LoadClosure)
+                    CXXPYTHON_OP_ENTRY(LoadAttr)
+                    CXXPYTHON_OP_ENTRY(StoreAttr)
+                    CXXPYTHON_OP_ENTRY(DeleteAttr)
+                    CXXPYTHON_OP_ENTRY(PopTop)
+                    CXXPYTHON_OP_ENTRY(DupTop)
+                    CXXPYTHON_OP_ENTRY(DupTwo)
+                    CXXPYTHON_OP_ENTRY(RotTwo)
+                    CXXPYTHON_OP_ENTRY(RotThree)
+                    CXXPYTHON_OP_ENTRY(UnaryOp)
+                    CXXPYTHON_OP_ENTRY(BinaryOp)
+                    CXXPYTHON_OP_ENTRY(InplaceBinaryOp)
+                    CXXPYTHON_OP_ENTRY(FormatValue)
+                    CXXPYTHON_OP_ENTRY(BinarySubscr)
+                    CXXPYTHON_OP_ENTRY(StoreSubscr)
+                    CXXPYTHON_OP_ENTRY(DeleteSubscr)
+                    CXXPYTHON_OP_ENTRY(BuildList)
+                    CXXPYTHON_OP_ENTRY(BuildTuple)
+                    CXXPYTHON_OP_ENTRY(BuildTupleUnpack)
+                    CXXPYTHON_OP_ENTRY(BuildMap)
+                    CXXPYTHON_OP_ENTRY(BuildKwMapUnpack)
+                    CXXPYTHON_OP_ENTRY(BuildSlice)
+                    CXXPYTHON_OP_ENTRY(CompareOp)
+                    CXXPYTHON_OP_ENTRY(GetIter)
+                    CXXPYTHON_OP_ENTRY(ForIter)
+                    CXXPYTHON_OP_ENTRY(BreakLoop)
+                    CXXPYTHON_OP_ENTRY(ContinueLoop)
+                    CXXPYTHON_OP_ENTRY(JumpAbsolute)
+                    CXXPYTHON_OP_ENTRY(PopJumpIfFalse)
+                    CXXPYTHON_OP_ENTRY(PopJumpIfTrue)
+                    CXXPYTHON_OP_ENTRY(JumpIfFalseOrPop)
+                    CXXPYTHON_OP_ENTRY(MakeFunction)
+                    CXXPYTHON_OP_ENTRY(MakeClass)
+                    CXXPYTHON_OP_ENTRY(Call)
+                    CXXPYTHON_OP_ENTRY(CallKw)
+                    CXXPYTHON_OP_ENTRY(CallEx)
+                    CXXPYTHON_OP_ENTRY(ImportStar)
+                    CXXPYTHON_OP_ENTRY(SetupExcept)
+                    CXXPYTHON_OP_ENTRY(SetupFinally)
+                    CXXPYTHON_OP_ENTRY(PopExcept)
+                    CXXPYTHON_OP_ENTRY(PopFinally)
+                    CXXPYTHON_OP_ENTRY(CheckExceptionMatch)
+                    CXXPYTHON_OP_ENTRY(RaiseValue)
+                    CXXPYTHON_OP_ENTRY(WithExit)
+                    CXXPYTHON_OP_ENTRY(EndFinally)
+                    CXXPYTHON_OP_ENTRY(ReturnValue)
+                };
                 const std::size_t opcode_index = static_cast<std::size_t>(instruction.opcode);
                 if (opcode_index >= OpcodeCount)
-                    goto target_slow;
+                    goto cxxpy_fallback;
                 goto *dispatch_table[opcode_index];
             }
-
-target_load_const:
-            {
-                if (instruction.operand >= code.constants().size())
-                    throw BytecodeError("LOAD_CONST operand out of range");
-                frame->push(code.constants()[instruction.operand]);
-                continue;
-            }
-
-target_load_name:
-            {
-                if (instruction.operand >= code.names().size())
-                    throw BytecodeError("LOAD_NAME operand out of range");
-                StrObject *name = code.names()[instruction.operand];
-                Object *value = locals.get(name);
-                if (!value)
-                    value = globals.get(name);
-                if (!value)
-                    value = builtins.get(name);
-                if (!value)
-                    raise_name_error(&runtime_, "name '" + name->value + "' is not defined");
-                frame->push(value);
-                continue;
-            }
-
-target_load_global:
-            {
-                if (instruction.operand >= code.names().size())
-                    throw BytecodeError("LOAD_GLOBAL operand out of range");
-                StrObject *name = code.names()[instruction.operand];
-                Object *value = globals.get(name);
-                if (!value)
-                    value = builtins.get(name);
-                if (!value)
-                    raise_name_error(&runtime_, "name '" + name->value + "' is not defined");
-                frame->push(value);
-                continue;
-            }
-
-target_load_fast:
-            {
-                Object *value = frame->fast_local(instruction.operand);
-                if (!value)
-                {
-                    StrObject *name = frame->fast_local_name(instruction.operand);
-                    raise_unbound_local_error(
-                        &runtime_,
-                        "cannot access local variable '" + name->value +
-                            "' where it is not associated with a value");
-                }
-                frame->push(value);
-                continue;
-            }
-
-target_store_fast:
-            {
-                Object *value = frame->pop();
-                frame->set_fast_local(instruction.operand, value);
-                continue;
-            }
-
-target_pop_top:
-            {
-                (void)frame->pop();
-                continue;
-            }
-
-target_binary_op:
-            {
-                const BinaryOp op = decode_binary_op(instruction.operand);
-                Object *right = frame->pop();
-                Object *left = frame->pop();
-                if (Object *result = vm_fastpath::try_binary_op(runtime_, left, right, op))
-                {
-                    frame->push(result);
-                    continue;
-                }
-                auto right_root = runtime_.root(right);
-                auto left_root = runtime_.root(left);
-                frame->push(object_binary_op(left, right, op));
-                continue;
-            }
-
-target_for_iter:
-            {
-                Object *iterator = frame->pop();
-                if (iterator && iterator->type() == runtime_.range_iterator_type())
-                {
-                    auto *range_iterator = static_cast<RangeIteratorObject *>(iterator);
-                    if (range_iterator->remaining() == 0)
-                    {
-                        jump_to(*frame, instruction_count, instruction.operand);
-                        continue;
-                    }
-                    const std::int64_t value = range_iterator->consume_value();
-                    frame->push(iterator);
-                    frame->push(runtime_.new_int(value));
-                    continue;
-                }
-                auto iterator_root = runtime_.root(iterator);
-                try
-                {
-                    Object *item = object_next(iterator_root.get());
-                    auto item_root = runtime_.root(item);
-                    frame->push(iterator_root.get());
-                    frame->push(item_root.get());
-                }
-                catch (const PythonError &error)
-                {
-                    if (error.type() && is_subclass(error.type(), runtime_.stop_iteration_type()))
-                    {
-                        jump_to(*frame, instruction_count, instruction.operand);
-                        continue;
-                    }
-                    throw;
-                }
-                continue;
-            }
-
-target_jump_absolute:
-            {
-                jump_to(*frame, instruction_count, instruction.operand);
-                continue;
-            }
-
-target_pop_jump_if_false:
-            {
-                Object *condition = frame->pop();
-                bool truth = false;
-                if (vm_fastpath::try_truth(runtime_, condition, truth))
-                {
-                    if (!truth)
-                        jump_to(*frame, instruction_count, instruction.operand);
-                    continue;
-                }
-                auto condition_root = runtime_.root(condition);
-                if (!is_true(condition))
-                    jump_to(*frame, instruction_count, instruction.operand);
-                continue;
-            }
-
-target_pop_jump_if_true:
-            {
-                Object *condition = frame->pop();
-                bool truth = false;
-                if (vm_fastpath::try_truth(runtime_, condition, truth))
-                {
-                    if (truth)
-                        jump_to(*frame, instruction_count, instruction.operand);
-                    continue;
-                }
-                auto condition_root = runtime_.root(condition);
-                if (is_true(condition))
-                    jump_to(*frame, instruction_count, instruction.operand);
-                continue;
-            }
-
-target_call:
-            {
-                const std::size_t arg_count = instruction.operand;
-                if (frame->stack_size() < arg_count + 1)
-                    throw BytecodeError("CALL stack underflow");
-                const std::size_t args_start = frame->stack_size() - arg_count;
-                ObjectSpan args = frame->stack_slice(args_start, arg_count);
-                Object *callable = frame->stack_at(args_start - 1);
-                Object *result = nullptr;
-                if (Object *fast_result = vm_fastpath::try_builtin_call(runtime_, callable, args))
-                {
-                    frame->truncate_stack(args_start - 1);
-                    frame->push(fast_result);
-                    continue;
-                }
-                result = object_call_rooted(callable, args);
-                frame->truncate_stack(args_start - 1);
-                frame->push(result);
-                continue;
-            }
-
-target_return_value:
-            {
-                Object *value = frame->pop();
-                bool jumped_to_finally = false;
-                while (frame->has_block_handler())
-                {
-                    const FrameBlockHandler handler = frame->pop_block_handler();
-                    if (handler.kind == FrameBlockKind::Except)
-                        continue;
-                    frame->clear_stack();
-                    frame->set_pending_return(value);
-                    jump_to(*frame, instruction_count, static_cast<std::uint32_t>(handler.target));
-                    jumped_to_finally = true;
-                    break;
-                }
-                if (jumped_to_finally)
-                    continue;
-                if (frame->trace_function())
-                {
-                    auto value_root = runtime_.root(value);
-                    (void)call_trace_function(runtime_,
-                                              thread_,
-                                              frame->trace_function(),
-                                              *frame,
-                                              "return",
-                                              value_root.get());
-                }
-                return value;
-            }
-
-target_slow:
+cxxpy_fallback:
 #endif
             switch (instruction.opcode)
             {
-            case Opcode::LoadConst:
+            CXXPYTHON_OP_LABEL(LoadConst) case Opcode::LoadConst:
             {
                 if (instruction.operand >= code.constants().size())
                     throw BytecodeError("LOAD_CONST operand out of range");
                 frame->push(code.constants()[instruction.operand]);
                 break;
             }
-            case Opcode::LoadName:
+            CXXPYTHON_OP_LABEL(LoadName) case Opcode::LoadName:
             {
                 if (instruction.operand >= code.names().size())
                     throw BytecodeError("LOAD_NAME operand out of range");
@@ -1426,7 +1204,7 @@ target_slow:
                 frame->push(value);
                 break;
             }
-            case Opcode::StoreName:
+            CXXPYTHON_OP_LABEL(StoreName) case Opcode::StoreName:
             {
                 if (instruction.operand >= code.names().size())
                     throw BytecodeError("STORE_NAME operand out of range");
@@ -1436,7 +1214,7 @@ target_slow:
                 locals.set(name, value);
                 break;
             }
-            case Opcode::DeleteName:
+            CXXPYTHON_OP_LABEL(DeleteName) case Opcode::DeleteName:
             {
                 if (instruction.operand >= code.names().size())
                     throw BytecodeError("DELETE_NAME operand out of range");
@@ -1445,7 +1223,7 @@ target_slow:
                     raise_name_error(&runtime_, "name '" + name->value + "' is not defined");
                 break;
             }
-            case Opcode::LoadGlobal:
+            CXXPYTHON_OP_LABEL(LoadGlobal) case Opcode::LoadGlobal:
             {
                 if (instruction.operand >= code.names().size())
                     throw BytecodeError("LOAD_GLOBAL operand out of range");
@@ -1458,7 +1236,7 @@ target_slow:
                 frame->push(value);
                 break;
             }
-            case Opcode::StoreGlobal:
+            CXXPYTHON_OP_LABEL(StoreGlobal) case Opcode::StoreGlobal:
             {
                 if (instruction.operand >= code.names().size())
                     throw BytecodeError("STORE_GLOBAL operand out of range");
@@ -1468,7 +1246,7 @@ target_slow:
                 globals.set(name, value);
                 break;
             }
-            case Opcode::DeleteGlobal:
+            CXXPYTHON_OP_LABEL(DeleteGlobal) case Opcode::DeleteGlobal:
             {
                 if (instruction.operand >= code.names().size())
                     throw BytecodeError("DELETE_GLOBAL operand out of range");
@@ -1477,7 +1255,7 @@ target_slow:
                     raise_name_error(&runtime_, "name '" + name->value + "' is not defined");
                 break;
             }
-            case Opcode::LoadFast:
+            CXXPYTHON_OP_LABEL(LoadFast) case Opcode::LoadFast:
             {
                 Object *value = frame->fast_local(instruction.operand);
                 if (!value)
@@ -1491,13 +1269,13 @@ target_slow:
                 frame->push(value);
                 break;
             }
-            case Opcode::StoreFast:
+            CXXPYTHON_OP_LABEL(StoreFast) case Opcode::StoreFast:
             {
                 Object *value = frame->pop();
                 frame->set_fast_local(instruction.operand, value);
                 break;
             }
-            case Opcode::DeleteFast:
+            CXXPYTHON_OP_LABEL(DeleteFast) case Opcode::DeleteFast:
             {
                 if (!frame->delete_fast_local(instruction.operand))
                 {
@@ -1509,7 +1287,7 @@ target_slow:
                 }
                 break;
             }
-            case Opcode::LoadDeref:
+            CXXPYTHON_OP_LABEL(LoadDeref) case Opcode::LoadDeref:
             {
                 CellObject *cell = frame->cell(instruction.operand);
                 if (cell->is_empty())
@@ -1517,7 +1295,7 @@ target_slow:
                 frame->push(cell->value());
                 break;
             }
-            case Opcode::StoreDeref:
+            CXXPYTHON_OP_LABEL(StoreDeref) case Opcode::StoreDeref:
             {
                 CellObject *cell = frame->cell(instruction.operand);
                 Object *value = frame->pop();
@@ -1530,7 +1308,7 @@ target_slow:
                 }
                 break;
             }
-            case Opcode::DeleteDeref:
+            CXXPYTHON_OP_LABEL(DeleteDeref) case Opcode::DeleteDeref:
             {
                 CellObject *cell = frame->cell(instruction.operand);
                 cell->set_value(nullptr);
@@ -1541,12 +1319,12 @@ target_slow:
                 }
                 break;
             }
-            case Opcode::LoadClosure:
+            CXXPYTHON_OP_LABEL(LoadClosure) case Opcode::LoadClosure:
             {
                 frame->push(frame->cell(instruction.operand));
                 break;
             }
-            case Opcode::LoadAttr:
+            CXXPYTHON_OP_LABEL(LoadAttr) case Opcode::LoadAttr:
             {
                 if (instruction.operand >= code.names().size())
                     throw BytecodeError("LOAD_ATTR operand out of range");
@@ -1556,7 +1334,7 @@ target_slow:
                 frame->push(object_get_attr(object, name));
                 break;
             }
-            case Opcode::StoreAttr:
+            CXXPYTHON_OP_LABEL(StoreAttr) case Opcode::StoreAttr:
             {
                 if (instruction.operand >= code.names().size())
                     throw BytecodeError("STORE_ATTR operand out of range");
@@ -1568,7 +1346,7 @@ target_slow:
                 object_set_attr(object, name, value);
                 break;
             }
-            case Opcode::DeleteAttr:
+            CXXPYTHON_OP_LABEL(DeleteAttr) case Opcode::DeleteAttr:
             {
                 if (instruction.operand >= code.names().size())
                     throw BytecodeError("DELETE_ATTR operand out of range");
@@ -1578,35 +1356,35 @@ target_slow:
                 object_delete_attr(object, name);
                 break;
             }
-            case Opcode::PopTop:
+            CXXPYTHON_OP_LABEL(PopTop) case Opcode::PopTop:
                 (void)frame->pop();
                 break;
-            case Opcode::DupTop:
+            CXXPYTHON_OP_LABEL(DupTop) case Opcode::DupTop:
             {
                 Object *top = frame->pop();
                 frame->push(top);
                 frame->push(top);
                 break;
             }
-            case Opcode::DupTwo:
-            {
-                Object *top = frame->pop();
-                Object *second = frame->pop();
-                frame->push(second);
-                frame->push(top);
-                frame->push(second);
-                frame->push(top);
-                break;
-            }
-            case Opcode::RotTwo:
+            CXXPYTHON_OP_LABEL(DupTwo) case Opcode::DupTwo:
             {
                 Object *top = frame->pop();
                 Object *second = frame->pop();
+                frame->push(second);
+                frame->push(top);
+                frame->push(second);
+                frame->push(top);
+                break;
+            }
+            CXXPYTHON_OP_LABEL(RotTwo) case Opcode::RotTwo:
+            {
+                Object *top = frame->pop();
+                Object *second = frame->pop();
                 frame->push(top);
                 frame->push(second);
                 break;
             }
-            case Opcode::RotThree:
+            CXXPYTHON_OP_LABEL(RotThree) case Opcode::RotThree:
             {
                 Object *top = frame->pop();
                 Object *second = frame->pop();
@@ -1616,7 +1394,7 @@ target_slow:
                 frame->push(second);
                 break;
             }
-            case Opcode::UnaryOp:
+            CXXPYTHON_OP_LABEL(UnaryOp) case Opcode::UnaryOp:
             {
                 const UnaryOp op = decode_unary_op(instruction.operand);
                 Object *operand = frame->pop();
@@ -1624,7 +1402,7 @@ target_slow:
                 frame->push(object_unary_op(operand, op));
                 break;
             }
-            case Opcode::BinaryOp:
+            CXXPYTHON_OP_LABEL(BinaryOp) case Opcode::BinaryOp:
             {
                 const BinaryOp op = decode_binary_op(instruction.operand);
                 Object *right = frame->pop();
@@ -1639,7 +1417,7 @@ target_slow:
                 frame->push(object_binary_op(left, right, op));
                 break;
             }
-            case Opcode::InplaceBinaryOp:
+            CXXPYTHON_OP_LABEL(InplaceBinaryOp) case Opcode::InplaceBinaryOp:
             {
                 const BinaryOp op = decode_binary_op(instruction.operand);
                 Object *right = frame->pop();
@@ -1654,7 +1432,7 @@ target_slow:
                 frame->push(object_inplace_binary_op(left, right, op));
                 break;
             }
-            case Opcode::FormatValue:
+            CXXPYTHON_OP_LABEL(FormatValue) case Opcode::FormatValue:
             {
                 Object *value = frame->pop();
                 auto value_root = runtime_.root(value);
@@ -1665,7 +1443,7 @@ target_slow:
                 frame->push(formatted_root.get());
                 break;
             }
-            case Opcode::BinarySubscr:
+            CXXPYTHON_OP_LABEL(BinarySubscr) case Opcode::BinarySubscr:
             {
                 Object *key = frame->pop();
                 Object *object = frame->pop();
@@ -1674,7 +1452,7 @@ target_slow:
                 frame->push(object_get_item(object, key));
                 break;
             }
-            case Opcode::StoreSubscr:
+            CXXPYTHON_OP_LABEL(StoreSubscr) case Opcode::StoreSubscr:
             {
                 Object *value = frame->pop();
                 Object *key = frame->pop();
@@ -1685,7 +1463,7 @@ target_slow:
                 object_set_item(object, key, value);
                 break;
             }
-            case Opcode::DeleteSubscr:
+            CXXPYTHON_OP_LABEL(DeleteSubscr) case Opcode::DeleteSubscr:
             {
                 Object *key = frame->pop();
                 Object *object = frame->pop();
@@ -1694,7 +1472,7 @@ target_slow:
                 object_delete_item(object, key);
                 break;
             }
-            case Opcode::BuildList:
+            CXXPYTHON_OP_LABEL(BuildList) case Opcode::BuildList:
             {
                 std::vector<Object *> items(instruction.operand);
                 std::vector<Rooted<Object>> roots;
@@ -1709,7 +1487,7 @@ target_slow:
                 frame->push(list);
                 break;
             }
-            case Opcode::BuildTuple:
+            CXXPYTHON_OP_LABEL(BuildTuple) case Opcode::BuildTuple:
             {
                 std::vector<Object *> items(instruction.operand);
                 std::vector<Rooted<Object>> roots;
@@ -1724,7 +1502,7 @@ target_slow:
                 frame->push(tuple);
                 break;
             }
-            case Opcode::BuildTupleUnpack:
+            CXXPYTHON_OP_LABEL(BuildTupleUnpack) case Opcode::BuildTupleUnpack:
             {
                 std::vector<Object *> sources(instruction.operand);
                 std::vector<Rooted<Object>> roots;
@@ -1751,7 +1529,7 @@ target_slow:
                 frame->push(tuple);
                 break;
             }
-            case Opcode::BuildMap:
+            CXXPYTHON_OP_LABEL(BuildMap) case Opcode::BuildMap:
             {
                 std::vector<Object *> keys(instruction.operand);
                 std::vector<Object *> values(instruction.operand);
@@ -1771,7 +1549,7 @@ target_slow:
                 frame->push(dict);
                 break;
             }
-            case Opcode::BuildKwMapUnpack:
+            CXXPYTHON_OP_LABEL(BuildKwMapUnpack) case Opcode::BuildKwMapUnpack:
             {
                 std::vector<Object *> sources(instruction.operand);
                 std::vector<Rooted<Object>> roots;
@@ -1803,7 +1581,7 @@ target_slow:
                 frame->push(dict);
                 break;
             }
-            case Opcode::BuildSlice:
+            CXXPYTHON_OP_LABEL(BuildSlice) case Opcode::BuildSlice:
             {
                 if (instruction.operand != 3)
                     throw BytecodeError("BUILD_SLICE operand must be 3");
@@ -1818,7 +1596,7 @@ target_slow:
                 frame->push(slice);
                 break;
             }
-            case Opcode::CompareOp:
+            CXXPYTHON_OP_LABEL(CompareOp) case Opcode::CompareOp:
             {
                 const ComparisonOp op = decode_comparison_op(instruction.operand);
                 Object *right = frame->pop();
@@ -1866,14 +1644,14 @@ target_slow:
                 }
                 break;
             }
-            case Opcode::GetIter:
+            CXXPYTHON_OP_LABEL(GetIter) case Opcode::GetIter:
             {
                 Object *iterable = frame->pop();
                 auto iterable_root = runtime_.root(iterable);
                 frame->push(object_iter(iterable_root.get()));
                 break;
             }
-            case Opcode::ForIter:
+            CXXPYTHON_OP_LABEL(ForIter) case Opcode::ForIter:
             {
                 Object *iterator = frame->pop();
                 if (iterator && iterator->type() == runtime_.range_iterator_type())
@@ -1908,7 +1686,7 @@ target_slow:
                 }
                 break;
             }
-            case Opcode::BreakLoop:
+            CXXPYTHON_OP_LABEL(BreakLoop) case Opcode::BreakLoop:
             {
                 bool jumped_to_finally = false;
                 while (frame->has_block_handler())
@@ -1927,7 +1705,7 @@ target_slow:
                 jump_to(*frame, instruction_count, instruction.operand);
                 break;
             }
-            case Opcode::ContinueLoop:
+            CXXPYTHON_OP_LABEL(ContinueLoop) case Opcode::ContinueLoop:
             {
                 bool jumped_to_finally = false;
                 while (frame->has_block_handler())
@@ -1945,12 +1723,12 @@ target_slow:
                 jump_to(*frame, instruction_count, instruction.operand);
                 break;
             }
-            case Opcode::JumpAbsolute:
+            CXXPYTHON_OP_LABEL(JumpAbsolute) case Opcode::JumpAbsolute:
             {
                 jump_to(*frame, instruction_count, instruction.operand);
                 break;
             }
-            case Opcode::PopJumpIfFalse:
+            CXXPYTHON_OP_LABEL(PopJumpIfFalse) case Opcode::PopJumpIfFalse:
             {
                 Object *condition = frame->pop();
                 bool truth = false;
@@ -1965,7 +1743,7 @@ target_slow:
                     jump_to(*frame, instruction_count, instruction.operand);
                 break;
             }
-            case Opcode::PopJumpIfTrue:
+            CXXPYTHON_OP_LABEL(PopJumpIfTrue) case Opcode::PopJumpIfTrue:
             {
                 Object *condition = frame->pop();
                 bool truth = false;
@@ -1980,7 +1758,7 @@ target_slow:
                     jump_to(*frame, instruction_count, instruction.operand);
                 break;
             }
-            case Opcode::JumpIfFalseOrPop:
+            CXXPYTHON_OP_LABEL(JumpIfFalseOrPop) case Opcode::JumpIfFalseOrPop:
             {
                 Object *condition = frame->pop();
                 bool truth = false;
@@ -2001,7 +1779,7 @@ target_slow:
                 }
                 break;
             }
-            case Opcode::MakeFunction:
+            CXXPYTHON_OP_LABEL(MakeFunction) case Opcode::MakeFunction:
             {
                 const std::uint32_t closure_count =
                     instruction.operand & MakeFunctionClosureCountMask;
@@ -2078,7 +1856,7 @@ target_slow:
                 frame->push(function);
                 break;
             }
-            case Opcode::MakeClass:
+            CXXPYTHON_OP_LABEL(MakeClass) case Opcode::MakeClass:
             {
                 if (instruction.operand >= code.names().size())
                     throw BytecodeError("MAKE_CLASS operand out of range");
@@ -2112,7 +1890,7 @@ target_slow:
                 frame->push(type);
                 break;
             }
-            case Opcode::Call:
+            CXXPYTHON_OP_LABEL(Call) case Opcode::Call:
             {
                 const std::size_t arg_count = instruction.operand;
                 if (frame->stack_size() < arg_count + 1)
@@ -2133,7 +1911,7 @@ target_slow:
                 frame->push(result);
                 break;
             }
-            case Opcode::CallKw:
+            CXXPYTHON_OP_LABEL(CallKw) case Opcode::CallKw:
             {
                 Object *keywords_object = frame->pop();
                 auto *keywords = dynamic_cast<DictObject *>(keywords_object);
@@ -2153,7 +1931,7 @@ target_slow:
                 frame->push(object_call_rooted(callable_root.get(), ObjectSpan(args.data(), args.size()), keywords_root.get()));
                 break;
             }
-            case Opcode::CallEx:
+            CXXPYTHON_OP_LABEL(CallEx) case Opcode::CallEx:
             {
                 Object *keywords_object = frame->pop();
                 auto *keywords = dynamic_cast<DictObject *>(keywords_object);
@@ -2177,27 +1955,27 @@ target_slow:
                 frame->push(object_call_rooted(callable_root.get(), ObjectSpan(args.data(), args.size()), keywords_root.get()));
                 break;
             }
-            case Opcode::ImportStar:
+            CXXPYTHON_OP_LABEL(ImportStar) case Opcode::ImportStar:
             {
                 Object *module = frame->pop();
                 import_star(runtime_, module, *frame->locals());
                 break;
             }
-            case Opcode::SetupExcept:
+            CXXPYTHON_OP_LABEL(SetupExcept) case Opcode::SetupExcept:
             {
                 if (instruction.operand >= code.instructions().size())
                     throw BytecodeError("SETUP_EXCEPT target out of range");
                 frame->push_exception_handler(instruction.operand);
                 break;
             }
-            case Opcode::SetupFinally:
+            CXXPYTHON_OP_LABEL(SetupFinally) case Opcode::SetupFinally:
             {
                 if (instruction.operand >= code.instructions().size())
                     throw BytecodeError("SETUP_FINALLY target out of range");
                 frame->push_finally_handler(instruction.operand);
                 break;
             }
-            case Opcode::PopExcept:
+            CXXPYTHON_OP_LABEL(PopExcept) case Opcode::PopExcept:
             {
                 if (frame->has_exception_handler())
                     (void)frame->pop_exception_handler();
@@ -2205,12 +1983,12 @@ target_slow:
                     thread_.pop_handled_exception();
                 break;
             }
-            case Opcode::PopFinally:
+            CXXPYTHON_OP_LABEL(PopFinally) case Opcode::PopFinally:
             {
                 (void)frame->pop_finally_handler();
                 break;
             }
-            case Opcode::CheckExceptionMatch:
+            CXXPYTHON_OP_LABEL(CheckExceptionMatch) case Opcode::CheckExceptionMatch:
             {
                 Object *matcher = frame->pop();
                 Object *exception = frame->pop();
@@ -2222,7 +2000,7 @@ target_slow:
                                 : runtime_.false_value());
                 break;
             }
-            case Opcode::RaiseValue:
+            CXXPYTHON_OP_LABEL(RaiseValue) case Opcode::RaiseValue:
             {
                 Object *value = frame->pop();
                 auto value_root = runtime_.root(value);
@@ -2233,7 +2011,7 @@ target_slow:
                     raise_type_error(&runtime_, "exceptions must derive from BaseException");
                 throw PythonError(exception_object);
             }
-            case Opcode::WithExit:
+            CXXPYTHON_OP_LABEL(WithExit) case Opcode::WithExit:
             {
                 Object *exit_callable = frame->pop();
                 auto exit_root = runtime_.root(exit_callable);
@@ -2268,7 +2046,7 @@ target_slow:
                 }
                 break;
             }
-            case Opcode::EndFinally:
+            CXXPYTHON_OP_LABEL(EndFinally) case Opcode::EndFinally:
             {
                 switch (frame->pending_control_kind())
                 {
@@ -2306,7 +2084,7 @@ target_slow:
                 }
                 break;
             }
-            case Opcode::ReturnValue:
+            CXXPYTHON_OP_LABEL(ReturnValue) case Opcode::ReturnValue:
             {
                 Object *value = frame->pop();
                 bool jumped_to_finally = false;
