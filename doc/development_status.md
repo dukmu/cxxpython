@@ -28,6 +28,9 @@ Completed:
   strong reference to their heap type.
 - Inlined small VM/object hot-path accessors (`Object::type/runtime`,
   `Frame::push/pop`, instruction pointer helpers, stack size).
+- Moved GC tracking from an allocation-time RTTI check to an object-header bit,
+  so numeric leaf allocation no longer pays `dynamic_cast` just to decide cycle
+  collector membership.
 - Rooted freshly allocated Python function locals across argument binding and
   frame creation.
 - Added focused tests for tracked vs untracked GC pressure, untracked leaf
@@ -43,6 +46,8 @@ Verification:
 - `./build/cxxpython test2.py multi 100000`: about `0.27s`.
 - Sequential `./build/cxxpython test2.py multi 1000000`: `3.70s`, `3.77s`,
   `3.77s` in local runs after the hot-path changes.
+- Follow-up tracked-bit run: pure compute benchmark improved from about `3.02s`
+  to `2.60s`; sequential `test2.py multi 1000000` was `3.66s`.
 
 Known debt:
 

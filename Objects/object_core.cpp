@@ -1039,9 +1039,15 @@ namespace cxxpython
 
     bool Object::gc_tracked() const noexcept
     {
-        if (dynamic_cast<const TypeObject *>(this))
-            return true;
-        return type_ && (type_->flags & TypeFlagGCTracked) != 0;
+        return (gc_state_ & kGcTrackedBit) != 0;
+    }
+
+    void Object::set_gc_tracked(bool tracked) noexcept
+    {
+        if (tracked)
+            gc_state_ |= kGcTrackedBit;
+        else
+            gc_state_ &= ~kGcTrackedBit;
     }
 
     void Object::set_heap_index(std::size_t index) noexcept

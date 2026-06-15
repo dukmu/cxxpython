@@ -282,6 +282,7 @@ namespace cxxpython
         void decref() noexcept;
         std::size_t ref_count() const noexcept;
         bool gc_tracked() const noexcept;
+        void set_gc_tracked(bool tracked) noexcept;
         GCGeneration gc_generation() const noexcept;
         void promote_gc_generation() noexcept;
         bool gc_marked() const noexcept;
@@ -312,6 +313,7 @@ namespace cxxpython
         std::size_t heap_index_ = std::numeric_limits<std::size_t>::max();
         static constexpr std::uint8_t kGcMarkBit = 1U << 0;
         static constexpr std::uint8_t kGcOldBit = 1U << 1;
+        static constexpr std::uint8_t kGcTrackedBit = 1U << 2;
         std::uint8_t gc_state_ = 0;
     };
 

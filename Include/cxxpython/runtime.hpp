@@ -393,6 +393,8 @@ namespace cxxpython
             auto object = std::make_unique<T>(std::forward<Args>(args)...);
             T *raw = object.get();
             raw->set_runtime(this);
+            raw->set_gc_tracked(std::is_same_v<T, TypeObject> ||
+                                (raw->type() && (raw->type()->flags & TypeFlagGCTracked) != 0));
             {
                 std::scoped_lock lock(heap_mutex_);
                 raw->set_heap_index(heap_.size());
