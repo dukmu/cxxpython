@@ -413,6 +413,14 @@ namespace cxxpython
                 if (threshold != 0 && count >= threshold)
                     gc_requested_.store(true, std::memory_order_relaxed);
             }
+            else if (gc_enabled_.load(std::memory_order_relaxed))
+            {
+                const std::size_t count =
+                    untracked_allocations_since_gc_.fetch_add(1, std::memory_order_relaxed) + 1;
+                const std::size_t threshold = gc_threshold_.load(std::memory_order_relaxed);
+                if (threshold != 0 && count >= threshold * 4)
+                    gc_requested_.store(true, std::memory_order_relaxed);
+            }
             return raw;
         }
 
@@ -472,6 +480,7 @@ namespace cxxpython
         std::atomic_bool gc_enabled_{true};
         std::atomic_bool gc_requested_{false};
         std::atomic_size_t allocations_since_gc_{0};
+        std::atomic_size_t untracked_allocations_since_gc_{0};
         std::atomic_size_t gc_threshold_{65536};
         std::atomic_bool gc_stop_requested_{false};
 

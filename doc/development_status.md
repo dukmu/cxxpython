@@ -48,6 +48,10 @@ Verification:
   `3.77s` in local runs after the hot-path changes.
 - Follow-up tracked-bit run: pure compute benchmark improved from about `3.02s`
   to `2.60s`; sequential `test2.py multi 1000000` was `3.66s`.
+- Follow-up leaf-cleanup run: untracked leaf allocations request cleanup at a
+  higher threshold without increasing cycle-GC pressure. Pure compute improved
+  to about `2.08s`; sequential `test2.py multi 1000000` varied around
+  `3.76s` to `3.94s`.
 
 Known debt:
 

@@ -110,6 +110,7 @@ namespace cxxpython
             object->gc_unmark();
 
         allocations_since_gc_.store(0, std::memory_order_relaxed);
+        untracked_allocations_since_gc_.store(0, std::memory_order_relaxed);
         gc_requested_.store(false, std::memory_order_relaxed);
         return collected;
     }
