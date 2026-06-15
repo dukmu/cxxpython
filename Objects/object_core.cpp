@@ -12,6 +12,11 @@ namespace cxxpython
 {
     namespace
     {
+        bool owns_type_reference(TypeObject *type) noexcept
+        {
+            return type && (type->flags & TypeFlagHeapType) != 0;
+        }
+
         bool is_data_descriptor(Object *value)
         {
             return value && value->type() && value->type()->slots.descr_set;
@@ -995,7 +1000,7 @@ namespace cxxpython
     Object::Object(TypeObject *type)
         : type_(type)
     {
-        if (type_)
+        if (owns_type_reference(type_))
             type_->incref();
     }
 
@@ -1007,17 +1012,9 @@ namespace cxxpython
     void Object::clear_references()
     {
         CXXPYTHON_CLEAR_REF(instance_dict_);
-        CXXPYTHON_CLEAR_REF(type_);
-    }
-
-    TypeObject *Object::type() const noexcept
-    {
-        return type_;
-    }
-
-    Runtime *Object::runtime() const noexcept
-    {
-        return runtime_;
+        if (owns_type_reference(type_))
+            type_->decref();
+        type_ = nullptr;
     }
 
     void Object::set_runtime(Runtime *runtime) noexcept
@@ -1038,6 +1035,23 @@ namespace cxxpython
     std::size_t Object::ref_count() const noexcept
     {
         return ref_count_.load(std::memory_order_relaxed);
+    }
+
+    bool Object::gc_tracked() const noexcept
+    {
+        if (dynamic_cast<const TypeObject *>(this))
+            return true;
+        return type_ && (type_->flags & TypeFlagGCTracked) != 0;
+    }
+
+    void Object::set_heap_index(std::size_t index) noexcept
+    {
+        heap_index_ = index;
+    }
+
+    std::size_t Object::heap_index() const noexcept
+    {
+        return heap_index_;
     }
 
     GCGeneration Object::gc_generation() const noexcept
@@ -1069,9 +1083,9 @@ namespace cxxpython
     {
         if (type == type_)
             return;
-        if (type)
+        if (owns_type_reference(type))
             type->incref();
-        if (type_)
+        if (owns_type_reference(type_))
             type_->decref();
         type_ = type;
     }

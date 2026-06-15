@@ -585,45 +585,6 @@ namespace cxxpython
         }
     }
 
-    std::size_t Frame::instruction_pointer() const noexcept
-    {
-        return ip_;
-    }
-
-    std::size_t Frame::last_instruction_index() const noexcept
-    {
-        return last_ip_;
-    }
-
-    void Frame::advance() noexcept
-    {
-        last_ip_ = ip_;
-        ++ip_;
-    }
-
-    void Frame::jump_to(std::size_t target) noexcept
-    {
-        ip_ = target;
-    }
-
-    void Frame::push(Object *object)
-    {
-        if (!object)
-            throw BytecodeError("cannot push null object onto frame stack");
-        if (stack_.size() >= MaxValueStackDepth)
-            raise_recursion_error(runtime(), "maximum VM value stack depth exceeded");
-        stack_.push_back(object);
-    }
-
-    Object *Frame::pop()
-    {
-        if (stack_.empty())
-            throw BytecodeError("frame stack underflow");
-        Object *object = stack_.back();
-        stack_.pop_back();
-        return object;
-    }
-
     Object *Frame::stack_at(std::size_t index) const
     {
         if (index >= stack_.size())
@@ -647,11 +608,6 @@ namespace cxxpython
     void Frame::clear_stack() noexcept
     {
         stack_.clear();
-    }
-
-    std::size_t Frame::stack_size() const noexcept
-    {
-        return stack_.size();
     }
 
     void Frame::push_exception_handler(std::size_t target)

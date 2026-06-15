@@ -441,6 +441,7 @@ namespace cxxpython
     Object *PythonFunctionObject::call_rooted(ObjectSpan positional, DictObject *keywords)
     {
         DictObject *locals = runtime()->new_dict();
+        auto locals_root = runtime()->root(locals);
         const std::uint32_t expected = code_->arg_count();
         const std::uint32_t keyword_only_count = code_->kwonly_arg_count();
         if (code_->varnames().size() < argument_slot_count(code_))

@@ -12,6 +12,9 @@ This directory records the restart plan for the new `cxxpython` repository.
 - [执行内省与并发设计](execution_introspection_design.md): traceback,
   lexer/parser script exposure, `dis`/`pdb` preparation, and the initial
   threading/coroutine/process model.
+- [无 GIL GC 与多线程设计](nogil_gc_threading_design.md): target ownership,
+  deferred deallocation, stop-the-world cycle GC, thread states, and locking
+  invariants for no-GIL execution.
 
 The goal is not to preserve the old implementation. The goal is to preserve
 hard-earned knowledge while designing a cleaner, more complete Python 3 runtime

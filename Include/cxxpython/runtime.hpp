@@ -395,9 +395,15 @@ namespace cxxpython
             raw->set_runtime(this);
             {
                 std::scoped_lock lock(heap_mutex_);
+                raw->set_heap_index(heap_.size());
                 heap_.push_back(std::move(object));
+                ++live_heap_objects_;
+                if (raw->gc_tracked())
+                    tracked_heap_.push_back(raw);
+                else
+                    untracked_heap_.push_back(raw);
             }
-            if (gc_enabled_.load(std::memory_order_relaxed))
+            if (gc_enabled_.load(std::memory_order_relaxed) && raw->gc_tracked())
             {
                 const std::size_t count =
                     allocations_since_gc_.fetch_add(1, std::memory_order_relaxed) + 1;
@@ -432,6 +438,7 @@ namespace cxxpython
         std::size_t collect_garbage_at_safepoint(ThreadState &current_thread, bool force);
         bool all_other_active_threads_at_gc_safepoint(ThreadState &current_thread) const;
         void wait_for_garbage_collection_stop();
+        void destroy_heap_object_unlocked(Object *object);
         ModuleObject *load_module_from_spec(const ModuleLoadSpec &spec);
         ModuleObject *load_extension_module_from_spec(const ModuleLoadSpec &spec);
         TypeObject *importlib_type_for_loader(std::string_view loader_name);
@@ -447,7 +454,10 @@ namespace cxxpython
             static_cast<std::size_t>(small_int_max_ - small_int_min_ + 1);
 
         std::vector<std::unique_ptr<Object>> heap_;
+        std::vector<Object *> tracked_heap_;
+        std::vector<Object *> untracked_heap_;
         std::vector<Object *> roots_;
+        std::size_t live_heap_objects_ = 0;
         mutable std::mutex heap_mutex_;
         mutable std::mutex roots_mutex_;
         mutable std::mutex thread_states_mutex_;

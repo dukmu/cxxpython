@@ -112,7 +112,7 @@ namespace cxxpython
     std::size_t Runtime::heap_size() const noexcept
     {
         std::scoped_lock lock(heap_mutex_);
-        return heap_.size();
+        return live_heap_objects_;
     }
 
     std::size_t Runtime::root_count() const noexcept

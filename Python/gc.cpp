@@ -23,17 +23,18 @@ namespace cxxpython
             if (!object || object->gc_marked())
                 return;
             object->gc_mark();
-            worklist.push_back(object);
             marked_objects.push_back(object);
+            if (object->gc_tracked())
+                worklist.push_back(object);
         };
 
         visit_roots(enqueue);
         {
             std::scoped_lock lock(heap_mutex_);
-            for (const auto &object : heap_)
+            for (Object *object : tracked_heap_)
             {
                 if (object && !collect_old && object->gc_generation() == GCGeneration::Old)
-                    enqueue(object.get());
+                    enqueue(object);
             }
         }
         visit_thread_states([&enqueue](ThreadState &thread) {
@@ -49,7 +50,10 @@ namespace cxxpython
         }
 
         for (Object *object : marked_objects)
-            object->promote_gc_generation();
+        {
+            if (object->gc_tracked())
+                object->promote_gc_generation();
+        }
 
         {
             std::scoped_lock lock(roots_mutex_);
@@ -62,27 +66,45 @@ namespace cxxpython
         }
 
         std::scoped_lock lock(heap_mutex_);
-        const std::size_t before = heap_.size();
+        const std::size_t before = live_heap_objects_;
 
-        for (const auto &object : heap_)
+        for (Object *object : tracked_heap_)
         {
             if (!object || object->gc_marked())
+                continue;
+            if (!collect_old && object->gc_generation() == GCGeneration::Old)
                 continue;
             if (object->ref_count() != 0)
                 object->clear_references();
         }
 
-        heap_.erase(std::remove_if(heap_.begin(),
-                                    heap_.end(),
-                                    [collect_old](const std::unique_ptr<Object> &object) {
-                                        if (!object)
-                                            return true;
-                                        if (!collect_old && object->gc_generation() == GCGeneration::Old)
-                                            return false;
-                                        return !object->gc_marked();
-                                    }),
-                    heap_.end());
-        const std::size_t collected = before - heap_.size();
+        tracked_heap_.erase(std::remove_if(tracked_heap_.begin(),
+                                           tracked_heap_.end(),
+                                           [this, collect_old](Object *object) {
+                                               if (!object)
+                                                   return true;
+                                               if (!collect_old && object->gc_generation() == GCGeneration::Old)
+                                                   return false;
+                                               if (object->gc_marked())
+                                                   return false;
+                                               destroy_heap_object_unlocked(object);
+                                               return true;
+                                           }),
+                            tracked_heap_.end());
+
+        untracked_heap_.erase(std::remove_if(untracked_heap_.begin(),
+                                             untracked_heap_.end(),
+                                             [this](Object *object) {
+                                                 if (!object)
+                                                     return true;
+                                                 if (object->gc_marked() || object->ref_count() != 0)
+                                                     return false;
+                                                 destroy_heap_object_unlocked(object);
+                                                 return true;
+                                             }),
+                              untracked_heap_.end());
+
+        const std::size_t collected = before - live_heap_objects_;
 
         for (Object *object : marked_objects)
             object->gc_unmark();
@@ -90,6 +112,17 @@ namespace cxxpython
         allocations_since_gc_.store(0, std::memory_order_relaxed);
         gc_requested_.store(false, std::memory_order_relaxed);
         return collected;
+    }
+
+    void Runtime::destroy_heap_object_unlocked(Object *object)
+    {
+        if (!object)
+            return;
+        const std::size_t index = object->heap_index();
+        if (index >= heap_.size() || heap_[index].get() != object)
+            return;
+        heap_[index].reset();
+        --live_heap_objects_;
     }
 
     std::size_t Runtime::collect_garbage_if_requested(ThreadState &current_thread)

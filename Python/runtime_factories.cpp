@@ -623,7 +623,7 @@ namespace cxxpython
     {
         TypeObject *type = allocate_type(std::move(name));
         type->set_type(type_type_);
-        type->flags = TypeFlagHeapType | TypeFlagHasInstanceDict;
+        type->flags = TypeFlagHeapType | TypeFlagHasInstanceDict | TypeFlagGCTracked;
         TypeObject *resolved_base = base ? base : object_type_;
         type->slots = inherit_slots(resolved_base, slots);
         initialize_type(type, resolved_base);
@@ -671,7 +671,7 @@ namespace cxxpython
         std::string qualname = request.qualname.empty() ? class_name : std::move(request.qualname);
         TypeObject *type = allocate_type(std::move(class_name));
         type->set_type(metaclass);
-        type->flags = TypeFlagHeapType | TypeFlagHasInstanceDict;
+        type->flags = TypeFlagHeapType | TypeFlagHasInstanceDict | TypeFlagGCTracked;
         type->slots = inherit_slots(best_base, {});
         initialize_type(type, bases);
         type->set_base(best_base);

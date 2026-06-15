@@ -62,18 +62,52 @@ namespace cxxpython
         void set_fast_local(std::size_t index, Object *value);
         bool delete_fast_local(std::size_t index);
         void sync_fast_locals_to_dict();
-        std::size_t instruction_pointer() const noexcept;
-        std::size_t last_instruction_index() const noexcept;
-        void advance() noexcept;
-        void jump_to(std::size_t target) noexcept;
+        std::size_t instruction_pointer() const noexcept
+        {
+            return ip_;
+        }
 
-        void push(Object *object);
-        Object *pop();
+        std::size_t last_instruction_index() const noexcept
+        {
+            return last_ip_;
+        }
+
+        void advance() noexcept
+        {
+            last_ip_ = ip_;
+            ++ip_;
+        }
+
+        void jump_to(std::size_t target) noexcept
+        {
+            ip_ = target;
+        }
+
+        void push(Object *object)
+        {
+            if (!object)
+                throw BytecodeError("cannot push null object onto frame stack");
+            if (stack_.size() >= MaxValueStackDepth)
+                raise_recursion_error(runtime(), "maximum VM value stack depth exceeded");
+            stack_.push_back(object);
+        }
+
+        Object *pop()
+        {
+            if (stack_.empty())
+                throw BytecodeError("frame stack underflow");
+            Object *object = stack_.back();
+            stack_.pop_back();
+            return object;
+        }
         Object *stack_at(std::size_t index) const;
         ObjectSpan stack_slice(std::size_t index, std::size_t count) const;
         void truncate_stack(std::size_t size) noexcept;
         void clear_stack() noexcept;
-        std::size_t stack_size() const noexcept;
+        std::size_t stack_size() const noexcept
+        {
+            return stack_.size();
+        }
         void visit_stack(const VisitChildren &visitor) const;
         void visit_fast_locals(const VisitChildren &visitor) const;
         void push_exception_handler(std::size_t target);

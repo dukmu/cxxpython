@@ -1,5 +1,61 @@
 # Development Status
 
+## 2026-06-15 Threaded GC Stability And Numeric Hot Path Recovery
+
+Review focus:
+
+- Keep the threaded explicit-GC deadlock fix stable.
+- Move cycle-GC pressure away from leaf numeric/string temporaries without
+  hiding leaks behind benchmark-specific behavior.
+- Recover `test2.py multi 1000000` performance to the CPython range on the same
+  machine.
+
+Completed:
+
+- Added a no-GIL GC/threading design document covering target ownership,
+  deferred deallocation, tracked-only cycle GC, thread states, safepoints,
+  container locking, shutdown, tests, and migration slices.
+- Added explicit `TypeFlagGCTracked` classification. Container-like and
+  reference-owning object layouts count toward cycle-GC pressure; exact builtin
+  leaf objects such as `int`, `float`, `str`, and `bytes` do not.
+- Added runtime tracked/untracked object indexes plus stable heap slots, so GC
+  can delete unreachable candidates without compacting the whole heap vector on
+  every explicit collection.
+- Updated GC marking to traverse only tracked objects while still marking all
+  explicit roots.
+- Changed builtin instances to borrow runtime-lifetime builtin type objects,
+  matching CPython's `ob_type` ownership model. Heap-type instances still own a
+  strong reference to their heap type.
+- Inlined small VM/object hot-path accessors (`Object::type/runtime`,
+  `Frame::push/pop`, instruction pointer helpers, stack size).
+- Rooted freshly allocated Python function locals across argument binding and
+  frame creation.
+- Added focused tests for tracked vs untracked GC pressure, untracked leaf
+  refcount lifetime, tracked cycle collection, and builtin-vs-heap type
+  ownership.
+
+Verification:
+
+- `cmake --build build -j2`
+- `./build/test_core_objects` passed 245/245.
+- `./build/cxxpython Tests/python/gc_thread_explicit_collect.py`
+- `./build/cxxpython Tests/python/gc_thread_wait.py`
+- `./build/cxxpython test2.py multi 100000`: about `0.27s`.
+- Sequential `./build/cxxpython test2.py multi 1000000`: `3.70s`, `3.77s`,
+  `3.77s` in local runs after the hot-path changes.
+
+Known debt:
+
+- `decref()` still does not yet enqueue zero-ref objects for deferred
+  destruction. This slice reduces explicit-GC heap pressure and removes
+  unnecessary builtin-type refcount churn, but full no-GIL ownership still
+  requires the deferred-deallocation migration described in
+  `nogil_gc_threading_design.md`.
+- One full test run observed an intermittent `gc_thread_explicit_collect.py`
+  subprocess segfault after the builtin-type ownership optimization; the script
+  passed 10 standalone repetitions and the full suite passed on immediate
+  rerun. Keep this area under stress testing before broadening the ownership
+  change further.
 
 ## 2026-06-15 Strong Ownership Migration, GC Clear Phase, and VM/GC Optimization
 

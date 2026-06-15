@@ -117,6 +117,24 @@ TEST(CoreObjects, TypeFlagsSeparateCompactBuiltinsFromHeapInstances)
     EXPECT_EQ(int_child->solid_base, runtime.int_type());
 }
 
+TEST(CoreObjects, BuiltinInstancesBorrowTypesAndHeapInstancesOwnTypes)
+{
+    cxxpython::Runtime runtime;
+
+    const std::size_t int_type_refs = runtime.int_type()->ref_count();
+    cxxpython::IntObject *integer = runtime.new_int(4096);
+    EXPECT_EQ(runtime.int_type()->ref_count(), int_type_refs);
+    (void)integer;
+
+    cxxpython::TypeObject *heap_type = runtime.new_heap_type("OwnedType", runtime.object_type());
+    auto heap_type_root = runtime.root(heap_type);
+    const std::size_t heap_type_refs = heap_type->ref_count();
+
+    cxxpython::Object *instance = runtime.new_plain_instance(heap_type_root.get());
+    EXPECT_EQ(heap_type->ref_count(), heap_type_refs + 1U);
+    (void)instance;
+}
+
 TEST(CoreObjects, TypeObjectsOwnBaseMroDictAndBasesTupleReferences)
 {
     cxxpython::Runtime runtime;

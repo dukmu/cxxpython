@@ -207,7 +207,7 @@ TEST(CoreObjects, SmallIntegerCacheIsRootedAcrossGarbageCollection)
     EXPECT_EQ(runtime.new_int(-5), negative_cached);
 }
 
-TEST(CoreObjects, PrimitiveHeapObjectsCountTowardAutomaticGarbageCollection)
+TEST(CoreObjects, PrimitiveHeapObjectsDoNotCountTowardAutomaticCycleGarbageCollection)
 {
     cxxpython::Runtime runtime;
 
@@ -220,10 +220,24 @@ TEST(CoreObjects, PrimitiveHeapObjectsCountTowardAutomaticGarbageCollection)
     (void)runtime.new_str("temporary");
     (void)runtime.new_bytes("temporary");
 
-    EXPECT_GE(runtime.garbage_collection_count(), baseline + 13U);
+    EXPECT_EQ(runtime.garbage_collection_count(), baseline);
 }
 
-TEST(CoreObjects, ReferenceCountsDoNotCreateGarbageCollectionRoots)
+TEST(CoreObjects, TrackedContainersCountTowardAutomaticCycleGarbageCollection)
+{
+    cxxpython::Runtime runtime;
+
+    (void)runtime.collect_garbage();
+    const std::size_t baseline = runtime.garbage_collection_count();
+
+    (void)runtime.new_list({});
+    (void)runtime.new_tuple({});
+    (void)runtime.new_dict();
+
+    EXPECT_GE(runtime.garbage_collection_count(), baseline + 3U);
+}
+
+TEST(CoreObjects, ReferenceCountsKeepUntrackedLeafObjectsAlive)
 {
     cxxpython::Runtime runtime;
     cxxpython::IntObject *value = runtime.new_int(4096);
@@ -234,6 +248,10 @@ TEST(CoreObjects, ReferenceCountsDoNotCreateGarbageCollectionRoots)
 
     value->incref();
     EXPECT_EQ(value->ref_count(), 1U);
+    (void)runtime.collect_garbage();
+    EXPECT_EQ(value->ref_count(), 1U);
+    EXPECT_GE(runtime.heap_size(), 1U);
+    value->decref();
     (void)runtime.collect_garbage();
     EXPECT_LT(runtime.heap_size(), after_allocation);
 }
@@ -250,7 +268,7 @@ TEST(CoreObjects, RootedObjectsAreTemporaryGarbageCollectionRoots)
         EXPECT_EQ(value->ref_count(), 0U);
         (void)runtime.collect_garbage();
         EXPECT_EQ(value->ref_count(), 0U);
-        EXPECT_EQ(value->gc_generation(), cxxpython::GCGeneration::Old);
+        EXPECT_EQ(value->gc_generation(), cxxpython::GCGeneration::Young);
     }
 
     EXPECT_EQ(value->ref_count(), 0U);

@@ -237,6 +237,7 @@ namespace cxxpython
     using TypeFlags = std::uint32_t;
     constexpr TypeFlags TypeFlagHeapType = 1U << 0;
     constexpr TypeFlags TypeFlagHasInstanceDict = 1U << 1;
+    constexpr TypeFlags TypeFlagGCTracked = 1U << 2;
 
     enum class GCGeneration : std::uint8_t
     {
@@ -272,17 +273,24 @@ namespace cxxpython
         virtual ~Object();
         virtual void clear_references();
 
-        Runtime *runtime() const noexcept;
+        Runtime *runtime() const noexcept
+        {
+            return runtime_;
+        }
         void set_runtime(Runtime *runtime) noexcept;
         void incref() noexcept;
         void decref() noexcept;
         std::size_t ref_count() const noexcept;
+        bool gc_tracked() const noexcept;
         GCGeneration gc_generation() const noexcept;
         void promote_gc_generation() noexcept;
         bool gc_marked() const noexcept;
         void gc_mark() noexcept;
         void gc_unmark() noexcept;
-        TypeObject *type() const noexcept;
+        TypeObject *type() const noexcept
+        {
+            return type_;
+        }
         void set_type(TypeObject *type) noexcept;
         std::string repr() const;
         std::int64_t hash() const;
@@ -293,10 +301,15 @@ namespace cxxpython
         void set_instance_dict(DictObject *dict) noexcept;
 
     private:
+        friend class Runtime;
+        void set_heap_index(std::size_t index) noexcept;
+        std::size_t heap_index() const noexcept;
+
         Runtime *runtime_ = nullptr;
         TypeObject *type_;
         DictObject *instance_dict_ = nullptr;
         std::atomic_size_t ref_count_{0};
+        std::size_t heap_index_ = std::numeric_limits<std::size_t>::max();
         static constexpr std::uint8_t kGcMarkBit = 1U << 0;
         static constexpr std::uint8_t kGcOldBit = 1U << 1;
         std::uint8_t gc_state_ = 0;
