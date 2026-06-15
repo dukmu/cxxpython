@@ -403,7 +403,7 @@ namespace cxxpython
     }
 
     CodeObject *Runtime::new_code(std::vector<Object *> constants,
-                                  std::vector<Object *> names,
+                                  std::vector<StrObject *> names,
                                   std::vector<Instruction> instructions,
                                   std::vector<std::uint32_t> lines)
     {
@@ -416,11 +416,11 @@ namespace cxxpython
     }
 
     CodeObject *Runtime::new_code(std::string name,
-                                  std::string filename,
-                                  std::vector<Object *> constants,
-                                  std::vector<Object *> names,
-                                  std::vector<Instruction> instructions,
-                                  std::vector<std::uint32_t> lines)
+                                   std::string filename,
+                                   std::vector<Object *> constants,
+                                   std::vector<StrObject *> names,
+                                   std::vector<Instruction> instructions,
+                                   std::vector<std::uint32_t> lines)
     {
         return new_code(std::move(name),
                         std::move(filename),
@@ -434,13 +434,13 @@ namespace cxxpython
     }
 
     CodeObject *Runtime::new_code(std::string name,
-                                  std::string filename,
-                                  std::uint32_t arg_count,
-                                  std::vector<Object *> varnames,
-                                  std::vector<Object *> constants,
-                                  std::vector<Object *> names,
-                                  std::vector<Instruction> instructions,
-                                  std::vector<std::uint32_t> lines)
+                                   std::string filename,
+                                   std::uint32_t arg_count,
+                                   std::vector<StrObject *> varnames,
+                                   std::vector<Object *> constants,
+                                   std::vector<StrObject *> names,
+                                   std::vector<Instruction> instructions,
+                                   std::vector<std::uint32_t> lines)
     {
         return new_code(std::move(name),
                         std::move(filename),
@@ -459,13 +459,13 @@ namespace cxxpython
 
     CodeObject *Runtime::new_code(std::string name,
                                   std::string filename,
-                                  std::uint32_t arg_count,
-                                  std::uint32_t flags,
-                                  std::vector<Object *> varnames,
-                                  std::vector<Object *> constants,
-                                  std::vector<Object *> names,
-                                  std::vector<Instruction> instructions,
-                                  std::vector<std::uint32_t> lines)
+                                   std::uint32_t arg_count,
+                                   std::uint32_t flags,
+                                   std::vector<StrObject *> varnames,
+                                   std::vector<Object *> constants,
+                                   std::vector<StrObject *> names,
+                                   std::vector<Instruction> instructions,
+                                   std::vector<std::uint32_t> lines)
     {
         return new_code(std::move(name),
                         std::move(filename),
@@ -484,15 +484,15 @@ namespace cxxpython
 
     CodeObject *Runtime::new_code(std::string name,
                                   std::string filename,
-                                  std::uint32_t arg_count,
-                                  std::uint32_t flags,
-                                  std::vector<Object *> varnames,
-                                  std::vector<Object *> constants,
-                                  std::vector<Object *> names,
-                                  std::vector<Object *> cellvars,
-                                  std::vector<Object *> freevars,
-                                  std::vector<Instruction> instructions,
-                                  std::vector<std::uint32_t> lines)
+                                   std::uint32_t arg_count,
+                                   std::uint32_t flags,
+                                   std::vector<StrObject *> varnames,
+                                   std::vector<Object *> constants,
+                                   std::vector<StrObject *> names,
+                                   std::vector<StrObject *> cellvars,
+                                   std::vector<StrObject *> freevars,
+                                   std::vector<Instruction> instructions,
+                                   std::vector<std::uint32_t> lines)
     {
         return new_code(std::move(name),
                         std::move(filename),
@@ -512,15 +512,15 @@ namespace cxxpython
     CodeObject *Runtime::new_code(std::string name,
                                   std::string filename,
                                   std::uint32_t arg_count,
-                                  std::uint32_t kwonly_arg_count,
-                                  std::uint32_t flags,
-                                  std::vector<Object *> varnames,
-                                  std::vector<Object *> constants,
-                                  std::vector<Object *> names,
-                                  std::vector<Object *> cellvars,
-                                  std::vector<Object *> freevars,
-                                  std::vector<Instruction> instructions,
-                                  std::vector<std::uint32_t> lines)
+                                   std::uint32_t kwonly_arg_count,
+                                   std::uint32_t flags,
+                                   std::vector<StrObject *> varnames,
+                                   std::vector<Object *> constants,
+                                   std::vector<StrObject *> names,
+                                   std::vector<StrObject *> cellvars,
+                                   std::vector<StrObject *> freevars,
+                                   std::vector<Instruction> instructions,
+                                   std::vector<std::uint32_t> lines)
     {
         return new_code(std::move(name),
                         std::move(filename),
@@ -540,16 +540,16 @@ namespace cxxpython
     CodeObject *Runtime::new_code(std::string name,
                                   std::string filename,
                                   std::uint32_t arg_count,
-                                  std::uint32_t posonly_arg_count,
-                                  std::uint32_t kwonly_arg_count,
-                                  std::uint32_t flags,
-                                  std::vector<Object *> varnames,
-                                  std::vector<Object *> constants,
-                                  std::vector<Object *> names,
-                                  std::vector<Object *> cellvars,
-                                  std::vector<Object *> freevars,
-                                  std::vector<Instruction> instructions,
-                                  std::vector<std::uint32_t> lines)
+                                   std::uint32_t posonly_arg_count,
+                                   std::uint32_t kwonly_arg_count,
+                                   std::uint32_t flags,
+                                   std::vector<StrObject *> varnames,
+                                   std::vector<Object *> constants,
+                                   std::vector<StrObject *> names,
+                                   std::vector<StrObject *> cellvars,
+                                   std::vector<StrObject *> freevars,
+                                   std::vector<Instruction> instructions,
+                                   std::vector<std::uint32_t> lines)
     {
         return allocate<CodeObject>(code_type_,
                                     std::move(name),
@@ -587,11 +587,8 @@ namespace cxxpython
         std::vector<Rooted<CellObject>> cell_roots;
         cells.reserve(code->cellvars().size() + closure.size());
         cell_roots.reserve(code->cellvars().size() + closure.size());
-        for (Object *name_object : code->cellvars())
+        for (StrObject *name : code->cellvars())
         {
-            auto *name = dynamic_cast<StrObject *>(name_object);
-            if (!name)
-                throw BytecodeError("cell variable name must be a str");
             CellObject *cell = new_cell(resolved_locals->get(name));
             cells.push_back(cell);
             cell_roots.push_back(root(cell));

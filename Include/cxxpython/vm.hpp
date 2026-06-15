@@ -55,6 +55,7 @@ namespace cxxpython
         DictObject *builtins() const noexcept;
         CellObject *cell(std::size_t index) const;
         std::size_t cell_count() const noexcept;
+        StrObject *fast_local_name(std::size_t index) const;
         Object *fast_local(std::size_t index) const;
         void set_fast_local(std::size_t index, Object *value);
         bool delete_fast_local(std::size_t index);
@@ -66,6 +67,8 @@ namespace cxxpython
 
         void push(Object *object);
         Object *pop();
+        Object *stack_at(std::size_t index) const;
+        ObjectSpan stack_slice(std::size_t index, std::size_t count) const;
         void truncate_stack(std::size_t size) noexcept;
         void clear_stack() noexcept;
         std::size_t stack_size() const noexcept;
@@ -97,6 +100,7 @@ namespace cxxpython
         DictObject *globals_;
         DictObject *builtins_;
         std::vector<CellObject *> cells_;
+        std::vector<StrObject *> fast_local_names_;
         std::vector<Object *> fast_locals_;
         std::size_t ip_ = 0;
         std::size_t last_ip_ = 0;

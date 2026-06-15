@@ -43,12 +43,12 @@ namespace cxxpython
         if (!frame->code())
             raise_type_error(this, "super(): no current frame");
 
-        const std::vector<Object *> &freevars = frame->code()->freevars();
+        const std::vector<StrObject *> &freevars = frame->code()->freevars();
         CellObject *class_cell = nullptr;
         for (std::size_t index = 0; index < freevars.size(); ++index)
         {
-            auto *name = dynamic_cast<StrObject *>(freevars[index]);
-            if (!name || name->value != "__class__")
+            StrObject *name = freevars[index];
+            if (name->value != "__class__")
                 continue;
             class_cell = frame->cell(frame->code()->cellvars().size() + index);
             break;
@@ -60,9 +60,8 @@ namespace cxxpython
             raise_type_error(this, "super(): __class__ cell is not a type");
         if (frame->code()->varnames().empty())
             raise_type_error(this, "super(): no arguments");
-        auto *first_arg_name = dynamic_cast<StrObject *>(frame->code()->varnames()[0]);
-        if (!first_arg_name)
-            throw BytecodeError("super() first argument metadata must be a str");
+        StrObject *first_arg_name = frame->code()->varnames()[0];
+        (void)first_arg_name;
         Object *first_arg = frame->fast_local(0);
         if (!first_arg)
             raise_type_error(this, "super(): arg[0] deleted");

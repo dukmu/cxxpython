@@ -1628,8 +1628,8 @@ namespace cxxpython
             {
                 for (std::size_t index = 0; index < names_.size(); ++index)
                 {
-                    auto *entry = dynamic_cast<StrObject *>(names_[index]);
-                    if (entry && entry->value == name)
+                    StrObject *entry = names_[index];
+                    if (entry->value == name)
                         return index;
                 }
                 raise_syntax_error(&runtime_, "unknown symbol table entry");
@@ -1639,8 +1639,8 @@ namespace cxxpython
             {
                 for (std::size_t index = 0; index < names_.size(); ++index)
                 {
-                    auto *entry = dynamic_cast<StrObject *>(names_[index]);
-                    if (entry && entry->value == name)
+                    StrObject *entry = names_[index];
+                    if (entry->value == name)
                         return index;
                 }
                 names_.push_back(runtime_.new_str(name));
@@ -1666,10 +1666,10 @@ namespace cxxpython
             Runtime &runtime_;
             const SymbolTable &symbols_;
             std::string filename_;
-            std::vector<Object *> names_;
-            std::vector<Object *> varnames_;
-            std::vector<Object *> cellvars_;
-            std::vector<Object *> freevars_;
+            std::vector<StrObject *> names_;
+            std::vector<StrObject *> varnames_;
+            std::vector<StrObject *> cellvars_;
+            std::vector<StrObject *> freevars_;
             std::vector<Object *> constants_;
             std::vector<Instruction> instructions_;
             std::vector<std::uint32_t> lines_;

@@ -1127,32 +1127,38 @@ TEST(Bytecode, CallOpcodeRootsCallableAndArgumentsAcrossDispatch)
     cxxpython::Runtime runtime;
     cxxpython::VirtualMachine vm(runtime);
     const std::size_t baseline_roots = runtime.root_count();
-    bool observed_roots = false;
+    bool observed_frame_stack_roots = false;
     cxxpython::Object *result = runtime.new_str("called");
-    cxxpython::NativeFunctionObject *callable = runtime.new_native_function(
+    cxxpython::Object *left = runtime.new_str("left");
+    cxxpython::Object *right = runtime.new_str("right");
+    cxxpython::NativeFunctionObject *callable = nullptr;
+    callable = runtime.new_native_function(
         "observe_roots",
-        [baseline_roots, &observed_roots, result](cxxpython::Runtime &runtime,
-                                                  const cxxpython::CallArguments &args)
+        [baseline_roots, &observed_frame_stack_roots, result, left, right, &callable](cxxpython::Runtime &runtime,
+                                                                                     const cxxpython::CallArguments &args)
         {
             EXPECT_EQ(args.positional.size(), 2U);
             cxxpython::VirtualMachine *active = runtime.active_vm();
             EXPECT_NE(active, nullptr);
             if (!active)
                 return result;
-            std::size_t temporary_root_count = 0;
-            active->thread_state().visit_temporary_roots(
-                [&temporary_root_count](cxxpython::Object *object)
-                {
-                    if (object)
-                        ++temporary_root_count;
-                });
-            EXPECT_GE(temporary_root_count, 3U);
+            cxxpython::Frame *frame = active->thread_state().current_frame();
+            EXPECT_NE(frame, nullptr);
+            if (!frame)
+                return result;
+            EXPECT_GE(frame->stack_size(), 3U);
+            if (frame->stack_size() < 3U)
+                return result;
+            const std::size_t base = frame->stack_size() - 3;
+            EXPECT_EQ(frame->stack_at(base), callable);
+            EXPECT_EQ(frame->stack_at(base + 1), left);
+            EXPECT_EQ(frame->stack_at(base + 2), right);
             EXPECT_EQ(runtime.root_count(), baseline_roots);
-            observed_roots = true;
+            observed_frame_stack_roots = true;
             return result;
         });
     cxxpython::CodeObject *code = runtime.new_code(
-        {callable, runtime.new_str("left"), runtime.new_str("right")},
+        {callable, left, right},
         {{cxxpython::Opcode::LoadConst, 0},
          {cxxpython::Opcode::LoadConst, 1},
          {cxxpython::Opcode::LoadConst, 2},
@@ -1160,7 +1166,7 @@ TEST(Bytecode, CallOpcodeRootsCallableAndArgumentsAcrossDispatch)
          {cxxpython::Opcode::ReturnValue, 0}});
 
     EXPECT_EQ(vm.execute(*code), result);
-    EXPECT_TRUE(observed_roots);
+    EXPECT_TRUE(observed_frame_stack_roots);
     EXPECT_EQ(runtime.root_count(), baseline_roots);
 }
 

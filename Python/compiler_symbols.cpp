@@ -1378,9 +1378,9 @@ namespace cxxpython
         return names_.size() - 1;
     }
 
-    std::vector<Object *> SymbolTable::make_name_objects(Runtime &runtime) const
+    std::vector<StrObject *> SymbolTable::make_name_objects(Runtime &runtime) const
     {
-        std::vector<Object *> names;
+        std::vector<StrObject *> names;
         names.reserve(names_.size());
         for (const std::string &name : names_)
             names.push_back(runtime.new_str(name));
@@ -1548,27 +1548,27 @@ namespace cxxpython
         return nonlocals_;
     }
 
-    std::vector<Object *> SymbolTable::make_varname_objects(Runtime &runtime) const
+    std::vector<StrObject *> SymbolTable::make_varname_objects(Runtime &runtime) const
     {
-        std::vector<Object *> varnames;
+        std::vector<StrObject *> varnames;
         varnames.reserve(varnames_.size());
         for (const std::string &name : varnames_)
             varnames.push_back(runtime.new_str(name));
         return varnames;
     }
 
-    std::vector<Object *> SymbolTable::make_cellvar_objects(Runtime &runtime) const
+    std::vector<StrObject *> SymbolTable::make_cellvar_objects(Runtime &runtime) const
     {
-        std::vector<Object *> cellvars;
+        std::vector<StrObject *> cellvars;
         cellvars.reserve(cellvars_.size());
         for (const std::string &name : cellvars_)
             cellvars.push_back(runtime.new_str(name));
         return cellvars;
     }
 
-    std::vector<Object *> SymbolTable::make_freevar_objects(Runtime &runtime) const
+    std::vector<StrObject *> SymbolTable::make_freevar_objects(Runtime &runtime) const
     {
-        std::vector<Object *> freevars;
+        std::vector<StrObject *> freevars;
         freevars.reserve(freevars_.size());
         for (const std::string &name : freevars_)
             freevars.push_back(runtime.new_str(name));

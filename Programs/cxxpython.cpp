@@ -23,6 +23,7 @@ namespace
     enum class RunMode
     {
         Repl,
+        Command,
         Script,
         Module,
     };
@@ -30,6 +31,7 @@ namespace
     struct CliOptions
     {
         RunMode mode = RunMode::Repl;
+        std::optional<std::string> command;
         std::optional<std::string> script_path;
         std::optional<std::string> module_name;
         std::vector<std::string> passthrough_args;
@@ -180,6 +182,20 @@ namespace
         if (argc == 1)
             return options;
 
+        if (std::string_view(argv[1]) == "-c")
+        {
+            if (argc < 3)
+                throw std::runtime_error("cxxpython: -c requires a command string");
+            options.mode = RunMode::Command;
+            options.command = argv[2] ? argv[2] : "";
+            std::vector<std::string> command_argv;
+            command_argv.push_back("-c");
+            for (int index = 3; index < argc; ++index)
+                command_argv.push_back(argv[index] ? argv[index] : "");
+            options.passthrough_args = std::move(command_argv);
+            return options;
+        }
+
         if (std::string_view(argv[1]) == "-m")
         {
             if (argc < 3)
@@ -293,6 +309,42 @@ namespace
         }
 
         return 0;
+    }
+
+    int run_command(cxxpython::Runtime &runtime, const std::string &command, const std::vector<std::string> &argv)
+    {
+        configure_sys_state(runtime, argv, std::filesystem::current_path(), false);
+        if (!import_site(runtime))
+            return 1;
+
+        try
+        {
+            cxxpython::VirtualMachine vm(runtime);
+            cxxpython::ModuleObject *module = runtime.new_module("__main__", "<string>");
+            cxxpython::CodeObject *code = cxxpython::compile_exec_input(runtime, command, "<string>");
+            (void)vm.execute(cxxpython::ExecutionRequest{
+                .code = code,
+                .locals = module->dict(),
+                .globals = module->dict(),
+                .builtins = runtime.builtins_dict(),
+                .module = module,
+                .closure = {},
+                .mode = cxxpython::ExecutionMode::Module,
+            });
+            return 0;
+        }
+        catch (const cxxpython::PythonError &error)
+        {
+            if (is_system_exit(runtime, error))
+                return system_exit_status(runtime, error);
+            print_python_error(error);
+            return 1;
+        }
+        catch (const cxxpython::BytecodeError &error)
+        {
+            std::cerr << "BytecodeError: " << error.what() << "\n";
+            return 1;
+        }
     }
 
     int run_script(cxxpython::Runtime &runtime, const std::filesystem::path &script_path, const std::vector<std::string> &argv)
@@ -421,6 +473,8 @@ int main(int argc, char **argv)
 
         if (options.mode == RunMode::Repl)
             return run_repl(runtime);
+        if (options.mode == RunMode::Command)
+            return run_command(runtime, *options.command, options.passthrough_args);
         if (options.mode == RunMode::Script)
             return run_script(runtime, *options.script_path, options.passthrough_args);
         return run_module(runtime, *options.module_name, options.passthrough_args);

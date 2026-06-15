@@ -78,6 +78,12 @@ namespace cxxpython
             return runtime.new_tuple(std::move(copied));
         }
 
+        Object *tuple_from_str_vector(Runtime &runtime, const std::vector<StrObject *> &items)
+        {
+            std::vector<Object *> copied(items.begin(), items.end());
+            return runtime.new_tuple(std::move(copied));
+        }
+
         Object *code_consts_getter(Runtime &runtime, Object *instance, TypeObject *)
         {
             return tuple_from_object_vector(runtime, require_code_instance(runtime, instance, "co_consts")->constants());
@@ -85,22 +91,22 @@ namespace cxxpython
 
         Object *code_names_getter(Runtime &runtime, Object *instance, TypeObject *)
         {
-            return tuple_from_object_vector(runtime, require_code_instance(runtime, instance, "co_names")->names());
+            return tuple_from_str_vector(runtime, require_code_instance(runtime, instance, "co_names")->names());
         }
 
         Object *code_varnames_getter(Runtime &runtime, Object *instance, TypeObject *)
         {
-            return tuple_from_object_vector(runtime, require_code_instance(runtime, instance, "co_varnames")->varnames());
+            return tuple_from_str_vector(runtime, require_code_instance(runtime, instance, "co_varnames")->varnames());
         }
 
         Object *code_cellvars_getter(Runtime &runtime, Object *instance, TypeObject *)
         {
-            return tuple_from_object_vector(runtime, require_code_instance(runtime, instance, "co_cellvars")->cellvars());
+            return tuple_from_str_vector(runtime, require_code_instance(runtime, instance, "co_cellvars")->cellvars());
         }
 
         Object *code_freevars_getter(Runtime &runtime, Object *instance, TypeObject *)
         {
-            return tuple_from_object_vector(runtime, require_code_instance(runtime, instance, "co_freevars")->freevars());
+            return tuple_from_str_vector(runtime, require_code_instance(runtime, instance, "co_freevars")->freevars());
         }
 
         Object *code_firstlineno_getter(Runtime &runtime, Object *instance, TypeObject *)
@@ -147,22 +153,22 @@ namespace cxxpython
                 if (constant)
                     visitor(constant);
             }
-            for (Object *name : code->names())
+            for (StrObject *name : code->names())
             {
                 if (name)
                     visitor(name);
             }
-            for (Object *varname : code->varnames())
+            for (StrObject *varname : code->varnames())
             {
                 if (varname)
                     visitor(varname);
             }
-            for (Object *cellvar : code->cellvars())
+            for (StrObject *cellvar : code->cellvars())
             {
                 if (cellvar)
                     visitor(cellvar);
             }
-            for (Object *freevar : code->freevars())
+            for (StrObject *freevar : code->freevars())
             {
                 if (freevar)
                     visitor(freevar);
@@ -328,11 +334,11 @@ namespace cxxpython
                            std::uint32_t posonly_arg_count,
                            std::uint32_t kwonly_arg_count,
                            CodeObject::Flags flags,
-                           std::vector<Object *> varnames,
+                           std::vector<StrObject *> varnames,
                            std::vector<Object *> constants,
-                           std::vector<Object *> names,
-                           std::vector<Object *> cellvars,
-                           std::vector<Object *> freevars,
+                           std::vector<StrObject *> names,
+                           std::vector<StrObject *> cellvars,
+                           std::vector<StrObject *> freevars,
                            std::vector<Instruction> instructions,
                            std::vector<std::uint32_t> lines)
         : Object(type),
@@ -473,7 +479,7 @@ namespace cxxpython
         return arg_count_ + kwonly_arg_count_ + (has_varargs() ? 1U : 0U);
     }
 
-    const std::vector<Object *> &CodeObject::varnames() const noexcept
+    const std::vector<StrObject *> &CodeObject::varnames() const noexcept
     {
         return varnames_;
     }
@@ -483,17 +489,17 @@ namespace cxxpython
         return constants_;
     }
 
-    const std::vector<Object *> &CodeObject::names() const noexcept
+    const std::vector<StrObject *> &CodeObject::names() const noexcept
     {
         return names_;
     }
 
-    const std::vector<Object *> &CodeObject::cellvars() const noexcept
+    const std::vector<StrObject *> &CodeObject::cellvars() const noexcept
     {
         return cellvars_;
     }
 
-    const std::vector<Object *> &CodeObject::freevars() const noexcept
+    const std::vector<StrObject *> &CodeObject::freevars() const noexcept
     {
         return freevars_;
     }

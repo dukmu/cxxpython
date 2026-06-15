@@ -111,11 +111,11 @@ namespace cxxpython
                    std::uint32_t posonly_arg_count,
                    std::uint32_t kwonly_arg_count,
                    Flags flags,
-                   std::vector<Object *> varnames,
+                   std::vector<StrObject *> varnames,
                    std::vector<Object *> constants,
-                   std::vector<Object *> names,
-                   std::vector<Object *> cellvars,
-                   std::vector<Object *> freevars,
+                   std::vector<StrObject *> names,
+                   std::vector<StrObject *> cellvars,
+                   std::vector<StrObject *> freevars,
                    std::vector<Instruction> instructions,
                    std::vector<std::uint32_t> lines = {});
 
@@ -129,11 +129,11 @@ namespace cxxpython
         bool has_varkeywords() const noexcept;
         std::uint32_t varargs_index() const noexcept;
         std::uint32_t varkeywords_index() const noexcept;
-        const std::vector<Object *> &varnames() const noexcept;
+        const std::vector<StrObject *> &varnames() const noexcept;
         const std::vector<Object *> &constants() const noexcept;
-        const std::vector<Object *> &names() const noexcept;
-        const std::vector<Object *> &cellvars() const noexcept;
-        const std::vector<Object *> &freevars() const noexcept;
+        const std::vector<StrObject *> &names() const noexcept;
+        const std::vector<StrObject *> &cellvars() const noexcept;
+        const std::vector<StrObject *> &freevars() const noexcept;
         const std::vector<Instruction> &instructions() const noexcept;
         const std::vector<std::uint32_t> &lines() const noexcept;
         std::uint32_t stack_size() const noexcept;
@@ -146,11 +146,11 @@ namespace cxxpython
         std::uint32_t posonly_arg_count_ = 0;
         std::uint32_t kwonly_arg_count_ = 0;
         Flags flags_ = 0;
-        std::vector<Object *> varnames_;
+        std::vector<StrObject *> varnames_;
         std::vector<Object *> constants_;
-        std::vector<Object *> names_;
-        std::vector<Object *> cellvars_;
-        std::vector<Object *> freevars_;
+        std::vector<StrObject *> names_;
+        std::vector<StrObject *> cellvars_;
+        std::vector<StrObject *> freevars_;
         std::vector<Instruction> instructions_;
         std::vector<std::uint32_t> lines_;
         std::uint32_t stack_size_ = 0;

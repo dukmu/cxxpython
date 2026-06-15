@@ -99,20 +99,12 @@ namespace cxxpython
             return dict.contains(key);
         }
 
-        DictObject *require_dict(Runtime &runtime, Object *self, const char *name)
-        {
-            auto *dict = dynamic_cast<DictObject *>(self);
-            if (!dict)
-                raise_type_error(&runtime, std::string(name) + " receiver does not have dict layout");
-            return dict;
-        }
-
         Object *dict_keys_method(Runtime &runtime, Object *self, ObjectSpan args)
         {
             if (!args.empty())
                 raise_type_error(&runtime, "dict.keys() takes exactly zero arguments");
             std::vector<Object *> keys;
-            for (const DictObject::Entry &entry : require_dict(runtime, self, "dict.keys")->entries())
+            for (const DictObject::Entry &entry : static_cast<DictObject *>(self)->entries())
                 keys.push_back(entry.key);
             return runtime.new_list(std::move(keys));
         }
@@ -122,7 +114,7 @@ namespace cxxpython
             if (!args.empty())
                 raise_type_error(&runtime, "dict.values() takes exactly zero arguments");
             std::vector<Object *> values;
-            for (const DictObject::Entry &entry : require_dict(runtime, self, "dict.values")->entries())
+            for (const DictObject::Entry &entry : static_cast<DictObject *>(self)->entries())
                 values.push_back(entry.value);
             return runtime.new_list(std::move(values));
         }
@@ -132,7 +124,7 @@ namespace cxxpython
             if (!args.empty())
                 raise_type_error(&runtime, "dict.items() takes exactly zero arguments");
             std::vector<Object *> items;
-            for (const DictObject::Entry &entry : require_dict(runtime, self, "dict.items")->entries())
+            for (const DictObject::Entry &entry : static_cast<DictObject *>(self)->entries())
                 items.push_back(runtime.new_tuple({entry.key, entry.value}));
             return runtime.new_list(std::move(items));
         }
@@ -141,7 +133,7 @@ namespace cxxpython
         {
             if (args.empty() || args.size() > 2)
                 raise_type_error(&runtime, "dict.get() takes one or two arguments");
-            Object *value = require_dict(runtime, self, "dict.get")->get(args[0]);
+            Object *value = static_cast<DictObject *>(self)->get(args[0]);
             if (value)
                 return value;
             return args.size() == 2 ? args[1] : static_cast<Object *>(runtime.none());
@@ -151,7 +143,7 @@ namespace cxxpython
         {
             if (args.empty() || args.size() > 2)
                 raise_type_error(&runtime, "dict.pop() takes one or two arguments");
-            DictObject *dict = require_dict(runtime, self, "dict.pop");
+            DictObject *dict = static_cast<DictObject *>(self);
             Object *value = dict->get(args[0]);
             if (value)
             {
@@ -168,7 +160,7 @@ namespace cxxpython
         {
             if (!args.empty())
                 raise_type_error(&runtime, "dict.clear() takes exactly zero arguments");
-            DictObject *dict = require_dict(runtime, self, "dict.clear");
+            DictObject *dict = static_cast<DictObject *>(self);
             std::vector<DictObject::Entry> entries = dict->entries();
             for (const DictObject::Entry &entry : entries)
                 (void)dict->erase(entry.key);
@@ -181,7 +173,7 @@ namespace cxxpython
                 raise_type_error(&runtime, "dict.copy() takes exactly zero arguments");
             DictObject *copy = runtime.new_dict();
             auto copy_root = runtime.root(copy);
-            for (const DictObject::Entry &entry : require_dict(runtime, self, "dict.copy")->entries())
+            for (const DictObject::Entry &entry : static_cast<DictObject *>(self)->entries())
                 copy->set(entry.key, entry.value);
             return copy_root.get();
         }

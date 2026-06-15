@@ -117,10 +117,7 @@ namespace cxxpython
         {
             if (index >= code->varnames().size())
                 throw BytecodeError("function code object argument metadata exceeds varnames");
-            auto *name = dynamic_cast<StrObject *>(code->varnames()[index]);
-            if (!name)
-                throw BytecodeError("function varname must be a str");
-            return name;
+            return code->varnames()[index];
         }
 
         void raise_positional_count_error(Runtime *runtime,

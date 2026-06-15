@@ -76,6 +76,10 @@ target_compile_options(cxxpython_core PRIVATE
     -Wextra
     -Wpedantic
     -Werror
+    $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang>:-Wno-pedantic>
+)
+target_compile_definitions(cxxpython_core PRIVATE
+    $<$<COMPILE_LANG_AND_ID:CXX,GNU,Clang>:CXXPYTHON_HAS_COMPUTED_GOTO=1>
 )
 find_package(Threads REQUIRED)
 target_link_libraries(cxxpython_core PUBLIC ${CMAKE_DL_LIBS} Threads::Threads)

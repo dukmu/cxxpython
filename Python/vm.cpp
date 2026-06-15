@@ -14,6 +14,8 @@ namespace cxxpython
 {
     namespace
     {
+        constexpr std::size_t OpcodeCount = static_cast<std::size_t>(Opcode::ReturnValue) + 1;
+
         void jump_to(Frame &frame, std::size_t instruction_count, std::uint32_t target)
         {
             if (target >= instruction_count)
@@ -440,6 +442,7 @@ namespace cxxpython
           globals_(globals),
           builtins_(builtins),
           cells_(std::move(cells)),
+          fast_local_names_(code ? code->varnames().size() : 0, nullptr),
           fast_locals_(code ? code->varnames().size() : 0, nullptr)
     {
         if (!code_)
@@ -455,9 +458,8 @@ namespace cxxpython
         stack_.reserve(code_->stack_size());
         for (std::size_t index = 0; index < code_->varnames().size(); ++index)
         {
-            auto *name = dynamic_cast<StrObject *>(code_->varnames()[index]);
-            if (!name)
-                throw BytecodeError("frame varname must be a str");
+            StrObject *name = code_->varnames()[index];
+            fast_local_names_[index] = name;
             fast_locals_[index] = locals_->get(name);
         }
     }
@@ -494,6 +496,13 @@ namespace cxxpython
         return cells_.size();
     }
 
+    StrObject *Frame::fast_local_name(std::size_t index) const
+    {
+        if (index >= fast_local_names_.size())
+            throw BytecodeError("fast local name index out of range");
+        return fast_local_names_[index];
+    }
+
     Object *Frame::fast_local(std::size_t index) const
     {
         if (index >= fast_locals_.size())
@@ -507,9 +516,6 @@ namespace cxxpython
             throw BytecodeError("fast local index out of range");
         if (!value)
             throw BytecodeError("cannot assign null fast local");
-        auto *name = dynamic_cast<StrObject *>(code_->varnames()[index]);
-        if (!name)
-            throw BytecodeError("fast local name must be a str");
         fast_locals_[index] = value;
     }
 
@@ -519,9 +525,6 @@ namespace cxxpython
             throw BytecodeError("fast local index out of range");
         if (!fast_locals_[index])
             return false;
-        auto *name = dynamic_cast<StrObject *>(code_->varnames()[index]);
-        if (!name)
-            throw BytecodeError("fast local name must be a str");
         fast_locals_[index] = nullptr;
         return true;
     }
@@ -530,9 +533,7 @@ namespace cxxpython
     {
         for (std::size_t index = 0; index < fast_locals_.size(); ++index)
         {
-            auto *name = dynamic_cast<StrObject *>(code_->varnames()[index]);
-            if (!name)
-                throw BytecodeError("fast local name must be a str");
+            StrObject *name = fast_local_names_[index];
             if (Object *value = fast_locals_[index])
                 locals_->set(name, value);
             else
@@ -577,6 +578,20 @@ namespace cxxpython
         Object *object = stack_.back();
         stack_.pop_back();
         return object;
+    }
+
+    Object *Frame::stack_at(std::size_t index) const
+    {
+        if (index >= stack_.size())
+            throw BytecodeError("frame stack index out of range");
+        return stack_[index];
+    }
+
+    ObjectSpan Frame::stack_slice(std::size_t index, std::size_t count) const
+    {
+        if (index > stack_.size() || count > stack_.size() - index)
+            throw BytecodeError("frame stack slice out of range");
+        return ObjectSpan(stack_.data() + index, count);
     }
 
     void Frame::truncate_stack(std::size_t size) noexcept
@@ -1027,6 +1042,283 @@ namespace cxxpython
             {
             if (eval_breaker_requested(runtime_, *frame))
                 handle_eval_breaker(runtime_, thread_, code, *frame, last_traced_line);
+#if defined(CXXPYTHON_HAS_COMPUTED_GOTO)
+            static void *dispatch_table[OpcodeCount] = {
+                &&target_load_const,       // LoadConst
+                &&target_load_name,        // LoadName
+                &&target_slow,             // StoreName
+                &&target_slow,             // DeleteName
+                &&target_load_global,      // LoadGlobal
+                &&target_slow,             // StoreGlobal
+                &&target_slow,             // DeleteGlobal
+                &&target_load_fast,        // LoadFast
+                &&target_store_fast,       // StoreFast
+                &&target_slow,             // DeleteFast
+                &&target_slow,             // LoadDeref
+                &&target_slow,             // StoreDeref
+                &&target_slow,             // DeleteDeref
+                &&target_slow,             // LoadClosure
+                &&target_slow,             // LoadAttr
+                &&target_slow,             // StoreAttr
+                &&target_slow,             // DeleteAttr
+                &&target_pop_top,          // PopTop
+                &&target_slow,             // DupTop
+                &&target_slow,             // DupTwo
+                &&target_slow,             // RotTwo
+                &&target_slow,             // RotThree
+                &&target_slow,             // UnaryOp
+                &&target_binary_op,        // BinaryOp
+                &&target_slow,             // InplaceBinaryOp
+                &&target_slow,             // FormatValue
+                &&target_slow,             // BinarySubscr
+                &&target_slow,             // StoreSubscr
+                &&target_slow,             // DeleteSubscr
+                &&target_slow,             // BuildList
+                &&target_slow,             // BuildTuple
+                &&target_slow,             // BuildTupleUnpack
+                &&target_slow,             // BuildMap
+                &&target_slow,             // BuildKwMapUnpack
+                &&target_slow,             // BuildSlice
+                &&target_slow,             // CompareOp
+                &&target_slow,             // GetIter
+                &&target_for_iter,         // ForIter
+                &&target_slow,             // BreakLoop
+                &&target_slow,             // ContinueLoop
+                &&target_jump_absolute,    // JumpAbsolute
+                &&target_pop_jump_if_false,// PopJumpIfFalse
+                &&target_pop_jump_if_true, // PopJumpIfTrue
+                &&target_slow,             // JumpIfFalseOrPop
+                &&target_slow,             // MakeFunction
+                &&target_slow,             // MakeClass
+                &&target_call,             // Call
+                &&target_slow,             // CallKw
+                &&target_slow,             // CallEx
+                &&target_slow,             // ImportStar
+                &&target_slow,             // SetupExcept
+                &&target_slow,             // SetupFinally
+                &&target_slow,             // PopExcept
+                &&target_slow,             // PopFinally
+                &&target_slow,             // CheckExceptionMatch
+                &&target_slow,             // RaiseValue
+                &&target_slow,             // WithExit
+                &&target_slow,             // EndFinally
+                &&target_return_value,     // ReturnValue
+            };
+            {
+                const std::size_t opcode_index = static_cast<std::size_t>(instruction.opcode);
+                if (opcode_index >= OpcodeCount)
+                    goto target_slow;
+                goto *dispatch_table[opcode_index];
+            }
+
+target_load_const:
+            {
+                if (instruction.operand >= code.constants().size())
+                    throw BytecodeError("LOAD_CONST operand out of range");
+                frame->push(code.constants()[instruction.operand]);
+                continue;
+            }
+
+target_load_name:
+            {
+                if (instruction.operand >= code.names().size())
+                    throw BytecodeError("LOAD_NAME operand out of range");
+                StrObject *name = code.names()[instruction.operand];
+                Object *value = locals.get(name);
+                if (!value)
+                    value = globals.get(name);
+                if (!value)
+                    value = builtins.get(name);
+                if (!value)
+                    raise_name_error(&runtime_, "name '" + name->value + "' is not defined");
+                frame->push(value);
+                continue;
+            }
+
+target_load_global:
+            {
+                if (instruction.operand >= code.names().size())
+                    throw BytecodeError("LOAD_GLOBAL operand out of range");
+                StrObject *name = code.names()[instruction.operand];
+                Object *value = globals.get(name);
+                if (!value)
+                    value = builtins.get(name);
+                if (!value)
+                    raise_name_error(&runtime_, "name '" + name->value + "' is not defined");
+                frame->push(value);
+                continue;
+            }
+
+target_load_fast:
+            {
+                Object *value = frame->fast_local(instruction.operand);
+                if (!value)
+                {
+                    StrObject *name = frame->fast_local_name(instruction.operand);
+                    raise_unbound_local_error(
+                        &runtime_,
+                        "cannot access local variable '" + name->value +
+                            "' where it is not associated with a value");
+                }
+                frame->push(value);
+                continue;
+            }
+
+target_store_fast:
+            {
+                Object *value = frame->pop();
+                auto value_root = runtime_.root(value);
+                frame->set_fast_local(instruction.operand, value);
+                continue;
+            }
+
+target_pop_top:
+            {
+                (void)frame->pop();
+                continue;
+            }
+
+target_binary_op:
+            {
+                const BinaryOp op = decode_binary_op(instruction.operand);
+                Object *right = frame->pop();
+                Object *left = frame->pop();
+                if (Object *result = vm_fastpath::try_binary_op(runtime_, left, right, op))
+                {
+                    frame->push(result);
+                    continue;
+                }
+                auto right_root = runtime_.root(right);
+                auto left_root = runtime_.root(left);
+                frame->push(object_binary_op(left, right, op));
+                continue;
+            }
+
+target_for_iter:
+            {
+                Object *iterator = frame->pop();
+                if (iterator && iterator->type() == runtime_.range_iterator_type())
+                {
+                    auto *range_iterator = static_cast<RangeIteratorObject *>(iterator);
+                    if (range_iterator->remaining() == 0)
+                    {
+                        jump_to(*frame, instruction_count, instruction.operand);
+                        continue;
+                    }
+                    const std::int64_t value = range_iterator->consume_value();
+                    frame->push(iterator);
+                    frame->push(runtime_.new_int(value));
+                    continue;
+                }
+                auto iterator_root = runtime_.root(iterator);
+                try
+                {
+                    Object *item = object_next(iterator_root.get());
+                    auto item_root = runtime_.root(item);
+                    frame->push(iterator_root.get());
+                    frame->push(item_root.get());
+                }
+                catch (const PythonError &error)
+                {
+                    if (error.type() && is_subclass(error.type(), runtime_.stop_iteration_type()))
+                    {
+                        jump_to(*frame, instruction_count, instruction.operand);
+                        continue;
+                    }
+                    throw;
+                }
+                continue;
+            }
+
+target_jump_absolute:
+            {
+                jump_to(*frame, instruction_count, instruction.operand);
+                continue;
+            }
+
+target_pop_jump_if_false:
+            {
+                Object *condition = frame->pop();
+                bool truth = false;
+                if (vm_fastpath::try_truth(runtime_, condition, truth))
+                {
+                    if (!truth)
+                        jump_to(*frame, instruction_count, instruction.operand);
+                    continue;
+                }
+                auto condition_root = runtime_.root(condition);
+                if (!is_true(condition))
+                    jump_to(*frame, instruction_count, instruction.operand);
+                continue;
+            }
+
+target_pop_jump_if_true:
+            {
+                Object *condition = frame->pop();
+                bool truth = false;
+                if (vm_fastpath::try_truth(runtime_, condition, truth))
+                {
+                    if (truth)
+                        jump_to(*frame, instruction_count, instruction.operand);
+                    continue;
+                }
+                auto condition_root = runtime_.root(condition);
+                if (is_true(condition))
+                    jump_to(*frame, instruction_count, instruction.operand);
+                continue;
+            }
+
+target_call:
+            {
+                const std::size_t arg_count = instruction.operand;
+                if (frame->stack_size() < arg_count + 1)
+                    throw BytecodeError("CALL stack underflow");
+                const std::size_t args_start = frame->stack_size() - arg_count;
+                ObjectSpan args = frame->stack_slice(args_start, arg_count);
+                Object *callable = frame->stack_at(args_start - 1);
+                Object *result = nullptr;
+                if (Object *fast_result = vm_fastpath::try_builtin_call(runtime_, callable, args))
+                {
+                    frame->truncate_stack(args_start - 1);
+                    frame->push(fast_result);
+                    continue;
+                }
+                result = object_call_rooted(callable, args);
+                frame->truncate_stack(args_start - 1);
+                frame->push(result);
+                continue;
+            }
+
+target_return_value:
+            {
+                Object *value = frame->pop();
+                auto value_root = runtime_.root(value);
+                bool jumped_to_finally = false;
+                while (frame->has_block_handler())
+                {
+                    const FrameBlockHandler handler = frame->pop_block_handler();
+                    if (handler.kind == FrameBlockKind::Except)
+                        continue;
+                    frame->clear_stack();
+                    frame->set_pending_return(value);
+                    jump_to(*frame, instruction_count, static_cast<std::uint32_t>(handler.target));
+                    jumped_to_finally = true;
+                    break;
+                }
+                if (jumped_to_finally)
+                    continue;
+                if (frame->trace_function())
+                    (void)call_trace_function(runtime_,
+                                              thread_,
+                                              frame->trace_function(),
+                                              *frame,
+                                              "return",
+                                              value_root.get());
+                return value;
+            }
+
+target_slow:
+#endif
             switch (instruction.opcode)
             {
             case Opcode::LoadConst:
@@ -1040,9 +1332,7 @@ namespace cxxpython
             {
                 if (instruction.operand >= code.names().size())
                     throw BytecodeError("LOAD_NAME operand out of range");
-                auto *name = dynamic_cast<StrObject *>(code.names()[instruction.operand]);
-                if (!name)
-                    throw BytecodeError("LOAD_NAME requires a str name");
+                StrObject *name = code.names()[instruction.operand];
                 Object *value = locals.get(name);
                 if (!value)
                     value = globals.get(name);
@@ -1057,9 +1347,7 @@ namespace cxxpython
             {
                 if (instruction.operand >= code.names().size())
                     throw BytecodeError("STORE_NAME operand out of range");
-                auto *name = dynamic_cast<StrObject *>(code.names()[instruction.operand]);
-                if (!name)
-                    throw BytecodeError("STORE_NAME requires a str name");
+                StrObject *name = code.names()[instruction.operand];
                 Object *value = frame->pop();
                 auto value_root = runtime_.root(value);
                 locals.set(name, value);
@@ -1069,9 +1357,7 @@ namespace cxxpython
             {
                 if (instruction.operand >= code.names().size())
                     throw BytecodeError("DELETE_NAME operand out of range");
-                auto *name = dynamic_cast<StrObject *>(code.names()[instruction.operand]);
-                if (!name)
-                    throw BytecodeError("DELETE_NAME requires a str name");
+                StrObject *name = code.names()[instruction.operand];
                 if (!locals.erase(name))
                     raise_name_error(&runtime_, "name '" + name->value + "' is not defined");
                 break;
@@ -1080,9 +1366,7 @@ namespace cxxpython
             {
                 if (instruction.operand >= code.names().size())
                     throw BytecodeError("LOAD_GLOBAL operand out of range");
-                auto *name = dynamic_cast<StrObject *>(code.names()[instruction.operand]);
-                if (!name)
-                    throw BytecodeError("LOAD_GLOBAL requires a str name");
+                StrObject *name = code.names()[instruction.operand];
                 Object *value = globals.get(name);
                 if (!value)
                     value = builtins.get(name);
@@ -1095,9 +1379,7 @@ namespace cxxpython
             {
                 if (instruction.operand >= code.names().size())
                     throw BytecodeError("STORE_GLOBAL operand out of range");
-                auto *name = dynamic_cast<StrObject *>(code.names()[instruction.operand]);
-                if (!name)
-                    throw BytecodeError("STORE_GLOBAL requires a str name");
+                StrObject *name = code.names()[instruction.operand];
                 Object *value = frame->pop();
                 auto value_root = runtime_.root(value);
                 globals.set(name, value);
@@ -1107,36 +1389,27 @@ namespace cxxpython
             {
                 if (instruction.operand >= code.names().size())
                     throw BytecodeError("DELETE_GLOBAL operand out of range");
-                auto *name = dynamic_cast<StrObject *>(code.names()[instruction.operand]);
-                if (!name)
-                    throw BytecodeError("DELETE_GLOBAL requires a str name");
+                StrObject *name = code.names()[instruction.operand];
                 if (!globals.erase(name))
                     raise_name_error(&runtime_, "name '" + name->value + "' is not defined");
                 break;
             }
             case Opcode::LoadFast:
             {
-                if (instruction.operand >= code.varnames().size())
-                    throw BytecodeError("LOAD_FAST operand out of range");
-                auto *name = dynamic_cast<StrObject *>(code.varnames()[instruction.operand]);
-                if (!name)
-                    throw BytecodeError("LOAD_FAST requires a str varname");
                 Object *value = frame->fast_local(instruction.operand);
                 if (!value)
+                {
+                    StrObject *name = frame->fast_local_name(instruction.operand);
                     raise_unbound_local_error(
                         &runtime_,
                         "cannot access local variable '" + name->value +
                             "' where it is not associated with a value");
+                }
                 frame->push(value);
                 break;
             }
             case Opcode::StoreFast:
             {
-                if (instruction.operand >= code.varnames().size())
-                    throw BytecodeError("STORE_FAST operand out of range");
-                auto *name = dynamic_cast<StrObject *>(code.varnames()[instruction.operand]);
-                if (!name)
-                    throw BytecodeError("STORE_FAST requires a str varname");
                 Object *value = frame->pop();
                 auto value_root = runtime_.root(value);
                 frame->set_fast_local(instruction.operand, value);
@@ -1144,16 +1417,14 @@ namespace cxxpython
             }
             case Opcode::DeleteFast:
             {
-                if (instruction.operand >= code.varnames().size())
-                    throw BytecodeError("DELETE_FAST operand out of range");
-                auto *name = dynamic_cast<StrObject *>(code.varnames()[instruction.operand]);
-                if (!name)
-                    throw BytecodeError("DELETE_FAST requires a str varname");
                 if (!frame->delete_fast_local(instruction.operand))
+                {
+                    StrObject *name = frame->fast_local_name(instruction.operand);
                     raise_unbound_local_error(
                         &runtime_,
                         "cannot delete local variable '" + name->value +
                             "' where it is not associated with a value");
+                }
                 break;
             }
             case Opcode::LoadDeref:
@@ -1172,9 +1443,7 @@ namespace cxxpython
                 cell->set_value(value);
                 if (instruction.operand < code.cellvars().size())
                 {
-                    auto *name = dynamic_cast<StrObject *>(code.cellvars()[instruction.operand]);
-                    if (!name)
-                        throw BytecodeError("STORE_DEREF requires a str cellvar name");
+                    StrObject *name = code.cellvars()[instruction.operand];
                     locals.set(name, value);
                 }
                 break;
@@ -1185,9 +1454,7 @@ namespace cxxpython
                 cell->set_value(nullptr);
                 if (instruction.operand < code.cellvars().size())
                 {
-                    auto *name = dynamic_cast<StrObject *>(code.cellvars()[instruction.operand]);
-                    if (!name)
-                        throw BytecodeError("DELETE_DEREF requires a str cellvar name");
+                    StrObject *name = code.cellvars()[instruction.operand];
                     (void)locals.erase(name);
                 }
                 break;
@@ -1201,9 +1468,7 @@ namespace cxxpython
             {
                 if (instruction.operand >= code.names().size())
                     throw BytecodeError("LOAD_ATTR operand out of range");
-                auto *name = dynamic_cast<StrObject *>(code.names()[instruction.operand]);
-                if (!name)
-                    throw BytecodeError("LOAD_ATTR requires a str name");
+                StrObject *name = code.names()[instruction.operand];
                 Object *object = frame->pop();
                 auto object_root = runtime_.root(object);
                 frame->push(object_get_attr(object, name));
@@ -1213,9 +1478,7 @@ namespace cxxpython
             {
                 if (instruction.operand >= code.names().size())
                     throw BytecodeError("STORE_ATTR operand out of range");
-                auto *name = dynamic_cast<StrObject *>(code.names()[instruction.operand]);
-                if (!name)
-                    throw BytecodeError("STORE_ATTR requires a str name");
+                StrObject *name = code.names()[instruction.operand];
                 Object *value = frame->pop();
                 Object *object = frame->pop();
                 auto value_root = runtime_.root(value);
@@ -1227,9 +1490,7 @@ namespace cxxpython
             {
                 if (instruction.operand >= code.names().size())
                     throw BytecodeError("DELETE_ATTR operand out of range");
-                auto *name = dynamic_cast<StrObject *>(code.names()[instruction.operand]);
-                if (!name)
-                    throw BytecodeError("DELETE_ATTR requires a str name");
+                StrObject *name = code.names()[instruction.operand];
                 Object *object = frame->pop();
                 auto object_root = runtime_.root(object);
                 object_delete_attr(object, name);
@@ -1729,9 +1990,7 @@ namespace cxxpython
             {
                 if (instruction.operand >= code.names().size())
                     throw BytecodeError("MAKE_CLASS operand out of range");
-                auto *class_name = dynamic_cast<StrObject *>(code.names()[instruction.operand]);
-                if (!class_name)
-                    throw BytecodeError("MAKE_CLASS requires a str name");
+                StrObject *class_name = code.names()[instruction.operand];
                 Object *code_object = frame->pop();
                 auto *class_code = dynamic_cast<CodeObject *>(code_object);
                 if (!class_code)
@@ -1763,22 +2022,23 @@ namespace cxxpython
             }
             case Opcode::Call:
             {
-                std::vector<Object *> args(instruction.operand);
-                for (std::size_t index = args.size(); index > 0; --index)
-                    args[index - 1] = frame->pop();
-                Object *callable = frame->pop();
+                const std::size_t arg_count = instruction.operand;
+                if (frame->stack_size() < arg_count + 1)
+                    throw BytecodeError("CALL stack underflow");
+                const std::size_t args_start = frame->stack_size() - arg_count;
+                ObjectSpan args = frame->stack_slice(args_start, arg_count);
+                Object *callable = frame->stack_at(args_start - 1);
+                Object *result = nullptr;
                 if (Object *result =
-                        vm_fastpath::try_builtin_call(runtime_, callable, ObjectSpan(args.data(), args.size())))
+                        vm_fastpath::try_builtin_call(runtime_, callable, args))
                 {
+                    frame->truncate_stack(args_start - 1);
                     frame->push(result);
                     break;
                 }
-                std::vector<Rooted<Object>> roots;
-                roots.reserve(args.size());
-                for (Object *arg : args)
-                    add_temporary_root(runtime_, roots, arg);
-                auto callable_root = runtime_.root(callable);
-                frame->push(object_call_rooted(callable_root.get(), ObjectSpan(args.data(), args.size())));
+                result = object_call_rooted(callable, args);
+                frame->truncate_stack(args_start - 1);
+                frame->push(result);
                 break;
             }
             case Opcode::CallKw:

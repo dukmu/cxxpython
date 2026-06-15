@@ -23,7 +23,7 @@ namespace cxxpython
         SymbolScope scope() const noexcept;
 
         std::size_t add_name(const std::string &name);
-        std::vector<Object *> make_name_objects(Runtime &runtime) const;
+        std::vector<StrObject *> make_name_objects(Runtime &runtime) const;
         const std::vector<std::string> &names() const noexcept;
 
         std::size_t add_local(const std::string &name);
@@ -51,9 +51,9 @@ namespace cxxpython
         bool is_nonlocal(const std::string &name) const;
         const std::vector<std::string> &nonlocals() const noexcept;
 
-        std::vector<Object *> make_varname_objects(Runtime &runtime) const;
-        std::vector<Object *> make_cellvar_objects(Runtime &runtime) const;
-        std::vector<Object *> make_freevar_objects(Runtime &runtime) const;
+        std::vector<StrObject *> make_varname_objects(Runtime &runtime) const;
+        std::vector<StrObject *> make_cellvar_objects(Runtime &runtime) const;
+        std::vector<StrObject *> make_freevar_objects(Runtime &runtime) const;
 
     private:
         SymbolScope scope_;

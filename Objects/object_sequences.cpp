@@ -166,19 +166,11 @@ namespace cxxpython
             return runtime.none();
         }
 
-        ListObject *require_list(Runtime &runtime, Object *self, const char *name)
-        {
-            auto *list = dynamic_cast<ListObject *>(self);
-            if (!list)
-                raise_type_error(&runtime, std::string(name) + " receiver does not have list layout");
-            return list;
-        }
-
         Object *list_extend_method(Runtime &runtime, Object *self, ObjectSpan args)
         {
             if (args.size() != 1)
                 raise_type_error(&runtime, "list.extend() takes exactly one argument");
-            ListObject *list = require_list(runtime, self, "list.extend");
+            ListObject *list = static_cast<ListObject *>(self);
             std::vector<Object *> items = collect_iterable_items(&runtime, args[0]);
             for (Object *item : items)
                 list->append(item);
@@ -189,7 +181,7 @@ namespace cxxpython
         {
             if (args.size() > 1)
                 raise_type_error(&runtime, "list.pop() takes at most one argument");
-            ListObject *list = require_list(runtime, self, "list.pop");
+            ListObject *list = static_cast<ListObject *>(self);
             if (list->size() == 0)
                 raise_index_error(&runtime, "pop from empty list");
             std::int64_t index = -1;
@@ -210,7 +202,7 @@ namespace cxxpython
         {
             if (!args.empty())
                 raise_type_error(&runtime, "list.clear() takes exactly zero arguments");
-            ListObject *list = require_list(runtime, self, "list.clear");
+            ListObject *list = static_cast<ListObject *>(self);
             while (list->size() != 0)
                 list->erase(-1);
             return runtime.none();
@@ -220,7 +212,7 @@ namespace cxxpython
         {
             if (!args.empty())
                 raise_type_error(&runtime, "list.copy() takes exactly zero arguments");
-            return runtime.new_list(require_list(runtime, self, "list.copy")->items());
+            return runtime.new_list(static_cast<ListObject *>(self)->items());
         }
 
         std::string tuple_repr(const Object &object)

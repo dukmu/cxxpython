@@ -70,6 +70,39 @@ TEST(Cli, PassesScriptPathAndArgumentsToSysArgv)
     std::filesystem::remove(script);
 }
 
+TEST(Cli, SupportsCommandExecutionWithDashC)
+{
+    const test_process::CommandResult result = test_process::run_command(
+        program_with_args({"-c", "print('hello', 42)"}));
+
+    EXPECT_EQ(result.exit_code, 0);
+    EXPECT_EQ(result.output, "hello 42\n");
+}
+
+TEST(Cli, PassesCommandArgumentsToSysArgv)
+{
+    const test_process::CommandResult result = test_process::run_command(
+        program_with_args({"-c", "import sys\nprint(sys.argv[0])\nprint(sys.argv[1])\nprint(sys.argv[2])", "alpha", "beta"}));
+
+    EXPECT_EQ(result.exit_code, 0);
+    EXPECT_EQ(result.output,
+              "-c\n"
+              "alpha\n"
+              "beta\n");
+}
+
+TEST(Cli, ReportsCommandPythonErrors)
+{
+    const test_process::CommandResult result = test_process::run_command(
+        program_with_args({"-c", "missing"}));
+
+    EXPECT_EQ(result.exit_code, 1);
+    EXPECT_EQ(result.output,
+              "Traceback (most recent call last):\n"
+              "  File \"<string>\", line 1, in <module>\n"
+              "NameError: name 'missing' is not defined\n");
+}
+
 TEST(Cli, SupportsModuleExecutionWithDashM)
 {
     const std::filesystem::path directory = std::filesystem::temp_directory_path();

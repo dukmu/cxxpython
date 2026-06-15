@@ -1,6 +1,56 @@
 # Development Status
 
 
+## 2026-06-15 CLI Command And Fast Local Metadata Slice
+
+Review focus:
+
+- Add CPython-style `-c` command execution without regressing script, module, or
+  REPL launcher behavior.
+- Remove redundant descriptor receiver layout checks from newly added builtin
+  container methods.
+- Reduce VM local-variable metadata overhead on hot `LOAD_FAST` / `STORE_FAST`
+  paths without changing bytecode semantics.
+
+Completed:
+
+- Added `RunMode::Command` and `cxxpython -c <command> [args...]` execution.
+- Set command-mode `sys.argv` to `['-c', ...]` and compile command input with
+  `"<string>"` for traceback locations.
+- Added CLI regressions for `-c` execution, command `sys.argv`, and command
+  traceback reporting.
+- Removed redundant `require_dict()` / `require_list()` helpers now that method
+  descriptors validate the receiver type before invoking builtin methods.
+- Cached `StrObject *` fast-local names on `Frame` construction, so hot local
+  load/store/delete paths no longer re-read and re-`dynamic_cast` code varname
+  metadata on every opcode.
+- Tightened `CodeObject` metadata so `names`, `varnames`, `cellvars`, and
+  `freevars` are stored as `StrObject *` vectors instead of generic `Object *`
+  vectors.
+- Added a GCC/Clang-only computed-goto fast dispatch path for selected hot
+  opcodes, with the existing `switch` dispatch retained as the portable slow
+  path.
+- Changed plain `CALL` dispatch to pass an `ObjectSpan` over the active frame
+  value stack, avoiding per-call positional argument vector allocation.
+
+Performance notes:
+
+- Local `build/test2.py multi 1000000` completed in about `5.89s` after the
+  fast-local cache and about `5.93s` after strict metadata, computed-goto hot
+  dispatch, and stack-slice `CALL`. This is effectively flat in this local run,
+  but removes allocator and RTTI work from VM hot paths.
+
+Verification:
+
+- `cmake --build build -j2`
+- `./build/test_core_objects --gtest_filter='Cli.*:Bytecode.*Frame*:Bytecode.FastLocals*'`
+- `./build/cxxpython -c "import sys; print(sys.argv[0]); print(sys.argv[1])" tail`
+- `./build/cxxpython Tests/python/builtin_container_methods.py`
+- `./build/cxxpython Tests/python/gc_thread_wait.py`
+- `ctest --test-dir build --output-on-failure`
+- `eval "$(conda shell.zsh hook)" && conda activate nn && /usr/bin/time -f '%E %MKB' ./build/cxxpython build/test2.py multi 1000000`
+
+
 ## 2026-06-14 VM Thread And Call Stability Slice
 
 Review focus:
