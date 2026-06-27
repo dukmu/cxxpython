@@ -2149,7 +2149,11 @@ TEST(Compile, CompilesAndExecutesFStringConversionsAndFormatSpec)
         runtime,
         "a = f\"{1!r}\"\n"
         "b = f\"{'xy'!s}\"\n"
-        "c = f\"{7:}\"\n",
+        "c = f\"{7:}\"\n"
+        "width = 3\n"
+        "d = f\"{1:{2}}\"\n"
+        "e = f\"{'x':>{width}}\"\n"
+        "f = f\"{'x':{width}}\"\n",
         "script.py");
     ASSERT_NE(code, nullptr);
     EXPECT_EQ(vm.execute(*code, *globals), runtime.none());
@@ -2163,6 +2167,15 @@ TEST(Compile, CompilesAndExecutesFStringConversionsAndFormatSpec)
     auto *c = dynamic_cast<cxxpython::StrObject *>(globals->get(runtime.new_str("c")));
     ASSERT_NE(c, nullptr);
     EXPECT_EQ(c->value, "7");
+    auto *d = dynamic_cast<cxxpython::StrObject *>(globals->get(runtime.new_str("d")));
+    ASSERT_NE(d, nullptr);
+    EXPECT_EQ(d->value, " 1");
+    auto *e = dynamic_cast<cxxpython::StrObject *>(globals->get(runtime.new_str("e")));
+    ASSERT_NE(e, nullptr);
+    EXPECT_EQ(e->value, "  x");
+    auto *f = dynamic_cast<cxxpython::StrObject *>(globals->get(runtime.new_str("f")));
+    ASSERT_NE(f, nullptr);
+    EXPECT_EQ(f->value, "x  ");
 }
 
 TEST(Compile, RaisesSyntaxErrorForUnsupportedFStringAsciiConversion)

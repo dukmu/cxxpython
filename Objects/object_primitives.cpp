@@ -49,6 +49,74 @@ namespace cxxpython
             return &left == &right;
         }
 
+        struct BasicFormatSpec final
+        {
+            char align = '\0';
+            std::size_t width = 0;
+        };
+
+        BasicFormatSpec parse_basic_format_spec(Runtime &runtime,
+                                                const std::string &spec,
+                                                bool allow_integer_decimal_type)
+        {
+            BasicFormatSpec parsed;
+            if (spec.empty())
+                return parsed;
+
+            std::size_t index = 0;
+            if (spec[index] == '<' || spec[index] == '>' || spec[index] == '^')
+                parsed.align = spec[index++];
+
+            const std::size_t width_start = index;
+            while (index < spec.size() && spec[index] >= '0' && spec[index] <= '9')
+                ++index;
+
+            const bool has_decimal_type = allow_integer_decimal_type && index < spec.size() && spec[index] == 'd';
+            if (has_decimal_type)
+                ++index;
+            if (width_start == index && !has_decimal_type)
+                raise_type_error(&runtime, "unsupported format string");
+            if (index != spec.size())
+                raise_type_error(&runtime, "unsupported format string");
+
+            if (width_start == index || (has_decimal_type && width_start + 1 == index))
+                return parsed;
+
+            const char *begin = spec.data() + width_start;
+            const char *end = spec.data() + index;
+            if (has_decimal_type)
+                --end;
+            std::size_t width = 0;
+            const auto [position, error] = std::from_chars(begin, end, width);
+            if (error != std::errc{} || position != end)
+                raise_value_error(&runtime, "invalid format width");
+            parsed.width = width;
+            return parsed;
+        }
+
+        std::string apply_basic_format(const std::string &text,
+                                       const BasicFormatSpec &spec,
+                                       char default_align)
+        {
+            if (text.size() >= spec.width)
+                return text;
+            const std::size_t padding = spec.width - text.size();
+            switch (spec.align == '\0' ? default_align : spec.align)
+            {
+            case '<':
+                return text + std::string(padding, ' ');
+            case '^':
+            {
+                const std::size_t left = padding / 2;
+                const std::size_t right = padding - left;
+                return std::string(left, ' ') + text + std::string(right, ' ');
+            }
+            case '>':
+            default:
+                return std::string(padding, ' ') + text;
+            }
+        }
+
         std::string float_repr(const Object &object)
         {
             std::ostringstream out;
@@ -181,6 +249,24 @@ namespace cxxpython
         std::string int_repr(const Object &object)
         {
             return std::to_string(static_cast<const IntObject *>(&object)->value);
+        }
+
+        Object *int_format_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (args.size() != 1)
+                raise_type_error(&runtime, "int.__format__() takes exactly one argument");
+            auto *number = dynamic_cast<IntObject *>(self);
+            if (!number)
+                raise_type_error(&runtime, "int format receiver does not have int layout");
+            auto *format_spec = dynamic_cast<StrObject *>(args[0]);
+            if (!format_spec)
+                raise_type_error(&runtime, "format specifier must be a string");
+
+            const std::string text = int_repr(*number);
+            if (format_spec->value.empty())
+                return runtime.new_str(text);
+            return runtime.new_str(
+                apply_basic_format(text, parse_basic_format_spec(runtime, format_spec->value, true), '>'));
         }
 
         std::int64_t int_hash(const Object &object)
@@ -526,6 +612,23 @@ namespace cxxpython
         std::string str_repr(const Object &object)
         {
             return "'" + escape_single_quoted(static_cast<const StrObject *>(&object)->value) + "'";
+        }
+
+        Object *str_format_method(Runtime &runtime, Object *self, ObjectSpan args)
+        {
+            if (args.size() != 1)
+                raise_type_error(&runtime, "str.__format__() takes exactly one argument");
+            auto *text = dynamic_cast<StrObject *>(self);
+            if (!text)
+                raise_type_error(&runtime, "str format receiver does not have str layout");
+            auto *format_spec = dynamic_cast<StrObject *>(args[0]);
+            if (!format_spec)
+                raise_type_error(&runtime, "format specifier must be a string");
+
+            if (format_spec->value.empty())
+                return runtime.new_str(text->value);
+            return runtime.new_str(
+                apply_basic_format(text->value, parse_basic_format_spec(runtime, format_spec->value, false), '<'));
         }
 
         std::int64_t str_hash(const Object &object)
@@ -1206,6 +1309,8 @@ namespace cxxpython
                         runtime.new_method_descriptor("__int__", type, int_identity_method));
         type->dict->set(runtime.new_str("__index__"),
                         runtime.new_method_descriptor("__index__", type, int_identity_method));
+        type->dict->set(runtime.new_str("__format__"),
+                        runtime.new_method_descriptor("__format__", type, int_format_method));
         type->dict->set(runtime.new_str("__divmod__"),
                         runtime.new_method_descriptor("__divmod__",
                                                       type,
@@ -1228,6 +1333,8 @@ namespace cxxpython
 
     void initialize_str_type_methods(Runtime &runtime, TypeObject *type)
     {
+        type->dict->set(runtime.new_str("__format__"),
+                        runtime.new_method_descriptor("__format__", type, str_format_method));
         type->dict->set(runtime.new_str("join"),
                         runtime.new_method_descriptor("join",
                                                       type,

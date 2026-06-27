@@ -1393,9 +1393,13 @@ namespace cxxpython::compiler_internal
             std::unique_ptr<Expr> parse_fstring_expression()
             {
                 const Token &token = advance();
+                return parse_fstring_text(token.lexeme, token);
+            }
+
+            std::unique_ptr<Expr> parse_fstring_text(const std::string &text, const Token &token)
+            {
                 std::vector<FStringPart> parts;
                 std::string literal;
-                const std::string &text = token.lexeme;
                 std::size_t index = 0;
                 while (index < text.size())
                 {
@@ -1418,9 +1422,12 @@ namespace cxxpython::compiler_internal
                             raise_at(token, "empty expression in f-string");
                         std::vector<Token> expression_tokens =
                             lex_source(runtime_, parsed.expression_source, filename_);
+                        std::unique_ptr<Expr> format_spec;
+                        if (!parsed.format_spec.empty())
+                            format_spec = parse_fstring_text(parsed.format_spec, token);
                         parts.emplace_back(parse_expression(runtime_, expression_tokens, filename_),
                                            parsed.conversion,
-                                           std::move(parsed.format_spec));
+                                           std::move(format_spec));
                         index = parsed.next_index;
                         continue;
                     }

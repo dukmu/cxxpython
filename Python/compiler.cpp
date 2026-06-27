@@ -207,7 +207,7 @@ namespace cxxpython
                             emit({Opcode::RotTwo, 0});
                             emit({Opcode::Call, 1});
                         }
-                        if (part.format_spec.empty())
+                        if (!part.format_spec)
                         {
                             emit({Opcode::FormatValue, 0});
                         }
@@ -218,7 +218,7 @@ namespace cxxpython
                                 static_cast<std::uint32_t>(ensure_name_index("format")),
                             });
                             emit({Opcode::RotTwo, 0});
-                            emit_constant(runtime_.new_str(part.format_spec));
+                            part.format_spec->accept(*this);
                             emit({Opcode::Call, 2});
                         }
                     }

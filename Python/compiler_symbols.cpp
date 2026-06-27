@@ -37,6 +37,8 @@ namespace cxxpython
                 {
                     if (part.is_expression())
                         part.expression->accept(*this);
+                    if (part.format_spec)
+                        part.format_spec->accept(*this);
                 }
             }
 
@@ -682,6 +684,8 @@ namespace cxxpython
                 {
                     if (part.is_expression())
                         part.expression->accept(*this);
+                    if (part.format_spec)
+                        part.format_spec->accept(*this);
                 }
             }
 
@@ -1022,6 +1026,8 @@ namespace cxxpython
                 {
                     if (part.is_expression())
                         part.expression->accept(*this);
+                    if (part.format_spec)
+                        part.format_spec->accept(*this);
                 }
             }
 

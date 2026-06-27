@@ -1,5 +1,40 @@
 # Development Status
 
+## 2026-06-27 FString Format Spec And Code Type Identity
+
+Completed:
+
+- Made f-string format specs compile as nested f-string expressions instead of
+  storing the spec as an opaque literal string.
+- This lets `f"{value:{width}}"` and mixed literal/expression specs such as
+  `f"{text:>{width}}"` evaluate the spec expression before calling
+  `format(value, spec)`.
+- Added `int.__format__` and `str.__format__` support for the basic alignment
+  and width forms currently exercised by f-strings and `format()`. `bool`
+  inherits the integer formatting path.
+- Added script-level regression coverage showing that separate code object
+  instances share the same runtime `code` type object.
+
+Design notes:
+
+- The f-string fix stays in parser/compiler lowering and keeps the VM's
+  existing `format(value, spec)` path. It is not a benchmark or value-specific
+  special case.
+- Multiple `CodeObject` values from separate `compile()` or function
+  definitions are expected. The invariant being locked down is that
+  `type(c1) is type(c2)` and `type(c1) is type(func.__code__)` remain true
+  within one runtime.
+- Format mini-language support is still intentionally partial; unsupported
+  flags, fill characters, numeric bases, and precision beyond the existing
+  float `.Nf` path should be added as focused protocol slices.
+
+Verification:
+
+- `cmake --build build -j2`
+- `./build/test_core_objects` passed 246/246.
+- `./build/cxxpython Tests/python/fstring_features.py`
+- `./build/cxxpython Tests/python/code_object_type_identity.py`
+
 ## 2026-06-15 Threaded GC Stability And Numeric Hot Path Recovery
 
 Review focus:

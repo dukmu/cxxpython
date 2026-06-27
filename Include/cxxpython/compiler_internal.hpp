@@ -336,7 +336,7 @@ namespace cxxpython::compiler_internal
 
         explicit FStringPart(std::unique_ptr<Expr> expression_in,
                              FStringConversion conversion_in = FStringConversion::None,
-                             std::string format_spec_in = {})
+                             std::unique_ptr<Expr> format_spec_in = nullptr)
             : expression(std::move(expression_in)),
               conversion(conversion_in),
               format_spec(std::move(format_spec_in))
@@ -351,7 +351,7 @@ namespace cxxpython::compiler_internal
         std::string literal;
         std::unique_ptr<Expr> expression;
         FStringConversion conversion = FStringConversion::None;
-        std::string format_spec;
+        std::unique_ptr<Expr> format_spec;
     };
 
     struct FStringExpr final : Expr
