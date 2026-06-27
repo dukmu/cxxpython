@@ -142,6 +142,7 @@ TEST(Bytecode, MetadataNamesAndStackEffects)
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::PopFinally, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::CheckExceptionMatch, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::RaiseValue, 0}), -1);
+    EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::RaiseValue, 1}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::WithExit, 0}), -1);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::EndFinally, 0}), 0);
     EXPECT_EQ(cxxpython::stack_effect({cxxpython::Opcode::ReturnValue, 0}), -1);

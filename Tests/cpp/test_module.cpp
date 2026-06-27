@@ -97,6 +97,7 @@ TEST(Module, BootstrapsBuiltinsModule)
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("BaseException")), runtime.base_exception_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("Exception")), runtime.exception_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("TypeError")), runtime.type_error_type());
+    EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("RuntimeError")), runtime.runtime_error_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("ValueError")), runtime.value_error_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("IndexError")), runtime.index_error_type());
     EXPECT_EQ(runtime.builtins_dict()->get(runtime.new_str("KeyError")), runtime.key_error_type());

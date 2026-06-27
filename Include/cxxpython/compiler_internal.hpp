@@ -950,7 +950,7 @@ namespace cxxpython::compiler_internal
 
     struct RaiseStmt final : Stmt
     {
-        explicit RaiseStmt(std::unique_ptr<Expr> value_in)
+        explicit RaiseStmt(std::unique_ptr<Expr> value_in = nullptr)
             : value(std::move(value_in))
         {
         }

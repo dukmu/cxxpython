@@ -240,7 +240,7 @@ TEST(Cli, RunsInteractiveReplFromStandardInput)
               "cxxpython 0.1.0-dev\n"
               ">>> 3\n"
               ">>> >>> 'ok'\n"
-              ">>> ... ... ... ... TypeError('boom')\n"
+              ">>> ... ... ... ... boom\n"
               ">>> ");
 }
 

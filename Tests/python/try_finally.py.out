@@ -1,7 +1,7 @@
 ['body', 'finally']
-TypeError('boom')
+boom
 ['body', 'finally', 'cleanup']
 ['except', 'finally']
 body
 ['finally']
-ValueError('finally')
+finally

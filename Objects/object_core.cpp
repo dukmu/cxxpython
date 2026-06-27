@@ -2059,6 +2059,15 @@ namespace cxxpython
             return "<null>";
         if (auto *text = dynamic_cast<const StrObject *>(object))
             return text->value;
+        if (auto *exception = dynamic_cast<const ExceptionObject *>(object))
+        {
+            TupleObject *args = exception->args();
+            if (!args || args->items().empty())
+                return "";
+            if (args->items().size() == 1)
+                return object_str(args->items()[0]);
+            return object_str(args);
+        }
         return object_repr(object);
     }
 

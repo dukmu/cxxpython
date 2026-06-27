@@ -232,6 +232,7 @@ namespace cxxpython
         install_builtin_constant(*this, dict, "BaseException", base_exception_type_);
         install_builtin_constant(*this, dict, "Exception", exception_type_);
         install_builtin_constant(*this, dict, "TypeError", type_error_type_);
+        install_builtin_constant(*this, dict, "RuntimeError", runtime_error_type_);
         install_builtin_constant(*this, dict, "ValueError", value_error_type_);
         install_builtin_constant(*this, dict, "IndexError", index_error_type_);
         install_builtin_constant(*this, dict, "KeyError", key_error_type_);

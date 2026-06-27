@@ -248,7 +248,8 @@ namespace cxxpython
 
             void visit(const compiler_internal::RaiseStmt &statement) override
             {
-                statement.value->accept(*this);
+                if (statement.value)
+                    statement.value->accept(*this);
             }
 
             void visit(const compiler_internal::GlobalStmt &statement) override
@@ -897,7 +898,8 @@ namespace cxxpython
 
             void visit(const compiler_internal::RaiseStmt &statement) override
             {
-                statement.value->accept(*this);
+                if (statement.value)
+                    statement.value->accept(*this);
             }
 
             void visit(const compiler_internal::GlobalStmt &statement) override
@@ -1208,7 +1210,8 @@ namespace cxxpython
 
             void visit(const compiler_internal::RaiseStmt &statement) override
             {
-                statement.value->accept(*this);
+                if (statement.value)
+                    statement.value->accept(*this);
             }
 
             void visit(const compiler_internal::GlobalStmt &statement) override

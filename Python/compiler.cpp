@@ -852,8 +852,15 @@ namespace cxxpython
             void visit(const compiler_internal::RaiseStmt &statement) override
             {
                 StatementLineGuard line(*this, statement);
-                statement.value->accept(*this);
-                emit({Opcode::RaiseValue, 0});
+                if (statement.value)
+                {
+                    statement.value->accept(*this);
+                    emit({Opcode::RaiseValue, 0});
+                }
+                else
+                {
+                    emit({Opcode::RaiseValue, 1});
+                }
             }
 
             void visit(const compiler_internal::GlobalStmt &statement) override

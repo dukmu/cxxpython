@@ -800,7 +800,7 @@ namespace cxxpython
             return -1;
         case Opcode::ReturnValue:
         case Opcode::RaiseValue:
-            return -1;
+            return instruction.opcode == Opcode::RaiseValue && instruction.operand != 0 ? 0 : -1;
         }
         throw BytecodeError("invalid opcode for stack effect");
     }

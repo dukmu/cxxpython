@@ -1,5 +1,35 @@
 # Development Status
 
+## 2026-06-27 Bare Re-Raise And RuntimeError
+
+Completed:
+
+- Parser/compiler now accept bare `raise`.
+- `RAISE_VALUE` uses operand `1` for CPython-style re-raise without consuming a
+  stack value.
+- Bare re-raise uses the thread state's current handled exception and removes
+  the current handler's exception state before propagating, so later code in
+  the same frame does not see a stale `sys.exc_info()` value.
+- Added the builtin `RuntimeError` type and use it for `raise` with no active
+  handled exception.
+- Updated `object_str()` for `BaseException` instances to follow CPython's
+  `BaseException.__str__` shape: no args -> empty string, one arg -> that
+  argument's string, multiple args -> args tuple string.
+
+Design notes:
+
+- This slice targets `except: raise` and typed `except E: raise`. Bare raise
+  during `finally`-only exception unwinding still depends on the pending
+  exception model and should be handled with exception chaining / `raise from`.
+- The VM keeps explicit stack effect metadata: normal raise consumes one stack
+  value; re-raise consumes none.
+
+Verification:
+
+- `cmake --build build -j2`
+- `./build/cxxpython Tests/python/bare_raise.py`
+- `./build/test_core_objects --gtest_filter='PythonScripts.RunsGoldenFiles:Compile.BareRaise*:Compile.TryExceptReraisesUnmatchedException'`
+
 ## 2026-06-27 FString Format Spec And Code Type Identity
 
 Completed:

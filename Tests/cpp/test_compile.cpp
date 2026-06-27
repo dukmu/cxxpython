@@ -1824,6 +1824,51 @@ TEST(Compile, TryExceptReraisesUnmatchedException)
     }
 }
 
+TEST(Compile, BareRaiseReraisesHandledException)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+    cxxpython::DictObject *globals = runtime.new_dict();
+
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(
+        runtime,
+        "saved = None\n"
+        "try:\n"
+        "    try:\n"
+        "        raise ValueError('same')\n"
+        "    except ValueError as exc:\n"
+        "        saved = exc\n"
+        "        raise\n"
+        "except ValueError as reraised:\n"
+        "    same = saved is reraised\n"
+        "    reraised_type = type(reraised)\n",
+        "script.py");
+    ASSERT_NE(code, nullptr);
+    EXPECT_EQ(vm.execute(*code, *globals), runtime.none());
+    EXPECT_EQ(globals->get(runtime.new_str("same")), runtime.true_value());
+    EXPECT_EQ(globals->get(runtime.new_str("reraised_type")), runtime.value_error_type());
+}
+
+TEST(Compile, BareRaiseWithoutHandledExceptionRaisesRuntimeError)
+{
+    cxxpython::Runtime runtime;
+    cxxpython::VirtualMachine vm(runtime);
+
+    cxxpython::CodeObject *code = cxxpython::compile_exec_input(runtime, "raise\n", "script.py");
+    ASSERT_NE(code, nullptr);
+
+    try
+    {
+        (void)vm.execute(*code);
+        FAIL() << "expected PythonError";
+    }
+    catch (const cxxpython::PythonError &error)
+    {
+        EXPECT_EQ(error.type(), runtime.runtime_error_type());
+        EXPECT_STREQ(error.what(), "No active exception to reraise");
+    }
+}
+
 TEST(Compile, CompilesAndExecutesTryFinallyControlFlow)
 {
     cxxpython::Runtime runtime;

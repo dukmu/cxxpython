@@ -5,12 +5,12 @@ value a
 exit a True
 enter boom
 exit boom False
-ValueError('bad')
+bad
 False
-caught ValueError('bad')
+caught bad
 enter suppress
 exit suppress False
-ValueError('hidden')
+hidden
 False
 after suppress
 enter outer

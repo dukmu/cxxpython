@@ -1961,14 +1961,30 @@ cxxpy_fallback:
             }
             CXXPYTHON_OP_LABEL(RaiseValue) case Opcode::RaiseValue:
             {
-                Object *value = frame->pop();
-                auto value_root = runtime_.root(value);
-                Object *exception = exception_instance_from_value(runtime_, value_root.get());
-                auto exception_root = runtime_.root(exception);
-                auto *exception_object = dynamic_cast<ExceptionObject *>(exception_root.get());
-                if (!exception_object)
-                    raise_type_error(&runtime_, "exceptions must derive from BaseException");
-                throw PythonError(exception_object);
+                if (instruction.operand != 0)
+                {
+                    ExceptionObject *exception = thread_.current_exception();
+                    if (!exception)
+                    {
+                        exception = runtime_.new_exception(runtime_.runtime_error_type(),
+                                                           "No active exception to reraise");
+                    }
+                    auto exception_root = runtime_.root(exception);
+                    if (thread_.current_exception() == exception)
+                        thread_.pop_handled_exception();
+                    throw PythonError(exception);
+                }
+                else
+                {
+                    Object *value = frame->pop();
+                    auto value_root = runtime_.root(value);
+                    Object *exception = exception_instance_from_value(runtime_, value_root.get());
+                    auto exception_root = runtime_.root(exception);
+                    auto *exception_object = dynamic_cast<ExceptionObject *>(exception_root.get());
+                    if (!exception_object)
+                        raise_type_error(&runtime_, "exceptions must derive from BaseException");
+                    throw PythonError(exception_object);
+                }
             }
             CXXPYTHON_OP_LABEL(WithExit) case Opcode::WithExit:
             {

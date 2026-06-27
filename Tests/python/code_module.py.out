@@ -15,7 +15,7 @@ True
 True
 True
 True
-TypeError('boom')
+boom
 False
 
 False

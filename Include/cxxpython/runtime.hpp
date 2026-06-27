@@ -139,6 +139,7 @@ namespace cxxpython
         TypeObject *base_exception_type() const noexcept;
         TypeObject *exception_type() const noexcept;
         TypeObject *type_error_type() const noexcept;
+        TypeObject *runtime_error_type() const noexcept;
         TypeObject *value_error_type() const noexcept;
         TypeObject *index_error_type() const noexcept;
         TypeObject *key_error_type() const noexcept;
@@ -528,6 +529,7 @@ namespace cxxpython
         TypeObject *base_exception_type_ = nullptr;
         TypeObject *exception_type_ = nullptr;
         TypeObject *type_error_type_ = nullptr;
+        TypeObject *runtime_error_type_ = nullptr;
         TypeObject *value_error_type_ = nullptr;
         TypeObject *index_error_type_ = nullptr;
         TypeObject *key_error_type_ = nullptr;

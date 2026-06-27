@@ -306,11 +306,12 @@ namespace cxxpython::compiler_internal
             ParsedStatement parse_raise_statement()
             {
                 const Token &raise_token = advance();
-                if (peek().kind == TokenKind::Newline ||
-                    peek().kind == TokenKind::Dedent ||
-                    peek().kind == TokenKind::End)
-                    raise_at(raise_token, "bare raise is not supported yet");
-                auto statement = std::make_unique<RaiseStmt>(parse_expression_only());
+                std::unique_ptr<Expr> value;
+                if (peek().kind != TokenKind::Newline &&
+                    peek().kind != TokenKind::Dedent &&
+                    peek().kind != TokenKind::End)
+                    value = parse_expression_only();
+                auto statement = std::make_unique<RaiseStmt>(std::move(value));
                 statement->line = raise_token.line;
                 return ParsedStatement{
                     std::move(statement),

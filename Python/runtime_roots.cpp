@@ -284,6 +284,7 @@ namespace cxxpython
         initialize_type_dict(base_exception_type_);
         initialize_type_dict(exception_type_);
         initialize_type_dict(type_error_type_);
+        initialize_type_dict(runtime_error_type_);
         initialize_type_dict(value_error_type_);
         initialize_type_dict(index_error_type_);
         initialize_type_dict(key_error_type_);
