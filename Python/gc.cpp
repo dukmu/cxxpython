@@ -6,6 +6,22 @@
 
 namespace cxxpython
 {
+    namespace
+    {
+        bool has_other_active_frames(const std::vector<ThreadState *> &threads,
+                                     ThreadState &current_thread)
+        {
+            for (ThreadState *thread : threads)
+            {
+                if (!thread || thread == &current_thread)
+                    continue;
+                if (thread->frame_depth() != 0)
+                    return true;
+            }
+            return false;
+        }
+    }
+
     std::size_t Runtime::collect_garbage()
     {
         if (VirtualMachine *vm = active_vm())
@@ -156,8 +172,6 @@ namespace cxxpython
         {
             if (!thread || thread == &current_thread)
                 continue;
-            if (thread->frame_depth() == 0)
-                continue;
             if (!thread->at_gc_safepoint())
                 return false;
         }
@@ -167,6 +181,14 @@ namespace cxxpython
     std::size_t Runtime::collect_garbage_at_safepoint(ThreadState &current_thread, bool force)
     {
         std::unique_lock lock(gc_coordination_mutex_);
+        {
+            std::scoped_lock threads_lock(thread_states_mutex_);
+            if (has_other_active_frames(thread_states_, current_thread))
+            {
+                gc_requested_.store(false, std::memory_order_relaxed);
+                return 0;
+            }
+        }
         if (gc_stop_requested_.load(std::memory_order_acquire))
         {
             ThreadGCStateGuard safepoint(current_thread, ThreadGCState::OpcodeSafepoint);

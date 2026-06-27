@@ -673,8 +673,9 @@ namespace cxxpython
             Object *instance = type->slots.new_object(*type, args);
             if (!instance)
                 raise_type_error(type->runtime(), "__new__ returned null");
-            call_init_slot(*type, instance, args);
-            return instance;
+            auto instance_root = type->runtime()->root(instance);
+            call_init_slot(*type, instance_root.get(), args);
+            return instance_root.get();
         }
 
         TypeObject *type_from_three_args(Runtime &runtime, TypeObject *metaclass, ObjectSpan args)

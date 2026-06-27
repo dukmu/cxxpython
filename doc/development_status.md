@@ -1,5 +1,47 @@
 # Development Status
 
+## 2026-06-27 Thread Entry And Conservative Multi-Thread GC
+
+Completed:
+
+- Hardened `_thread.start_new_thread` so callable, args, and kwargs roots are
+  held by an RAII handoff object that lives until the detached native thread
+  finishes.
+- Moved `threading.Thread` completion signalling to the native thread wrapper,
+  so `join()` waits for the native entrypoint to finish exception handling and
+  root cleanup.
+- Kept Python exceptions inside the native thread entrypoint. Non-`SystemExit`
+  Python exceptions are reported as unraisable thread errors; `SystemExit`
+  remains silent.
+- Added `std::exception` and catch-all handling so no host exception crosses
+  the `std::thread` boundary and calls `std::terminate`.
+- Changed thread states to start in `NativeWait`; `VirtualMachine::execute()`
+  marks them `Running` only while bytecode is executing. Entering `Running`
+  from a non-running state waits for any active GC stop request to finish.
+- Fixed lifecycle holes where a newly allocated instance could be collected
+  during `__init__`, and where a newly allocated frame could be collected
+  before it was pushed into the owning thread state.
+- Rooted `new_frame()` inputs explicitly across frame construction.
+- Made eval breaker handling respond to an active GC stop request, not only a
+  new GC request.
+- Kept multi-threaded GC conservative for now: if another thread has active
+  Python frames, `collect_garbage_at_safepoint()` clears the pending request and
+  returns without sweeping. Single-threaded GC still performs normal collection.
+  This avoids the current toy no-GIL collector scanning or clearing object
+  graphs while other Python threads are active; the full no-GIL GC design still
+  needs a later, explicit implementation slice.
+- Added a script regression where a direct `_thread` worker raises `TypeError`;
+  the process reports the unraisable error and continues running.
+
+Verification:
+
+- `cmake --build build -j2`
+- `./build/cxxpython Tests/python/thread_exception_exit.py`
+- `timeout 20 ./build/cxxpython /tmp/cxxpython_thread_gc_stress.py`
+- `timeout 20 zsh -c 'for i in {1..100}; do ./build/cxxpython Tests/python/gc_thread_explicit_collect.py >/tmp/gc_thread.out 2>&1; code=$?; if [ $code -ne 0 ]; then echo fail:$i code:$code; cat /tmp/gc_thread.out; exit 1; fi; if ! diff -u Tests/python/gc_thread_explicit_collect.py.out /tmp/gc_thread.out >/tmp/gc_thread.diff; then echo mismatch:$i code:$code; cat /tmp/gc_thread.diff; cat /tmp/gc_thread.out; exit 1; fi; done; echo ok'`
+- `./build/test_core_objects --gtest_filter='PythonScripts.RunsGoldenFiles'`
+- `./build/test_core_objects` passed 248/248.
+
 ## 2026-06-27 Bare Re-Raise And RuntimeError
 
 Completed:

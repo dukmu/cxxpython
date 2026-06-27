@@ -260,7 +260,8 @@ namespace cxxpython
                                  Frame &frame,
                                  std::uint32_t &last_traced_line)
         {
-            if (runtime.garbage_collection_requested())
+            if (runtime.garbage_collection_requested() ||
+                runtime.garbage_collection_stop_requested())
                 (void)runtime.collect_garbage_if_requested(thread);
 
             if (Object *trace_function = frame.trace_function())
@@ -934,10 +935,13 @@ namespace cxxpython
         interpreter_.runtime().notify_gc_safepoint_change();
     }
 
-    ThreadGCStateGuard::ThreadGCStateGuard(ThreadState &thread, ThreadGCState state) noexcept
+    ThreadGCStateGuard::ThreadGCStateGuard(ThreadState &thread, ThreadGCState state)
         : thread_(thread), previous_(thread.gc_state())
     {
-        thread_.set_gc_state(state);
+        if (state == ThreadGCState::Running && previous_ != ThreadGCState::Running)
+            thread_.interpreter().runtime().enter_thread_running(thread_);
+        else
+            thread_.set_gc_state(state);
     }
 
     ThreadGCStateGuard::~ThreadGCStateGuard()
@@ -1036,6 +1040,7 @@ namespace cxxpython
     Object *VirtualMachine::execute(const ExecutionRequest &request)
     {
         ActiveVirtualMachine active_vm(*this);
+        ThreadGCStateGuard running(thread_, ThreadGCState::Running);
         if (!request.code)
             throw BytecodeError("execution request requires a code object");
         if (!request.locals)
@@ -1052,7 +1057,8 @@ namespace cxxpython
         const std::vector<Instruction> &instructions = code.instructions();
         const std::size_t instruction_count = instructions.size();
         Frame *frame = runtime_.new_frame(&code, &locals, &globals, &builtins, request.closure);
-        ActiveFrame active_frame(thread_, *frame);
+        auto frame_root = runtime_.root(frame);
+        ActiveFrame active_frame(thread_, *frame_root.get());
         if (Object *global_trace = thread_.trace_function())
             set_frame_trace_from_result(*frame, call_trace_function(runtime_,
                                                                     thread_,

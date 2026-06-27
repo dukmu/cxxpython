@@ -84,6 +84,15 @@ namespace cxxpython
         notify_gc_safepoint_change();
     }
 
+    void Runtime::enter_thread_running(ThreadState &thread)
+    {
+        std::unique_lock lock(gc_coordination_mutex_);
+        gc_condition_.wait(lock, [this] {
+            return !gc_stop_requested_.load(std::memory_order_acquire);
+        });
+        thread.set_gc_state(ThreadGCState::Running);
+    }
+
     void Runtime::notify_gc_safepoint_change()
     {
         gc_condition_.notify_all();

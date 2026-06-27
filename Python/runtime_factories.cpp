@@ -583,6 +583,11 @@ namespace cxxpython
         if (!resolved_builtins)
             raise_type_error(this, "runtime builtins are not initialized");
 
+        auto code_root = root(code);
+        auto locals_root = root(resolved_locals);
+        auto globals_root = root(resolved_globals);
+        auto builtins_root = root(resolved_builtins);
+
         std::vector<CellObject *> cells;
         std::vector<Rooted<CellObject>> cell_roots;
         cells.reserve(code->cellvars().size() + closure.size());
@@ -602,10 +607,10 @@ namespace cxxpython
         }
 
         return allocate<Frame>(frame_type_,
-                               code,
-                               resolved_locals,
-                               resolved_globals,
-                               resolved_builtins,
+                               code_root.get(),
+                               locals_root.get(),
+                               globals_root.get(),
+                               builtins_root.get(),
                                std::move(cells));
     }
 

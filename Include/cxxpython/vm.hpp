@@ -199,13 +199,13 @@ namespace cxxpython
         std::vector<Object *> temporary_roots_;
         Object *trace_function_ = nullptr;
         std::size_t trace_depth_ = 0;
-        std::atomic<ThreadGCState> gc_state_{ThreadGCState::Running};
+        std::atomic<ThreadGCState> gc_state_{ThreadGCState::NativeWait};
     };
 
     class ThreadGCStateGuard final
     {
     public:
-        ThreadGCStateGuard(ThreadState &thread, ThreadGCState state) noexcept;
+        ThreadGCStateGuard(ThreadState &thread, ThreadGCState state);
         ~ThreadGCStateGuard();
 
         ThreadGCStateGuard(const ThreadGCStateGuard &) = delete;

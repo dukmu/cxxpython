@@ -7,6 +7,7 @@
 
 #include <iostream>
 #include <limits>
+#include <memory>
 #include <sstream>
 #include <thread>
 
@@ -118,52 +119,147 @@ namespace cxxpython
 
         void print_unraisable_thread_error(const PythonError &error)
         {
+            if (!error.value())
+            {
+                std::cerr << "Exception ignored in thread started by _thread.start_new_thread: "
+                          << "unknown Python exception\n";
+                return;
+            }
             std::cerr << "Exception ignored in thread started by _thread.start_new_thread: "
                       << error.type_name() << ": " << error.what() << "\n";
+        }
+
+        struct ThreadStartState final
+        {
+            ThreadStartState(Runtime &runtime_in,
+                             Object *callable_in,
+                             TupleObject *args_in,
+                             DictObject *kwargs_in,
+                             ThreadLockObject *completion_lock_in)
+                : runtime_(runtime_in),
+                  callable(callable_in),
+                  args(args_in),
+                  kwargs(kwargs_in),
+                  completion_lock(completion_lock_in)
+            {
+                runtime_.add_root(callable);
+                runtime_.add_root(args);
+                runtime_.add_root(kwargs);
+                runtime_.add_root(completion_lock);
+            }
+
+            ~ThreadStartState()
+            {
+                release_call_roots();
+                release_completion_root();
+            }
+
+            void release_call_roots()
+            {
+                if (!callable && !args && !kwargs)
+                    return;
+                runtime_.remove_root(kwargs);
+                runtime_.remove_root(args);
+                runtime_.remove_root(callable);
+                kwargs = nullptr;
+                args = nullptr;
+                callable = nullptr;
+            }
+
+            void release_completion_root()
+            {
+                if (!completion_lock_rooted)
+                    return;
+                runtime_.remove_root(completion_lock);
+                completion_lock_rooted = false;
+            }
+
+            Runtime &runtime_;
+            Object *callable;
+            TupleObject *args;
+            DictObject *kwargs;
+            ThreadLockObject *completion_lock;
+            bool completion_lock_rooted = true;
+        };
+
+        void report_thread_host_exception(const char *message)
+        {
+            std::cerr << "Exception ignored in thread started by _thread.start_new_thread: "
+                      << message << "\n";
+        }
+
+        void release_completion_lock(ThreadStartState &state)
+        {
+            if (!state.completion_lock)
+                return;
+            try
+            {
+                state.completion_lock->release();
+            }
+            catch (const PythonError &error)
+            {
+                print_unraisable_thread_error(error);
+            }
+            catch (const std::exception &error)
+            {
+                report_thread_host_exception(error.what());
+            }
+            catch (...)
+            {
+                report_thread_host_exception("unknown non-standard exception");
+            }
+        }
+
+        void run_thread_entry(std::unique_ptr<ThreadStartState> state)
+        {
+            try
+            {
+                std::vector<Object *> positional = state->args->items();
+                (void)object_call(
+                    state->callable,
+                    CallArguments{ObjectSpan(positional.data(), positional.size()), state->kwargs});
+            }
+            catch (const PythonError &error)
+            {
+                if (!error.type() || !is_subclass(error.type(), state->runtime_.system_exit_type()))
+                    print_unraisable_thread_error(error);
+            }
+            catch (const std::exception &error)
+            {
+                report_thread_host_exception(error.what());
+            }
+            catch (...)
+            {
+                report_thread_host_exception("unknown non-standard exception");
+            }
+            state->release_call_roots();
+            release_completion_lock(*state);
+            state->release_completion_root();
         }
 
         Object *thread_start_new_thread(Runtime &runtime, const CallArguments &args)
         {
             require_no_keywords(&runtime, "start_new_thread", args);
-            require_positional_range(&runtime, "start_new_thread", args, 2, 3);
+            require_positional_range(&runtime, "start_new_thread", args, 2, 4);
             Object *callable = args.positional[0];
             auto *thread_args = dynamic_cast<TupleObject *>(args.positional[1]);
             if (!thread_args)
                 raise_type_error(&runtime, "start_new_thread() args must be tuple");
             DictObject *thread_kwargs = nullptr;
-            if (args.positional.size() == 3)
+            if (args.positional.size() >= 3 && args.positional[2] != runtime.none())
             {
                 thread_kwargs = dynamic_cast<DictObject *>(args.positional[2]);
                 if (!thread_kwargs)
                     raise_type_error(&runtime, "start_new_thread() kwargs must be dict");
             }
+            ThreadLockObject *completion_lock = nullptr;
+            if (args.positional.size() == 4 && args.positional[3] != runtime.none())
+                completion_lock = require_lock(runtime, args.positional[3], "start_new_thread");
 
-            runtime.add_root(callable);
-            runtime.add_root(thread_args);
-            runtime.add_root(thread_kwargs);
+            auto state = std::make_unique<ThreadStartState>(
+                runtime, callable, thread_args, thread_kwargs, completion_lock);
 
-            std::thread thread([&runtime, callable, thread_args, thread_kwargs]() {
-                try
-                {
-                    std::vector<Object *> positional = thread_args->items();
-                    (void)object_call(
-                        callable,
-                        CallArguments{ObjectSpan(positional.data(), positional.size()), thread_kwargs});
-                }
-                catch (const PythonError &error)
-                {
-                    if (!is_subclass(error.type(), runtime.system_exit_type()))
-                        print_unraisable_thread_error(error);
-                }
-                catch (const std::exception &error)
-                {
-                    std::cerr << "Exception ignored in thread started by _thread.start_new_thread: "
-                              << error.what() << "\n";
-                }
-                runtime.remove_root(thread_kwargs);
-                runtime.remove_root(thread_args);
-                runtime.remove_root(callable);
-            });
+            std::thread thread(run_thread_entry, std::move(state));
 
             const std::int64_t ident = thread_id_value(thread.get_id());
             thread.detach();
@@ -187,7 +283,7 @@ namespace cxxpython
                 "start_new_thread",
                 thread_start_new_thread,
                 "Start a new OS thread and call function(*args, **kwargs).",
-                "($module, function, args, kwargs=None, /)",
+                "($module, function, args, kwargs=None, completion_lock=None, /)",
             },
             {
                 "exit",

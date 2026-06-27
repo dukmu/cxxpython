@@ -379,6 +379,7 @@ namespace cxxpython
         void visit_roots(const std::function<void(Object *)> &visitor) const;
         void register_thread_state(ThreadState *thread);
         void unregister_thread_state(ThreadState *thread);
+        void enter_thread_running(ThreadState &thread);
         void notify_gc_safepoint_change();
         void visit_thread_states(const std::function<void(ThreadState &)> &visitor) const;
         void visit_heap(const std::function<void(Object *)> &visitor) const;

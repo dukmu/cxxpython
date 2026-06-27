@@ -202,7 +202,7 @@ class Thread:
             raise ValueError('threads can only be started once')
         self._started = True
         self._done.acquire()
-        self.ident = _thread.start_new_thread(self._bootstrap, ())
+        self.ident = _thread.start_new_thread(self._bootstrap, (), None, self._done)
 
     def _bootstrap(self):
         try:
@@ -210,8 +210,6 @@ class Thread:
                 self._target(*self._args, **self._kwargs)
         except Exception as e:
             traceback.print_exception(e)
-        finally:
-            self._done.release()
 
     def join(self):
         if not self._started:

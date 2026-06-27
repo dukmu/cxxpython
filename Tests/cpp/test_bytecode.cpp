@@ -1383,26 +1383,35 @@ TEST(Bytecode, ThreadGCStateGuardRestoresPreviousState)
     cxxpython::VirtualMachine vm(runtime);
     cxxpython::ThreadState &thread = vm.thread_state();
 
-    EXPECT_EQ(thread.gc_state(), cxxpython::ThreadGCState::Running);
-    EXPECT_FALSE(thread.at_gc_safepoint());
+    EXPECT_EQ(thread.gc_state(), cxxpython::ThreadGCState::NativeWait);
+    EXPECT_TRUE(thread.at_gc_safepoint());
 
     {
-        cxxpython::ThreadGCStateGuard opcode_guard(thread, cxxpython::ThreadGCState::OpcodeSafepoint);
-        EXPECT_EQ(thread.gc_state(), cxxpython::ThreadGCState::OpcodeSafepoint);
-        EXPECT_TRUE(thread.at_gc_safepoint());
+        cxxpython::ThreadGCStateGuard running_guard(thread, cxxpython::ThreadGCState::Running);
+        EXPECT_EQ(thread.gc_state(), cxxpython::ThreadGCState::Running);
+        EXPECT_FALSE(thread.at_gc_safepoint());
 
         {
-            cxxpython::ThreadGCStateGuard native_guard(thread, cxxpython::ThreadGCState::NativeWait);
-            EXPECT_EQ(thread.gc_state(), cxxpython::ThreadGCState::NativeWait);
+            cxxpython::ThreadGCStateGuard opcode_guard(thread, cxxpython::ThreadGCState::OpcodeSafepoint);
+            EXPECT_EQ(thread.gc_state(), cxxpython::ThreadGCState::OpcodeSafepoint);
+            EXPECT_TRUE(thread.at_gc_safepoint());
+
+            {
+                cxxpython::ThreadGCStateGuard native_guard(thread, cxxpython::ThreadGCState::NativeWait);
+                EXPECT_EQ(thread.gc_state(), cxxpython::ThreadGCState::NativeWait);
+                EXPECT_TRUE(thread.at_gc_safepoint());
+            }
+
+            EXPECT_EQ(thread.gc_state(), cxxpython::ThreadGCState::OpcodeSafepoint);
             EXPECT_TRUE(thread.at_gc_safepoint());
         }
 
-        EXPECT_EQ(thread.gc_state(), cxxpython::ThreadGCState::OpcodeSafepoint);
-        EXPECT_TRUE(thread.at_gc_safepoint());
+        EXPECT_EQ(thread.gc_state(), cxxpython::ThreadGCState::Running);
+        EXPECT_FALSE(thread.at_gc_safepoint());
     }
 
-    EXPECT_EQ(thread.gc_state(), cxxpython::ThreadGCState::Running);
-    EXPECT_FALSE(thread.at_gc_safepoint());
+    EXPECT_EQ(thread.gc_state(), cxxpython::ThreadGCState::NativeWait);
+    EXPECT_TRUE(thread.at_gc_safepoint());
 }
 
 TEST(Bytecode, RuntimeVisitsRegisteredThreadStatesAsRoots)
