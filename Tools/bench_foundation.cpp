@@ -1,6 +1,9 @@
 #include "cxxpython/core/execution.hpp"
 
 #include <chrono>
+#include <barrier>
+#include <ctime>
+#include <future>
 #include <iostream>
 
 namespace
@@ -258,4 +261,31 @@ int main()
               << " with_instructions=" << context.payload<CodeObject>(with_code).program.instructions().size()
               << " with_max_stack=" << context.payload<CodeObject>(with_code).program.max_stack()
               << " with_live_set_check=ok\n";
+
+    // N1 storage/coordinator cost only, not Python VM parallelism evidence.
+    constexpr int total = 60000;
+    for (int workers : {1, 2, 4})
+    {
+        Interpreter storage; std::barrier start(workers + 1), finish(workers + 1); std::vector<std::future<void>> tasks;
+        for (int i = 0; i < workers; ++i)
+            tasks.push_back(std::async(std::launch::async, [&] {
+                Attachment thread(storage); ReturnSlot out(thread); start.arrive_and_wait();
+                for (int n = 0; n < total / workers; ++n) thread.allocate<Node>(out);
+                // Sample process CPU before thread exit discards sub-tick CPU
+                // accounting on some hosts; frozen roots still permit GC.
+                NativeWait wait(thread); finish.arrive_and_wait(); finish.arrive_and_wait();
+            }));
+        while (storage.gc_state().active != static_cast<std::size_t>(workers)) std::this_thread::yield();
+        const auto cpu_start = std::clock();
+        const auto elapsed = measure([&] { start.arrive_and_wait(); finish.arrive_and_wait(); });
+        const auto cpu_ns = static_cast<std::int64_t>((std::clock() - cpu_start) * (1000000000.0 / CLOCKS_PER_SEC));
+        finish.arrive_and_wait(); for (auto &task : tasks) task.get();
+        Attachment observer(storage); observer.collect(); const auto final = observer.stats();
+        if (final.objects || final.live_bytes || final.roots || final.registered_threads != 1) return 1;
+        std::cout << "parallel_storage_workers=" << workers << " total_allocations=" << total << " wall_ns=" << elapsed
+                  << " process_cpu_ns=" << cpu_ns << " collections=" << final.collections
+                  << " request_epoch=" << storage.gc_state().request_epoch << " completed_epoch=" << storage.gc_state().completed_epoch
+                  << " max_rendezvous_ns=" << final.max_rendezvous_ns << " last_mark_sweep_ns=" << final.last_pause_ns
+                  << " parallel_storage_live_set_check=ok\n";
+    }
 }

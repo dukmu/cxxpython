@@ -19,14 +19,18 @@ is retained; the concurrency gates do not narrow language/library/release scope.
 | Concurrency Gate | Current Status | Remaining Evidence |
 | --- | --- | --- |
 | N0 access/publication contracts | Experimental | Plan 2 adopted; per-field migration contracts and implementation audits still required |
-| N1 roots/heap/GC | Experimental | Thread-owned roots, arena affinity, registry scanning/retirement and internal no-wait result publication exist; multi-Active, epoch gate, transfer records and scalable heap metadata are not yet implemented |
+| N1 roots/heap/GC | Experimental | Thread-owned roots, multi-Active storage, request/ack/completed gate and frozen registry scanning exist; transfer records, bounded rooted shared reads and scalable heap metadata remain |
 | N2 shared objects/methods | Planned | TypeSnapshot/FunctionCallState, atomic/shared fields and callback-safe critical sections |
-| N3 parallel VM | Planned | Shared same Function/Code CPU progress, allocation-free loop polling and 1/2/4-worker costs |
+| N3 parallel VM | Planned | Dispatch polling exists; shared same Function/Code CPU progress, allocation-free VM loop acknowledgement and 1/2/4-worker Python costs remain |
 | N4-N6 completion/release | Planned | Remaining runtime, frontend/library, platform, performance and replacement gates |
 
-State::execution still guards unconverted shared heap/ObjectOps paths in this
-transition. It is an explicit implementation gap, not the accepted final model.
-Do not remove it before the root, GC and shared-field dependencies are safe.
+State::execution and whole-Attachment execution permission have been removed.
+Unbootstrapped storage permits multiple Active mutators. Core bootstrap requires
+one registered thread and quarantines unconverted ObjectOps: a second Active
+admission is explicitly rejected; NativeWait return waits for exclusive admission.
+This temporary boundary is NOT N2 completion or Python CPU-parallel support.
+The heap/layout map still has a short central metadata mutex; task 04 must
+replace its hot-path lookups and accounting before N3 performance acceptance.
 
 Baseline: Python 3.12 language semantics, with CPython 3.12.14 as the intended
 fixed differential reference. No CPython ABI, `.pyc` or private bytecode promise.
@@ -51,8 +55,10 @@ No Python-language feature is Supported on the new target yet. In particular,
 f-strings, bare raise/chaining, unpacking, global/nonlocal and code type identity
 remain requirements for M4-M5, not features inferred from legacy tests.
 
-## Decisions Implemented In The First M1 Slice
+## Decisions Implemented In The First M1 Slice (Historical)
 
+The ownership/layout decisions persist, but the serial permission model below
+describes that first slice; the current epoch contract is at the end of this file.
 These resolve the storage portion of ADR-001/002/003/006/007/010. Other parts of
 those ADRs remain open; no full M0 completion claim is made.
 
@@ -234,7 +240,7 @@ alternative ownership layer to bypass these dependencies.
 
 `Tests/cpp/core/test_types.cpp` covers the two seed cycles, persistent and unique
 type identity, idempotency, failure/retry and GC-setting restoration, concurrent
-attachment publication, C3 diamonds and conflicts, metaclass selection, native
+sequential cross-attachment seed identity, C3 diamonds and conflicts, metaclass selection, native
 layout inheritance/conflicts, rejected unready definitions, failed caller output,
 and fixed-live-set type/instance collection under forced GC. This extends the
 storage tests using production operations, not a separate test object kernel.
@@ -1083,7 +1089,7 @@ across Python callbacks, and thread exit/shutdown. Acceptance must demonstrate
 overlapping CPU execution in the same interpreter, shared-object correctness,
 GC stress and race/deadlock checks, not merely passing the current serial suite.
 
-## Plan 2 Adoption And First Root-Arena Migration
+## Plan 2 Adoption And First Root-Arena Migration (Historical)
 
 The user supplied cxxpython_foundation_redesign_plan_2.md, replaced the old goal
 and set its N0-N6/M0-M9 objective active. No additional approval of the shared-
@@ -1155,3 +1161,85 @@ from values kept continuously rooted/frozen by the sender until the receiver
 finishes. This bounded test handoff is not a public queue/TransferRecord API.
 The old serial-permission test uses an atomic counter and is explicitly named
 as transitional admission, not a requirement that execution stay serialized.
+
+## N1 Multi-Active Storage And Epoch Rendezvous
+
+This supersedes the first root-arena slice's transitional execution mutex.
+The production heap supports multiple Active OS threads with private arenas;
+synthetic immutable layouts exercise it without a second collector or a
+test-only permission mode. Full N1 and Python parallel ObjectOps remain open.
+
+The State coordinator owns phase, registration/retirement and resume admission.
+ThreadRecord state is Active, Parked, NativeWait, Collector or Exiting after
+registration; PendingAttach cannot enter the registry until phase Running.
+The request epoch is atomic, while ack/completed and transitions are ordered
+under the same coordinator gate. Root push/pop/publication remain owner-only.
+
+1. The requesting Active owner becomes Collector and publishes a new request
+   epoch. Other Active threads poll, publish ack and become Parked. NativeWait
+   owners already have frozen roots; Exiting owners keep their registry/State
+   leases until the current round finishes. Collector waits release the gate.
+2. After no other Active owner remains, membership cannot change until Running.
+   The collector scans every frozen arena and the heap, without acquiring a
+   heap/object mutex, calling Python or following edges during physical destroy.
+   Trace/destroy must not reenter the runtime or coordinator diagnostics.
+3. Completion is published under that gate. Resuming and newly attaching threads
+   must acquire it and recheck Running; they cannot escape a newer request.
+   Multiple explicit collectors join a real collection and receive its result
+   through their own record, even if another epoch starts before they resume.
+
+Happens-before: owner root/frame writes precede its ack/state release and gate
+unlock in the wait. The collector acquires that gate and observes no Active
+owner before reading roots. Its completed epoch and heap changes precede gate
+unlock; each owner acquires the same gate before setting Active and accessing
+payloads again. NativeWait entry/exit, retirement and new admission use the same
+ordering. No owner can mutate a frozen root extent while the collector scans.
+
+`poll` compares request with owner-local observed epoch on its fast path. The VM
+polls every 64 dispatch iterations and at reason transfers; allocation also
+polls before construction. gc.disable suppresses automatic collection, not
+explicit GC or stop acknowledgement. A nonallocating native poll loop is tested;
+same-Function/Code nonallocating VM progress is still an N3 gate, not inferred.
+
+`stats` can request a diagnostic stop to read all arena/heap counters safely.
+A diagnostic stop does not satisfy a concurrent explicit collect. That join
+originally returned zero without reclaiming garbage; the focused regression
+failed before distinguishing collection requests from diagnostic requests.
+`Interpreter::gc_state` reads only coordinator-owned native state and counts;
+it does not inspect an Active arena. Rendezvous duration is recorded separately
+from mark/sweep duration, with last/max wait values, not pause percentiles.
+Per-thread last-safepoint/resource and timeout diagnostics remain to be built.
+
+Current field migration map (not a declaration of parallel ObjectOps safety):
+
+| Storage | Current Protector | Remaining Boundary |
+| --- | --- | --- |
+| RootCell/deque/free/count | Owner writes; epoch-frozen collector reads | Bounded pre-reserved NoSafepoint load-to-root API |
+| ThreadRecord registry/arena ID/status | Coordinator gate; native record leases | Full thread/shutdown and timeout diagnostics |
+| Active Frame/repr/call depth/handled view | Owner-only, traced through existing roots | External reflection snapshots; N3 parallel VM proof |
+| Heap map/layout/accounting | Short central heap_mutex; erase only at STW | Stable domain/layout metadata, local spans/budgets and exit reclamation |
+| Header/Cell/tail/Dict/Type/Function/exception mutable data | Explicit core quarantine | N2 rooted atomic reads, short locks and immutable snapshots |
+| Immutable native buffers | Owner construction and externally synchronized publication | Const access API and audited cache writes |
+
+The temporary heap map returns references to immutable layout elements: rehash
+does not invalidate element references, and erase waits for this reader's stop
+acknowledgement. Map lookup/registration, shared pressure and external accounting
+are locked; no GC rendezvous or Python callback runs while holding that lock.
+It can still allocate/wait and serialize common paths, so it is a prototype
+bottleneck, not the plan's final scalable allocation protocol.
+
+Bootstrap requires a single registered attachment before enabling quarantine.
+The prior concurrently-started bootstrap fixture relied on the old execution
+lock; it now tests already-published seed identity under sequential admission.
+Separate tests require unsafe parallel bootstrap/admission to fail explicitly
+without publishing a partial image. This boundary must be removed through N2,
+not renamed as completed shared-object synchronization.
+
+Tests cover 2/4 Active storage workers, shared continuously rooted immutable
+input, pressure/explicit GC, simultaneous collectors, admission and NativeWait
+return during a request, allocation-free polls, diagnostic joins, closing and
+exit acknowledgement. Native storage cost probes retain fixed total work for
+1/2/4 workers and verify post-GC live sets. Neither proves Python CPU speedup.
+TransferRecord, NoSafepoint/shared reads, local allocation, N2 snapshots and
+same PythonFunction/Code execution remain the immediate dependencies. The full
+N0-N6/M0-M9 goal is active and no whole concurrency milestone is complete.

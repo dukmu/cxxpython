@@ -154,6 +154,7 @@ include(GoogleTest)
 
 add_executable(test_foundation
     Tests/cpp/core/test_memory.cpp
+    Tests/cpp/core/test_gc_epochs.cpp
     Tests/cpp/core/test_types.cpp
     Tests/cpp/core/test_call.cpp
     Tests/cpp/core/test_attributes.cpp

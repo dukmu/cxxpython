@@ -360,7 +360,7 @@ namespace
         EXPECT_EQ(right.collect(), 0U);
     }
 
-    TEST(FoundationThreads, NativeWaitPublishesRootsAndRestoresExecutionPermission)
+    TEST(FoundationThreads, NativeWaitPublishesRootsAndRestoresAdmission)
     {
         int destroyed = 0;
         Interpreter interpreter;
@@ -453,7 +453,7 @@ namespace
         roots.release(first); EXPECT_EQ(owner.collect(), 1U); EXPECT_EQ(destroyed, 3);
     }
 
-    TEST(FoundationThreads, TransitionalAdmissionKeepsUnmigratedHeapOperationsSafe)
+    TEST(FoundationThreads, RepeatedAdmissionAllocationAndRetirementRemainSafe)
     {
         Interpreter interpreter;
         std::atomic<int> counter{0};
@@ -474,7 +474,7 @@ namespace
         EXPECT_EQ(counter.load(), 400);
     }
 
-    TEST(FoundationThreads, SeparateInterpretersDoNotShareAnExecutionLock)
+    TEST(FoundationThreads, SeparateInterpretersHaveIndependentCoordinators)
     {
         Interpreter first;
         Interpreter second;

@@ -254,7 +254,7 @@ namespace
         std::array values{integer("4").get(context)}; auto container = tuple(values);
         const auto shared_container = container.get(context);
         ASSERT_TRUE(context.enter_repr(container)); std::exception_ptr failure;
-        std::thread worker([&] {
+        auto work = [&] {
             try
             {
                 Attachment attached(interpreter); RootScope worker_roots(attached); ReturnSlot out(attached);
@@ -263,8 +263,8 @@ namespace
                 EXPECT_EQ(attached.payload<StrObject>(out.result().value()).value, U"(4,)");
             }
             catch (...) { failure = std::current_exception(); }
-        });
-        { NativeWait wait(context); worker.join(); }
+        };
+        { NativeWait wait(context); std::thread worker(work); worker.join(); }
         context.leave_repr(container.get(context)); EXPECT_FALSE(failure);
         ReturnSlot out(context); repr(context, container, out); expect_text(out, U"(4,)");
     }

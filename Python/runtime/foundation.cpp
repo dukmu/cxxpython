@@ -7,6 +7,7 @@
 #include <bit>
 #include <cassert>
 #include <chrono>
+#include <condition_variable>
 #include <deque>
 #include <limits>
 #include <random>
@@ -71,8 +72,7 @@ namespace cxxpython::core
             ResultTag tag = ResultTag::Empty;
         };
 
-        // Owner-only writes. Collection scans registered arenas only while
-        // their owners are stopped; epoch admission replaces the serial gate next.
+        // Owner-only writes; the epoch gate publishes a frozen arena to GC.
         struct RootArena
         {
             explicit RootArena(std::uint64_t identity) : identity(identity) {}
@@ -86,6 +86,9 @@ namespace cxxpython::core
             explicit ThreadRecord(std::uint64_t identity) : owner(std::this_thread::get_id()), roots(identity) {}
             const std::thread::id owner;
             RootArena roots;
+            std::atomic<MutatorState> state{MutatorState::PendingAttach};
+            std::uint64_t observed_epoch = 0, ack_epoch = 0, wait_epoch = 0;
+            std::size_t collection_result = 0;
         };
 
         struct Allocation
@@ -107,6 +110,64 @@ namespace cxxpython::core
                     allocation.layout.destroy_storage(object);
             }
 
+            bool other_active(const ThreadRecord *self = nullptr) const
+            {
+                return std::any_of(threads.begin(), threads.end(), [&](const auto &thread) {
+                    return thread.get() != self && thread->state.load(std::memory_order_acquire) == MutatorState::Active;
+                });
+            }
+            void resume(ThreadRecord &thread, std::unique_lock<std::mutex> &gate)
+            {
+                changed.wait(gate, [&] { return phase == GcPhase::Running && (!core_quarantine || !other_active(&thread)); });
+                thread.observed_epoch = completed_epoch;
+                thread.state.store(MutatorState::Active, std::memory_order_release);
+            }
+            HeapStats capture_stats() const
+            {
+                std::size_t roots = 0, cells = 0;
+                for (const auto &thread : threads) { roots += thread->roots.count; cells += thread->roots.cells.size(); }
+                return {heap.size(), live_bytes, heap.size() * sizeof(Allocation) + cells * sizeof(RootCell) + threads.size() * sizeof(ThreadRecord),
+                        roots, cells, collections, reclaimed_bytes, last_pause_ns, threads.size(), last_rendezvous_ns, max_rendezvous_ns};
+            }
+            std::size_t rendezvous(ThreadRecord &caller, HeapStats *snapshot = nullptr)
+            {
+                std::unique_lock gate(coordinator);
+                for (;;)
+                {
+                    if (phase == GcPhase::Running) break;
+                    const auto epoch = request_epoch.load(std::memory_order_relaxed);
+                    const bool joined_collection = collection_request;
+                    caller.wait_epoch = epoch; caller.ack_epoch = epoch;
+                    caller.state.store(MutatorState::Parked, std::memory_order_release); changed.notify_all();
+                    resume(caller, gate);
+                    if (!snapshot && joined_collection) return caller.collection_result;
+                }
+                if (snapshot && !other_active(&caller)) { *snapshot = capture_stats(); return 0; }
+                const auto epoch = request_epoch.load(std::memory_order_relaxed) + 1;
+                if (!epoch) throw std::overflow_error("GC epochs exhausted");
+                phase = GcPhase::Requesting; collection_request = snapshot == nullptr;
+                caller.wait_epoch = epoch; caller.ack_epoch = epoch;
+                caller.state.store(MutatorState::Collector, std::memory_order_release);
+                const auto requested = std::chrono::steady_clock::now();
+                request_epoch.store(epoch, std::memory_order_release); changed.notify_all();
+                changed.wait(gate, [&] { return !other_active(&caller); });
+                if (!snapshot)
+                {
+                    last_rendezvous_ns = static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
+                        std::chrono::steady_clock::now() - requested).count());
+                    max_rendezvous_ns = std::max(max_rendezvous_ns, last_rendezvous_ns);
+                }
+                phase = GcPhase::Collecting;
+                // Membership cannot change until Running; exiting owners keep
+                // their record/State leases while waiting for this round.
+                const auto collected = snapshot ? (*snapshot = capture_stats(), std::size_t{0}) : sweep();
+                for (const auto &thread : threads)
+                    if (thread->wait_epoch == epoch) thread->collection_result = collected;
+                completed_epoch = epoch; caller.observed_epoch = epoch;
+                caller.state.store(MutatorState::Active, std::memory_order_release);
+                phase = GcPhase::Running; changed.notify_all(); return collected;
+            }
+
             void mark(ObjectHeader *object) noexcept
             {
                 if (!object)
@@ -121,7 +182,7 @@ namespace cxxpython::core
                 worklist = &allocation;
             }
 
-            std::size_t collect()
+            std::size_t sweep()
             {
                 const auto start = std::chrono::steady_clock::now();
                 Tracer tracer(this, [](void *state, ObjectHeader *object) noexcept {
@@ -176,7 +237,15 @@ namespace cxxpython::core
                 std::uniform_int_distribution<std::uint64_t> distribution;
                 return std::array{distribution(random), distribution(random)};
             }();
-            std::mutex execution;
+            std::mutex coordinator;
+            std::condition_variable changed;
+            GcPhase phase = GcPhase::Running;
+            bool collection_request = false;
+            std::atomic<std::uint64_t> request_epoch{0};
+            std::uint64_t completed_epoch = 0;
+            bool core_quarantine = false;
+            // Transitional central registration only, not an execution mutex.
+            std::mutex heap_mutex;
             std::atomic<bool> accepting{true};
             std::unordered_map<ObjectHeader *, Allocation> heap;
             std::vector<std::shared_ptr<ThreadRecord>> threads;
@@ -188,7 +257,8 @@ namespace cxxpython::core
             std::size_t collections = 0;
             std::size_t reclaimed_bytes = 0;
             std::uint64_t last_pause_ns = 0;
-            bool gc_enabled = true;
+            std::uint64_t last_rendezvous_ns = 0, max_rendezvous_ns = 0;
+            std::atomic<bool> gc_enabled{true};
             std::size_t allocations_remaining = std::numeric_limits<std::size_t>::max();
             ObjectHeader *object_type = nullptr;
             ObjectHeader *type_type = nullptr;
@@ -201,19 +271,40 @@ namespace cxxpython::core
 
     Interpreter::Interpreter(HeapConfig config) : state_(std::make_shared<detail::State>(config)) {}
     Interpreter::~Interpreter() { close(); }
-    void Interpreter::close() noexcept { state_->accepting.store(false, std::memory_order_release); }
+    void Interpreter::close() noexcept
+    {
+        std::lock_guard gate(state_->coordinator);
+        state_->accepting.store(false, std::memory_order_release); state_->changed.notify_all();
+    }
+    GcSnapshot Interpreter::gc_state() const
+    {
+        std::lock_guard gate(state_->coordinator);
+        GcSnapshot result{state_->phase, state_->request_epoch.load(std::memory_order_acquire), state_->completed_epoch, state_->threads.size(), 0, 0, 0, state_->collections};
+        for (const auto &thread : state_->threads)
+            switch (thread->state.load(std::memory_order_acquire))
+            {
+                case MutatorState::Active: ++result.active; break;
+                case MutatorState::Parked: ++result.parked; break;
+                case MutatorState::NativeWait: ++result.native_wait; break;
+                default: break;
+            }
+        return result;
+    }
 
     Attachment::Attachment(Interpreter &interpreter)
-        : state_(interpreter.state_), permission_(state_->execution, std::defer_lock)
+        : state_(interpreter.state_)
     {
+        std::unique_lock gate(state_->coordinator);
+        state_->changed.wait(gate, [&] { return !state_->accepting.load(std::memory_order_acquire) || state_->phase == GcPhase::Running; });
         if (!state_->accepting.load(std::memory_order_acquire))
             throw std::logic_error("interpreter is closing");
-        permission_.lock();
-        if (!state_->accepting.load(std::memory_order_acquire))
-            throw std::logic_error("interpreter is closing");
+        if (state_->core_quarantine && state_->other_active())
+            throw std::logic_error("parallel ObjectOps admission is unavailable until N2 migration");
         if (!state_->next_arena_id) throw std::overflow_error("root arena identities exhausted");
         thread_record_ = std::make_shared<detail::ThreadRecord>(state_->next_arena_id++);
         state_->threads.push_back(thread_record_);
+        thread_record_->observed_epoch = state_->completed_epoch;
+        thread_record_->state.store(MutatorState::Active, std::memory_order_release);
     }
 
     Attachment::~Attachment()
@@ -221,12 +312,17 @@ namespace cxxpython::core
         require_attached();
         if (thread_record_->roots.count != 0 || !repr_stack_.empty() || current_frame_)
             std::terminate();
+        std::unique_lock gate(state_->coordinator);
+        thread_record_->ack_epoch = state_->request_epoch.load(std::memory_order_relaxed);
+        thread_record_->state.store(MutatorState::Exiting, std::memory_order_release); state_->changed.notify_all();
+        state_->changed.wait(gate, [&] { return state_->phase == GcPhase::Running; });
         std::erase(state_->threads, thread_record_);
+        state_->changed.notify_all();
     }
 
     void Attachment::require_attached() const
     {
-        if (thread_record_->owner != std::this_thread::get_id() || !permission_.owns_lock())
+        if (thread_record_->owner != std::this_thread::get_id() || thread_record_->state.load(std::memory_order_relaxed) != MutatorState::Active)
             throw std::logic_error("Python heap access requires an attached owning thread");
     }
     CallExecutor Attachment::call_executor() const
@@ -260,31 +356,35 @@ namespace cxxpython::core
     void Attachment::require_owns(Value value) const
     {
         require_attached();
+        std::lock_guard metadata(state_->heap_mutex);
         if (!state_->heap.contains(value.object()))
             throw std::logic_error("value does not belong to this interpreter");
     }
 
     void Attachment::require_layout(Value value, const void *family) const
     {
-        require_owns(value);
-        if (state_->heap.at(value.object()).layout.native_family != family)
+        if (allocation_layout(value).native_family != family)
             throw std::logic_error("object has incompatible native layout");
     }
     bool Attachment::has_native_layout(Value value, const void *family) const
     {
-        require_owns(value);
-        return state_->heap.at(value.object()).layout.native_family == family;
+        return allocation_layout(value).native_family == family;
+    }
+    const LayoutDescriptor &Attachment::allocation_layout(Value value) const
+    {
+        require_attached(); std::lock_guard metadata(state_->heap_mutex);
+        const auto found = state_->heap.find(value.object());
+        if (found == state_->heap.end()) throw std::logic_error("value does not belong to this interpreter");
+        return found->second.layout;
     }
     std::optional<Value> *Attachment::instance_dictionary(Value object)
     {
-        require_owns(object);
-        const auto &layout = state_->heap.at(object.object()).layout;
+        const auto &layout = allocation_layout(object);
         return layout.fields.dictionary ? layout.field_cells(object.object()) + layout.fields.slots : nullptr;
     }
     std::optional<Value> &Attachment::instance_slot(Value object, std::size_t index)
     {
-        require_owns(object);
-        const auto &layout = state_->heap.at(object.object()).layout;
+        const auto &layout = allocation_layout(object);
         if (index >= layout.fields.slots) throw std::logic_error("slot is outside immutable instance layout");
         return layout.field_cells(object.object())[index];
     }
@@ -450,15 +550,19 @@ namespace cxxpython::core
     {
         require_attached();
         out.reset(*this);
-        if (state_->allocations_remaining == 0)
-            throw std::bad_alloc();
-        if (state_->gc_enabled && (state_->config.collect_every_allocation ||
-            bytes >= state_->budget || state_->allocated_since_gc >= state_->budget - bytes))
-            collect();
+        poll(); bool pressure;
+        {
+            std::lock_guard metadata(state_->heap_mutex);
+            if (state_->allocations_remaining == 0) throw std::bad_alloc();
+            pressure = state_->gc_enabled && (state_->config.collect_every_allocation || bytes >= state_->budget || state_->allocated_since_gc >= state_->budget - bytes);
+        }
+        if (pressure) collect();
     }
 
     void Attachment::adopt(ObjectHeader *object, LayoutDescriptor layout, ReturnSlot &out, std::size_t external)
     {
+        std::lock_guard metadata(state_->heap_mutex);
+        if (state_->allocations_remaining == 0) throw std::bad_alloc();
         const auto storage_bytes = layout.storage_size();
         if (external > std::numeric_limits<std::size_t>::max() - storage_bytes)
             throw std::bad_alloc();
@@ -479,7 +583,7 @@ namespace cxxpython::core
     void Attachment::require_edge(Handle owner, const GcEdge &edge) const
     {
         Value value = owner.get(*this);
-        const auto &layout = state_->heap.at(value.object()).layout;
+        const auto &layout = allocation_layout(value);
         auto offset = reinterpret_cast<std::uintptr_t>(&edge) -
                       reinterpret_cast<std::uintptr_t>(value.object());
         if (offset > layout.size || layout.size - offset < sizeof(GcEdge))
@@ -503,7 +607,8 @@ namespace cxxpython::core
     }
     void Attachment::account_external(Value owner, std::size_t bytes)
     {
-        require_owns(owner);
+        require_attached(); std::lock_guard metadata(state_->heap_mutex);
+        if (!state_->heap.contains(owner.object())) throw std::logic_error("value does not belong to this interpreter");
         auto &allocation = state_->heap.at(owner.object());
         auto without_previous = state_->live_bytes - allocation.external_bytes;
         if (bytes > std::numeric_limits<std::size_t>::max() - without_previous)
@@ -518,15 +623,32 @@ namespace cxxpython::core
         state_->live_bytes = without_previous + bytes;
     }
 
-    std::size_t Attachment::collect() { require_attached(); return state_->collect(); }
+    std::size_t Attachment::collect() { require_attached(); return state_->rendezvous(*thread_record_); }
+    void Attachment::poll()
+    {
+        require_attached();
+        if (state_->request_epoch.load(std::memory_order_acquire) == thread_record_->observed_epoch) return;
+        std::unique_lock gate(state_->coordinator);
+        if (state_->phase != GcPhase::Running)
+        {
+            thread_record_->ack_epoch = state_->request_epoch.load(std::memory_order_relaxed);
+            thread_record_->state.store(MutatorState::Parked, std::memory_order_release); state_->changed.notify_all();
+        }
+        state_->resume(*thread_record_, gate);
+    }
     void Attachment::set_allocation_limit(std::size_t remaining)
-    { require_attached(); state_->allocations_remaining = remaining; }
+    { require_attached(); std::lock_guard metadata(state_->heap_mutex); state_->allocations_remaining = remaining; }
 
     void Attachment::bootstrap()
     {
         require_attached();
         if (state_->type_type)
             return;
+        {
+            std::lock_guard gate(state_->coordinator);
+            if (state_->threads.size() != 1) throw std::logic_error("core bootstrap requires exclusive migration admission");
+            state_->core_quarantine = true;
+        }
         const bool previous_gc = state_->gc_enabled;
         state_->gc_enabled = false;
         try
@@ -639,8 +761,8 @@ namespace cxxpython::core
             detail::build_core_objects(*this, outputs);
             for (std::size_t i = 0; i < outputs.size(); ++i)
                 state_->core[i] = outputs[i]->result().value().object();
-            // The image is available to native factories under the execution
-            // lock, but not published until all preexisting B2 types are ready.
+            // Core quarantine excludes other Active owners; publish only after
+            // all preexisting B2 types are ready.
             for (const auto &saved : previous_types) detail::type_ready(*this, saved.type);
             payload<TypeObject>(object_type()).immutable = true;
             payload<TypeObject>(type_type()).immutable = true;
@@ -671,20 +793,16 @@ namespace cxxpython::core
     void Attachment::set_gc_enabled(bool enabled) { require_attached(); state_->gc_enabled = enabled; }
     HeapStats Attachment::stats() const
     {
-        require_attached();
-        std::size_t roots = 0, cells = 0;
-        for (const auto &thread : state_->threads) { roots += thread->roots.count; cells += thread->roots.cells.size(); }
-        return {state_->heap.size(), state_->live_bytes,
-                state_->heap.size() * sizeof(detail::Allocation) +
-                    cells * sizeof(detail::RootCell) + state_->threads.size() * sizeof(detail::ThreadRecord),
-                roots, cells, state_->collections,
-                state_->reclaimed_bytes, state_->last_pause_ns, state_->threads.size()};
+        require_attached(); HeapStats result{}; state_->rendezvous(*thread_record_, &result); return result;
     }
 
     NativeWait::NativeWait(Attachment &context) : context_(context)
     {
         context_.require_attached();
-        context_.permission_.unlock();
+        std::lock_guard gate(context_.state_->coordinator);
+        context_.thread_record_->ack_epoch = context_.state_->request_epoch.load(std::memory_order_relaxed);
+        context_.thread_record_->state.store(MutatorState::NativeWait, std::memory_order_release); context_.state_->changed.notify_all();
     }
-    NativeWait::~NativeWait() { context_.permission_.lock(); }
+    NativeWait::~NativeWait()
+    { std::unique_lock gate(context_.state_->coordinator); context_.state_->resume(*context_.thread_record_, gate); }
 }

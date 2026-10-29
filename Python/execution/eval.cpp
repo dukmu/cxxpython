@@ -122,13 +122,16 @@ namespace cxxpython::core
         void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &out)
         {
             ReturnSlot result(context);
+            std::size_t poll_budget = 64;
             for (;;)
             {
+                if (!--poll_budget) { context.poll(); poll_budget = 64; }
                 auto &data = context.payload<FrameObject>(activation.current()); const auto &code = context.payload<CodeObject>(data.code);
                 try
                 {
                     if (data.reason)
                     {
+                        context.poll();
                         if (data.unwind(context)) { activation.sync(); continue; }
                         if (const auto *returned = std::get_if<FunctionReturn>(&*data.reason))
                         { if (activation.returned(returned->value, out)) return; }

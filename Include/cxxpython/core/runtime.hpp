@@ -180,6 +180,15 @@ namespace cxxpython::core
         std::size_t reclaimed_bytes;
         std::uint64_t last_pause_ns;
         std::size_t registered_threads;
+        std::uint64_t last_rendezvous_ns, max_rendezvous_ns;
+    };
+    enum class MutatorState { PendingAttach, Active, Parked, NativeWait, Collector, Exiting };
+    enum class GcPhase { Running, Requesting, Collecting };
+    struct GcSnapshot
+    {
+        GcPhase phase;
+        std::uint64_t request_epoch, completed_epoch;
+        std::size_t registered, active, parked, native_wait, collections;
     };
 
     class Interpreter final
@@ -190,6 +199,7 @@ namespace cxxpython::core
         Interpreter(const Interpreter &) = delete;
         Interpreter &operator=(const Interpreter &) = delete;
         void close() noexcept;
+        GcSnapshot gc_state() const;
 
     private:
         friend class Attachment;
@@ -341,6 +351,7 @@ namespace cxxpython::core
         // Deterministic managed-allocation quota for embedding/failure tests.
         void set_allocation_limit(std::size_t remaining);
         std::size_t collect();
+        void poll();
         void set_gc_enabled(bool enabled);
         HeapStats stats() const;
         void require_attached() const;
@@ -354,6 +365,7 @@ namespace cxxpython::core
         friend class detail::FrameActivation;
         void require_owns(Value value) const;
         void require_layout(Value value, const void *family) const;
+        const LayoutDescriptor &allocation_layout(Value value) const;
         bool has_native_layout(Value value, const void *family) const;
         LayoutDescriptor require_instance_layout(Handle type, const LayoutDescriptor &layout);
         void require_edge(Handle owner, const GcEdge &edge) const;
@@ -389,8 +401,6 @@ namespace cxxpython::core
 
         std::shared_ptr<detail::State> state_;
         std::shared_ptr<detail::ThreadRecord> thread_record_;
-        // Transitional admission for unconverted heap/ObjectOps, not the N1-N3 target.
-        std::unique_lock<std::mutex> permission_;
         std::size_t call_depth_ = 0;
         std::size_t native_depth_ = 0;
         std::vector<Value> repr_stack_;

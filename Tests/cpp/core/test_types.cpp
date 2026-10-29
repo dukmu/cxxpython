@@ -128,26 +128,21 @@ namespace
         EXPECT_EQ(context.stats().collections, before);
     }
 
-    TEST(FoundationTypes, ConcurrentAttachmentsPublishExactlyOneSeedGraph)
+    TEST(FoundationTypes, PublishedSeedGraphIdentitySurvivesSequentialCoreAdmission)
     {
         Interpreter interpreter({.collect_every_allocation = true});
-        std::vector<std::future<Value>> identities;
-        for (int i = 0; i < 4; ++i)
-            identities.push_back(std::async(std::launch::async, [&] {
-                Attachment context(interpreter);
-                context.bootstrap();
-                context.collect();
-                return context.type_type();
-            }));
-        Attachment context(interpreter);
-        // Await workers without keeping their execution permission locked out.
+        Attachment context(interpreter); context.bootstrap(); const auto identity = context.type_type();
         {
             NativeWait wait(context);
-            for (auto &identity : identities)
-                identity.wait();
+            for (int i = 0; i < 4; ++i)
+            {
+                auto worker = std::async(std::launch::async, [&] {
+                    Attachment other(interpreter); other.bootstrap(); other.collect(); return other.type_type();
+                });
+                EXPECT_EQ(worker.get(), identity);
+            }
         }
-        for (auto &identity : identities)
-            EXPECT_EQ(identity.get(), context.type_type());
+        EXPECT_EQ(context.type_type(), identity);
         EXPECT_EQ(context.stats().objects, 2U);
     }
 

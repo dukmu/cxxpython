@@ -1,5 +1,89 @@
 # Development Status
 
+## 2026-10-29 N1 Multi-Active Storage And GC Epoch Stable Point
+
+This entry is prepended; all earlier development history is unchanged. The
+user-confirmed full Plan 2 N0-N6/M0-M9 goal is active. This slice advances task
+03 on the production heap; it does not mark N1, N2 or Python parallelism complete.
+
+- Removed State::execution and whole-Attachment execution permission. Fresh
+  storage contexts now admit multiple Active OS threads in one Interpreter and
+  shared heap, with thread-private roots and no alternate test collector.
+- Added request/ack/completed epochs, a shared coordinator/admission/resume
+  gate, and Active/Parked/NativeWait/Collector/Exiting transitions. Collectors
+  wait without holding the heap metadata lock. Membership stays fixed during
+  Requesting/Collecting; exiting owners keep their native record/State leases
+  until completion. NativeWait return and new attach cannot outrun a request.
+- Concurrent explicit collectors join one real collection and receive its
+  result through their own records. Diagnostic stats stops are distinct: the
+  first regression test returned zero and left garbage alive when an explicit
+  collect joined a diagnostic stop; it now performs the required real GC.
+- close updates admission under the same gate and notifies pending attaches,
+  avoiding a lost wakeup. Existing attachments can finish. Native diagnostics
+  expose coordinator state/counts without reading Active root arenas.
+- Added fast epoch polling before allocation, every 64 VM dispatch iterations
+  and at reason transfers. Disabling automatic GC does not disable polling or
+  explicit collection. Allocation-free native polling is tested; the shared
+  Python VM allocation-free loop remains an N3 gate.
+- Split rendezvous wait timing from mark/sweep timing, recording last/max wait.
+  A short heap_mutex protects temporary central registration, layout lookup,
+  quotas and accounting; no Python callback or GC rendezvous holds it. Layout
+  references survive rehash, and STW prevents erase before the reader stops.
+  This is not the final scalable metadata/local-allocation implementation.
+- Unconverted ObjectOps are explicitly quarantined: bootstrap requires one
+  registered attachment, second Active admission is rejected, and frozen-owner
+  return waits for exclusive admission. This is an exposed temporary gap, not
+  a renamed final GIL or proof of Python CPU parallelism. The old concurrent
+  bootstrap fixture depended on execution-lock serialization and was replaced
+  with published seed identity under sequential admission plus explicit unsafe
+  parallel bootstrap/admission rejection tests. A repr handoff now launches its
+  receiver inside the sender's NativeWait window, without a startup race.
+- Added eight epoch tests covering 2/4 Active workers, shared continuously
+  rooted immutable input, automatic/explicit GC, simultaneous collectors,
+  attach/NativeWait recovery during a request, diagnostic joins, close and exit
+  acknowledgement. Existing failure-allocation and ownership tests still run.
+  Updated foundation_contracts with current field boundaries and the epoch
+  happens-before argument; earlier serial sections are identified as history.
+
+Verification and costs:
+
+- Release foundation 260/260. Eight epoch tests passed 30 consecutive repeats.
+  Full CTest exit 0, discovery count 508 (248 legacy + 260 foundation), with
+  15-second per-foundation-test timeouts.
+- ASan/UBSan/LeakSanitizer 260/260 outside the ptrace sandbox; TSan 260/260,
+  including actual multiple-Active allocation/GC/retirement paths.
+- Independent foundation-only Release benchmark rebuilt without legacy/tests.
+  Three final probes ran after builds/sanitizers completed. All exact-result
+  and final live-set checks passed; old workload categories remain present.
+  GCC 11.4 / Release / x86-64 WSL2, no CPU pinning or frequency control.
+- Final 100000 root register/releases: 3.29/3.35/4.12 ms; allocate/automatic-GC:
+  9.13/9.80/10.32 ms. Handle/header/Value remain 32/8/8 bytes; Frame prefix is
+  240 bytes. One record plus two root cells now records 248 metadata bytes
+  versus 208 before the epoch fields; STL/control-block/allocator/RSS costs
+  remain excluded. No zero-overhead or serial speedup claim is made.
+- New fixed-total 60000-allocation storage probe: median wall time at 1/2/4
+  workers is 6.35/12.20/21.00 ms, respectively. Median process CPU is about
+  6.45/15.31/40.92 ms. Each round performs 15 collections and returns to an empty
+  heap; request equals completed. Largest observed rendezvous wait is 0.522 ms,
+  not a percentile or bound. The negative scaling is retained, not hidden.
+- Initial process CPU samples taken after worker exit were implausibly low
+  (including 0.026 ms for a 5.84 ms single-worker run). The corrected probe
+  samples while workers are alive with frozen roots, then retires them outside
+  the timed interval. Both initial and final rows remain in the CSVs; the
+  storage CSV labels the initial CPU boundary unreliable. They are not directly
+  comparable retirement timings. All serial categories, including slow samples,
+  are retained as n1_epochs_initial/final in the existing CSVs.
+
+Next dependency: task 04 stable heap/layout metadata and local allocation/budget,
+then bounded rooted shared reads/TransferRecord and N2 field/snapshot migration.
+The central heap map/shared accounting and related contention remain concrete
+scaling bottlenecks; the current native storage probe is NOT the P1/shared
+PythonFunction/Code CPU-parallel acceptance test. Full timeout diagnostics,
+NoSafepoint scopes, N2/N3, N4-N6/M0-M9, source-level test2.py, CPython performance
+and release gates all remain open. No new Python RC authority, subagent or
+legacy VM fallback was introduced. Unrelated user test2.py and temporary_plan.md
+deletion are excluded from this stable point. The full goal remains active.
+
 ## 2026-10-29 Plan 2 Adoption And N1 Thread-Owned Root Arenas
 
 The user supplied cxxpython_foundation_redesign_plan_2.md and replaced the old
