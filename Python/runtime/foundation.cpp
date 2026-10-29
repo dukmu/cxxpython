@@ -71,6 +71,23 @@ namespace cxxpython::core
             ResultTag tag = ResultTag::Empty;
         };
 
+        // Owner-only writes. Collection scans registered arenas only while
+        // their owners are stopped; epoch admission replaces the serial gate next.
+        struct RootArena
+        {
+            explicit RootArena(std::uint64_t identity) : identity(identity) {}
+            const std::uint64_t identity;
+            std::deque<RootCell> cells;
+            RootCell *free = nullptr;
+            std::size_t count = 0;
+        };
+        struct ThreadRecord
+        {
+            explicit ThreadRecord(std::uint64_t identity) : owner(std::this_thread::get_id()), roots(identity) {}
+            const std::thread::id owner;
+            RootArena roots;
+        };
+
         struct Allocation
         {
             const LayoutDescriptor layout;
@@ -110,9 +127,10 @@ namespace cxxpython::core
                 Tracer tracer(this, [](void *state, ObjectHeader *object) noexcept {
                     static_cast<State *>(state)->mark(object);
                 });
-                for (const auto &cell : roots)
-                    if (cell.scope && cell.tag != ResultTag::Empty)
-                        mark(cell.object);
+                for (const auto &thread : threads)
+                    for (const auto &cell : thread->roots.cells)
+                        if (cell.scope && cell.tag != ResultTag::Empty)
+                            mark(cell.object);
                 mark(object_type);
                 mark(type_type);
                 for (auto *object : core)
@@ -161,10 +179,9 @@ namespace cxxpython::core
             std::mutex execution;
             std::atomic<bool> accepting{true};
             std::unordered_map<ObjectHeader *, Allocation> heap;
-            std::deque<RootCell> roots;
-            RootCell *free_root = nullptr;
+            std::vector<std::shared_ptr<ThreadRecord>> threads;
+            std::uint64_t next_arena_id = 1;
             Allocation *worklist = nullptr;
-            std::size_t root_count = 0;
             std::size_t live_bytes = 0;
             std::size_t allocated_since_gc = 0;
             std::size_t budget;
@@ -187,26 +204,29 @@ namespace cxxpython::core
     void Interpreter::close() noexcept { state_->accepting.store(false, std::memory_order_release); }
 
     Attachment::Attachment(Interpreter &interpreter)
-        : state_(interpreter.state_), thread_(std::this_thread::get_id()),
-          permission_(state_->execution, std::defer_lock)
+        : state_(interpreter.state_), permission_(state_->execution, std::defer_lock)
     {
         if (!state_->accepting.load(std::memory_order_acquire))
             throw std::logic_error("interpreter is closing");
         permission_.lock();
         if (!state_->accepting.load(std::memory_order_acquire))
             throw std::logic_error("interpreter is closing");
+        if (!state_->next_arena_id) throw std::overflow_error("root arena identities exhausted");
+        thread_record_ = std::make_shared<detail::ThreadRecord>(state_->next_arena_id++);
+        state_->threads.push_back(thread_record_);
     }
 
     Attachment::~Attachment()
     {
         require_attached();
-        if (owned_roots_ != 0 || !repr_stack_.empty() || current_frame_)
+        if (thread_record_->roots.count != 0 || !repr_stack_.empty() || current_frame_)
             std::terminate();
+        std::erase(state_->threads, thread_record_);
     }
 
     void Attachment::require_attached() const
     {
-        if (thread_ != std::this_thread::get_id() || !permission_.owns_lock())
+        if (thread_record_->owner != std::this_thread::get_id() || !permission_.owns_lock())
             throw std::logic_error("Python heap access requires an attached owning thread");
     }
     CallExecutor Attachment::call_executor() const
@@ -272,7 +292,7 @@ namespace cxxpython::core
     detail::RootCell &Attachment::cell(Handle handle) const
     {
         require_attached();
-        if (handle.owner_ != state_.get() || !handle.cell_ ||
+        if (handle.owner_ != state_.get() || handle.arena_id_ != thread_record_->roots.identity || !handle.cell_ ||
             !handle.cell_->scope || handle.cell_->generation != handle.generation_)
             throw std::logic_error("foreign or expired root handle");
         return *handle.cell_;
@@ -281,23 +301,24 @@ namespace cxxpython::core
     Handle Attachment::acquire(const void *scope)
     {
         require_attached();
-        auto *cell = state_->free_root;
+        auto &arena = thread_record_->roots;
+        auto *cell = arena.free;
         if (cell)
-            state_->free_root = cell->next_free;
+            arena.free = cell->next_free;
         else
         {
-            state_->roots.emplace_back();
-            cell = &state_->roots.back();
+            arena.cells.emplace_back();
+            cell = &arena.cells.back();
         }
         ++cell->generation;
         cell->revision = 0;
         cell->object = nullptr;
         cell->scope = scope;
         cell->tag = ResultTag::Empty;
-        ++state_->root_count;
-        ++owned_roots_;
+        ++arena.count;
         Handle handle;
         handle.owner_ = state_.get();
+        handle.arena_id_ = arena.identity;
         handle.cell_ = cell;
         handle.generation_ = cell->generation;
         return handle;
@@ -306,16 +327,17 @@ namespace cxxpython::core
     void Attachment::release(Handle handle) noexcept
     {
         // A scope may retain old tokens after explicit, non-LIFO release.
+        auto &arena = thread_record_->roots;
+        assert(handle.owner_ == state_.get() && handle.arena_id_ == arena.identity);
         auto &cell = *handle.cell_;
         if (!cell.scope || cell.generation != handle.generation_)
             return;
         cell.object = nullptr;
         cell.scope = nullptr;
         cell.tag = ResultTag::Empty;
-        cell.next_free = state_->free_root;
-        state_->free_root = &cell;
-        --state_->root_count;
-        --owned_roots_;
+        cell.next_free = arena.free;
+        arena.free = &cell;
+        --arena.count;
     }
 
     Value Handle::get(const Attachment &context) const
@@ -388,7 +410,12 @@ namespace cxxpython::core
     {
         if (object)
             context_.require_owns(Value(*object));
-        auto &cell = context_.cell(root_);
+        (void)context_.cell(root_);
+        store_root_noexcept(tag, object);
+    }
+    void ReturnSlot::store_root_noexcept(ResultTag tag, ObjectHeader *object) noexcept
+    {
+        auto &cell = *root_.cell_;
         cell.object = object;
         cell.tag = tag;
         ++cell.revision;
@@ -444,7 +471,9 @@ namespace cxxpython::core
             std::numeric_limits<std::size_t>::max() - state_->allocated_since_gc);
         if (state_->allocations_remaining != std::numeric_limits<std::size_t>::max())
             --state_->allocations_remaining;
-        out.ok(Value(*object));
+        // prepare_allocation validated this caller-owned cell; heap insertion
+        // established the domain. Publication does not query heap or allocate.
+        out.store_root_noexcept(ResultTag::Ok, object);
     }
 
     void Attachment::require_edge(Handle owner, const GcEdge &edge) const
@@ -643,11 +672,13 @@ namespace cxxpython::core
     HeapStats Attachment::stats() const
     {
         require_attached();
+        std::size_t roots = 0, cells = 0;
+        for (const auto &thread : state_->threads) { roots += thread->roots.count; cells += thread->roots.cells.size(); }
         return {state_->heap.size(), state_->live_bytes,
                 state_->heap.size() * sizeof(detail::Allocation) +
-                    state_->roots.size() * sizeof(detail::RootCell),
-                state_->root_count, state_->roots.size(), state_->collections,
-                state_->reclaimed_bytes, state_->last_pause_ns};
+                    cells * sizeof(detail::RootCell) + state_->threads.size() * sizeof(detail::ThreadRecord),
+                roots, cells, state_->collections,
+                state_->reclaimed_bytes, state_->last_pause_ns, state_->threads.size()};
     }
 
     NativeWait::NativeWait(Attachment &context) : context_(context)

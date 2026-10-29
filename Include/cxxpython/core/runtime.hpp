@@ -38,6 +38,7 @@ namespace cxxpython::core
     {
         struct State;
         struct RootCell;
+        struct ThreadRecord;
         struct BigInt;
         class FrameActivation;
         std::uint64_t siphash24(std::span<const std::byte> data, std::array<std::uint64_t, 2> key) noexcept;
@@ -178,6 +179,7 @@ namespace cxxpython::core
         std::size_t collections;
         std::size_t reclaimed_bytes;
         std::uint64_t last_pause_ns;
+        std::size_t registered_threads;
     };
 
     class Interpreter final
@@ -206,6 +208,7 @@ namespace cxxpython::core
         friend class ReturnSlot;
         friend class ResultView;
         detail::State *owner_ = nullptr;
+        std::uint64_t arena_id_ = 0;
         detail::RootCell *cell_ = nullptr;
         std::uint64_t generation_ = 0;
     };
@@ -263,6 +266,8 @@ namespace cxxpython::core
     private:
         friend class Attachment;
         void write(ResultTag tag, ObjectHeader *object);
+        // Only after validating the output cell and the incoming object's domain.
+        void store_root_noexcept(ResultTag tag, ObjectHeader *object) noexcept;
         Attachment &context_;
         Handle root_;
     };
@@ -383,9 +388,9 @@ namespace cxxpython::core
         }
 
         std::shared_ptr<detail::State> state_;
-        const std::thread::id thread_;
+        std::shared_ptr<detail::ThreadRecord> thread_record_;
+        // Transitional admission for unconverted heap/ObjectOps, not the N1-N3 target.
         std::unique_lock<std::mutex> permission_;
-        std::size_t owned_roots_ = 0;
         std::size_t call_depth_ = 0;
         std::size_t native_depth_ = 0;
         std::vector<Value> repr_stack_;

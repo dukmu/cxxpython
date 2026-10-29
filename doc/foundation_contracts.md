@@ -2,11 +2,31 @@
 
 ## Authority And Status
 
-The repository-root `cxxpython_foundation_redesign_plan.md` is the authoritative
-plan. This ledger records decisions and executable evidence, not a replacement
-architecture. The older architecture, no-GIL, development-plan and feature-matrix
-documents describe the **legacy** implementation. Their passing tests do not
-establish new-core compatibility.
+The repository-root `cxxpython_foundation_redesign_plan_2.md` is authoritative.
+It supersedes the first plan's per-interpreter execution-lock target. This ledger
+records implementation evidence, not a replacement architecture. Earlier slices
+below describe their then-serialized implementation and do not establish no-GIL
+compatibility. Older RC/no-GIL documents concern the **legacy** implementation,
+not another lifetime authority for this tracing core.
+
+The current priority is N0 -> N1 -> N2 -> N3: contracts, parallel roots/heap/GC,
+shared-object synchronization, then the existing VM's shared-Function/Code CPU
+parallelism. Multiple Active mutators in one Interpreter/shared heap are required.
+I/O detachment, separate interpreters and native computation do not substitute
+for simultaneous Python bytecode and ObjectOps execution. Remaining M0-M9 work
+is retained; the concurrency gates do not narrow language/library/release scope.
+
+| Concurrency Gate | Current Status | Remaining Evidence |
+| --- | --- | --- |
+| N0 access/publication contracts | Experimental | Plan 2 adopted; per-field migration contracts and implementation audits still required |
+| N1 roots/heap/GC | Experimental | Thread-owned roots, arena affinity, registry scanning/retirement and internal no-wait result publication exist; multi-Active, epoch gate, transfer records and scalable heap metadata are not yet implemented |
+| N2 shared objects/methods | Planned | TypeSnapshot/FunctionCallState, atomic/shared fields and callback-safe critical sections |
+| N3 parallel VM | Planned | Shared same Function/Code CPU progress, allocation-free loop polling and 1/2/4-worker costs |
+| N4-N6 completion/release | Planned | Remaining runtime, frontend/library, platform, performance and replacement gates |
+
+State::execution still guards unconverted shared heap/ObjectOps paths in this
+transition. It is an explicit implementation gap, not the accepted final model.
+Do not remove it before the root, GC and shared-field dependencies are safe.
 
 Baseline: Python 3.12 language semantics, with CPython 3.12.14 as the intended
 fixed differential reference. No CPython ABI, `.pyc` or private bytecode promise.
@@ -1046,7 +1066,7 @@ This is native CodeBuilder verification, not source-language support or the
 pinned executable differential gate. Async with, target unpacking/lowering,
 exception groups and the remaining M4-M9 gates are not inferred from it.
 
-## Concurrency Route Review Hold
+## Concurrency Route Review Hold (Historical)
 
 The user's latest requirement is real CPU-parallel Python execution in one
 interpreter with a shared heap. NativeWait/I/O progress or separate interpreters
@@ -1054,11 +1074,84 @@ are not substitutes. The implemented foundation still holds State::execution
 for an Attachment's attached lifetime; this is serial execution, not no-GIL.
 The original plan/AGENTS concurrency choice has not been silently rewritten.
 
-The goal is paused for the user's route review. No new synchronization design
-is implemented in this checkpoint. The conflicting per-interpreter-lock final
-target needs revision before work resumes. Review topics include mutator
+At that checkpoint the goal was paused for the user's route review. No new
+synchronization design was implemented there. Plan 2 now supersedes that hold
+and the conflicting per-interpreter-lock final target. Review topics included mutator
 registration and safe points, root publication and GC stop coordination,
 heap/root bookkeeping, shared mutable-object synchronization without locks
 across Python callbacks, and thread exit/shutdown. Acceptance must demonstrate
 overlapping CPU execution in the same interpreter, shared-object correctness,
 GC stress and race/deadlock checks, not merely passing the current serial suite.
+
+## Plan 2 Adoption And First Root-Arena Migration
+
+The user supplied cxxpython_foundation_redesign_plan_2.md, replaced the old goal
+and set its N0-N6/M0-M9 objective active. No additional approval of the shared-
+Interpreter/heap CPU-parallel requirement is outstanding. The original plan is
+retained as history. AGENTS now points to the second plan and explicitly rejects
+an execution GIL, separate interpreters and NativeWait as final CPU evidence.
+
+The first task-02 implementation moves RootCell deque/free-list/count into one
+RootArena owned by each registered ThreadRecord. Registration and retirement
+currently use the existing transitional admission mutex. The State registry and
+Attachment hold native shared leases on records; this is not Python object RC.
+The current collector scans every registered arena, including owners frozen in
+NativeWait, rather than one global arena or only its requesting thread's roots.
+Retirement occurs with no live roots and removes that arena's cells/storage.
+
+Handles contain Interpreter identity, monotonic per-Interpreter arena identity,
+cell address and cell generation. The arena check happens before dereferencing
+the cell, rejecting foreign/retired-arena handles even on the same OS thread.
+Within an arena, existing non-LIFO reuse, stale generations and ResultView
+revision validation remain unchanged. Ordinary Handle/ReturnSlot/ResultView
+do not become cross-thread transfer objects. Three regressions first failed
+against the global-arena implementation, then passed after this migration.
+
+ReturnSlot's trusted internal store writes only an existing caller-owned cell's
+object/tag/revision and is noexcept, without allocation, heap lookup or waiting.
+Managed allocation uses it after output validation and successful domain
+registration. Public ok/raised still validate inputs; they are not yet the
+shared-field load-to-root API. RootArena growth remains a safepoint-free host
+allocation under the current serialized implementation; bounded NoSafepoint
+access and pre-reserved roots still require the next N1/N2 work.
+
+HeapStats now aggregates root counts/cells over registered records and reports
+registered_threads. Recorded metadata adds sizeof(ThreadRecord), but excludes
+shared_ptr control blocks, deque blocks, registry capacity, allocator overhead
+and RSS. Handles grow from 24 to 32 bytes on this x86-64 build. Allocation and
+root performance therefore need a new series, not an assertion of zero cost.
+
+Current field-access migration map (not a declaration of concurrent safety):
+
+| Storage | Current Protector | Required Parallel Boundary |
+| --- | --- | --- |
+| RootCell/deque/free/count | Owning Attachment only; collector under transitional admission while owners are frozen | Epoch-acknowledged immutable root extents; owner-only writes and completed-epoch resume |
+| ThreadRecord registry/arena ID | Transitional admission mutex | Coordinator membership/epoch gate and collector record leases |
+| Active Frame/repr/call depth/handled view | Invoking Attachment, existing active roots | Owner-only execution state; safe external snapshots/STW observation |
+| heap map/layout checks/accounting | Transitional admission mutex | Stable owner/layout metadata, local allocation/accounting, short slow-path coordination |
+| header.type/Cell/instance tail slots | Transitional admission mutex | Rooted atomic edges or short object locks; load-to-root before safepoint |
+| Type namespace/MRO/name/flags/epoch | Transitional admission mutex | Frozen topology, TypeSnapshot/current publication and consistent publication sequence |
+| Function code/defaults/name/globals metadata | Transitional admission; Code itself immutable | Rooted FunctionCallState snapshot, separate globals-object synchronization |
+| Dict entries/index and mappingproxy view | Transitional admission mutex | Callback-free short commit, rooted reads/versioning; Type proxies follow current snapshot |
+| Exception args/context/cause/traceback and tb_next | Transitional admission mutex | Rooted field snapshots and coherent chain mutation; identity preserved |
+| Numeric/string/tuple/native callable buffers | Logically immutable value/call data, public T& still exposed | Safely published const views, mutable cache rules and audited construction-only access |
+
+The table and new header comments expose current limitations. Full per-field
+encapsulation, immutable snapshots and publication are still N0/N2 audit gates;
+version counters do not legalize reading concurrently changing STL containers.
+No new unprotected ObjectOps parallel entry is enabled by moving roots.
+
+Current happens-before evidence is still mutex-based: owner writes precede
+NativeWait unlock; collector admission acquires that mutex before scanning all
+frozen arenas; owner reacquires it before resuming. Registration/retirement also
+occur under that gate. This is NOT the plan's request/ack/completed protocol.
+The next task must replace it with the explicit multi-mutator state machine,
+shared admission/resume epoch gate, pinned records and allocation-free-loop
+polling, while rejecting unsafe unconverted ObjectOps paths. TransferRecord,
+NoSafepoint rooted loads and stable heap metadata remain necessary dependencies.
+
+Existing tail-mutation/repr NativeWait tests now establish receiver-local roots
+from values kept continuously rooted/frozen by the sender until the receiver
+finishes. This bounded test handoff is not a public queue/TransferRecord API.
+The old serial-permission test uses an atomic counter and is explicitly named
+as transitional admission, not a requirement that execution stay serialized.

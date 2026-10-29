@@ -1,5 +1,10 @@
 # No-GIL GC and Threading Design
 
+> Legacy RC/cycle-GC proposal for the old runtime. It does not govern the
+> cxxpython::core foundation. The authoritative
+> `cxxpython_foundation_redesign_plan_2.md` retains non-moving precise tracing
+> without Python object RC and requires multiple mutators in one shared heap.
+
 This document defines the target ownership, garbage collection, and threading
 model for cxxpython without a global interpreter lock. It is a design contract
 for implementation work, not a benchmark workaround. The goal is to make object

@@ -252,12 +252,13 @@ namespace
     TEST_F(CoreRepresentation, ReprIdentityGuardIsLocalToTheActiveAttachmentAcrossNativeWait)
     {
         std::array values{integer("4").get(context)}; auto container = tuple(values);
+        const auto shared_container = container.get(context);
         ASSERT_TRUE(context.enter_repr(container)); std::exception_ptr failure;
         std::thread worker([&] {
             try
             {
                 Attachment attached(interpreter); RootScope worker_roots(attached); ReturnSlot out(attached);
-                repr(attached, worker_roots.root(container.get(attached)), out);
+                repr(attached, worker_roots.root(shared_container), out);
                 ASSERT_EQ(out.result().tag(), ResultTag::Ok);
                 EXPECT_EQ(attached.payload<StrObject>(out.result().value()).value, U"(4,)");
             }

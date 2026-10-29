@@ -1,0 +1,4 @@
+series,iterations,root_register_release_ns,allocation_and_auto_gc_ns,registered_threads,handle_bytes,root_cells,recorded_metadata_bytes,live_bytes
+n1_owned_arenas,100000,3609921,8601111,1,32,2,208,0
+n1_owned_arenas,100000,3285665,9269655,1,32,2,208,0
+n1_owned_arenas,100000,3198877,8915748,1,32,2,208,0

@@ -9,6 +9,8 @@
 
 namespace cxxpython::core
 {
+    // Type metadata currently relies on transitional serial admission.
+    // Plan 2 replaces published mutable metadata with rooted TypeSnapshot reads.
     struct InstanceObject
     {
         ObjectHeader header;

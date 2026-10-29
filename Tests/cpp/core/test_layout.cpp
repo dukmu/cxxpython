@@ -282,13 +282,15 @@ namespace
     TEST_F(CoreLayout, FrozenRootsPermitTailMutationAndCollectionFromAnotherAttachment)
     {
         auto cls = type(U"Slots", std::vector<std::u32string>{U"x"}); auto self = instance(cls); auto name = text(U"x");
+        const auto shared_self = self.get(context), shared_name = name.get(context);
         {
             NativeWait wait(context);
             auto finished = std::async(std::launch::async, [&] {
                 Attachment other(interpreter); RootScope scope(other); ReturnSlot out(other);
+                auto receiver = scope.root(shared_self); auto attribute = scope.root(shared_name);
                 make_str(other, U"from another attachment", out);
                 auto value = scope.root(out.result().value());
-                set_attribute(other, self, name, value, out);
+                set_attribute(other, receiver, attribute, value, out);
                 EXPECT_EQ(out.result().tag(), ResultTag::Ok);
                 other.collect();
             });

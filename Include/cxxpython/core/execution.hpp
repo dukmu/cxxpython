@@ -217,6 +217,8 @@ namespace cxxpython::core
     };
     struct FrameObject
     {
+        // Execution fields are writer-owned by this invocation's Attachment.
+        // Cross-thread observation still requires N3 snapshots/STW, not raw reads.
         ObjectHeader header;
         const Value function, code;
         std::optional<Value> back;

@@ -1,5 +1,74 @@
 # Development Status
 
+## 2026-10-29 Plan 2 Adoption And N1 Thread-Owned Root Arenas
+
+The user supplied cxxpython_foundation_redesign_plan_2.md and replaced the old
+goal through the goal UI. get_goal confirms an active full N0-N6/M0-M9 objective:
+same Interpreter/shared heap Python CPU parallelism, not an execution GIL.
+No obsolete goal was marked complete to perform that replacement. This entry is
+prepended; every earlier development record is preserved.
+
+- Made Plan 2 authoritative in AGENTS and foundation_contracts; preserved the
+  supplied plan verbatim as a repository artifact. The original plan is history.
+  Marked the older RC/cycle-GC document explicitly legacy. The current N0-N6
+  ledger retains all M0-M9 language/library/runtime/performance/release gates.
+- Began task package 02 rather than expanding syntax/library work. Moved the
+  root deque, free list and count from State into ThreadRecord-owned RootArena.
+  Registration/retirement are explicit, and the collector enumerates all
+  registered arenas, including NativeWait-frozen owners. Exiting attachments
+  release root storage instead of retaining a global historical high-water pool.
+- Added a monotonic per-Interpreter arena identity to Handle, checked before
+  reading its cell. Foreign arenas are rejected even on the same OS thread;
+  stale cell generation/revision and non-LIFO reuse checks remain. Removed the
+  redundant per-Attachment root counter; the owning arena is its authority.
+- Separated trusted noexcept root publication from validation. Allocation
+  publishes through the existing caller cell after domain registration, without
+  another heap lookup or allocation. Public result writes retain validation;
+  a complete shared load-to-root access API is still pending.
+- Added registered_threads and aggregate per-arena accounting to HeapStats;
+  native ThreadRecord bytes are included in recorded metadata. Added header
+  migration boundaries and a current-protector/required-parallel-access table.
+  The table identifies unconverted shared state rather than calling it safe.
+- Three new tests first failed against the global arena: foreign Handle reads
+  were accepted and retired storage remained global. They now validate arena
+  rejection, same-thread different-arena rejection, retired identities/storage,
+  registry counts and collection with two frozen arenas plus a collector.
+  Two existing layout/repr tests were corrected to create receiver-owned roots
+  while the sender stays continuously rooted/frozen; they do not establish a
+  TransferRecord/queue API. The old serial-permission test now has an atomic
+  counter and an explicit transitional-admission name.
+
+Verification:
+
+- Release foundation 252/252. Full CTest exit 0, discovery count 500
+  (248 legacy + 252 foundation).
+- ASan/UBSan/LeakSanitizer 252/252 outside the ptrace sandbox; TSan 252/252.
+- Independent foundation-only Release, no tests/legacy, built successfully.
+  Three probes ran after all builds/sanitizers completed; exact-result and
+  post-GC live-set checks passed. GCC 11.4 / Release / x86-64 WSL2, without
+  CPU pinning/frequency control: 100000 root register/releases took
+  3.61/3.29/3.20 ms; allocate/automatic-GC took 8.60/9.27/8.92 ms.
+- Handle is now 32 bytes versus the prior 24; Value/header remain eight bytes.
+  With one registered record and two root cells, recorded metadata is 208
+  bytes versus the prior 96 because it now includes the 112-byte ThreadRecord.
+  shared_ptr control blocks, deque/registry capacity, allocator overhead and RSS
+  are not included. Frame prefix remains 240 bytes. Raw new root metrics are in
+  benchmarks/foundation-roots-2026-10-29.csv; all other categories, including
+  slower samples, remain in the layout/numeric/execution CSVs as n1_roots_*.
+- These are still SERIAL costs, not CPU-parallel or CPython acceptance. No
+  subagent, new Python RC layer or legacy VM fallback was introduced. User
+  test2.py, perf.data*, Zone.Identifier metadata and temporary_plan.md deletion
+  remain outside the stable-point commit.
+
+N0 and N1 are NOT complete. State::execution explicitly remains a transitional
+guard for unmigrated heap/ObjectOps paths. The next dependency is the production
+request/ack/completed epoch gate with registration/exit and NativeWait recovery,
+then stable heap/layout metadata, local allocation/accounting, bounded rooted
+shared reads and N2 snapshots/synchronization. Multiple Active mutators, real
+same-Function/Code CPU parallelism, non-allocating loop polls and 1/2/4-worker
+measurements remain mandatory N1-N3 gates. No serial behavior is a final target.
+The new full goal remains active, including N4-N6/M0-M9 completion and release.
+
 ## 2026-10-29 M4 With Stable Point And Concurrency Review Hold
 
 This entry is prepended; earlier records are unchanged. The user paused the

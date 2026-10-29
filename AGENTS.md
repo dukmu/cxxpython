@@ -5,19 +5,29 @@ compiler, VM, and extension platform implemented in a C/C++ mix.
 
 ## Active Architecture
 
-- `cxxpython_foundation_redesign_plan.md` is the authoritative implementation
-  plan. Where older documents or this guide disagree, follow that plan and
+- `cxxpython_foundation_redesign_plan_2.md` is the authoritative implementation
+  plan. It supersedes the first plan's serial execution choice. Where older
+  documents or this guide disagree, follow the second plan and
   update the conflicting guidance.
 - Build the replacement in `cxxpython::core`, with headers under
   `Include/cxxpython/core/` and an independent `cxxpython_foundation` target.
   It must not link the legacy Runtime, Object, parser or VM to fill gaps.
 - The first foundation uses boxed values, immutable native layouts, stable
   precise roots, caller-owned result slots, tracing GC without Python object
-  reference counting, and one execution lock per interpreter.
+  reference counting. Multiple OS threads must execute Python bytecode and
+  object protocols simultaneously in one Interpreter and one shared heap.
+- Follow N0 -> N1 -> N2 -> N3 before expanding the remaining M0-M9 capabilities.
+  Use thread-owned root arenas, request/ack/completed GC epochs, rooted shared
+  reads, explicit field synchronization and immutable metadata snapshots.
+  No interpreter-wide mutex may surround ordinary execution in the final path.
+  NativeWait/I/O progress and separate interpreters are not CPU-parallel proof.
+- During migration, identify the remaining serialized/unsafe boundaries
+  explicitly; do not expose unconverted ObjectOps as concurrently safe.
+  A transitional serial guard is not completion of N1-N3 or a hidden final GIL.
 - The existing CLI and its tests remain a legacy comparison path until the
   replacement meets the migration gates. Earlier no-GIL/refcount design notes
   describe the old path, not requirements for the new foundation.
-- Advance through M0-M9 using the plan's acceptance gates. Record actual tests,
+- Advance through N0-N6 and the complete M0-M9 acceptance gates. Record actual tests,
   remaining gates and the next dependency in `doc/development_status.md`.
   Do not mark a whole milestone complete based on a narrower passing slice.
 - Preserve development history: append new entries or insert them at the top

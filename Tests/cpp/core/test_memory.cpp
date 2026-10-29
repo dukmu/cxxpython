@@ -382,10 +382,81 @@ namespace
         EXPECT_EQ(destroyed, 0);
     }
 
-    TEST(FoundationThreads, ExecutionPermissionSerializesSharedHeapAccess)
+    TEST(FoundationThreads, SameInterpreterHandlesBelongToTheirOwningArena)
+    {
+        Interpreter interpreter; Attachment owner(interpreter); RootScope scope(owner); auto node = make_node(owner, scope);
+        const auto value = node.get(owner);
+        {
+            NativeWait wait(owner);
+            auto reader = std::async(std::launch::async, [&] {
+                Attachment other(interpreter); RootScope local(other);
+                EXPECT_EQ(other.stats().registered_threads, 2U);
+                EXPECT_THROW(node.get(other), std::logic_error);
+                EXPECT_THROW(other.payload<Node>(node), std::logic_error);
+                EXPECT_THROW(local.release(node), std::logic_error);
+                // Owner stays frozen/rooted until this bounded handoff ends.
+                auto own_handle = local.root(value); EXPECT_EQ(own_handle.get(other), value);
+                EXPECT_EQ(other.collect(), 0U);
+            });
+            reader.get();
+            Attachment nested(interpreter);
+            EXPECT_EQ(nested.stats().registered_threads, 2U);
+            EXPECT_THROW(node.get(nested), std::logic_error);
+        }
+        EXPECT_EQ(node.get(owner), value);
+        EXPECT_EQ(owner.stats().registered_threads, 1U);
+    }
+
+    TEST(FoundationThreads, RetiredRootArenasReleaseTheirStorageAndRejectOldHandles)
+    {
+        Interpreter interpreter; Handle stale;
+        for (int round = 0; round < 20; ++round)
+        {
+            Attachment context(interpreter);
+            EXPECT_EQ(context.stats().root_cells, 0U);
+            EXPECT_EQ(context.stats().registered_threads, 1U);
+            if (round) { EXPECT_THROW(stale.get(context), std::logic_error); }
+            context.collect();
+            RootScope roots(context);
+            for (int i = 0; i < 50; ++i) stale = make_node(context, roots);
+            EXPECT_EQ(context.stats().roots, 50U);
+        }
+        Attachment observer(interpreter); EXPECT_EQ(observer.stats().root_cells, 0U);
+        EXPECT_THROW(stale.get(observer), std::logic_error); EXPECT_EQ(observer.collect(), 50U);
+    }
+
+    TEST(FoundationThreads, CollectorScansEveryRegisteredFrozenArena)
+    {
+        int destroyed = 0; Interpreter interpreter; Attachment owner(interpreter); RootScope roots(owner);
+        auto first = make_node(owner, roots, &destroyed); std::promise<void> ready, resume;
+        auto resume_requested = resume.get_future();
+        {
+            NativeWait wait(owner);
+            auto worker = std::async(std::launch::async, [&] {
+                Attachment other(interpreter); RootScope local(other); auto second = make_node(other, local, &destroyed);
+                { NativeWait parked(other); ready.set_value(); resume_requested.get(); }
+                EXPECT_NO_THROW(second.get(other));
+            });
+            ready.get_future().get();
+            {
+                Attachment collector(interpreter); EXPECT_EQ(collector.stats().roots, 2U);
+                EXPECT_EQ(collector.stats().registered_threads, 3U);
+                EXPECT_EQ(collector.collect(), 0U); EXPECT_THROW(first.get(collector), std::logic_error);
+                { RootScope temporary(collector); make_node(collector, temporary, &destroyed); }
+                EXPECT_EQ(collector.collect(), 1U); EXPECT_EQ(destroyed, 1);
+            }
+            resume.set_value(); worker.get();
+        }
+        EXPECT_EQ(owner.stats().roots, 1U); EXPECT_LE(owner.stats().root_cells, 2U);
+        EXPECT_EQ(owner.stats().registered_threads, 1U);
+        EXPECT_EQ(owner.collect(), 1U); EXPECT_EQ(destroyed, 2); EXPECT_NO_THROW(first.get(owner));
+        roots.release(first); EXPECT_EQ(owner.collect(), 1U); EXPECT_EQ(destroyed, 3);
+    }
+
+    TEST(FoundationThreads, TransitionalAdmissionKeepsUnmigratedHeapOperationsSafe)
     {
         Interpreter interpreter;
-        int counter = 0;
+        std::atomic<int> counter{0};
         std::vector<std::thread> threads;
         for (int tid = 0; tid < 4; ++tid)
             threads.emplace_back([&] {
@@ -400,7 +471,7 @@ namespace
             });
         for (auto &thread : threads)
             thread.join();
-        EXPECT_EQ(counter, 400);
+        EXPECT_EQ(counter.load(), 400);
     }
 
     TEST(FoundationThreads, SeparateInterpretersDoNotShareAnExecutionLock)

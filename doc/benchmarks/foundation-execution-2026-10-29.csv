@@ -35,3 +35,15 @@ m4_with_finally,10000,33931253,11,2,240,ok,0
 m4_with_context,10000,67030206,16,5,240,ok,0
 m4_with_context,10000,53460792,16,5,240,ok,0
 m4_with_context,10000,52665492,16,5,240,ok,0
+n1_roots_direct,10000,24126799,4,2,240,ok,0
+n1_roots_direct,10000,23294547,4,2,240,ok,0
+n1_roots_direct,10000,26156164,4,2,240,ok,0
+n1_roots_scheduled,10000,35689068,5,3,240,ok,4
+n1_roots_scheduled,10000,38266134,5,3,240,ok,4
+n1_roots_scheduled,10000,40329882,5,3,240,ok,4
+n1_roots_finally,10000,28770456,11,2,240,ok,0
+n1_roots_finally,10000,33971551,11,2,240,ok,0
+n1_roots_finally,10000,31464069,11,2,240,ok,0
+n1_roots_with,10000,50782857,16,5,240,ok,0
+n1_roots_with,10000,51265275,16,5,240,ok,0
+n1_roots_with,10000,49000262,16,5,240,ok,0

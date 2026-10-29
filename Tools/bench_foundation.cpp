@@ -67,6 +67,7 @@ int main()
               << " live_bytes=" << stats.live_bytes
               << " recorded_metadata_bytes=" << stats.metadata_bytes
               << " root_cells=" << stats.root_cells
+              << " registered_threads=" << stats.registered_threads << " handle_bytes=" << sizeof(Handle)
               << " last_gc_pause_ns=" << stats.last_pause_ns << '\n';
 
     context.bootstrap_core();

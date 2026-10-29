@@ -7,6 +7,9 @@
 
 namespace cxxpython::core
 {
+    // Plan 2 migration boundary: these public payloads are not concurrent APIs.
+    // Mutable fields still require transitional serial admission until N2;
+    // immutable value buffers need const-view/publication interfaces in N1-N2.
     struct NoneObject
     {
         ObjectHeader header;
