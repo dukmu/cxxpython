@@ -1,6 +1,6 @@
 # cxxpython Agent Guide
 
-This repository is a clean-room restart of `cxxpython`: a Python 3 runtime,
+This repository is an independent restart of `cxxpython`: a Python 3 runtime,
 compiler, VM, and extension platform implemented in a C/C++ mix.
 
 ## Active Architecture
@@ -34,6 +34,18 @@ compiler, VM, and extension platform implemented in a C/C++ mix.
 - Advance through N0-N6 and the complete M0-M9 acceptance gates. Record actual tests,
   remaining gates and the next dependency in `doc/development_status.md`.
   Do not mark a whole milestone complete based on a narrower passing slice.
+- The active service goal is now the module/unified-import foundation stage;
+  the full language, standard-library and product scope remains in Plan 2
+  sections 0.8 and 11.2. Complete a stage only on its actual acceptance evidence,
+  then promptly commit/push and create the next dependent stage goal.
+- Follow CPython's native/Python responsibilities: `Modules/` supplies necessary
+  C/C++ capabilities, `Lib/` supplies Python libraries and policy. Do not rewrite
+  an entire Python library in C++ just to avoid completing its syntax/dependencies.
+  Fixed CPython source may be adapted with provenance, notices and licenses;
+  its RC/GIL/private ABI assumptions do not override this runtime's contracts.
+- The user allows limited, explained performance regressions, not very large or
+  exponential degradation. Preserve raw complexity/performance measurements;
+  real CPU parallelism alone does not meet absolute performance acceptance.
 - Preserve development history: append new entries or insert them at the top
   of `doc/development_status.md`; do not rewrite earlier entries.
 - Generate measurement tables with `Tools/benchmarks/record.py`

@@ -1,5 +1,40 @@
 # Development Status
 
+## 2026-10-30 Module Stage Goal And Base-To-Full Scope Preserved
+
+Prepended without rewriting history. This is a requirements/route update after
+727625e, not a claim that modules, imports or libraries have been implemented.
+
+- The user cleared the unfinished broad service goal and installed the active
+  module/unified-import foundation goal. Verified the service now contains that
+  objective. The full N0-N6/M0-M9 delivery was not falsely marked complete; it
+  remains authoritative in Plan 2. Stage completion requires actual evidence,
+  followed by timely commit/push and creation of the next dependency goal.
+- Recorded the user's full named library, syntax, runpy and product-interpreter
+  scope in Plan 2 sections 0.8/11.2. The roadmap runs from module/namespace/loader
+  through language/platform Base, Python bootstrap/product entry, general/thread
+  libraries, introspection/debug/test tools and specialized native backends to
+  Full release. A top-level import or copied source file is not library support.
+- Inspected fixed CPython 3.12.14 source in /tmp/Python-3.12.14: Lib os/importlib/
+  ctypes/curses/runpy and dependency imports in threading/weakref/abc/ast/socket/
+  tokenize, plus Modules Setup bootstrap/stdlib definitions. Preserve native
+  capabilities in Modules and Python policy in Lib, not a wholesale C++ rewrite.
+  The tokenizer requirement includes the baseline's tokenize/token interfaces.
+- Recorded unified import for C/C++ builtin/extension and Python source loaders,
+  versioned C-callable boundary requirements, per-interpreter state, precise
+  roots and native-code leases. Ordinary shared libraries require FFI rather
+  than being silently treated as importable Python modules. No CPython binary
+  ABI, RC/GIL dependency or new extension implementation is claimed.
+- The user permits direct fixed-upstream adaptation with provenance and license
+  preservation. Updated AGENTS to remove the conflicting blanket clean-room
+  description and retain the independent runtime/GC/ownership model. No upstream
+  code has been copied in this documentation node.
+- Updated performance policy to allow limited explained regressions, not very
+  large or exponential degradation. The old parity direction is a long-term
+  reference rather than a prerequisite for every basic feature; today's very
+  large absolute performance gap is still not accepted. No new performance data
+  or runtime test result is claimed here. User files remain untouched.
+
 ## 2026-10-30 Float Source And Operators; Host Tests Outside Lib
 
 Prepended without rewriting history. The previous stable node is 1a0255c.

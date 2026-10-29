@@ -80,6 +80,16 @@
 
 按用户要求，`Lib/` 只用于解释器标准库。宿主 Python 差分驱动、测量报告测试统一迁到 `Tests/python/`，与 `Tests/cpp/` 并列；CMake、开发规则和当前文档同步采用此路径。前一节及历史开发记录中的 `Lib/test/` 是整理时的旧位置，不再作为当前目录约定。
 
+### 0.8 2026-10-30：从 Base 到 Full 的持续范围与阶段 Goal
+
+用户再次明确：模块、namespace、loader、import、大量语法以及标准库和产品解释器都是必须继续完成的目标，不因 N0-N3 或数值切片通过而缩减。允许直接参考、复制固定 CPython 源码并改造，不要求把纯 Python 标准库全部重写为 C++；原生 C/C++ 能力与 Python 策略层按实际依赖划分，详细推进顺序见 §11.2。
+
+当前服务 goal 已由用户替换为模块与统一导入基础阶段：Module/namespace、唯一模块表、GC 安全的并发初始化与失败回滚，内存/文件源码与 C/C++ 原生模块，动态扩展 ABI 边界，import/from/包以及 sys/builtins/__main__ 的基础闭环。该阶段验收、提交和推送后才标完成，再创建下一依赖阶段 goal。被替换的完整 N0-N6/M0-M9 目标没有被宣布完成；完整范围继续由本计划约束，阶段 goal 不是对它的删减。
+
+后续不得遗忘的用户指定范围为：sys、os、posix、encodings、ctypes、curses、importlib、logging、re、test、threading、weakref、abc、ast、code、dataclasses、dis、enum、opcode、pdb、pickle、socket、tokenizer、trace、types、uuid，以及 runpy、产品解释器和 N4 之后的完整目标。tokenizer 能力对照固定基线的 tokenize/token 等实际接口，不伪造兼容模块名称。依赖模块也属于闭包，不能只让这些顶层名字可导入。
+
+用户接受语义/架构推进中的有限性能回退，但不接受极大幅度或指数级退化；不能据此把目前数量级的 CPython 差距标为达标。沿用原始记录与自动生成报告，按输入规模检查复杂度，性能要求见 §12.2。
+
 ## 1. 先确定兼容合同和架构边界
 
 “兼容 Python 3”需要拆成可验证的承诺。建议第一阶段固定 Python 3.12 的核心语言语义，按能力完成；只有对应矩阵全部通过，才扩大对外承诺。选择 3.12 是为了沿用本轮已经核验的语义和测试基线。
@@ -858,6 +868,27 @@ bootstrap code 的冻结在私有格式稳定后进行。初期可嵌入版本�
 
 先提供同步原语、线程生命周期与 Queue，再验收更高层 ThreadPoolExecutor/asyncio。调度器和 I/O readiness 可以用 Python 组合；GC 与 root publication 必须由 runtime 提供一致基础。
 
+### 11.2 Base 到 Full 的实施顺序与原生/Python 分层
+
+以下是交付顺序，不是当前支持声明。阶段可以按依赖交错，但不得以大量 placeholder 模块、宿主 CPython 执行或另一个运行时填补缺口。需要的基础语法、对象、协议和系统能力随真实库依赖一起完成。
+
+1. **模块与统一导入基础，当前 goal。** Module 对象和真实 namespace，sys.modules 的单一权威映射，内存/源码文件/native initializer 共用初始化事务，import/from/别名/包与循环、并发、失败重试。sys、builtins、__main__ 共享同一执行环境。模块等待使用 GC-aware park，不持 registry 锁执行用户代码；动态扩展的 ABI、状态和代码 lease 先定义清楚。
+2. **语言、对象和平台 Base。** 补齐容器、bytes/buffer、字符串/编码、常用 builtins、作用域/反射、super、解包、comprehension、generator、f-string 和库实际需要的其他语法。原生 posix、I/O、codec、时间与 _thread 提供系统能力；Python os、路径与 encodings/codecs 组合策略。弱引用/终结、阻塞 detach、关闭和多解释器状态不可由库层临时掩盖。
+3. **Python 自举和产品入口。** 让 Lib 中的 importlib/bootstrap 策略依赖小的原生 _imp 能力，而不是永久把完整导入策略焊在 C++ 中。先源码 bootstrap，再按必要性使用本编译器生成 frozen code。闭合 io/os/encodings/sys、导入元数据与路径配置后接 runpy、script/-c/-m、包的 __main__、REPL、argv、stdio、embedding、安装布局与隔离配置，复用同一 RunRequest。
+4. **通用库和真线程。** 按依赖推进 types、abc、weakref、enum、dataclasses、threading、logging、uuid 及其 functools、collections、contextlib、queue 等闭包。参考 abc/_abc、weakref/_weakref、threading/_thread 的边界；缓存和复合操作必须适配共享堆并行，线程异常交付与 join/shutdown 使用真实生命周期，不引入 GIL。
+5. **编译、调试和测试工具。** 完成 ast、tokenizer/tokenize/token、opcode、dis、code、trace、pdb 以及所需 traceback、inspect、linecache 等。公开真实 AST/Code/Frame 数据，dis/opcode 对应本项目的实际指令，不把 CPython 私有字节码表直接冒充本项目字节码。宿主回归驱动仍在 Tests/python；用户要求的 test 是逐步接入的上游测试支持包和选定测试集，放入 Lib 时作为真正的 Python 库对待。
+6. **专用内核和外部库能力。** 按完整依赖接入 re、pickle、socket、ctypes、curses，对应 _sre、_pickle、_socket、_ctypes、_curses 等原生能力与 Python 包装/策略。保留 Python regex/序列化语义，不用其他方言或近似对象替代；FFI callback、缓冲区、终端/网络资源的等待、关闭与平台差异分别验收。
+7. **Full 与发布。** 完成剩余 3.12 语法/库矩阵、平台、扩展、产品工具、性能和发布验收。没有通过的库依赖、接口或行为仍是待完成项，不因先后顺序而变成不支持的最终目标。
+
+原生与 Python import 的具体边界：
+
+- `Objects/`、`Python/`、`Parser/` 实现本项目对象/执行/GC/编译与导入机制；`Modules/` 放系统调用、资源、运行时钩子、必要算法及原生扩展入口；`Lib/` 放 Python 标准库和可用 Python 表达的策略。不能为了绕过缺失语法，就把整套 Python 库 API 逐个改写成 C++。
+- C 和 C++ 编写的内建/动态扩展都通过统一模块协议导入，不能另建第二个模块表。公开 C 边界使用版本化、C 可调用的定义与不透明上下文/根句柄；C++ 实现可以提供内部便利封装，但不能要求 C 模块依赖 C++ 类布局、异常 ABI 或 STL。具体 API 在增加实现前另行记录和测试，不预先堆叠接口框架。
+- 原生库代码 lease 覆盖模块初始化、所有可调用入口与后台 callback；模块状态按 Interpreter 隔离，可扫描的引用参与同一 GC。阻塞 FFI/I/O 与导入等待使用明确的 GC-aware 边界；不允许动态库卸载后还保留可调用代码地址。
+- 普通 C/C++ 共享库不自动成为 Python 模块：扩展模块需约定的初始化/ABI，普通库符号访问由 ctypes/FFI 能力负责。参考 CPython 的职责，不承诺当前支持 CPython C API、ABI 或现成扩展二进制，尤其不能直接保留其 RC/GIL 假设。
+- 采用固定 CPython 3.12.14 参考及源码时，保留文件来源、版本、许可/版权、第三方依赖许可与适配差异。复制 C 实现必须改接本项目的对象、根、错误、线程和模块状态合同；复制 Lib 源码必须补其语言/原生依赖，不以删掉失败路径伪装兼容。
+- 每个进入实现的模块记录实际语法/builtins/native/跨模块依赖、平台条件和测试排除项。支持与性能表由测试/测量证据生成；复制文件、import smoke 或模块名字存在都不等于该模块 Supported。完整依赖与真实工作流通过后及时完成阶段 goal、提交推送，再设置下一阶段 goal。
+
 ## 12. 性能、原生接口和工程化
 
 ### 12.1 无 GIL 的成本从下一阶段测
@@ -897,7 +928,7 @@ N1 开始测 roots、分配、heap 元数据和 stop handshake；N2 测共享 Ty
 
 单线程分别比较：重构前 `b23f367` foundation、重构后的单线程模式、固定 CPython 3.12 reference；如引入 free-threaded CPython 作额外对照，另列版本和构建选项。不要拿不同总工作量、开 sanitizer 的构建和 native 计算替代 Python VM 工作相互比较。
 
-保留原产品方向：支持集合上 `T_cxxpython/T_CPython` 几何均值最终不高于 1.0，同时公开明显慢项。当前这仍是建议产品目标。N3 先给出真实基线、瓶颈与回归预算，再决定发布是否达标；不能把“没有 GIL”直接推导为更快。
+按 2026-10-30 用户更新的验收方向，允许为语义和基础架构闭环接受可解释的有限回退，但不接受极大幅度或指数级退化。原先支持集合上 `T_cxxpython/T_CPython` 几何均值不高于 1.0 保留为长期优化参考，不再作为每个基础功能阶段的硬性先决条件；当前数量级差距仍是未通过项。每组增加输入规模观察复杂度，并公开慢项、基线、瓶颈和回归预算，再决定发布是否达标；不能把“没有 GIL”或多核加速直接推导为绝对性能达标。
 
 ### 12.3 内存与暂停也属于性能
 
