@@ -84,16 +84,57 @@ class GraphPass final {
     void name(const std::u32string &text, Span span, Opcode local, Opcode global)
     {
         const auto &binding = symbol(text);
-        if (binding.classification == NameClass::Local)
+        if (binding.classification == NameClass::Namespace ||
+            (program_.scopes[scope_].kind == ScopeKind::Class &&
+             binding.classification == NameClass::GlobalImplicit))
+            emit(local == Opcode::LoadFast    ? Opcode::LoadName
+                 : local == Opcode::StoreFast ? Opcode::StoreName
+                                              : Opcode::DeleteName,
+                 span, 0, text);
+        else if (binding.classification == NameClass::Local)
             emit(local, span, static_cast<std::uint32_t>(*binding.slot));
         else if (binding.classification == NameClass::Cell ||
                  binding.classification == NameClass::Free)
-            emit(local == Opcode::LoadFast    ? Opcode::LoadDeref
+            emit(local == Opcode::LoadFast
+                     ? (program_.scopes[scope_].kind == ScopeKind::Class ? Opcode::LoadClassDeref
+                                                                         : Opcode::LoadDeref)
                  : local == Opcode::StoreFast ? Opcode::StoreDeref
                                               : Opcode::DeleteDeref,
                  span, static_cast<std::uint32_t>(*binding.slot));
         else
             emit(global, span, 0, text);
+    }
+    void nested(std::size_t scope, const Suite &body, const FunctionStmt *definition = nullptr)
+    {
+        const auto parent_scope = scope_, parent_block = block_;
+        auto parent_loops = std::move(loops_);
+        const auto *parent_first = first_statement_;
+        function(scope, body, definition);
+        scope_ = parent_scope;
+        block_ = parent_block;
+        loops_ = std::move(parent_loops);
+        first_statement_ = parent_first;
+    }
+    void make_function(std::size_t child, Span span, std::uint32_t flags = 0)
+    {
+        const auto &parent = program_.scopes[scope_];
+        const auto &freevars = program_.scopes[child].freevars;
+        for (const auto &name : freevars) {
+            auto cell = std::find(parent.cellvars.begin(), parent.cellvars.end(), name);
+            std::size_t slot = cell - parent.cellvars.begin();
+            if (cell == parent.cellvars.end()) {
+                const auto free = std::find(parent.freevars.begin(), parent.freevars.end(), name);
+                if (free == parent.freevars.end())
+                    throw std::logic_error("child free variable has no enclosing cell");
+                slot += free - parent.freevars.begin();
+            }
+            emit(Opcode::LoadClosure, span, static_cast<std::uint32_t>(slot));
+        }
+        if (!freevars.empty())
+            emit(Opcode::BuildTuple, span, static_cast<std::uint32_t>(freevars.size()));
+        emit(Opcode::LoadConst, span);
+        current().instructions.back().function = child;
+        emit(Opcode::MakeFunction, span, flags | (!freevars.empty() ? 4 : 0));
     }
     void test(const Expr &value, std::size_t yes, std::size_t no, bool preserve = false)
     {
@@ -463,7 +504,8 @@ class GraphPass final {
                         jump(done, span);
                         select(done);
                     } else if constexpr (std::is_same_v<T, ReturnStmt>) {
-                        if (!scope_ && program_.mode != InputMode::Eval)
+                        if (program_.scopes[scope_].kind != ScopeKind::Function &&
+                            program_.mode != InputMode::Eval)
                             error(span, "'return' outside function");
                         if (node.value)
                             expression(*node.value);
@@ -512,14 +554,9 @@ class GraphPass final {
                              span, static_cast<std::uint32_t>(loops_.back()));
                         current().exit = FlowBlock::Exit::Stop;
                     } else if constexpr (std::is_same_v<T, FunctionStmt>) {
-                        const auto parent_scope = scope_, parent_block = block_;
-                        auto parent_loops = std::move(loops_);
-                        const auto *parent_first = first_statement_;
-                        function(node.scope, node.body, &node);
-                        scope_ = parent_scope;
-                        block_ = parent_block;
-                        loops_ = std::move(parent_loops);
-                        first_statement_ = parent_first;
+                        nested(node.scope, node.body, &node);
+                        for (const auto &decorator : node.decorators)
+                            expression(*decorator);
                         std::uint32_t defaults = 0;
                         std::vector<std::u32string> keywords;
                         for (const auto &parameter : node.parameters)
@@ -540,24 +577,28 @@ class GraphPass final {
                             emit(Opcode::BuildNameDict, span);
                             current().instructions.back().keywords = keywords;
                         }
-                        const auto &freevars = program_.scopes[node.scope].freevars;
-                        for (const auto &name : freevars) {
-                            const auto &binding = symbol(name);
-                            if (binding.classification != NameClass::Cell &&
-                                binding.classification != NameClass::Free)
-                                throw std::logic_error("child free variable has no enclosing cell");
-                            emit(Opcode::LoadClosure, span,
-                                 static_cast<std::uint32_t>(*binding.slot));
-                        }
-                        if (!freevars.empty())
-                            emit(Opcode::BuildTuple, span,
-                                 static_cast<std::uint32_t>(freevars.size()));
-                        emit(Opcode::LoadConst, span);
-                        current().instructions.back().function = node.scope;
-                        emit(Opcode::MakeFunction, span,
-                             (defaults ? 1 : 0) | (!keywords.empty() ? 2 : 0) |
-                                 (!freevars.empty() ? 4 : 0));
-                        name(node.name, span, Opcode::StoreFast, Opcode::StoreGlobal);
+                        make_function(node.scope, span,
+                                      (defaults ? 1 : 0) | (!keywords.empty() ? 2 : 0));
+                        for (std::size_t i = 0; i < node.decorators.size(); ++i)
+                            emit(Opcode::Call, span, 1);
+                        name(node.binding, span, Opcode::StoreFast, Opcode::StoreGlobal);
+                    } else if constexpr (std::is_same_v<T, ClassStmt>) {
+                        nested(node.scope, node.body);
+                        for (const auto &decorator : node.decorators)
+                            expression(*decorator);
+                        emit(Opcode::LoadBuildClass, span);
+                        make_function(node.scope, span);
+                        literal({Literal::Kind::String, node.name}, span);
+                        for (const auto &base : node.bases)
+                            expression(*base);
+                        for (const auto &keyword : node.keywords)
+                            expression(*keyword.second);
+                        emit(Opcode::Call, span, static_cast<std::uint32_t>(node.bases.size() + 2));
+                        for (const auto &keyword : node.keywords)
+                            current().instructions.back().keywords.push_back(keyword.first);
+                        for (std::size_t i = 0; i < node.decorators.size(); ++i)
+                            emit(Opcode::Call, span, 1);
+                        name(node.binding, span, Opcode::StoreFast, Opcode::StoreGlobal);
                     } else
                         static_assert(std::is_same_v<T, DeclareStmt>,
                                       "CFG lowering missing statement");
@@ -585,9 +626,25 @@ class GraphPass final {
             signature.varargs = definition->varargs;
             signature.varkwargs = definition->varkwargs;
         }
+        const auto &info = program_.scopes[scope];
+        if (info.kind == ScopeKind::Class) {
+            emit(Opcode::LoadName, info.span, 0, U"__name__");
+            emit(Opcode::StoreName, info.span, 0, U"__module__");
+            literal({Literal::Kind::String, info.qualname}, info.span);
+            emit(Opcode::StoreName, info.span, 0, U"__qualname__");
+            if (const auto &docstring = program_.graphs[scope].docstring) {
+                literal({Literal::Kind::String, *docstring}, info.span);
+                emit(Opcode::StoreName, info.span, 0, U"__doc__");
+            }
+        }
         suite(body);
         if (current().exit == FlowBlock::Exit::Open) {
-            none(program_.scopes[scope].span);
+            if (info.kind == ScopeKind::Class && !info.cellvars.empty()) {
+                emit(Opcode::LoadClosure, info.span, 0);
+                emit(Opcode::DupTop, info.span);
+                emit(Opcode::StoreName, info.span, 0, U"__classcell__");
+            } else
+                none(info.span);
             current().exit = FlowBlock::Exit::Return;
             current().span = program_.scopes[scope].span;
         }
@@ -679,6 +736,9 @@ void SourceUnit::freeze(Attachment &context, ReturnSlot &out) const
             spec.docstring = graph.docstring;
             spec.cellvars = scope.cellvars;
             spec.freevars = scope.freevars;
+            spec.kind = scope.kind == ScopeKind::Class    ? CodeKind::ClassBody
+                        : scope.kind == ScopeKind::Module ? CodeKind::Module
+                                                          : CodeKind::Function;
             CodeBuilder builder(context, std::move(spec));
             std::vector<CodeBuilder::Label> labels;
             for (std::size_t i = 0; i < graph.blocks.size(); ++i)

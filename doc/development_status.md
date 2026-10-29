@@ -1,5 +1,75 @@
 # Development Status
 
+## 2026-10-29 Class Bodies, Namespaces And Decorators In The Shared VM
+
+Prepended without rewriting history. The previous stable node is 6de249d.
+The full Plan 2 goal remains active. This advances L1 class execution without
+declaring complete Python syntax, constructors, libraries or performance support.
+
+- Added class/decorator AST and parsing, sharing call-argument parsing rather
+  than adding a second frontend. Definition/decorator expressions use ordinary
+  calls. Private names/attributes/parameters are mangled while source-visible
+  function/class names and qualnames keep their spelling. Differential testing
+  corrected the initially wrong assumption that call keyword names are mangled.
+- Scope analysis now separates class namespaces from fast locals. Methods skip
+  class attribute bindings but capture enclosing function Cells through the
+  class. Class global directives do not block that forwarding. Implicit class
+  Cells are separate from an outer free Cell with the same name; metadata and
+  the verifier permit that real class layout without fake fast-local slots.
+- CodeKind explicitly distinguishes Function/Module/ClassBody. Each class-body
+  Frame owns/traces its namespace mapping and fresh class Cells; Function/Code
+  remain immutable and reusable. LOAD_NAME/STORE_NAME/DELETE_NAME and
+  LOAD_CLASS_DEREF use internal exact-name dictionaries or normal mapping
+  protocols; only KeyError is missing. New opcode kinds, bounds, stack effects,
+  disassembly and rejection of invalid mixed layouts have focused tests.
+- Added the ordinary __build_class__ builtin in Python/bltinmodule.cpp. It
+  resolves MRO entries, selects/prepares the metaclass, runs the body through
+  the existing VM and calls the metaclass with normal arguments/keywords.
+  It preserves original bases and validates class-cell propagation. Default
+  type.__prepare__, existing type.__new__/C3/layout checks, descriptor set-name,
+  init-subclass and metaclass hooks remain the single construction mechanism.
+- TypeSnapshot now owns actual immutable bases/MRO tuples, materialized once
+  and retained by name/namespace updates. Read-only __bases__/__mro__/__base__
+  expose real identities; dynamic base replacement remains a gate. Module
+  names/docstrings/qualnames and reused method Code identities are exercised.
+  Class/Function/Cell/MRO cycles return to the original precise live set.
+- Actual constructor testing exposed str still reaching object.__new__.
+  Added ordinary empty/object str construction, keyword/arity/encoding argument
+  validation and native-layout-preserving str subclasses through the existing
+  construction hooks. KeyError single-argument str now uses repr, while an
+  explicit BaseException.__str__ retains base behavior. No byte decoder or
+  complete Unicode/codec matrix is claimed.
+- The new repeated parallel class factory exposed a real pre-existing first
+  Type publication bug under TSan: competition for the shared publication epoch
+  was mistaken for concurrent mutation of the same unpublished Type. First
+  publication now polls/retries legitimate epoch contention and still rejects
+  an actually changed metadata edge. No class/VM/interpreter execution lock,
+  extra collector, general retry framework or timeout workaround was added.
+- Added nine native cases and expanded the same-Function/Code two-Active-worker
+  test with repeated class creation and method CPU loops during GC. Final normal
+  CTest passes 342/342, including all 339 native cases, actual executable
+  differential, recorder tests and formatting. Final ASan/UBSan/LSan passes
+  339/339 and TSan 337/337; only the two established exhaustive allocation
+  enumerations are excluded from TSan and covered by normal/ASan.
+  All eleven differential groups pass against fixed CPython 3.12.14, also under
+  the ASan CLI. Failed pre-fix runs were repaired, not counted as passes.
+- Added the captured source method kernel to the existing benchmark/recorder.
+  Three idle Release samples after builds/sanitizers generated
+  l1-class-namespaces raw JSONL, CSV and Markdown automatically. The method
+  workload shows real CPU parallelism but weaker scaling than scalar loops;
+  existing scalar timings are modestly higher in this run. Absolute CPython
+  performance remains a failed gate; no parity or optimization gain is claimed.
+- The user explicitly requested terra audit/fix of remaining constructors.
+  A single terra agent has reported missing int text/base and real float,
+  tuple/dict construction and begun separate numeric work. Its in-progress
+  longobject/protocol/float/constructor-test files are excluded from this stable
+  class node. No sol/astra agent was started. Continue actual constructor
+  implementation and fixed-reference tests, not another audit-only node.
+  Super, full numeric/container/iteration APIs, reflection, call/base unpacking,
+  annotations, imports/f-strings, library/thread/I/O workflows, finalization,
+  platform/install and performance release gates remain. The user's
+  temporary_plan.md deletion and untracked test2.py remain untouched.
+
 ## 2026-10-29 Source Exceptions And With Through Verified Regions
 
 Prepended without rewriting history. The previous stable node is 9d1bde6.

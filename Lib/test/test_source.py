@@ -391,6 +391,247 @@ class SourceDifferential(unittest.TestCase):
         self.assertEqual(actual.returncode, 1)
         self.assertEqual(actual.stderr.count("ValueError"), 1)
 
+    def test_class_and_decorator_workflows(self):
+        cases = [
+            ("""
+             value = 90
+             class Base:
+                 'documentation'
+                 value = 3
+                 def __init__(self, n=4):
+                     self.n = n
+                 def total(self):
+                     return self.n + self.value
+             class Child(Base):
+                 @staticmethod
+                 def scale(n):
+                     return n * 2
+                 @classmethod
+                 def identify(cls):
+                     return cls
+             instance = Child(7)
+             """, "instance.total(), Child.scale(5), instance.identify() is Child, value, Base.__doc__, Child.__module__"),
+            ("""
+             def factory(x):
+                 class C:
+                     x = 99
+                     def read(self):
+                         return x, __class__
+                     class Inner:
+                         value = x
+                 return C
+             A = factory(7)
+             B = factory(8)
+             """, "A.x, A.Inner.value, A().read()[0], B().read()[0], A().read()[1] is A, A.read.__code__ is B.read.__code__"),
+            ("""
+             def factory(x):
+                 class C:
+                     nonlocal x
+                     x += 1
+                     value = x
+                     def read(self):
+                         return x
+                 return C
+             C = factory(7)
+             """, "C.value, C().read()"),
+            ("""
+             x = 90
+             def factory(x):
+                 class C:
+                     global x
+                     value = x
+                     def read(self):
+                         return x
+                 return C
+             C = factory(7)
+             """, "C.value, C().read()"),
+            ("""
+             class A:
+                 def make(self):
+                     class B:
+                         owner = __class__
+                         def who(self):
+                             return __class__
+                     return B
+             B = A().make()
+             """, "B.owner is A, B().who() is B, B.who.__qualname__"),
+            ("""
+             class __C:
+                 __slots__ = ('__value',)
+                 def __init__(self, __value=7):
+                     self.__value = __value
+                 def __hidden(self):
+                     return self.__value
+             c = __C()
+             """, "c._C__hidden(), __C._C__hidden.__name__, __C._C__hidden.__qualname__, __C.__init__.__code__.co_varnames"),
+            ("""
+             events = 0
+             def decorator(n):
+                 global events
+                 events = events * 10 + n
+                 def apply(value):
+                     global events
+                     events = events * 10 + n + 2
+                     return value
+                 return apply
+             def default():
+                 global events
+                 events = events * 10 + 3
+                 return 42
+             @decorator(1)
+             @decorator(2)
+             def f(value=default()):
+                 return value
+             """, "events, f(), f.__code__.co_firstlineno"),
+            ("""
+             class A: pass
+             class B(A): pass
+             bases = B.__bases__
+             mro = B.__mro__
+             B.value = 42
+             B.__name__ = 'Renamed'
+             """, "B.__bases__ is bases, B.__mro__ is mro, B.__base__ is A, B.__mro__[1] is A, object.__base__"),
+            ("""
+             events = 0
+             class Descriptor:
+                 def __set_name__(self, owner, name):
+                     global events
+                     events = events * 10 + 1
+                     self.owner = owner
+                 def __get__(self, instance, owner):
+                     return self.owner
+             class Base:
+                 def __init_subclass__(cls, *, flag=2):
+                     global events
+                     events = events * 10 + flag
+             class Alias:
+                 def __mro_entries__(self, bases):
+                     return (Base,)
+             alias = Alias()
+             class Child(alias, flag=3):
+                 owner = Descriptor()
+             """, "Child.owner is Child, Child.__bases__[0] is Base, Child.__orig_bases__[0] is alias, events"),
+            ("""
+             class C:
+                 def __new__(cls):
+                     return 17
+             """, "C()"),
+            ("""
+             class Meta(type):
+                 @classmethod
+                 def __prepare__(cls, name, bases, *, flag):
+                     return type.__prepare__(name, bases)
+                 def __new__(cls, name, bases, namespace, *, flag):
+                     result = type.__new__(cls, name, bases, namespace)
+                     result.flag = flag
+                     return result
+             class C(metaclass=Meta, flag=7):
+                 value = 42
+             """, "C.flag, C.value, type(C) is Meta"),
+            ("""
+             class Namespace:
+                 def __getitem__(self, key):
+                     if key == 'injected':
+                         return 17
+                     raise KeyError(key)
+                 def __setitem__(self, key, value):
+                     if key == 'value':
+                         self.saved = value
+             class Meta(type):
+                 @classmethod
+                 def __prepare__(cls, name, bases):
+                     return Namespace()
+                 def __new__(cls, name, bases, namespace):
+                     return namespace
+             class C(metaclass=Meta):
+                 value = injected
+             """, "C.saved"),
+            ("""
+             def meta(name, bases, namespace):
+                 return 7
+             class C(metaclass=meta):
+                 def who(self):
+                     return __class__
+             """, "C"),
+            ("__build_class__ = None\nclass C: pass", "C.__name__"),
+            ("""
+             class Descriptor:
+                 def __get__(self, instance, owner):
+                     if instance is None:
+                         return self
+                     return instance.value
+                 def __set__(self, instance, value):
+                     instance.value = value
+             class C:
+                 item = Descriptor()
+             c = C()
+             c.item = 42
+             """, "c.item"),
+            ("""
+             def factory():
+                 class C:
+                     def who(self):
+                         return __class__
+                 return C
+             A = factory()
+             B = factory()
+             """, "A is not B, A.who.__code__ is B.who.__code__, A.who.__closure__ is not B.who.__closure__"),
+            ("""
+             class C:
+                 def f(self, **kwargs):
+                     return len(kwargs)
+                 def g(self):
+                     return self.f(__x=1, _C__x=2)
+             """, "C().g()"),
+            ("", "str(KeyError('x')), str(KeyError(1, 2)), str(KeyError()), BaseException.__str__(KeyError('x'))"),
+            ("", "str(), str(None), str(object=42), str(encoding='utf8'), str(errors='strict')"),
+            ("""
+             class Text(str):
+                 pass
+             value = Text(42)
+             """, "value == '42', type(value) is Text, type(str(value)) is str"),
+        ]
+        for source, expression in cases:
+            with self.subTest(expression=expression):
+                self.check_program(dedent(source), expression)
+
+    def test_class_definition_errors(self):
+        for source in [
+            "class C: return 1",
+            "for i in range(1):\n    class C: break",
+            "class C:\n    def f(self, __x, _C__x): pass",
+            "@staticmethod\nvalue = 1",
+        ]:
+            with self.subTest(source=source):
+                actual = self.execute([self.binary, "-c", source])
+                expected = self.execute([self.reference, "-c", source])
+                self.assertEqual(actual.returncode, 1, actual.stderr)
+                self.assertNotEqual(expected.returncode, 0)
+                self.assertIn("SyntaxError", actual.stderr)
+                self.assertIn("SyntaxError", expected.stderr)
+        for source, error in [
+            ("class A: pass\nclass B(A, A): pass", "TypeError"),
+            ("class C(flag=1): pass", "TypeError"),
+            ("str(1, object=2)", "TypeError"),
+            ("str(1, encoding='utf8')", "TypeError"),
+            ("str(encoding=None)", "TypeError"),
+            ("class C:\n    def f(self, __x): return __x\nC().f(__x=1)", "TypeError"),
+            ("class A: x = 1\nclass B:\n    y = x", "NameError"),
+            ("__build_class__(None, 'C')", "TypeError"),
+            ("def f(): pass\n__build_class__(f, None)", "TypeError"),
+            ("class Meta(type):\n    def __prepare__(name, bases): return 1\nclass C(metaclass=Meta): pass", "TypeError"),
+            ("class Alias:\n    def __mro_entries__(self, bases): return None\nclass C(Alias()): pass", "TypeError"),
+            ("class M1(type): pass\nclass M2(type): pass\nclass A(metaclass=M1): pass\nclass B(metaclass=M2): pass\nclass C(A, B): pass", "TypeError"),
+            ("class Drop(type):\n    def __new__(cls, name, bases, namespace):\n        return type.__new__(cls, name, bases, type.__prepare__(name, bases))\nclass C(metaclass=Drop):\n    def who(self): return __class__", "RuntimeError"),
+        ]:
+            with self.subTest(source=source):
+                actual = self.execute([self.binary, "-c", source])
+                expected = self.execute([self.reference, "-c", source])
+                self.assertEqual(actual.returncode, 1, actual.stderr)
+                self.assertNotEqual(expected.returncode, 0)
+                self.assertIn(error, actual.stderr)
+                self.assertIn(error, expected.stderr)
+
     def test_file_entry_and_unicode_diagnostics(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "source.py"

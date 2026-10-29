@@ -168,6 +168,20 @@ void instance_dict_set(Attachment &context, Value receiver, std::optional<Value>
     context.store(receiver, *dictionary, value);
     out.ok(context.builtin(CoreObject::None));
 }
+void type_bases(Attachment &context, Value receiver, ReturnSlot &out)
+{
+    TypeView view(context, receiver);
+    out.ok(context.payload<TypeSnapshot>(*view.snapshot()).bases);
+}
+void type_mro(Attachment &context, Value receiver, ReturnSlot &out)
+{
+    TypeView view(context, receiver);
+    out.ok(context.payload<TypeSnapshot>(*view.snapshot()).mro);
+}
+void type_base(Attachment &context, Value receiver, ReturnSlot &out)
+{
+    out.ok(context.payload<TypeObject>(receiver).base.value_or(context.builtin(CoreObject::None)));
+}
 void type_dict_get(Attachment &context, Value receiver, ReturnSlot &out)
 {
     auto dictionary = TypeView(context, receiver).dictionary();
@@ -348,6 +362,12 @@ void install_attribute_descriptors(Attachment &context, std::span<const Handle> 
                   U"__class__", class_get, class_set);
     install_field(context, descriptor_type, string_type, roots.root(context.type_type()),
                   U"__dict__", type_dict_get, nullptr);
+    install_field(context, descriptor_type, string_type, roots.root(context.type_type()),
+                  U"__bases__", type_bases, nullptr);
+    install_field(context, descriptor_type, string_type, roots.root(context.type_type()),
+                  U"__mro__", type_mro, nullptr);
+    install_field(context, descriptor_type, string_type, roots.root(context.type_type()),
+                  U"__base__", type_base, nullptr);
     install_field(context, descriptor_type, string_type, roots.root(context.type_type()),
                   U"__name__", type_name, type_name_set);
     install_field(context, descriptor_type, string_type, roots.root(context.type_type()),

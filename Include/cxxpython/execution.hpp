@@ -57,6 +57,11 @@ enum class Opcode : std::uint8_t {
     Copy,
     UnpackSequence,
     Raise,
+    LoadName,
+    StoreName,
+    DeleteName,
+    LoadClassDeref,
+    LoadBuildClass,
     Count,
 };
 enum class OperandDomain {
@@ -188,6 +193,7 @@ class CodeValidationError : public std::invalid_argument {
     CodeErrorKind kind;
     std::optional<std::size_t> pc;
 };
+enum class CodeKind { Function, Module, ClassBody };
 struct CodeSpec {
     std::u32string name = U"<code>";
     std::optional<std::u32string> qualname;
@@ -197,6 +203,7 @@ struct CodeSpec {
     std::vector<std::u32string> locals;
     std::optional<std::u32string> docstring;
     std::vector<std::u32string> cellvars, freevars;
+    CodeKind kind = CodeKind::Function;
 };
 class CodeBuilder;
 class VerifiedCode final {
@@ -239,9 +246,13 @@ class VerifiedCode final {
     {
         return freevars_;
     }
-    std::span<const std::uint32_t> cell_locals() const noexcept
+    std::span<const std::optional<std::uint32_t>> cell_locals() const noexcept
     {
         return cell_locals_;
+    }
+    CodeKind kind() const noexcept
+    {
+        return kind_;
     }
     std::size_t max_stack() const noexcept
     {
@@ -259,20 +270,22 @@ class VerifiedCode final {
                  std::vector<CallLayout> calls, std::vector<RegionLayout> regions,
                  SignatureLayout signature, std::vector<std::u32string> locals,
                  std::vector<std::u32string> cellvars, std::vector<std::u32string> freevars,
-                 std::size_t stack, std::uint32_t first_line)
+                 std::size_t stack, std::uint32_t first_line, CodeKind kind)
         : instructions_(std::move(instructions)), positions_(std::move(positions)),
           calls_(std::move(calls)), regions_(std::move(regions)), signature_(std::move(signature)),
           locals_(std::move(locals)), cellvars_(std::move(cellvars)),
-          freevars_(std::move(freevars)), max_stack_(stack), first_line_(first_line)
+          freevars_(std::move(freevars)), max_stack_(stack), first_line_(first_line), kind_(kind)
     {
         for (const auto &region : regions_)
             if (region.depth > max_regions_)
                 max_regions_ = region.depth;
         for (const auto &name : cellvars_) {
             std::size_t index = 0;
-            while (locals_[index] != name)
+            while (index < locals_.size() && locals_[index] != name)
                 ++index;
-            cell_locals_.push_back(static_cast<std::uint32_t>(index));
+            cell_locals_.push_back(index < locals_.size()
+                                       ? std::optional{static_cast<std::uint32_t>(index)}
+                                       : std::nullopt);
         }
     }
     std::vector<Instruction> instructions_;
@@ -282,10 +295,11 @@ class VerifiedCode final {
     SignatureLayout signature_;
     std::vector<std::u32string> locals_;
     std::vector<std::u32string> cellvars_, freevars_;
-    std::vector<std::uint32_t> cell_locals_;
+    std::vector<std::optional<std::uint32_t>> cell_locals_;
     std::size_t max_stack_;
     std::uint32_t first_line_;
     std::size_t max_regions_ = 0;
+    CodeKind kind_;
 };
 struct CodeObject {
     ObjectHeader header;
@@ -408,6 +422,7 @@ struct FrameObject {
     std::vector<std::optional<Value>> locals;
     std::vector<Value> operands;
     const std::vector<Value> cells;
+    const std::optional<Value> namespace_mapping;
     std::size_t pc = 0, sp = 0;
     std::atomic<std::size_t> last_instruction{std::numeric_limits<std::size_t>::max()};
     std::optional<std::size_t> pending_call;
@@ -418,9 +433,10 @@ struct FrameObject {
     FrameState state = FrameState::Created;
     FrameObject(InitialType head, Value function, Value code, std::size_t local_count,
                 std::size_t stack_count, Value padding, std::size_t max_regions = 0,
-                std::vector<Value> cells = {})
+                std::vector<Value> cells = {}, std::optional<Value> namespace_mapping = {})
         : header(head), function(function), code(code), locals(local_count),
-          operands(stack_count, padding), cells(std::move(cells))
+          operands(stack_count, padding), cells(std::move(cells)),
+          namespace_mapping(namespace_mapping)
     {
         regions.reserve(max_regions);
         cleanups.reserve(max_regions);

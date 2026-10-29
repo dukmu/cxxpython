@@ -1,4 +1,4 @@
-#include "cxxpython/objects.hpp"
+#include "cxxpython/protocol.hpp"
 
 #include <algorithm>
 
@@ -472,6 +472,60 @@ void type_init(Attachment &context, Handle, std::span<const Value> args, ReturnS
     }
     out.ok(context.builtin(CoreObject::None));
 }
+void type_prepare(Attachment &context, Handle, std::span<const Value>, ReturnSlot &out)
+{
+    RootScope roots(context);
+    context.allocate_instance<DictObject>(roots.root(context.builtin(CoreObject::DictType)), out);
+}
+void string_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!is_type(context, args[0]) ||
+        !is_subtype(context, args[0], context.builtin(CoreObject::StrType))) {
+        type_error(context, U"str.__new__ requires a str type", out);
+        return;
+    }
+    const auto &positional = context.payload<TupleObject>(args[1]).items;
+    if (positional.size() > 3) {
+        type_error(context, U"str expects at most three arguments", out);
+        return;
+    }
+    constexpr std::array<std::u32string_view, 3> names{U"object", U"encoding", U"errors"};
+    std::array<std::optional<Value>, 3> values;
+    std::copy(positional.begin(), positional.end(), values.begin());
+    DictView keywords(context, args[2]);
+    for (auto entry : keywords.entries()) {
+        const auto &name = context.payload<StrObject>(entry.key).value;
+        const auto found = std::find(names.begin(), names.end(), name);
+        if (found == names.end() || values[found - names.begin()]) {
+            type_error(context, U"invalid or repeated str keyword argument", out);
+            return;
+        }
+        values[found - names.begin()] = entry.value;
+    }
+    for (std::size_t i = 1; i < values.size(); ++i)
+        if (values[i] && !is_instance(context, *values[i], CoreObject::StrType)) {
+            type_error(context, U"str encoding and errors must be strings", out);
+            return;
+        }
+    RootScope roots(context);
+    ReturnSlot converted(context);
+    if (!values[0])
+        make_str(context, U"", converted);
+    else if (values[1] || values[2]) {
+        type_error(context, U"decoding requires a bytes-like object", out);
+        return;
+    } else
+        str(context, roots.root(*values[0]), converted);
+    if (raised(converted)) {
+        out.raised(converted.exception());
+        return;
+    }
+    if (args[0] == context.builtin(CoreObject::StrType))
+        out.ok(converted.value());
+    else
+        context.allocate_instance<StrObject>(roots.root(args[0]), out,
+                                             context.payload<StrObject>(converted.value()).value);
+}
 void object_subclass(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_type(context, args[0])) {
@@ -522,6 +576,8 @@ void install_construction(Attachment &context, std::span<const Handle> core)
     install(at(CoreObject::StopIterationType), U"__init__", exception, stop_init);
     install(type, U"__call__", variadic, type_call);
     install(type, U"__init__", variadic, type_init);
+    install(type, U"__prepare__", variadic, type_prepare, Binding::Class);
+    install(at(CoreObject::StrType), U"__new__", variadic, string_new, Binding::Static);
     SignatureLayout definition;
     definition.parameters = {{U"cls", ParameterKind::PositionalOnly},
                              {U"name", ParameterKind::PositionalOnly},

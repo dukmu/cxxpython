@@ -187,7 +187,8 @@ void with_method(Attachment &context, Handle manager, Protocol protocol, ReturnS
                             slot.type.get(context), out);
 }
 void make_frame(Attachment &context, Handle function, CallArgsView args,
-                std::optional<Value> receiver, ReturnSlot &out)
+                std::optional<Value> receiver, ReturnSlot &out,
+                std::optional<Handle> namespace_mapping = {})
 {
     RootScope roots(context);
     const auto &callable = context.payload<FunctionObject>(function);
@@ -197,6 +198,17 @@ void make_frame(Attachment &context, Handle function, CallArgsView args,
     if (callable.kwdefaults)
         keywords = roots.root(*callable.kwdefaults).get(context);
     const auto &program = context.payload<CodeObject>(code).program;
+    std::optional<Value> mapping;
+    ReturnSlot space(context);
+    if (namespace_mapping)
+        mapping = roots.root(namespace_mapping->get(context)).get(context);
+    else if (program.kind() == CodeKind::Module)
+        mapping = callable.globals;
+    else if (program.kind() == CodeKind::ClassBody) {
+        context.allocate_instance<DictObject>(roots.root(context.builtin(CoreObject::DictType)),
+                                              space);
+        mapping = space.value();
+    }
     std::vector<Value> bound;
     detail::FunctionDefaults values{context.payload<TupleObject>(defaults).items, keywords};
     if (!detail::bind_arguments(context, program.signature(), args, receiver, roots, bound, out,
@@ -208,9 +220,10 @@ void make_frame(Attachment &context, Handle function, CallArgsView args,
         const auto type = roots.root(context.builtin(CoreObject::CellType));
         ReturnSlot cell(context);
         for (auto local : program.cell_locals()) {
-            context.allocate_instance<CellObject>(
-                type, cell,
-                local < bound.size() ? std::optional<Value>{bound[local]} : std::optional<Value>{});
+            context.allocate_instance<CellObject>(type, cell,
+                                                  local && *local < bound.size()
+                                                      ? std::optional<Value>{bound[*local]}
+                                                      : std::optional<Value>{});
             cells.push_back(roots.root(cell.value()).get(context));
         }
     }
@@ -220,12 +233,30 @@ void make_frame(Attachment &context, Handle function, CallArgsView args,
     context.allocate_instance<FrameObject>(
         roots.root(context.builtin(CoreObject::FrameType)), out, function.get(context),
         code.get(context), program.local_names().size(), program.max_stack(),
-        context.builtin(CoreObject::None), program.max_regions(), std::move(cells));
+        context.builtin(CoreObject::None), program.max_regions(), std::move(cells), mapping);
     auto &data = context.payload<FrameObject>(out.value());
     for (std::size_t i = 0; i < bound.size(); ++i)
         data.locals[i] = bound[i];
     for (auto local : program.cell_locals())
-        data.locals[local].reset();
+        if (local)
+            data.locals[*local].reset();
+}
+void namespace_lookup(Attachment &context, Value mapping, Value key, ReturnSlot &out)
+{
+    if (context.type_of(mapping) == context.builtin(CoreObject::DictType)) {
+        const auto found =
+            detail::name_lookup(context, mapping, context.payload<StrObject>(key).value);
+        if (found)
+            out.ok(*found);
+        else
+            out.reset();
+        return;
+    }
+    RootScope roots(context);
+    get_item(context, roots.root(mapping), roots.root(key), out);
+    if (raised(out) && is_subtype(context, context.type_of(out.exception()),
+                                  context.builtin(CoreObject::KeyErrorType)))
+        out.reset();
 }
 void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &out)
 {
@@ -273,6 +304,20 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
             case Opcode::LoadClosure:
                 data.operands[data.sp++] = data.cells[operand];
                 break;
+            case Opcode::LoadClassDeref: {
+                const auto offset = operand - code.program.cell_names().size();
+                const auto key = context.payload<TupleObject>(code.freevars).items[offset];
+                namespace_lookup(context, *data.namespace_mapping, key, result);
+                if (result.tag() == ResultTag::Empty)
+                    read_cell(context, data.cells[operand], result);
+                if (result.tag() == ResultTag::Empty)
+                    unbound(context, code.program.free_names()[offset], result, true);
+                if (raised(result))
+                    activation.raising(result.exception());
+                else
+                    data.operands[data.sp++] = result.value();
+                break;
+            }
             case Opcode::LoadDeref:
             case Opcode::DeleteDeref: {
                 if (opcode == Opcode::LoadDeref)
@@ -297,6 +342,67 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 write_cell(context, data.cells[operand], data.operands[data.sp - 1]);
                 data.operands[--data.sp] = context.builtin(CoreObject::None);
                 break;
+            case Opcode::LoadBuildClass: {
+                const auto &function = context.payload<FunctionObject>(data.function);
+                const auto value =
+                    detail::name_lookup(context, function.builtins, U"__build_class__");
+                if (value)
+                    data.operands[data.sp++] = *value;
+                else {
+                    raise_error(context, CoreObject::NameErrorType, U"__build_class__ not found",
+                                result);
+                    activation.raising(result.exception());
+                }
+                break;
+            }
+            case Opcode::LoadName:
+            case Opcode::StoreName:
+            case Opcode::DeleteName: {
+                const auto mapping = *data.namespace_mapping;
+                const auto key = context.payload<TupleObject>(code.names).items[operand];
+                const auto &name = context.payload<StrObject>(key).value;
+                if (opcode == Opcode::LoadName) {
+                    namespace_lookup(context, mapping, key, result);
+                    if (result.tag() == ResultTag::Empty) {
+                        const auto &function = context.payload<FunctionObject>(data.function);
+                        auto value = detail::name_lookup(context, function.globals, name);
+                        if (!value)
+                            value = detail::name_lookup(context, function.builtins, name);
+                        if (value)
+                            result.ok(*value);
+                        else
+                            raise_error(context, CoreObject::NameErrorType,
+                                        U"name '" + name + U"' is not defined", result);
+                    }
+                    if (!raised(result))
+                        data.operands[data.sp++] = result.value();
+                } else if (context.type_of(mapping) == context.builtin(CoreObject::DictType)) {
+                    result.reset();
+                    if (opcode == Opcode::StoreName)
+                        detail::name_store(context, mapping, key, data.operands[data.sp - 1]);
+                    else if (!detail::name_erase(context, mapping, name))
+                        raise_error(context, CoreObject::NameErrorType,
+                                    U"name '" + name + U"' is not defined", result);
+                } else {
+                    RootScope roots(context);
+                    if (opcode == Opcode::StoreName)
+                        set_item(context, roots.root(mapping), roots.root(key),
+                                 roots.root(data.operands[data.sp - 1]), result);
+                    else {
+                        del_item(context, roots.root(mapping), roots.root(key), result);
+                        if (raised(result) &&
+                            is_subtype(context, context.type_of(result.exception()),
+                                       context.builtin(CoreObject::KeyErrorType)))
+                            raise_error(context, CoreObject::NameErrorType,
+                                        U"name '" + name + U"' is not defined", result);
+                    }
+                }
+                if (raised(result))
+                    activation.raising(result.exception());
+                else if (opcode == Opcode::StoreName)
+                    data.operands[--data.sp] = context.builtin(CoreObject::None);
+                break;
+            }
             case Opcode::LoadGlobal:
             case Opcode::StoreGlobal:
             case Opcode::DeleteGlobal: {
@@ -925,6 +1031,27 @@ void make_function(Attachment &context, const FunctionSpec &spec, ReturnSlot &ou
                                               builtins.get(context), closure);
 }
 namespace detail {
+void execute_class_body(Attachment &context, Handle function, Handle mapping, ReturnSlot &out)
+{
+    if (!context.enter_call()) {
+        raise_error(context, CoreObject::RecursionErrorType, U"maximum call depth exceeded", out);
+        return;
+    }
+    try {
+        ReturnSlot active(context);
+        make_frame(context, function, {}, {}, active, mapping);
+        if (raised(active))
+            out.raised(active.exception());
+        else {
+            FrameActivation activation(context, active);
+            run(context, activation, out);
+        }
+    } catch (...) {
+        context.leave_call();
+        throw;
+    }
+    context.leave_call();
+}
 void execute_function(Attachment &context, Handle function, CallArgsView args,
                       std::optional<Value> receiver, ReturnSlot &out)
 {

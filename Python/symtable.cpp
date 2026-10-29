@@ -9,6 +9,7 @@ struct Binding {
     Span first;
     bool bound = false, used = false, parameter = false, global = false, nonlocal = false;
     NameClass classification = NameClass::GlobalImplicit;
+    bool forwarded = false;
 };
 struct ScopeBindings {
     std::vector<Binding> entries;
@@ -38,9 +39,12 @@ class ScopePass final {
         for (std::size_t scope = 0; scope < bindings_.size(); ++scope)
             for (auto &entry : bindings_[scope].entries)
                 entry.classification = entry.global ? NameClass::GlobalExplicit
-                                       : program_.scopes[scope].kind == ScopeKind::Function &&
-                                               entry.bound && !entry.nonlocal
+                                       : entry.bound && !entry.nonlocal &&
+                                               program_.scopes[scope].kind == ScopeKind::Function
                                            ? NameClass::Local
+                                       : entry.bound && !entry.nonlocal &&
+                                               program_.scopes[scope].kind == ScopeKind::Class
+                                           ? NameClass::Namespace
                                            : NameClass::GlobalImplicit;
         for (std::size_t scope = 1; scope < bindings_.size(); ++scope) {
             const auto count = bindings_[scope].entries.size();
@@ -50,7 +54,18 @@ class ScopePass final {
                     continue;
                 auto parent = program_.scopes[scope].parent;
                 std::optional<std::size_t> owner;
-                while (parent && program_.scopes[*parent].kind == ScopeKind::Function) {
+                while (parent && program_.scopes[*parent].kind != ScopeKind::Module) {
+                    if (program_.scopes[*parent].kind == ScopeKind::Class) {
+                        if (entry.name == U"__class__") {
+                            owner = parent;
+                            auto &cells = program_.scopes[*parent].cellvars;
+                            if (cells.empty())
+                                cells.push_back(U"__class__");
+                            break;
+                        }
+                        parent = program_.scopes[*parent].parent;
+                        continue;
+                    }
                     const auto *candidate = bindings_[*parent].find(entry.name);
                     if (candidate && candidate->global)
                         break;
@@ -65,11 +80,16 @@ class ScopePass final {
                         error(entry.first, "no binding for nonlocal name found");
                     continue;
                 }
-                bindings_[*owner].find(entry.name)->classification = NameClass::Cell;
+                if (program_.scopes[*owner].kind == ScopeKind::Function)
+                    bindings_[*owner].find(entry.name)->classification = NameClass::Cell;
                 for (auto cursor = std::optional<std::size_t>{scope}; cursor != owner;
-                     cursor = program_.scopes[*cursor].parent)
-                    bindings_[*cursor].get(entry.name, entry.first).classification =
-                        NameClass::Free;
+                     cursor = program_.scopes[*cursor].parent) {
+                    auto &forwarded = bindings_[*cursor].get(entry.name, entry.first);
+                    forwarded.forwarded = true;
+                    if (program_.scopes[*cursor].kind != ScopeKind::Class ||
+                        (!forwarded.bound && !forwarded.global) || forwarded.nonlocal)
+                        forwarded.classification = NameClass::Free;
+                }
             }
         }
         for (std::size_t scope = 0; scope < bindings_.size(); ++scope) {
@@ -80,7 +100,7 @@ class ScopePass final {
                     info.locals.push_back(entry.name);
                 if (entry.classification == NameClass::Cell && entry.parameter)
                     info.cellvars.push_back(entry.name);
-                if (entry.classification == NameClass::Free)
+                if (entry.classification == NameClass::Free || entry.forwarded)
                     info.freevars.push_back(entry.name);
             }
             const auto cell_parameters = info.cellvars.size();
@@ -116,18 +136,39 @@ class ScopePass final {
     {
         const auto id = bindings_.size();
         bindings_.emplace_back();
+        private_names_.push_back(parent ? private_names_[*parent] : std::u32string{});
         program_.scopes.push_back(
             {kind, std::move(name), std::move(qualname), parent, span, {}, {}, {}, {}});
         return id;
     }
-    void expression(const Expr &value, std::size_t scope)
+    std::u32string mangle(std::u32string name, std::size_t scope) const
+    {
+        const auto &owner = private_names_[scope];
+        if (owner.empty() || !name.starts_with(U"__") || name.ends_with(U"__") ||
+            name.find(U'.') != name.npos)
+            return name;
+        const auto begin = owner.find_first_not_of(U'_');
+        return begin == owner.npos ? name : U"_" + owner.substr(begin) + name;
+    }
+    std::u32string qualified(const std::u32string &name, std::size_t scope) const
+    {
+        const auto &parent = program_.scopes[scope];
+        return parent.kind == ScopeKind::Module
+                   ? name
+                   : parent.qualname + (parent.kind == ScopeKind::Function ? U".<locals>." : U".") +
+                         name;
+    }
+    void expression(Expr &value, std::size_t scope)
     {
         std::visit(
-            [&](const auto &node) {
+            [&](auto &node) {
                 using T = std::decay_t<decltype(node)>;
-                if constexpr (std::is_same_v<T, NameExpr>)
+                if constexpr (std::is_same_v<T, NameExpr>) {
+                    node.name = mangle(std::move(node.name), scope);
                     bindings_[scope].get(node.name, value.span).used = true;
-                else if constexpr (std::is_same_v<T, UnaryExpr>)
+                    if (node.name == U"super" && program_.scopes[scope].kind == ScopeKind::Function)
+                        bindings_[scope].get(U"__class__", value.span).used = true;
+                } else if constexpr (std::is_same_v<T, UnaryExpr>)
                     expression(*node.value, scope);
                 else if constexpr (std::is_same_v<T, BinaryExpr> || std::is_same_v<T, BoolExpr>) {
                     expression(*node.left, scope);
@@ -139,11 +180,13 @@ class ScopePass final {
                     expression(*node.target, scope);
                     for (const auto &item : node.positional)
                         expression(*item, scope);
-                    for (const auto &item : node.keywords)
+                    for (auto &item : node.keywords) {
                         expression(*item.second, scope);
-                } else if constexpr (std::is_same_v<T, AttributeExpr>)
+                    }
+                } else if constexpr (std::is_same_v<T, AttributeExpr>) {
                     expression(*node.object, scope);
-                else if constexpr (std::is_same_v<T, TupleExpr>) {
+                    node.name = mangle(std::move(node.name), scope);
+                } else if constexpr (std::is_same_v<T, TupleExpr>) {
                     for (const auto &item : node.items)
                         expression(*item, scope);
                 } else if constexpr (std::is_same_v<T, SubscriptExpr>) {
@@ -154,12 +197,13 @@ class ScopePass final {
             },
             value.node);
     }
-    void target(const Expr &value, std::size_t scope, bool read = false)
+    void target(Expr &value, std::size_t scope, bool read = false)
     {
         if (const auto *tuple = std::get_if<TupleExpr>(&value.node)) {
             for (const auto &item : tuple->items)
                 target(*item, scope, read);
-        } else if (const auto *name = std::get_if<NameExpr>(&value.node)) {
+        } else if (auto *name = std::get_if<NameExpr>(&value.node)) {
+            name->name = mangle(std::move(name->name), scope);
             if (name->name == U"__debug__")
                 error(value.span, "cannot assign/delete __debug__");
             auto &entry = bindings_[scope].get(name->name, value.span);
@@ -168,8 +212,11 @@ class ScopePass final {
         } else if (const auto *item = std::get_if<SubscriptExpr>(&value.node)) {
             expression(*item->object, scope);
             expression(*item->key, scope);
-        } else
-            expression(*std::get<AttributeExpr>(value.node).object, scope);
+        } else {
+            auto &attribute = std::get<AttributeExpr>(value.node);
+            expression(*attribute.object, scope);
+            attribute.name = mangle(std::move(attribute.name), scope);
+        }
     }
     void collect(Suite &body, std::size_t scope)
     {
@@ -213,7 +260,8 @@ class ScopePass final {
                             if (handler.type)
                                 expression(*handler.type, scope);
                             if (handler.name) {
-                                const auto &[name, span] = *handler.name;
+                                auto &[name, span] = *handler.name;
+                                name = mangle(std::move(name), scope);
                                 if (name == U"__debug__")
                                     error(span, "cannot assign __debug__");
                                 bindings_[scope].get(name, span).bound = true;
@@ -233,7 +281,8 @@ class ScopePass final {
                         if (node.nonlocal && program_.scopes[scope].kind == ScopeKind::Module)
                             error(statement->span,
                                   "nonlocal declaration not allowed at module level");
-                        for (const auto &[name, span] : node.names) {
+                        for (auto &[name, span] : node.names) {
+                            name = mangle(std::move(name), scope);
                             auto &entry = bindings_[scope].get(name, span);
                             if (entry.parameter || entry.bound || entry.used)
                                 error(span, "name used, assigned or parameter before "
@@ -247,25 +296,46 @@ class ScopePass final {
                     } else if constexpr (std::is_same_v<T, FunctionStmt>) {
                         if (node.name == U"__debug__")
                             error(statement->span, "cannot assign __debug__");
-                        bindings_[scope].get(node.name, statement->span).bound = true;
+                        node.binding = mangle(node.name, scope);
+                        bindings_[scope].get(node.binding, statement->span).bound = true;
+                        for (const auto &decorator : node.decorators)
+                            expression(*decorator, scope);
                         for (const auto &parameter : node.parameters)
                             if (parameter.default_value)
                                 expression(*parameter.default_value, scope);
-                        const auto qualname =
-                            program_.scopes[scope].kind == ScopeKind::Module
-                                ? node.name
-                                : program_.scopes[scope].qualname + U".<locals>." + node.name;
-                        node.scope =
-                            add(ScopeKind::Function, node.name, qualname, scope, statement->span);
-                        for (const auto &parameter : node.parameters) {
+                        node.scope = add(ScopeKind::Function, node.name,
+                                         qualified(node.name, scope), scope, statement->span);
+                        for (auto &parameter : node.parameters) {
+                            parameter.name = mangle(std::move(parameter.name), node.scope);
                             auto &entry = bindings_[node.scope].get(parameter.name, parameter.span);
+                            if (entry.parameter)
+                                error(parameter.span, "duplicate parameter name");
                             entry.bound = entry.parameter = true;
                         }
-                        for (const auto *name : {&node.varargs, &node.varkwargs})
+                        for (auto *name : {&node.varargs, &node.varkwargs})
                             if (*name) {
+                                **name = mangle(std::move(**name), node.scope);
                                 auto &entry = bindings_[node.scope].get(**name, statement->span);
+                                if (entry.parameter)
+                                    error(statement->span, "duplicate parameter name");
                                 entry.bound = entry.parameter = true;
                             }
+                        collect(node.body, node.scope);
+                    } else if constexpr (std::is_same_v<T, ClassStmt>) {
+                        if (node.name == U"__debug__")
+                            error(statement->span, "cannot assign __debug__");
+                        node.binding = mangle(node.name, scope);
+                        bindings_[scope].get(node.binding, statement->span).bound = true;
+                        for (const auto &decorator : node.decorators)
+                            expression(*decorator, scope);
+                        for (const auto &base : node.bases)
+                            expression(*base, scope);
+                        for (auto &item : node.keywords) {
+                            expression(*item.second, scope);
+                        }
+                        node.scope = add(ScopeKind::Class, node.name, qualified(node.name, scope),
+                                         scope, statement->span);
+                        private_names_[node.scope] = node.name;
                         collect(node.body, node.scope);
                     } else
                         static_assert(std::is_same_v<T, ControlStmt>,
@@ -276,6 +346,7 @@ class ScopePass final {
     SourceProgram &program_;
     Suite &body_;
     std::vector<ScopeBindings> bindings_;
+    std::vector<std::u32string> private_names_;
 };
 
 } // namespace

@@ -19,17 +19,20 @@ enum class TypeState { Building, Structural, Ready };
 
 struct TypeSnapshot {
     ObjectHeader header;
-    const Value name, qualname, dictionary;
+    const Value name, qualname, dictionary, bases, mro;
     const std::optional<Value> storage;
     TypeSnapshot(InitialType head, Value name, Value qualname, Value dictionary,
-                 std::optional<Value> storage)
-        : header(head), name(name), qualname(qualname), dictionary(dictionary), storage(storage)
+                 std::optional<Value> storage, Value bases, Value mro)
+        : header(head), name(name), qualname(qualname), dictionary(dictionary), bases(bases),
+          mro(mro), storage(storage)
     {}
     void trace(Tracer &tracer) const noexcept
     {
         tracer.visit(name);
         tracer.visit(qualname);
         tracer.visit(dictionary);
+        tracer.visit(bases);
+        tracer.visit(mro);
         if (storage)
             tracer.visit(*storage);
     }

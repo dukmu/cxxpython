@@ -357,12 +357,21 @@ void publish_type(Attachment &context, Value type)
         throw std::logic_error("ready type has no namespace");
     context.store(*view.dictionary(),
                   context.payload<DictObject>(*view.dictionary()).namespace_owner, type);
-    ReturnSlot staged(context);
+    RootScope roots(context);
+    ReturnSlot staged(context), temporary(context);
+    cxxpython::core::make_tuple(context, context.payload<TypeObject>(type).bases, temporary);
+    const auto bases = roots.root(temporary.value());
+    cxxpython::core::make_tuple(context, context.payload<TypeObject>(type).mro, temporary);
+    const auto mro = roots.root(temporary.value());
     context.allocate<TypeSnapshot>(staged, std::get<Value>(view.name()),
                                    std::get<Value>(view.qualname()), *view.dictionary(),
-                                   view.storage());
-    if (!commit_type(context, type, {}, staged.value()))
-        throw std::logic_error("unpublished type changed concurrently");
+                                   view.storage(), bases.get(context), mro.get(context));
+    while (!commit_type(context, type, {}, staged.value())) {
+        context.load(type, context.payload<TypeObject>(type).metadata, temporary);
+        if (temporary.tag() != ResultTag::Empty)
+            throw std::logic_error("unpublished type changed concurrently");
+        context.poll();
+    }
     auto &data = context.payload<TypeObject>(type);
     context.store(*view.dictionary(), context.payload<DictObject>(*view.dictionary()).storage, {});
     data.name = std::u32string{};
@@ -383,7 +392,9 @@ void type_name_store(Attachment &context, Value type, Value name, bool qualified
                 throw std::logic_error("type mutation requires published metadata");
             context.allocate<TypeSnapshot>(staged, qualified ? std::get<Value>(old.name()) : name,
                                            qualified ? name : std::get<Value>(old.qualname()),
-                                           *old.dictionary(), old.storage());
+                                           *old.dictionary(), old.storage(),
+                                           context.payload<TypeSnapshot>(*old.snapshot()).bases,
+                                           context.payload<TypeSnapshot>(*old.snapshot()).mro);
             if (commit_type(context, type, old.snapshot(), staged.value()))
                 return;
         }
@@ -410,7 +421,9 @@ bool type_namespace_change(Attachment &context, Value type, const std::u32string
                 return false;
             context.allocate<TypeSnapshot>(staged, std::get<Value>(old.name()),
                                            std::get<Value>(old.qualname()), *old.dictionary(),
-                                           storage.value());
+                                           storage.value(),
+                                           context.payload<TypeSnapshot>(*old.snapshot()).bases,
+                                           context.payload<TypeSnapshot>(*old.snapshot()).mro);
             if (commit_type(context, type, old.snapshot(), staged.value()))
                 return true;
         }

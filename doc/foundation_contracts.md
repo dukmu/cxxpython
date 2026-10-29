@@ -25,7 +25,9 @@ non-starred unpacking and integer/protocol subscripts. Experimental range,
 tuple/string iteration, iter(obj), next(it[, default]) and exception construction
 use ordinary object protocols. Raise/reraise/chaining, try/except/else/finally and
 synchronous with use verified regions and the existing frame scheduler.
-Mutable containers, slices, full iteration APIs, class source lowering,
+Class definitions and decorators use the existing type/descriptor/call machinery
+with separate class namespaces, lexical forwarding and real __class__ Cells.
+Mutable containers, slices, full iteration APIs, super(),
 exception groups, imports, suspension, f-strings, float/power
 protocols, full Unicode source handling and the remaining Python 3.12 matrix are
 unfinished. These are remaining delivery requirements, not a reduction of the
@@ -77,6 +79,10 @@ Header/type references, instance field tails, Cell contents and exception graph
 edges use atomic rooted operations. Name Dict storage and Type metadata publish
 immutable snapshots, prepared outside short commits. Callbacks, allocation and
 blocking do not occur under internal publication critical sections.
+TypeSnapshot includes actual managed bases/MRO tuples, materialized once at first
+publication and retained unchanged through name/dictionary updates. __bases__,
+__mro__ and __base__ expose that hierarchy, not newly assembled representations.
+Dynamic __bases__ replacement remains unsupported.
 
 Code and Function/default/closure identities are immutable; dictionaries and
 referenced values retain their own synchronization semantics. Per-thread protocol
@@ -107,8 +113,12 @@ root and refreshes them only on frame switches. Polls and atomic instruction
 publication for reflection remain active. Cleanup reasons and traceback graphs
 are traced, not hidden in native stack state.
 
-Code declares disjoint cell/free layouts; FAST access to captured locals is
-rejected. Frame preparation roots fresh local Cells and existing free Cells
+Code has an explicit Function/Module/ClassBody kind. Function code declares
+disjoint cell/free layouts; class code may own an implicit __class__ Cell and
+forward an outer Cell with the same name. The verifier distinguishes those
+layouts and rejects namespace opcodes in optimized function code, class-deref
+access to local Cells, and mapping code with fast locals/parameters.
+FAST access to captured locals is rejected. Frame preparation roots fresh local Cells and existing free Cells
 before publishing its const cell-identity vector. Captured parameters have no
 second mutable fast-local authority. Siblings share Cells; distinct factory calls
 do not. Function/Cell cycles use ordinary tracing, not reference counting.
@@ -123,6 +133,45 @@ actual managed metadata; runtime closure creation reuses the scope's Code.
 
 Several threads may call the same Function/Code/closure. Individual shared Cell
 edges are synchronized; compound nonlocal += is not implicitly atomic.
+
+## Class Namespaces And Construction
+
+The native AST has class/decorator nodes. Lexical analysis distinguishes class
+namespace bindings from fast locals, skips class attributes when resolving a
+method's lexical free variables, and independently forwards outer Cells through
+the class scope. Class global declarations do not block a method from capturing
+an enclosing function's variable. Private identifiers/attributes/parameters are
+mangled in the owning class context; function/class name and qualname metadata
+retain their source spellings. Call keyword names are not mangled.
+
+Each class-body invocation owns its namespace mapping and fresh implicit class
+Cells; Function does not cache that mutable state. Frame traces its mapping.
+LOAD_NAME checks the mapping then globals/builtins; LOAD_CLASS_DEREF checks it
+before the corresponding free Cell. Exact internal name dictionaries use their
+existing storage API; generic mappings use ordinary item protocols. Only KeyError
+means missing. Store/delete use the same mapping boundary, including callbacks
+and exceptions. This does not introduce a general public dict implementation.
+
+LOAD_BUILD_CLASS reads the actual builtins mapping, not a shadowing global.
+The ordinary __build_class__ builtin resolves __mro_entries__, selects the
+metaclass, calls __prepare__, executes the body through the same verified VM and
+calls the metaclass. It preserves keywords, __orig_bases__ and user exceptions;
+callable non-type metaclasses may return arbitrary values. Default type.__prepare__
+returns a new name dictionary. Existing type.__new__ still owns C3/layout checks,
+descriptor __set_name__, __init_subclass__ and class-cell filling.
+
+Class prologues store actual module/qualname/docstring values. Normal epilogues
+publish/return the implicit Cell when needed. After a type result, build_class
+checks that the Cell was propagated and filled with that identity; missing and
+wrong values are Python RuntimeError/TypeError, not host faults. A scope's Code
+is frozen once and reused by subsequent class/factory invocations, while their
+types, Functions and Cells are distinct. Decorators evaluate top-to-bottom
+before definition expressions and apply bottom-to-top before name binding.
+
+Zero-/two-argument super and its descriptor object, full locals/globals/vars
+reflection, general containers, call/base unpacking, annotation scopes/type
+parameters and the rest of the type protocol/method matrix remain delivery
+requirements. Class source support here is experimental, not complete M2/M5.
 
 ## Iteration And Items
 
@@ -162,6 +211,11 @@ tuple. StopIteration.value is an independent traced atomic tail field: assigning
 args or calling BaseException.__init__ does not overwrite it, while calling
 StopIteration.__init__ resets it. Complete exception subtype-specific constructor
 matrices remain a gate.
+KeyError's one-argument str uses repr of its key; explicitly calling
+BaseException.__str__ retains the base behavior. The ordinary str constructor
+supports empty/object conversion, object/encoding/errors argument validation
+and native-layout-preserving subclasses. Byte buffers/codecs and the complete
+Unicode API remain requirements; no existing non-buffer type is silently decoded.
 
 ## Source Exceptions And Cleanup
 
@@ -210,7 +264,7 @@ dictionaries; arbitrary namespace mappings and Python compile/exec/eval are abse
 Native contracts live in Tests/cpp; actual executable differential drivers live
 in Lib/test and use fixed CPython 3.12.14 when configured. Benchmark source kernels
 are captured verbatim for the paired reference; raw runs retain version/build/hash
-provenance and generate tables. Same-Function source, closure, for-loop and exception probes
+provenance and generate tables. Same-Function source, closure, for-loop, exception and method probes
 exercise CPU parallelism, but absolute single-thread CPython parity remains a
 failed gate.
 Do not replace that requirement with multicore scaling or a native-only probe.

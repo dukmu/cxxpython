@@ -16,6 +16,7 @@ endif()
 add_library(cxxpython_core
     Python/gc.cpp
     Python/compile.cpp
+    Python/bltinmodule.cpp
     Python/symtable.cpp
     Python/flowgraph.cpp
     Python/ceval.cpp

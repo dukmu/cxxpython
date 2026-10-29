@@ -148,6 +148,7 @@ enum class TokenKind {
     Colon,
     Comma,
     Dot,
+    At,
     Semi,
     Plus,
     Minus,
@@ -176,6 +177,7 @@ enum class TokenKind {
     For,
     In,
     Def,
+    Class,
     Return,
     Raise,
     From,
@@ -314,7 +316,7 @@ class Lexer final {
                     {"for", TokenKind::For},
                     {"in", TokenKind::In},
                     {"lambda", TokenKind::Unsupported},
-                    {"class", TokenKind::Unsupported},
+                    {"class", TokenKind::Class},
                     {"try", TokenKind::Try},
                     {"except", TokenKind::Except},
                     {"finally", TokenKind::Finally},
@@ -439,9 +441,11 @@ class Lexer final {
             case '>':
                 push(equals() ? TokenKind::Ge : TokenKind::Gt, start);
                 break;
+            case '@':
+                push(TokenKind::At, start);
+                break;
             case '{':
             case '}':
-            case '@':
             case '&':
             case '|':
             case '^':
@@ -729,6 +733,42 @@ class Parser final {
     Suite compound()
     {
         Recursion recursion(*this);
+        if (is(K::At)) {
+            const auto start = peek().span.begin;
+            std::vector<ExprPtr> decorators;
+            while (accept(K::At)) {
+                decorators.push_back(expression());
+                expect(K::Newline);
+                newlines();
+            }
+            if (!is(K::Def) && !is(K::Class))
+                fail(peek(), "decorator must precede a function or class");
+            auto declaration = compound();
+            auto &first = *declaration.front();
+            first.span.begin = start;
+            if (auto *function = std::get_if<FunctionStmt>(&first.node))
+                function->decorators = std::move(decorators);
+            else
+                std::get<ClassStmt>(first.node).decorators = std::move(decorators);
+            return declaration;
+        }
+        if (accept(K::Class)) {
+            const auto start = tokens_[index_ - 1].span.begin;
+            ClassStmt definition;
+            definition.name = expect(K::Name).text;
+            if (accept(K::Left)) {
+                arguments(definition.bases, definition.keywords);
+                expect(K::Right);
+            }
+            if (is(K::LeftBracket))
+                fail(peek(), "type parameters require annotation-scope support",
+                     SourceErrorKind::Capability);
+            definition.body = suite();
+            Suite result;
+            result.push_back(
+                statement(std::move(definition), {start, tokens_[index_ - 1].span.end}));
+            return result;
+        }
         if (accept(K::Try)) {
             const auto start = tokens_[index_ - 1].span.begin;
             TryStmt attempt;
@@ -1006,6 +1046,35 @@ class Parser final {
     {
         return boolean(false);
     }
+    std::size_t arguments(std::vector<ExprPtr> &positional,
+                          std::vector<std::pair<std::u32string, ExprPtr>> &named)
+    {
+        std::unordered_set<std::u32string> keywords;
+        std::size_t depth = 0;
+        while (!is(K::Right)) {
+            if (is(K::Star) || is(K::Power))
+                fail(peek(), "call unpacking requires the unpacking capability",
+                     SourceErrorKind::Capability);
+            if (is(K::Name) && tokens_[index_ + 1].kind == K::Assign) {
+                const auto name = take();
+                take();
+                if (!keywords.insert(name.text).second)
+                    fail(name, "keyword argument repeated");
+                auto argument = expression();
+                depth = std::max(depth, argument->depth);
+                named.push_back({name.text, std::move(argument)});
+            } else {
+                if (!keywords.empty())
+                    fail(peek(), "positional argument follows keyword argument");
+                auto argument = expression();
+                depth = std::max(depth, argument->depth);
+                positional.push_back(std::move(argument));
+            }
+            if (!accept(K::Comma))
+                break;
+        }
+        return depth;
+    }
     ExprPtr expression_list()
     {
         auto value = expression();
@@ -1128,30 +1197,8 @@ class Parser final {
             expect(K::Left);
             CallExpr call;
             call.target = std::move(value);
-            std::unordered_set<std::u32string> keywords;
-            auto depth = call.target->depth;
-            while (!is(K::Right)) {
-                if (is(K::Star) || is(K::Power))
-                    fail(peek(), "call unpacking requires the unpacking capability",
-                         SourceErrorKind::Capability);
-                if (is(K::Name) && tokens_[index_ + 1].kind == K::Assign) {
-                    const auto name = take();
-                    take();
-                    if (!keywords.insert(name.text).second)
-                        fail(name, "keyword argument repeated");
-                    auto argument = expression();
-                    depth = std::max(depth, argument->depth);
-                    call.keywords.push_back({name.text, std::move(argument)});
-                } else {
-                    if (!keywords.empty())
-                        fail(peek(), "positional argument follows keyword argument");
-                    auto argument = expression();
-                    depth = std::max(depth, argument->depth);
-                    call.positional.push_back(std::move(argument));
-                }
-                if (!accept(K::Comma))
-                    break;
-            }
+            const auto depth =
+                std::max(call.target->depth, arguments(call.positional, call.keywords));
             const auto end = expect(K::Right).span.end;
             value = node(std::move(call), {start, end}, depth + 1);
         }

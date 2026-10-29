@@ -395,9 +395,11 @@ void exception_repr(Attachment &context, Handle, std::span<const Value> args, Re
     }
     make_str(context, std::move(name), out);
 }
+template <bool KeyError>
 void exception_str(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
-    if (!instance_of<ExceptionObject, CoreObject::BaseExceptionType>(context, args[0])) {
+    if (!instance_of < ExceptionObject,
+        KeyError ? CoreObject::KeyErrorType : CoreObject::BaseExceptionType > (context, args[0])) {
         type_error(context, out);
         return;
     }
@@ -408,6 +410,8 @@ void exception_str(Attachment &context, Handle, std::span<const Value> args, Ret
     const auto &values = context.payload<TupleObject>(arguments).items;
     if (values.empty())
         make_str(context, U"", out);
+    else if (KeyError && values.size() == 1)
+        repr(context, roots.root(values[0]), out);
     else
         str(context, values.size() == 1 ? roots.root(values[0]) : arguments, out);
 }
@@ -439,7 +443,8 @@ void install_value_protocols(Attachment &context, std::span<const Handle> core)
     install(at(CoreObject::NoneType), U"__hash__", none_hash);
     install(at(CoreObject::MappingProxyType), U"__hash__", proxy_hash);
     install(at(CoreObject::BaseExceptionType), U"__repr__", exception_repr);
-    install(at(CoreObject::BaseExceptionType), U"__str__", exception_str);
+    install(at(CoreObject::BaseExceptionType), U"__str__", exception_str<false>);
+    install(at(CoreObject::KeyErrorType), U"__str__", exception_str<true>);
     for (auto [id, label] :
          {std::pair{CoreObject::None, U"None"}, {CoreObject::NotImplemented, U"NotImplemented"}}) {
         ReturnSlot text(context);

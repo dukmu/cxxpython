@@ -32,6 +32,9 @@ continuations as native bytecode, not a second source-only exception mechanism.
 verified bytecode and calls normal object protocols. Python-to-Python calls do
 not grow the C++ stack. `Python/unwind.cpp` handles structured control reasons and
 cleanup continuations. `Python/traceback.cpp` owns traceback operations.
+`Python/bltinmodule.cpp` owns the ordinary __build_class__ builtin, coordinating
+base expansion, metaclass preparation, a normal class-body Frame and existing
+type construction. It is not a separate class VM or lifetime authority.
 
 ## Objects And Lifetime
 
@@ -68,7 +71,10 @@ parks a thread without exclusive execution permission on resume.
 Mutable shared references use rooted atomic edge operations. Name dictionaries
 and type metadata publish immutable snapshots; Code and Function metadata are
 immutable. Closure Cell identities are shared, while each call owns its Frame
-and fresh local Cells. There is no whole-interpreter ordinary execution lock.
+and fresh local Cells. CodeKind distinguishes function, module and class-body
+namespace rules; a class Frame owns/traces its supplied mapping and implicit
+class Cell rather than putting invocation state in shared Function/Code.
+There is no whole-interpreter ordinary execution lock.
 
 ## Tests And Tooling
 

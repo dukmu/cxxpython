@@ -37,8 +37,8 @@ class SourceError final : public std::invalid_argument {
     const std::uint32_t offset, end_offset;
 };
 enum class InputMode { Exec, Eval };
-enum class ScopeKind { Module, Function };
-enum class NameClass { Local, GlobalExplicit, GlobalImplicit, Free, Cell };
+enum class ScopeKind { Module, Function, Class };
+enum class NameClass { Local, Namespace, GlobalExplicit, GlobalImplicit, Free, Cell };
 struct SymbolInfo {
     std::u32string name;
     NameClass classification;

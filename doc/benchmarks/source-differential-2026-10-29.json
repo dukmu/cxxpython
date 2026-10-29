@@ -1,10 +1,10 @@
 {
-  "captured_at": "2026-10-29T14:30:55.395023+00:00",
+  "captured_at": "2026-10-29T15:29:07.230796+00:00",
   "reference_version": "Python 3.12.14",
   "provenance": {
     "binary": {
       "path": "/home/shefrin/repo/cxxpython/build/cxxpython",
-      "sha256": "b3e22b49d5f98a74109b9dbc875d645208bec4878d7d1b683bc0ab897ee11919"
+      "sha256": "a5c1208dfd8471b4cb87c45ba05f717c5e8ce9831b3ba27d00ebf7d580ed8e07"
     },
     "reference": {
       "path": "/tmp/cxxpython-cpython31214-build/python",
@@ -13,6 +13,786 @@
   },
   "passed": true,
   "observations": [
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nvalue = 90\nclass Base:\n    'documentation'\n    value = 3\n    def __init__(self, n=4):\n        self.n = n\n    def total(self):\n        return self.n + self.value\nclass Child(Base):\n    @staticmethod\n    def scale(n):\n        return n * 2\n    @classmethod\n    def identify(cls):\n        return cls\ninstance = Child(7)\n",
+        "--eval",
+        "instance.total(), Child.scale(5), instance.identify() is Child, value, Base.__doc__, Child.__module__"
+      ],
+      "stdout": "(10, 10, True, 90, 'documentation', '__main__')\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nvalue = 90\nclass Base:\n    'documentation'\n    value = 3\n    def __init__(self, n=4):\n        self.n = n\n    def total(self):\n        return self.n + self.value\nclass Child(Base):\n    @staticmethod\n    def scale(n):\n        return n * 2\n    @classmethod\n    def identify(cls):\n        return cls\ninstance = Child(7)\n\nprint(repr((instance.total(), Child.scale(5), instance.identify() is Child, value, Base.__doc__, Child.__module__)))"
+      ],
+      "stdout": "(10, 10, True, 90, 'documentation', '__main__')\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\ndef factory(x):\n    class C:\n        x = 99\n        def read(self):\n            return x, __class__\n        class Inner:\n            value = x\n    return C\nA = factory(7)\nB = factory(8)\n",
+        "--eval",
+        "A.x, A.Inner.value, A().read()[0], B().read()[0], A().read()[1] is A, A.read.__code__ is B.read.__code__"
+      ],
+      "stdout": "(99, 7, 7, 8, True, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\ndef factory(x):\n    class C:\n        x = 99\n        def read(self):\n            return x, __class__\n        class Inner:\n            value = x\n    return C\nA = factory(7)\nB = factory(8)\n\nprint(repr((A.x, A.Inner.value, A().read()[0], B().read()[0], A().read()[1] is A, A.read.__code__ is B.read.__code__)))"
+      ],
+      "stdout": "(99, 7, 7, 8, True, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\ndef factory(x):\n    class C:\n        nonlocal x\n        x += 1\n        value = x\n        def read(self):\n            return x\n    return C\nC = factory(7)\n",
+        "--eval",
+        "C.value, C().read()"
+      ],
+      "stdout": "(8, 8)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\ndef factory(x):\n    class C:\n        nonlocal x\n        x += 1\n        value = x\n        def read(self):\n            return x\n    return C\nC = factory(7)\n\nprint(repr((C.value, C().read())))"
+      ],
+      "stdout": "(8, 8)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nx = 90\ndef factory(x):\n    class C:\n        global x\n        value = x\n        def read(self):\n            return x\n    return C\nC = factory(7)\n",
+        "--eval",
+        "C.value, C().read()"
+      ],
+      "stdout": "(90, 7)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nx = 90\ndef factory(x):\n    class C:\n        global x\n        value = x\n        def read(self):\n            return x\n    return C\nC = factory(7)\n\nprint(repr((C.value, C().read())))"
+      ],
+      "stdout": "(90, 7)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass A:\n    def make(self):\n        class B:\n            owner = __class__\n            def who(self):\n                return __class__\n        return B\nB = A().make()\n",
+        "--eval",
+        "B.owner is A, B().who() is B, B.who.__qualname__"
+      ],
+      "stdout": "(True, True, 'A.make.<locals>.B.who')\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass A:\n    def make(self):\n        class B:\n            owner = __class__\n            def who(self):\n                return __class__\n        return B\nB = A().make()\n\nprint(repr((B.owner is A, B().who() is B, B.who.__qualname__)))"
+      ],
+      "stdout": "(True, True, 'A.make.<locals>.B.who')\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass __C:\n    __slots__ = ('__value',)\n    def __init__(self, __value=7):\n        self.__value = __value\n    def __hidden(self):\n        return self.__value\nc = __C()\n",
+        "--eval",
+        "c._C__hidden(), __C._C__hidden.__name__, __C._C__hidden.__qualname__, __C.__init__.__code__.co_varnames"
+      ],
+      "stdout": "(7, '__hidden', '__C.__hidden', ('self', '_C__value'))\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass __C:\n    __slots__ = ('__value',)\n    def __init__(self, __value=7):\n        self.__value = __value\n    def __hidden(self):\n        return self.__value\nc = __C()\n\nprint(repr((c._C__hidden(), __C._C__hidden.__name__, __C._C__hidden.__qualname__, __C.__init__.__code__.co_varnames)))"
+      ],
+      "stdout": "(7, '__hidden', '__C.__hidden', ('self', '_C__value'))\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nevents = 0\ndef decorator(n):\n    global events\n    events = events * 10 + n\n    def apply(value):\n        global events\n        events = events * 10 + n + 2\n        return value\n    return apply\ndef default():\n    global events\n    events = events * 10 + 3\n    return 42\n@decorator(1)\n@decorator(2)\ndef f(value=default()):\n    return value\n",
+        "--eval",
+        "events, f(), f.__code__.co_firstlineno"
+      ],
+      "stdout": "(12343, 42, 15)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nevents = 0\ndef decorator(n):\n    global events\n    events = events * 10 + n\n    def apply(value):\n        global events\n        events = events * 10 + n + 2\n        return value\n    return apply\ndef default():\n    global events\n    events = events * 10 + 3\n    return 42\n@decorator(1)\n@decorator(2)\ndef f(value=default()):\n    return value\n\nprint(repr((events, f(), f.__code__.co_firstlineno)))"
+      ],
+      "stdout": "(12343, 42, 15)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass A: pass\nclass B(A): pass\nbases = B.__bases__\nmro = B.__mro__\nB.value = 42\nB.__name__ = 'Renamed'\n",
+        "--eval",
+        "B.__bases__ is bases, B.__mro__ is mro, B.__base__ is A, B.__mro__[1] is A, object.__base__"
+      ],
+      "stdout": "(True, True, True, True, None)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass A: pass\nclass B(A): pass\nbases = B.__bases__\nmro = B.__mro__\nB.value = 42\nB.__name__ = 'Renamed'\n\nprint(repr((B.__bases__ is bases, B.__mro__ is mro, B.__base__ is A, B.__mro__[1] is A, object.__base__)))"
+      ],
+      "stdout": "(True, True, True, True, None)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nevents = 0\nclass Descriptor:\n    def __set_name__(self, owner, name):\n        global events\n        events = events * 10 + 1\n        self.owner = owner\n    def __get__(self, instance, owner):\n        return self.owner\nclass Base:\n    def __init_subclass__(cls, *, flag=2):\n        global events\n        events = events * 10 + flag\nclass Alias:\n    def __mro_entries__(self, bases):\n        return (Base,)\nalias = Alias()\nclass Child(alias, flag=3):\n    owner = Descriptor()\n",
+        "--eval",
+        "Child.owner is Child, Child.__bases__[0] is Base, Child.__orig_bases__[0] is alias, events"
+      ],
+      "stdout": "(True, True, True, 13)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nevents = 0\nclass Descriptor:\n    def __set_name__(self, owner, name):\n        global events\n        events = events * 10 + 1\n        self.owner = owner\n    def __get__(self, instance, owner):\n        return self.owner\nclass Base:\n    def __init_subclass__(cls, *, flag=2):\n        global events\n        events = events * 10 + flag\nclass Alias:\n    def __mro_entries__(self, bases):\n        return (Base,)\nalias = Alias()\nclass Child(alias, flag=3):\n    owner = Descriptor()\n\nprint(repr((Child.owner is Child, Child.__bases__[0] is Base, Child.__orig_bases__[0] is alias, events)))"
+      ],
+      "stdout": "(True, True, True, 13)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass C:\n    def __new__(cls):\n        return 17\n",
+        "--eval",
+        "C()"
+      ],
+      "stdout": "17\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass C:\n    def __new__(cls):\n        return 17\n\nprint(repr((C())))"
+      ],
+      "stdout": "17\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass Meta(type):\n    @classmethod\n    def __prepare__(cls, name, bases, *, flag):\n        return type.__prepare__(name, bases)\n    def __new__(cls, name, bases, namespace, *, flag):\n        result = type.__new__(cls, name, bases, namespace)\n        result.flag = flag\n        return result\nclass C(metaclass=Meta, flag=7):\n    value = 42\n",
+        "--eval",
+        "C.flag, C.value, type(C) is Meta"
+      ],
+      "stdout": "(7, 42, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass Meta(type):\n    @classmethod\n    def __prepare__(cls, name, bases, *, flag):\n        return type.__prepare__(name, bases)\n    def __new__(cls, name, bases, namespace, *, flag):\n        result = type.__new__(cls, name, bases, namespace)\n        result.flag = flag\n        return result\nclass C(metaclass=Meta, flag=7):\n    value = 42\n\nprint(repr((C.flag, C.value, type(C) is Meta)))"
+      ],
+      "stdout": "(7, 42, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass Namespace:\n    def __getitem__(self, key):\n        if key == 'injected':\n            return 17\n        raise KeyError(key)\n    def __setitem__(self, key, value):\n        if key == 'value':\n            self.saved = value\nclass Meta(type):\n    @classmethod\n    def __prepare__(cls, name, bases):\n        return Namespace()\n    def __new__(cls, name, bases, namespace):\n        return namespace\nclass C(metaclass=Meta):\n    value = injected\n",
+        "--eval",
+        "C.saved"
+      ],
+      "stdout": "17\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass Namespace:\n    def __getitem__(self, key):\n        if key == 'injected':\n            return 17\n        raise KeyError(key)\n    def __setitem__(self, key, value):\n        if key == 'value':\n            self.saved = value\nclass Meta(type):\n    @classmethod\n    def __prepare__(cls, name, bases):\n        return Namespace()\n    def __new__(cls, name, bases, namespace):\n        return namespace\nclass C(metaclass=Meta):\n    value = injected\n\nprint(repr((C.saved)))"
+      ],
+      "stdout": "17\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\ndef meta(name, bases, namespace):\n    return 7\nclass C(metaclass=meta):\n    def who(self):\n        return __class__\n",
+        "--eval",
+        "C"
+      ],
+      "stdout": "7\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\ndef meta(name, bases, namespace):\n    return 7\nclass C(metaclass=meta):\n    def who(self):\n        return __class__\n\nprint(repr((C)))"
+      ],
+      "stdout": "7\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "__build_class__ = None\nclass C: pass",
+        "--eval",
+        "C.__name__"
+      ],
+      "stdout": "'C'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "__build_class__ = None\nclass C: pass\nprint(repr((C.__name__)))"
+      ],
+      "stdout": "'C'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass Descriptor:\n    def __get__(self, instance, owner):\n        if instance is None:\n            return self\n        return instance.value\n    def __set__(self, instance, value):\n        instance.value = value\nclass C:\n    item = Descriptor()\nc = C()\nc.item = 42\n",
+        "--eval",
+        "c.item"
+      ],
+      "stdout": "42\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass Descriptor:\n    def __get__(self, instance, owner):\n        if instance is None:\n            return self\n        return instance.value\n    def __set__(self, instance, value):\n        instance.value = value\nclass C:\n    item = Descriptor()\nc = C()\nc.item = 42\n\nprint(repr((c.item)))"
+      ],
+      "stdout": "42\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\ndef factory():\n    class C:\n        def who(self):\n            return __class__\n    return C\nA = factory()\nB = factory()\n",
+        "--eval",
+        "A is not B, A.who.__code__ is B.who.__code__, A.who.__closure__ is not B.who.__closure__"
+      ],
+      "stdout": "(True, True, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\ndef factory():\n    class C:\n        def who(self):\n            return __class__\n    return C\nA = factory()\nB = factory()\n\nprint(repr((A is not B, A.who.__code__ is B.who.__code__, A.who.__closure__ is not B.who.__closure__)))"
+      ],
+      "stdout": "(True, True, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass C:\n    def f(self, **kwargs):\n        return len(kwargs)\n    def g(self):\n        return self.f(__x=1, _C__x=2)\n",
+        "--eval",
+        "C().g()"
+      ],
+      "stdout": "2\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass C:\n    def f(self, **kwargs):\n        return len(kwargs)\n    def g(self):\n        return self.f(__x=1, _C__x=2)\n\nprint(repr((C().g())))"
+      ],
+      "stdout": "2\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "",
+        "--eval",
+        "str(KeyError('x')), str(KeyError(1, 2)), str(KeyError()), BaseException.__str__(KeyError('x'))"
+      ],
+      "stdout": "(\"'x'\", '(1, 2)', '', 'x')\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nprint(repr((str(KeyError('x')), str(KeyError(1, 2)), str(KeyError()), BaseException.__str__(KeyError('x')))))"
+      ],
+      "stdout": "(\"'x'\", '(1, 2)', '', 'x')\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "",
+        "--eval",
+        "str(), str(None), str(object=42), str(encoding='utf8'), str(errors='strict')"
+      ],
+      "stdout": "('', 'None', '42', '', '')\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nprint(repr((str(), str(None), str(object=42), str(encoding='utf8'), str(errors='strict'))))"
+      ],
+      "stdout": "('', 'None', '42', '', '')\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass Text(str):\n    pass\nvalue = Text(42)\n",
+        "--eval",
+        "value == '42', type(value) is Text, type(str(value)) is str"
+      ],
+      "stdout": "(True, True, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass Text(str):\n    pass\nvalue = Text(42)\n\nprint(repr((value == '42', type(value) is Text, type(str(value)) is str)))"
+      ],
+      "stdout": "(True, True, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "class C: return 1"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 1\nclass C: return 1\n         ^\nSyntaxError: 'return' outside function\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "class C: return 1"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 1\nSyntaxError: 'return' outside function\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "for i in range(1):\n    class C: break"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 2\n    class C: break\n             ^\nSyntaxError: 'break'/'continue' outside loop\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "for i in range(1):\n    class C: break"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 2\nSyntaxError: 'break' outside loop\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "class C:\n    def f(self, __x, _C__x): pass"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 2\n    def f(self, __x, _C__x): pass\n                     ^\nSyntaxError: duplicate parameter name\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "class C:\n    def f(self, __x, _C__x): pass"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 2\nSyntaxError: duplicate argument '_C__x' in function definition\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "@staticmethod\nvalue = 1"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 2\nvalue = 1\n^\nSyntaxError: decorator must precede a function or class\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "@staticmethod\nvalue = 1"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 2\n    value = 1\n    ^^^^^\nSyntaxError: invalid syntax\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "class A: pass\nclass B(A, A): pass"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 2, in <module>\nTypeError: duplicate base class\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "class A: pass\nclass B(A, A): pass"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 2, in <module>\nTypeError: duplicate base class A\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "class C(flag=1): pass"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError: unexpected or positional-only keyword: flag\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "class C(flag=1): pass"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError: C.__init_subclass__() takes no keyword arguments\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "str(1, object=2)"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError: invalid or repeated str keyword argument\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "str(1, object=2)"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError: argument for str() given by name ('object') and position (1)\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "str(1, encoding='utf8')"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError: decoding requires a bytes-like object\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "str(1, encoding='utf8')"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError: decoding to str: need a bytes-like object, int found\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "str(encoding=None)"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError: str encoding and errors must be strings\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "str(encoding=None)"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError: str() argument 'encoding' must be str, not None\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "class C:\n    def f(self, __x): return __x\nC().f(__x=1)"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 3, in <module>\nTypeError: unexpected or positional-only keyword: __x\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "class C:\n    def f(self, __x): return __x\nC().f(__x=1)"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 3, in <module>\nTypeError: C.f() got an unexpected keyword argument '__x'\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "class A: x = 1\nclass B:\n    y = x"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 2, in <module>\n  File \"<string>\", line 3, in B\nNameError: name 'x' is not defined\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "class A: x = 1\nclass B:\n    y = x"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 2, in <module>\n  File \"<string>\", line 3, in B\nNameError: name 'x' is not defined\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "__build_class__(None, 'C')"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError: __build_class__ requires a function and string name\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "__build_class__(None, 'C')"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError: __build_class__: func must be a function\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "def f(): pass\n__build_class__(f, None)"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 2, in <module>\nTypeError: __build_class__ requires a function and string name\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "def f(): pass\n__build_class__(f, None)"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 2, in <module>\nTypeError: __build_class__: name is not a string\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "class Meta(type):\n    def __prepare__(name, bases): return 1\nclass C(metaclass=Meta): pass"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 3, in <module>\nTypeError: __prepare__ must return a mapping\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "class Meta(type):\n    def __prepare__(name, bases): return 1\nclass C(metaclass=Meta): pass"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 3, in <module>\nTypeError: Meta.__prepare__() must return a mapping, not int\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "class Alias:\n    def __mro_entries__(self, bases): return None\nclass C(Alias()): pass"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 3, in <module>\nTypeError: __mro_entries__ must return a tuple\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "class Alias:\n    def __mro_entries__(self, bases): return None\nclass C(Alias()): pass"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 3, in <module>\nTypeError: __mro_entries__ must return a tuple\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "class M1(type): pass\nclass M2(type): pass\nclass A(metaclass=M1): pass\nclass B(metaclass=M2): pass\nclass C(A, B): pass"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 5, in <module>\nTypeError: metaclass conflict\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "class M1(type): pass\nclass M2(type): pass\nclass A(metaclass=M1): pass\nclass B(metaclass=M2): pass\nclass C(A, B): pass"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 5, in <module>\nTypeError: metaclass conflict: the metaclass of a derived class must be a (non-strict) subclass of the metaclasses of all its bases\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "class Drop(type):\n    def __new__(cls, name, bases, namespace):\n        return type.__new__(cls, name, bases, type.__prepare__(name, bases))\nclass C(metaclass=Drop):\n    def who(self): return __class__"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 4, in <module>\nRuntimeError: __class__ not set; was __classcell__ propagated to type.__new__?\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "class Drop(type):\n    def __new__(cls, name, bases, namespace):\n        return type.__new__(cls, name, bases, type.__prepare__(name, bases))\nclass C(metaclass=Drop):\n    def who(self): return __class__"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 4, in <module>\nRuntimeError: __class__ not set defining 'C' as <class '__main__.C'>. Was __classcell__ propagated to type.__new__?\n",
+      "exit_code": 1
+    },
     {
       "command": [
         "build/cxxpython",
@@ -988,7 +1768,7 @@
     {
       "command": [
         "build/cxxpython",
-        "/tmp/tmpzjl8lhqm/source.py",
+        "/tmp/tmp0jaf6pu4/source.py",
         "--eval",
         "f(41)"
       ],

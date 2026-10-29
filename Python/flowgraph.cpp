@@ -61,6 +61,11 @@ constexpr std::array definitions{
     OpcodeDefinition{"COPY", 0, 0, 1, OperandDomain::StackDepth, FlowKind::Next, false, false},
     OpcodeDefinition{"UNPACK_SEQUENCE", 1, 1, 0, OperandDomain::Count, FlowKind::Next, true, true},
     OpcodeDefinition{"RAISE", 0, 0, 0, OperandDomain::RaiseArity, FlowKind::Stop, true, true},
+    OpcodeDefinition{"LOAD_NAME", 0, 0, 1, OperandDomain::Name, FlowKind::Next, true, true},
+    OpcodeDefinition{"STORE_NAME", 1, 1, 0, OperandDomain::Name, FlowKind::Next, true, true},
+    OpcodeDefinition{"DELETE_NAME", 0, 0, 0, OperandDomain::Name, FlowKind::Next, true, true},
+    OpcodeDefinition{"LOAD_CLASS_DEREF", 0, 0, 1, OperandDomain::Cell, FlowKind::Next, true, true},
+    OpcodeDefinition{"LOAD_BUILD_CLASS", 0, 0, 1, OperandDomain::None, FlowKind::Next, true, true},
 };
 static_assert(definitions.size() == static_cast<std::size_t>(Opcode::Count));
 [[noreturn]] void invalid(CodeErrorKind kind, const char *message,
@@ -92,6 +97,11 @@ std::size_t verify(const CodeSpec &spec, std::span<const Instruction> instructio
         invalid(CodeErrorKind::EmptyCode, "empty instruction sequence");
     if (!spec.first_line)
         invalid(CodeErrorKind::SourcePosition, "first line must be positive");
+    if (spec.kind < CodeKind::Function || spec.kind > CodeKind::ClassBody ||
+        (spec.kind != CodeKind::Function &&
+         (!spec.locals.empty() || !spec.signature.parameters.empty() || spec.signature.varargs ||
+          spec.signature.varkwargs)))
+        invalid(CodeErrorKind::Signature, "mapping code cannot declare fast locals or parameters");
     try {
         spec.signature.validate();
     } catch (const std::invalid_argument &error) {
@@ -120,9 +130,12 @@ std::size_t verify(const CodeSpec &spec, std::span<const Instruction> instructio
         invalid(CodeErrorKind::SizeLimit, "too many local or closure slots");
     std::unordered_set<std::u32string> closure_names;
     for (const auto &name : spec.cellvars)
-        if (!names.contains(name) || !closure_names.insert(name).second)
+        if ((spec.kind != CodeKind::ClassBody && !names.contains(name)) || name.empty() ||
+            !closure_names.insert(name).second)
             invalid(CodeErrorKind::CellLayout,
                     "cell variable must identify one distinct local slot");
+    if (spec.kind == CodeKind::ClassBody)
+        closure_names.clear();
     for (const auto &name : spec.freevars)
         if (name.empty() || names.contains(name) || !closure_names.insert(name).second)
             invalid(CodeErrorKind::CellLayout,
@@ -132,6 +145,13 @@ std::size_t verify(const CodeSpec &spec, std::span<const Instruction> instructio
         if (static_cast<std::size_t>(opcode) >= definitions.size())
             invalid(CodeErrorKind::UnknownOpcode, "unknown opcode", pc);
         const auto &definition = opcode_definition(opcode);
+        if ((opcode == Opcode::LoadName || opcode == Opcode::StoreName ||
+             opcode == Opcode::DeleteName || opcode == Opcode::LoadClassDeref) &&
+            spec.kind == CodeKind::Function)
+            invalid(CodeErrorKind::Operand, "namespace opcode requires mapping code", pc);
+        if (opcode == Opcode::LoadClassDeref &&
+            (spec.kind != CodeKind::ClassBody || operand < spec.cellvars.size()))
+            invalid(CodeErrorKind::CellBounds, "LOAD_CLASS_DEREF requires a class free cell", pc);
         switch (definition.operand) {
         case OperandDomain::None:
             if (operand)
@@ -422,7 +442,8 @@ std::size_t VerifiedCode::external_bytes() const noexcept
                  regions_.capacity() * sizeof(RegionLayout) +
                  (locals_.capacity() + cellvars_.capacity() + freevars_.capacity()) *
                      sizeof(std::u32string) +
-                 cell_locals_.capacity() * sizeof(std::uint32_t) + signature_.external_bytes();
+                 cell_locals_.capacity() * sizeof(std::optional<std::uint32_t>) +
+                 signature_.external_bytes();
     for (const auto &local : locals_)
         bytes += string_bytes(local);
     for (const auto &name : cellvars_)
@@ -561,7 +582,7 @@ void CodeBuilder::freeze(ReturnSlot &out)
                                 constants_.size(), names_.size());
     VerifiedCode verified(std::move(instructions), positions_, std::move(calls), std::move(regions),
                           spec_.signature, spec_.locals, spec_.cellvars, spec_.freevars, maximum,
-                          spec_.first_line);
+                          spec_.first_line, spec_.kind);
     RootScope roots(context_);
     ReturnSlot temporary(context_);
     cxxpython::core::make_tuple(context_, constants_, temporary);

@@ -485,6 +485,16 @@ int main()
             pass
     return value
 )"));
+    const SourceUnit class_program(SourceBuffer(R"(class Operation:
+    def item(self, value):
+        return value
+def total(n):
+    operation = Operation()
+    value = 0
+    for item in range(n, 0, -1):
+        value += operation.item(item)
+    return value
+)"));
     auto hex_source = [](const SourceUnit &source) {
         std::string result;
         constexpr char hex[] = "0123456789abcdef";
@@ -499,9 +509,11 @@ int main()
               << " source_kernel_hex=" << hex_source(*source_program)
               << " closure_kernel_hex=" << hex_source(closure_program)
               << " for_kernel_hex=" << hex_source(for_program)
-              << " exception_kernel_hex=" << hex_source(exception_program) << '\n';
-    for (const auto *source : std::array<const SourceUnit *, 5>{
-             nullptr, &*source_program, &closure_program, &for_program, &exception_program})
+              << " exception_kernel_hex=" << hex_source(exception_program)
+              << " class_kernel_hex=" << hex_source(class_program) << '\n';
+    for (const auto *source :
+         std::array<const SourceUnit *, 6>{nullptr, &*source_program, &closure_program,
+                                           &for_program, &exception_program, &class_program})
         for (int workers : {1, 2, 4}) {
             Interpreter vm;
             Attachment controller(vm);
@@ -608,11 +620,12 @@ int main()
             const auto final = controller.stats();
             if (final.objects != baseline.objects || final.transfer_roots)
                 return 1;
-            std::cout << (source == &exception_program ? "parallel_exception_workers="
-                          : source == &for_program     ? "parallel_for_workers="
-                          : source == &closure_program ? "parallel_closure_workers="
-                          : source                     ? "parallel_source_workers="
-                                                       : "parallel_vm_workers=")
+            std::cout << (source == &class_program       ? "parallel_class_workers="
+                          : source == &exception_program ? "parallel_exception_workers="
+                          : source == &for_program       ? "parallel_for_workers="
+                          : source == &closure_program   ? "parallel_closure_workers="
+                          : source                       ? "parallel_source_workers="
+                                                         : "parallel_vm_workers=")
                       << workers << " total_iterations=" << vm_total << " wall_ns=" << wall_ns
                       << " process_cpu_ns=" << cpu_ns
                       << " collections=" << final.collections - baseline.collections

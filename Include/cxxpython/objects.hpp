@@ -320,6 +320,7 @@ void install_native_field(Attachment &context, std::span<const Handle> core, Han
 void install_iteration(Attachment &context, std::span<const Handle> core);
 void install_ranges(Attachment &context, std::span<const Handle> core);
 void install_iterator_builtins(Attachment &context, std::span<const Handle> core, Value mapping);
+void install_class_builtins(Attachment &context, std::span<const Handle> core, Value mapping);
 void stop_iteration(Attachment &context, ReturnSlot &out);
 void install_call_descriptors(Attachment &context, std::span<const Handle> core);
 void install_attribute_descriptors(Attachment &context, std::span<const Handle> core);
@@ -332,6 +333,7 @@ LayoutDescriptor execution_layout(CoreObject type);
 void install_execution(Attachment &context, std::span<const Handle> core);
 void execute_function(Attachment &context, Handle function, CallArgsView args,
                       std::optional<Value> receiver, ReturnSlot &out);
+void execute_class_body(Attachment &context, Handle function, Handle mapping, ReturnSlot &out);
 struct FunctionDefaults {
     std::span<const Value> positional;
     std::optional<Value> keywords;

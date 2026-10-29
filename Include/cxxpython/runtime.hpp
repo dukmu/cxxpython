@@ -47,6 +47,7 @@ enum class CoreObject : std::size_t {
     OverflowErrorType,
     LookupErrorType,
     IndexErrorType,
+    KeyErrorType,
     StopIterationType,
     NameErrorType,
     UnboundLocalErrorType,

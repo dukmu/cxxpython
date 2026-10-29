@@ -9,6 +9,237 @@ Storage/native delivery probes do not establish Python VM parallelism. RSS is th
 
 | Series | Probe | Workers | Metric | Unit | Samples | Median | Min | Max |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| l1-class-namespaces | cleanup_iterations | - | active_region_bytes | bytes | 3 | 32.000 | 32.000 | 32.000 |
+| l1-class-namespaces | cleanup_iterations | - | cleanup_continuation_bytes | bytes | 3 | 48.000 | 48.000 | 48.000 |
+| l1-class-namespaces | cleanup_iterations | - | cleanup_function_ns | ms | 3 | 18.395 | 17.361 | 18.638 |
+| l1-class-namespaces | function_iterations | - | frame_prefix_bytes | bytes | 3 | 272.000 | 272.000 | 272.000 |
+| l1-class-namespaces | function_iterations | - | verified_function_ns | ms | 3 | 13.889 | 13.802 | 14.569 |
+| l1-class-namespaces | hash_iterations | - | string_hash_ns | ms | 3 | 65.055 | 64.649 | 66.710 |
+| l1-class-namespaces | hash_iterations | - | tuple_repr_ns | ms | 3 | 17.483 | 17.400 | 18.309 |
+| l1-class-namespaces | int_iterations | - | big_int_mul_ns | ms | 3 | 7.926 | 7.271 | 8.126 |
+| l1-class-namespaces | int_iterations | - | int_add_ns | ms | 3 | 61.069 | 60.512 | 61.616 |
+| l1-class-namespaces | int_iterations | - | int_object_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| l1-class-namespaces | iterations | - | allocation_and_auto_gc_ns | ms | 3 | 4.865 | 4.518 | 6.156 |
+| l1-class-namespaces | iterations | - | handle_bytes | bytes | 3 | 32.000 | 32.000 | 32.000 |
+| l1-class-namespaces | iterations | - | header_bytes | bytes | 3 | 8.000 | 8.000 | 8.000 |
+| l1-class-namespaces | iterations | - | last_gc_pause_ns | ms | 3 | 0.003 | 0.001 | 0.004 |
+| l1-class-namespaces | iterations | - | live_bytes | bytes | 3 | 0.000 | 0.000 | 0.000 |
+| l1-class-namespaces | iterations | - | node_bytes | bytes | 3 | 16.000 | 16.000 | 16.000 |
+| l1-class-namespaces | iterations | - | recorded_metadata_bytes | bytes | 3 | 3360.000 | 3360.000 | 3360.000 |
+| l1-class-namespaces | iterations | - | root_register_release_ns | ms | 3 | 3.096 | 2.852 | 3.913 |
+| l1-class-namespaces | native_call_iterations | - | core_live_bytes | bytes | 3 | 125032.000 | 125032.000 | 125032.000 |
+| l1-class-namespaces | native_call_iterations | - | core_metadata_bytes | bytes | 3 | 154992.000 | 154992.000 | 154992.000 |
+| l1-class-namespaces | native_call_iterations | - | core_reserved_bytes | bytes | 3 | 452368.000 | 452368.000 | 452368.000 |
+| l1-class-namespaces | native_call_iterations | - | lookup_bind_call_ns | ms | 3 | 18.415 | 18.096 | 18.708 |
+| l1-class-namespaces | native_call_iterations | - | native_call_ns | ms | 3 | 12.383 | 12.200 | 13.197 |
+| l1-class-namespaces | parallel_class_workers | 1 | finish_live_bytes | bytes | 3 | 197336.000 | 197336.000 | 197336.000 |
+| l1-class-namespaces | parallel_class_workers | 1 | finish_metadata_bytes | bytes | 3 | 252928.000 | 252928.000 | 252928.000 |
+| l1-class-namespaces | parallel_class_workers | 1 | finish_reserved_bytes | bytes | 3 | 678432.000 | 678432.000 | 678432.000 |
+| l1-class-namespaces | parallel_class_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.062 | 0.054 | 0.066 |
+| l1-class-namespaces | parallel_class_workers | 1 | max_rendezvous_ns | ms | 3 | 0.004 | 0.002 | 0.006 |
+| l1-class-namespaces | parallel_class_workers | 1 | process_cpu_ns | ms | 3 | 497.778 | 486.895 | 504.158 |
+| l1-class-namespaces | parallel_class_workers | 1 | source_freeze_run_ns | ms | 3 | 0.162 | 0.150 | 0.164 |
+| l1-class-namespaces | parallel_class_workers | 1 | wall_ns | ms | 3 | 492.099 | 477.907 | 501.114 |
+| l1-class-namespaces | parallel_class_workers | 2 | finish_live_bytes | bytes | 3 | 159320.000 | 143984.000 | 171632.000 |
+| l1-class-namespaces | parallel_class_workers | 2 | finish_metadata_bytes | bytes | 3 | 295584.000 | 258016.000 | 295584.000 |
+| l1-class-namespaces | parallel_class_workers | 2 | finish_reserved_bytes | bytes | 3 | 744080.000 | 678432.000 | 744080.000 |
+| l1-class-namespaces | parallel_class_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.050 | 0.049 | 0.099 |
+| l1-class-namespaces | parallel_class_workers | 2 | max_rendezvous_ns | ms | 3 | 0.135 | 0.133 | 0.253 |
+| l1-class-namespaces | parallel_class_workers | 2 | process_cpu_ns | ms | 3 | 512.013 | 499.311 | 520.548 |
+| l1-class-namespaces | parallel_class_workers | 2 | source_freeze_run_ns | ms | 3 | 0.144 | 0.143 | 0.185 |
+| l1-class-namespaces | parallel_class_workers | 2 | wall_ns | ms | 3 | 272.725 | 259.263 | 277.430 |
+| l1-class-namespaces | parallel_class_workers | 4 | finish_live_bytes | bytes | 3 | 178928.000 | 153584.000 | 184688.000 |
+| l1-class-namespaces | parallel_class_workers | 4 | finish_metadata_bytes | bytes | 3 | 378432.000 | 343328.000 | 378432.000 |
+| l1-class-namespaces | parallel_class_workers | 4 | finish_reserved_bytes | bytes | 3 | 871160.000 | 809728.000 | 871160.000 |
+| l1-class-namespaces | parallel_class_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.069 | 0.047 | 0.131 |
+| l1-class-namespaces | parallel_class_workers | 4 | max_rendezvous_ns | ms | 3 | 2.457 | 0.894 | 4.417 |
+| l1-class-namespaces | parallel_class_workers | 4 | process_cpu_ns | ms | 3 | 635.090 | 608.906 | 640.754 |
+| l1-class-namespaces | parallel_class_workers | 4 | source_freeze_run_ns | ms | 3 | 0.142 | 0.141 | 0.213 |
+| l1-class-namespaces | parallel_class_workers | 4 | wall_ns | ms | 3 | 229.563 | 211.907 | 236.579 |
+| l1-class-namespaces | parallel_closure_workers | 1 | finish_live_bytes | bytes | 3 | 129184.000 | 129184.000 | 129184.000 |
+| l1-class-namespaces | parallel_closure_workers | 1 | finish_metadata_bytes | bytes | 3 | 198928.000 | 198928.000 | 198928.000 |
+| l1-class-namespaces | parallel_closure_workers | 1 | finish_reserved_bytes | bytes | 3 | 530464.000 | 530464.000 | 530464.000 |
+| l1-class-namespaces | parallel_closure_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.029 | 0.029 | 0.046 |
+| l1-class-namespaces | parallel_closure_workers | 1 | max_rendezvous_ns | ms | 3 | 0.002 | 0.002 | 0.008 |
+| l1-class-namespaces | parallel_closure_workers | 1 | process_cpu_ns | ms | 3 | 265.596 | 261.151 | 272.426 |
+| l1-class-namespaces | parallel_closure_workers | 1 | source_freeze_run_ns | ms | 3 | 0.100 | 0.100 | 0.101 |
+| l1-class-namespaces | parallel_closure_workers | 1 | wall_ns | ms | 3 | 265.574 | 256.405 | 271.132 |
+| l1-class-namespaces | parallel_closure_workers | 2 | finish_live_bytes | bytes | 3 | 179488.000 | 169768.000 | 185656.000 |
+| l1-class-namespaces | parallel_closure_workers | 2 | finish_metadata_bytes | bytes | 3 | 278976.000 | 278432.000 | 278976.000 |
+| l1-class-namespaces | parallel_closure_workers | 2 | finish_reserved_bytes | bytes | 3 | 665840.000 | 661760.000 | 665840.000 |
+| l1-class-namespaces | parallel_closure_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.052 | 0.041 | 0.059 |
+| l1-class-namespaces | parallel_closure_workers | 2 | max_rendezvous_ns | ms | 3 | 0.143 | 0.074 | 0.434 |
+| l1-class-namespaces | parallel_closure_workers | 2 | process_cpu_ns | ms | 3 | 270.678 | 268.239 | 280.800 |
+| l1-class-namespaces | parallel_closure_workers | 2 | source_freeze_run_ns | ms | 3 | 0.099 | 0.097 | 0.108 |
+| l1-class-namespaces | parallel_closure_workers | 2 | wall_ns | ms | 3 | 138.734 | 136.021 | 142.282 |
+| l1-class-namespaces | parallel_closure_workers | 4 | finish_live_bytes | bytes | 3 | 149152.000 | 142000.000 | 150592.000 |
+| l1-class-namespaces | parallel_closure_workers | 4 | finish_metadata_bytes | bytes | 3 | 325280.000 | 324736.000 | 325280.000 |
+| l1-class-namespaces | parallel_closure_workers | 4 | finish_reserved_bytes | bytes | 3 | 731488.000 | 727408.000 | 731488.000 |
+| l1-class-namespaces | parallel_closure_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.045 | 0.042 | 0.087 |
+| l1-class-namespaces | parallel_closure_workers | 4 | max_rendezvous_ns | ms | 3 | 0.714 | 0.356 | 0.783 |
+| l1-class-namespaces | parallel_closure_workers | 4 | process_cpu_ns | ms | 3 | 304.554 | 296.349 | 305.171 |
+| l1-class-namespaces | parallel_closure_workers | 4 | source_freeze_run_ns | ms | 3 | 0.103 | 0.101 | 0.107 |
+| l1-class-namespaces | parallel_closure_workers | 4 | wall_ns | ms | 3 | 89.209 | 85.475 | 90.415 |
+| l1-class-namespaces | parallel_exception_workers | 1 | finish_live_bytes | bytes | 3 | 254964.000 | 254964.000 | 254964.000 |
+| l1-class-namespaces | parallel_exception_workers | 1 | finish_metadata_bytes | bytes | 3 | 394272.000 | 394272.000 | 394272.000 |
+| l1-class-namespaces | parallel_exception_workers | 1 | finish_reserved_bytes | bytes | 3 | 883872.000 | 883872.000 | 883872.000 |
+| l1-class-namespaces | parallel_exception_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.059 | 0.054 | 0.096 |
+| l1-class-namespaces | parallel_exception_workers | 1 | max_rendezvous_ns | ms | 3 | 0.002 | 0.001 | 0.006 |
+| l1-class-namespaces | parallel_exception_workers | 1 | process_cpu_ns | ms | 3 | 429.962 | 420.674 | 440.070 |
+| l1-class-namespaces | parallel_exception_workers | 1 | source_freeze_run_ns | ms | 3 | 0.099 | 0.096 | 0.167 |
+| l1-class-namespaces | parallel_exception_workers | 1 | wall_ns | ms | 3 | 422.038 | 415.861 | 435.549 |
+| l1-class-namespaces | parallel_exception_workers | 2 | finish_live_bytes | bytes | 3 | 253716.000 | 252916.000 | 256988.000 |
+| l1-class-namespaces | parallel_exception_workers | 2 | finish_metadata_bytes | bytes | 3 | 385664.000 | 385664.000 | 385664.000 |
+| l1-class-namespaces | parallel_exception_workers | 2 | finish_reserved_bytes | bytes | 3 | 860096.000 | 860096.000 | 860096.000 |
+| l1-class-namespaces | parallel_exception_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.072 | 0.070 | 0.117 |
+| l1-class-namespaces | parallel_exception_workers | 2 | max_rendezvous_ns | ms | 3 | 0.144 | 0.105 | 0.682 |
+| l1-class-namespaces | parallel_exception_workers | 2 | process_cpu_ns | ms | 3 | 464.365 | 450.011 | 478.377 |
+| l1-class-namespaces | parallel_exception_workers | 2 | source_freeze_run_ns | ms | 3 | 0.097 | 0.095 | 0.099 |
+| l1-class-namespaces | parallel_exception_workers | 2 | wall_ns | ms | 3 | 234.013 | 226.029 | 247.631 |
+| l1-class-namespaces | parallel_exception_workers | 4 | finish_live_bytes | bytes | 3 | 224636.000 | 132004.000 | 230420.000 |
+| l1-class-namespaces | parallel_exception_workers | 4 | finish_metadata_bytes | bytes | 3 | 412864.000 | 331008.000 | 433408.000 |
+| l1-class-namespaces | parallel_exception_workers | 4 | finish_reserved_bytes | bytes | 3 | 897760.000 | 735816.000 | 925744.000 |
+| l1-class-namespaces | parallel_exception_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.161 | 0.083 | 0.196 |
+| l1-class-namespaces | parallel_exception_workers | 4 | max_rendezvous_ns | ms | 3 | 0.733 | 0.514 | 2.032 |
+| l1-class-namespaces | parallel_exception_workers | 4 | process_cpu_ns | ms | 3 | 492.076 | 479.951 | 513.854 |
+| l1-class-namespaces | parallel_exception_workers | 4 | source_freeze_run_ns | ms | 3 | 0.097 | 0.096 | 0.155 |
+| l1-class-namespaces | parallel_exception_workers | 4 | wall_ns | ms | 3 | 146.360 | 138.562 | 156.374 |
+| l1-class-namespaces | parallel_for_workers | 1 | finish_live_bytes | bytes | 3 | 192076.000 | 192076.000 | 192076.000 |
+| l1-class-namespaces | parallel_for_workers | 1 | finish_metadata_bytes | bytes | 3 | 278176.000 | 278176.000 | 278176.000 |
+| l1-class-namespaces | parallel_for_workers | 1 | finish_reserved_bytes | bytes | 3 | 670168.000 | 670168.000 | 670168.000 |
+| l1-class-namespaces | parallel_for_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.074 | 0.073 | 0.262 |
+| l1-class-namespaces | parallel_for_workers | 1 | max_rendezvous_ns | ms | 3 | 0.002 | 0.002 | 0.002 |
+| l1-class-namespaces | parallel_for_workers | 1 | process_cpu_ns | ms | 3 | 182.917 | 178.133 | 186.719 |
+| l1-class-namespaces | parallel_for_workers | 1 | source_freeze_run_ns | ms | 3 | 0.085 | 0.085 | 0.127 |
+| l1-class-namespaces | parallel_for_workers | 1 | wall_ns | ms | 3 | 181.570 | 181.118 | 192.967 |
+| l1-class-namespaces | parallel_for_workers | 2 | finish_live_bytes | bytes | 3 | 206564.000 | 195316.000 | 216020.000 |
+| l1-class-namespaces | parallel_for_workers | 2 | finish_metadata_bytes | bytes | 3 | 327616.000 | 320832.000 | 327616.000 |
+| l1-class-namespaces | parallel_for_workers | 2 | finish_reserved_bytes | bytes | 3 | 752512.000 | 735816.000 | 752512.000 |
+| l1-class-namespaces | parallel_for_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.086 | 0.073 | 0.091 |
+| l1-class-namespaces | parallel_for_workers | 2 | max_rendezvous_ns | ms | 3 | 0.080 | 0.059 | 0.130 |
+| l1-class-namespaces | parallel_for_workers | 2 | process_cpu_ns | ms | 3 | 182.209 | 173.533 | 186.515 |
+| l1-class-namespaces | parallel_for_workers | 2 | source_freeze_run_ns | ms | 3 | 0.087 | 0.086 | 0.089 |
+| l1-class-namespaces | parallel_for_workers | 2 | wall_ns | ms | 3 | 95.707 | 89.425 | 99.819 |
+| l1-class-namespaces | parallel_for_workers | 4 | finish_live_bytes | bytes | 3 | 167348.000 | 157564.000 | 172580.000 |
+| l1-class-namespaces | parallel_for_workers | 4 | finish_metadata_bytes | bytes | 3 | 368576.000 | 337792.000 | 375360.000 |
+| l1-class-namespaces | parallel_for_workers | 4 | finish_reserved_bytes | bytes | 3 | 801464.000 | 752512.000 | 818160.000 |
+| l1-class-namespaces | parallel_for_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.062 | 0.059 | 0.089 |
+| l1-class-namespaces | parallel_for_workers | 4 | max_rendezvous_ns | ms | 3 | 0.748 | 0.340 | 2.993 |
+| l1-class-namespaces | parallel_for_workers | 4 | process_cpu_ns | ms | 3 | 197.039 | 190.936 | 226.477 |
+| l1-class-namespaces | parallel_for_workers | 4 | source_freeze_run_ns | ms | 3 | 0.087 | 0.085 | 0.111 |
+| l1-class-namespaces | parallel_for_workers | 4 | wall_ns | ms | 3 | 60.202 | 60.172 | 71.728 |
+| l1-class-namespaces | parallel_source_workers | 1 | finish_live_bytes | bytes | 3 | 214692.000 | 214692.000 | 214692.000 |
+| l1-class-namespaces | parallel_source_workers | 1 | finish_metadata_bytes | bytes | 3 | 308784.000 | 308784.000 | 308784.000 |
+| l1-class-namespaces | parallel_source_workers | 1 | finish_reserved_bytes | bytes | 3 | 723200.000 | 723200.000 | 723200.000 |
+| l1-class-namespaces | parallel_source_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.051 | 0.049 | 0.074 |
+| l1-class-namespaces | parallel_source_workers | 1 | max_rendezvous_ns | ms | 3 | 0.002 | 0.002 | 0.008 |
+| l1-class-namespaces | parallel_source_workers | 1 | process_cpu_ns | ms | 3 | 264.673 | 256.917 | 268.400 |
+| l1-class-namespaces | parallel_source_workers | 1 | source_freeze_run_ns | ms | 3 | 0.085 | 0.083 | 0.089 |
+| l1-class-namespaces | parallel_source_workers | 1 | wall_ns | ms | 3 | 264.697 | 252.164 | 267.103 |
+| l1-class-namespaces | parallel_source_workers | 2 | finish_live_bytes | bytes | 3 | 243076.000 | 129180.000 | 249676.000 |
+| l1-class-namespaces | parallel_source_workers | 2 | finish_metadata_bytes | bytes | 3 | 351264.000 | 238016.000 | 351264.000 |
+| l1-class-namespaces | parallel_source_workers | 2 | finish_reserved_bytes | bytes | 3 | 792928.000 | 591904.000 | 792928.000 |
+| l1-class-namespaces | parallel_source_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.078 | 0.037 | 0.153 |
+| l1-class-namespaces | parallel_source_workers | 2 | max_rendezvous_ns | ms | 3 | 0.179 | 0.104 | 0.419 |
+| l1-class-namespaces | parallel_source_workers | 2 | process_cpu_ns | ms | 3 | 272.369 | 268.983 | 274.887 |
+| l1-class-namespaces | parallel_source_workers | 2 | source_freeze_run_ns | ms | 3 | 0.086 | 0.084 | 0.087 |
+| l1-class-namespaces | parallel_source_workers | 2 | wall_ns | ms | 3 | 140.995 | 137.230 | 146.014 |
+| l1-class-namespaces | parallel_source_workers | 4 | finish_live_bytes | bytes | 3 | 183636.000 | 161316.000 | 215556.000 |
+| l1-class-namespaces | parallel_source_workers | 4 | finish_metadata_bytes | bytes | 3 | 397024.000 | 359456.000 | 434592.000 |
+| l1-class-namespaces | parallel_source_workers | 4 | finish_reserved_bytes | bytes | 3 | 854496.000 | 788848.000 | 920144.000 |
+| l1-class-namespaces | parallel_source_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.085 | 0.083 | 0.097 |
+| l1-class-namespaces | parallel_source_workers | 4 | max_rendezvous_ns | ms | 3 | 1.147 | 0.415 | 3.358 |
+| l1-class-namespaces | parallel_source_workers | 4 | process_cpu_ns | ms | 3 | 296.069 | 289.521 | 298.361 |
+| l1-class-namespaces | parallel_source_workers | 4 | source_freeze_run_ns | ms | 3 | 0.091 | 0.082 | 0.217 |
+| l1-class-namespaces | parallel_source_workers | 4 | wall_ns | ms | 3 | 90.087 | 86.592 | 122.920 |
+| l1-class-namespaces | parallel_storage_workers | 1 | finish_live_bytes | bytes | 3 | 42720.000 | 42720.000 | 42720.000 |
+| l1-class-namespaces | parallel_storage_workers | 1 | finish_metadata_bytes | bytes | 3 | 97040.000 | 97040.000 | 97040.000 |
+| l1-class-namespaces | parallel_storage_workers | 1 | finish_reserved_bytes | bytes | 3 | 135504.000 | 135504.000 | 135504.000 |
+| l1-class-namespaces | parallel_storage_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.029 | 0.021 | 0.032 |
+| l1-class-namespaces | parallel_storage_workers | 1 | max_rendezvous_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| l1-class-namespaces | parallel_storage_workers | 1 | process_cpu_ns | ms | 3 | 2.332 | 2.251 | 2.373 |
+| l1-class-namespaces | parallel_storage_workers | 1 | wall_ns | ms | 3 | 2.328 | 2.316 | 2.502 |
+| l1-class-namespaces | parallel_storage_workers | 2 | finish_live_bytes | bytes | 3 | 13664.000 | 12496.000 | 14560.000 |
+| l1-class-namespaces | parallel_storage_workers | 2 | finish_metadata_bytes | bytes | 3 | 100352.000 | 100352.000 | 100352.000 |
+| l1-class-namespaces | parallel_storage_workers | 2 | finish_reserved_bytes | bytes | 3 | 135504.000 | 135504.000 | 135504.000 |
+| l1-class-namespaces | parallel_storage_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.029 | 0.025 | 0.044 |
+| l1-class-namespaces | parallel_storage_workers | 2 | max_rendezvous_ns | ms | 3 | 0.049 | 0.031 | 0.086 |
+| l1-class-namespaces | parallel_storage_workers | 2 | process_cpu_ns | ms | 3 | 2.844 | 2.564 | 2.872 |
+| l1-class-namespaces | parallel_storage_workers | 2 | wall_ns | ms | 3 | 1.904 | 1.722 | 1.999 |
+| l1-class-namespaces | parallel_storage_workers | 4 | finish_live_bytes | bytes | 3 | 45040.000 | 33408.000 | 57040.000 |
+| l1-class-namespaces | parallel_storage_workers | 4 | finish_metadata_bytes | bytes | 3 | 241248.000 | 197440.000 | 241248.000 |
+| l1-class-namespaces | parallel_storage_workers | 4 | finish_reserved_bytes | bytes | 3 | 336656.000 | 271008.000 | 336656.000 |
+| l1-class-namespaces | parallel_storage_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.101 | 0.024 | 0.115 |
+| l1-class-namespaces | parallel_storage_workers | 4 | max_rendezvous_ns | ms | 3 | 0.205 | 0.172 | 0.211 |
+| l1-class-namespaces | parallel_storage_workers | 4 | process_cpu_ns | ms | 3 | 4.655 | 4.181 | 4.790 |
+| l1-class-namespaces | parallel_storage_workers | 4 | wall_ns | ms | 3 | 3.015 | 2.751 | 3.060 |
+| l1-class-namespaces | parallel_vm_workers | 1 | finish_live_bytes | bytes | 3 | 126300.000 | 126300.000 | 126300.000 |
+| l1-class-namespaces | parallel_vm_workers | 1 | finish_metadata_bytes | bytes | 3 | 195984.000 | 195984.000 | 195984.000 |
+| l1-class-namespaces | parallel_vm_workers | 1 | finish_reserved_bytes | bytes | 3 | 526256.000 | 526256.000 | 526256.000 |
+| l1-class-namespaces | parallel_vm_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.042 | 0.036 | 0.050 |
+| l1-class-namespaces | parallel_vm_workers | 1 | max_rendezvous_ns | ms | 3 | 0.002 | 0.002 | 0.002 |
+| l1-class-namespaces | parallel_vm_workers | 1 | process_cpu_ns | ms | 3 | 227.942 | 227.485 | 232.650 |
+| l1-class-namespaces | parallel_vm_workers | 1 | source_freeze_run_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| l1-class-namespaces | parallel_vm_workers | 1 | wall_ns | ms | 3 | 227.661 | 226.418 | 228.363 |
+| l1-class-namespaces | parallel_vm_workers | 2 | finish_live_bytes | bytes | 3 | 174540.000 | 169452.000 | 180684.000 |
+| l1-class-namespaces | parallel_vm_workers | 2 | finish_metadata_bytes | bytes | 3 | 275392.000 | 275392.000 | 275392.000 |
+| l1-class-namespaces | parallel_vm_workers | 2 | finish_reserved_bytes | bytes | 3 | 657552.000 | 657552.000 | 657552.000 |
+| l1-class-namespaces | parallel_vm_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.078 | 0.066 | 0.168 |
+| l1-class-namespaces | parallel_vm_workers | 2 | max_rendezvous_ns | ms | 3 | 0.113 | 0.069 | 0.139 |
+| l1-class-namespaces | parallel_vm_workers | 2 | process_cpu_ns | ms | 3 | 240.563 | 233.193 | 245.870 |
+| l1-class-namespaces | parallel_vm_workers | 2 | source_freeze_run_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| l1-class-namespaces | parallel_vm_workers | 2 | wall_ns | ms | 3 | 122.968 | 119.732 | 129.139 |
+| l1-class-namespaces | parallel_vm_workers | 4 | finish_live_bytes | bytes | 3 | 132684.000 | 132660.000 | 251572.000 |
+| l1-class-namespaces | parallel_vm_workers | 4 | finish_metadata_bytes | bytes | 3 | 321504.000 | 321504.000 | 397728.000 |
+| l1-class-namespaces | parallel_vm_workers | 4 | finish_reserved_bytes | bytes | 3 | 723200.000 | 723200.000 | 862656.000 |
+| l1-class-namespaces | parallel_vm_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.052 | 0.046 | 0.098 |
+| l1-class-namespaces | parallel_vm_workers | 4 | max_rendezvous_ns | ms | 3 | 0.483 | 0.329 | 0.500 |
+| l1-class-namespaces | parallel_vm_workers | 4 | process_cpu_ns | ms | 3 | 262.222 | 252.936 | 281.341 |
+| l1-class-namespaces | parallel_vm_workers | 4 | source_freeze_run_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| l1-class-namespaces | parallel_vm_workers | 4 | wall_ns | ms | 3 | 76.989 | 72.958 | 86.620 |
+| l1-class-namespaces | process_peak_rss_kib | - | process_peak_rss_kib | KiB | 3 | 7132.000 | 6996.000 | 8396.000 |
+| l1-class-namespaces | scheduled_iterations | - | scheduled_function_ns | ms | 3 | 20.526 | 20.159 | 21.338 |
+| l1-class-namespaces | shared_edge_iterations | - | cell_object_bytes | bytes | 3 | 16.000 | 16.000 | 16.000 |
+| l1-class-namespaces | shared_edge_iterations | - | rooted_cell_read_ns | ms | 3 | 2.218 | 2.216 | 2.249 |
+| l1-class-namespaces | shared_edge_iterations | - | rooted_cell_store_read_ns | ms | 3 | 4.493 | 4.366 | 4.628 |
+| l1-class-namespaces | slot_iterations | - | generic_prefix_bytes | bytes | 3 | 8.000 | 8.000 | 8.000 |
+| l1-class-namespaces | slot_iterations | - | slot_instance_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| l1-class-namespaces | slot_iterations | - | slot_set_get_ns | ms | 3 | 28.830 | 28.657 | 30.043 |
+| l1-class-namespaces | source_parse_scope_cfg_ns | - | source_bytes | bytes | 3 | 92.000 | 92.000 | 92.000 |
+| l1-class-namespaces | source_parse_scope_cfg_ns | - | source_parse_scope_cfg_ns | ms | 3 | 0.037 | 0.037 | 0.046 |
+| l1-class-namespaces | transfer_iterations | - | transfer_roundtrip_ns | ms | 3 | 0.939 | 0.893 | 0.950 |
+| l1-class-namespaces | transfer_iterations | - | transfer_token_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| l1-class-namespaces | with_iterations | - | with_function_ns | ms | 3 | 30.615 | 29.559 | 30.840 |
+| l1-class-namespaces-cpython | parallel_class_workers | 1 | process_cpu_ns | ms | 3 | 9.129 | 8.970 | 9.484 |
+| l1-class-namespaces-cpython | parallel_class_workers | 1 | wall_ns | ms | 3 | 9.301 | 8.879 | 9.627 |
+| l1-class-namespaces-cpython | parallel_class_workers | 2 | process_cpu_ns | ms | 3 | 8.966 | 8.859 | 8.966 |
+| l1-class-namespaces-cpython | parallel_class_workers | 2 | wall_ns | ms | 3 | 8.769 | 8.749 | 8.867 |
+| l1-class-namespaces-cpython | parallel_class_workers | 4 | process_cpu_ns | ms | 3 | 9.147 | 9.098 | 9.346 |
+| l1-class-namespaces-cpython | parallel_class_workers | 4 | wall_ns | ms | 3 | 9.111 | 8.906 | 9.199 |
+| l1-class-namespaces-cpython | parallel_closure_workers | 1 | process_cpu_ns | ms | 3 | 6.317 | 6.312 | 7.207 |
+| l1-class-namespaces-cpython | parallel_closure_workers | 1 | wall_ns | ms | 3 | 6.627 | 6.487 | 7.127 |
+| l1-class-namespaces-cpython | parallel_closure_workers | 2 | process_cpu_ns | ms | 3 | 6.300 | 6.046 | 6.426 |
+| l1-class-namespaces-cpython | parallel_closure_workers | 2 | wall_ns | ms | 3 | 6.198 | 5.910 | 6.353 |
+| l1-class-namespaces-cpython | parallel_closure_workers | 4 | process_cpu_ns | ms | 3 | 6.139 | 5.809 | 6.655 |
+| l1-class-namespaces-cpython | parallel_closure_workers | 4 | wall_ns | ms | 3 | 6.095 | 5.739 | 6.559 |
+| l1-class-namespaces-cpython | parallel_exception_workers | 1 | process_cpu_ns | ms | 3 | 8.032 | 7.498 | 8.469 |
+| l1-class-namespaces-cpython | parallel_exception_workers | 1 | wall_ns | ms | 3 | 7.886 | 7.355 | 8.383 |
+| l1-class-namespaces-cpython | parallel_exception_workers | 2 | process_cpu_ns | ms | 3 | 7.746 | 7.680 | 7.970 |
+| l1-class-namespaces-cpython | parallel_exception_workers | 2 | wall_ns | ms | 3 | 7.807 | 7.602 | 7.810 |
+| l1-class-namespaces-cpython | parallel_exception_workers | 4 | process_cpu_ns | ms | 3 | 8.038 | 7.868 | 8.099 |
+| l1-class-namespaces-cpython | parallel_exception_workers | 4 | wall_ns | ms | 3 | 7.913 | 7.718 | 7.975 |
+| l1-class-namespaces-cpython | parallel_for_workers | 1 | process_cpu_ns | ms | 3 | 5.293 | 4.731 | 5.337 |
+| l1-class-namespaces-cpython | parallel_for_workers | 1 | wall_ns | ms | 3 | 5.229 | 4.636 | 5.239 |
+| l1-class-namespaces-cpython | parallel_for_workers | 2 | process_cpu_ns | ms | 3 | 4.855 | 4.811 | 5.243 |
+| l1-class-namespaces-cpython | parallel_for_workers | 2 | wall_ns | ms | 3 | 4.891 | 4.860 | 5.188 |
+| l1-class-namespaces-cpython | parallel_for_workers | 4 | process_cpu_ns | ms | 3 | 4.892 | 4.854 | 5.697 |
+| l1-class-namespaces-cpython | parallel_for_workers | 4 | wall_ns | ms | 3 | 4.748 | 4.707 | 5.562 |
+| l1-class-namespaces-cpython | parallel_source_workers | 1 | process_cpu_ns | ms | 3 | 6.520 | 6.168 | 6.571 |
+| l1-class-namespaces-cpython | parallel_source_workers | 1 | wall_ns | ms | 3 | 6.537 | 6.101 | 6.855 |
+| l1-class-namespaces-cpython | parallel_source_workers | 2 | process_cpu_ns | ms | 3 | 6.278 | 6.272 | 6.503 |
+| l1-class-namespaces-cpython | parallel_source_workers | 2 | wall_ns | ms | 3 | 6.203 | 6.143 | 6.546 |
+| l1-class-namespaces-cpython | parallel_source_workers | 4 | process_cpu_ns | ms | 3 | 6.175 | 5.934 | 6.493 |
+| l1-class-namespaces-cpython | parallel_source_workers | 4 | wall_ns | ms | 3 | 6.009 | 5.832 | 6.395 |
 | l1-source-exceptions | cleanup_iterations | - | active_region_bytes | bytes | 3 | 32.000 | 32.000 | 32.000 |
 | l1-source-exceptions | cleanup_iterations | - | cleanup_continuation_bytes | bytes | 3 | 48.000 | 48.000 | 48.000 |
 | l1-source-exceptions | cleanup_iterations | - | cleanup_function_ns | ms | 3 | 15.273 | 15.053 | 17.760 |
@@ -1466,6 +1697,42 @@ Derived from median wall/process CPU times. CPU/wall is not a speedup; 1-worker 
 
 | Series | Probe | Workers | Wall ms | CPU/Wall | Speedup | Efficiency |
 | --- | --- | --- | --- | --- | --- | --- |
+| l1-class-namespaces | parallel_class_workers | 1 | 492.099 | 1.012 | 1.000 | 1.000 |
+| l1-class-namespaces | parallel_class_workers | 2 | 272.725 | 1.877 | 1.804 | 0.902 |
+| l1-class-namespaces | parallel_class_workers | 4 | 229.563 | 2.767 | 2.144 | 0.536 |
+| l1-class-namespaces | parallel_closure_workers | 1 | 265.574 | 1.000 | 1.000 | 1.000 |
+| l1-class-namespaces | parallel_closure_workers | 2 | 138.734 | 1.951 | 1.914 | 0.957 |
+| l1-class-namespaces | parallel_closure_workers | 4 | 89.209 | 3.414 | 2.977 | 0.744 |
+| l1-class-namespaces | parallel_exception_workers | 1 | 422.038 | 1.019 | 1.000 | 1.000 |
+| l1-class-namespaces | parallel_exception_workers | 2 | 234.013 | 1.984 | 1.803 | 0.902 |
+| l1-class-namespaces | parallel_exception_workers | 4 | 146.360 | 3.362 | 2.884 | 0.721 |
+| l1-class-namespaces | parallel_for_workers | 1 | 181.570 | 1.007 | 1.000 | 1.000 |
+| l1-class-namespaces | parallel_for_workers | 2 | 95.707 | 1.904 | 1.897 | 0.949 |
+| l1-class-namespaces | parallel_for_workers | 4 | 60.202 | 3.273 | 3.016 | 0.754 |
+| l1-class-namespaces | parallel_source_workers | 1 | 264.697 | 1.000 | 1.000 | 1.000 |
+| l1-class-namespaces | parallel_source_workers | 2 | 140.995 | 1.932 | 1.877 | 0.939 |
+| l1-class-namespaces | parallel_source_workers | 4 | 90.087 | 3.286 | 2.938 | 0.735 |
+| l1-class-namespaces | parallel_storage_workers | 1 | 2.328 | 1.002 | 1.000 | 1.000 |
+| l1-class-namespaces | parallel_storage_workers | 2 | 1.904 | 1.493 | 1.222 | 0.611 |
+| l1-class-namespaces | parallel_storage_workers | 4 | 3.015 | 1.544 | 0.772 | 0.193 |
+| l1-class-namespaces | parallel_vm_workers | 1 | 227.661 | 1.001 | 1.000 | 1.000 |
+| l1-class-namespaces | parallel_vm_workers | 2 | 122.968 | 1.956 | 1.851 | 0.926 |
+| l1-class-namespaces | parallel_vm_workers | 4 | 76.989 | 3.406 | 2.957 | 0.739 |
+| l1-class-namespaces-cpython | parallel_class_workers | 1 | 9.301 | 0.982 | 1.000 | 1.000 |
+| l1-class-namespaces-cpython | parallel_class_workers | 2 | 8.769 | 1.022 | 1.061 | 0.530 |
+| l1-class-namespaces-cpython | parallel_class_workers | 4 | 9.111 | 1.004 | 1.021 | 0.255 |
+| l1-class-namespaces-cpython | parallel_closure_workers | 1 | 6.627 | 0.953 | 1.000 | 1.000 |
+| l1-class-namespaces-cpython | parallel_closure_workers | 2 | 6.198 | 1.016 | 1.069 | 0.535 |
+| l1-class-namespaces-cpython | parallel_closure_workers | 4 | 6.095 | 1.007 | 1.087 | 0.272 |
+| l1-class-namespaces-cpython | parallel_exception_workers | 1 | 7.886 | 1.018 | 1.000 | 1.000 |
+| l1-class-namespaces-cpython | parallel_exception_workers | 2 | 7.807 | 0.992 | 1.010 | 0.505 |
+| l1-class-namespaces-cpython | parallel_exception_workers | 4 | 7.913 | 1.016 | 0.997 | 0.249 |
+| l1-class-namespaces-cpython | parallel_for_workers | 1 | 5.229 | 1.012 | 1.000 | 1.000 |
+| l1-class-namespaces-cpython | parallel_for_workers | 2 | 4.891 | 0.993 | 1.069 | 0.534 |
+| l1-class-namespaces-cpython | parallel_for_workers | 4 | 4.748 | 1.030 | 1.101 | 0.275 |
+| l1-class-namespaces-cpython | parallel_source_workers | 1 | 6.537 | 0.997 | 1.000 | 1.000 |
+| l1-class-namespaces-cpython | parallel_source_workers | 2 | 6.203 | 1.012 | 1.054 | 0.527 |
+| l1-class-namespaces-cpython | parallel_source_workers | 4 | 6.009 | 1.027 | 1.088 | 0.272 |
 | l1-source-exceptions | parallel_closure_workers | 1 | 243.912 | 1.036 | 1.000 | 1.000 |
 | l1-source-exceptions | parallel_closure_workers | 2 | 126.691 | 2.028 | 1.925 | 0.963 |
 | l1-source-exceptions | parallel_closure_workers | 4 | 77.233 | 3.469 | 3.158 | 0.790 |
@@ -1629,6 +1896,21 @@ The CPython probe executes the source kernel captured from the C++ benchmark, wi
 
 | Series | Probe | Workers | cxxpython ms | CPython ms | cxxpython/CPython |
 | --- | --- | --- | --- | --- | --- |
+| l1-class-namespaces | parallel_class_workers | 1 | 492.099 | 9.301 | 52.907 |
+| l1-class-namespaces | parallel_class_workers | 2 | 272.725 | 8.769 | 31.100 |
+| l1-class-namespaces | parallel_class_workers | 4 | 229.563 | 9.111 | 25.196 |
+| l1-class-namespaces | parallel_closure_workers | 1 | 265.574 | 6.627 | 40.076 |
+| l1-class-namespaces | parallel_closure_workers | 2 | 138.734 | 6.198 | 22.382 |
+| l1-class-namespaces | parallel_closure_workers | 4 | 89.209 | 6.095 | 14.636 |
+| l1-class-namespaces | parallel_exception_workers | 1 | 422.038 | 7.886 | 53.515 |
+| l1-class-namespaces | parallel_exception_workers | 2 | 234.013 | 7.807 | 29.976 |
+| l1-class-namespaces | parallel_exception_workers | 4 | 146.360 | 7.913 | 18.495 |
+| l1-class-namespaces | parallel_for_workers | 1 | 181.570 | 5.229 | 34.726 |
+| l1-class-namespaces | parallel_for_workers | 2 | 95.707 | 4.891 | 19.567 |
+| l1-class-namespaces | parallel_for_workers | 4 | 60.202 | 4.748 | 12.678 |
+| l1-class-namespaces | parallel_source_workers | 1 | 264.697 | 6.537 | 40.490 |
+| l1-class-namespaces | parallel_source_workers | 2 | 140.995 | 6.203 | 22.731 |
+| l1-class-namespaces | parallel_source_workers | 4 | 90.087 | 6.009 | 14.991 |
 | l1-source-exceptions | parallel_closure_workers | 1 | 243.912 | 5.900 | 41.340 |
 | l1-source-exceptions | parallel_closure_workers | 2 | 126.691 | 5.896 | 21.486 |
 | l1-source-exceptions | parallel_closure_workers | 4 | 77.233 | 5.681 | 13.595 |

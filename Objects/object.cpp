@@ -405,6 +405,8 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
            at(CoreObject::ExceptionType));
     define(CoreObject::IndexErrorType, "IndexError", LayoutDescriptor::of<ExceptionObject>(),
            at(CoreObject::LookupErrorType));
+    define(CoreObject::KeyErrorType, "KeyError", LayoutDescriptor::of<ExceptionObject>(),
+           at(CoreObject::LookupErrorType));
     define(CoreObject::StopIterationType, "StopIteration", LayoutDescriptor::of<ExceptionObject>(),
            at(CoreObject::ExceptionType));
     define(CoreObject::NameErrorType, "NameError", LayoutDescriptor::of<ExceptionObject>(),
@@ -526,6 +528,10 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     core.push_back(roots.root(builtins.value()));
     const auto mapping = builtins.value();
     auto publish = [&](Value key, Value value) { name_store(context, mapping, key, value); };
+    context.allocate_instance<StrObject>(at(CoreObject::StrType), text, U"builtins");
+    const auto module_name = roots.root(text.value());
+    context.allocate_instance<StrObject>(at(CoreObject::StrType), text, U"__name__");
+    publish(text.value(), module_name.get(context));
     for (auto id : {CoreObject::StrType,
                     CoreObject::TupleType,
                     CoreObject::DictType,
@@ -544,6 +550,7 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                     CoreObject::OverflowErrorType,
                     CoreObject::LookupErrorType,
                     CoreObject::IndexErrorType,
+                    CoreObject::KeyErrorType,
                     CoreObject::StopIterationType,
                     CoreObject::RangeType,
                     CoreObject::NameErrorType,
@@ -574,6 +581,7 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     operation("repr", U"repr", builtin_protocol<Protocol::Repr>);
     operation("hash", U"hash", builtin_protocol<Protocol::Hash>);
     install_iterator_builtins(context, core, mapping);
+    install_class_builtins(context, core, mapping);
 }
 } // namespace detail
 } // namespace cxxpython::core

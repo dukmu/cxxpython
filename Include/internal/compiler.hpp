@@ -87,8 +87,17 @@ struct ParameterSpec {
 };
 struct FunctionStmt {
     std::u32string name;
+    std::u32string binding;
+    std::vector<ExprPtr> decorators;
     std::vector<ParameterSpec> parameters;
     std::optional<std::u32string> varargs, varkwargs;
+    Suite body;
+    std::size_t scope = 0;
+};
+struct ClassStmt {
+    std::u32string name, binding;
+    std::vector<ExprPtr> bases, decorators;
+    std::vector<std::pair<std::u32string, ExprPtr>> keywords;
     Suite body;
     std::size_t scope = 0;
 };
@@ -124,7 +133,8 @@ enum class ControlStmt { Pass, Break, Continue };
 struct Stmt {
     Span span;
     std::variant<ExprStmt, AssignStmt, AugAssignStmt, DeleteStmt, IfStmt, WhileStmt, ForStmt,
-                 FunctionStmt, ReturnStmt, RaiseStmt, TryStmt, WithStmt, DeclareStmt, ControlStmt>
+                 FunctionStmt, ClassStmt, ReturnStmt, RaiseStmt, TryStmt, WithStmt, DeclareStmt,
+                 ControlStmt>
         node;
 };
 // CFG instructions use native literals/names until one attached freeze task

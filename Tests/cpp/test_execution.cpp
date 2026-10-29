@@ -378,6 +378,32 @@ TEST_F(CoreExecution, RaiseOpcodeValidatesArityAndNormalizesExceptionTypesAndCau
     EXPECT_EQ(context.type_of(out.value()), context.builtin(CoreObject::TypeErrorType));
 }
 
+TEST_F(CoreExecution, MappingCodeKindsAndClassCellLayoutsHaveExplicitVerification)
+{
+    CodeBuilder fast(context);
+    fast.emit(Opcode::LoadName, fast.name(U"value"));
+    fast.emit(Opcode::Return);
+    invalid(fast, CodeErrorKind::Operand);
+    CodeSpec spec;
+    spec.kind = CodeKind::ClassBody;
+    spec.cellvars = {U"__class__"};
+    spec.freevars = {U"__class__"};
+    CodeBuilder body(context, spec);
+    body.emit(Opcode::LoadClassDeref, 1);
+    body.emit(Opcode::Return);
+    const auto program = code(body);
+    EXPECT_EQ(context.payload<CodeObject>(program).program.kind(), CodeKind::ClassBody);
+    EXPECT_NE(disassemble(context, program).find("LOAD_CLASS_DEREF"), std::string::npos);
+    CodeBuilder local_cell(context, spec);
+    local_cell.emit(Opcode::LoadClassDeref, 0);
+    invalid(local_cell, CodeErrorKind::CellBounds);
+    spec.locals = {U"hidden"};
+    CodeBuilder hidden(context, spec);
+    hidden.emit(Opcode::LoadConst, hidden.constant(builtin(CoreObject::None)));
+    hidden.emit(Opcode::Return);
+    invalid(hidden, CodeErrorKind::Signature);
+}
+
 TEST_F(CoreExecution, GlobalLookupUsesLiveGlobalsThenTheFunctionsBuiltinsMapping)
 {
     auto globals = dictionary(), builtins = dictionary();

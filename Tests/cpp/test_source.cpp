@@ -452,6 +452,257 @@ error.__suppress_context__ = False
     }
 }
 
+TEST_F(CoreSource, ClassesExecuteInTheirOwnNamespaceAndBindOrdinaryMethods)
+{
+    const auto globals = dictionary();
+    ReturnSlot out(context);
+    exec(R"(value = 90
+class Base:
+    'base documentation'
+    value = 3
+    def __init__(self, n=4):
+        self.n = n
+    def total(self):
+        return self.n + self.value
+class Child(Base):
+    @staticmethod
+    def scale(n):
+        return n * 2
+    @classmethod
+    def identify(cls):
+        return cls
+instance = Child(7)
+)",
+         globals, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    eval("instance.total(), Child.scale(5), instance.identify() is Child, value, Base.__doc__, "
+         "Child.__qualname__",
+         out, globals);
+    EXPECT_EQ(result(out), "(10, 10, True, 90, 'base documentation', 'Child')");
+}
+
+TEST_F(CoreSource, ClassBindingsDoNotCaptureMethodsButForwardOuterClosureCells)
+{
+    const auto globals = dictionary();
+    ReturnSlot out(context);
+    exec(R"(def factory(x):
+    class Outer:
+        x = 99
+        captured = x
+        def read(self):
+            return x, __class__
+        class Inner:
+            value = x
+    return Outer
+A = factory(7)
+B = factory(8)
+)",
+         globals, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    eval("A.captured, A.Inner.value, A().read()[0], B().read()[0], A().read()[1] is A, "
+         "A.read.__code__ is B.read.__code__",
+         out, globals);
+    EXPECT_EQ(result(out), "(99, 7, 7, 8, True, True)");
+}
+
+TEST_F(CoreSource, ClassCellsCanCoexistWithAnOuterCellOfTheSameName)
+{
+    const auto globals = dictionary();
+    ReturnSlot out(context);
+    exec(R"(class A:
+    def make(self):
+        class B:
+            owner = __class__
+            def who(self):
+                return __class__
+        return B
+B = A().make()
+)",
+         globals, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    eval("B.owner is A, B().who() is B, B.who.__qualname__", out, globals);
+    EXPECT_EQ(result(out), "(True, True, 'A.make.<locals>.B.who')");
+    eval("A.make.__code__.co_consts", out, globals);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    bool found = false;
+    for (auto value : context.payload<TupleObject>(out.value()).items) {
+        if (context.type_of(value) != context.builtin(CoreObject::CodeType))
+            continue;
+        const auto &code = context.payload<CodeObject>(value);
+        if (context.payload<StrObject>(code.name).value != U"B")
+            continue;
+        found = true;
+        EXPECT_EQ(code.program.kind(), CodeKind::ClassBody);
+        EXPECT_TRUE(context.payload<TupleObject>(code.varnames).items.empty());
+        ASSERT_EQ(code.program.cell_names().size(), 1U);
+        ASSERT_EQ(code.program.free_names().size(), 1U);
+        EXPECT_EQ(code.program.cell_names()[0], U"__class__");
+        EXPECT_EQ(code.program.free_names()[0], U"__class__");
+        ASSERT_EQ(code.program.cell_locals().size(), 1U);
+        EXPECT_FALSE(code.program.cell_locals()[0]);
+    }
+    EXPECT_TRUE(found);
+}
+
+TEST_F(CoreSource, PrivateNamesAndDecoratorOrderPreserveSourceVisibleIdentities)
+{
+    const auto globals = dictionary();
+    ReturnSlot out(context);
+    exec(R"(events = 0
+def decorator(n):
+    global events
+    events = events * 10 + n
+    def apply(value):
+        global events
+        events = events * 10 + n + 2
+        return value
+    return apply
+@decorator(1)
+@decorator(2)
+class C:
+    __slots__ = ('__value',)
+    @decorator(5)
+    def __init__(self, __value=7):
+        self.__value = __value
+    def read(self):
+        return self.__value
+    def __hidden(self):
+        return 42
+c = C()
+)",
+         globals, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    eval("c.read(), c._C__hidden(), C._C__hidden.__name__, C._C__hidden.__qualname__, "
+         "C.__init__.__code__.co_varnames, events",
+         out, globals);
+    EXPECT_EQ(result(out), "(7, 42, '__hidden', 'C.__hidden', ('self', '_C__value'), 125743)");
+}
+
+TEST_F(CoreSource, ClassTypeHooksAndMroEntriesRunThroughNormalCalls)
+{
+    const auto globals = dictionary();
+    ReturnSlot out(context);
+    exec(R"(events = 0
+class Descriptor:
+    def __set_name__(self, owner, name):
+        global events
+        events = events * 10 + 1
+        self.owner = owner
+    def __get__(self, instance, owner):
+        return self.owner
+class Base:
+    def __init_subclass__(cls, *, flag=2):
+        global events
+        events = events * 10 + flag
+class Alias:
+    def __mro_entries__(self, bases):
+        return (Base,)
+alias = Alias()
+class Child(alias, flag=3):
+    owner = Descriptor()
+)",
+         globals, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    eval("Child.owner is Child, Child.__bases__[0] is Base, Child.__orig_bases__[0] is alias, "
+         "events",
+         out, globals);
+    EXPECT_EQ(result(out), "(True, True, True, 13)");
+    exec("bases = Child.__bases__\nmro = Child.__mro__\nChild.other = 42", globals, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    eval("Child.__bases__ is bases, Child.__mro__ is mro, Child.__base__ is Base", out, globals);
+    EXPECT_EQ(result(out), "(True, True, True)");
+}
+
+TEST_F(CoreSource, MetaclassPrepareUsesGenericNamespaceProtocolsAndPreservesLookupErrors)
+{
+    const auto globals = dictionary();
+    ReturnSlot out(context);
+    exec(R"(class Namespace:
+    def __getitem__(self, key):
+        if key == 'injected':
+            return 17
+        raise KeyError(key)
+    def __setitem__(self, key, value):
+        if key == 'value':
+            self.saved = value
+class Meta(type):
+    @classmethod
+    def __prepare__(cls, name, bases, *, flag):
+        return Namespace()
+    def __new__(cls, name, bases, namespace, *, flag):
+        return namespace
+class C(metaclass=Meta, flag=8):
+    value = injected
+)",
+         globals, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    eval("C.saved", out, globals);
+    EXPECT_EQ(result(out), "17");
+    eval("str(KeyError('x')), str(KeyError(1, 2)), str(KeyError()), "
+         "BaseException.__str__(KeyError('x'))",
+         out);
+    EXPECT_EQ(result(out), "(\"'x'\", '(1, 2)', '', 'x')");
+    eval("str(), str(None), str(object=42), str(encoding='utf8')", out);
+    EXPECT_EQ(result(out), "('', 'None', '42', '')");
+    exec(R"(def bad(self, key):
+    raise ValueError('lookup')
+Namespace.__getitem__ = bad
+class D(metaclass=Meta, flag=8):
+    pass
+)",
+         globals, out);
+    raised(out, CoreObject::ValueErrorType);
+}
+
+TEST_F(CoreSource, ClassCellPropagationFailuresArePythonExceptionsNotHostFaults)
+{
+    const auto globals = dictionary();
+    ReturnSlot out(context);
+    exec(R"(class Drop(type):
+    def __new__(cls, name, bases, namespace):
+        return type.__new__(cls, name, bases, type.__prepare__(name, bases))
+)",
+         globals, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    exec(R"(class C(metaclass=Drop):
+    def who(self):
+        return __class__
+)",
+         globals, out);
+    raised(out, CoreObject::RuntimeErrorType);
+    exec(R"(class Wrong(type):
+    def __new__(cls, name, bases, namespace):
+        result = type.__new__(cls, name, bases, namespace)
+        result.who.__closure__[0].cell_contents = None
+        return result
+class D(metaclass=Wrong):
+    def who(self):
+        return __class__
+)",
+         globals, out);
+    raised(out, CoreObject::TypeErrorType);
+}
+
+TEST_F(CoreSource, ClassFunctionCellAndMroCyclesReturnToTheOriginalLiveSet)
+{
+    const SourceUnit unit(SourceBuffer(R"(class C:
+    def who(self):
+        return __class__
+result = C().who()
+)"));
+    context.collect();
+    const auto baseline = context.stats().objects;
+    for (int i = 0; i < 10; ++i) {
+        {
+            ReturnSlot out(context);
+            run(context, {&unit}, out);
+            ASSERT_EQ(out.tag(), ResultTag::Ok);
+        }
+        context.collect();
+        EXPECT_EQ(context.stats().objects, baseline);
+    }
+}
+
 TEST_F(CoreSource, FunctionsLoopsDefaultsKeywordsAndRuntimeCodeIdentityCompose)
 {
     auto globals = dictionary();
@@ -761,7 +1012,7 @@ TEST(SourceDiagnostics, InvalidProgramsDoNotSilentlyCompileThroughAnotherLanguag
         SCOPED_TRACE(source);
         EXPECT_THROW(SourceUnit{SourceBuffer(source)}, SourceError);
     }
-    for (auto source : {"import x", "class X: pass", "f'{x}'", "x = 1.5", "x = [1]",
+    for (auto source : {"import x", "class X[T]: pass", "f'{x}'", "x = 1.5", "x = [1]",
                         "try:\n    pass\nexcept* Exception:\n    pass"}) {
         SCOPED_TRACE(source);
         try {
@@ -874,11 +1125,22 @@ TEST(SourceParallel, ImmutableNativeGraphsFreezeConcurrentlyWithoutSharedPythonS
 
 TEST(SourceParallel, OneFrozenSourceAndFunctionRunInOneSharedInterpreter)
 {
-    for (unsigned variant : {0U, 1U, 2U, 3U}) {
+    for (unsigned variant : {0U, 1U, 2U, 3U, 4U}) {
         const bool closure = variant == 1;
         SCOPED_TRACE(variant);
         const SourceUnit unit(SourceBuffer(
-            variant == 3 ? R"(def total(n):
+            variant == 4   ? R"(def total(n):
+    for unused in range(8):
+        class Operation:
+            @staticmethod
+            def item(value):
+                return value
+    result = 0
+    for item in range(n, 0, -1):
+        result += Operation.item(item)
+    return result
+)"
+            : variant == 3 ? R"(def total(n):
     result = 0
     for item in range(n, 0, -1):
         try:
