@@ -43,6 +43,44 @@ namespace
         CodeBuilder unknown(context); unknown.emit(static_cast<Opcode>(255)); invalid(unknown, CodeErrorKind::UnknownOpcode);
         CodeBuilder operand(context); operand.emit(Opcode::Return, 1); invalid(operand, CodeErrorKind::Operand);
         CodeBuilder domain(context); domain.emit(Opcode::Binary, 255); invalid(domain, CodeErrorKind::Operand);
+        CodeBuilder flags(context); flags.emit(Opcode::MakeFunction, 4); invalid(flags, CodeErrorKind::Operand);
+        CodeBuilder function(context); function.emit(Opcode::MakeFunction, 3); invalid(function, CodeErrorKind::StackUnderflow);
+    }
+
+    TEST_F(CoreExecution, FunctionCreationRetainsCodeIdentityAndInheritsTheExecutionEnvironment)
+    {
+        CodeBuilder child(context); child.emit(Opcode::LoadGlobal, child.name(U"answer")); child.emit(Opcode::Return);
+        const auto child_code = code(child); CodeBuilder parent(context);
+        parent.emit(Opcode::LoadConst, parent.constant(child_code)); parent.emit(Opcode::MakeFunction); parent.emit(Opcode::Return);
+        const auto globals = dictionary(), builtins = dictionary(); const auto answer = integer(42);
+        detail::name_store(context, builtins.get(context), text(U"answer").get(context), answer.get(context));
+        FunctionSpec spec{code(parent), globals}; spec.builtins = builtins; ReturnSlot out(context); make_function(context, spec, out);
+        const auto factory = roots.root(out.result().value()); call(context, factory, {}, out); ASSERT_EQ(out.result().tag(), ResultTag::Ok);
+        const auto first = roots.root(out.result().value()); call(context, factory, {}, out); ASSERT_EQ(out.result().tag(), ResultTag::Ok);
+        const auto second = roots.root(out.result().value()); EXPECT_NE(first.get(context), second.get(context));
+        for (auto fn : {first, second})
+        {
+            const auto &function = context.payload<FunctionObject>(fn);
+            EXPECT_EQ(function.code, child_code.get(context)); EXPECT_EQ(function.globals, globals.get(context)); EXPECT_EQ(function.builtins, builtins.get(context));
+            call(context, fn, {}, out); ASSERT_EQ(out.result().tag(), ResultTag::Ok); EXPECT_EQ(out.result().value(), answer.get(context));
+        }
+    }
+
+    TEST_F(CoreExecution, FunctionCreationConsumesDefaultsInDeclaredStackOrder)
+    {
+        CodeSpec spec; spec.signature.parameters = {{U"a"}, {U"b", ParameterKind::KeywordOnly}}; spec.locals = {U"a", U"b"};
+        CodeBuilder child(context, spec); child.emit(Opcode::LoadFast); child.emit(Opcode::LoadFast, 1);
+        child.emit(Opcode::Binary, static_cast<std::uint32_t>(BinaryOp::Add)); child.emit(Opcode::Return); const auto child_code = code(child);
+        ReturnSlot out(context); std::array values{integer(40).get(context)}; cxxpython::core::make_tuple(context, values, out); const auto defaults = roots.root(out.result().value());
+        const auto keywords = dictionary(); detail::name_store(context, keywords.get(context), text(U"b").get(context), integer(2).get(context));
+        CodeBuilder parent(context); parent.emit(Opcode::LoadConst, parent.constant(defaults)); parent.emit(Opcode::LoadConst, parent.constant(keywords));
+        parent.emit(Opcode::LoadConst, parent.constant(child_code)); parent.emit(Opcode::MakeFunction, 3); parent.emit(Opcode::Return);
+        call(context, function(code(parent)), {}, out); ASSERT_EQ(out.result().tag(), ResultTag::Ok); const auto fn = roots.root(out.result().value());
+        EXPECT_EQ(context.payload<FunctionObject>(fn).defaults, defaults.get(context)); EXPECT_EQ(context.payload<FunctionObject>(fn).kwdefaults, keywords.get(context));
+        call(context, fn, {}, out); ASSERT_EQ(out.result().tag(), ResultTag::Ok); EXPECT_EQ(int_decimal(context, out.result().value()), "42");
+        CodeBuilder invalid_function(context); invalid_function.emit(Opcode::LoadConst, invalid_function.constant(integer(1)));
+        invalid_function.emit(Opcode::MakeFunction); invalid_function.emit(Opcode::Return);
+        call(context, function(code(invalid_function)), {}, out); error(out, CoreObject::TypeErrorType);
     }
 
     TEST_F(CoreExecution, VerificationChecksOperandBoundsEvenInUnreachableInstructions)
@@ -51,6 +89,75 @@ namespace
         CodeBuilder local(context); local.emit(Opcode::LoadFast, 0); invalid(local, CodeErrorKind::LocalBounds);
         CodeBuilder jump(context); jump.emit(Opcode::Jump, 1); invalid(jump, CodeErrorKind::JumpBounds);
         CodeBuilder dead(context); dead.emit(Opcode::Jump, 0); dead.emit(Opcode::LoadConst, 0); invalid(dead, CodeErrorKind::ConstantBounds);
+        for (auto opcode : {Opcode::LoadGlobal, Opcode::StoreGlobal, Opcode::DeleteGlobal})
+        { CodeBuilder global(context); global.emit(opcode); invalid(global, CodeErrorKind::NameBounds); }
+    }
+
+    TEST_F(CoreExecution, GlobalLookupUsesLiveGlobalsThenTheFunctionsBuiltinsMapping)
+    {
+        auto globals = dictionary(), builtins = dictionary(); auto key = text(U"answer");
+        auto first = integer(41), second = integer(42); ReturnSlot out(context);
+        detail::name_store(context, builtins.get(context), key.get(context), first.get(context));
+        CodeBuilder builder(context); const auto index = builder.name(U"answer"); EXPECT_EQ(builder.name(U"answer"), index);
+        builder.emit(Opcode::LoadGlobal, index); builder.emit(Opcode::Return); auto program = code(builder);
+        FunctionSpec spec{program, globals}; spec.builtins = builtins; make_function(context, spec, out); const auto fn = roots.root(out.result().value());
+        call(context, fn, {}, out); ASSERT_EQ(out.result().tag(), ResultTag::Ok); EXPECT_EQ(out.result().value(), first.get(context));
+        detail::name_store(context, globals.get(context), key.get(context), second.get(context));
+        call(context, fn, {}, out); EXPECT_EQ(out.result().value(), second.get(context));
+        detail::name_erase(context, globals.get(context), U"answer");
+        detail::name_store(context, builtins.get(context), key.get(context), second.get(context));
+        call(context, fn, {}, out); EXPECT_EQ(out.result().value(), second.get(context));
+        detail::name_erase(context, builtins.get(context), U"answer"); call(context, fn, {}, out); error(out, CoreObject::NameErrorType);
+        get_attribute(context, fn, text(U"__builtins__"), out); EXPECT_EQ(out.result().value(), builtins.get(context));
+        get_attribute(context, program, text(U"co_names"), out); const auto &names = context.payload<TupleObject>(out.result().value()).items;
+        ASSERT_EQ(names.size(), 1U); EXPECT_EQ(context.payload<StrObject>(names[0]).value, U"answer");
+        EXPECT_NE(disassemble(context, program).find("LOAD_GLOBAL"), std::string::npos);
+    }
+
+    TEST_F(CoreExecution, GlobalStoresAndDeletesDoNotMutateBuiltinsAndTranslateMissingNames)
+    {
+        auto globals = dictionary(), builtins = dictionary(); auto key = text(U"answer"); auto value = integer(42); ReturnSlot out(context);
+        detail::name_store(context, builtins.get(context), key.get(context), context.builtin(CoreObject::IntOne));
+        CodeBuilder store(context); const auto name = store.name(U"answer");
+        store.emit(Opcode::LoadConst, store.constant(value)); store.emit(Opcode::StoreGlobal, name);
+        store.emit(Opcode::LoadGlobal, name); store.emit(Opcode::Return); auto program = code(store);
+        FunctionSpec spec{program, globals}; spec.builtins = builtins; make_function(context, spec, out); auto writer = roots.root(out.result().value());
+        call(context, writer, {}, out); ASSERT_EQ(out.result().tag(), ResultTag::Ok); EXPECT_EQ(out.result().value(), value.get(context));
+        EXPECT_EQ(detail::name_lookup(context, globals.get(context), U"answer"), value.get(context));
+        EXPECT_EQ(detail::name_lookup(context, builtins.get(context), U"answer"), context.builtin(CoreObject::IntOne));
+        CodeBuilder erase(context); const auto erased = erase.name(U"answer"); erase.emit(Opcode::DeleteGlobal, erased);
+        erase.emit(Opcode::LoadGlobal, erased); erase.emit(Opcode::Return); spec.code = code(erase); make_function(context, spec, out); auto deleter = roots.root(out.result().value());
+        call(context, deleter, {}, out); ASSERT_EQ(out.result().tag(), ResultTag::Ok); EXPECT_EQ(out.result().value(), context.builtin(CoreObject::IntOne));
+        call(context, deleter, {}, out); error(out, CoreObject::NameErrorType);
+        context.set_allocation_limit(0); call(context, writer, {}, out); error(out, CoreObject::MemoryErrorType);
+        EXPECT_FALSE(detail::name_lookup(context, globals.get(context), U"answer"));
+    }
+
+    TEST_F(CoreExecution, ImageBuiltinsUseOrdinaryProtocolsAndCalls)
+    {
+        CodeBuilder builder(context); builder.emit(Opcode::LoadGlobal, builder.name(U"len"));
+        builder.emit(Opcode::LoadConst, builder.constant(text(U"abc"))); builder.call(1); builder.emit(Opcode::Return);
+        auto fn = function(code(builder)); ReturnSlot out(context); call(context, fn, {}, out);
+        ASSERT_EQ(out.result().tag(), ResultTag::Ok); EXPECT_EQ(int_decimal(context, out.result().value()), "3");
+        EXPECT_EQ(detail::name_lookup(context, context.builtin(CoreObject::Builtins), U"int"), context.builtin(CoreObject::IntType));
+        EXPECT_EQ(detail::name_lookup(context, context.builtin(CoreObject::Builtins), U"object"), context.object_type());
+    }
+
+    TEST_F(CoreExecution, GlobalStoreAllocationFailureLeavesTheOldBindingIntact)
+    {
+        ReturnSlot out(context); auto globals = dictionary(), name = text(U"answer"), old = integer(7);
+        detail::name_store(context, globals.get(context), name.get(context), old.get(context));
+        make_native_function(context, "exhaust allocation quota", {},
+            [](Attachment &context, Handle, std::span<const Value>, ReturnSlot &out) {
+                context.set_allocation_limit(0); out.ok(context.builtin(CoreObject::IntOne));
+            }, {}, out);
+        auto exhaust = roots.root(out.result().value()); CodeBuilder builder(context);
+        builder.emit(Opcode::LoadConst, builder.constant(exhaust)); builder.call(0);
+        builder.emit(Opcode::StoreGlobal, builder.name(U"answer")); builder.emit(Opcode::LoadConst, builder.constant(builtin(CoreObject::None))); builder.emit(Opcode::Return);
+        make_function(context, {code(builder), globals}, out); const auto fn = roots.root(out.result().value());
+        call(context, fn, {}, out); error(out, CoreObject::MemoryErrorType);
+        context.set_allocation_limit(std::numeric_limits<std::size_t>::max());
+        EXPECT_EQ(detail::name_lookup(context, globals.get(context), U"answer"), old.get(context));
     }
 
     TEST_F(CoreExecution, VerificationRejectsUnderflowFallthroughAndGrowingBackEdges)
@@ -201,6 +308,8 @@ namespace
         EXPECT_EQ(data.state, FrameState::Completed); EXPECT_EQ(data.sp, 0U); EXPECT_EQ(data.locals[0], self.get(context));
         for (auto value : data.operands) EXPECT_EQ(value, context.builtin(CoreObject::None));
         get_attribute(context, frame, text(U"f_code"), out); EXPECT_EQ(out.result().value(), program.get(context));
+        get_attribute(context, frame, text(U"f_globals"), out); EXPECT_EQ(out.result().value(), context.payload<FunctionObject>(data.function).globals);
+        get_attribute(context, frame, text(U"f_builtins"), out); EXPECT_EQ(out.result().value(), context.builtin(CoreObject::Builtins));
         EXPECT_FALSE(context.current_frame());
     }
 

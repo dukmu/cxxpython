@@ -1,6 +1,7 @@
 #include "cxxpython/core/execution.hpp"
 
 #include <algorithm>
+#include <bit>
 #include <unordered_set>
 
 namespace cxxpython::core
@@ -33,6 +34,10 @@ namespace cxxpython::core
             OpcodeDefinition{"ENTER_WITH", 2, 0, 0, OperandDomain::Region, FlowKind::Next, false, false},
             OpcodeDefinition{"WITH_EXIT", 0, 0, 4, OperandDomain::Region, FlowKind::Next, false, false},
             OpcodeDefinition{"WITH_RESULT", 1, 1, 0, OperandDomain::Region, FlowKind::Next, true, true},
+            OpcodeDefinition{"LOAD_GLOBAL", 0, 0, 1, OperandDomain::Name, FlowKind::Next, true, true},
+            OpcodeDefinition{"STORE_GLOBAL", 1, 1, 0, OperandDomain::Name, FlowKind::Next, true, true},
+            OpcodeDefinition{"DELETE_GLOBAL", 0, 0, 0, OperandDomain::Name, FlowKind::Next, true, true},
+            OpcodeDefinition{"MAKE_FUNCTION", 1, 1, 1, OperandDomain::FunctionFlags, FlowKind::Next, true, true},
         };
         static_assert(definitions.size() == static_cast<std::size_t>(Opcode::Count));
         [[noreturn]] void invalid(CodeErrorKind kind, const char *message, std::optional<std::size_t> pc = {})
@@ -54,7 +59,7 @@ namespace cxxpython::core
         std::size_t verify(const CodeSpec &spec, std::span<const Instruction> instructions,
                            std::span<const SourcePosition> positions, std::span<const CallLayout> calls,
                            std::span<const RegionLayout> regions, std::span<const std::optional<RegionToken>> scopes,
-                           std::size_t constants)
+                           std::size_t constants, std::size_t name_count)
         {
             if (instructions.empty()) invalid(CodeErrorKind::EmptyCode, "empty instruction sequence");
             if (!spec.first_line) invalid(CodeErrorKind::SourcePosition, "first line must be positive");
@@ -88,6 +93,12 @@ namespace cxxpython::core
                         break;
                     case OperandDomain::Local:
                         if (operand >= spec.locals.size()) invalid(CodeErrorKind::LocalBounds, "local index out of bounds", pc);
+                        break;
+                    case OperandDomain::Name:
+                        if (operand >= name_count) invalid(CodeErrorKind::NameBounds, "name index out of bounds", pc);
+                        break;
+                    case OperandDomain::FunctionFlags:
+                        if (operand & ~3U) invalid(CodeErrorKind::Operand, "invalid function creation flags", pc);
                         break;
                     case OperandDomain::Target:
                         if (operand >= instructions.size()) invalid(CodeErrorKind::JumpBounds, "jump target out of bounds", pc);
@@ -239,7 +250,10 @@ namespace cxxpython::core
         if (definition.operand == OperandDomain::CallSite && instruction.operand >= calls.size())
             invalid(CodeErrorKind::CallBounds, "call-site index out of bounds");
         const auto arguments = definition.operand == OperandDomain::CallSite ? calls[instruction.operand].argument_count() : 0;
-        return {definition.inputs + arguments, definition.pops + arguments, definition.pushes};
+        if (definition.operand == OperandDomain::FunctionFlags && (instruction.operand & ~3U))
+            invalid(CodeErrorKind::Operand, "invalid function creation flags");
+        const auto defaults = definition.operand == OperandDomain::FunctionFlags ? std::popcount(instruction.operand) : 0;
+        return {definition.inputs + arguments + defaults, definition.pops + arguments + defaults, definition.pushes};
     }
     std::size_t VerifiedCode::external_bytes() const noexcept
     {
@@ -250,7 +264,7 @@ namespace cxxpython::core
         return bytes;
     }
     void CodeObject::trace(Tracer &tracer) const noexcept
-    { for (auto value : {constants, varnames, name, qualname, filename, call_keywords}) tracer.visit(value); }
+    { for (auto value : {constants, varnames, name, qualname, filename, call_keywords, names}) tracer.visit(value); }
     CodeBuilder::CodeBuilder(Attachment &context, CodeSpec spec) : context_(context), roots_(context), spec_(std::move(spec))
     {
         if (!context.core_ready()) throw std::logic_error("CodeBuilder requires the B3 image");
@@ -262,6 +276,15 @@ namespace cxxpython::core
         if (constants_.size() >= std::numeric_limits<std::uint32_t>::max()) invalid(CodeErrorKind::SizeLimit, "too many constants");
         auto rooted = roots_.root(value.get(context_)); constants_.push_back(rooted.get(context_));
         return static_cast<std::uint32_t>(constants_.size() - 1);
+    }
+    std::uint32_t CodeBuilder::name(std::u32string value)
+    {
+        for (std::size_t i = 0; i < names_.size(); ++i)
+            if (context_.payload<StrObject>(names_[i]).value == value) return static_cast<std::uint32_t>(i);
+        if (names_.size() >= std::numeric_limits<std::uint32_t>::max()) invalid(CodeErrorKind::SizeLimit, "too many names");
+        ReturnSlot text(context_); make_str(context_, std::move(value), text);
+        const auto rooted = roots_.root(text.result().value()); names_.push_back(rooted.get(context_));
+        return static_cast<std::uint32_t>(names_.size() - 1);
     }
     CodeBuilder::Label CodeBuilder::label()
     { labels_.push_back({}); return {this, labels_.size() - 1}; }
@@ -321,10 +344,11 @@ namespace cxxpython::core
             }
             regions.push_back(layout);
         }
-        const auto maximum = verify(spec_, instructions, positions_, calls, regions, scopes_, constants_.size());
+        const auto maximum = verify(spec_, instructions, positions_, calls, regions, scopes_, constants_.size(), names_.size());
         VerifiedCode verified(std::move(instructions), positions_, std::move(calls), std::move(regions), spec_.signature, spec_.locals, maximum, spec_.first_line);
         RootScope roots(context_); ReturnSlot temporary(context_);
         cxxpython::core::make_tuple(context_, constants_, temporary); auto constants = roots.root(temporary.result().value());
+        cxxpython::core::make_tuple(context_, names_, temporary); auto global_names = roots.root(temporary.result().value());
         std::vector<Value> names;
         for (const auto &name : spec_.locals)
         { make_str(context_, name, temporary); names.push_back(roots.root(temporary.result().value()).get(context_)); }
@@ -346,7 +370,7 @@ namespace cxxpython::core
         { cxxpython::core::make_tuple(context_, keyword_tables, temporary); call_keywords = roots.root(temporary.result().value()); }
         auto type = roots.root(context_.builtin(CoreObject::CodeType));
         context_.allocate_instance<CodeObject>(type, out, std::move(verified), constants.get(context_), varnames.get(context_),
-                                             name.get(context_), qualname.get(context_), filename.get(context_), call_keywords.get(context_));
+                                             name.get(context_), qualname.get(context_), filename.get(context_), call_keywords.get(context_), global_names.get(context_));
     }
     void CodeBuilder::call(std::uint32_t positional, std::span<const std::u32string> keywords, SourcePosition source)
     {

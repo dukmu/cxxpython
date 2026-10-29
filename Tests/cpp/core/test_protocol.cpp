@@ -193,6 +193,37 @@ namespace
         invoke_protocol(context, obj, slot, {}, out); EXPECT_EQ(out.result().value(), replacement.get(context));
     }
 
+    TEST_F(CoreProtocols, ThreadPrivateCacheIncludesMissingSlotsAndInvalidatesOnBaseMutation)
+    {
+        auto base = type(); auto cls = type({&base, 1});
+        context.set_gc_enabled(false);
+        EXPECT_FALSE(context.cached_protocol(cls, Protocol::Len, roots));
+        EXPECT_EQ(resolve_protocol(context, cls, Protocol::Len, roots).state, SlotState::Missing);
+        ASSERT_TRUE(context.cached_protocol(cls, Protocol::Len, roots));
+        method(base, U"__len__", integer(7));
+        EXPECT_FALSE(context.cached_protocol(cls, Protocol::Len, roots));
+        auto slot = resolve_protocol(context, cls, Protocol::Len, roots);
+        ASSERT_EQ(slot.state, SlotState::Native); EXPECT_EQ(slot.owner.get(context), base.get(context));
+        auto cached = context.cached_protocol(cls, Protocol::Len, roots); ASSERT_TRUE(cached);
+        EXPECT_EQ(cached->descriptor.get(context), slot.descriptor.get(context));
+        context.collect(); EXPECT_FALSE(context.cached_protocol(cls, Protocol::Len, roots));
+        ReturnSlot out(context); invoke_protocol(context, instance(cls), slot, {}, out);
+        ASSERT_EQ(out.result().tag(), ResultTag::Ok); EXPECT_EQ(int_decimal(context, out.result().value()), "7");
+    }
+
+    TEST(ProtocolCache, CachedClassesDoNotBecomePermanentRoots)
+    {
+        Interpreter interpreter; Attachment context(interpreter); context.bootstrap_core(); context.collect();
+        const auto baseline = context.stats().objects;
+        {
+            RootScope roots(context); ReturnSlot out(context); create_type(context, {U"Ephemeral"}, out);
+            const auto cls = roots.root(out.result().value());
+            resolve_protocol(context, cls, Protocol::Len, roots);
+            ASSERT_TRUE(context.cached_protocol(cls, Protocol::Len, roots));
+        }
+        context.collect(); EXPECT_EQ(context.stats().objects, baseline);
+    }
+
     TEST_F(CoreProtocols, OperandsSurviveAliasedOutputAndMemoryErrorIsRooted)
     {
         ReturnSlot out(context); make_int(context, 42, out);

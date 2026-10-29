@@ -25,6 +25,8 @@ namespace cxxpython::core
     class Tracer;
     class NoSafepoint;
     class Transfer;
+    enum class Protocol : std::size_t;
+    struct ResolvedSlot;
     enum class CoreObject : std::size_t
     {
         NoneType, StrType, TupleType, DictType, IntType, BoolType, NotImplementedType,
@@ -35,7 +37,7 @@ namespace cxxpython::core
         NativeFunctionType, MethodDescriptorType, BoundMethodType,
         GetSetDescriptorType, MappingProxyType, StaticMethodType, ClassMethodType, MemberDescriptorType, CellType,
         CodeType, FunctionType, FrameType, TracebackType,
-        None, NotImplemented, False, True, IntZero, IntOne, EmptyTuple, MemoryError, Count,
+        None, NotImplemented, False, True, IntZero, IntOne, EmptyTuple, MemoryError, Builtins, Count,
     };
     namespace detail
     {
@@ -402,6 +404,8 @@ namespace cxxpython::core
         Value builtin(CoreObject object) const;
         std::uint64_t type_epoch() const;
         void invalidate_types();
+        std::optional<ResolvedSlot> cached_protocol(Handle type, Protocol protocol, RootScope &roots);
+        void cache_protocol(const ResolvedSlot &slot);
         std::uint64_t publication_epoch(PublicationDomain domain) const;
         bool begin_publication(PublicationDomain domain, std::uint64_t epoch);
         void end_publication(PublicationDomain domain, std::uint64_t epoch);

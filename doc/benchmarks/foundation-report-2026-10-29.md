@@ -326,6 +326,158 @@ Storage/native delivery probes do not establish Python VM parallelism. RSS is th
 | n2-n3-shared-vm-idle | transfer_iterations | - | transfer_roundtrip_ns | ms | 3 | 0.975 | 0.928 | 1.135 |
 | n2-n3-shared-vm-idle | transfer_iterations | - | transfer_token_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
 | n2-n3-shared-vm-idle | with_iterations | - | with_function_ns | ms | 3 | 55.915 | 53.066 | 63.551 |
+| n3-local-protocol-cache | cleanup_iterations | - | active_region_bytes | bytes | 3 | 32.000 | 32.000 | 32.000 |
+| n3-local-protocol-cache | cleanup_iterations | - | cleanup_continuation_bytes | bytes | 3 | 48.000 | 48.000 | 48.000 |
+| n3-local-protocol-cache | cleanup_iterations | - | cleanup_function_ns | ms | 3 | 25.943 | 24.189 | 30.581 |
+| n3-local-protocol-cache | function_iterations | - | frame_prefix_bytes | bytes | 3 | 232.000 | 232.000 | 232.000 |
+| n3-local-protocol-cache | function_iterations | - | verified_function_ns | ms | 3 | 20.857 | 18.836 | 22.168 |
+| n3-local-protocol-cache | hash_iterations | - | string_hash_ns | ms | 3 | 88.610 | 84.085 | 98.158 |
+| n3-local-protocol-cache | hash_iterations | - | tuple_repr_ns | ms | 3 | 25.997 | 23.941 | 28.470 |
+| n3-local-protocol-cache | int_iterations | - | big_int_mul_ns | ms | 3 | 9.822 | 9.674 | 11.245 |
+| n3-local-protocol-cache | int_iterations | - | int_add_ns | ms | 3 | 87.816 | 87.206 | 90.767 |
+| n3-local-protocol-cache | int_iterations | - | int_object_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| n3-local-protocol-cache | iterations | - | allocation_and_auto_gc_ns | ms | 3 | 4.843 | 4.502 | 4.885 |
+| n3-local-protocol-cache | iterations | - | handle_bytes | bytes | 3 | 32.000 | 32.000 | 32.000 |
+| n3-local-protocol-cache | iterations | - | header_bytes | bytes | 3 | 8.000 | 8.000 | 8.000 |
+| n3-local-protocol-cache | iterations | - | last_gc_pause_ns | ms | 3 | 0.001 | 0.000 | 0.002 |
+| n3-local-protocol-cache | iterations | - | live_bytes | bytes | 3 | 0.000 | 0.000 | 0.000 |
+| n3-local-protocol-cache | iterations | - | node_bytes | bytes | 3 | 16.000 | 16.000 | 16.000 |
+| n3-local-protocol-cache | iterations | - | recorded_metadata_bytes | bytes | 3 | 3360.000 | 3360.000 | 3360.000 |
+| n3-local-protocol-cache | iterations | - | root_register_release_ns | ms | 3 | 3.643 | 3.593 | 3.659 |
+| n3-local-protocol-cache | native_call_iterations | - | core_live_bytes | bytes | 3 | 88080.000 | 88080.000 | 88080.000 |
+| n3-local-protocol-cache | native_call_iterations | - | core_metadata_bytes | bytes | 3 | 99472.000 | 99472.000 | 99472.000 |
+| n3-local-protocol-cache | native_call_iterations | - | core_reserved_bytes | bytes | 3 | 321152.000 | 321152.000 | 321152.000 |
+| n3-local-protocol-cache | native_call_iterations | - | lookup_bind_call_ns | ms | 3 | 26.445 | 26.238 | 26.772 |
+| n3-local-protocol-cache | native_call_iterations | - | native_call_ns | ms | 3 | 23.321 | 22.690 | 24.153 |
+| n3-local-protocol-cache | parallel_storage_workers | 1 | finish_live_bytes | bytes | 3 | 42720.000 | 42720.000 | 42720.000 |
+| n3-local-protocol-cache | parallel_storage_workers | 1 | finish_metadata_bytes | bytes | 3 | 97040.000 | 97040.000 | 97040.000 |
+| n3-local-protocol-cache | parallel_storage_workers | 1 | finish_reserved_bytes | bytes | 3 | 135504.000 | 135504.000 | 135504.000 |
+| n3-local-protocol-cache | parallel_storage_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.012 | 0.011 | 0.022 |
+| n3-local-protocol-cache | parallel_storage_workers | 1 | max_rendezvous_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| n3-local-protocol-cache | parallel_storage_workers | 1 | process_cpu_ns | ms | 3 | 2.305 | 2.283 | 2.691 |
+| n3-local-protocol-cache | parallel_storage_workers | 1 | wall_ns | ms | 3 | 2.328 | 2.313 | 2.641 |
+| n3-local-protocol-cache | parallel_storage_workers | 2 | finish_live_bytes | bytes | 3 | 9408.000 | 9200.000 | 11040.000 |
+| n3-local-protocol-cache | parallel_storage_workers | 2 | finish_metadata_bytes | bytes | 3 | 100352.000 | 100352.000 | 100352.000 |
+| n3-local-protocol-cache | parallel_storage_workers | 2 | finish_reserved_bytes | bytes | 3 | 135504.000 | 135504.000 | 135504.000 |
+| n3-local-protocol-cache | parallel_storage_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.013 | 0.006 | 0.013 |
+| n3-local-protocol-cache | parallel_storage_workers | 2 | max_rendezvous_ns | ms | 3 | 0.035 | 0.024 | 0.048 |
+| n3-local-protocol-cache | parallel_storage_workers | 2 | process_cpu_ns | ms | 3 | 2.698 | 2.610 | 2.714 |
+| n3-local-protocol-cache | parallel_storage_workers | 2 | wall_ns | ms | 3 | 1.757 | 1.673 | 1.946 |
+| n3-local-protocol-cache | parallel_storage_workers | 4 | finish_live_bytes | bytes | 3 | 63088.000 | 59360.000 | 63984.000 |
+| n3-local-protocol-cache | parallel_storage_workers | 4 | finish_metadata_bytes | bytes | 3 | 282208.000 | 282208.000 | 282208.000 |
+| n3-local-protocol-cache | parallel_storage_workers | 4 | finish_reserved_bytes | bytes | 3 | 398096.000 | 398096.000 | 398096.000 |
+| n3-local-protocol-cache | parallel_storage_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.039 | 0.032 | 0.133 |
+| n3-local-protocol-cache | parallel_storage_workers | 4 | max_rendezvous_ns | ms | 3 | 0.130 | 0.094 | 0.377 |
+| n3-local-protocol-cache | parallel_storage_workers | 4 | process_cpu_ns | ms | 3 | 3.323 | 3.136 | 3.681 |
+| n3-local-protocol-cache | parallel_storage_workers | 4 | wall_ns | ms | 3 | 2.267 | 2.046 | 2.898 |
+| n3-local-protocol-cache | parallel_vm_workers | 1 | finish_live_bytes | bytes | 3 | 118836.000 | 118836.000 | 118836.000 |
+| n3-local-protocol-cache | parallel_vm_workers | 1 | finish_metadata_bytes | bytes | 3 | 178384.000 | 178384.000 | 178384.000 |
+| n3-local-protocol-cache | parallel_vm_workers | 1 | finish_reserved_bytes | bytes | 3 | 460648.000 | 460648.000 | 460648.000 |
+| n3-local-protocol-cache | parallel_vm_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.020 | 0.018 | 0.021 |
+| n3-local-protocol-cache | parallel_vm_workers | 1 | max_rendezvous_ns | ms | 3 | 0.002 | 0.001 | 0.002 |
+| n3-local-protocol-cache | parallel_vm_workers | 1 | process_cpu_ns | ms | 3 | 361.365 | 353.930 | 362.808 |
+| n3-local-protocol-cache | parallel_vm_workers | 1 | wall_ns | ms | 3 | 358.471 | 349.659 | 360.296 |
+| n3-local-protocol-cache | parallel_vm_workers | 2 | finish_live_bytes | bytes | 3 | 119260.000 | 117244.000 | 130516.000 |
+| n3-local-protocol-cache | parallel_vm_workers | 2 | finish_metadata_bytes | bytes | 3 | 183264.000 | 183264.000 | 220832.000 |
+| n3-local-protocol-cache | parallel_vm_workers | 2 | finish_reserved_bytes | bytes | 3 | 464736.000 | 464736.000 | 530384.000 |
+| n3-local-protocol-cache | parallel_vm_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.051 | 0.026 | 0.053 |
+| n3-local-protocol-cache | parallel_vm_workers | 2 | max_rendezvous_ns | ms | 3 | 0.165 | 0.141 | 0.235 |
+| n3-local-protocol-cache | parallel_vm_workers | 2 | process_cpu_ns | ms | 3 | 354.136 | 353.931 | 366.070 |
+| n3-local-protocol-cache | parallel_vm_workers | 2 | wall_ns | ms | 3 | 179.549 | 179.353 | 184.528 |
+| n3-local-protocol-cache | parallel_vm_workers | 4 | finish_live_bytes | bytes | 3 | 149236.000 | 105780.000 | 158356.000 |
+| n3-local-protocol-cache | parallel_vm_workers | 4 | finish_metadata_bytes | bytes | 3 | 304512.000 | 266336.000 | 342080.000 |
+| n3-local-protocol-cache | parallel_vm_workers | 4 | finish_reserved_bytes | bytes | 3 | 661680.000 | 591944.000 | 727328.000 |
+| n3-local-protocol-cache | parallel_vm_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.044 | 0.039 | 0.067 |
+| n3-local-protocol-cache | parallel_vm_workers | 4 | max_rendezvous_ns | ms | 3 | 0.819 | 0.746 | 2.834 |
+| n3-local-protocol-cache | parallel_vm_workers | 4 | process_cpu_ns | ms | 3 | 376.476 | 372.792 | 390.637 |
+| n3-local-protocol-cache | parallel_vm_workers | 4 | wall_ns | ms | 3 | 110.647 | 107.565 | 124.280 |
+| n3-local-protocol-cache | process_peak_rss_kib | - | process_peak_rss_kib | KiB | 3 | 6084.000 | 6040.000 | 7096.000 |
+| n3-local-protocol-cache | scheduled_iterations | - | scheduled_function_ns | ms | 3 | 33.078 | 29.902 | 37.505 |
+| n3-local-protocol-cache | shared_edge_iterations | - | cell_object_bytes | bytes | 3 | 16.000 | 16.000 | 16.000 |
+| n3-local-protocol-cache | shared_edge_iterations | - | rooted_cell_read_ns | ms | 3 | 3.010 | 2.993 | 3.521 |
+| n3-local-protocol-cache | shared_edge_iterations | - | rooted_cell_store_read_ns | ms | 3 | 5.432 | 5.341 | 5.475 |
+| n3-local-protocol-cache | slot_iterations | - | generic_prefix_bytes | bytes | 3 | 8.000 | 8.000 | 8.000 |
+| n3-local-protocol-cache | slot_iterations | - | slot_instance_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| n3-local-protocol-cache | slot_iterations | - | slot_set_get_ns | ms | 3 | 41.460 | 40.563 | 42.806 |
+| n3-local-protocol-cache | transfer_iterations | - | transfer_roundtrip_ns | ms | 3 | 0.990 | 0.987 | 1.066 |
+| n3-local-protocol-cache | transfer_iterations | - | transfer_token_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| n3-local-protocol-cache | with_iterations | - | with_function_ns | ms | 3 | 46.650 | 44.368 | 51.068 |
+| n4-global-environment | cleanup_iterations | - | active_region_bytes | bytes | 3 | 32.000 | 32.000 | 32.000 |
+| n4-global-environment | cleanup_iterations | - | cleanup_continuation_bytes | bytes | 3 | 48.000 | 48.000 | 48.000 |
+| n4-global-environment | cleanup_iterations | - | cleanup_function_ns | ms | 3 | 25.575 | 25.011 | 26.374 |
+| n4-global-environment | function_iterations | - | frame_prefix_bytes | bytes | 3 | 232.000 | 232.000 | 232.000 |
+| n4-global-environment | function_iterations | - | verified_function_ns | ms | 3 | 21.250 | 19.980 | 23.666 |
+| n4-global-environment | hash_iterations | - | string_hash_ns | ms | 3 | 89.534 | 87.946 | 92.114 |
+| n4-global-environment | hash_iterations | - | tuple_repr_ns | ms | 3 | 25.886 | 24.372 | 26.484 |
+| n4-global-environment | int_iterations | - | big_int_mul_ns | ms | 3 | 9.986 | 9.823 | 10.495 |
+| n4-global-environment | int_iterations | - | int_add_ns | ms | 3 | 90.247 | 90.040 | 97.722 |
+| n4-global-environment | int_iterations | - | int_object_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| n4-global-environment | iterations | - | allocation_and_auto_gc_ns | ms | 3 | 5.098 | 4.569 | 5.146 |
+| n4-global-environment | iterations | - | handle_bytes | bytes | 3 | 32.000 | 32.000 | 32.000 |
+| n4-global-environment | iterations | - | header_bytes | bytes | 3 | 8.000 | 8.000 | 8.000 |
+| n4-global-environment | iterations | - | last_gc_pause_ns | ms | 3 | 0.001 | 0.001 | 0.002 |
+| n4-global-environment | iterations | - | live_bytes | bytes | 3 | 0.000 | 0.000 | 0.000 |
+| n4-global-environment | iterations | - | node_bytes | bytes | 3 | 16.000 | 16.000 | 16.000 |
+| n4-global-environment | iterations | - | recorded_metadata_bytes | bytes | 3 | 3360.000 | 3360.000 | 3360.000 |
+| n4-global-environment | iterations | - | root_register_release_ns | ms | 3 | 3.711 | 3.652 | 3.775 |
+| n4-global-environment | native_call_iterations | - | core_live_bytes | bytes | 3 | 93712.000 | 93712.000 | 93712.000 |
+| n4-global-environment | native_call_iterations | - | core_metadata_bytes | bytes | 3 | 99520.000 | 99520.000 | 99520.000 |
+| n4-global-environment | native_call_iterations | - | core_reserved_bytes | bytes | 3 | 321152.000 | 321152.000 | 321152.000 |
+| n4-global-environment | native_call_iterations | - | lookup_bind_call_ns | ms | 3 | 25.048 | 24.806 | 25.879 |
+| n4-global-environment | native_call_iterations | - | native_call_ns | ms | 3 | 23.873 | 22.616 | 23.974 |
+| n4-global-environment | parallel_storage_workers | 1 | finish_live_bytes | bytes | 3 | 42720.000 | 42720.000 | 42720.000 |
+| n4-global-environment | parallel_storage_workers | 1 | finish_metadata_bytes | bytes | 3 | 97040.000 | 97040.000 | 97040.000 |
+| n4-global-environment | parallel_storage_workers | 1 | finish_reserved_bytes | bytes | 3 | 135504.000 | 135504.000 | 135504.000 |
+| n4-global-environment | parallel_storage_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.012 | 0.012 | 0.022 |
+| n4-global-environment | parallel_storage_workers | 1 | max_rendezvous_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| n4-global-environment | parallel_storage_workers | 1 | process_cpu_ns | ms | 3 | 2.577 | 2.316 | 2.581 |
+| n4-global-environment | parallel_storage_workers | 1 | wall_ns | ms | 3 | 2.555 | 2.434 | 2.555 |
+| n4-global-environment | parallel_storage_workers | 2 | finish_live_bytes | bytes | 3 | 14544.000 | 8624.000 | 63712.000 |
+| n4-global-environment | parallel_storage_workers | 2 | finish_metadata_bytes | bytes | 3 | 103200.000 | 100352.000 | 190816.000 |
+| n4-global-environment | parallel_storage_workers | 2 | finish_reserved_bytes | bytes | 3 | 139712.000 | 135504.000 | 271008.000 |
+| n4-global-environment | parallel_storage_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.011 | 0.005 | 0.137 |
+| n4-global-environment | parallel_storage_workers | 2 | max_rendezvous_ns | ms | 3 | 0.039 | 0.032 | 0.129 |
+| n4-global-environment | parallel_storage_workers | 2 | process_cpu_ns | ms | 3 | 2.652 | 2.555 | 2.809 |
+| n4-global-environment | parallel_storage_workers | 2 | wall_ns | ms | 3 | 1.746 | 1.741 | 1.941 |
+| n4-global-environment | parallel_storage_workers | 4 | finish_live_bytes | bytes | 3 | 44464.000 | 32848.000 | 56912.000 |
+| n4-global-environment | parallel_storage_workers | 4 | finish_metadata_bytes | bytes | 3 | 241248.000 | 238400.000 | 282208.000 |
+| n4-global-environment | parallel_storage_workers | 4 | finish_reserved_bytes | bytes | 3 | 336656.000 | 332448.000 | 398096.000 |
+| n4-global-environment | parallel_storage_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.024 | 0.015 | 0.044 |
+| n4-global-environment | parallel_storage_workers | 4 | max_rendezvous_ns | ms | 3 | 0.113 | 0.077 | 0.152 |
+| n4-global-environment | parallel_storage_workers | 4 | process_cpu_ns | ms | 3 | 3.638 | 3.377 | 4.580 |
+| n4-global-environment | parallel_storage_workers | 4 | wall_ns | ms | 3 | 2.321 | 2.223 | 2.877 |
+| n4-global-environment | parallel_vm_workers | 1 | finish_live_bytes | bytes | 3 | 130180.000 | 130180.000 | 130180.000 |
+| n4-global-environment | parallel_vm_workers | 1 | finish_metadata_bytes | bytes | 3 | 178336.000 | 178336.000 | 178336.000 |
+| n4-global-environment | parallel_vm_workers | 1 | finish_reserved_bytes | bytes | 3 | 460448.000 | 460448.000 | 460448.000 |
+| n4-global-environment | parallel_vm_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.029 | 0.022 | 0.067 |
+| n4-global-environment | parallel_vm_workers | 1 | max_rendezvous_ns | ms | 3 | 0.002 | 0.002 | 0.002 |
+| n4-global-environment | parallel_vm_workers | 1 | process_cpu_ns | ms | 3 | 345.437 | 342.584 | 356.274 |
+| n4-global-environment | parallel_vm_workers | 1 | wall_ns | ms | 3 | 340.646 | 337.831 | 355.846 |
+| n4-global-environment | parallel_vm_workers | 2 | finish_live_bytes | bytes | 3 | 148628.000 | 145700.000 | 154132.000 |
+| n4-global-environment | parallel_vm_workers | 2 | finish_metadata_bytes | bytes | 3 | 220784.000 | 220784.000 | 257744.000 |
+| n4-global-environment | parallel_vm_workers | 2 | finish_reserved_bytes | bytes | 3 | 530184.000 | 530184.000 | 591744.000 |
+| n4-global-environment | parallel_vm_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.033 | 0.032 | 0.060 |
+| n4-global-environment | parallel_vm_workers | 2 | max_rendezvous_ns | ms | 3 | 0.165 | 0.060 | 13.996 |
+| n4-global-environment | parallel_vm_workers | 2 | process_cpu_ns | ms | 3 | 366.094 | 364.528 | 366.889 |
+| n4-global-environment | parallel_vm_workers | 2 | wall_ns | ms | 3 | 185.376 | 182.721 | 274.107 |
+| n4-global-environment | parallel_vm_workers | 4 | finish_live_bytes | bytes | 3 | 172436.000 | 94924.000 | 181356.000 |
+| n4-global-environment | parallel_vm_workers | 4 | finish_metadata_bytes | bytes | 3 | 342032.000 | 266288.000 | 342640.000 |
+| n4-global-environment | parallel_vm_workers | 4 | finish_reserved_bytes | bytes | 3 | 727128.000 | 591744.000 | 731216.000 |
+| n4-global-environment | parallel_vm_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.061 | 0.049 | 0.062 |
+| n4-global-environment | parallel_vm_workers | 4 | max_rendezvous_ns | ms | 3 | 0.577 | 0.324 | 2.663 |
+| n4-global-environment | parallel_vm_workers | 4 | process_cpu_ns | ms | 3 | 382.386 | 379.579 | 382.920 |
+| n4-global-environment | parallel_vm_workers | 4 | wall_ns | ms | 3 | 115.073 | 109.886 | 121.270 |
+| n4-global-environment | process_peak_rss_kib | - | process_peak_rss_kib | KiB | 3 | 7348.000 | 6200.000 | 8092.000 |
+| n4-global-environment | scheduled_iterations | - | scheduled_function_ns | ms | 3 | 32.201 | 31.752 | 32.938 |
+| n4-global-environment | shared_edge_iterations | - | cell_object_bytes | bytes | 3 | 16.000 | 16.000 | 16.000 |
+| n4-global-environment | shared_edge_iterations | - | rooted_cell_read_ns | ms | 3 | 3.081 | 2.932 | 3.364 |
+| n4-global-environment | shared_edge_iterations | - | rooted_cell_store_read_ns | ms | 3 | 5.022 | 4.902 | 5.403 |
+| n4-global-environment | slot_iterations | - | generic_prefix_bytes | bytes | 3 | 8.000 | 8.000 | 8.000 |
+| n4-global-environment | slot_iterations | - | slot_instance_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| n4-global-environment | slot_iterations | - | slot_set_get_ns | ms | 3 | 42.056 | 41.967 | 42.596 |
+| n4-global-environment | transfer_iterations | - | transfer_roundtrip_ns | ms | 3 | 0.964 | 0.915 | 0.994 |
+| n4-global-environment | transfer_iterations | - | transfer_token_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| n4-global-environment | with_iterations | - | with_function_ns | ms | 3 | 43.442 | 42.284 | 43.735 |
 
 ## Fixed-Work Scaling
 
@@ -354,3 +506,15 @@ Derived from median wall/process CPU times. CPU/wall is not a speedup; 1-worker 
 | n2-n3-shared-vm-idle | parallel_vm_workers | 1 | 462.564 | 1.000 | 1.000 | 1.000 |
 | n2-n3-shared-vm-idle | parallel_vm_workers | 2 | 250.011 | 1.943 | 1.850 | 0.925 |
 | n2-n3-shared-vm-idle | parallel_vm_workers | 4 | 147.308 | 3.359 | 3.140 | 0.785 |
+| n3-local-protocol-cache | parallel_storage_workers | 1 | 2.328 | 0.990 | 1.000 | 1.000 |
+| n3-local-protocol-cache | parallel_storage_workers | 2 | 1.757 | 1.535 | 1.325 | 0.662 |
+| n3-local-protocol-cache | parallel_storage_workers | 4 | 2.267 | 1.466 | 1.027 | 0.257 |
+| n3-local-protocol-cache | parallel_vm_workers | 1 | 358.471 | 1.008 | 1.000 | 1.000 |
+| n3-local-protocol-cache | parallel_vm_workers | 2 | 179.549 | 1.972 | 1.997 | 0.998 |
+| n3-local-protocol-cache | parallel_vm_workers | 4 | 110.647 | 3.403 | 3.240 | 0.810 |
+| n4-global-environment | parallel_storage_workers | 1 | 2.555 | 1.009 | 1.000 | 1.000 |
+| n4-global-environment | parallel_storage_workers | 2 | 1.746 | 1.519 | 1.463 | 0.731 |
+| n4-global-environment | parallel_storage_workers | 4 | 2.321 | 1.568 | 1.101 | 0.275 |
+| n4-global-environment | parallel_vm_workers | 1 | 340.646 | 1.014 | 1.000 | 1.000 |
+| n4-global-environment | parallel_vm_workers | 2 | 185.376 | 1.975 | 1.838 | 0.919 |
+| n4-global-environment | parallel_vm_workers | 4 | 115.073 | 3.323 | 2.960 | 0.740 |

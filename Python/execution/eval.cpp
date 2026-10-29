@@ -6,7 +6,7 @@ namespace cxxpython::core
 {
     void FunctionObject::trace(Tracer &tracer) const noexcept
     {
-        for (auto value : {code, globals, name, qualname}) tracer.visit(value);
+        for (auto value : {code, globals, builtins, name, qualname}) tracer.visit(value);
         if (defaults) tracer.visit(*defaults);
         if (kwdefaults) tracer.visit(*kwdefaults);
     }
@@ -150,8 +150,49 @@ namespace cxxpython::core
                         case Opcode::LoadFast:
                             if (!data.locals[operand]) { unbound(context, code, operand, result); activation.raising(result.result().exception()); break; }
                             data.operands[data.sp++] = *data.locals[operand]; break;
+                        case Opcode::LoadGlobal:
+                        case Opcode::StoreGlobal:
+                        case Opcode::DeleteGlobal:
+                        {
+                            const auto &function = context.payload<FunctionObject>(data.function);
+                            const auto key = context.payload<TupleObject>(code.names).items[operand];
+                            const auto &name = context.payload<StrObject>(key).value;
+                            if (opcode == Opcode::LoadGlobal)
+                            {
+                                auto value = detail::name_lookup(context, function.globals, name);
+                                if (!value) value = detail::name_lookup(context, function.builtins, name);
+                                if (value) data.operands[data.sp++] = *value;
+                                else
+                                {
+                                    raise_error(context, CoreObject::NameErrorType, U"name '" + name + U"' is not defined", result);
+                                    activation.raising(result.result().exception());
+                                }
+                            }
+                            else if (opcode == Opcode::StoreGlobal)
+                            {
+                                detail::name_store(context, function.globals, key, data.operands[data.sp - 1]);
+                                data.operands[--data.sp] = context.builtin(CoreObject::None);
+                            }
+                            else if (!detail::name_erase(context, function.globals, name))
+                            {
+                                raise_error(context, CoreObject::NameErrorType, U"name '" + name + U"' is not defined", result);
+                                activation.raising(result.result().exception());
+                            }
+                            break;
+                        }
                         case Opcode::StoreFast:
                             data.locals[operand] = data.operands[--data.sp]; data.operands[data.sp] = context.builtin(CoreObject::None); break;
+                        case Opcode::MakeFunction:
+                        {
+                            RootScope roots(context); const auto &parent = context.payload<FunctionObject>(data.function);
+                            auto cursor = data.sp; const auto child_code = roots.root(data.operands[--cursor]);
+                            FunctionSpec spec{child_code, roots.root(parent.globals)}; spec.builtins = roots.root(parent.builtins);
+                            if (operand & static_cast<std::uint32_t>(FunctionFlags::KeywordDefaults)) spec.kwdefaults = roots.root(data.operands[--cursor]);
+                            if (operand & static_cast<std::uint32_t>(FunctionFlags::Defaults)) spec.defaults = roots.root(data.operands[--cursor]);
+                            make_function(context, spec, result);
+                            if (raised(result)) { activation.raising(result.result().exception()); break; }
+                            data.trim_stack(context, cursor); data.operands[data.sp++] = result.result().value(); break;
+                        }
                         case Opcode::DeleteFast:
                             if (!data.locals[operand]) { unbound(context, code, operand, result); activation.raising(result.result().exception()); break; }
                             data.locals[operand].reset(); break;
@@ -284,6 +325,7 @@ namespace cxxpython::core
         void code_filename(Attachment &c, Value value, ReturnSlot &out) { out.ok(c.payload<CodeObject>(value).filename); }
         void code_constants(Attachment &c, Value value, ReturnSlot &out) { out.ok(c.payload<CodeObject>(value).constants); }
         void code_varnames(Attachment &c, Value value, ReturnSlot &out) { out.ok(c.payload<CodeObject>(value).varnames); }
+        void code_names(Attachment &c, Value value, ReturnSlot &out) { out.ok(c.payload<CodeObject>(value).names); }
         void code_stacksize(Attachment &c, Value value, ReturnSlot &out)
         { make_int(c, static_cast<std::int64_t>(c.payload<CodeObject>(value).program.max_stack()), out); }
         void code_firstline(Attachment &c, Value value, ReturnSlot &out)
@@ -292,6 +334,7 @@ namespace cxxpython::core
         void function_name(Attachment &c, Value value, ReturnSlot &out) { out.ok(c.payload<FunctionObject>(value).name); }
         void function_qualname(Attachment &c, Value value, ReturnSlot &out) { out.ok(c.payload<FunctionObject>(value).qualname); }
         void function_globals(Attachment &c, Value value, ReturnSlot &out) { out.ok(c.payload<FunctionObject>(value).globals); }
+        void function_builtins(Attachment &c, Value value, ReturnSlot &out) { out.ok(c.payload<FunctionObject>(value).builtins); }
         void function_defaults(Attachment &c, Value value, ReturnSlot &out)
         {
             out.ok(c.payload<FunctionObject>(value).defaults.value_or(c.builtin(CoreObject::None)));
@@ -299,6 +342,10 @@ namespace cxxpython::core
         void function_keywords(Attachment &c, Value value, ReturnSlot &out)
         { out.ok(c.payload<FunctionObject>(value).kwdefaults.value_or(c.builtin(CoreObject::None))); }
         void frame_code(Attachment &c, Value value, ReturnSlot &out) { out.ok(c.payload<FrameObject>(value).code); }
+        void frame_globals(Attachment &c, Value value, ReturnSlot &out)
+        { out.ok(c.payload<FunctionObject>(c.payload<FrameObject>(value).function).globals); }
+        void frame_builtins(Attachment &c, Value value, ReturnSlot &out)
+        { out.ok(c.payload<FunctionObject>(c.payload<FrameObject>(value).function).builtins); }
         void frame_back(Attachment &c, Value value, ReturnSlot &out)
         { out.ok(c.payload<FrameObject>(value).back.value_or(c.builtin(CoreObject::None))); }
         void frame_lineno(Attachment &c, Value value, ReturnSlot &out)
@@ -331,6 +378,7 @@ namespace cxxpython::core
     {
         out.check_caller(context); RootScope roots(context);
         auto code = roots.root(spec.code.get(context)); auto globals = roots.root(spec.globals.get(context));
+        auto builtins = roots.root(spec.builtins ? spec.builtins->get(context) : context.builtin(CoreObject::Builtins));
         std::optional<Value> defaults, keywords;
         if (spec.defaults) defaults = roots.root(spec.defaults->get(context)).get(context);
         if (spec.kwdefaults) keywords = roots.root(spec.kwdefaults->get(context)).get(context);
@@ -338,12 +386,13 @@ namespace cxxpython::core
         if (context.type_of(code) != context.builtin(CoreObject::CodeType) || !context.has_layout<CodeObject>(code.get(context)))
         { type_error(context, U"function requires verified Code", out); return; }
         if (!kind<DictObject, CoreObject::DictType>(context, globals.get(context)) ||
+            !kind<DictObject, CoreObject::DictType>(context, builtins.get(context)) ||
             (defaults && !kind<TupleObject, CoreObject::TupleType>(context, *defaults)) ||
             (keywords && !kind<DictObject, CoreObject::DictType>(context, *keywords)))
-        { type_error(context, U"function requires a globals dict, defaults tuple and optional kwdefaults dict", out); return; }
+        { type_error(context, U"function requires globals/builtins dicts, defaults tuple and optional kwdefaults dict", out); return; }
         const auto &program = context.payload<CodeObject>(code);
         context.allocate_instance<FunctionObject>(roots.root(context.builtin(CoreObject::FunctionType)), out,
-            code.get(context), globals.get(context), defaults, keywords, program.name, program.qualname);
+            code.get(context), globals.get(context), defaults, keywords, program.name, program.qualname, builtins.get(context));
     }
     namespace detail
     {
@@ -377,10 +426,13 @@ namespace cxxpython::core
             field(CoreObject::CodeType, U"co_filename", code_filename); field(CoreObject::CodeType, U"co_consts", code_constants);
             field(CoreObject::CodeType, U"co_varnames", code_varnames); field(CoreObject::CodeType, U"co_stacksize", code_stacksize);
             field(CoreObject::CodeType, U"co_firstlineno", code_firstline);
+            field(CoreObject::CodeType, U"co_names", code_names);
             field(CoreObject::FunctionType, U"__code__", function_code); field(CoreObject::FunctionType, U"__name__", function_name);
             field(CoreObject::FunctionType, U"__qualname__", function_qualname); field(CoreObject::FunctionType, U"__globals__", function_globals);
+            field(CoreObject::FunctionType, U"__builtins__", function_builtins);
             field(CoreObject::FunctionType, U"__defaults__", function_defaults); field(CoreObject::FunctionType, U"__kwdefaults__", function_keywords);
             field(CoreObject::FrameType, U"f_code", frame_code); field(CoreObject::FrameType, U"f_back", frame_back);
+            field(CoreObject::FrameType, U"f_globals", frame_globals); field(CoreObject::FrameType, U"f_builtins", frame_builtins);
             field(CoreObject::FrameType, U"f_lineno", frame_lineno);
             SignatureLayout unary; unary.parameters = {{U"self", ParameterKind::PositionalOnly}};
             for (auto kind : {CoreObject::CodeType, CoreObject::FunctionType, CoreObject::FrameType})

@@ -13,9 +13,10 @@ namespace cxxpython::core
         LoadConst, LoadFast, StoreFast, DeleteFast, PopTop, DupTop,
         Binary, Compare, Jump, JumpIfFalse, Return, RaiseInstance, Call,
         EnterRegion, LeaveRegion, EndHandler, BreakLoop, ContinueLoop, Reraise, LoadException, ExceptionMatch,
-        PrepareWith, EnterWith, WithExit, WithResult, Count,
+        PrepareWith, EnterWith, WithExit, WithResult, LoadGlobal, StoreGlobal, DeleteGlobal, MakeFunction, Count,
     };
-    enum class OperandDomain { None, Constant, Local, Binary, Compare, Target, CallSite, Region };
+    enum class OperandDomain { None, Constant, Local, Name, Binary, Compare, Target, CallSite, Region, FunctionFlags };
+    enum class FunctionFlags : std::uint32_t { None = 0, Defaults = 1, KeywordDefaults = 2 };
     enum class FlowKind { Next, Jump, Branch, Stop, Leave, EndHandler, LoopControl };
     enum class RegionKind { Loop, Except, Finally, With };
     enum class RegionPhase { Protected, Handler, Cleanup };
@@ -82,7 +83,7 @@ namespace cxxpython::core
         EmptyCode, UnknownOpcode, Operand, ConstantBounds, LocalBounds, JumpBounds,
         StackUnderflow, StackJoin, Fallthrough, Signature, SourcePosition,
         ForeignLabel, UnboundLabel, DuplicateLabel, SizeLimit, CallBounds,
-        RegionBounds, RegionStructure, RegionJump, StackBase, LoopTarget,
+        RegionBounds, RegionStructure, RegionJump, StackBase, LoopTarget, NameBounds,
     };
     class CodeValidationError : public std::invalid_argument
     {
@@ -139,11 +140,11 @@ namespace cxxpython::core
     {
         ObjectHeader header;
         const VerifiedCode program;
-        const Value constants, varnames, name, qualname, filename, call_keywords;
+        const Value constants, varnames, name, qualname, filename, call_keywords, names;
         CodeObject(InitialType head, VerifiedCode code, Value consts, Value variables,
-                   Value name, Value qualname, Value filename, Value call_keywords)
+                   Value name, Value qualname, Value filename, Value call_keywords, Value names)
             : header(head), program(std::move(code)), constants(consts), varnames(variables),
-              name(name), qualname(qualname), filename(filename), call_keywords(call_keywords) {}
+              name(name), qualname(qualname), filename(filename), call_keywords(call_keywords), names(names) {}
         void trace(Tracer &tracer) const noexcept;
         std::size_t external_bytes() const noexcept { return program.external_bytes(); }
     };
@@ -154,6 +155,7 @@ namespace cxxpython::core
         struct Region { const CodeBuilder *owner; std::uint32_t index; };
         explicit CodeBuilder(Attachment &context, CodeSpec spec = {});
         std::uint32_t constant(Handle value);
+        std::uint32_t name(std::u32string value);
         Label label();
         void bind(Label label);
         void emit(Opcode opcode, std::uint32_t operand = 0, SourcePosition source = {});
@@ -172,6 +174,7 @@ namespace cxxpython::core
         RootScope roots_;
         CodeSpec spec_;
         std::vector<Value> constants_;
+        std::vector<Value> names_;
         std::vector<Instruction> instructions_;
         std::vector<SourcePosition> positions_;
         std::vector<std::optional<std::size_t>> labels_;
@@ -192,18 +195,20 @@ namespace cxxpython::core
     struct FunctionObject
     {
         ObjectHeader header;
-        const Value code, globals;
+        const Value code, globals, builtins;
         const std::optional<Value> defaults, kwdefaults;
         const Value name, qualname;
         FunctionObject(InitialType head, Value code, Value globals, std::optional<Value> defaults,
-                       std::optional<Value> kwdefaults, Value name, Value qualname)
-            : header(head), code(code), globals(globals), defaults(defaults), kwdefaults(kwdefaults), name(name), qualname(qualname) {}
+                       std::optional<Value> kwdefaults, Value name, Value qualname, Value builtins)
+            : header(head), code(code), globals(globals), builtins(builtins), defaults(defaults), kwdefaults(kwdefaults), name(name), qualname(qualname) {}
         void trace(Tracer &tracer) const noexcept;
     };
     struct FunctionSpec
     {
         Handle code, globals;
         std::optional<Handle> defaults = {}, kwdefaults = {};
+        // Host execution environment; source/loader policy selects this mapping.
+        std::optional<Handle> builtins = {};
     };
     enum class FrameState { Created, Running, Completed };
     struct TracebackObject

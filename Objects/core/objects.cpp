@@ -1,4 +1,5 @@
 #include "cxxpython/core/objects.hpp"
+#include "cxxpython/core/protocol.hpp"
 
 #include <algorithm>
 #include <unordered_set>
@@ -39,6 +40,14 @@ namespace cxxpython::core
 
     namespace
     {
+        template <Protocol Operation>
+        void builtin_protocol(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+        {
+            RootScope roots(context); auto value = roots.root(args[0]);
+            if constexpr (Operation == Protocol::Len) length(context, value, out);
+            else if constexpr (Operation == Protocol::Repr) repr(context, value, out);
+            else if constexpr (Operation == Protocol::Hash) hash(context, value, out);
+        }
         #include "cxxpython/core/unicode_identifiers.inc"
 
         bool in_ranges(std::span<const std::pair<char32_t, char32_t>> ranges, char32_t point)
@@ -390,6 +399,37 @@ namespace cxxpython::core
                             CoreObject::MemberDescriptorType, CoreObject::CellType,
                             CoreObject::CodeType, CoreObject::FunctionType, CoreObject::FrameType, CoreObject::TracebackType})
                 context.payload<TypeObject>(at(id)).subclassable = false;
+
+            auto &builtins = *outputs[static_cast<std::size_t>(CoreObject::Builtins)];
+            context.allocate_instance<DictObject>(at(CoreObject::DictType), builtins);
+            core.push_back(roots.root(builtins.result().value()));
+            const auto mapping = builtins.result().value();
+            auto publish = [&](Value key, Value value) { name_store(context, mapping, key, value); };
+            for (auto id : {CoreObject::StrType, CoreObject::TupleType, CoreObject::DictType, CoreObject::IntType, CoreObject::BoolType,
+                            CoreObject::BaseExceptionType, CoreObject::ExceptionType, CoreObject::TypeErrorType, CoreObject::AttributeErrorType,
+                            CoreObject::ValueErrorType, CoreObject::RuntimeErrorType, CoreObject::MemoryErrorType, CoreObject::RecursionErrorType,
+                            CoreObject::ArithmeticErrorType, CoreObject::ZeroDivisionErrorType, CoreObject::OverflowErrorType,
+                            CoreObject::NameErrorType, CoreObject::UnboundLocalErrorType, CoreObject::StaticMethodType, CoreObject::ClassMethodType})
+                publish(std::get<Value>(context.payload<TypeObject>(at(id)).name), at(id).get(context));
+            for (auto type : {context.object_type(), context.type_type()})
+                publish(std::get<Value>(context.payload<TypeObject>(type).name), type);
+            for (auto [name, id] : {std::pair{U"None", CoreObject::None}, {U"True", CoreObject::True},
+                                   {U"False", CoreObject::False}, {U"NotImplemented", CoreObject::NotImplemented}})
+            {
+                context.allocate_instance<StrObject>(at(CoreObject::StrType), text, name);
+                publish(text.result().value(), at(id).get(context));
+            }
+            auto operation = [&](const char *name, std::u32string key, NativeEntry entry) {
+                SignatureLayout signature; signature.parameters = {{U"object", ParameterKind::PositionalOnly}};
+                ReturnSlot function(context);
+                context.allocate_instance<NativeFunctionObject>(at(CoreObject::NativeFunctionType), function,
+                    name, std::move(signature), entry, std::vector<Value>{});
+                context.allocate_instance<StrObject>(at(CoreObject::StrType), text, std::move(key));
+                publish(text.result().value(), function.result().value());
+            };
+            operation("len", U"len", builtin_protocol<Protocol::Len>);
+            operation("repr", U"repr", builtin_protocol<Protocol::Repr>);
+            operation("hash", U"hash", builtin_protocol<Protocol::Hash>);
         }
     }
 }

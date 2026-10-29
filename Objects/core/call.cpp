@@ -104,6 +104,13 @@ namespace cxxpython::core
             const auto positional_count = static_cast<std::size_t>(std::count_if(
                 signature.parameters.begin(), signature.parameters.end(),
                 [](const Parameter &p) { return p.kind != ParameterKind::KeywordOnly; }));
+            if (args.keywords.empty() && !signature.varargs && !signature.varkwargs &&
+                given == signature.parameters.size() && given == positional_count)
+            {
+                bound.reserve(given);
+                for (std::size_t i = 0; i < given; ++i) { const auto value = positional(i); roots.root(value); bound.push_back(value); }
+                return true;
+            }
             if (given > positional_count && !signature.varargs)
             { type_error(context, U"too many positional arguments", out); return false; }
             std::vector<std::optional<Value>> slots(signature.parameters.size());

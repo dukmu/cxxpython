@@ -162,6 +162,30 @@ namespace
         EXPECT_EQ(committed.load(), 1);
     }
 
+    TEST(ParallelVm, SameFunctionStoresIndependentBindingsInSharedGlobalsDuringGc)
+    {
+        Interpreter interpreter; Attachment source(interpreter); source.bootstrap_core(); RootScope roots(source); ReturnSlot out(source);
+        CodeSpec spec; spec.signature.parameters = {{U"worker"}, {U"value"}}; spec.locals = {U"worker", U"value"};
+        CodeBuilder builder(source, spec); const auto left = builder.name(U"left"), right = builder.name(U"right");
+        const auto second = builder.label(); builder.emit(Opcode::LoadFast); builder.jump(Opcode::JumpIfFalse, second);
+        builder.emit(Opcode::LoadFast, 1); builder.emit(Opcode::StoreGlobal, right); builder.emit(Opcode::LoadGlobal, right); builder.emit(Opcode::Return);
+        builder.bind(second); builder.emit(Opcode::LoadFast, 1); builder.emit(Opcode::StoreGlobal, left); builder.emit(Opcode::LoadGlobal, left); builder.emit(Opcode::Return);
+        const auto target = function(source, roots, builder);
+        run_shared(interpreter, source, target, [](Attachment &context, Value fn, std::size_t worker) {
+            RootScope roots(context); const auto target = roots.root(fn); ReturnSlot argument(context), result(context);
+            for (int i = 0; i < 40; ++i)
+            {
+                make_int(context, i + 100 * worker, argument);
+                std::array args{context.builtin(worker ? CoreObject::True : CoreObject::False), argument.result().value()};
+                call(context, target, {args, {}}, result); ASSERT_EQ(result.result().tag(), ResultTag::Ok);
+                EXPECT_EQ(result.result().value(), argument.result().value()); context.collect();
+            }
+        });
+        const auto globals = source.payload<FunctionObject>(target).globals;
+        EXPECT_EQ(int_decimal(source, *detail::name_lookup(source, globals, U"left")), "39");
+        EXPECT_EQ(int_decimal(source, *detail::name_lookup(source, globals, U"right")), "139");
+    }
+
     TEST(ParallelVm, SharedExceptionSurvivesOrdinaryCallsWithAndFinally)
     {
         Interpreter interpreter; Attachment source(interpreter); source.bootstrap_core(); RootScope roots(source); ReturnSlot out(source);

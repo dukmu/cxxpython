@@ -139,6 +139,7 @@ namespace cxxpython::core
     {
         const auto &definition = protocol_definition(id);
         const auto value = type.get(context);
+        if (auto cached = context.cached_protocol(type, id, roots)) return *cached;
         if (!is_subtype(context, context.type_of(value), context.type_type()) ||
             context.payload<TypeObject>(type).state != TypeState::Ready)
             throw std::invalid_argument("protocol resolution requires a ready type");
@@ -151,10 +152,14 @@ namespace cxxpython::core
                 auto attribute = detail::find_type_attribute(context, value, std::u32string(definition.name));
                 if (context.type_epoch() == epoch)
                 {
-                    if (!attribute) return {id, SlotState::Missing, rooted_type, {}, {}, epoch};
+                    if (!attribute)
+                    {
+                        ResolvedSlot slot{id, SlotState::Missing, rooted_type, {}, {}, epoch}; context.cache_protocol(slot); return slot;
+                    }
                     auto state = definition.none_disables && attribute->value == context.builtin(CoreObject::None) ? SlotState::Disabled :
                         context.type_of(attribute->value) == context.builtin(CoreObject::NativeFunctionType) ? SlotState::Native : SlotState::PythonDescriptor;
-                    return {id, state, rooted_type, roots.root(attribute->owner), roots.root(attribute->value), epoch};
+                    ResolvedSlot slot{id, state, rooted_type, roots.root(attribute->owner), roots.root(attribute->value), epoch};
+                    context.cache_protocol(slot); return slot;
                 }
             }
             context.poll(); std::this_thread::yield();

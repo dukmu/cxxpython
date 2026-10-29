@@ -1,6 +1,7 @@
 #include "cxxpython/core/runtime.hpp"
 #include "cxxpython/core/type.hpp"
 #include "cxxpython/core/objects.hpp"
+#include "cxxpython/core/protocol.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -155,6 +156,13 @@ namespace cxxpython::core
         };
         struct ThreadRecord
         {
+            struct ProtocolEntry
+            {
+                ObjectHeader *type = nullptr, *owner = nullptr, *descriptor = nullptr;
+                Protocol protocol = Protocol::Count;
+                SlotState state = SlotState::Missing;
+                std::uint64_t epoch = 0;
+            };
             explicit ThreadRecord(std::uint64_t identity) : owner(std::this_thread::get_id()), roots(identity) {}
             const std::thread::id owner;
             RootArena roots;
@@ -164,6 +172,13 @@ namespace cxxpython::core
             std::list<AllocationSpan> spans;
             AllocationSpan *current_span = nullptr;
             std::size_t pending_bytes = 0;
+            // Borrowed identities, not roots. Sweep clears them before reuse.
+            std::array<ProtocolEntry, 64> protocols;
+            ProtocolEntry &protocol_entry(Value type, Protocol protocol) noexcept
+            {
+                const auto hash = (reinterpret_cast<std::uintptr_t>(type.object()) >> 4) ^ (static_cast<std::size_t>(protocol) * 17);
+                return protocols[hash % protocols.size()];
+            }
         };
 
         std::size_t saturated_add(std::size_t a, std::size_t b) noexcept
@@ -285,9 +300,12 @@ namespace cxxpython::core
                     static_cast<State *>(state)->mark(object);
                 });
                 for (const auto &thread : threads)
+                {
+                    thread->protocols.fill({});
                     for (const auto &cell : thread->roots.cells)
                         if (cell.scope && cell.tag != ResultTag::Empty)
                             mark(cell.object);
+                }
                 for (auto *record = transfer_head; record; record = record->next) mark(&record->header);
                 mark(object_type);
                 mark(type_type);
@@ -918,6 +936,23 @@ namespace cxxpython::core
     void Attachment::end_publication(PublicationDomain domain, std::uint64_t epoch)
     { require_attached(); assert(no_safepoint_depth_); (domain == PublicationDomain::Type ? state_->type_epoch : state_->exception_epoch).store(epoch + 2, std::memory_order_release); }
     std::uint64_t Attachment::type_epoch() const { return publication_epoch(PublicationDomain::Type); }
+    std::optional<ResolvedSlot> Attachment::cached_protocol(Handle type, Protocol protocol, RootScope &roots)
+    {
+        const auto value = type.get(*this); const auto epoch = type_epoch();
+        const auto entry = thread_record_->protocol_entry(value, protocol);
+        if ((epoch & 1) || entry.type != value.object() || entry.protocol != protocol || entry.epoch != epoch) return {};
+        // Root insertion never polls. This Active owner cannot be swept while
+        // promoting a borrowed entry; every real sweep clears the whole cache.
+        return ResolvedSlot{protocol, entry.state, roots.root(value), entry.owner ? roots.root(Value(*entry.owner)) : Handle{},
+            entry.descriptor ? roots.root(Value(*entry.descriptor)) : Handle{}, epoch};
+    }
+    void Attachment::cache_protocol(const ResolvedSlot &slot)
+    {
+        const auto type = slot.type.get(*this);
+        const auto owner = slot.state != SlotState::Missing ? slot.owner.get(*this).object() : nullptr;
+        const auto descriptor = slot.state != SlotState::Missing ? slot.descriptor.get(*this).object() : nullptr;
+        thread_record_->protocol_entry(type, slot.protocol) = {type.object(), owner, descriptor, slot.protocol, slot.state, slot.epoch};
+    }
     void Attachment::invalidate_types()
     {
         for (;;)

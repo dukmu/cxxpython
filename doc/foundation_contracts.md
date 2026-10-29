@@ -22,7 +22,8 @@ is retained; the concurrency gates do not narrow language/library/release scope.
 | N1 roots/heap/GC | Experimental | Thread-owned roots/spans, epochs, bounded atomic load-to-root and managed transfer leases exist; native slow-path, duration/timeout and complete lifecycle audits remain |
 | N2 shared objects/methods | Experimental | Atomic header/tails/exception edges, immutable DictStorage/TypeSnapshot and const Function call data implemented; general containers, future mutable Function setters and full native-duration audit remain |
 | N3 parallel VM | Experimental | Same Function/Code CPU loops, collecting callbacks, shared exception CALL/with/finally, allocation-free polling and generated 1/2/4-worker costs now run; full language/thread API and performance acceptance remain |
-| N4-N6 completion/release | Planned | Remaining runtime, frontend/library, platform, performance and replacement gates |
+| N4 execution/runtime completion | Experimental | Globals/builtins lookup, global mutation and runtime Function creation added; closures, general namespace mappings, suspension, resources/import and lifecycle remain |
+| N5-N6 source/release | Planned | Source frontend/library, platform, performance and replacement gates |
 
 State::execution and whole-Attachment execution permission have been removed.
 Storage, ObjectOps and ordinary VM calls permit multiple Active mutators.
@@ -47,7 +48,7 @@ All new C++ interfaces are internal and unstable until the M1-M4 gates pass.
 | M1 storage/environment | Experimental | B0-B2 storage and seed gates now pass; interfaces remain internal/unstable |
 | M2 types/methods/call | Experimental | Calls/construction, field tails, cells, B2 promotion and common hash/repr/str/truth/comparison/arithmetic dispatch exist; full protocols/reflection/mutation and weakrefs remain |
 | M3 builtins | Experimental | Int/bool seed, initial Unicode value/representation/hash, tuple and cell value semantics; complete numeric, container, iterator, codec/buffer and finalization matrices remain |
-| M4 execution | Experimental | Verified Code/Function/Frame, non-recursive calls, tracebacks, handler/finally/loop unwind and synchronous with exist; full exception normalization, closure/namespace execution and suspension remain |
+| M4 execution | Experimental | Verified Code/Function/Frame, non-recursive calls, tracebacks, structured unwind/with, global namespaces and runtime Function creation exist; full exception normalization, closures/general mappings and suspension remain |
 | M5 frontend | Planned | ScopeInfo/CFG, source positions, validated Code, L0-L2 differential cases |
 | M6 boot/platform | Planned | RunRequest, loader/import, CLI/embedding, I/O, thread API and shutdown |
 | M7 libraries | Planned | Real workflows and dependency closures, including unittest |
@@ -1487,3 +1488,65 @@ while n2-n3-shared-vm-idle was collected after builds finished. Neither series
 claims CPython parity. Full source/frontend, threading/I/O APIs, duration bounds,
 platform and release acceptance remain the next Plan 2 dependencies, not waived
 by this checkpoint. Do not extend this checkpoint into more defensive scaffolding.
+
+## Thread-Private Protocol Cache And Namespace Execution
+
+Each ThreadRecord owns a fixed 64-entry direct-mapped protocol cache, keyed by
+Type identity, typed Protocol and the matching even publication epoch. Entries
+include Missing/Disabled results. Successful promotion roots type/owner/target
+before any safepoint. The cache is borrowed, not another root authority: each
+STW sweep clears all entries before tracing/destruction/address reuse. It cannot
+keep ephemeral classes or old descriptors alive. Record storage is accounted
+in existing metadata statistics. There are no shared-Code writes, cache mutexes,
+global hit counters or extra managed cache objects.
+
+The binder handles complete positional calls directly before constructing its
+general slots/keyword containers. It preserves receiver prefixing, ownership,
+keyword-only rejection, defaults, varargs and error behavior; other shapes use
+the existing binder. No workload/value-specific arithmetic path was introduced.
+The automatic n3-local-protocol-cache series isolates these changes; profiling
+with the installed perf launcher was unavailable for this WSL kernel, so there
+is no claim of a sampled profile. Final namespace measurements are a separate
+series, not replacements for the earlier raw runs.
+
+CodeBuilder.name interns managed strings in an immutable Code.names tuple,
+exposed as co_names. The verifier checks every name operand, even unreachable
+instructions. Numeric operands remain uint32 instruction indices/table indices;
+opcode metadata drives verification, stack effects and disassembly.
+
+- LOAD_GLOBAL name: [] -> [value]. Read the Function globals name dictionary,
+  then its captured builtins name dictionary. Missing both raises NameError.
+  No cached binding or copied globals snapshot becomes a second truth.
+- STORE_GLOBAL name: [value] -> []. COW/CAS-update globals only, preserving the
+  rooted operand until publication succeeds. Allocation failure leaves the
+  old binding intact and takes the ordinary raised MemoryError path.
+- DELETE_GLOBAL name: [] -> []. Delete from globals only; absence raises
+  NameError even if builtins has that name. COW failure does not partly erase.
+- MAKE_FUNCTION flags: [defaults?, kwdefaults?, code] -> [function]. Flag value 1
+  supplies a defaults tuple and value 2 a keyword-default dictionary, in that
+  order below Code. Other flag bits fail verification. Type faults raise Python
+  TypeError. The child captures the parent's globals/builtins identities and
+  shares the exact verified Code object; each evaluation creates a new Function,
+  not another Code. Closure creation remains a separate missing capability.
+
+All four instructions use ordinary allocation/result/unwind paths, retain stack
+roots through calls/GC and participate in the existing dispatch safepoint budget.
+Function.builtins is immutable environment identity, while its dictionary remains
+shared and mutable. Function.__builtins__, Frame.f_globals and Frame.f_builtins
+return those actual dictionaries without copying them.
+
+The image now roots a real builtins name dictionary with the existing public
+type/exception/singleton names and len/repr/hash wrappers over ordinary protocols.
+This registry does not complete constructors or the full builtins API matrix.
+The internal host FunctionSpec selects explicit globals/builtins dictionaries;
+omitting builtins uses the image mapping. It does not implement source loader or
+arbitrary __builtins__/module policy. The future RunRequest/frontend must select
+that environment according to the Python entrypoint contract, not guess scope
+inside opcode emission. Class/exec custom mappings and locals reflection remain.
+
+New execution tests cover builtin fallback, live rebinding/deletion, name bounds,
+runtime Function identity/defaults/environment, COW allocation failure and shared
+same-Function global stores during collection. Existing descriptor mutation,
+subtype dispatch, callbacks, aliasing, binder and unwind tests exercise cache
+invalidation and the positional path. Next dependency: Source/Span, frozen scope
+classification and L0 compilation to this same executor, not another VM.
