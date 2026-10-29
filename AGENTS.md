@@ -3,6 +3,28 @@
 This repository is a clean-room restart of `cxxpython`: a Python 3 runtime,
 compiler, VM, and extension platform implemented in a C/C++ mix.
 
+## Active Architecture
+
+- `cxxpython_foundation_redesign_plan.md` is the authoritative implementation
+  plan. Where older documents or this guide disagree, follow that plan and
+  update the conflicting guidance.
+- Build the replacement in `cxxpython::core`, with headers under
+  `Include/cxxpython/core/` and an independent `cxxpython_foundation` target.
+  It must not link the legacy Runtime, Object, parser or VM to fill gaps.
+- The first foundation uses boxed values, immutable native layouts, stable
+  precise roots, caller-owned result slots, tracing GC without Python object
+  reference counting, and one execution lock per interpreter.
+- The existing CLI and its tests remain a legacy comparison path until the
+  replacement meets the migration gates. Earlier no-GIL/refcount design notes
+  describe the old path, not requirements for the new foundation.
+- Advance through M0-M9 using the plan's acceptance gates. Record actual tests,
+  remaining gates and the next dependency in `doc/development_status.md`.
+  Do not mark a whole milestone complete based on a narrower passing slice.
+- Preserve development history: append new entries or insert them at the top
+  of `doc/development_status.md`; do not rewrite earlier entries.
+- The user authorizes timely stable-point commits after verification. Commit
+  completed vertical slices promptly, excluding unrelated user changes.
+
 ## Direction
 
 - Prefer correctness and Python semantics over short-term compatibility hacks.

@@ -1,0 +1,10 @@
+series,int_iterations,int_add_ns,big_int_iterations,big_int_mul_ns,int_object_bytes,numeric_live_set_check,hash_iterations,string_hash_ns,repr_iterations,tuple_repr_ns,representation_live_set_check
+protocol_integer_final,100000,107053141,10000,11089034,24,ok,NA,NA,NA,NA,NA
+protocol_integer_final,100000,103933793,10000,11233012,24,ok,NA,NA,NA,NA,NA
+protocol_integer_final,100000,104470719,10000,11128666,24,ok,NA,NA,NA,NA,NA
+hash_representation_final,100000,109201782,10000,13858624,24,ok,100000,107702859,10000,30145174,ok
+hash_representation_final,100000,112021908,10000,11978481,24,ok,100000,107092979,10000,29090087,ok
+hash_representation_final,100000,106125223,10000,11331492,24,ok,100000,108976395,10000,28431760,ok
+m4_returning_final,100000,128057896,10000,13301778,24,ok,100000,126326795,10000,33857855,ok
+m4_returning_final,100000,119977021,10000,13064179,24,ok,100000,126899217,10000,35853021,ok
+m4_returning_final,100000,128554506,10000,15483923,24,ok,100000,138810407,10000,34592470,ok

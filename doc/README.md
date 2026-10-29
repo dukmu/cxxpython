@@ -2,6 +2,12 @@
 
 This directory records the restart plan for the new `cxxpython` repository.
 
+Active authority: [foundation redesign plan](../cxxpython_foundation_redesign_plan.md).
+[Foundation contracts and migration ledger](foundation_contracts.md) records
+new-core decisions, tests and remaining gates. The older architecture, feature
+matrix, development plan and no-GIL notes below describe the legacy runtime;
+they do not override the foundation redesign.
+
 - [经验报告](experience_report.md): lessons from the previous implementation.
 - [Python 特性支持目标](python_feature_matrix.md): target support matrix.
 - [架构设计](architecture_design.md): runtime, compiler, VM, modules, GC, C/C++ API.

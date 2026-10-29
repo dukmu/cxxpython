@@ -5,7 +5,7 @@ build/
 *.dylib
 *.dll
 *.exe
-core
+/core
 .cache/
 .DS_Store
 

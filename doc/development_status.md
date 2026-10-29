@@ -1,5 +1,654 @@
 # Development Status
 
+## 2026-10-29 M4 Verified Returning Code/Function/Frame Stable Point
+
+The complete M0-M9 goal remains active. This is the first independent execution
+vertical slice, not a source frontend, full M4 or a replacement release. This
+entry is inserted at the top; all preceding development entries are preserved.
+The user requests timely verified stable-point commits, which is now recorded
+in AGENTS.md together with the append/prepend-only development-log rule.
+
+- Added CodeBuilder labels, source positions, bounded stack-height verification,
+  a move-only VerifiedCode proof and immutable Code execution data. A single
+  opcode table drives names, domains, stack effects, flow and disassembly.
+  Invalid/unreachable operands, underflow, fallthrough, unequal joins and
+  growing back edges are rejected; zero-growth infinite loops can be verified.
+- Added actual managed Code, Function and Frame types. Functions retain the
+  same Code identity; co_consts/co_varnames and code/name/file metadata are real
+  managed objects, not reconstructed Code instances. Code structural equality/
+  hash and complete Python reflection remain Experimental acceptance work.
+- Refactored one binder for native and bytecode functions, with defaults kept
+  in Function rather than Code. Preserved absent versus empty defaults and
+  variadic result ownership. Function descriptors/special methods use existing
+  ObjectOps; function dictionaries go through TypeReady's native-tail planner.
+- Registered a typed interpreter-owned CallExecutor at successful bootstrap
+  publication. Objects/call has no VM-header dependency or global active VM.
+  Every bootstrap-allocation failure still rolls back and retries.
+- Added a switch executor for constants, fast locals, arithmetic/comparison,
+  branches, return and normalized exception-instance transfer. Operators use
+  existing ObjectOps. Frames have preallocated stable local/operand arrays,
+  trace their values and expose code/back/source-line metadata. Results reach
+  caller roots before operand cleanup. Captured completed Frames keep locals.
+- Native reentry restores the previous active Frame; normal, Raised and C++
+  host-fault paths clear operands and mark Completed. Host faults are not
+  disguised as Python exceptions. The active-frame identity borrows an ordinary
+  execution root rather than creating an untraced lifetime authority.
+- Added 17 execution/lifecycle tests covering validation, binding, descriptors,
+  code identity, loops, GC callbacks, source observation, reentry/back edges,
+  host faults, every freeze-allocation failure, Frame allocation recovery and
+  function/globals/code cycle collection.
+
+Verification of this stable point:
+
+- Release foundation: 197/197. Full CTest: exit 0, discovery count 445
+  (248 legacy + 197 foundation).
+- ASan/UBSan/LeakSanitizer: 197/197 outside the ptrace sandbox. TSan: 197/197.
+- Foundation-only Release with tests/legacy disabled built successfully. Three
+  benchmark runs completed after sanitizer/build handles finished; all exact
+  result and final-live-set checks passed. GCC 11.4 / Release / x86-64 WSL2,
+  no CPU pinning/frequency control: 10000 calls to a four-instruction, two-arg
+  verified function took 24.56/24.96/24.99 ms. max_stack is 2; Frame prefix is
+  128 bytes before vector buffers, heap metadata and execution roots.
+- Raw execution rows are in benchmarks/foundation-execution-2026-10-29.csv.
+  Older probe categories, including slower samples, remain in the layout and
+  numeric CSVs as m4_returning_final. No CPython parity or speedup is claimed.
+- Staged source/log whitespace checks pass excluding the unchanged provided
+  plan, whose Markdown hard-break spaces and final blank line are preserved.
+  perf.data*, test2.py and the user's temporary_plan.md deletion are excluded
+  from this stable-point commit.
+
+Remaining M4 gates: non-recursive Python-to-Python call scheduling, closure/cell
+execution, globals/module/class namespace frames, traceback, structured regions
+and unwind, finally/with and typed suspension/resume. CALL and yield opcodes are
+not approximated with recursive C++ execution. RAISE_INSTANCE accepts only an
+already normalized exception; class/bare/cause normalization remains open.
+Remaining M2/M3 type/reflection, callable value, weakref/finalization, numeric,
+container/iterator and codec gates remain. Original test2 single/multi and I/O
+performance acceptance, pinned source differential execution and M5-M9 are
+still incomplete; the full goal has not been narrowed or marked complete.
+
+## 2026-10-29 M2 Hash/Repr/Str And M3 Initial Value Semantics
+
+The full M0-M9 goal remains active. This replaces identity placeholders for
+initial value types with real ObjectOps behavior, without declaring the builtin
+matrix complete or linking to the old VM/runtime.
+
+- Added common hash/repr/str entries using existing rooted resolution,
+  descriptor binding, binder, errors and call-depth accounting. Hash enforces
+  actual integer results, handles huge values and normalizes -1; string
+  conversion validates semantic str types rather than a matching C++ prefix.
+- Added numeric/identity/string/tuple hashing; equal bool/int values share their
+  hash. Immutable string-hash keys belong to interpreter state, seeded at host
+  construction, with SipHash-2-4 reference-vector tests and no global key.
+- Added str codepoint equality/order, repr quoting/Unicode escaping and subtype
+  conversion behavior. Extended the existing Unicode generator with fixed 15.0
+  printable-category data; both old XID and new category outputs reproduced.
+- Added tuple value comparison/hash/repr and cell content comparison,
+  unhashability and non-calling repr. Added actual type/singleton/object repr,
+  BaseException argument-based repr/str and proxy-to-mapping hashing. The B3
+  mutable name dictionaries are explicitly unhashable.
+- Added a scoped tuple repr identity guard per Attachment, not per interpreter.
+  A NativeWait/second-attachment test checks independent rendering; user repr
+  recursion still raises RecursionError through the ordinary call guard.
+- Added 17 tests, including invalid native layouts, subclasses, callbacks, OOM,
+  recursive formatting, hash reduction, wrappers and exception text. No extra
+  collector/RC layer, persistent protocol cache or subagent was introduced.
+
+Verification:
+
+- Release foundation 180/180; full CTest exit 0, discovery count 428
+  (248 legacy + 180 foundation).
+- ASan/UBSan/LeakSanitizer 180/180 outside the ptrace sandbox; TSan 180/180.
+- Foundation-only Release built with tests/legacy disabled. Three cost-probe
+  samples ran after all sanitizer/build handles completed; result and final
+  live-set checks passed. GCC 11.4 / Release / x86-64 WSL2, no CPU binding or
+  frequency control: 100000 public string hashes took 107.70/107.09/108.98 ms;
+  10000 two-item tuple repr calls took 30.15/29.09/28.43 ms. Raw rows and older
+  probe categories remain in the numeric/layout CSVs as hash_representation_final.
+- No commits were made; user files and the unrelated deletion remain intact.
+
+These are generic kernel costs, not CPython parity. In particular, existing
+integer-add samples are retained at 109.20/112.02/106.13 ms per 100000 calls,
+rather than dropping a slower sample or claiming an optimization.
+
+Next available vertical slice: M4 verified Code/CodeBuilder, stable rooted
+Frame slots and minimal const/arithmetic/return execution through current
+ObjectOps. This follows the plan's explicit M3/M4 overlap after the minimal
+builtin set; full M3 completion is not an extra prerequisite. Remaining M2/M3
+type mutation/reflection, callable value semantics, weakref/finalization,
+containers/iterators, numeric/codec and ownership gates remain active work.
+There is still no new source frontend, pinned executable language differential
+suite, original single/multi/I/O performance acceptance or replacement release.
+
+## 2026-10-29 M2 Common Protocols And M3 Integer Seed
+
+The full M0-M9 goal remains active. This checkpoint turns the protocol/integer
+interface draft into an independently built, tested foundation slice; it does
+not declare M2/M3 complete or change the legacy CLI/VM.
+
+- Added centralized protocol metadata, rooted resolution with actual lookup
+  type/owner/descriptor and type-epoch revalidation. Invocations reuse the
+  existing descriptor engine, native binder and call-depth limit, with no new
+  cache, collector, RC layer, subagent or second dispatch implementation.
+- Added truth, checked length/index, arbitrary-result rich comparison,
+  container-only identity equality, five binary and inplace operations.
+  Subtype arithmetic overload checks run class lookup/descriptor and rich
+  inequality callbacks; comparison has its own right-subtype/same-type rules.
+  Callback mutation is re-resolved, and class-creation eq/hash rules are separate
+  from dynamic attribute mutation.
+- Added boxed int/bool and rooted NotImplemented, numeric error types, checked
+  int64 arithmetic and owned arbitrary-precision promotion/normalization.
+  Corrected negative division/modulo, minimum-int overflow, int subclass
+  conversion/layout/identity, and unsafe explicit bool allocation via int.new.
+  Python-visible wrappers and implicit arithmetic share the same native entries.
+- Boost.Multiprecision >= 1.74 is a private header dependency, configured through
+  BOOST_MULTIPRECISION_INCLUDE_DIR if needed. This environment used Ubuntu's
+  Boost 1.74 development package extracted into /tmp, not installed. No normal
+  build fetch or Boost runtime library was added. GMP's fatal/global OOM
+  allocator contract was unsuitable for per-interpreter MemoryError recovery.
+- Added 24 focused forced-GC tests (15 protocol + nine numeric), including
+  custom descriptor overload comparison, callback mutation, full C3/epoch,
+  recursion, foreign interpreters, OOM, big storage and explicit wrappers.
+
+Final verification:
+
+- Release foundation: 163/163. Full CTest: exit 0, discovery count 411
+  (248 legacy + 163 foundation).
+- ASan/UBSan/LeakSanitizer: 163/163 outside the ptrace sandbox. TSan: 163/163.
+- Foundation-only Release, testing/legacy disabled: built and ran the extended
+  cost probe three times, after all sanitizer handles completed.
+- No commits were made; the unrelated user deletion and files were preserved.
+
+GCC 11.4 / Release / x86-64 WSL2, no CPU pinning/frequency control: 100000
+public integer additions took 107.05/103.93/104.47 ms; 10000 big-int
+multiplications took 11.09/11.23/11.13 ms. Each sample checked the exact values
+and unchanged post-collection live set. IntObject occupies 24 bytes before heap
+metadata/external storage. These expose substantial generic dispatch cost, not
+CPython parity or a measured speedup. Raw data is retained in
+`benchmarks/foundation-numeric-2026-10-29.csv`; existing allocation/call/slot
+probe rows are retained as protocol_integer_final in the layout CSV.
+
+Next dependency: complete common hash/repr/str and remaining primitive/numeric
+semantics, while closing remaining M2 type/mutation, weakref and ownership gates
+before the M4 executor. Integer string/base parsing, full operators/float,
+warning behavior, complete containers and pinned source-language differential
+execution remain incomplete. The original test2.py single/multi and I/O/CPython
+performance acceptance is still unproven. The migration ledger has the exact
+Experimental boundary rather than treating this slice as an entire milestone.
+
+## 2026-10-29 M2 Managed Cells And Runtime Type Readiness
+
+The active goal is still the full M0-M9 redesign. This slice closes native
+class/namespace cells and the recorded pre-B3 type-promotion hole, without
+claiming complete TypeReady, language closures or CPython performance parity.
+
+Implemented:
+
+- Added actual traced CellObject storage, zero/one-argument native construction,
+  non-subclassability and cell_contents get/set/delete descriptors. Empty and
+  None remain distinct; shared native captures observe mutation of one cell;
+  unrooted cell cycles are handled by the same tracing collector without RC.
+- Added type.__new__ class-cell and Python 3.12 namespace-cell handling. Method
+  preparation precedes publication, hooks see filled cells, source dictionaries
+  remain intact, and callback failure does not undo an already published effect.
+  Tested aliased hooks and invalid namespace-cell ordering as well as GC/reentry.
+- Replaced the structural boolean with Building/Structural/Ready TypeState.
+  One type_ready path completes names, real dictionaries, module metadata and
+  descriptors for both ordinary creation and bootstrap promotion. Native return
+  validation rejects unready types and clears their caller result on that fault.
+- Existing B2 types, metaclasses and instances now become usable in place after
+  B3. Temporary native module text is consumed into the namespace rather than
+  forgotten or retained as a second runtime authority. Early managed namespace
+  input is rejected instead of silently dropped.
+- Extended the bootstrap transaction from two seed snapshots to all existing
+  structural type metadata, with staged image availability distinct from final
+  publication. Every managed allocation can fail and retry while preserving old
+  identities/state, restoring external accounting and the GC policy.
+- Added 12 cell tests and six readiness tests. No old VM/runtime linkage,
+  alternate collector, RC layer, stdlib stub or subagent was introduced.
+
+Final verification:
+
+- Release foundation tests: 139/139.
+- Full CTest: exit 0; discovery count 387 (248 legacy + 139 foundation).
+- ASan/UBSan with LeakSanitizer: 139/139, outside the ptrace sandbox.
+- TSan: 139/139.
+- Foundation-only Release rebuilt successfully with testing/legacy disabled.
+- After sanitizer handles completed, three existing cost-probe runs passed all
+  result/live-set checks. Raw rows are appended as cell_readiness_final in
+  `benchmarks/foundation-layout-2026-10-29.csv`.
+- `git diff --check` passed. No commits were made.
+
+GCC 11.4 / Release / x86-64 WSL2, without CPU binding/frequency control: 100000
+allocations took 8.71/9.07/8.67 ms; native calls 27.63/27.20/26.93 ms; 10000
+method lookups/calls 13.25/12.99/13.11 ms; 10000 slot set/get pairs
+22.05/22.34/22.49 ms. These remain comparable kernel cost samples, not a
+controlled speedup or a source/CPython benchmark acceptance result.
+
+Remaining work includes complete protocols/reflection/type mutation, weakrefs
+and finalization, cell content comparison/hash/repr, VM closure dereference and
+class-body validation. Custom metaclass MRO hooks and exact visibility of cells
+on structural-definition failures remain compatibility gates; no building type
+is intentionally exposed to ordinary runtime operations. The CPython 3.12.14
+sources were consulted, but pinned executable differential/source execution and
+the original single/multi/I/O performance requirements are still unproven.
+
+## 2026-10-29 M2 Native Prefixes And Named-Slot Layouts
+
+The full M0-M9 goal remains active. This slice implements actual prefix/tail
+storage and named slots on the independent foundation target, rather than
+rejecting native subclasses with dictionaries. No legacy execution path changed.
+
+Implemented:
+
+- Added immutable InstanceFieldPlan metadata, checked complete storage sizing,
+  explicit C++ prefix/field-array construction and matching aligned destruction.
+  GC traces tail cells and sweeps through copied allocation metadata, without
+  consulting a possibly destroyed Type. Failed construction/adoption releases
+  the full storage and leaves the caller output empty.
+- Removed InstanceObject's inline dictionary and Type's duplicate dictionary
+  flag. The generic prefix is now just the eight-byte header. Native subclasses
+  preserve inherited dictionaries and append named fields through the same plan.
+- Added TypeReady planning for inherited slots, sorted private-name-mangled new
+  fields, dictionaries, native restrictions, C3/solid storage conflicts and
+  class-variable errors. Public type creation accepts str/tuple/name-dict slot
+  sources. Changing __slots__ later does not rewrite a published layout.
+- Added native member descriptors using the existing binding/call engine,
+  explicit wrappers, owner checks, unbound/None distinction and data-descriptor
+  priority. Inherited dictionary descriptors use actual allocation offsets.
+- Tests reproduced and fixed over-permissive class reassignment across deep
+  slot hierarchies and acceptance of nonempty tuple-subclass slots. Layout
+  equality alone does not grant Python storage compatibility.
+- Added fixed Unicode 15 XID data and a reproducible generator, retaining source
+  SHA and Unicode license. This avoids locale and the installed Unicode 14 ICU
+  dependency. The generator output and license were checked with cmp.
+- Added 19 forced-GC layout tests, including over-aligned payloads, failed native
+  construction, Type/instance cycle sweep, removed descriptors, dictionary
+  offset changes, quota failure/retry and cross-attachment tail mutation/GC.
+- Extended the cost probe with slot get/set and actual instance storage size.
+
+Verification of final code:
+
+- Release `test_foundation`: 121/121.
+- Full CTest: exit 0, 369/369 (248 legacy + 121 foundation).
+- ASan/UBSan with LeakSanitizer: 121/121, outside the ptrace sandbox.
+- TSan: 121/121, including the new NativeWait/tail mutation test.
+- Foundation-only Release with legacy/testing disabled rebuilt successfully.
+- Unicode generator reproduced the checked-in table exactly; retained license
+  matched the official downloaded text. Neither is fetched during normal build.
+- `git diff --check` passed. No subagents or commits were used.
+
+Cost observations, GCC 11.4 / Release / x86-64 WSL2, no CPU pinning/frequency
+control: the first all-aligned/out-of-line path measured 9.51/9.98/9.55 ms for
+100000 allocations, versus roughly 8.2-8.7 ms at the preceding checkpoint.
+Ordinary alignment now uses ordinary new/delete and empty-plan calculations
+inline. After all sanitizer processes were confirmed finished, the final series
+was 8.78/8.65/8.65 ms. Other intermediate, slower samples are retained separately
+in `benchmarks/foundation-layout-2026-10-29.csv`; they were taken before the TSan
+handle was reaped and are not treated as a quiescent comparison.
+
+Final slot set/get cost was 22.05/22.51/22.34 ms per 10000 pairs, with result
+checks. Two named cells currently cost 40 bytes including the eight-byte native
+prefix; each optional-Value cell costs 16 bytes. This records representation
+overhead instead of claiming that a small header proves CPython memory parity.
+These are kernel cost probes, not controlled optimization results or Python
+source/CPython performance acceptance evidence.
+
+Remaining M2 gates include managed class/closure cells, private B2 promotion,
+complete type reflection/mutation and protocols. Arbitrary iterable slot sources,
+weakref slots/finalizers and UnicodeEncodeError semantics also remain explicitly
+Experimental/Planned. No frontend/VM/source-language support or original
+single/multi/I/O performance target is declared complete.
+
+## 2026-10-29 M2 Type Construction And Class-Creation Callbacks
+
+The M0-M9 goal remains active. This advances the independent foundation's M2
+construction path without altering the legacy interpreter, adding a parallel
+ownership layer, or declaring full TypeReady/Python compatibility complete.
+
+Implemented:
+
+- Added object/type new/init/call wrappers to real type namespaces. Construction
+  reuses the existing lookup/bind/call/binder/ReturnSlot operations. Unrelated
+  __new__ results skip init; returned subclasses use their actual initializer;
+  init must return None. Explicit wrappers and implicit construction share code.
+- Added traced staticmethod/classmethod objects and descriptor behavior,
+  including subclass-owner binding and arbitrary callable invocation. Prepared
+  native __new__/__init_subclass__/__class_getitem__ definitions during creation.
+- Added three-argument type construction with a copied managed namespace,
+  shared winning-metaclass selection and constructor delegation, typed
+  TypeDefinitionError-to-Raised translation, and a real ValueError type for
+  NUL names. Other host faults are not disguised as Python exceptions.
+- Added rooted __set_name__ namespace snapshots and inherited __init_subclass__
+  dispatch with class keywords. Verified removal of both current and future
+  entries before forced GC, callback order and failure chaining/propagation.
+- Changed type metadata to bootstrap text or actual managed str, with only
+  one authoritative representation at a time. Name/qualname reflection and
+  mutation preserve assigned object identity; module lives in the namespace.
+- Extended the B3 transaction to restore seed names/qualnames/accounting.
+  Existing failure/retry tests reproduced the missing rollback after the new
+  managed-name edges were introduced, then passed with the complete restoration.
+- A new winning-metaclass test reproduced premature default TypeReady validation
+  of NUL names/qualname/slots. Delegation now occurs first, outside the structural
+  definition-error catch, preserving custom-constructor behavior.
+- Added 24 production-path, forced-GC cases in
+  `Tests/cpp/core/test_construction.cpp`, including failure at every managed
+  allocation of default class creation and fixed live roots/heap after retry.
+
+Verification of final source state:
+
+- `cmake --build build --target test_foundation -j2` succeeded.
+- `./build/test_foundation --gtest_brief=1`: 102/102.
+- `ctest --test-dir build --output-on-failure -j2 --quiet`: exit 0;
+  `ctest --test-dir build -N`: 350 tests (248 legacy + 102 foundation).
+- ASan/UBSan with LeakSanitizer: 102/102, outside the ptrace sandbox.
+- TSan: 102/102.
+- Foundation-only Release and its existing cost probe rebuilt successfully.
+- `git diff --check` passed. No subagents or commits were used.
+
+Three independent Release cost-probe runs on the same GCC 11.4 / x86-64 WSL2
+environment, without CPU binding or frequency control. Native-call and method
+costs remain comparable to the earlier samples; these are not Python source
+benchmarks, controlled optimization evidence or CPython performance results.
+
+```text
+iterations=100000 header_bytes=8 node_bytes=16 allocation_and_auto_gc_ns=8668121 root_register_release_ns=3626865 collections=26 live_bytes=0 recorded_metadata_bytes=96 root_cells=2 last_gc_pause_ns=1315
+native_call_iterations=100000 native_call_ns=27329849 method_iterations=10000 lookup_bind_call_ns=12911802 live_objects=149
+iterations=100000 header_bytes=8 node_bytes=16 allocation_and_auto_gc_ns=8278031 root_register_release_ns=2979199 collections=26 live_bytes=0 recorded_metadata_bytes=96 root_cells=2 last_gc_pause_ns=292
+native_call_iterations=100000 native_call_ns=26302758 method_iterations=10000 lookup_bind_call_ns=13043799 live_objects=149
+iterations=100000 header_bytes=8 node_bytes=16 allocation_and_auto_gc_ns=8194513 root_register_release_ns=2888087 collections=26 live_bytes=0 recorded_metadata_bytes=96 root_cells=2 last_gc_pause_ns=189
+native_call_iterations=100000 native_call_ns=28150079 method_iterations=10000 lookup_bind_call_ns=13363058 live_objects=149
+```
+
+Remaining gates are recorded in `foundation_contracts.md`: native tails/slots,
+managed cells, complete TypeReady/reflection/protocols, specific Unicode error
+semantics, decorator/native-constructor metadata and private B2 promotion.
+Slots/classcell inputs have explicit tested rejection until their contracts land.
+The adapter's missing-module behavior also awaits actual caller VM globals.
+The fixed CPython 3.12.14 source was consulted for ordering semantics, but no
+pinned executable differential run or new source frontend/CLI exists yet.
+Original single/multi/I/O compatibility and performance requirements remain
+unfulfilled parts of the active full goal.
+
+## 2026-10-29 M2 Introspection Descriptors And Default Attribute Wrappers
+
+The long-term goal remains the full M0-M9 redesign, not this checkpoint. This
+slice advances M2 on the independent foundation target; it does not change the
+legacy interpreter or claim that type construction/source execution is ready.
+
+Implemented:
+
+- Added native get/set descriptors and a managed mapping proxy. Owner and mapping
+  references are traced by the same collector; callbacks are plain native entry
+  pointers, not hidden closures or a separate lifetime system.
+- Installed object `__class__`, per-heap-instance `__dict__`, type `__dict__`,
+  and bound-method `__func__`/`__self__` through the existing descriptor engine.
+  There are no attribute-name cases for those fields in lookup/mutation.
+- Compatible generic heap-class assignment preserves identity and the instance
+  dictionary. Invalid/deleted/incompatible/immutable class changes are TypeError.
+  Plain object instances no longer silently acquire dictionary storage.
+- Instance dictionaries are live and replaceable; deleting the instance edge
+  does not clear a separately retained old dictionary. Type dictionaries return
+  readonly proxies to the actual namespace, not snapshots or mutable aliases.
+- Published callable object/type default attribute wrappers. User hooks can
+  delegate through them; explicit object vs type lookup retains its distinct
+  class-MRO behavior. Object mutation cannot bypass the type mutation boundary.
+  Removed the old parallel fallback dispatch after installing these defaults.
+- Fixed implicit native descriptor binding of Python None. The engine retains
+  an optional receiver instead of interpreting a real None as absent. Explicit
+  `__get__` wrappers and implicit binding share the native implementation.
+- A new reentry test first failed when a getter erased its own descriptor and
+  collected it. Rooting descriptor/receiver across the callback fixes that
+  failure without suppressing collection.
+- Native layouts now reject inherited dictionary fields they cannot represent.
+  The structural mixin test uses a field-free native mixin; generic Python
+  mixins with native-prefix instances still need the planned tail-field layout.
+- Added 16 focused forced-GC tests in `Tests/cpp/core/test_attributes.cpp`.
+
+Final verification:
+
+- `cmake --build build --target test_foundation -j2` succeeded.
+- `./build/test_foundation --gtest_brief=1`: 78/78.
+- `ctest --test-dir build --output-on-failure -j2 --quiet`: 326/326
+  (248 legacy + 78 foundation), exit 0.
+- Final ASan/UBSan with LeakSanitizer: 78/78, outside the ptrace sandbox.
+- Final TSan: 78/78.
+- Foundation-only Release rebuilt with legacy/testing disabled; the existing
+  cost probe passed result/live-set checks in three independent processes.
+- `git diff --check` passed. No subagents or commits were used.
+
+Raw final Release cost samples, same GCC 11.4 / x86-64 WSL2 environment as the
+previous checkpoint, no CPU binding/frequency control. This is not a source
+benchmark, a measured optimization claim or a CPython comparison.
+
+```text
+iterations=100000 header_bytes=8 node_bytes=16 allocation_and_auto_gc_ns=8215804 root_register_release_ns=3036850 collections=26 live_bytes=0 recorded_metadata_bytes=96 root_cells=2 last_gc_pause_ns=1150
+native_call_iterations=100000 native_call_ns=26119985 method_iterations=10000 lookup_bind_call_ns=13158899 live_objects=82
+iterations=100000 header_bytes=8 node_bytes=16 allocation_and_auto_gc_ns=8544618 root_register_release_ns=2944111 collections=26 live_bytes=0 recorded_metadata_bytes=96 root_cells=2 last_gc_pause_ns=324
+native_call_iterations=100000 native_call_ns=28234405 method_iterations=10000 lookup_bind_call_ns=13060908 live_objects=82
+iterations=100000 header_bytes=8 node_bytes=16 allocation_and_auto_gc_ns=8983010 root_register_release_ns=2992109 collections=26 live_bytes=0 recorded_metadata_bytes=96 root_cells=2 last_gc_pause_ns=315
+native_call_iterations=100000 native_call_ns=27089056 method_iterations=10000 lookup_bind_call_ns=13476428 live_objects=82
+```
+
+Remaining M2 acceptance work: type `__call__`/`__new__`/`__init__`, remaining
+type reflection, Python-facing TypeSpec errors, native-tail/slots layout,
+class-creation callbacks and full protocol readiness. The mapping proxy's public
+mapping protocol is M3 work, not approximated by a list or a dict copy. Pinned
+CPython 3.12.14 differential evidence, a new frontend/CLI, and the original
+single/multi/I/O performance gates remain unfulfilled requirements of the goal.
+
+## 2026-10-29 B3 Seeds And First Native Method-Call Flow
+
+The M0-M9 goal remains active. This slice closes the first production
+instance -> lookup -> descriptor -> binder -> NativeEntry -> Ok/Raised -> GC
+flow. It does not declare M2, the language frontend or Python compatibility done.
+
+Implemented:
+
+- Added transactional `bootstrap_core()` on the existing heap/roots, with real
+  None, codepoint str, tuple, name dictionary, BaseException/Exception/error,
+  native function, native method descriptor and bound method objects. Boot
+  failure at every managed allocation is followed by rollback and retry.
+- Core type dictionaries now contain the actual descriptor/call wrappers.
+  Heap classes and generic instances use the same managed name dictionaries;
+  no test-only attribute store or parallel dispatch engine was introduced.
+- Added full-MRO attribute lookup, instance shadowing/non-data binding, data
+  descriptor priority, metaclass data-descriptor precedence, attribute hooks and
+  AttributeError-only getattr fallback. Class mutation increments the type epoch.
+- Added structured SignatureLayout validation and binding for all parameter
+  kinds/defaults/variadics. Preserved keyword order and positional-only names
+  captured by **kwargs. Variadic containers are allocated only when requested.
+- Added explicit-context NativeEntry calls, traced defaults/captures, compatible
+  receiver checks, bound methods, generic __call__, and explicit __call__ wrappers
+  sharing the same binder/entry implementation. Native/layout identity alone
+  cannot bypass Python type semantics.
+- Actual Python errors are returned as rooted BaseException instances with
+  tuple args. bad_alloc uses a pre-rooted MemoryError; recursion produces
+  RecursionError. Host faults and missing native results are not silently
+  converted into a user error or None.
+- Protected input/output aliasing by staging input roots before result reset.
+  Verified captures/defaults, callee exceptions, descriptor callbacks and
+  normalized argument storage across forced collection and native reentry.
+- External buffer capacities are accounted at allocation, including strings,
+  tuples, signatures/captures and name indexes. Name-index capacity accounting
+  is incremental; insertion does not scan the entire namespace for bookkeeping.
+- Added 23 tests in `Tests/cpp/core/test_call.cpp`. The fixed-live-set test drops
+  complete temporary method/type/instance graphs and verifies reclamation.
+- Extended the cost probe with native-call and lookup/bind/call measurements.
+
+Final verification:
+
+- `cmake --build build --target test_foundation -j2`
+- `./build/test_foundation --gtest_brief=1`: 62/62.
+- `ctest --test-dir build --output-on-failure -j2`: 310/310 (248 legacy + 62 core).
+- ASan/UBSan with LeakSanitizer: 62/62; run outside the ptrace sandbox.
+- TSan: 62/62.
+- Foundation-only Release with tests/legacy disabled rebuilt; the expanded
+  `bench_foundation` passed its result and live-set checks.
+- `git diff --check` passed. No subagents were started; no commits were made.
+
+Cost samples on the same GCC 11.4 / Release / x86-64 WSL2 environment as the
+earlier storage probe, three independent processes, no CPU binding/frequency
+control. These are native-core costs, not Python source or CPython comparisons.
+
+```text
+iterations=100000 header_bytes=8 node_bytes=16 allocation_and_auto_gc_ns=8324521 root_register_release_ns=2969194 collections=26 live_bytes=0 recorded_metadata_bytes=96 root_cells=2 last_gc_pause_ns=518
+native_call_iterations=100000 native_call_ns=26110132 method_iterations=10000 lookup_bind_call_ns=13211023 live_objects=50
+iterations=100000 header_bytes=8 node_bytes=16 allocation_and_auto_gc_ns=8669957 root_register_release_ns=2978199 collections=26 live_bytes=0 recorded_metadata_bytes=96 root_cells=2 last_gc_pause_ns=785
+native_call_iterations=100000 native_call_ns=26701344 method_iterations=10000 lookup_bind_call_ns=13359265 live_objects=50
+iterations=100000 header_bytes=8 node_bytes=16 allocation_and_auto_gc_ns=8282963 root_register_release_ns=2907263 collections=26 live_bytes=0 recorded_metadata_bytes=96 root_cells=2 last_gc_pause_ns=340
+native_call_iterations=100000 native_call_ns=26464771 method_iterations=10000 lookup_bind_call_ns=12644652 live_objects=50
+```
+
+Technical-debt review / remaining M2 gates:
+
+- The new types supply B3 storage/call seeds, not complete str/tuple/dict
+  protocols. Name dictionaries intentionally precede general hash/equality,
+  views and callback-safe container operations; deletion currently shifts entries.
+- Object __class__/__dict__, method reflection, type.__call__/__new__/__init__,
+  full protocol readiness and class-creation callbacks remain next. TypeSpec
+  definition faults still use the host channel until that Python boundary exists.
+- Exception fields are traced, but VM traceback/handled context/chaining and
+  exact CPython diagnostic text remain unverified. The MemoryError reserve has
+  no Python-visible mutable traceback/context API yet.
+- New-core source execution, CPython 3.12 differential semantics and the declared
+  workload performance target are not proven by these tests or timing samples.
+  Their requirements remain intact in the active goal and migration ledger.
+
+## 2026-10-28 B2 Bootstrap And Structural TypeReady
+
+The active long-term goal is the complete redesign plan, M0-M9. This checkpoint
+advances B2 and the structural part of M2; it does not complete the goal or claim
+Python-visible TypeReady, descriptors, exception semantics or method calls.
+
+Implemented since the first storage slice:
+
+- Added production `TypeObject`, `InstanceObject`, TypeSpec and NativeTypeSpec
+  in the isolated new core. Type metadata is independent of allocation layout;
+  bases, MRO and solid-base references are traced by the existing collector.
+- Closed the object/type seed graph with real header type edges, base relations
+  and MROs. The interpreter roots exactly one graph; repeated/concurrent
+  attachments observe the same type identity, distinct from other interpreters.
+- Added an explicit bounded bootstrap transaction: suspend automatic collection,
+  root intermediate shells, initialize all metadata, then publish both seed
+  roots. Failure unwinds temporary roots, restores GC policy and reclaims shells;
+  the same attachment can retry. No separate bootstrap collector was introduced.
+- Added a managed-allocation quota to exercise each of the two seed allocation
+  failure points. Verified existing caller roots survive failed bootstrap.
+- Added structural TypeReady: complete C3 merge, duplicate/inconsistent-base
+  rejection, most-derived metaclass selection, solid-base layout compatibility,
+  and native instance layout validation. Class and instance results are rooted
+  and typed before publication, not patched with type edges after returning.
+- Added caller-validated ReturnSlot reset so a foreign output slot is rejected
+  before an operation changes another attachment's state.
+- Accounted TypeObject host string/vector buffers and verified repeated temporary
+  type/instance cycles return to the two-seed live set under forced collection.
+- Added 15 focused tests in `Tests/cpp/core/test_types.cpp`. No legacy execution
+  code, Python library stubs or subagent implementations were added.
+
+Verification on the final implementation:
+
+- `cmake --build build --target test_foundation -j2`
+- `./build/test_foundation --gtest_brief=1`: 39/39 (24 storage/thread + 15 type).
+- `ctest --test-dir build --output-on-failure -j2`: 287/287 (248 legacy + 39 core).
+- ASan/UBSan with LeakSanitizer enabled: 39/39; run outside the ptrace sandbox.
+- TSan: 39/39, including concurrent seed publication and NativeWait.
+- Foundation-only Release with tests/legacy disabled rebuilt successfully;
+  `bench_foundation` still passed its allocation/root/live-set checks.
+- `git diff --check` passed.
+
+Technical-debt review and next dependency:
+
+- `structure_ready` is deliberately not full protocol readiness. Type names and
+  immutable construction-time Value arrays are internal host metadata; there is
+  no second user-visible namespace or test-only dispatch engine.
+- Host TypeSpec errors currently use `invalid_argument`. Before a Python
+  `type.__new__`/class-build boundary is exposed, B3 must supply real exception
+  objects and the common Raised channel, type dictionaries, descriptors and
+  protocol resolution. No Python TypeError compatibility is claimed here.
+- Native layouts can be inherited unchanged or introduced over generic object
+  storage. Tail-field/slots planning and compatible native-prefix extension
+  remain M2 work; unrelated solid bases cannot be combined just because their
+  C++ family IDs happen to match.
+- The quota covers managed allocation failures, not exhaustive host allocator
+  fault injection. Host constructors/metadata insertion still use normal RAII.
+- Next: minimal B3 exception and namespace/callable objects, then one production
+  instance -> lookup -> descriptor -> binder -> native-call -> Ok/Raised flow
+  under forced GC. M3-M9 and the original compatibility/performance gates remain
+  in the goal and migration ledger.
+
+## 2026-10-28 Foundation M0/M1 Storage Slice
+
+Authority: `cxxpython_foundation_redesign_plan.md`. The earlier entries below
+record the legacy runtime. New decisions, capability gates and next work are
+tracked in `doc/foundation_contracts.md`, not inferred from the old feature count.
+No complete M0 or M1 claim: B2 object/type seeds and bootstrap failure rollback
+are still pending; M2's full method-call flow has not been implemented.
+
+Implemented:
+
+- Updated `AGENTS.md` and the documentation index to make the new plan primary.
+- Added independent `cxxpython_foundation` with no legacy runtime/VM dependency.
+  `CXXPYTHON_BUILD_LEGACY=OFF` isolates it; `BUILD_TESTING=OFF` avoids fetching
+  GTest. Test builds may reuse an installed package or the pinned source tree.
+- Added non-owning boxed Value, a one-edge ObjectHeader, immutable per-allocation
+  layout metadata and checked native payload access. Synthetic M1 nodes are not
+  Python types; their type edges are optional until B2/B3 bootstrap exists.
+- Added stable, reusable root cells and interpreter/generation-checked handles,
+  non-LIFO release, caller-rooted Empty/Ok/Raised slots and revision-checked
+  result views. Registration/publication does not initiate GC.
+- Added non-moving, full-heap tracing without Python RC. Header type edges and
+  payload edges are traced independently of physical destruction. Leaf objects
+  and reported external bytes affect automatic pressure; explicit collection
+  remains available when automatic collection is disabled.
+- Added per-interpreter execution permission, OS-thread-owned attachments,
+  NativeWait release/reacquire, admission closure and shared host lifetime leases.
+  Existing leases can resume after close. This is not yet a public threading or
+  complete shutdown API.
+- Added 24 storage/thread contract tests and an opt-in, correctness-checked cost
+  probe. Narrowed the old `core` ignore rule so new-core directories are tracked.
+
+Verification on the final code:
+
+- `cmake --build build -j2`
+- `ctest --test-dir build --output-on-failure -j2`: 272/272 (248 legacy + 24 new).
+- Foundation-only ASan/UBSan: 24/24, with leak detection active. The sanitizer
+  test build/run needed execution outside the sandbox's ptrace environment.
+- Foundation-only TSan: 24/24, including all six attachment/thread tests.
+- Release foundation + cost probe built with both legacy and tests disabled;
+  no test dependency fetch was involved.
+- `git diff --check` passed.
+
+Cost probe raw samples, three independent processes, GCC 11.4.0 / C++20 /
+CMake Release (`-O3 -DNDEBUG`), Linux x86-64 WSL2 5.15.153.1, i5-12500H guest
+with four logical CPUs. No CPU binding or frequency control; these are initial
+cost observations, not a formal performance gate or CPython comparison. The
+host Python is 3.10.12; no new-core Python differential run is claimed.
+
+```text
+iterations=100000 header_bytes=8 node_bytes=16 allocation_and_auto_gc_ns=8832486 root_register_release_ns=3168414 collections=26 live_bytes=0 recorded_metadata_bytes=96 root_cells=2 last_gc_pause_ns=1330
+iterations=100000 header_bytes=8 node_bytes=16 allocation_and_auto_gc_ns=9931348 root_register_release_ns=3250637 collections=26 live_bytes=0 recorded_metadata_bytes=96 root_cells=2 last_gc_pause_ns=363
+iterations=100000 header_bytes=8 node_bytes=16 allocation_and_auto_gc_ns=8798237 root_register_release_ns=3084159 collections=26 live_bytes=0 recorded_metadata_bytes=96 root_cells=2 last_gc_pause_ns=1187
+```
+
+Technical-debt review:
+
+- One object lifetime authority and one execution permission per interpreter;
+  no old GC workaround, RC, TLS active VM or test-only collector was imported.
+- STL storage is the initial allocator. Recorded metadata excludes STL allocator
+  overhead/RSS, and root release searches the current scope's active tokens;
+  large-live-set root costs still need measurement before optimization.
+- M1 Raised protects a payload but does not validate BaseException semantics.
+  Host contract faults are not disguised as Python exceptions. Typed errors,
+  binder alias rules and the full native-call boundary belong to M2.
+- Python callbacks/finalizers, traced external arrays, type readiness, VM frame
+  lifecycle and daemon/deadline shutdown are not supplied by this storage slice.
+- Kept the user's removed `temporary_plan.md`, redesign plan and performance/
+  benchmark files untouched. No subagents were started.
+
+Next: finish B2 object/type seeds and repeatable bootstrap rollback with this
+same heap/root machinery, then TypeReady and native descriptor/binder/call/GC.
+
 ## 2026-06-27 Thread Entry And Conservative Multi-Thread GC
 
 Completed:
