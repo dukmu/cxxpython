@@ -16,6 +16,7 @@ namespace cxxpython::core
     {
         tracer.visit(function); tracer.visit(code); if (back) tracer.visit(*back);
         for (const auto &value : locals) if (value) tracer.visit(*value);
+        for (auto cell : cells) tracer.visit(cell);
         for (std::size_t i = 0; i < sp; ++i) tracer.visit(operands[i]);
         if (handled_exception) tracer.visit(*handled_exception);
         if (reason) trace_reason(*reason, tracer);

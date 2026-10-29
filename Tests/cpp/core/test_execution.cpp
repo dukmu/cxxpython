@@ -43,7 +43,7 @@ namespace
         CodeBuilder unknown(context); unknown.emit(static_cast<Opcode>(255)); invalid(unknown, CodeErrorKind::UnknownOpcode);
         CodeBuilder operand(context); operand.emit(Opcode::Return, 1); invalid(operand, CodeErrorKind::Operand);
         CodeBuilder domain(context); domain.emit(Opcode::Binary, 255); invalid(domain, CodeErrorKind::Operand);
-        CodeBuilder flags(context); flags.emit(Opcode::MakeFunction, 4); invalid(flags, CodeErrorKind::Operand);
+        CodeBuilder flags(context); flags.emit(Opcode::MakeFunction, 8); invalid(flags, CodeErrorKind::Operand);
         CodeBuilder function(context); function.emit(Opcode::MakeFunction, 3); invalid(function, CodeErrorKind::StackUnderflow);
     }
 
@@ -91,6 +91,55 @@ namespace
         CodeBuilder dead(context); dead.emit(Opcode::Jump, 0); dead.emit(Opcode::LoadConst, 0); invalid(dead, CodeErrorKind::ConstantBounds);
         for (auto opcode : {Opcode::LoadGlobal, Opcode::StoreGlobal, Opcode::DeleteGlobal})
         { CodeBuilder global(context); global.emit(opcode); invalid(global, CodeErrorKind::NameBounds); }
+    }
+
+    TEST_F(CoreExecution, ClosureOperandsAndLayoutsAreVerifiedBeforePublication)
+    {
+        for (auto opcode : {Opcode::LoadDeref, Opcode::StoreDeref, Opcode::DeleteDeref, Opcode::LoadClosure})
+        {
+            CodeBuilder builder(context); builder.emit(Opcode::Jump); builder.emit(opcode);
+            invalid(builder, CodeErrorKind::CellBounds);
+        }
+        CodeSpec spec; spec.locals = {U"x"}; spec.cellvars = {U"missing"};
+        CodeBuilder missing(context, spec); missing.emit(Opcode::Jump); invalid(missing, CodeErrorKind::CellLayout);
+        spec.cellvars = {U"x", U"x"}; CodeBuilder duplicate(context, spec); duplicate.emit(Opcode::Jump); invalid(duplicate, CodeErrorKind::CellLayout);
+        spec.cellvars = {U"x"}; spec.freevars = {U"x"}; CodeBuilder overlap(context, spec); overlap.emit(Opcode::Jump); invalid(overlap, CodeErrorKind::CellLayout);
+        spec.freevars.clear();
+        for (auto opcode : {Opcode::LoadFast, Opcode::StoreFast, Opcode::DeleteFast})
+        {
+            CodeBuilder fast(context, spec); fast.emit(opcode); invalid(fast, CodeErrorKind::CellLayout);
+        }
+        CodeBuilder flags(context); flags.emit(Opcode::MakeFunction, 7); invalid(flags, CodeErrorKind::StackUnderflow);
+        const auto effect = instruction_effect({Opcode::MakeFunction, 7});
+        EXPECT_EQ(effect.inputs, 4U); EXPECT_EQ(effect.pops, 4U); EXPECT_EQ(effect.pushes, 1U);
+    }
+
+    TEST_F(CoreExecution, FunctionClosureShapeAndCellAllocationFailuresUseNormalResultPaths)
+    {
+        CodeSpec spec; spec.freevars = {U"value"}; CodeBuilder builder(context, spec);
+        builder.emit(Opcode::LoadDeref); builder.emit(Opcode::Return); const auto program = code(builder);
+        FunctionSpec function_spec{program, dictionary()}; ReturnSlot out(context);
+        make_function(context, function_spec, out); error(out, CoreObject::TypeErrorType);
+        function_spec.closure = integer(1); make_function(context, function_spec, out); error(out, CoreObject::TypeErrorType);
+        function_spec.closure = builtin(CoreObject::EmptyTuple); make_function(context, function_spec, out); error(out, CoreObject::ValueErrorType);
+        std::array wrong{context.builtin(CoreObject::IntOne)}; cxxpython::core::make_tuple(context, wrong, out);
+        function_spec.closure = roots.root(out.result().value()); make_function(context, function_spec, out); error(out, CoreObject::TypeErrorType);
+        context.allocate_instance<CellObject>(builtin(CoreObject::CellType), out, context.builtin(CoreObject::IntOne));
+        const auto cell = roots.root(out.result().value()); std::array values{cell.get(context)};
+        cxxpython::core::make_tuple(context, values, out); const auto closure = roots.root(out.result().value());
+        function_spec.closure = closure; make_function(context, function_spec, out); ASSERT_EQ(out.result().tag(), ResultTag::Ok);
+        const auto fn = roots.root(out.result().value()); call(context, fn, {}, out); EXPECT_EQ(out.result().value(), context.builtin(CoreObject::IntOne));
+        EXPECT_EQ(disassemble(context, program), "0 LOAD_DEREF 0\n1 RETURN\n");
+        spec.freevars.clear(); spec.signature.parameters = {{U"value"}}; spec.locals = {U"value"}; spec.cellvars = {U"value"};
+        CodeBuilder captured(context, spec); captured.emit(Opcode::LoadDeref); captured.emit(Opcode::Return);
+        const auto target = function(code(captured)); std::array args{context.builtin(CoreObject::IntOne)};
+        for (auto limit : {0U, 1U})
+        {
+            context.set_allocation_limit(limit); call(context, target, {args, {}}, out); error(out, CoreObject::MemoryErrorType);
+            EXPECT_FALSE(context.current_frame());
+        }
+        context.set_allocation_limit(std::numeric_limits<std::size_t>::max());
+        call(context, target, {args, {}}, out); EXPECT_EQ(out.result().value(), args[0]);
     }
 
     TEST_F(CoreExecution, SourceLoweringOpcodesHaveVerifiedOperandsAndStackInputs)

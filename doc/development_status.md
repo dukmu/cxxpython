@@ -1,5 +1,64 @@
 # Development Status
 
+## 2026-10-29 Lexical Closures Through The Parallel Source VM
+
+Prepended without changing previous entries. The previous turn committed and
+pushed 70c1ccb with measured execution-cost reductions. This turn removes the
+remaining closure rejection and advances N4/N5's execution/source dependencies;
+the full N0-N6/M0-M9 goal remains active, not reduced to this language feature.
+
+- Extended the existing frozen scope pass with explicit cell/free layouts and
+  lowered lexical capture/nonlocal through the ordinary CFG, CodeBuilder and
+  scheduler. Captured parameters retain parameter order, other cell/free names
+  have deterministic sorted layouts, and intermediate scopes forward the same
+  Cell identities. Global barriers and lexical binding are not guessed at emit.
+- Code now records/traces actual co_cellvars/co_freevars tuples. co_varnames
+  excludes non-parameter cellvars while internal slots retain binder indexing.
+  The verifier rejects bad/overlapping layouts, bad cell operands and FAST access
+  to captured locals, including unreachable instructions. Added four explicit
+  closure opcodes with stack/domain/error/disassembly contracts; MAKE_FUNCTION
+  handles closure tuples alongside defaults/kwdefaults using verified stack order.
+- Function retains an immutable closure tuple and exposes its actual __closure__;
+  shape errors use Python TypeError/ValueError. Frame preparation roots freshly
+  created local Cells and existing free Cells before publishing the Frame.
+  Frame cell identities are const and precisely traced/accounted. Captured
+  parameters do not retain a second mutable fast-local value. Code is still
+  frozen once per source scope; runtime closure creation reuses that identity.
+- Cell contents use the existing rooted atomic load/store/exchange operations.
+  Local unbound access raises UnboundLocalError, free access raises NameError;
+  deletion is one exchange rather than check-then-clear. Siblings share Cells,
+  factory calls isolate them and recursive Function/Cell cycles return to the
+  original live set. No RC, function lock, alternate GC or new ownership layer
+  was introduced. Compound nonlocal += is not claimed to be atomic.
+- Added six focused tests plus expanded existing scope and parallel scenarios:
+  defaults/parameter captures, transitive scopes, shared versus distinct Cells,
+  values of different types, empty/deleted/rebound cells, nested recursion,
+  reflection, verifier failures, Cell/Frame allocation failure and cycle GC.
+  The same source-derived closure Function/Code now runs on two Active workers,
+  concurrently storing a shared nonlocal and reading captured state during GC.
+  Worker setup propagates failures without leaving the start latch unresolved.
+- CTest 563/563 passes. Foundation ASan/UBSan/LSan 314/314 and TSan 312/312 pass;
+  only the same two exhaustive bootstrap/promotion allocation enumerations are
+  excluded from TSan and covered by Release/ASan. All three fixed CPython 3.12.14
+  executable differential groups pass, now including twenty-two positive source
+  workflows, closure metadata/order/global barriers and compile/runtime errors.
+  Four benchmark-recorder tests pass. No timeout was increased or failure hidden.
+- Extended the existing benchmark/recorder, not a separate harness, with a real
+  source closure kernel shared at 1/2/4 workers. Its exact encoded source runs on
+  the reference executable; closure and plain source have separate derived
+  scaling/comparison rows. Automatic n4-lexical-closures raw runs retain binary
+  hashes/build flags and three idle samples collected before sanitizer builds.
+  Previous raw samples remain; no numeric table was manually edited.
+- The closure workload confirms simultaneous Python execution with shared Cells,
+  while the plain-source costs remain near the previous stable node. The large
+  absolute CPython performance gap is still an open release gate, not waived by
+  this capability or multicore scaling. Next: advance remaining basic object/
+  iterator and class/exception source-execution dependencies alongside measured
+  general call costs; do not spend another turn expanding root/cache guards.
+  Full language, actual threading/I/O/library workflows, platform/install and
+  release acceptance remain incomplete. No subagents were used; unrelated user
+  changes to temporary_plan.md and test2.py remain excluded.
+
 ## 2026-10-29 Remove Repeated Root And Call Preparation Costs
 
 Prepended without rewriting history. The previous source milestone is 4a3b0fd.

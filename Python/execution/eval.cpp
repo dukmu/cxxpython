@@ -9,6 +9,7 @@ namespace cxxpython::core
         for (auto value : {code, globals, builtins, name, qualname}) tracer.visit(value);
         if (defaults) tracer.visit(*defaults);
         if (kwdefaults) tracer.visit(*kwdefaults);
+        if (closure) tracer.visit(*closure);
     }
     namespace detail
     {
@@ -106,10 +107,11 @@ namespace cxxpython::core
         bool raised(ReturnSlot &out) { return out.tag() == ResultTag::Raised; }
         template <class T, CoreObject Kind> bool kind(Attachment &context, Value value)
         { return is_subtype(context, context.type_of(value), context.builtin(Kind)) && context.has_layout<T>(value); }
-        void unbound(Attachment &context, const CodeObject &code, std::uint32_t local, ReturnSlot &out)
+        void unbound(Attachment &context, const std::u32string &name, ReturnSlot &out, bool free = false)
         {
-            raise_error(context, CoreObject::UnboundLocalErrorType,
-                        U"local variable '" + code.program.local_names()[local] + U"' is not bound", out);
+            raise_error(context, free ? CoreObject::NameErrorType : CoreObject::UnboundLocalErrorType,
+                        free ? U"cannot access free variable '" + name + U"' where it is not associated with a value in enclosing scope" :
+                               U"local variable '" + name + U"' is not bound", out);
         }
         void with_method(Attachment &context, Handle manager, Protocol protocol, ReturnSlot &out)
         {
@@ -128,10 +130,24 @@ namespace cxxpython::core
             const auto &program = context.payload<CodeObject>(code).program; std::vector<Value> bound;
             detail::FunctionDefaults values{context.payload<TupleObject>(defaults).items, keywords};
             if (!detail::bind_arguments(context, program.signature(), args, receiver, roots, bound, out, values)) return;
+            std::vector<Value> cells; cells.reserve(program.cell_names().size() + program.free_names().size());
+            if (!program.cell_locals().empty())
+            {
+                const auto type = roots.root(context.builtin(CoreObject::CellType)); ReturnSlot cell(context);
+                for (auto local : program.cell_locals())
+                {
+                    context.allocate_instance<CellObject>(type, cell, local < bound.size() ? std::optional<Value>{bound[local]} : std::optional<Value>{});
+                    cells.push_back(roots.root(cell.value()).get(context));
+                }
+            }
+            if (callable.closure)
+                for (auto cell : context.payload<TupleObject>(*callable.closure).items) cells.push_back(cell);
             context.allocate_instance<FrameObject>(roots.root(context.builtin(CoreObject::FrameType)), out,
-                function.get(context), code.get(context), program.local_names().size(), program.max_stack(), context.builtin(CoreObject::None), program.max_regions());
+                function.get(context), code.get(context), program.local_names().size(), program.max_stack(), context.builtin(CoreObject::None),
+                program.max_regions(), std::move(cells));
             auto &data = context.payload<FrameObject>(out.value());
             for (std::size_t i = 0; i < bound.size(); ++i) data.locals[i] = bound[i];
+            for (auto local : program.cell_locals()) data.locals[local].reset();
         }
         void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &out)
         {
@@ -162,8 +178,27 @@ namespace cxxpython::core
                             data.operands[data.sp++] = context.payload<TupleObject>(code.constants).items[operand];
                             break;
                         case Opcode::LoadFast:
-                            if (!data.locals[operand]) { unbound(context, code, operand, result); activation.raising(result.exception()); break; }
+                            if (!data.locals[operand]) { unbound(context, code.program.local_names()[operand], result); activation.raising(result.exception()); break; }
                             data.operands[data.sp++] = *data.locals[operand]; break;
+                        case Opcode::LoadClosure:
+                            data.operands[data.sp++] = data.cells[operand]; break;
+                        case Opcode::LoadDeref:
+                        case Opcode::DeleteDeref:
+                        {
+                            if (opcode == Opcode::LoadDeref) read_cell(context, data.cells[operand], result);
+                            else context.exchange(data.cells[operand], context.payload<CellObject>(data.cells[operand]).contents, {}, result);
+                            if (result.tag() == ResultTag::Empty)
+                            {
+                                const auto local_cells = code.program.cell_names().size(); const bool free = operand >= local_cells;
+                                unbound(context, free ? code.program.free_names()[operand - local_cells] : code.program.cell_names()[operand], result, free);
+                                activation.raising(result.exception());
+                            }
+                            else if (opcode == Opcode::LoadDeref) data.operands[data.sp++] = result.value();
+                            break;
+                        }
+                        case Opcode::StoreDeref:
+                            write_cell(context, data.cells[operand], data.operands[data.sp - 1]);
+                            data.operands[--data.sp] = context.builtin(CoreObject::None); break;
                         case Opcode::LoadGlobal:
                         case Opcode::StoreGlobal:
                         case Opcode::DeleteGlobal:
@@ -201,6 +236,7 @@ namespace cxxpython::core
                             RootScope roots(context); const auto &parent = context.payload<FunctionObject>(data.function);
                             auto cursor = data.sp; const auto child_code = roots.root(data.operands[--cursor]);
                             FunctionSpec spec{child_code, roots.root(parent.globals)}; spec.builtins = roots.root(parent.builtins);
+                            if (operand & static_cast<std::uint32_t>(FunctionFlags::Closure)) spec.closure = roots.root(data.operands[--cursor]);
                             if (operand & static_cast<std::uint32_t>(FunctionFlags::KeywordDefaults)) spec.kwdefaults = roots.root(data.operands[--cursor]);
                             if (operand & static_cast<std::uint32_t>(FunctionFlags::Defaults)) spec.defaults = roots.root(data.operands[--cursor]);
                             make_function(context, spec, result);
@@ -208,7 +244,7 @@ namespace cxxpython::core
                             data.trim_stack(context, cursor); data.operands[data.sp++] = result.value(); break;
                         }
                         case Opcode::DeleteFast:
-                            if (!data.locals[operand]) { unbound(context, code, operand, result); activation.raising(result.exception()); break; }
+                            if (!data.locals[operand]) { unbound(context, code.program.local_names()[operand], result); activation.raising(result.exception()); break; }
                             data.locals[operand].reset(); break;
                         case Opcode::PopTop:
                             data.operands[--data.sp] = context.builtin(CoreObject::None); break;
@@ -380,6 +416,8 @@ namespace cxxpython::core
         void code_constants(Attachment &c, Value value, ReturnSlot &out) { out.ok(c.payload<CodeObject>(value).constants); }
         void code_varnames(Attachment &c, Value value, ReturnSlot &out) { out.ok(c.payload<CodeObject>(value).varnames); }
         void code_names(Attachment &c, Value value, ReturnSlot &out) { out.ok(c.payload<CodeObject>(value).names); }
+        void code_cellvars(Attachment &c, Value value, ReturnSlot &out) { out.ok(c.payload<CodeObject>(value).cellvars); }
+        void code_freevars(Attachment &c, Value value, ReturnSlot &out) { out.ok(c.payload<CodeObject>(value).freevars); }
         void code_stacksize(Attachment &c, Value value, ReturnSlot &out)
         { make_int(c, static_cast<std::int64_t>(c.payload<CodeObject>(value).program.max_stack()), out); }
         void code_firstline(Attachment &c, Value value, ReturnSlot &out)
@@ -389,6 +427,8 @@ namespace cxxpython::core
         void function_qualname(Attachment &c, Value value, ReturnSlot &out) { out.ok(c.payload<FunctionObject>(value).qualname); }
         void function_globals(Attachment &c, Value value, ReturnSlot &out) { out.ok(c.payload<FunctionObject>(value).globals); }
         void function_builtins(Attachment &c, Value value, ReturnSlot &out) { out.ok(c.payload<FunctionObject>(value).builtins); }
+        void function_closure(Attachment &c, Value value, ReturnSlot &out)
+        { out.ok(c.payload<FunctionObject>(value).closure.value_or(c.builtin(CoreObject::None))); }
         void function_doc(Attachment &c, Value value, ReturnSlot &out)
         { out.ok(c.payload<CodeObject>(c.payload<FunctionObject>(value).code).docstring); }
         void function_defaults(Attachment &c, Value value, ReturnSlot &out)
@@ -435,9 +475,14 @@ namespace cxxpython::core
         out.check_caller(context); RootScope roots(context);
         auto code = roots.root(spec.code.get(context)); auto globals = roots.root(spec.globals.get(context));
         auto builtins = roots.root(spec.builtins ? spec.builtins->get(context) : context.builtin(CoreObject::Builtins));
-        std::optional<Value> defaults, keywords;
+        std::optional<Value> defaults, keywords, closure;
         if (spec.defaults) defaults = roots.root(spec.defaults->get(context)).get(context);
         if (spec.kwdefaults) keywords = roots.root(spec.kwdefaults->get(context)).get(context);
+        if (spec.closure)
+        {
+            const auto value = roots.root(spec.closure->get(context)).get(context);
+            if (value != context.builtin(CoreObject::None)) closure = value;
+        }
         out.reset(context);
         if (context.type_of(code) != context.builtin(CoreObject::CodeType) || !context.has_layout<CodeObject>(code.get(context)))
         { type_error(context, U"function requires verified Code", out); return; }
@@ -447,8 +492,21 @@ namespace cxxpython::core
             (keywords && !kind<DictObject, CoreObject::DictType>(context, *keywords)))
         { type_error(context, U"function requires globals/builtins dicts, defaults tuple and optional kwdefaults dict", out); return; }
         const auto &program = context.payload<CodeObject>(code);
+        if (!closure && !program.program.free_names().empty())
+        { type_error(context, U"function requires a closure tuple", out); return; }
+        if (closure)
+        {
+            if (!kind<TupleObject, CoreObject::TupleType>(context, *closure))
+            { type_error(context, U"function closure must be a tuple", out); return; }
+            const auto &cells = context.payload<TupleObject>(*closure).items;
+            if (cells.size() != program.program.free_names().size())
+            { raise_error(context, CoreObject::ValueErrorType, U"function closure length does not match Code free variables", out); return; }
+            for (auto cell : cells)
+                if (!kind<CellObject, CoreObject::CellType>(context, cell))
+                { type_error(context, U"function closure elements must be cells", out); return; }
+        }
         context.allocate_instance<FunctionObject>(roots.root(context.builtin(CoreObject::FunctionType)), out,
-            code.get(context), globals.get(context), defaults, keywords, program.name, program.qualname, builtins.get(context));
+            code.get(context), globals.get(context), defaults, keywords, program.name, program.qualname, builtins.get(context), closure);
     }
     namespace detail
     {
@@ -483,9 +541,11 @@ namespace cxxpython::core
             field(CoreObject::CodeType, U"co_varnames", code_varnames); field(CoreObject::CodeType, U"co_stacksize", code_stacksize);
             field(CoreObject::CodeType, U"co_firstlineno", code_firstline);
             field(CoreObject::CodeType, U"co_names", code_names);
+            field(CoreObject::CodeType, U"co_cellvars", code_cellvars); field(CoreObject::CodeType, U"co_freevars", code_freevars);
             field(CoreObject::FunctionType, U"__code__", function_code); field(CoreObject::FunctionType, U"__name__", function_name);
             field(CoreObject::FunctionType, U"__qualname__", function_qualname); field(CoreObject::FunctionType, U"__globals__", function_globals);
             field(CoreObject::FunctionType, U"__builtins__", function_builtins);
+            field(CoreObject::FunctionType, U"__closure__", function_closure);
             field(CoreObject::FunctionType, U"__doc__", function_doc);
             field(CoreObject::FunctionType, U"__defaults__", function_defaults); field(CoreObject::FunctionType, U"__kwdefaults__", function_keywords);
             field(CoreObject::FrameType, U"f_code", frame_code); field(CoreObject::FrameType, U"f_back", frame_back);

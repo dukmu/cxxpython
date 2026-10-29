@@ -65,7 +65,7 @@ namespace
         ASSERT_EQ(out.result().tag(), ResultTag::Ok); eval("result", out, globals); EXPECT_EQ(result(out), "True");
     }
 
-    TEST_F(CoreSource, ScopeClassificationIsFrozenBeforeEmissionAndRejectsUnloweredClosures)
+    TEST_F(CoreSource, ScopeClassificationAndClosureLayoutsAreFrozenBeforeEmission)
     {
         SourceUnit unit(SourceBuffer("x = 1\ndef f(arg):\n    before = later\n    later = arg\n    return before\n"));
         ASSERT_EQ(unit.scopes().size(), 2U); const auto &scope = unit.scopes()[1];
@@ -77,9 +77,74 @@ namespace
         EXPECT_EQ(closure.scopes()[1].symbols[0].classification, NameClass::Cell);
         bool free = false; for (const auto &symbol : closure.scopes()[2].symbols) free |= symbol.name == U"x" && symbol.classification == NameClass::Free;
         EXPECT_TRUE(free);
-        try { closure.freeze(context, out); FAIL(); }
-        catch (const SourceError &error) { EXPECT_EQ(error.kind, SourceErrorKind::Capability); }
-        EXPECT_EQ(out.result().tag(), ResultTag::Empty);
+        closure.freeze(context, out); EXPECT_EQ(out.result().tag(), ResultTag::Ok);
+        EXPECT_EQ(closure.scopes()[1].cellvars, (std::vector<std::u32string>{U"x"}));
+        EXPECT_EQ(closure.scopes()[2].freevars, (std::vector<std::u32string>{U"x"}));
+        run(context, {&closure, globals}, out); ASSERT_EQ(out.result().tag(), ResultTag::Ok);
+        eval("outer(42)()()", out, globals); EXPECT_EQ(result(out), "42");
+    }
+
+    TEST_F(CoreSource, ClosuresShareSiblingCellsButNotOtherFactoryInvocations)
+    {
+        const auto globals = dictionary(); ReturnSlot out(context);
+        exec("def outer(start):\n    global writer, eraser\n    value = start\n"
+             "    def read():\n        return value\n"
+             "    def write(new):\n        nonlocal value\n        value = new\n        return value\n"
+             "    def erase():\n        nonlocal value\n        del value\n"
+             "    writer = write\n    eraser = erase\n    return read\n"
+             "first = outer(7)\nsecond = outer(40)\nwriter(42)\n", globals, out);
+        ASSERT_EQ(out.result().tag(), ResultTag::Ok);
+        eval("first() * 100 + second()", out, globals); EXPECT_EQ(result(out), "742");
+        const auto second = *detail::name_lookup(context, globals.get(context), U"second");
+        const auto writer = *detail::name_lookup(context, globals.get(context), U"writer");
+        const auto closure = *context.payload<FunctionObject>(second).closure;
+        const auto &cells = context.payload<TupleObject>(closure).items;
+        ASSERT_EQ(cells.size(), 1U);
+        EXPECT_EQ(cells[0], context.payload<TupleObject>(*context.payload<FunctionObject>(writer).closure).items[0]);
+        eval("second.__closure__", out, globals); EXPECT_EQ(out.result().value(), closure);
+        eval("eraser()", out, globals); ASSERT_EQ(out.result().tag(), ResultTag::Ok);
+        eval("second()", out, globals); raised(out, CoreObject::NameErrorType);
+        eval("eraser()", out, globals); raised(out, CoreObject::NameErrorType);
+        eval("writer(99)", out, globals); EXPECT_EQ(result(out), "99");
+        eval("second()", out, globals); EXPECT_EQ(result(out), "99");
+        eval("writer('changed')", out, globals); EXPECT_EQ(result(out), "'changed'");
+        eval("second()", out, globals); EXPECT_EQ(result(out), "'changed'");
+        eval("writer(None)", out, globals); EXPECT_EQ(result(out), "None");
+        eval("second() is None", out, globals); EXPECT_EQ(result(out), "True");
+    }
+
+    TEST_F(CoreSource, CapturedParametersDefaultsAndIntermediateScopesUseOneCellAuthority)
+    {
+        const auto globals = dictionary(); ReturnSlot out(context);
+        exec("x = 100\ndef outer(x, /, *args, flag=2, **kw):\n"
+             "    def middle():\n        def inner(step=x, *, extra=flag):\n"
+             "            return x + flag + len(args) + len(kw) + step + extra\n"
+             "        return inner\n    x += 1\n    return middle\n"
+             "a = outer(10, 1, 2, flag=3, key=1)()\n", globals, out);
+        ASSERT_EQ(out.result().tag(), ResultTag::Ok);
+        eval("a()", out, globals); EXPECT_EQ(result(out), "31");
+        eval("a(1, extra=2)", out, globals); EXPECT_EQ(result(out), "20");
+        eval("a.__code__.co_freevars", out, globals); EXPECT_EQ(result(out), "('args', 'flag', 'kw', 'x')");
+        eval("outer.__code__.co_cellvars", out, globals); EXPECT_EQ(result(out), "('x', 'flag', 'args', 'kw')");
+        eval("outer.__code__.co_varnames", out, globals); EXPECT_EQ(result(out), "('x', 'flag', 'args', 'kw', 'middle')");
+        exec("def local():\n    value = 42\n    def inner():\n        return value\n    return inner\n", globals, out);
+        eval("local.__code__.co_varnames", out, globals); EXPECT_EQ(result(out), "('inner',)");
+        eval("x", out, globals); EXPECT_EQ(result(out), "100");
+    }
+
+    TEST_F(CoreSource, EmptyCapturedLocalsAndFreeVariablesRaiseDifferentPythonErrors)
+    {
+        const auto globals = dictionary(); ReturnSlot out(context);
+        exec("def outer(flag):\n    if flag:\n        x = 1\n    def inner():\n        return x\n    return inner\n"
+             "def local():\n    def inner():\n        return x\n    return x\n    x = 1\n"
+             "def deleted():\n    x = 1\n    def inner():\n        return x\n    del x\n    del x\n"
+             "def recursive():\n    def fact(n):\n        if n <= 1:\n            return 1\n        return n * fact(n - 1)\n    return fact\n", globals, out);
+        ASSERT_EQ(out.result().tag(), ResultTag::Ok);
+        eval("outer(0)()", out, globals); raised(out, CoreObject::NameErrorType);
+        eval("local()", out, globals); raised(out, CoreObject::UnboundLocalErrorType);
+        eval("deleted()", out, globals); raised(out, CoreObject::UnboundLocalErrorType);
+        eval("recursive()(10)", out, globals); EXPECT_EQ(result(out), "3628800");
+        eval("outer(1)()", out, globals); EXPECT_EQ(result(out), "1");
     }
 
     TEST_F(CoreSource, GlobalsAreExplicitAndDefaultsEvaluateAtDefinitionTime)
@@ -183,6 +248,17 @@ namespace
         run(context, {code}, out); ASSERT_EQ(out.result().tag(), ResultTag::Ok); EXPECT_EQ(result(out), "42");
     }
 
+    TEST_F(CoreSource, RecursiveClosureCyclesReturnToTheOriginalLiveSet)
+    {
+        const SourceUnit unit(SourceBuffer("def outer():\n    def recurse(n):\n        if n:\n            return recurse(n - 1)\n        return 42\n    return recurse\nresult = outer()(7)\n"));
+        context.collect(); const auto baseline = context.stats().objects;
+        for (int i = 0; i < 10; ++i)
+        {
+            { ReturnSlot out(context); run(context, {&unit}, out); ASSERT_EQ(out.tag(), ResultTag::Ok); }
+            context.collect(); EXPECT_EQ(context.stats().objects, baseline);
+        }
+    }
+
     TEST(SourceParallel, ImmutableNativeGraphsFreezeConcurrentlyWithoutSharedPythonState)
     {
         const SourceUnit unit(SourceBuffer("def f(n=40):\n    return n + 2\nresult = f()\n"));
@@ -209,28 +285,48 @@ namespace
 
     TEST(SourceParallel, OneFrozenSourceAndFunctionRunInOneSharedInterpreter)
     {
-        const SourceUnit unit(SourceBuffer("def total(n):\n    result = 0\n    while n:\n        result += n\n        n -= 1\n    return result\n"));
-        Interpreter interpreter; Attachment source(interpreter); source.bootstrap_core(); RootScope roots(source); ReturnSlot out(source);
-        source.allocate_instance<DictObject>(roots.root(source.builtin(CoreObject::DictType)), out); const auto globals = roots.root(out.result().value());
-        run(source, {&unit, globals}, out); ASSERT_EQ(out.result().tag(), ResultTag::Ok);
-        const auto fn = roots.root(*detail::name_lookup(source, globals.get(source), U"total"));
-        std::array transfers{source.make_transfer(fn), source.make_transfer(fn)}; std::latch ready(2), start(1); std::array<std::future<Transfer>, 2> tasks;
+        for (bool closure : {false, true})
         {
-            NativeWait wait(source);
-            for (std::size_t i = 0; i < tasks.size(); ++i)
-                tasks[i] = std::async(std::launch::async, [&, token = std::move(transfers[i])]() mutable {
-                    Attachment context(interpreter); RootScope roots(context); ReturnSlot function(context), argument(context), result(context);
-                    context.receive(token, function); const auto fn = roots.root(function.result().value());
-                    ready.count_down(); start.wait(); make_int(context, 20000, argument); std::array args{argument.result().value()};
-                    call(context, fn, {args, {}}, result); if (result.result().tag() != ResultTag::Ok) throw std::runtime_error("source call failed");
-                    context.collect(); return context.make_transfer(roots.root(result.result().value()));
-                });
-            ready.wait(); EXPECT_EQ(interpreter.gc_state().active, 2U); start.count_down();
-        }
-        for (auto &task : tasks)
-        {
-            Transfer result; { NativeWait wait(source); result = task.get(); }
-            source.receive(result, out); EXPECT_EQ(int_decimal(source, out.result().value()), "200010000");
+            SCOPED_TRACE(closure ? "shared closure" : "plain function");
+            const SourceUnit unit(SourceBuffer(closure ?
+                "def outer(step):\n    shared = 0\n    def total(n):\n        nonlocal shared\n        result = 0\n"
+                "        while n:\n            shared = n\n            result += n * step\n            n -= 1\n"
+                "        return result\n    return total\ntotal = outer(1)\n" :
+                "def total(n):\n    result = 0\n    while n:\n        result += n\n        n -= 1\n    return result\n"));
+            Interpreter interpreter; Attachment source(interpreter); source.bootstrap_core(); RootScope roots(source); ReturnSlot out(source);
+            source.allocate_instance<DictObject>(roots.root(source.builtin(CoreObject::DictType)), out); const auto globals = roots.root(out.value());
+            run(source, {&unit, globals}, out); ASSERT_EQ(out.tag(), ResultTag::Ok);
+            const auto fn = roots.root(*detail::name_lookup(source, globals.get(source), U"total"));
+            std::array transfers{source.make_transfer(fn), source.make_transfer(fn)}; std::latch ready(2), start(1); std::array<std::future<Transfer>, 2> tasks;
+            {
+                NativeWait wait(source);
+                for (std::size_t i = 0; i < tasks.size(); ++i)
+                    tasks[i] = std::async(std::launch::async, [&, token = std::move(transfers[i])]() mutable {
+                        bool announced = false;
+                        try
+                        {
+                            Attachment context(interpreter); RootScope roots(context); ReturnSlot function(context), argument(context), result(context);
+                            context.receive(token, function); const auto fn = roots.root(function.value());
+                            announced = true; ready.count_down(); start.wait(); make_int(context, 20000, argument); std::array args{argument.value()};
+                            call(context, fn, {args, {}}, result); if (result.tag() != ResultTag::Ok) throw std::runtime_error("source call failed");
+                            context.collect(); return context.make_transfer(roots.root(result.value()));
+                        }
+                        catch (...) { if (!announced) ready.count_down(); throw; }
+                    });
+                ready.wait(); EXPECT_EQ(interpreter.gc_state().active, 2U); start.count_down();
+            }
+            for (auto &task : tasks)
+            {
+                Transfer result; { NativeWait wait(source); EXPECT_NO_THROW(result = task.get()); }
+                if (!result) continue;
+                source.receive(result, out); EXPECT_EQ(int_decimal(source, out.value()), "200010000");
+            }
+            if (closure)
+            {
+                const auto tuple = *source.payload<FunctionObject>(fn).closure;
+                const auto cell = source.payload<TupleObject>(tuple).items[0];
+                ASSERT_TRUE(read_cell(source, cell, out)); EXPECT_EQ(int_decimal(source, out.value()), "1");
+            }
         }
     }
 }

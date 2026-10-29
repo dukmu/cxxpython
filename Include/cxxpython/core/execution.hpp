@@ -14,10 +14,11 @@ namespace cxxpython::core
         Binary, Compare, Jump, JumpIfFalse, Return, RaiseInstance, Call,
         EnterRegion, LeaveRegion, EndHandler, BreakLoop, ContinueLoop, Reraise, LoadException, ExceptionMatch,
         PrepareWith, EnterWith, WithExit, WithResult, LoadGlobal, StoreGlobal, DeleteGlobal, MakeFunction,
-        Unary, Inplace, Swap, LoadAttr, StoreAttr, DeleteAttr, BuildTuple, BuildNameDict, Count,
+        Unary, Inplace, Swap, LoadAttr, StoreAttr, DeleteAttr, BuildTuple, BuildNameDict,
+        LoadDeref, StoreDeref, DeleteDeref, LoadClosure, Count,
     };
-    enum class OperandDomain { None, Constant, Local, Name, Binary, Compare, Target, CallSite, Region, FunctionFlags, Unary, StackDepth, Count };
-    enum class FunctionFlags : std::uint32_t { None = 0, Defaults = 1, KeywordDefaults = 2 };
+    enum class OperandDomain { None, Constant, Local, Name, Binary, Compare, Target, CallSite, Region, FunctionFlags, Unary, StackDepth, Count, Cell };
+    enum class FunctionFlags : std::uint32_t { None = 0, Defaults = 1, KeywordDefaults = 2, Closure = 4 };
     enum class FlowKind { Next, Jump, Branch, Stop, Leave, EndHandler, LoopControl };
     enum class RegionKind { Loop, Except, Finally, With };
     enum class RegionPhase { Protected, Handler, Cleanup };
@@ -84,7 +85,7 @@ namespace cxxpython::core
         EmptyCode, UnknownOpcode, Operand, ConstantBounds, LocalBounds, JumpBounds,
         StackUnderflow, StackJoin, Fallthrough, Signature, SourcePosition,
         ForeignLabel, UnboundLabel, DuplicateLabel, SizeLimit, CallBounds,
-        RegionBounds, RegionStructure, RegionJump, StackBase, LoopTarget, NameBounds,
+        RegionBounds, RegionStructure, RegionJump, StackBase, LoopTarget, NameBounds, CellBounds, CellLayout,
     };
     class CodeValidationError : public std::invalid_argument
     {
@@ -103,6 +104,7 @@ namespace cxxpython::core
         SignatureLayout signature;
         std::vector<std::u32string> locals;
         std::optional<std::u32string> docstring;
+        std::vector<std::u32string> cellvars, freevars;
     };
     class CodeBuilder;
     class VerifiedCode final
@@ -117,6 +119,9 @@ namespace cxxpython::core
         std::size_t max_regions() const noexcept { return max_regions_; }
         const SignatureLayout &signature() const noexcept { return signature_; }
         std::span<const std::u32string> local_names() const noexcept { return locals_; }
+        std::span<const std::u32string> cell_names() const noexcept { return cellvars_; }
+        std::span<const std::u32string> free_names() const noexcept { return freevars_; }
+        std::span<const std::uint32_t> cell_locals() const noexcept { return cell_locals_; }
         std::size_t max_stack() const noexcept { return max_stack_; }
         std::uint32_t first_line() const noexcept { return first_line_; }
         std::size_t external_bytes() const noexcept;
@@ -124,16 +129,26 @@ namespace cxxpython::core
         friend class CodeBuilder;
         VerifiedCode(std::vector<Instruction> instructions, std::vector<SourcePosition> positions,
                      std::vector<CallLayout> calls, std::vector<RegionLayout> regions, SignatureLayout signature, std::vector<std::u32string> locals,
+                     std::vector<std::u32string> cellvars, std::vector<std::u32string> freevars,
                      std::size_t stack, std::uint32_t first_line)
             : instructions_(std::move(instructions)), positions_(std::move(positions)), calls_(std::move(calls)), regions_(std::move(regions)), signature_(std::move(signature)),
-              locals_(std::move(locals)), max_stack_(stack), first_line_(first_line)
-        { for (const auto &region : regions_) if (region.depth > max_regions_) max_regions_ = region.depth; }
+              locals_(std::move(locals)), cellvars_(std::move(cellvars)), freevars_(std::move(freevars)), max_stack_(stack), first_line_(first_line)
+        {
+            for (const auto &region : regions_) if (region.depth > max_regions_) max_regions_ = region.depth;
+            for (const auto &name : cellvars_)
+            {
+                std::size_t index = 0; while (locals_[index] != name) ++index;
+                cell_locals_.push_back(static_cast<std::uint32_t>(index));
+            }
+        }
         std::vector<Instruction> instructions_;
         std::vector<SourcePosition> positions_;
         std::vector<CallLayout> calls_;
         std::vector<RegionLayout> regions_;
         SignatureLayout signature_;
         std::vector<std::u32string> locals_;
+        std::vector<std::u32string> cellvars_, freevars_;
+        std::vector<std::uint32_t> cell_locals_;
         std::size_t max_stack_;
         std::uint32_t first_line_;
         std::size_t max_regions_ = 0;
@@ -142,11 +157,11 @@ namespace cxxpython::core
     {
         ObjectHeader header;
         const VerifiedCode program;
-        const Value constants, varnames, name, qualname, filename, call_keywords, names, docstring;
+        const Value constants, varnames, name, qualname, filename, call_keywords, names, docstring, cellvars, freevars;
         CodeObject(InitialType head, VerifiedCode code, Value consts, Value variables,
-                   Value name, Value qualname, Value filename, Value call_keywords, Value names, Value docstring)
+                   Value name, Value qualname, Value filename, Value call_keywords, Value names, Value docstring, Value cellvars, Value freevars)
             : header(head), program(std::move(code)), constants(consts), varnames(variables),
-              name(name), qualname(qualname), filename(filename), call_keywords(call_keywords), names(names), docstring(docstring) {}
+              name(name), qualname(qualname), filename(filename), call_keywords(call_keywords), names(names), docstring(docstring), cellvars(cellvars), freevars(freevars) {}
         void trace(Tracer &tracer) const noexcept;
         std::size_t external_bytes() const noexcept { return program.external_bytes(); }
     };
@@ -200,11 +215,11 @@ namespace cxxpython::core
     {
         ObjectHeader header;
         const Value code, globals, builtins;
-        const std::optional<Value> defaults, kwdefaults;
+        const std::optional<Value> defaults, kwdefaults, closure;
         const Value name, qualname;
         FunctionObject(InitialType head, Value code, Value globals, std::optional<Value> defaults,
-                       std::optional<Value> kwdefaults, Value name, Value qualname, Value builtins)
-            : header(head), code(code), globals(globals), builtins(builtins), defaults(defaults), kwdefaults(kwdefaults), name(name), qualname(qualname) {}
+                       std::optional<Value> kwdefaults, Value name, Value qualname, Value builtins, std::optional<Value> closure)
+            : header(head), code(code), globals(globals), builtins(builtins), defaults(defaults), kwdefaults(kwdefaults), closure(closure), name(name), qualname(qualname) {}
         void trace(Tracer &tracer) const noexcept;
     };
     struct FunctionSpec
@@ -213,6 +228,7 @@ namespace cxxpython::core
         std::optional<Handle> defaults = {}, kwdefaults = {};
         // Host execution environment; source/loader policy selects this mapping.
         std::optional<Handle> builtins = {};
+        std::optional<Handle> closure = {};
     };
     enum class FrameState { Created, Running, Completed };
     struct TracebackObject
@@ -235,6 +251,7 @@ namespace cxxpython::core
         std::optional<Value> back;
         std::vector<std::optional<Value>> locals;
         std::vector<Value> operands;
+        const std::vector<Value> cells;
         std::size_t pc = 0, sp = 0;
         std::atomic<std::size_t> last_instruction{std::numeric_limits<std::size_t>::max()};
         std::optional<std::size_t> pending_call;
@@ -243,15 +260,16 @@ namespace cxxpython::core
         std::optional<TracedReason> reason;
         std::optional<Value> handled_exception;
         FrameState state = FrameState::Created;
-        FrameObject(InitialType head, Value function, Value code, std::size_t local_count, std::size_t stack_count, Value padding, std::size_t max_regions = 0)
-            : header(head), function(function), code(code), locals(local_count), operands(stack_count, padding)
+        FrameObject(InitialType head, Value function, Value code, std::size_t local_count, std::size_t stack_count, Value padding,
+                    std::size_t max_regions = 0, std::vector<Value> cells = {})
+            : header(head), function(function), code(code), locals(local_count), operands(stack_count, padding), cells(std::move(cells))
         { regions.reserve(max_regions); cleanups.reserve(max_regions); }
         void trace(Tracer &tracer) const noexcept;
         void trim_stack(Attachment &context, std::size_t size) noexcept;
         bool unwind(Attachment &context);
         void finish_handler(Attachment &context);
         std::size_t external_bytes() const noexcept
-        { return locals.capacity() * sizeof(std::optional<Value>) + operands.capacity() * sizeof(Value) +
+        { return locals.capacity() * sizeof(std::optional<Value>) + (operands.capacity() + cells.capacity()) * sizeof(Value) +
                  regions.capacity() * sizeof(ActiveRegion) + cleanups.capacity() * sizeof(CleanupContinuation); }
     };
     const OpcodeDefinition &opcode_definition(Opcode opcode);

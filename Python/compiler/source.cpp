@@ -72,9 +72,24 @@ namespace cxxpython::core::detail
                     auto &info = program_.scopes[scope];
                     for (const auto &entry : bindings_[scope].entries)
                     {
+                        if (entry.classification == NameClass::Local || entry.classification == NameClass::Cell) info.locals.push_back(entry.name);
+                        if (entry.classification == NameClass::Cell && entry.parameter) info.cellvars.push_back(entry.name);
+                        if (entry.classification == NameClass::Free) info.freevars.push_back(entry.name);
+                    }
+                    const auto cell_parameters = info.cellvars.size();
+                    for (const auto &entry : bindings_[scope].entries)
+                        if (entry.classification == NameClass::Cell && !entry.parameter) info.cellvars.push_back(entry.name);
+                    std::sort(info.cellvars.begin() + cell_parameters, info.cellvars.end());
+                    std::sort(info.freevars.begin(), info.freevars.end());
+                    for (const auto &entry : bindings_[scope].entries)
+                    {
                         std::optional<std::size_t> slot;
-                        if (entry.classification == NameClass::Local || entry.classification == NameClass::Cell)
-                        { slot = info.locals.size(); info.locals.push_back(entry.name); }
+                        if (entry.classification == NameClass::Local)
+                            slot = std::find(info.locals.begin(), info.locals.end(), entry.name) - info.locals.begin();
+                        else if (entry.classification == NameClass::Cell)
+                            slot = std::find(info.cellvars.begin(), info.cellvars.end(), entry.name) - info.cellvars.begin();
+                        else if (entry.classification == NameClass::Free)
+                            slot = info.cellvars.size() + (std::find(info.freevars.begin(), info.freevars.end(), entry.name) - info.freevars.begin());
                         info.symbols.push_back({entry.name, entry.classification, entry.first, slot});
                     }
                 }
@@ -84,7 +99,7 @@ namespace cxxpython::core::detail
             std::size_t add(ScopeKind kind, std::u32string name, std::u32string qualname, std::optional<std::size_t> parent, Span span)
             {
                 const auto id = bindings_.size(); bindings_.emplace_back();
-                program_.scopes.push_back({kind, std::move(name), std::move(qualname), parent, span, {}, {}}); return id;
+                program_.scopes.push_back({kind, std::move(name), std::move(qualname), parent, span, {}, {}, {}, {}}); return id;
             }
             void expression(const Expr &value, std::size_t scope)
             {
@@ -181,8 +196,11 @@ namespace cxxpython::core::detail
             void name(const std::u32string &text, Span span, Opcode local, Opcode global)
             {
                 const auto &binding = symbol(text);
-                if (binding.classification == NameClass::Local || binding.classification == NameClass::Cell)
+                if (binding.classification == NameClass::Local)
                     emit(local, span, static_cast<std::uint32_t>(*binding.slot));
+                else if (binding.classification == NameClass::Cell || binding.classification == NameClass::Free)
+                    emit(local == Opcode::LoadFast ? Opcode::LoadDeref : local == Opcode::StoreFast ? Opcode::StoreDeref : Opcode::DeleteDeref,
+                         span, static_cast<std::uint32_t>(*binding.slot));
                 else emit(global, span, 0, text);
             }
             void test(const Expr &value, std::size_t yes, std::size_t no, bool preserve = false)
@@ -344,8 +362,17 @@ namespace cxxpython::core::detail
                             for (const auto &parameter : node.parameters) if (parameter.default_value && parameter.kind == ParameterKind::KeywordOnly)
                             { expression(*parameter.default_value); keywords.push_back(parameter.name); }
                             if (!keywords.empty()) { emit(Opcode::BuildNameDict, span); current().instructions.back().keywords = keywords; }
+                            const auto &freevars = program_.scopes[node.scope].freevars;
+                            for (const auto &name : freevars)
+                            {
+                                const auto &binding = symbol(name);
+                                if (binding.classification != NameClass::Cell && binding.classification != NameClass::Free)
+                                    throw std::logic_error("child free variable has no enclosing cell");
+                                emit(Opcode::LoadClosure, span, static_cast<std::uint32_t>(*binding.slot));
+                            }
+                            if (!freevars.empty()) emit(Opcode::BuildTuple, span, static_cast<std::uint32_t>(freevars.size()));
                             emit(Opcode::LoadConst, span); current().instructions.back().function = node.scope;
-                            emit(Opcode::MakeFunction, span, (defaults ? 1 : 0) | (!keywords.empty() ? 2 : 0));
+                            emit(Opcode::MakeFunction, span, (defaults ? 1 : 0) | (!keywords.empty() ? 2 : 0) | (!freevars.empty() ? 4 : 0));
                             name(node.name, span, Opcode::StoreFast, Opcode::StoreGlobal);
                         }
                     }, statement->node);
@@ -410,9 +437,6 @@ namespace cxxpython::core
     void SourceUnit::freeze(Attachment &context, ReturnSlot &out) const
     {
         out.reset(context);
-        for (const auto &scope : program_->scopes) for (const auto &symbol : scope.symbols)
-            if (symbol.classification == NameClass::Cell || symbol.classification == NameClass::Free)
-                throw SourceError(source(), symbol.declaration, "closure lowering requires the remaining Cell/closure execution capability", SourceErrorKind::Capability);
         try
         {
             RootScope roots(context); ReturnSlot temporary(context); std::vector<Handle> codes(program_->graphs.size());
@@ -423,6 +447,7 @@ namespace cxxpython::core
                 CodeSpec spec; spec.name = scope.name; spec.qualname = scope.qualname; spec.filename = filename_text;
                 spec.first_line = source().position(scope.span).line; spec.locals = scope.locals; spec.signature = graph.signature;
                 spec.docstring = graph.docstring;
+                spec.cellvars = scope.cellvars; spec.freevars = scope.freevars;
                 CodeBuilder builder(context, std::move(spec)); std::vector<CodeBuilder::Label> labels;
                 for (std::size_t i = 0; i < graph.blocks.size(); ++i) labels.push_back(builder.label());
                 for (std::size_t i = 0; i < graph.blocks.size(); ++i)

@@ -41,13 +41,23 @@ class SourceDifferential(unittest.TestCase):
             ("def factory():\n    def child():\n        return 42\n    return child\na = factory()\nb = factory()", "a is not b and a.__code__ is b.__code__"),
             ("'module doc'\ndef f():\n    'function doc'\n    return __debug__", "__doc__ + ' ' + f.__doc__"),
             ("'module doc'\nglobal __doc__", "__doc__"),
+            ("def outer(x):\n    def middle():\n        def inner():\n            return x\n        return inner\n    return middle", "outer(42)()()"),
+            ("def outer(x):\n    def read():\n        return x\n    def bump():\n        nonlocal x\n        x += 1\n    bump()\n    return read\na = outer(40)\nb = outer(10)", "a() * 100 + b()"),
+            ("def outer(x, /, *args, flag=2, **kw):\n    def inner(step=x, *, extra=flag):\n        return x + flag + len(args) + len(kw) + step + extra\n    x += 1\n    return inner\na = outer(10, 1, 2, flag=3, key=1)", "a()"),
+            ("def outer(z, a):\n    x = 1\n    y = 2\n    def inner():\n        return z + a + x + y\n    return inner", "outer.__code__.co_cellvars"),
+            ("def outer(z, a):\n    x = 1\n    y = 2\n    def inner():\n        return z + a + x + y\n    return inner", "outer.__code__.co_varnames"),
+            ("def outer(z, a):\n    x = 1\n    y = 2\n    def inner():\n        return z + a + x + y\n    return inner", "outer(1, 2).__code__.co_freevars"),
+            ("def outer():\n    def fact(n):\n        if n <= 1:\n            return 1\n        return n * fact(n - 1)\n    return fact", "outer()(15)"),
+            ("x = 42\ndef outer():\n    x = 1\n    def middle():\n        global x\n        def inner():\n            return x\n        return inner\n    return middle", "outer()()()"),
+            ("def outer(x):\n    def read():\n        return x\n    return read\na = outer(1)\nb = outer(2)", "a is not b and a.__closure__ is not b.__closure__ and a.__code__ is b.__code__"),
         ]
         for source, expression in cases:
             with self.subTest(expression=expression):
                 self.check_program(source, expression)
 
     def test_compile_and_runtime_errors_stay_distinct(self):
-        for source in ["return 1", "break", "if 1:\nx = 2", "def f(a, a): pass", "x = 1\nglobal x"]:
+        for source in ["return 1", "break", "if 1:\nx = 2", "def f(a, a): pass", "x = 1\nglobal x",
+                       "def f():\n    nonlocal missing", "def f(x):\n    nonlocal x", "def f():\n    global x\n    nonlocal x"]:
             with self.subTest(source=source):
                 actual = self.execute([self.binary, "-c", source])
                 expected = self.execute([self.reference, "-c", source])
@@ -59,6 +69,16 @@ class SourceDifferential(unittest.TestCase):
         self.assertIn("Traceback", actual.stderr)
         self.assertIn("line 2", actual.stderr)
         self.assertIn("ZeroDivisionError", actual.stderr)
+        for source, error in [
+            ("def f():\n    def inner():\n        return x\n    return x\n    x = 1\nf()", "UnboundLocalError"),
+            ("def f():\n    x = 1\n    def inner():\n        return x\n    del x\n    return inner\nf()()", "NameError"),
+        ]:
+            actual = self.execute([self.binary, "-c", source])
+            expected = self.execute([self.reference, "-c", source])
+            self.assertEqual(actual.returncode, 1, actual.stderr)
+            self.assertNotEqual(expected.returncode, 0)
+            self.assertIn(error, actual.stderr)
+            self.assertIn(error, expected.stderr)
 
     def test_file_entry_and_unicode_diagnostics(self):
         with tempfile.TemporaryDirectory() as directory:

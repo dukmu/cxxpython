@@ -40,6 +40,7 @@ namespace cxxpython::core
         std::u32string name;
         NameClass classification;
         Span declaration;
+        // Local: fast slot. Cell/Free: cellvars followed by freevars.
         std::optional<std::size_t> slot;
     };
     struct ScopeInfo
@@ -50,6 +51,7 @@ namespace cxxpython::core
         Span span;
         std::vector<SymbolInfo> symbols;
         std::vector<std::u32string> locals;
+        std::vector<std::u32string> cellvars, freevars;
     };
     namespace detail { struct SourceProgram; }
     // Pure host parse/scope/CFG state; immutable and shareable after construction.

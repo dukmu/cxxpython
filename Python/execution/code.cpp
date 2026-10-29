@@ -46,6 +46,10 @@ namespace cxxpython::core
             OpcodeDefinition{"DELETE_ATTR", 1, 1, 0, OperandDomain::Name, FlowKind::Next, true, true},
             OpcodeDefinition{"BUILD_TUPLE", 0, 0, 1, OperandDomain::Count, FlowKind::Next, true, true},
             OpcodeDefinition{"BUILD_NAME_DICT", 0, 0, 1, OperandDomain::CallSite, FlowKind::Next, true, true},
+            OpcodeDefinition{"LOAD_DEREF", 0, 0, 1, OperandDomain::Cell, FlowKind::Next, true, true},
+            OpcodeDefinition{"STORE_DEREF", 1, 1, 0, OperandDomain::Cell, FlowKind::Next, false, false},
+            OpcodeDefinition{"DELETE_DEREF", 0, 0, 0, OperandDomain::Cell, FlowKind::Next, true, true},
+            OpcodeDefinition{"LOAD_CLOSURE", 0, 0, 1, OperandDomain::Cell, FlowKind::Next, false, false},
         };
         static_assert(definitions.size() == static_cast<std::size_t>(Opcode::Count));
         [[noreturn]] void invalid(CodeErrorKind kind, const char *message, std::optional<std::size_t> pc = {})
@@ -86,6 +90,16 @@ namespace cxxpython::core
             std::unordered_set<std::u32string> names;
             for (const auto &name : spec.locals)
                 if (name.empty() || !names.insert(name).second) invalid(CodeErrorKind::Signature, "empty or duplicate local name");
+            const auto limit = std::numeric_limits<std::uint32_t>::max();
+            if (spec.locals.size() > limit || spec.cellvars.size() > limit || spec.freevars.size() > limit - spec.cellvars.size())
+                invalid(CodeErrorKind::SizeLimit, "too many local or closure slots");
+            std::unordered_set<std::u32string> closure_names;
+            for (const auto &name : spec.cellvars)
+                if (!names.contains(name) || !closure_names.insert(name).second)
+                    invalid(CodeErrorKind::CellLayout, "cell variable must identify one distinct local slot");
+            for (const auto &name : spec.freevars)
+                if (name.empty() || names.contains(name) || !closure_names.insert(name).second)
+                    invalid(CodeErrorKind::CellLayout, "free variable must be distinct from locals and other cells");
             for (std::size_t pc = 0; pc < instructions.size(); ++pc)
             {
                 const auto [opcode, operand] = instructions[pc];
@@ -101,12 +115,17 @@ namespace cxxpython::core
                         break;
                     case OperandDomain::Local:
                         if (operand >= spec.locals.size()) invalid(CodeErrorKind::LocalBounds, "local index out of bounds", pc);
+                        if (std::find(spec.cellvars.begin(), spec.cellvars.end(), spec.locals[operand]) != spec.cellvars.end())
+                            invalid(CodeErrorKind::CellLayout, "captured locals must use cell operations", pc);
+                        break;
+                    case OperandDomain::Cell:
+                        if (operand >= spec.cellvars.size() + spec.freevars.size()) invalid(CodeErrorKind::CellBounds, "closure index out of bounds", pc);
                         break;
                     case OperandDomain::Name:
                         if (operand >= name_count) invalid(CodeErrorKind::NameBounds, "name index out of bounds", pc);
                         break;
                     case OperandDomain::FunctionFlags:
-                        if (operand & ~3U) invalid(CodeErrorKind::Operand, "invalid function creation flags", pc);
+                        if (operand & ~7U) invalid(CodeErrorKind::Operand, "invalid function creation flags", pc);
                         break;
                     case OperandDomain::Target:
                         if (operand >= instructions.size()) invalid(CodeErrorKind::JumpBounds, "jump target out of bounds", pc);
@@ -267,7 +286,7 @@ namespace cxxpython::core
             invalid(CodeErrorKind::CallBounds, "call-site index out of bounds");
         const auto arguments = definition.operand == OperandDomain::CallSite ? calls[instruction.operand].argument_count() :
             definition.operand == OperandDomain::Count ? instruction.operand : 0;
-        if (definition.operand == OperandDomain::FunctionFlags && (instruction.operand & ~3U))
+        if (definition.operand == OperandDomain::FunctionFlags && (instruction.operand & ~7U))
             invalid(CodeErrorKind::Operand, "invalid function creation flags");
         const auto defaults = definition.operand == OperandDomain::FunctionFlags ? std::popcount(instruction.operand) : 0;
         const auto inputs = definition.operand == OperandDomain::StackDepth ? instruction.operand : definition.inputs;
@@ -277,12 +296,15 @@ namespace cxxpython::core
     {
         auto bytes = instructions_.capacity() * sizeof(Instruction) + positions_.capacity() * sizeof(SourcePosition) +
                      calls_.capacity() * sizeof(CallLayout) + regions_.capacity() * sizeof(RegionLayout) +
-                     locals_.capacity() * sizeof(std::u32string) + signature_.external_bytes();
+                     (locals_.capacity() + cellvars_.capacity() + freevars_.capacity()) * sizeof(std::u32string) +
+                     cell_locals_.capacity() * sizeof(std::uint32_t) + signature_.external_bytes();
         for (const auto &local : locals_) bytes += string_bytes(local);
+        for (const auto &name : cellvars_) bytes += string_bytes(name);
+        for (const auto &name : freevars_) bytes += string_bytes(name);
         return bytes;
     }
     void CodeObject::trace(Tracer &tracer) const noexcept
-    { for (auto value : {constants, varnames, name, qualname, filename, call_keywords, names, docstring}) tracer.visit(value); }
+    { for (auto value : {constants, varnames, name, qualname, filename, call_keywords, names, docstring, cellvars, freevars}) tracer.visit(value); }
     CodeBuilder::CodeBuilder(Attachment &context, CodeSpec spec) : context_(context), roots_(context), spec_(std::move(spec))
     {
         if (!context.core_ready()) throw std::logic_error("CodeBuilder requires the B3 image");
@@ -363,14 +385,25 @@ namespace cxxpython::core
             regions.push_back(layout);
         }
         const auto maximum = verify(spec_, instructions, positions_, calls, regions, scopes_, constants_.size(), names_.size());
-        VerifiedCode verified(std::move(instructions), positions_, std::move(calls), std::move(regions), spec_.signature, spec_.locals, maximum, spec_.first_line);
+        VerifiedCode verified(std::move(instructions), positions_, std::move(calls), std::move(regions), spec_.signature,
+                              spec_.locals, spec_.cellvars, spec_.freevars, maximum, spec_.first_line);
         RootScope roots(context_); ReturnSlot temporary(context_);
         cxxpython::core::make_tuple(context_, constants_, temporary); auto constants = roots.root(temporary.value());
         cxxpython::core::make_tuple(context_, names_, temporary); auto global_names = roots.root(temporary.value());
         std::vector<Value> names;
-        for (const auto &name : spec_.locals)
-        { make_str(context_, name, temporary); names.push_back(roots.root(temporary.value()).get(context_)); }
+        const auto parameters = spec_.signature.parameters.size() + bool(spec_.signature.varargs) + bool(spec_.signature.varkwargs);
+        for (std::size_t i = 0; i < spec_.locals.size(); ++i)
+            if (i < parameters || std::find(spec_.cellvars.begin(), spec_.cellvars.end(), spec_.locals[i]) == spec_.cellvars.end())
+            { make_str(context_, spec_.locals[i], temporary); names.push_back(roots.root(temporary.value()).get(context_)); }
         cxxpython::core::make_tuple(context_, names, temporary); auto varnames = roots.root(temporary.value());
+        auto closure_names = [&](const std::vector<std::u32string> &entries) {
+            if (entries.empty()) return roots.root(context_.builtin(CoreObject::EmptyTuple));
+            std::vector<Value> values;
+            for (const auto &entry : entries)
+            { make_str(context_, entry, temporary); values.push_back(roots.root(temporary.value()).get(context_)); }
+            cxxpython::core::make_tuple(context_, values, temporary); return roots.root(temporary.value());
+        };
+        const auto cellvars = closure_names(spec_.cellvars), freevars = closure_names(spec_.freevars);
         make_str(context_, spec_.name, temporary); auto name = roots.root(temporary.value());
         make_str(context_, spec_.qualname.value_or(spec_.name), temporary); auto qualname = roots.root(temporary.value());
         make_str(context_, spec_.filename, temporary); auto filename = roots.root(temporary.value());
@@ -390,7 +423,8 @@ namespace cxxpython::core
         { cxxpython::core::make_tuple(context_, keyword_tables, temporary); call_keywords = roots.root(temporary.value()); }
         auto type = roots.root(context_.builtin(CoreObject::CodeType));
         context_.allocate_instance<CodeObject>(type, out, std::move(verified), constants.get(context_), varnames.get(context_),
-                                             name.get(context_), qualname.get(context_), filename.get(context_), call_keywords.get(context_), global_names.get(context_), docstring.get(context_));
+                                             name.get(context_), qualname.get(context_), filename.get(context_), call_keywords.get(context_), global_names.get(context_),
+                                             docstring.get(context_), cellvars.get(context_), freevars.get(context_));
     }
     void CodeBuilder::call(std::uint32_t positional, std::span<const std::u32string> keywords, SourcePosition source)
     { call_site(Opcode::Call, positional, keywords, source); }

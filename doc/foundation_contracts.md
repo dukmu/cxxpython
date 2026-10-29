@@ -22,7 +22,7 @@ is retained; the concurrency gates do not narrow language/library/release scope.
 | N1 roots/heap/GC | Experimental | Thread-owned roots/spans, epochs, bounded atomic load-to-root and managed transfer leases exist; native slow-path, duration/timeout and complete lifecycle audits remain |
 | N2 shared objects/methods | Experimental | Atomic header/tails/exception edges, immutable DictStorage/TypeSnapshot and const Function call data implemented; general containers, future mutable Function setters and full native-duration audit remain |
 | N3 parallel VM | Experimental | Same Function/Code CPU loops, collecting callbacks, shared exception CALL/with/finally, allocation-free polling and generated 1/2/4-worker costs now run; full language/thread API and performance acceptance remain |
-| N4 execution/runtime completion | Experimental | Globals/builtins lookup, global mutation and runtime Function creation added; closures, general namespace mappings, suspension, resources/import and lifecycle remain |
+| N4 execution/runtime completion | Experimental | Globals/builtins lookup, global mutation, runtime Function creation and shared lexical closures added; general namespace mappings, suspension, resources/import and lifecycle remain |
 | N5 source/library | Experimental | Independent Source/ScopeInfo/CFG -> Code/VM L0 bridge, pinned curated source differential and source CPU workers exist; complete language/library workflows remain |
 | N6 release | Planned | Full language/library, platform, performance and replacement gates |
 
@@ -49,8 +49,8 @@ All new C++ interfaces are internal and unstable until the M1-M4 gates pass.
 | M1 storage/environment | Experimental | B0-B2 storage and seed gates now pass; interfaces remain internal/unstable |
 | M2 types/methods/call | Experimental | Calls/construction, field tails, cells, B2 promotion and common hash/repr/str/truth/comparison/arithmetic dispatch exist; full protocols/reflection/mutation and weakrefs remain |
 | M3 builtins | Experimental | Int/bool seed, initial Unicode value/representation/hash, tuple and cell value semantics; complete numeric, container, iterator, codec/buffer and finalization matrices remain |
-| M4 execution | Experimental | Verified Code/Function/Frame, non-recursive calls, tracebacks, structured unwind/with, global namespaces and runtime Function creation exist; full exception normalization, closures/general mappings and suspension remain |
-| M5 frontend | Experimental | Source/Span, lexical scopes and CFG lower the initial L0 subset; closure/class/remaining syntax, Unicode identifiers and full differential matrix remain |
+| M4 execution | Experimental | Verified Code/Function/Frame, non-recursive calls, tracebacks, structured unwind/with, global namespaces, Function creation and lexical closures exist; full exception normalization, general mappings and suspension remain |
+| M5 frontend | Experimental | Source/Span, lexical scopes and CFG lower the initial L0 subset plus closures/nonlocal; class/remaining syntax, Unicode identifiers and full differential matrix remain |
 | M6 boot/platform | Experimental | RunRequest and experimental source/file/eval bridge exist; module loader/import, full CLI/embedding, I/O, thread API and shutdown remain |
 | M7 libraries | Planned | Real workflows and dependency closures, including unittest |
 | M8 optimization | Planned | Guarded optimizations and expanded language/library matrix |
@@ -1569,8 +1569,8 @@ local slots or resolving implicit/explicit globals and free/cell variables.
 Function parameters prefix locals. Assignment's symbol traversal is lexical;
 execution still evaluates the RHS before targets. Defaults are analyzed/evaluated
 in the defining scope. Ancestor binding, global barriers and transitive free
-variables are resolved before opcode emission. Unlowered Cell/Free scopes are
-rejected explicitly at freeze, never executed as implicit globals.
+variables are resolved before opcode emission. Cell/Free bindings lower to the
+explicit closure operations below, never to implicit globals.
 
 CFG blocks have explicit jump/branch/return edges. Value and test contexts are
 lowered separately so short-circuit boolean and chained comparison conditions
@@ -1587,11 +1587,12 @@ The Experimental accepted subset includes:
 - Name/attribute targets, chained assignment, augmented assignment and del;
   if/elif/else, while/else, break/continue, pass and function return.
 - Function definitions, positional-only and keyword-only parameters, defaults,
-  variadic parameter bindings, global declarations, module/function docstrings.
+  variadic parameter bindings, global/nonlocal declarations, lexical closures
+  and module/function docstrings.
   MAKE_FUNCTION reuses each scope's actual verified Code and current environment.
 
 Floats/complex, true division/power, dynamic containers, iteration/unpacking,
-classes/closures, import/handlers/with lowering, f-strings and remaining grammar
+classes, import/handlers/with lowering, f-strings and remaining grammar
 are not source-supported yet. Existing corresponding VM slices are retained.
 Unicode identifier NFKC, full escape warnings/name lookup, source encoding-cookie
 policy and the complete Python diagnostic/object matrix remain. Source input and
@@ -1716,3 +1717,68 @@ handle vectors no longer appears. The binary hash/build flags are retained in
 the corresponding raw benchmark records. Next work must advance guarded call
 execution and remaining closure/source/runtime dependencies, not extend this
 change into further root-safety scaffolding.
+
+## Lexical Closures In The Shared Heap
+
+CodeSpec/VerifiedCode now define cellvars and freevars. Each cellvar identifies
+one local slot; freevars are disjoint from locals and other cells. The verifier
+rejects duplicate/missing layouts and all out-of-range closure operands,
+including unreachable instructions. LOAD/STORE/DELETE_FAST cannot target a
+captured local, so no second mutable copy can diverge from its Cell contents.
+The combined closure operand space is cellvars followed by freevars; it is an
+internal uint32 index, not a promise of CPython bytecode encoding.
+
+The source scope pass freezes captured parameter names in parameter order,
+other cellvars in sorted order and freevars in sorted order before CFG emission.
+SymbolInfo.slot is a fast slot for Local, combined cell slot for Cell/Free.
+Internal local storage retains parameter-prefix indexing; co_varnames excludes
+non-parameter cellvars, like the selected reference. co_cellvars/co_freevars are
+actual managed immutable tuples. Defaults are still evaluated in the defining
+scope before Function creation. Each source scope still freezes one Code object;
+creating closures constructs Functions/Cells, not more Code instances.
+
+FunctionSpec.closure is an optional rooted tuple of Cell objects, retained by
+the immutable Function and exposed as its actual __closure__ (None if absent).
+None is treated as absent. Nonzero freevars require a closure; non-tuples or
+non-cell elements raise TypeError, and length mismatch raises ValueError.
+An explicit empty tuple with zero freevars is retained. Read-only Function
+fields do not require another FunctionCallState node; future setters still
+require coherent immutable publication under the existing Plan 2 contract.
+
+Before publishing a new Frame, make_frame prepares and roots a new Cell for
+every cellvar, initially holding the bound parameter value or unbound. It then
+copies the existing free Cell identities from Function.closure. The Frame's
+cell vector is const, traced and accounted as external storage; its lifetime
+never depends on a C++ stack or the defining Frame remaining alive. Captured
+parameter fast slots stay empty during execution. Sibling Functions capture the
+same Cells; separate factory calls create distinct Cells. Recursive
+Function/Cell cycles use the ordinary tracing collector without RC or side roots.
+
+New opcodes use the existing verifier, disassembly, exception and poll contracts:
+
+- LOAD_DEREF cell: [] -> [value]. One rooted atomic load; unbound local Cell
+  raises UnboundLocalError, unbound free Cell raises NameError.
+- STORE_DEREF cell: [value] -> []. Atomic edge store while the input remains
+  traced on the operand stack; no callback/allocation or interpreter lock.
+- DELETE_DEREF cell: [] -> []. One atomic exchange into the existing result
+  slot, not check-then-clear. Unbound raises the same local/free error types.
+- LOAD_CLOSURE cell: [] -> [Cell]. Captures identity even when contents unbound.
+- MAKE_FUNCTION now accepts Closure=4 alongside Defaults=1/KeywordDefaults=2.
+  Stack order is optional defaults, kwdefaults, closure tuple, then Code; it
+  consumes those operands and produces one Function. Unknown flags and missing
+  stack operands fail verification; closure shape errors are ordinary Python
+  runtime exceptions, leaving original operands rooted until completion.
+
+The same Function/Code/closure tuple can execute on multiple OS threads in one
+Interpreter. Shared Cell contents use the existing rooted AtomicGcEdge load,
+store and exchange paths. Compound Python operations such as nonlocal x += 1
+are not implicitly atomic; no function mutex or GIL covers their read/compute/
+write sequence. The source parallel test now includes concurrent nonlocal writes
+and captured reads during explicit/automatic GC, preserving both exact local
+CPU results and the shared Cell identity.
+
+The benchmark adds a real source-derived closure loop to the existing 1/2/4
+worker workflow. Its source is captured as closure_kernel_hex; the recorder
+executes the exact text on the pinned CPython reference and derives separate
+closure scaling/comparison rows. It does not compare that workload with the
+different plain-source kernel or reuse another probe's baseline.

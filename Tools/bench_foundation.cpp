@@ -311,19 +311,23 @@ int main()
     constexpr int vm_total = 120000;
     std::optional<SourceUnit> source_program;
     const auto parse_ns = measure([&] { source_program.emplace(SourceBuffer("def total(n):\n    value = 0\n    while n:\n        value += n\n        n -= 1\n    return value\n")); });
-    std::string source_hex; constexpr char hex[] = "0123456789abcdef";
-    for (unsigned char byte : source_program->source().text()) { source_hex += hex[byte >> 4]; source_hex += hex[byte & 15]; }
+    const SourceUnit closure_program(SourceBuffer("def factory(step):\n    def total(n):\n        value = 0\n        while n:\n            value += n\n            n -= step\n        return value\n    return total\ntotal = factory(1)\n"));
+    auto hex_source = [](const SourceUnit &source) {
+        std::string result; constexpr char hex[] = "0123456789abcdef";
+        for (unsigned char byte : source.source().text()) { result += hex[byte >> 4]; result += hex[byte & 15]; }
+        return result;
+    };
     std::cout << "source_parse_scope_cfg_ns=" << parse_ns << " source_bytes=" << source_program->source().text().size()
-              << " source_kernel_hex=" << source_hex << '\n';
-    for (bool from_source : {false, true})
+              << " source_kernel_hex=" << hex_source(*source_program) << " closure_kernel_hex=" << hex_source(closure_program) << '\n';
+    for (const auto *source : std::array<const SourceUnit *, 3>{nullptr, &*source_program, &closure_program})
     for (int workers : {1, 2, 4})
     {
         Interpreter vm; Attachment controller(vm); controller.bootstrap_core(); RootScope roots(controller); ReturnSlot out(controller);
         Handle function; std::int64_t freeze_run_ns = 0;
         controller.allocate_instance<DictObject>(roots.root(controller.builtin(CoreObject::DictType)), out); const auto globals = roots.root(out.result().value());
-        if (from_source)
+        if (source)
         {
-            freeze_run_ns = measure([&] { run(controller, {&*source_program, globals}, out); });
+            freeze_run_ns = measure([&] { run(controller, {source, globals}, out); });
             if (out.result().tag() != ResultTag::Ok) return 1;
             function = roots.root(*detail::name_lookup(controller, globals.get(controller), U"total"));
         }
@@ -365,7 +369,8 @@ int main()
         const auto finished = controller.stats(); finish.arrive_and_wait();
         for (auto &task : tasks) if (!task.get()) return 1;
         controller.collect(); const auto final = controller.stats(); if (final.objects != baseline.objects || final.transfer_roots) return 1;
-        std::cout << (from_source ? "parallel_source_workers=" : "parallel_vm_workers=") << workers << " total_iterations=" << vm_total << " wall_ns=" << wall_ns
+        std::cout << (source == &closure_program ? "parallel_closure_workers=" : source ? "parallel_source_workers=" : "parallel_vm_workers=")
+                  << workers << " total_iterations=" << vm_total << " wall_ns=" << wall_ns
                   << " process_cpu_ns=" << cpu_ns << " collections=" << final.collections - baseline.collections
                   << " max_rendezvous_ns=" << final.max_rendezvous_ns << " last_mark_sweep_ns=" << final.last_pause_ns
                   << " finish_reserved_bytes=" << finished.reserved_bytes << " finish_metadata_bytes=" << finished.metadata_bytes

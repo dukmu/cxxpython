@@ -1,10 +1,10 @@
 {
-  "captured_at": "2026-10-29T12:07:02.466121+00:00",
+  "captured_at": "2026-10-29T12:28:36.323326+00:00",
   "reference_version": "Python 3.12.14",
   "provenance": {
     "binary": {
       "path": "/home/shefrin/repo/cxxpython/build/cxxpython_next",
-      "sha256": "3f088d2db129fb3938c841ae0985f3f605b35dbaa85603bf9c2e3159709ec80d"
+      "sha256": "0a1d350ed561cb1509d730c847496e66c21f5ac1b77b9efabb07011616fea356"
     },
     "reference": {
       "path": "/tmp/cxxpython-cpython31214-build/python",
@@ -117,6 +117,66 @@
       "command": [
         "build/cxxpython_next",
         "-c",
+        "def f():\n    nonlocal missing"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 2\n    nonlocal missing\n             ^\nSyntaxError: no binding for nonlocal name found\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "def f():\n    nonlocal missing"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 2\nSyntaxError: no binding for nonlocal 'missing' found\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython_next",
+        "-c",
+        "def f(x):\n    nonlocal x"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 2\n    nonlocal x\n             ^\nSyntaxError: name used, assigned or parameter before global/nonlocal declaration\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "def f(x):\n    nonlocal x"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 2\nSyntaxError: name 'x' is parameter and nonlocal\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython_next",
+        "-c",
+        "def f():\n    global x\n    nonlocal x"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 3\n    nonlocal x\n             ^\nSyntaxError: name is both nonlocal and global\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "def f():\n    global x\n    nonlocal x"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 2\nSyntaxError: name 'x' is nonlocal and global\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython_next",
+        "-c",
         "def f():\n    return 1 // 0\nx = f()"
       ],
       "stdout": "",
@@ -126,7 +186,47 @@
     {
       "command": [
         "build/cxxpython_next",
-        "/tmp/tmpzr7kmu7s/source.py",
+        "-c",
+        "def f():\n    def inner():\n        return x\n    return x\n    x = 1\nf()"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 6, in <module>\n  File \"<string>\", line 4, in f\nUnboundLocalError(\"local variable 'x' is not bound\")\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "def f():\n    def inner():\n        return x\n    return x\n    x = 1\nf()"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 6, in <module>\n  File \"<string>\", line 4, in f\nUnboundLocalError: cannot access local variable 'x' where it is not associated with a value\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython_next",
+        "-c",
+        "def f():\n    x = 1\n    def inner():\n        return x\n    del x\n    return inner\nf()()"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 7, in <module>\n  File \"<string>\", line 4, in inner\nNameError(\"cannot access free variable 'x' where it is not associated with a value in enclosing scope\")\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "def f():\n    x = 1\n    def inner():\n        return x\n    del x\n    return inner\nf()()"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 7, in <module>\n  File \"<string>\", line 4, in inner\nNameError: cannot access free variable 'x' where it is not associated with a value in enclosing scope\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython_next",
+        "/tmp/tmpd3tx8dhy/source.py",
         "--eval",
         "f(41)"
       ],
@@ -427,6 +527,204 @@
         "'module doc'\nglobal __doc__\nprint(repr(__doc__))"
       ],
       "stdout": "'module doc'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython_next",
+        "-c",
+        "def outer(x):\n    def middle():\n        def inner():\n            return x\n        return inner\n    return middle",
+        "--eval",
+        "outer(42)()()"
+      ],
+      "stdout": "42\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "def outer(x):\n    def middle():\n        def inner():\n            return x\n        return inner\n    return middle\nprint(repr(outer(42)()()))"
+      ],
+      "stdout": "42\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython_next",
+        "-c",
+        "def outer(x):\n    def read():\n        return x\n    def bump():\n        nonlocal x\n        x += 1\n    bump()\n    return read\na = outer(40)\nb = outer(10)",
+        "--eval",
+        "a() * 100 + b()"
+      ],
+      "stdout": "4111\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "def outer(x):\n    def read():\n        return x\n    def bump():\n        nonlocal x\n        x += 1\n    bump()\n    return read\na = outer(40)\nb = outer(10)\nprint(repr(a() * 100 + b()))"
+      ],
+      "stdout": "4111\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython_next",
+        "-c",
+        "def outer(x, /, *args, flag=2, **kw):\n    def inner(step=x, *, extra=flag):\n        return x + flag + len(args) + len(kw) + step + extra\n    x += 1\n    return inner\na = outer(10, 1, 2, flag=3, key=1)",
+        "--eval",
+        "a()"
+      ],
+      "stdout": "30\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "def outer(x, /, *args, flag=2, **kw):\n    def inner(step=x, *, extra=flag):\n        return x + flag + len(args) + len(kw) + step + extra\n    x += 1\n    return inner\na = outer(10, 1, 2, flag=3, key=1)\nprint(repr(a()))"
+      ],
+      "stdout": "30\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython_next",
+        "-c",
+        "def outer(z, a):\n    x = 1\n    y = 2\n    def inner():\n        return z + a + x + y\n    return inner",
+        "--eval",
+        "outer.__code__.co_cellvars"
+      ],
+      "stdout": "('z', 'a', 'x', 'y')\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "def outer(z, a):\n    x = 1\n    y = 2\n    def inner():\n        return z + a + x + y\n    return inner\nprint(repr(outer.__code__.co_cellvars))"
+      ],
+      "stdout": "('z', 'a', 'x', 'y')\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython_next",
+        "-c",
+        "def outer(z, a):\n    x = 1\n    y = 2\n    def inner():\n        return z + a + x + y\n    return inner",
+        "--eval",
+        "outer.__code__.co_varnames"
+      ],
+      "stdout": "('z', 'a', 'inner')\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "def outer(z, a):\n    x = 1\n    y = 2\n    def inner():\n        return z + a + x + y\n    return inner\nprint(repr(outer.__code__.co_varnames))"
+      ],
+      "stdout": "('z', 'a', 'inner')\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython_next",
+        "-c",
+        "def outer(z, a):\n    x = 1\n    y = 2\n    def inner():\n        return z + a + x + y\n    return inner",
+        "--eval",
+        "outer(1, 2).__code__.co_freevars"
+      ],
+      "stdout": "('a', 'x', 'y', 'z')\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "def outer(z, a):\n    x = 1\n    y = 2\n    def inner():\n        return z + a + x + y\n    return inner\nprint(repr(outer(1, 2).__code__.co_freevars))"
+      ],
+      "stdout": "('a', 'x', 'y', 'z')\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython_next",
+        "-c",
+        "def outer():\n    def fact(n):\n        if n <= 1:\n            return 1\n        return n * fact(n - 1)\n    return fact",
+        "--eval",
+        "outer()(15)"
+      ],
+      "stdout": "1307674368000\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "def outer():\n    def fact(n):\n        if n <= 1:\n            return 1\n        return n * fact(n - 1)\n    return fact\nprint(repr(outer()(15)))"
+      ],
+      "stdout": "1307674368000\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython_next",
+        "-c",
+        "x = 42\ndef outer():\n    x = 1\n    def middle():\n        global x\n        def inner():\n            return x\n        return inner\n    return middle",
+        "--eval",
+        "outer()()()"
+      ],
+      "stdout": "42\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "x = 42\ndef outer():\n    x = 1\n    def middle():\n        global x\n        def inner():\n            return x\n        return inner\n    return middle\nprint(repr(outer()()()))"
+      ],
+      "stdout": "42\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython_next",
+        "-c",
+        "def outer(x):\n    def read():\n        return x\n    return read\na = outer(1)\nb = outer(2)",
+        "--eval",
+        "a is not b and a.__closure__ is not b.__closure__ and a.__code__ is b.__code__"
+      ],
+      "stdout": "True\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "def outer(x):\n    def read():\n        return x\n    return read\na = outer(1)\nb = outer(2)\nprint(repr(a is not b and a.__closure__ is not b.__closure__ and a.__code__ is b.__code__))"
+      ],
+      "stdout": "True\n",
       "stderr": "",
       "exit_code": 0
     }
