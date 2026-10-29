@@ -154,6 +154,15 @@ namespace cxxpython::core
             }
             else context.allocate_instance<IntObject>(cls, out, source.small);
         }
+        template <UnaryOp Op>
+        void int_unary(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+        {
+            if (!is_int(context, args[0])) { type_error(context, out); return; }
+            auto value = expanded(integer(context, args[0]));
+            if constexpr (Op == UnaryOp::Negative) value = -value;
+            if constexpr (Op == UnaryOp::Invert) value = ~value;
+            publish(context, std::move(value), out);
+        }
         void bool_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
         {
             if (args[0] != context.builtin(CoreObject::BoolType)) { type_error(context, out); return; }
@@ -268,6 +277,8 @@ namespace cxxpython::core
             install(U"__lt__", compare<CompareOp::Lt>, true); install(U"__le__", compare<CompareOp::Le>, true);
             install(U"__gt__", compare<CompareOp::Gt>, true); install(U"__ge__", compare<CompareOp::Ge>, true);
             install(U"__bool__", int_bool); install(U"__int__", int_identity); install(U"__index__", int_identity);
+            install(U"__pos__", int_unary<UnaryOp::Positive>); install(U"__neg__", int_unary<UnaryOp::Negative>);
+            install(U"__invert__", int_unary<UnaryOp::Invert>);
             install(U"__hash__", int_hash);
             install(U"__repr__", int_repr); install(U"__str__", int_repr);
             install_native_attribute(context, core, at(CoreObject::BoolType), U"__repr__", unary, bool_repr);

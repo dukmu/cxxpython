@@ -218,6 +218,12 @@ namespace cxxpython::core
             if (!instance_of<MappingProxyObject, CoreObject::MappingProxyType>(context, args[0])) { type_error(context, out); return; }
             RootScope roots(context); cxxpython::core::hash(context, roots.root(context.payload<MappingProxyObject>(args[0]).mapping), out);
         }
+        void string_add(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+        {
+            if (!string_value(context, args[0])) { type_error(context, out); return; }
+            if (!string_value(context, args[1])) { out.ok(context.builtin(CoreObject::NotImplemented)); return; }
+            make_str(context, context.payload<StrObject>(args[0]).value + context.payload<StrObject>(args[1]).value, out);
+        }
         void exception_repr(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
         {
             if (!instance_of<ExceptionObject, CoreObject::BaseExceptionType>(context, args[0])) { type_error(context, out); return; }
@@ -263,6 +269,7 @@ namespace cxxpython::core
             install(roots.root(context.type_type()), U"__repr__", type_repr);
             install(at(CoreObject::StrType), U"__hash__", string_hash); install(at(CoreObject::StrType), U"__str__", string_str);
             install(at(CoreObject::StrType), U"__repr__", string_repr);
+            install_native_attribute(context, core, at(CoreObject::StrType), U"__add__", pair, string_add);
             install(at(CoreObject::TupleType), U"__hash__", tuple_hash); install(at(CoreObject::TupleType), U"__repr__", tuple_repr);
             install(at(CoreObject::CellType), U"__repr__", cell_repr); install(at(CoreObject::NoneType), U"__hash__", none_hash);
             install(at(CoreObject::MappingProxyType), U"__hash__", proxy_hash);

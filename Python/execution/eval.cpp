@@ -200,12 +200,52 @@ namespace cxxpython::core
                             data.operands[--data.sp] = context.builtin(CoreObject::None); break;
                         case Opcode::DupTop:
                             data.operands[data.sp] = data.operands[data.sp - 1]; ++data.sp; break;
+                        case Opcode::Swap:
+                            std::swap(data.operands[data.sp - 1], data.operands[data.sp - operand]); break;
+                        case Opcode::BuildTuple:
+                        case Opcode::BuildNameDict:
+                        {
+                            const auto count = opcode == Opcode::BuildTuple ? operand : code.program.calls()[operand].keywords;
+                            const auto base = data.sp - count;
+                            if (opcode == Opcode::BuildTuple)
+                                cxxpython::core::make_tuple(context, std::span<const Value>{data.operands.data() + base, count}, result);
+                            else
+                            {
+                                RootScope roots(context); context.allocate_instance<DictObject>(roots.root(context.builtin(CoreObject::DictType)), result);
+                                const auto &table = context.payload<TupleObject>(code.call_keywords).items;
+                                const auto &names = context.payload<TupleObject>(table[operand]).items;
+                                for (std::size_t i = 0; i < names.size(); ++i) detail::name_store(context, result.result().value(), names[i], data.operands[base + i]);
+                            }
+                            data.trim_stack(context, base); data.operands[data.sp++] = result.result().value(); break;
+                        }
+                        case Opcode::Unary:
+                        {
+                            RootScope roots(context); unary(context, roots.root(data.operands[data.sp - 1]), static_cast<UnaryOp>(operand), result);
+                            if (raised(result)) activation.raising(result.result().exception());
+                            else data.operands[data.sp - 1] = result.result().value();
+                            break;
+                        }
+                        case Opcode::LoadAttr:
+                        case Opcode::StoreAttr:
+                        case Opcode::DeleteAttr:
+                        {
+                            RootScope roots(context); const auto name = roots.root(context.payload<TupleObject>(code.names).items[operand]);
+                            const auto base = data.sp - (opcode == Opcode::StoreAttr ? 2 : 1); const auto object = roots.root(data.operands[base]);
+                            if (opcode == Opcode::LoadAttr) get_attribute(context, object, name, result);
+                            else if (opcode == Opcode::StoreAttr) set_attribute(context, object, name, roots.root(data.operands[base + 1]), result);
+                            else del_attribute(context, object, name, result);
+                            if (raised(result)) { activation.raising(result.result().exception()); break; }
+                            data.trim_stack(context, base); if (opcode == Opcode::LoadAttr) data.operands[data.sp++] = result.result().value();
+                            break;
+                        }
                         case Opcode::Binary:
+                        case Opcode::Inplace:
                         case Opcode::Compare:
                         {
                             RootScope roots(context);
                             auto left = roots.root(data.operands[data.sp - 2]); auto right = roots.root(data.operands[data.sp - 1]);
                             if (opcode == Opcode::Binary) binary(context, left, right, static_cast<BinaryOp>(operand), result);
+                            else if (opcode == Opcode::Inplace) inplace(context, left, right, static_cast<BinaryOp>(operand), result);
                             else rich_compare(context, left, right, static_cast<CompareOp>(operand), result);
                             if (raised(result)) { activation.raising(result.result().exception()); break; }
                             data.operands[data.sp - 2] = result.result().value(); data.operands[--data.sp] = context.builtin(CoreObject::None); break;
@@ -335,6 +375,8 @@ namespace cxxpython::core
         void function_qualname(Attachment &c, Value value, ReturnSlot &out) { out.ok(c.payload<FunctionObject>(value).qualname); }
         void function_globals(Attachment &c, Value value, ReturnSlot &out) { out.ok(c.payload<FunctionObject>(value).globals); }
         void function_builtins(Attachment &c, Value value, ReturnSlot &out) { out.ok(c.payload<FunctionObject>(value).builtins); }
+        void function_doc(Attachment &c, Value value, ReturnSlot &out)
+        { out.ok(c.payload<CodeObject>(c.payload<FunctionObject>(value).code).docstring); }
         void function_defaults(Attachment &c, Value value, ReturnSlot &out)
         {
             out.ok(c.payload<FunctionObject>(value).defaults.value_or(c.builtin(CoreObject::None)));
@@ -430,6 +472,7 @@ namespace cxxpython::core
             field(CoreObject::FunctionType, U"__code__", function_code); field(CoreObject::FunctionType, U"__name__", function_name);
             field(CoreObject::FunctionType, U"__qualname__", function_qualname); field(CoreObject::FunctionType, U"__globals__", function_globals);
             field(CoreObject::FunctionType, U"__builtins__", function_builtins);
+            field(CoreObject::FunctionType, U"__doc__", function_doc);
             field(CoreObject::FunctionType, U"__defaults__", function_defaults); field(CoreObject::FunctionType, U"__kwdefaults__", function_keywords);
             field(CoreObject::FrameType, U"f_code", frame_code); field(CoreObject::FrameType, U"f_back", frame_back);
             field(CoreObject::FrameType, U"f_globals", frame_globals); field(CoreObject::FrameType, U"f_builtins", frame_builtins);

@@ -23,7 +23,8 @@ is retained; the concurrency gates do not narrow language/library/release scope.
 | N2 shared objects/methods | Experimental | Atomic header/tails/exception edges, immutable DictStorage/TypeSnapshot and const Function call data implemented; general containers, future mutable Function setters and full native-duration audit remain |
 | N3 parallel VM | Experimental | Same Function/Code CPU loops, collecting callbacks, shared exception CALL/with/finally, allocation-free polling and generated 1/2/4-worker costs now run; full language/thread API and performance acceptance remain |
 | N4 execution/runtime completion | Experimental | Globals/builtins lookup, global mutation and runtime Function creation added; closures, general namespace mappings, suspension, resources/import and lifecycle remain |
-| N5-N6 source/release | Planned | Source frontend/library, platform, performance and replacement gates |
+| N5 source/library | Experimental | Independent Source/ScopeInfo/CFG -> Code/VM L0 bridge, pinned curated source differential and source CPU workers exist; complete language/library workflows remain |
+| N6 release | Planned | Full language/library, platform, performance and replacement gates |
 
 State::execution and whole-Attachment execution permission have been removed.
 Storage, ObjectOps and ordinary VM calls permit multiple Active mutators.
@@ -49,15 +50,16 @@ All new C++ interfaces are internal and unstable until the M1-M4 gates pass.
 | M2 types/methods/call | Experimental | Calls/construction, field tails, cells, B2 promotion and common hash/repr/str/truth/comparison/arithmetic dispatch exist; full protocols/reflection/mutation and weakrefs remain |
 | M3 builtins | Experimental | Int/bool seed, initial Unicode value/representation/hash, tuple and cell value semantics; complete numeric, container, iterator, codec/buffer and finalization matrices remain |
 | M4 execution | Experimental | Verified Code/Function/Frame, non-recursive calls, tracebacks, structured unwind/with, global namespaces and runtime Function creation exist; full exception normalization, closures/general mappings and suspension remain |
-| M5 frontend | Planned | ScopeInfo/CFG, source positions, validated Code, L0-L2 differential cases |
-| M6 boot/platform | Planned | RunRequest, loader/import, CLI/embedding, I/O, thread API and shutdown |
+| M5 frontend | Experimental | Source/Span, lexical scopes and CFG lower the initial L0 subset; closure/class/remaining syntax, Unicode identifiers and full differential matrix remain |
+| M6 boot/platform | Experimental | RunRequest and experimental source/file/eval bridge exist; module loader/import, full CLI/embedding, I/O, thread API and shutdown remain |
 | M7 libraries | Planned | Real workflows and dependency closures, including unittest |
 | M8 optimization | Planned | Guarded optimizations and expanded language/library matrix |
 | M9 replacement | Planned | Compatibility, performance, installation and retirement gates |
 
-No Python-language feature is Supported on the new target yet. In particular,
-f-strings, bare raise/chaining, unpacking, global/nonlocal and code type identity
-remain requirements for M4-M5, not features inferred from legacy tests.
+No complete source-language/library family is Supported on the new target yet.
+The initial L0 source subset is Experimental. Global execution and Code identity
+now have new-core evidence; closures/nonlocal execution, f-strings, source-level
+raise/chaining/unpacking and the remaining syntax are still explicit gates.
 
 ## Decisions Implemented In The First M1 Slice (Historical)
 
@@ -1550,3 +1552,118 @@ same-Function global stores during collection. Existing descriptor mutation,
 subtype dispatch, callbacks, aliasing, binder and unwind tests exercise cache
 invalidation and the positional path. Next dependency: Source/Span, frozen scope
 classification and L0 compilation to this same executor, not another VM.
+
+## Initial Independent Source Pipeline
+
+The new source path links only cxxpython_foundation. Parser/core/source.cpp owns
+UTF-8 SourceBuffer, byte Spans, tokens and native variant AST parsing.
+Python/compiler/source.cpp performs an independent scope pass, builds a native
+basic-block CFG, then materializes/finalizes Code through the existing
+CodeBuilder. The AST is discarded before publishing the immutable SourceUnit;
+its Source/ScopeInfo/CFG contain no Python references and can be shared across
+compile workers. Each attached freeze task owns its roots and managed constants.
+No legacy lexer/parser/compiler/VM is used.
+
+The scope pass collects all bindings/references/declarations before assigning
+local slots or resolving implicit/explicit globals and free/cell variables.
+Function parameters prefix locals. Assignment's symbol traversal is lexical;
+execution still evaluates the RHS before targets. Defaults are analyzed/evaluated
+in the defining scope. Ancestor binding, global barriers and transitive free
+variables are resolved before opcode emission. Unlowered Cell/Free scopes are
+rejected explicitly at freeze, never executed as implicit globals.
+
+CFG blocks have explicit jump/branch/return edges. Value and test contexts are
+lowered separately so short-circuit boolean and chained comparison conditions
+do not repeat observable __bool__ calls. Intermediate comparison operands are
+evaluated once; a false arbitrary comparison result retains its identity when
+used as a value. Existing verification handles stack joins and all branch PCs.
+
+The Experimental accepted subset includes:
+
+- Decimal/base-prefixed arbitrary integers, underscores, normal/raw/triple
+  Unicode strings and the implemented escapes, None/True/False, ASCII names.
+- Unary +, -, ~, not; current +, -, *, //, % protocols; rich/identity comparisons,
+  chains, and/or, attributes and ordinary positional/keyword calls.
+- Name/attribute targets, chained assignment, augmented assignment and del;
+  if/elif/else, while/else, break/continue, pass and function return.
+- Function definitions, positional-only and keyword-only parameters, defaults,
+  variadic parameter bindings, global declarations, module/function docstrings.
+  MAKE_FUNCTION reuses each scope's actual verified Code and current environment.
+
+Floats/complex, true division/power, dynamic containers, iteration/unpacking,
+classes/closures, import/handlers/with lowering, f-strings and remaining grammar
+are not source-supported yet. Existing corresponding VM slices are retained.
+Unicode identifier NFKC, full escape warnings/name lookup, source encoding-cookie
+policy and the complete Python diagnostic/object matrix remain. Source input and
+experimental file paths currently use UTF-8. No fallback to legacy occurs.
+
+SourceError is a structured native compiler diagnostic, like CodeValidationError
+for the native bytecode API, not a replacement for a running Python exception.
+It retains category, filename, source line, Span, UTF-8 byte positions and
+one-based character offsets. Capability diagnostics are distinct from syntax,
+indentation/tab and encoding faults. The CLI renders these compile errors;
+runtime errors still use caller-owned Raised slots and actual traceback Frames.
+Python compile/exec/eval builtins and full SyntaxError attribute objects are not
+provided by this native API yet. Native parser recursion/expression/suite bounds
+are checked; long native preparation/verification duration auditing remains.
+
+New opcode contracts use the existing metadata and encoding:
+
+- UNARY op: [value] -> [result], checked UnaryOp, ordinary unary/truth protocols.
+- INPLACE op: [left, right] -> [result], checked BinaryOp, existing inplace path.
+- SWAP depth: unchanged stack height, requires depth >= 2 and that many inputs;
+  swap the top with the indicated stack entry. No allocation or callback.
+- LOAD_ATTR name: [owner] -> [value]; STORE_ATTR name: [owner, value] -> [];
+  DELETE_ATTR name: [owner] -> []. Checked co_names operands and ObjectOps.
+- BUILD_TUPLE count: [items...] -> [tuple], retaining stack roots through GC.
+- BUILD_NAME_DICT site: [values...] -> [dict], zero positional entries and
+  managed string keys from the call-site table; COW name-dictionary publication.
+
+All except SWAP may raise through existing Python result/unwind paths; operand,
+stack effect, source positions and disassembly are metadata-verified. Unary int
+methods and str concatenation were added to the common value protocols, not as
+source-only arithmetic. Code docstrings are managed immutable metadata exposed
+by Function.__doc__; there is no CPython bytecode/constant-table encoding promise.
+
+RunRequest accepts an immutable SourceUnit or rooted Code plus optional rooted
+globals/builtins dictionaries. Both inputs use the same freeze/function/call
+service. Caller aliases and foreign handles are checked through existing roots;
+new default environments get __main__. Supplied mappings and captured builtins
+retain their actual identities. Custom mappings/modules and full RunRequest
+module/import/stdio policies remain, not a second shadow environment.
+
+The experimental executable does not replace the legacy CLI:
+
+```sh
+build/cxxpython_next -c 'def f(n): return n + 1' --eval 'f(41)'
+build/cxxpython_next path/to/program.py --eval 'result'
+cmake -S . -B build -DCXXPYTHON_REFERENCE_PYTHON=/path/to/python3.12
+```
+
+-c/file executes source; optional --eval evaluates in the same environment and
+prints repr at the host boundary. File reads happen before attachment and output
+is copied before NativeWait. This is not the language print/sys/stdio API, a
+complete Python CLI, -m, REPL or sys.argv implementation. CLI syntax/runtime
+faults exit 1, usage/file-open faults exit 2 and internal compiler faults exit 70.
+
+Tests/tools/test_source_differential.py compares actual executable workflows,
+not parser smoke tokens. The retained source-differential JSON records commands,
+results, binary hashes and actual reference version. The selected reference was
+built in /tmp from the official
+[CPython 3.12.14 source](https://www.python.org/downloads/release/python-31214/),
+XZ SHA-256 5c8462af5790baf43a321a1559dbe0db06d1be4300fb85fb53c40060668e548a.
+It uses --without-ensurepip --disable-test-modules, inherited Conda compiler
+flags, no PGO/LTO; it is a fixed semantic reference, not a tuned performance gate.
+The default CMake host interpreter is only a smoke reference unless explicitly
+pinned through CXXPYTHON_REFERENCE_PYTHON.
+
+The existing recorder now accepts --reference and runs the exact source kernel
+captured from bench_foundation on that CPython binary, with identical total work
+and 1/2/4 threads. Both raw series, source text encoding, binary hashes, reference
+version/configuration and derived comparisons are retained automatically. The
+generated n5-l0-source-final series was collected after builds/sanitizers finished;
+the earlier n5-l0-source series includes a CLI-build overlap and is retained.
+The same-source comparison exposes a large single-thread performance gap; real
+CPU parallelism is not CPython parity. Next performance work must remove repeated
+VM/native-call preparation at rooted boundaries, alongside remaining N4/N5 work,
+not add more cache scaffolding or waive the release goal.

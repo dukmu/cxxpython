@@ -38,6 +38,14 @@ namespace cxxpython::core
             OpcodeDefinition{"STORE_GLOBAL", 1, 1, 0, OperandDomain::Name, FlowKind::Next, true, true},
             OpcodeDefinition{"DELETE_GLOBAL", 0, 0, 0, OperandDomain::Name, FlowKind::Next, true, true},
             OpcodeDefinition{"MAKE_FUNCTION", 1, 1, 1, OperandDomain::FunctionFlags, FlowKind::Next, true, true},
+            OpcodeDefinition{"UNARY", 1, 1, 1, OperandDomain::Unary, FlowKind::Next, true, true},
+            OpcodeDefinition{"INPLACE", 2, 2, 1, OperandDomain::Binary, FlowKind::Next, true, true},
+            OpcodeDefinition{"SWAP", 0, 0, 0, OperandDomain::StackDepth, FlowKind::Next, false, false},
+            OpcodeDefinition{"LOAD_ATTR", 1, 1, 1, OperandDomain::Name, FlowKind::Next, true, true},
+            OpcodeDefinition{"STORE_ATTR", 2, 2, 0, OperandDomain::Name, FlowKind::Next, true, true},
+            OpcodeDefinition{"DELETE_ATTR", 1, 1, 0, OperandDomain::Name, FlowKind::Next, true, true},
+            OpcodeDefinition{"BUILD_TUPLE", 0, 0, 1, OperandDomain::Count, FlowKind::Next, true, true},
+            OpcodeDefinition{"BUILD_NAME_DICT", 0, 0, 1, OperandDomain::CallSite, FlowKind::Next, true, true},
         };
         static_assert(definitions.size() == static_cast<std::size_t>(Opcode::Count));
         [[noreturn]] void invalid(CodeErrorKind kind, const char *message, std::optional<std::size_t> pc = {})
@@ -107,10 +115,18 @@ namespace cxxpython::core
                         if (operand > static_cast<std::uint32_t>(BinaryOp::Modulo)) invalid(CodeErrorKind::Operand, "invalid binary operator", pc);
                         break;
                     case OperandDomain::Compare:
-                        if (operand > static_cast<std::uint32_t>(CompareOp::Ge)) invalid(CodeErrorKind::Operand, "invalid comparison operator", pc);
+                        if (operand > static_cast<std::uint32_t>(CompareOp::IsNot)) invalid(CodeErrorKind::Operand, "invalid comparison operator", pc);
                         break;
+                    case OperandDomain::Unary:
+                        if (operand > static_cast<std::uint32_t>(UnaryOp::Not)) invalid(CodeErrorKind::Operand, "invalid unary operator", pc);
+                        break;
+                    case OperandDomain::StackDepth:
+                        if (operand < 2) invalid(CodeErrorKind::Operand, "swap depth must be at least two", pc);
+                        break;
+                    case OperandDomain::Count: break;
                     case OperandDomain::CallSite:
                         if (operand >= calls.size()) invalid(CodeErrorKind::CallBounds, "call-site index out of bounds", pc);
+                        if (opcode == Opcode::BuildNameDict && calls[operand].positional) invalid(CodeErrorKind::Operand, "name dictionary has positional keys", pc);
                         break;
                     case OperandDomain::Region:
                     {
@@ -249,11 +265,13 @@ namespace cxxpython::core
         const auto &definition = opcode_definition(instruction.opcode);
         if (definition.operand == OperandDomain::CallSite && instruction.operand >= calls.size())
             invalid(CodeErrorKind::CallBounds, "call-site index out of bounds");
-        const auto arguments = definition.operand == OperandDomain::CallSite ? calls[instruction.operand].argument_count() : 0;
+        const auto arguments = definition.operand == OperandDomain::CallSite ? calls[instruction.operand].argument_count() :
+            definition.operand == OperandDomain::Count ? instruction.operand : 0;
         if (definition.operand == OperandDomain::FunctionFlags && (instruction.operand & ~3U))
             invalid(CodeErrorKind::Operand, "invalid function creation flags");
         const auto defaults = definition.operand == OperandDomain::FunctionFlags ? std::popcount(instruction.operand) : 0;
-        return {definition.inputs + arguments + defaults, definition.pops + arguments + defaults, definition.pushes};
+        const auto inputs = definition.operand == OperandDomain::StackDepth ? instruction.operand : definition.inputs;
+        return {inputs + arguments + defaults, definition.pops + arguments + defaults, definition.pushes};
     }
     std::size_t VerifiedCode::external_bytes() const noexcept
     {
@@ -264,7 +282,7 @@ namespace cxxpython::core
         return bytes;
     }
     void CodeObject::trace(Tracer &tracer) const noexcept
-    { for (auto value : {constants, varnames, name, qualname, filename, call_keywords, names}) tracer.visit(value); }
+    { for (auto value : {constants, varnames, name, qualname, filename, call_keywords, names, docstring}) tracer.visit(value); }
     CodeBuilder::CodeBuilder(Attachment &context, CodeSpec spec) : context_(context), roots_(context), spec_(std::move(spec))
     {
         if (!context.core_ready()) throw std::logic_error("CodeBuilder requires the B3 image");
@@ -356,6 +374,8 @@ namespace cxxpython::core
         make_str(context_, spec_.name, temporary); auto name = roots.root(temporary.result().value());
         make_str(context_, spec_.qualname.value_or(spec_.name), temporary); auto qualname = roots.root(temporary.result().value());
         make_str(context_, spec_.filename, temporary); auto filename = roots.root(temporary.result().value());
+        auto docstring = roots.root(context_.builtin(CoreObject::None));
+        if (spec_.docstring) { make_str(context_, *spec_.docstring, temporary); docstring = roots.root(temporary.result().value()); }
         std::vector<Value> keyword_tables;
         for (const auto &site : calls_)
         {
@@ -370,14 +390,18 @@ namespace cxxpython::core
         { cxxpython::core::make_tuple(context_, keyword_tables, temporary); call_keywords = roots.root(temporary.result().value()); }
         auto type = roots.root(context_.builtin(CoreObject::CodeType));
         context_.allocate_instance<CodeObject>(type, out, std::move(verified), constants.get(context_), varnames.get(context_),
-                                             name.get(context_), qualname.get(context_), filename.get(context_), call_keywords.get(context_), global_names.get(context_));
+                                             name.get(context_), qualname.get(context_), filename.get(context_), call_keywords.get(context_), global_names.get(context_), docstring.get(context_));
     }
     void CodeBuilder::call(std::uint32_t positional, std::span<const std::u32string> keywords, SourcePosition source)
+    { call_site(Opcode::Call, positional, keywords, source); }
+    void CodeBuilder::name_dict(std::span<const std::u32string> names, SourcePosition source)
+    { call_site(Opcode::BuildNameDict, 0, names, source); }
+    void CodeBuilder::call_site(Opcode opcode, std::uint32_t positional, std::span<const std::u32string> keywords, SourcePosition source)
     {
         context_.require_attached();
         if (calls_.size() >= std::numeric_limits<std::uint32_t>::max()) invalid(CodeErrorKind::SizeLimit, "too many call sites");
         calls_.push_back({positional, {keywords.begin(), keywords.end()}});
-        try { emit(Opcode::Call, static_cast<std::uint32_t>(calls_.size() - 1), source); }
+        try { emit(opcode, static_cast<std::uint32_t>(calls_.size() - 1), source); }
         catch (...) { calls_.pop_back(); throw; }
     }
     CodeBuilder::RegionSpec &CodeBuilder::require_region(Region region)

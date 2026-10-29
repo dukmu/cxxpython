@@ -1,5 +1,67 @@
 # Development Status
 
+## 2026-10-29 Source To Scope To CFG To Shared-Heap Execution
+
+Prepended without rewriting earlier history. The previous turn committed and
+pushed 10f3540. This turn advances N5's allowed L0 source slice alongside N4,
+using the existing parallel runtime. The full N0-N6/M0-M9 goal stays active.
+
+- Implemented an independent UTF-8 SourceBuffer/Span, typed token/native AST
+  parser, separate lexical scope analysis and native basic-block CFG. SourceUnit
+  publishes immutable native Source/ScopeInfo/CFG and discards the AST; it has no
+  hidden Python references or compiler-global mutable state. Attached lowering
+  uses the existing CodeBuilder, verifier, roots, result ABI and VM, not legacy.
+- Added the initial Experimental source subset: integer/string literals,
+  unary/binary/identity/rich/boolean expressions, calls/attributes, name/attribute
+  assignments/deletion/inplace, if/while/else and loop control, function returns,
+  parameter/default/variadic binding, globals and docstrings. Free/cell/nonlocal
+  binding analysis is real, but closure execution is explicitly rejected rather
+  than reclassified as globals. Unsupported syntax/Unicode normalization/numeric
+  capabilities are diagnosed in the compiler; full L0/L1/L2 acceptance remains.
+- Added the required generic VM lowering operations and metadata checks, not
+  source-only evaluation hacks. Actual source execution exposed missing str +;
+  it now uses the common str protocol with NotImplemented/reflected semantics.
+  Separate value/test CFG lowering prevents repeated __bool__ calls in nested
+  boolean/compare conditions. Corrected module docstring's generated binding
+  handling against the fixed reference, rather than guessing scope during emit.
+- Added RunRequest for rooted Code or immutable source plus actual environment
+  dictionaries. Added cxxpython_next as an experimental independent entry for
+  file/-c and optional --eval in the same environment, with structured compile
+  diagnostics and real runtime tracebacks. It does not replace legacy or claim
+  print/sys/import/-m/REPL/sys.argv, arbitrary mappings or full SyntaxError APIs.
+- Added fourteen C++ tests/contracts for source semantics, scope/CFG ordering,
+  capability and position errors, default evaluation, Code identity, docstrings,
+  attribute side effects, exact truth-callback count, freeze failure, concurrent
+  freeze and source-derived same-Function/Code CPU execution during GC. All
+  execution and publication paths use the normal production core.
+- Built the plan's fixed CPython 3.12.14 reference from official source under
+  /tmp after the installed uv metadata lacked that download. The official XZ
+  SHA-256 matches the release page; no CPython source is linked/copied into the
+  runtime. Retained actual executable source differential commands/results,
+  binary hashes and version in benchmarks/source-differential-2026-10-29.json.
+  Three differential test groups pass against that binary, including thirteen
+  positive workflows, compile/runtime errors and the file entry. A Python 3.10
+  host smoke comparison also passed but is not the pinned acceptance evidence.
+- Final CTest 554/554 passes, foundation 305/305. ASan/UBSan/LSan 305/305 passes;
+  TSan 303/303 passes, excluding only the two exhaustive bootstrap/promotion
+  per-allocation enumerations already covered in Release/ASan. Four recorder
+  tests pass. No sanitizer failure or increased timeout was used.
+- Extended the existing benchmark/recorder to measure native parse/scope/CFG,
+  attached materialization and source-derived shared Function/Code at 1/2/4
+  workers. Optional --reference executes the captured identical source kernel
+  and total work on CPython, recording actual build flags and deriving the
+  comparison table. All tables are generated; raw slow results are retained.
+  See n5-l0-source-final and its paired -cpython series. The earlier n5-l0-source
+  samples overlapped a CLI build; the final samples ran after all builds/checks.
+- The automatic comparison exposes a major absolute performance gap despite
+  real source-level CPU scaling. This is not CPython parity or test2.py success.
+  Next: remove repeated VM access/native-call preparation under the existing
+  rooted execution boundaries, while advancing closure/execution and remaining
+  source/runtime dependencies. Do not keep expanding parser hardening, add
+  ad-hoc workload paths or reinterpret multicore speedup as release completion.
+- No subagents or legacy fallback were used. Unrelated temporary_plan.md
+  deletion and the user's untracked test2.py remain excluded from this node.
+
 ## 2026-10-29 Protocol Costs Reduced And Namespace Execution Unblocked
 
 Prepended without changing earlier history. The previous goal turn was concrete

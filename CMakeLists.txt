@@ -28,11 +28,17 @@ add_library(cxxpython_foundation
     Python/execution/eval.cpp
     Python/execution/traceback.cpp
     Python/execution/unwind.cpp
+    Parser/core/source.cpp
+    Python/compiler/source.cpp
 )
 target_include_directories(cxxpython_foundation PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/Include)
 target_include_directories(cxxpython_foundation SYSTEM PRIVATE ${BOOST_MULTIPRECISION_INCLUDE_DIR})
 target_link_libraries(cxxpython_foundation PUBLIC Threads::Threads)
 target_compile_options(cxxpython_foundation PRIVATE -Wall -Wextra -Wpedantic -Werror)
+
+add_executable(cxxpython_next Programs/foundation_main.cpp)
+target_link_libraries(cxxpython_next PRIVATE cxxpython_foundation)
+target_compile_options(cxxpython_next PRIVATE -Wall -Wextra -Wpedantic -Werror)
 
 option(CXXPYTHON_BUILD_BENCHMARKS "Build foundation cost probes" OFF)
 if(CXXPYTHON_BUILD_BENCHMARKS)
@@ -171,10 +177,19 @@ add_executable(test_foundation
     Tests/cpp/core/test_traceback.cpp
     Tests/cpp/core/test_unwind.cpp
     Tests/cpp/core/test_with.cpp
+    Tests/cpp/core/test_source.cpp
 )
 target_link_libraries(test_foundation PRIVATE cxxpython_foundation GTest::gtest_main)
 target_compile_options(test_foundation PRIVATE -Wall -Wextra -Wpedantic -Werror)
 gtest_discover_tests(test_foundation PROPERTIES TIMEOUT 15)
+find_package(Python3 COMPONENTS Interpreter QUIET)
+set(CXXPYTHON_REFERENCE_PYTHON "${Python3_EXECUTABLE}" CACHE FILEPATH "CPython executable used for source differential tests")
+if(Python3_Interpreter_FOUND)
+    add_test(NAME FoundationSource.Differential COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/Tests/tools/test_source_differential.py
+        --binary $<TARGET_FILE:cxxpython_next> --reference ${CXXPYTHON_REFERENCE_PYTHON})
+    set_tests_properties(FoundationSource.Differential PROPERTIES TIMEOUT 60)
+endif()
 
 if(CXXPYTHON_BUILD_LEGACY)
 add_executable(test_core_objects

@@ -8,7 +8,7 @@ namespace cxxpython::core
     {
         Bool, Len, Int, Index, Repr, Str, Hash, Eq, Ne, Lt, Le, Gt, Ge,
         Add, RAdd, IAdd, Sub, RSub, ISub, Mul, RMul, IMul,
-        FloorDiv, RFloorDiv, IFloorDiv, Mod, RMod, IMod, Enter, Exit, Count,
+        FloorDiv, RFloorDiv, IFloorDiv, Mod, RMod, IMod, Enter, Exit, Pos, Neg, Invert, Count,
     };
     enum class ProtocolResult { Any, Boolean, Length, Integer, String, Hash };
     struct ProtocolDefinition
@@ -28,14 +28,16 @@ namespace cxxpython::core
         Handle descriptor;
         std::uint64_t epoch;
     };
-    enum class CompareOp { Eq, Ne, Lt, Le, Gt, Ge };
+    enum class CompareOp { Eq, Ne, Lt, Le, Gt, Ge, Is, IsNot };
     enum class BinaryOp { Add, Subtract, Multiply, FloorDivide, Modulo };
+    enum class UnaryOp { Positive, Negative, Invert, Not };
 
     const ProtocolDefinition &protocol_definition(Protocol id);
     ResolvedSlot resolve_protocol(Attachment &context, Handle type, Protocol id, RootScope &roots);
     ResultView invoke_protocol(Attachment &context, Handle receiver, const ResolvedSlot &slot,
                                std::span<const Value> args, ReturnSlot &out);
     ResultView truth(Attachment &context, Handle value, ReturnSlot &out);
+    ResultView unary(Attachment &context, Handle value, UnaryOp op, ReturnSlot &out);
     ResultView length(Attachment &context, Handle value, ReturnSlot &out);
     ResultView index(Attachment &context, Handle value, ReturnSlot &out);
     ResultView hash(Attachment &context, Handle value, ReturnSlot &out);

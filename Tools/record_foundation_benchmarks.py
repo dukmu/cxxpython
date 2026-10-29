@@ -14,6 +14,29 @@ import statistics
 import subprocess
 
 
+REFERENCE_PROBE = r'''
+import sys, threading, time
+kernel = bytes.fromhex(sys.argv[1]).decode("utf-8")
+namespace = {}; exec(compile(kernel, "<foundation-benchmark>", "exec"), namespace)
+target = namespace["total"]
+for workers in (1, 2, 4):
+    start = threading.Barrier(workers + 1); finish = threading.Barrier(workers + 1)
+    results = [None] * workers
+    count = 120000 // workers
+    def work(index):
+        start.wait(); results[index] = target(count); finish.wait(); finish.wait()
+    tasks = [threading.Thread(target=work, args=(i,)) for i in range(workers)]
+    for task in tasks: task.start()
+    cpu = time.process_time_ns(); wall = time.perf_counter_ns()
+    start.wait(); finish.wait()
+    elapsed = time.perf_counter_ns() - wall; cpu = time.process_time_ns() - cpu
+    finish.wait()
+    for task in tasks: task.join()
+    assert all(result == count * (count + 1) // 2 for result in results)
+    print(f"parallel_source_workers={workers} total_iterations=120000 wall_ns={elapsed} process_cpu_ns={cpu} source_result_check=ok")
+'''
+
+
 def parse_output(output, series, sample):
     rows = []
     for line in output.splitlines():
@@ -67,6 +90,17 @@ def render_report(rows, failures):
         speedup = statistics.median(baseline) / wall
         lines.append(f"| {series} | {probe} | {workers} | {wall:.3f} | {statistics.median(cpu) / wall:.3f} | "
                      f"{speedup:.3f} | {speedup / int(workers):.3f} |")
+    lines += ["", "## Identical Source Comparison", "",
+              "The CPython probe executes the source kernel captured from the C++ benchmark, with the same total work and worker count. A ratio above 1 is slower.", "",
+              "| Series | Workers | cxxpython ms | CPython ms | cxxpython/CPython |",
+              "| --- | --- | --- | --- | --- |"]
+    for (series, probe, workers, metric, unit), values in sorted(groups.items()):
+        if probe != "parallel_source_workers" or metric != "wall_ns":
+            continue
+        reference = groups.get((series + "-cpython", probe, workers, metric, unit))
+        if reference:
+            wall, baseline = statistics.median(values), statistics.median(reference)
+            lines.append(f"| {series} | {workers} | {wall:.3f} | {baseline:.3f} | {wall / baseline:.3f} |")
     return "\n".join(lines) + "\n"
 
 
@@ -91,6 +125,7 @@ def main():
     source.add_argument("--input", type=Path, action="append", help="Import captured key=value output, without claiming binary provenance")
     source.add_argument("--report-only", action="store_true")
     parser.add_argument("--series")
+    parser.add_argument("--reference", type=Path, help="Also run the captured source kernel on this CPython executable")
     parser.add_argument("--runs", type=int, default=3)
     parser.add_argument("--date", default=date.today().isoformat())
     parser.add_argument("--output-dir", type=Path, default=Path(__file__).resolve().parents[1] / "doc/benchmarks")
@@ -137,6 +172,24 @@ def main():
                       imported_from=str(source_path) if source_path else None)
         with raw.open("a") as stream:
             stream.write(json.dumps(record, ensure_ascii=True) + "\n")
+        if args.reference and exit_code == 0:
+            fields = dict(token.split("=", 1) for token in output.split() if "=" in token)
+            kernel = fields["source_kernel_hex"]
+            reference = args.reference.resolve()
+            reference_command = [str(reference), "-c", REFERENCE_PROBE, kernel]
+            measured = subprocess.run(reference_command, capture_output=True, text=True)
+            version = subprocess.check_output([str(reference), "--version"], text=True).strip()
+            reference_build = json.loads(subprocess.check_output([str(reference), "-c", "import json,sysconfig; print(json.dumps({k:sysconfig.get_config_var(k) for k in ('CC','CFLAGS','CPPFLAGS','LDFLAGS','CONFIG_ARGS','PY_CFLAGS')}))"], text=True))
+            reference_record = dict(record, series=args.series + "-cpython", output=measured.stdout + measured.stderr,
+                                    exit_code=measured.returncode, command=reference_command, build=reference_build, reference_version=version,
+                                    binary_sha256=hashlib.sha256(reference.read_bytes()).hexdigest(), source_kernel_hex=kernel)
+            if measured.returncode == 0:
+                parse_output(reference_record["output"], reference_record["series"], sample)
+            with raw.open("a") as stream:
+                stream.write(json.dumps(reference_record, ensure_ascii=True) + "\n")
+            if measured.returncode:
+                generate_tables(raw, args.output_dir, args.date)
+                raise SystemExit(f"CPython benchmark failed with {measured.returncode}; raw output retained")
         generate_tables(raw, args.output_dir, args.date)
         if exit_code:
             raise SystemExit(f"benchmark failed with {exit_code}; raw output retained in {raw}")

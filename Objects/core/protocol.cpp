@@ -35,6 +35,9 @@ namespace cxxpython::core
             ProtocolDefinition{U"__imod__", 1, ProtocolResult::Any},
             ProtocolDefinition{U"__enter__", 0, ProtocolResult::Any},
             ProtocolDefinition{U"__exit__", 3, ProtocolResult::Any},
+            ProtocolDefinition{U"__pos__", 0, ProtocolResult::Any},
+            ProtocolDefinition{U"__neg__", 0, ProtocolResult::Any},
+            ProtocolDefinition{U"__invert__", 0, ProtocolResult::Any},
         };
         static_assert(definitions.size() == static_cast<std::size_t>(Protocol::Count));
         constexpr std::array comparisons{Protocol::Eq, Protocol::Ne, Protocol::Lt, Protocol::Le, Protocol::Gt, Protocol::Ge};
@@ -272,10 +275,28 @@ namespace cxxpython::core
             else boolean(context, int_sign(context, result.result().value()) != 0, out);
         });
     }
+    ResultView unary(Attachment &context, Handle value, UnaryOp op, ReturnSlot &out)
+    {
+        return guarded(context, out, [&] {
+            RootScope roots(context); const auto self = roots.root(value.get(context));
+            if (op == UnaryOp::Not)
+            {
+                ReturnSlot result(context); truth(context, self, result);
+                if (raised(result)) out.raised(result.result().exception());
+                else boolean(context, result.result().value() == context.builtin(CoreObject::False), out);
+                return;
+            }
+            constexpr std::array protocols{Protocol::Pos, Protocol::Neg, Protocol::Invert};
+            auto slot = resolve(context, self, protocols.at(static_cast<std::size_t>(op)), roots);
+            invoke_protocol(context, self, slot, {}, out);
+        });
+    }
     ResultView rich_compare(Attachment &context, Handle left, Handle right, CompareOp op, ReturnSlot &out)
     {
         return guarded(context, out, [&] {
             RootScope roots(context); auto a = roots.root(left.get(context)); auto b = roots.root(right.get(context)); out.reset(context);
+            if (op == CompareOp::Is || op == CompareOp::IsNot)
+            { boolean(context, (a.get(context) == b.get(context)) == (op == CompareOp::Is), out); return; }
             auto normal = comparisons.at(static_cast<std::size_t>(op));
             auto reflected = reflected_comparisons.at(static_cast<std::size_t>(op));
             const auto ltype = context.type_of(a); const auto rtype = context.type_of(b);

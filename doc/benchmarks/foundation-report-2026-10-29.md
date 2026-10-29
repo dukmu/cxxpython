@@ -478,6 +478,222 @@ Storage/native delivery probes do not establish Python VM parallelism. RSS is th
 | n4-global-environment | transfer_iterations | - | transfer_roundtrip_ns | ms | 3 | 0.964 | 0.915 | 0.994 |
 | n4-global-environment | transfer_iterations | - | transfer_token_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
 | n4-global-environment | with_iterations | - | with_function_ns | ms | 3 | 43.442 | 42.284 | 43.735 |
+| n5-l0-source | cleanup_iterations | - | active_region_bytes | bytes | 3 | 32.000 | 32.000 | 32.000 |
+| n5-l0-source | cleanup_iterations | - | cleanup_continuation_bytes | bytes | 3 | 48.000 | 48.000 | 48.000 |
+| n5-l0-source | cleanup_iterations | - | cleanup_function_ns | ms | 3 | 26.055 | 24.657 | 26.865 |
+| n5-l0-source | function_iterations | - | frame_prefix_bytes | bytes | 3 | 232.000 | 232.000 | 232.000 |
+| n5-l0-source | function_iterations | - | verified_function_ns | ms | 3 | 20.139 | 19.779 | 21.401 |
+| n5-l0-source | hash_iterations | - | string_hash_ns | ms | 3 | 86.921 | 84.059 | 89.203 |
+| n5-l0-source | hash_iterations | - | tuple_repr_ns | ms | 3 | 23.938 | 23.610 | 25.353 |
+| n5-l0-source | int_iterations | - | big_int_mul_ns | ms | 3 | 9.967 | 9.538 | 10.281 |
+| n5-l0-source | int_iterations | - | int_add_ns | ms | 3 | 86.727 | 81.769 | 92.001 |
+| n5-l0-source | int_iterations | - | int_object_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| n5-l0-source | iterations | - | allocation_and_auto_gc_ns | ms | 3 | 4.914 | 4.537 | 5.141 |
+| n5-l0-source | iterations | - | handle_bytes | bytes | 3 | 32.000 | 32.000 | 32.000 |
+| n5-l0-source | iterations | - | header_bytes | bytes | 3 | 8.000 | 8.000 | 8.000 |
+| n5-l0-source | iterations | - | last_gc_pause_ns | ms | 3 | 0.001 | 0.000 | 0.002 |
+| n5-l0-source | iterations | - | live_bytes | bytes | 3 | 0.000 | 0.000 | 0.000 |
+| n5-l0-source | iterations | - | node_bytes | bytes | 3 | 16.000 | 16.000 | 16.000 |
+| n5-l0-source | iterations | - | recorded_metadata_bytes | bytes | 3 | 3360.000 | 3360.000 | 3360.000 |
+| n5-l0-source | iterations | - | root_register_release_ns | ms | 3 | 3.652 | 3.537 | 3.859 |
+| n5-l0-source | native_call_iterations | - | core_live_bytes | bytes | 3 | 95688.000 | 95688.000 | 95688.000 |
+| n5-l0-source | native_call_iterations | - | core_metadata_bytes | bytes | 3 | 99520.000 | 99520.000 | 99520.000 |
+| n5-l0-source | native_call_iterations | - | core_reserved_bytes | bytes | 3 | 321152.000 | 321152.000 | 321152.000 |
+| n5-l0-source | native_call_iterations | - | lookup_bind_call_ns | ms | 3 | 26.039 | 24.474 | 26.372 |
+| n5-l0-source | native_call_iterations | - | native_call_ns | ms | 3 | 24.227 | 21.556 | 24.357 |
+| n5-l0-source | parallel_source_workers | 1 | finish_live_bytes | bytes | 3 | 164740.000 | 164740.000 | 164740.000 |
+| n5-l0-source | parallel_source_workers | 1 | finish_metadata_bytes | bytes | 3 | 216000.000 | 216000.000 | 216000.000 |
+| n5-l0-source | parallel_source_workers | 1 | finish_reserved_bytes | bytes | 3 | 526184.000 | 526184.000 | 526184.000 |
+| n5-l0-source | parallel_source_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.026 | 0.025 | 0.035 |
+| n5-l0-source | parallel_source_workers | 1 | max_rendezvous_ns | ms | 3 | 0.002 | 0.001 | 0.026 |
+| n5-l0-source | parallel_source_workers | 1 | process_cpu_ns | ms | 3 | 421.840 | 405.847 | 422.726 |
+| n5-l0-source | parallel_source_workers | 1 | source_freeze_run_ns | ms | 3 | 0.069 | 0.063 | 0.078 |
+| n5-l0-source | parallel_source_workers | 1 | wall_ns | ms | 3 | 408.430 | 401.301 | 437.675 |
+| n5-l0-source | parallel_source_workers | 2 | finish_live_bytes | bytes | 3 | 187964.000 | 183236.000 | 188180.000 |
+| n5-l0-source | parallel_source_workers | 2 | finish_metadata_bytes | bytes | 3 | 258544.000 | 258544.000 | 296112.000 |
+| n5-l0-source | parallel_source_workers | 2 | finish_reserved_bytes | bytes | 3 | 595920.000 | 595920.000 | 661568.000 |
+| n5-l0-source | parallel_source_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.044 | 0.042 | 0.054 |
+| n5-l0-source | parallel_source_workers | 2 | max_rendezvous_ns | ms | 3 | 0.139 | 0.072 | 0.188 |
+| n5-l0-source | parallel_source_workers | 2 | process_cpu_ns | ms | 3 | 413.993 | 413.063 | 414.467 |
+| n5-l0-source | parallel_source_workers | 2 | source_freeze_run_ns | ms | 3 | 0.070 | 0.069 | 0.071 |
+| n5-l0-source | parallel_source_workers | 2 | wall_ns | ms | 3 | 211.029 | 196.128 | 212.940 |
+| n5-l0-source | parallel_source_workers | 4 | finish_live_bytes | bytes | 3 | 174820.000 | 172516.000 | 180068.000 |
+| n5-l0-source | parallel_source_workers | 4 | finish_metadata_bytes | bytes | 3 | 341808.000 | 306064.000 | 342416.000 |
+| n5-l0-source | parallel_source_workers | 4 | finish_reserved_bytes | bytes | 3 | 723128.000 | 669744.000 | 727216.000 |
+| n5-l0-source | parallel_source_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.065 | 0.059 | 0.091 |
+| n5-l0-source | parallel_source_workers | 4 | max_rendezvous_ns | ms | 3 | 0.701 | 0.697 | 0.855 |
+| n5-l0-source | parallel_source_workers | 4 | process_cpu_ns | ms | 3 | 440.707 | 421.763 | 454.524 |
+| n5-l0-source | parallel_source_workers | 4 | source_freeze_run_ns | ms | 3 | 0.068 | 0.062 | 0.072 |
+| n5-l0-source | parallel_source_workers | 4 | wall_ns | ms | 3 | 125.775 | 117.652 | 133.194 |
+| n5-l0-source | parallel_storage_workers | 1 | finish_live_bytes | bytes | 3 | 42720.000 | 42720.000 | 42720.000 |
+| n5-l0-source | parallel_storage_workers | 1 | finish_metadata_bytes | bytes | 3 | 97040.000 | 97040.000 | 97040.000 |
+| n5-l0-source | parallel_storage_workers | 1 | finish_reserved_bytes | bytes | 3 | 135504.000 | 135504.000 | 135504.000 |
+| n5-l0-source | parallel_storage_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.015 | 0.012 | 0.037 |
+| n5-l0-source | parallel_storage_workers | 1 | max_rendezvous_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| n5-l0-source | parallel_storage_workers | 1 | process_cpu_ns | ms | 3 | 2.473 | 2.276 | 2.497 |
+| n5-l0-source | parallel_storage_workers | 1 | wall_ns | ms | 3 | 2.340 | 2.326 | 2.501 |
+| n5-l0-source | parallel_storage_workers | 2 | finish_live_bytes | bytes | 3 | 8656.000 | 7808.000 | 64560.000 |
+| n5-l0-source | parallel_storage_workers | 2 | finish_metadata_bytes | bytes | 3 | 100352.000 | 100352.000 | 190816.000 |
+| n5-l0-source | parallel_storage_workers | 2 | finish_reserved_bytes | bytes | 3 | 135504.000 | 135504.000 | 271008.000 |
+| n5-l0-source | parallel_storage_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.020 | 0.003 | 0.028 |
+| n5-l0-source | parallel_storage_workers | 2 | max_rendezvous_ns | ms | 3 | 0.033 | 0.029 | 0.043 |
+| n5-l0-source | parallel_storage_workers | 2 | process_cpu_ns | ms | 3 | 2.618 | 2.505 | 2.653 |
+| n5-l0-source | parallel_storage_workers | 2 | wall_ns | ms | 3 | 1.718 | 1.502 | 1.773 |
+| n5-l0-source | parallel_storage_workers | 4 | finish_live_bytes | bytes | 3 | 58672.000 | 6032.000 | 63632.000 |
+| n5-l0-source | parallel_storage_workers | 4 | finish_metadata_bytes | bytes | 3 | 282208.000 | 194592.000 | 287904.000 |
+| n5-l0-source | parallel_storage_workers | 4 | finish_reserved_bytes | bytes | 3 | 398096.000 | 266800.000 | 406512.000 |
+| n5-l0-source | parallel_storage_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.031 | 0.010 | 0.038 |
+| n5-l0-source | parallel_storage_workers | 4 | max_rendezvous_ns | ms | 3 | 0.115 | 0.084 | 0.145 |
+| n5-l0-source | parallel_storage_workers | 4 | process_cpu_ns | ms | 3 | 3.579 | 3.351 | 3.765 |
+| n5-l0-source | parallel_storage_workers | 4 | wall_ns | ms | 3 | 2.163 | 1.914 | 2.409 |
+| n5-l0-source | parallel_vm_workers | 1 | finish_live_bytes | bytes | 3 | 107900.000 | 107900.000 | 107900.000 |
+| n5-l0-source | parallel_vm_workers | 1 | finish_metadata_bytes | bytes | 3 | 140768.000 | 140768.000 | 140768.000 |
+| n5-l0-source | parallel_vm_workers | 1 | finish_reserved_bytes | bytes | 3 | 394888.000 | 394888.000 | 394888.000 |
+| n5-l0-source | parallel_vm_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.027 | 0.026 | 0.038 |
+| n5-l0-source | parallel_vm_workers | 1 | max_rendezvous_ns | ms | 3 | 0.001 | 0.001 | 0.001 |
+| n5-l0-source | parallel_vm_workers | 1 | process_cpu_ns | ms | 3 | 358.179 | 345.322 | 371.703 |
+| n5-l0-source | parallel_vm_workers | 1 | source_freeze_run_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| n5-l0-source | parallel_vm_workers | 1 | wall_ns | ms | 3 | 348.753 | 336.121 | 374.213 |
+| n5-l0-source | parallel_vm_workers | 2 | finish_live_bytes | bytes | 3 | 107756.000 | 103724.000 | 121692.000 |
+| n5-l0-source | parallel_vm_workers | 2 | finish_metadata_bytes | bytes | 3 | 182608.000 | 182608.000 | 183216.000 |
+| n5-l0-source | parallel_vm_workers | 2 | finish_reserved_bytes | bytes | 3 | 460536.000 | 460536.000 | 464624.000 |
+| n5-l0-source | parallel_vm_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.040 | 0.040 | 0.047 |
+| n5-l0-source | parallel_vm_workers | 2 | max_rendezvous_ns | ms | 3 | 0.214 | 0.172 | 0.237 |
+| n5-l0-source | parallel_vm_workers | 2 | process_cpu_ns | ms | 3 | 352.825 | 343.919 | 366.994 |
+| n5-l0-source | parallel_vm_workers | 2 | source_freeze_run_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| n5-l0-source | parallel_vm_workers | 2 | wall_ns | ms | 3 | 177.116 | 173.893 | 182.013 |
+| n5-l0-source | parallel_vm_workers | 4 | finish_live_bytes | bytes | 3 | 162124.000 | 110724.000 | 177676.000 |
+| n5-l0-source | parallel_vm_workers | 4 | finish_metadata_bytes | bytes | 3 | 305072.000 | 266896.000 | 342640.000 |
+| n5-l0-source | parallel_vm_workers | 4 | finish_reserved_bytes | bytes | 3 | 665656.000 | 595920.000 | 731304.000 |
+| n5-l0-source | parallel_vm_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.051 | 0.042 | 0.052 |
+| n5-l0-source | parallel_vm_workers | 4 | max_rendezvous_ns | ms | 3 | 0.638 | 0.310 | 3.729 |
+| n5-l0-source | parallel_vm_workers | 4 | process_cpu_ns | ms | 3 | 373.945 | 369.238 | 410.136 |
+| n5-l0-source | parallel_vm_workers | 4 | source_freeze_run_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| n5-l0-source | parallel_vm_workers | 4 | wall_ns | ms | 3 | 108.203 | 107.505 | 120.535 |
+| n5-l0-source | process_peak_rss_kib | - | process_peak_rss_kib | KiB | 3 | 6412.000 | 6324.000 | 7732.000 |
+| n5-l0-source | scheduled_iterations | - | scheduled_function_ns | ms | 3 | 31.918 | 29.596 | 32.933 |
+| n5-l0-source | shared_edge_iterations | - | cell_object_bytes | bytes | 3 | 16.000 | 16.000 | 16.000 |
+| n5-l0-source | shared_edge_iterations | - | rooted_cell_read_ns | ms | 3 | 2.946 | 2.720 | 3.011 |
+| n5-l0-source | shared_edge_iterations | - | rooted_cell_store_read_ns | ms | 3 | 5.196 | 4.782 | 5.296 |
+| n5-l0-source | slot_iterations | - | generic_prefix_bytes | bytes | 3 | 8.000 | 8.000 | 8.000 |
+| n5-l0-source | slot_iterations | - | slot_instance_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| n5-l0-source | slot_iterations | - | slot_set_get_ns | ms | 3 | 41.903 | 39.326 | 42.220 |
+| n5-l0-source | source_parse_scope_cfg_ns | - | source_bytes | bytes | 3 | 92.000 | 92.000 | 92.000 |
+| n5-l0-source | source_parse_scope_cfg_ns | - | source_parse_scope_cfg_ns | ms | 3 | 0.035 | 0.030 | 0.035 |
+| n5-l0-source | transfer_iterations | - | transfer_roundtrip_ns | ms | 3 | 0.978 | 0.887 | 0.978 |
+| n5-l0-source | transfer_iterations | - | transfer_token_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| n5-l0-source | with_iterations | - | with_function_ns | ms | 3 | 44.968 | 41.718 | 45.821 |
+| n5-l0-source-final | cleanup_iterations | - | active_region_bytes | bytes | 3 | 32.000 | 32.000 | 32.000 |
+| n5-l0-source-final | cleanup_iterations | - | cleanup_continuation_bytes | bytes | 3 | 48.000 | 48.000 | 48.000 |
+| n5-l0-source-final | cleanup_iterations | - | cleanup_function_ns | ms | 3 | 25.011 | 23.737 | 25.155 |
+| n5-l0-source-final | function_iterations | - | frame_prefix_bytes | bytes | 3 | 232.000 | 232.000 | 232.000 |
+| n5-l0-source-final | function_iterations | - | verified_function_ns | ms | 3 | 19.766 | 18.535 | 19.831 |
+| n5-l0-source-final | hash_iterations | - | string_hash_ns | ms | 3 | 84.750 | 81.927 | 85.038 |
+| n5-l0-source-final | hash_iterations | - | tuple_repr_ns | ms | 3 | 25.157 | 23.232 | 26.258 |
+| n5-l0-source-final | int_iterations | - | big_int_mul_ns | ms | 3 | 9.794 | 9.230 | 9.944 |
+| n5-l0-source-final | int_iterations | - | int_add_ns | ms | 3 | 85.737 | 85.627 | 87.899 |
+| n5-l0-source-final | int_iterations | - | int_object_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| n5-l0-source-final | iterations | - | allocation_and_auto_gc_ns | ms | 3 | 5.092 | 4.887 | 5.175 |
+| n5-l0-source-final | iterations | - | handle_bytes | bytes | 3 | 32.000 | 32.000 | 32.000 |
+| n5-l0-source-final | iterations | - | header_bytes | bytes | 3 | 8.000 | 8.000 | 8.000 |
+| n5-l0-source-final | iterations | - | last_gc_pause_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| n5-l0-source-final | iterations | - | live_bytes | bytes | 3 | 0.000 | 0.000 | 0.000 |
+| n5-l0-source-final | iterations | - | node_bytes | bytes | 3 | 16.000 | 16.000 | 16.000 |
+| n5-l0-source-final | iterations | - | recorded_metadata_bytes | bytes | 3 | 3360.000 | 3360.000 | 3360.000 |
+| n5-l0-source-final | iterations | - | root_register_release_ns | ms | 3 | 3.611 | 3.605 | 3.863 |
+| n5-l0-source-final | native_call_iterations | - | core_live_bytes | bytes | 3 | 95688.000 | 95688.000 | 95688.000 |
+| n5-l0-source-final | native_call_iterations | - | core_metadata_bytes | bytes | 3 | 99520.000 | 99520.000 | 99520.000 |
+| n5-l0-source-final | native_call_iterations | - | core_reserved_bytes | bytes | 3 | 321152.000 | 321152.000 | 321152.000 |
+| n5-l0-source-final | native_call_iterations | - | lookup_bind_call_ns | ms | 3 | 25.633 | 25.344 | 27.636 |
+| n5-l0-source-final | native_call_iterations | - | native_call_ns | ms | 3 | 23.185 | 22.969 | 25.057 |
+| n5-l0-source-final | parallel_source_workers | 1 | finish_live_bytes | bytes | 3 | 164740.000 | 164740.000 | 164740.000 |
+| n5-l0-source-final | parallel_source_workers | 1 | finish_metadata_bytes | bytes | 3 | 216000.000 | 216000.000 | 216000.000 |
+| n5-l0-source-final | parallel_source_workers | 1 | finish_reserved_bytes | bytes | 3 | 526184.000 | 526184.000 | 526184.000 |
+| n5-l0-source-final | parallel_source_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.035 | 0.031 | 0.056 |
+| n5-l0-source-final | parallel_source_workers | 1 | max_rendezvous_ns | ms | 3 | 0.002 | 0.002 | 0.004 |
+| n5-l0-source-final | parallel_source_workers | 1 | process_cpu_ns | ms | 3 | 398.190 | 391.977 | 398.912 |
+| n5-l0-source-final | parallel_source_workers | 1 | source_freeze_run_ns | ms | 3 | 0.073 | 0.071 | 0.085 |
+| n5-l0-source-final | parallel_source_workers | 1 | wall_ns | ms | 3 | 394.215 | 385.474 | 394.640 |
+| n5-l0-source-final | parallel_source_workers | 2 | finish_live_bytes | bytes | 3 | 178748.000 | 171260.000 | 187436.000 |
+| n5-l0-source-final | parallel_source_workers | 2 | finish_metadata_bytes | bytes | 3 | 220976.000 | 220976.000 | 258544.000 |
+| n5-l0-source-final | parallel_source_workers | 2 | finish_reserved_bytes | bytes | 3 | 530272.000 | 530272.000 | 595920.000 |
+| n5-l0-source-final | parallel_source_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.043 | 0.035 | 0.056 |
+| n5-l0-source-final | parallel_source_workers | 2 | max_rendezvous_ns | ms | 3 | 0.153 | 0.135 | 0.164 |
+| n5-l0-source-final | parallel_source_workers | 2 | process_cpu_ns | ms | 3 | 403.273 | 396.641 | 416.782 |
+| n5-l0-source-final | parallel_source_workers | 2 | source_freeze_run_ns | ms | 3 | 0.069 | 0.065 | 0.071 |
+| n5-l0-source-final | parallel_source_workers | 2 | wall_ns | ms | 3 | 203.129 | 199.648 | 210.582 |
+| n5-l0-source-final | parallel_source_workers | 4 | finish_live_bytes | bytes | 3 | 173532.000 | 172940.000 | 187236.000 |
+| n5-l0-source-final | parallel_source_workers | 4 | finish_metadata_bytes | bytes | 3 | 342416.000 | 305456.000 | 343024.000 |
+| n5-l0-source-final | parallel_source_workers | 4 | finish_reserved_bytes | bytes | 3 | 727216.000 | 665656.000 | 731304.000 |
+| n5-l0-source-final | parallel_source_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.057 | 0.056 | 0.064 |
+| n5-l0-source-final | parallel_source_workers | 4 | max_rendezvous_ns | ms | 3 | 0.729 | 0.416 | 4.095 |
+| n5-l0-source-final | parallel_source_workers | 4 | process_cpu_ns | ms | 3 | 432.316 | 431.641 | 448.428 |
+| n5-l0-source-final | parallel_source_workers | 4 | source_freeze_run_ns | ms | 3 | 0.068 | 0.067 | 0.070 |
+| n5-l0-source-final | parallel_source_workers | 4 | wall_ns | ms | 3 | 134.820 | 122.555 | 137.998 |
+| n5-l0-source-final | parallel_storage_workers | 1 | finish_live_bytes | bytes | 3 | 42720.000 | 42720.000 | 42720.000 |
+| n5-l0-source-final | parallel_storage_workers | 1 | finish_metadata_bytes | bytes | 3 | 97040.000 | 97040.000 | 97040.000 |
+| n5-l0-source-final | parallel_storage_workers | 1 | finish_reserved_bytes | bytes | 3 | 135504.000 | 135504.000 | 135504.000 |
+| n5-l0-source-final | parallel_storage_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.016 | 0.011 | 0.027 |
+| n5-l0-source-final | parallel_storage_workers | 1 | max_rendezvous_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| n5-l0-source-final | parallel_storage_workers | 1 | process_cpu_ns | ms | 3 | 2.484 | 2.304 | 2.522 |
+| n5-l0-source-final | parallel_storage_workers | 1 | wall_ns | ms | 3 | 2.460 | 2.351 | 2.663 |
+| n5-l0-source-final | parallel_storage_workers | 2 | finish_live_bytes | bytes | 3 | 13920.000 | 13424.000 | 65056.000 |
+| n5-l0-source-final | parallel_storage_workers | 2 | finish_metadata_bytes | bytes | 3 | 100352.000 | 100352.000 | 190816.000 |
+| n5-l0-source-final | parallel_storage_workers | 2 | finish_reserved_bytes | bytes | 3 | 135504.000 | 135504.000 | 271008.000 |
+| n5-l0-source-final | parallel_storage_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.015 | 0.014 | 0.027 |
+| n5-l0-source-final | parallel_storage_workers | 2 | max_rendezvous_ns | ms | 3 | 0.041 | 0.039 | 0.064 |
+| n5-l0-source-final | parallel_storage_workers | 2 | process_cpu_ns | ms | 3 | 2.771 | 2.425 | 3.101 |
+| n5-l0-source-final | parallel_storage_workers | 2 | wall_ns | ms | 3 | 1.941 | 1.654 | 2.083 |
+| n5-l0-source-final | parallel_storage_workers | 4 | finish_live_bytes | bytes | 3 | 55376.000 | 38384.000 | 68656.000 |
+| n5-l0-source-final | parallel_storage_workers | 4 | finish_metadata_bytes | bytes | 3 | 244096.000 | 238400.000 | 282208.000 |
+| n5-l0-source-final | parallel_storage_workers | 4 | finish_reserved_bytes | bytes | 3 | 340864.000 | 332448.000 | 398096.000 |
+| n5-l0-source-final | parallel_storage_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.031 | 0.031 | 0.033 |
+| n5-l0-source-final | parallel_storage_workers | 4 | max_rendezvous_ns | ms | 3 | 0.107 | 0.098 | 4.884 |
+| n5-l0-source-final | parallel_storage_workers | 4 | process_cpu_ns | ms | 3 | 3.219 | 2.900 | 3.374 |
+| n5-l0-source-final | parallel_storage_workers | 4 | wall_ns | ms | 3 | 2.203 | 2.049 | 7.016 |
+| n5-l0-source-final | parallel_vm_workers | 1 | finish_live_bytes | bytes | 3 | 107900.000 | 107900.000 | 107900.000 |
+| n5-l0-source-final | parallel_vm_workers | 1 | finish_metadata_bytes | bytes | 3 | 140768.000 | 140768.000 | 140768.000 |
+| n5-l0-source-final | parallel_vm_workers | 1 | finish_reserved_bytes | bytes | 3 | 394888.000 | 394888.000 | 394888.000 |
+| n5-l0-source-final | parallel_vm_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.030 | 0.026 | 0.058 |
+| n5-l0-source-final | parallel_vm_workers | 1 | max_rendezvous_ns | ms | 3 | 0.002 | 0.001 | 0.002 |
+| n5-l0-source-final | parallel_vm_workers | 1 | process_cpu_ns | ms | 3 | 353.073 | 346.783 | 358.076 |
+| n5-l0-source-final | parallel_vm_workers | 1 | source_freeze_run_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| n5-l0-source-final | parallel_vm_workers | 1 | wall_ns | ms | 3 | 347.113 | 342.266 | 356.740 |
+| n5-l0-source-final | parallel_vm_workers | 2 | finish_live_bytes | bytes | 3 | 104156.000 | 100668.000 | 104396.000 |
+| n5-l0-source-final | parallel_vm_workers | 2 | finish_metadata_bytes | bytes | 3 | 182608.000 | 182608.000 | 183216.000 |
+| n5-l0-source-final | parallel_vm_workers | 2 | finish_reserved_bytes | bytes | 3 | 460536.000 | 460536.000 | 464624.000 |
+| n5-l0-source-final | parallel_vm_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.034 | 0.032 | 0.034 |
+| n5-l0-source-final | parallel_vm_workers | 2 | max_rendezvous_ns | ms | 3 | 0.138 | 0.133 | 0.153 |
+| n5-l0-source-final | parallel_vm_workers | 2 | process_cpu_ns | ms | 3 | 360.275 | 348.398 | 361.722 |
+| n5-l0-source-final | parallel_vm_workers | 2 | source_freeze_run_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| n5-l0-source-final | parallel_vm_workers | 2 | wall_ns | ms | 3 | 181.549 | 174.477 | 182.979 |
+| n5-l0-source-final | parallel_vm_workers | 4 | finish_live_bytes | bytes | 3 | 129852.000 | 121428.000 | 187556.000 |
+| n5-l0-source-final | parallel_vm_workers | 4 | finish_metadata_bytes | bytes | 3 | 266896.000 | 266896.000 | 305680.000 |
+| n5-l0-source-final | parallel_vm_workers | 4 | finish_reserved_bytes | bytes | 3 | 595920.000 | 595920.000 | 669744.000 |
+| n5-l0-source-final | parallel_vm_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.039 | 0.039 | 0.056 |
+| n5-l0-source-final | parallel_vm_workers | 4 | max_rendezvous_ns | ms | 3 | 1.678 | 0.409 | 2.356 |
+| n5-l0-source-final | parallel_vm_workers | 4 | process_cpu_ns | ms | 3 | 377.618 | 363.108 | 409.943 |
+| n5-l0-source-final | parallel_vm_workers | 4 | source_freeze_run_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| n5-l0-source-final | parallel_vm_workers | 4 | wall_ns | ms | 3 | 112.279 | 98.594 | 121.070 |
+| n5-l0-source-final | process_peak_rss_kib | - | process_peak_rss_kib | KiB | 3 | 6232.000 | 6220.000 | 6372.000 |
+| n5-l0-source-final | scheduled_iterations | - | scheduled_function_ns | ms | 3 | 30.565 | 29.579 | 30.891 |
+| n5-l0-source-final | shared_edge_iterations | - | cell_object_bytes | bytes | 3 | 16.000 | 16.000 | 16.000 |
+| n5-l0-source-final | shared_edge_iterations | - | rooted_cell_read_ns | ms | 3 | 2.907 | 2.748 | 2.964 |
+| n5-l0-source-final | shared_edge_iterations | - | rooted_cell_store_read_ns | ms | 3 | 5.096 | 4.996 | 5.570 |
+| n5-l0-source-final | slot_iterations | - | generic_prefix_bytes | bytes | 3 | 8.000 | 8.000 | 8.000 |
+| n5-l0-source-final | slot_iterations | - | slot_instance_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| n5-l0-source-final | slot_iterations | - | slot_set_get_ns | ms | 3 | 42.981 | 42.857 | 44.777 |
+| n5-l0-source-final | source_parse_scope_cfg_ns | - | source_bytes | bytes | 3 | 92.000 | 92.000 | 92.000 |
+| n5-l0-source-final | source_parse_scope_cfg_ns | - | source_parse_scope_cfg_ns | ms | 3 | 0.036 | 0.034 | 0.036 |
+| n5-l0-source-final | transfer_iterations | - | transfer_roundtrip_ns | ms | 3 | 0.937 | 0.924 | 0.964 |
+| n5-l0-source-final | transfer_iterations | - | transfer_token_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| n5-l0-source-final | with_iterations | - | with_function_ns | ms | 3 | 41.132 | 40.612 | 43.677 |
+| n5-l0-source-final-cpython | parallel_source_workers | 1 | process_cpu_ns | ms | 3 | 6.025 | 5.972 | 6.074 |
+| n5-l0-source-final-cpython | parallel_source_workers | 1 | wall_ns | ms | 3 | 5.959 | 5.917 | 5.983 |
+| n5-l0-source-final-cpython | parallel_source_workers | 2 | process_cpu_ns | ms | 3 | 6.091 | 5.950 | 6.301 |
+| n5-l0-source-final-cpython | parallel_source_workers | 2 | wall_ns | ms | 3 | 6.005 | 5.867 | 6.370 |
+| n5-l0-source-final-cpython | parallel_source_workers | 4 | process_cpu_ns | ms | 3 | 5.824 | 5.776 | 6.121 |
+| n5-l0-source-final-cpython | parallel_source_workers | 4 | wall_ns | ms | 3 | 5.766 | 5.677 | 5.999 |
 
 ## Fixed-Work Scaling
 
@@ -518,3 +734,34 @@ Derived from median wall/process CPU times. CPU/wall is not a speedup; 1-worker 
 | n4-global-environment | parallel_vm_workers | 1 | 340.646 | 1.014 | 1.000 | 1.000 |
 | n4-global-environment | parallel_vm_workers | 2 | 185.376 | 1.975 | 1.838 | 0.919 |
 | n4-global-environment | parallel_vm_workers | 4 | 115.073 | 3.323 | 2.960 | 0.740 |
+| n5-l0-source | parallel_source_workers | 1 | 408.430 | 1.033 | 1.000 | 1.000 |
+| n5-l0-source | parallel_source_workers | 2 | 211.029 | 1.962 | 1.935 | 0.968 |
+| n5-l0-source | parallel_source_workers | 4 | 125.775 | 3.504 | 3.247 | 0.812 |
+| n5-l0-source | parallel_storage_workers | 1 | 2.340 | 1.057 | 1.000 | 1.000 |
+| n5-l0-source | parallel_storage_workers | 2 | 1.718 | 1.524 | 1.362 | 0.681 |
+| n5-l0-source | parallel_storage_workers | 4 | 2.163 | 1.655 | 1.082 | 0.270 |
+| n5-l0-source | parallel_vm_workers | 1 | 348.753 | 1.027 | 1.000 | 1.000 |
+| n5-l0-source | parallel_vm_workers | 2 | 177.116 | 1.992 | 1.969 | 0.985 |
+| n5-l0-source | parallel_vm_workers | 4 | 108.203 | 3.456 | 3.223 | 0.806 |
+| n5-l0-source-final | parallel_source_workers | 1 | 394.215 | 1.010 | 1.000 | 1.000 |
+| n5-l0-source-final | parallel_source_workers | 2 | 203.129 | 1.985 | 1.941 | 0.970 |
+| n5-l0-source-final | parallel_source_workers | 4 | 134.820 | 3.207 | 2.924 | 0.731 |
+| n5-l0-source-final | parallel_storage_workers | 1 | 2.460 | 1.010 | 1.000 | 1.000 |
+| n5-l0-source-final | parallel_storage_workers | 2 | 1.941 | 1.428 | 1.267 | 0.634 |
+| n5-l0-source-final | parallel_storage_workers | 4 | 2.203 | 1.461 | 1.116 | 0.279 |
+| n5-l0-source-final | parallel_vm_workers | 1 | 347.113 | 1.017 | 1.000 | 1.000 |
+| n5-l0-source-final | parallel_vm_workers | 2 | 181.549 | 1.984 | 1.912 | 0.956 |
+| n5-l0-source-final | parallel_vm_workers | 4 | 112.279 | 3.363 | 3.092 | 0.773 |
+| n5-l0-source-final-cpython | parallel_source_workers | 1 | 5.959 | 1.011 | 1.000 | 1.000 |
+| n5-l0-source-final-cpython | parallel_source_workers | 2 | 6.005 | 1.014 | 0.992 | 0.496 |
+| n5-l0-source-final-cpython | parallel_source_workers | 4 | 5.766 | 1.010 | 1.033 | 0.258 |
+
+## Identical Source Comparison
+
+The CPython probe executes the source kernel captured from the C++ benchmark, with the same total work and worker count. A ratio above 1 is slower.
+
+| Series | Workers | cxxpython ms | CPython ms | cxxpython/CPython |
+| --- | --- | --- | --- | --- |
+| n5-l0-source-final | 1 | 394.215 | 5.959 | 66.155 |
+| n5-l0-source-final | 2 | 203.129 | 6.005 | 33.825 |
+| n5-l0-source-final | 4 | 134.820 | 5.766 | 23.383 |

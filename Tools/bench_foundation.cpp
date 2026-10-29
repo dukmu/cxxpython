@@ -1,4 +1,4 @@
-#include "cxxpython/core/execution.hpp"
+#include "cxxpython/core/compiler.hpp"
 
 #include <chrono>
 #include <barrier>
@@ -309,9 +309,26 @@ int main()
 
     // Fixed Python work, one Function and Code shared by every worker.
     constexpr int vm_total = 120000;
+    std::optional<SourceUnit> source_program;
+    const auto parse_ns = measure([&] { source_program.emplace(SourceBuffer("def total(n):\n    value = 0\n    while n:\n        value += n\n        n -= 1\n    return value\n")); });
+    std::string source_hex; constexpr char hex[] = "0123456789abcdef";
+    for (unsigned char byte : source_program->source().text()) { source_hex += hex[byte >> 4]; source_hex += hex[byte & 15]; }
+    std::cout << "source_parse_scope_cfg_ns=" << parse_ns << " source_bytes=" << source_program->source().text().size()
+              << " source_kernel_hex=" << source_hex << '\n';
+    for (bool from_source : {false, true})
     for (int workers : {1, 2, 4})
     {
         Interpreter vm; Attachment controller(vm); controller.bootstrap_core(); RootScope roots(controller); ReturnSlot out(controller);
+        Handle function; std::int64_t freeze_run_ns = 0;
+        controller.allocate_instance<DictObject>(roots.root(controller.builtin(CoreObject::DictType)), out); const auto globals = roots.root(out.result().value());
+        if (from_source)
+        {
+            freeze_run_ns = measure([&] { run(controller, {&*source_program, globals}, out); });
+            if (out.result().tag() != ResultTag::Ok) return 1;
+            function = roots.root(*detail::name_lookup(controller, globals.get(controller), U"total"));
+        }
+        else
+        {
         CodeSpec spec; spec.signature.parameters = {{U"n"}}; spec.locals = {U"n", U"sum"}; CodeBuilder builder(controller, spec);
         const auto zero = builder.constant(roots.root(controller.builtin(CoreObject::IntZero)));
         const auto one = builder.constant(roots.root(controller.builtin(CoreObject::IntOne)));
@@ -323,8 +340,8 @@ int main()
         builder.emit(Opcode::Binary, static_cast<std::uint32_t>(BinaryOp::Subtract)); builder.emit(Opcode::StoreFast);
         builder.jump(Opcode::Jump, loop); builder.bind(done); builder.emit(Opcode::LoadFast, 1); builder.emit(Opcode::Return);
         builder.freeze(out); const auto code = roots.root(out.result().value());
-        controller.allocate_instance<DictObject>(roots.root(controller.builtin(CoreObject::DictType)), out); const auto globals = roots.root(out.result().value());
-        make_function(controller, {code, globals}, out); const auto function = roots.root(out.result().value());
+        make_function(controller, {code, globals}, out); function = roots.root(out.result().value());
+        }
         make_int(controller, vm_total / workers, out); const auto argument = roots.root(out.result().value());
         std::array values{function.get(controller), argument.get(controller)}; cxxpython::core::make_tuple(controller, values, out);
         const auto packet = roots.root(out.result().value()); out.reset(); controller.collect(); const auto baseline = controller.stats();
@@ -348,12 +365,12 @@ int main()
         const auto finished = controller.stats(); finish.arrive_and_wait();
         for (auto &task : tasks) if (!task.get()) return 1;
         controller.collect(); const auto final = controller.stats(); if (final.objects != baseline.objects || final.transfer_roots) return 1;
-        std::cout << "parallel_vm_workers=" << workers << " total_iterations=" << vm_total << " wall_ns=" << wall_ns
+        std::cout << (from_source ? "parallel_source_workers=" : "parallel_vm_workers=") << workers << " total_iterations=" << vm_total << " wall_ns=" << wall_ns
                   << " process_cpu_ns=" << cpu_ns << " collections=" << final.collections - baseline.collections
                   << " max_rendezvous_ns=" << final.max_rendezvous_ns << " last_mark_sweep_ns=" << final.last_pause_ns
                   << " finish_reserved_bytes=" << finished.reserved_bytes << " finish_metadata_bytes=" << finished.metadata_bytes
                   << " finish_live_bytes=" << finished.live_bytes << " finish_objects=" << finished.objects
-                  << " parallel_vm_live_set_check=ok\n";
+                  << " source_freeze_run_ns=" << freeze_run_ns << " parallel_vm_live_set_check=ok\n";
     }
 
     // N1 storage/coordinator cost only, not Python VM parallelism evidence.

@@ -93,6 +93,20 @@ namespace
         { CodeBuilder global(context); global.emit(opcode); invalid(global, CodeErrorKind::NameBounds); }
     }
 
+    TEST_F(CoreExecution, SourceLoweringOpcodesHaveVerifiedOperandsAndStackInputs)
+    {
+        CodeBuilder unary(context); unary.emit(Opcode::Unary, 255); invalid(unary, CodeErrorKind::Operand);
+        CodeBuilder swap(context); swap.emit(Opcode::Swap, 1); invalid(swap, CodeErrorKind::Operand);
+        CodeBuilder deep(context); deep.emit(Opcode::Swap, 2); invalid(deep, CodeErrorKind::StackUnderflow);
+        CodeBuilder tuple(context); tuple.emit(Opcode::BuildTuple, 1); invalid(tuple, CodeErrorKind::StackUnderflow);
+        for (auto opcode : {Opcode::LoadAttr, Opcode::StoreAttr, Opcode::DeleteAttr})
+        {
+            CodeBuilder attribute(context); attribute.emit(opcode); invalid(attribute, CodeErrorKind::NameBounds);
+        }
+        CodeBuilder dictionary(context); std::array<std::u32string, 1> names{U"x"}; dictionary.name_dict(names);
+        invalid(dictionary, CodeErrorKind::StackUnderflow);
+    }
+
     TEST_F(CoreExecution, GlobalLookupUsesLiveGlobalsThenTheFunctionsBuiltinsMapping)
     {
         auto globals = dictionary(), builtins = dictionary(); auto key = text(U"answer");

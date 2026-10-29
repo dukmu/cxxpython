@@ -13,9 +13,10 @@ namespace cxxpython::core
         LoadConst, LoadFast, StoreFast, DeleteFast, PopTop, DupTop,
         Binary, Compare, Jump, JumpIfFalse, Return, RaiseInstance, Call,
         EnterRegion, LeaveRegion, EndHandler, BreakLoop, ContinueLoop, Reraise, LoadException, ExceptionMatch,
-        PrepareWith, EnterWith, WithExit, WithResult, LoadGlobal, StoreGlobal, DeleteGlobal, MakeFunction, Count,
+        PrepareWith, EnterWith, WithExit, WithResult, LoadGlobal, StoreGlobal, DeleteGlobal, MakeFunction,
+        Unary, Inplace, Swap, LoadAttr, StoreAttr, DeleteAttr, BuildTuple, BuildNameDict, Count,
     };
-    enum class OperandDomain { None, Constant, Local, Name, Binary, Compare, Target, CallSite, Region, FunctionFlags };
+    enum class OperandDomain { None, Constant, Local, Name, Binary, Compare, Target, CallSite, Region, FunctionFlags, Unary, StackDepth, Count };
     enum class FunctionFlags : std::uint32_t { None = 0, Defaults = 1, KeywordDefaults = 2 };
     enum class FlowKind { Next, Jump, Branch, Stop, Leave, EndHandler, LoopControl };
     enum class RegionKind { Loop, Except, Finally, With };
@@ -101,6 +102,7 @@ namespace cxxpython::core
         std::uint32_t first_line = 1;
         SignatureLayout signature;
         std::vector<std::u32string> locals;
+        std::optional<std::u32string> docstring;
     };
     class CodeBuilder;
     class VerifiedCode final
@@ -140,11 +142,11 @@ namespace cxxpython::core
     {
         ObjectHeader header;
         const VerifiedCode program;
-        const Value constants, varnames, name, qualname, filename, call_keywords, names;
+        const Value constants, varnames, name, qualname, filename, call_keywords, names, docstring;
         CodeObject(InitialType head, VerifiedCode code, Value consts, Value variables,
-                   Value name, Value qualname, Value filename, Value call_keywords, Value names)
+                   Value name, Value qualname, Value filename, Value call_keywords, Value names, Value docstring)
             : header(head), program(std::move(code)), constants(consts), varnames(variables),
-              name(name), qualname(qualname), filename(filename), call_keywords(call_keywords), names(names) {}
+              name(name), qualname(qualname), filename(filename), call_keywords(call_keywords), names(names), docstring(docstring) {}
         void trace(Tracer &tracer) const noexcept;
         std::size_t external_bytes() const noexcept { return program.external_bytes(); }
     };
@@ -161,6 +163,7 @@ namespace cxxpython::core
         void emit(Opcode opcode, std::uint32_t operand = 0, SourcePosition source = {});
         void jump(Opcode opcode, Label target, SourcePosition source = {});
         void call(std::uint32_t positional, std::span<const std::u32string> keywords = {}, SourcePosition source = {});
+        void name_dict(std::span<const std::u32string> names, SourcePosition source = {});
         Region region(RegionKind kind);
         Region loop(Label continue_target, Label break_target);
         void enter(Region region, SourcePosition source = {});
@@ -181,6 +184,7 @@ namespace cxxpython::core
         std::vector<std::pair<std::size_t, Label>> fixups_;
         struct CallSiteSpec { std::uint32_t positional; std::vector<std::u32string> keywords; };
         std::vector<CallSiteSpec> calls_;
+        void call_site(Opcode opcode, std::uint32_t positional, std::span<const std::u32string> keywords, SourcePosition source);
         struct RegionSpec
         {
             RegionLayout layout;

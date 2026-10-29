@@ -1,0 +1,434 @@
+{
+  "captured_at": "2026-10-29T11:40:29.801466+00:00",
+  "reference_version": "Python 3.12.14",
+  "provenance": {
+    "binary": {
+      "path": "/home/shefrin/repo/cxxpython/build/cxxpython_next",
+      "sha256": "95d5a3a8d4bf854937eab5e153c6ca20348f3a4e7129d9e35b974d0e7b6c0e53"
+    },
+    "reference": {
+      "path": "/tmp/cxxpython-cpython31214-build/python",
+      "sha256": "0048a751931754717ef43384585009919fd2a5d952c253f107113787dcfe7a8b"
+    }
+  },
+  "passed": true,
+  "observations": [
+    {
+      "command": [
+        "build/cxxpython_next",
+        "-c",
+        "return 1"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 1\nreturn 1\n^\nSyntaxError: 'return' outside function\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "return 1"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 1\nSyntaxError: 'return' outside function\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython_next",
+        "-c",
+        "break"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 1\nbreak\n^\nSyntaxError: 'break'/'continue' outside loop\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "break"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 1\nSyntaxError: 'break' outside loop\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython_next",
+        "-c",
+        "if 1:\nx = 2"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 2\nx = 2\n^\nIndentationError: expected an indented block\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "if 1:\nx = 2"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 2\n    x = 2\n    ^\nIndentationError: expected an indented block after 'if' statement on line 1\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython_next",
+        "-c",
+        "def f(a, a): pass"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 1\ndef f(a, a): pass\n         ^\nSyntaxError: duplicate parameter name\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "def f(a, a): pass"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 1\nSyntaxError: duplicate argument 'a' in function definition\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython_next",
+        "-c",
+        "x = 1\nglobal x"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 2\nglobal x\n       ^\nSyntaxError: name used, assigned or parameter before global/nonlocal declaration\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "x = 1\nglobal x"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 2\nSyntaxError: name 'x' is assigned to before global declaration\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython_next",
+        "-c",
+        "def f():\n    return 1 // 0\nx = f()"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 3, in <module>\n  File \"<string>\", line 2, in f\nZeroDivisionError('integer division or modulo by zero')\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython_next",
+        "/tmp/tmpoax8hc0i/source.py",
+        "--eval",
+        "f(41)"
+      ],
+      "stdout": "42\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython_next",
+        "--eval",
+        "'\\u4f60' + )"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<eval>\", line 1\n'\\u4f60' + )\n           ^\nSyntaxError: unmatched ')'\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython_next",
+        "-c",
+        "",
+        "--eval",
+        "0x_FF + 0b101 + 0o7 + 1_000"
+      ],
+      "stdout": "1267\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nprint(repr(0x_FF + 0b101 + 0o7 + 1_000))"
+      ],
+      "stdout": "1267\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython_next",
+        "-c",
+        "",
+        "--eval",
+        "-(18446744073709551616) // 3"
+      ],
+      "stdout": "-6148914691236517206\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nprint(repr(-(18446744073709551616) // 3))"
+      ],
+      "stdout": "-6148914691236517206\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython_next",
+        "-c",
+        "",
+        "--eval",
+        "not 0 and 1 < 2 < 3 or missing"
+      ],
+      "stdout": "True\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nprint(repr(not 0 and 1 < 2 < 3 or missing))"
+      ],
+      "stdout": "True\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython_next",
+        "-c",
+        "",
+        "--eval",
+        "'\\u4f60\\u597d' ' ' r'\\n'"
+      ],
+      "stdout": "'\u4f60\u597d \\\\n'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nprint(repr('\\u4f60\\u597d' ' ' r'\\n'))"
+      ],
+      "stdout": "'\u4f60\u597d \\\\n'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython_next",
+        "-c",
+        "def f(n):\n    total = 0\n    while n:\n        total += n\n        n -= 1\n    return total",
+        "--eval",
+        "f(2000)"
+      ],
+      "stdout": "2001000\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "def f(n):\n    total = 0\n    while n:\n        total += n\n        n -= 1\n    return total\nprint(repr(f(2000)))"
+      ],
+      "stdout": "2001000\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython_next",
+        "-c",
+        "def fact(n):\n    if n <= 1:\n        return 1\n    return n * fact(n - 1)",
+        "--eval",
+        "fact(20)"
+      ],
+      "stdout": "2432902008176640000\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "def fact(n):\n    if n <= 1:\n        return 1\n    return n * fact(n - 1)\nprint(repr(fact(20)))"
+      ],
+      "stdout": "2432902008176640000\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython_next",
+        "-c",
+        "count = 0\ndef bump():\n    global count\n    count += 1\n    return count\ndef f(a=bump(), *, b=bump()):\n    return a * 10 + b\nx = f()\ny = f()",
+        "--eval",
+        "count * 100 + x + y"
+      ],
+      "stdout": "224\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "count = 0\ndef bump():\n    global count\n    count += 1\n    return count\ndef f(a=bump(), *, b=bump()):\n    return a * 10 + b\nx = f()\ny = f()\nprint(repr(count * 100 + x + y))"
+      ],
+      "stdout": "224\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython_next",
+        "-c",
+        "def f(a, /, b=2, *, c=3):\n    return a + b + c",
+        "--eval",
+        "f(1, c=4)"
+      ],
+      "stdout": "7\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "def f(a, /, b=2, *, c=3):\n    return a + b + c\nprint(repr(f(1, c=4)))"
+      ],
+      "stdout": "7\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython_next",
+        "-c",
+        "def f(*args, **kwargs):\n    return len(args) * 10 + len(kwargs)",
+        "--eval",
+        "f(1, 2, x=3)"
+      ],
+      "stdout": "21\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "def f(*args, **kwargs):\n    return len(args) * 10 + len(kwargs)\nprint(repr(f(1, 2, x=3)))"
+      ],
+      "stdout": "21\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython_next",
+        "-c",
+        "i = 0\nx = 0\nwhile i < 10:\n    i += 1\n    if i == 3:\n        continue\n    elif i == 7:\n        break\n    x += i\nelse:\n    x = 999",
+        "--eval",
+        "x"
+      ],
+      "stdout": "18\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "i = 0\nx = 0\nwhile i < 10:\n    i += 1\n    if i == 3:\n        continue\n    elif i == 7:\n        break\n    x += i\nelse:\n    x = 999\nprint(repr(x))"
+      ],
+      "stdout": "18\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython_next",
+        "-c",
+        "def factory():\n    def child():\n        return 42\n    return child\na = factory()\nb = factory()",
+        "--eval",
+        "a is not b and a.__code__ is b.__code__"
+      ],
+      "stdout": "True\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "def factory():\n    def child():\n        return 42\n    return child\na = factory()\nb = factory()\nprint(repr(a is not b and a.__code__ is b.__code__))"
+      ],
+      "stdout": "True\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython_next",
+        "-c",
+        "'module doc'\ndef f():\n    'function doc'\n    return __debug__",
+        "--eval",
+        "__doc__ + ' ' + f.__doc__"
+      ],
+      "stdout": "'module doc function doc'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "'module doc'\ndef f():\n    'function doc'\n    return __debug__\nprint(repr(__doc__ + ' ' + f.__doc__))"
+      ],
+      "stdout": "'module doc function doc'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython_next",
+        "-c",
+        "'module doc'\nglobal __doc__",
+        "--eval",
+        "__doc__"
+      ],
+      "stdout": "'module doc'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "'module doc'\nglobal __doc__\nprint(repr(__doc__))"
+      ],
+      "stdout": "'module doc'\n",
+      "stderr": "",
+      "exit_code": 0
+    }
+  ]
+}
