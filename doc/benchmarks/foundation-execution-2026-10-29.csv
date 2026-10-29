@@ -8,3 +8,9 @@ m4_call_direct,10000,29065940,4,2,144,ok,0
 m4_call_scheduled,10000,40093338,5,3,144,ok,4
 m4_call_scheduled,10000,36833261,5,3,144,ok,4
 m4_call_scheduled,10000,37461133,5,3,144,ok,4
+m4_traceback_direct,10000,23778261,4,2,144,ok,0
+m4_traceback_direct,10000,22008621,4,2,144,ok,0
+m4_traceback_direct,10000,24576849,4,2,144,ok,0
+m4_traceback_scheduled,10000,40716390,5,3,144,ok,4
+m4_traceback_scheduled,10000,35564626,5,3,144,ok,4
+m4_traceback_scheduled,10000,36833672,5,3,144,ok,4

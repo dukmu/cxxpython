@@ -237,6 +237,8 @@ namespace cxxpython::core
         std::optional<PreparedPythonCall> prepare_call(Attachment &context, Handle callable,
             CallArgsView args, RootScope &roots, ReturnSlot &out);
         void validate_return(Attachment &context, ReturnSlot &out);
+        void append_traceback(Attachment &context, Handle exception, Handle frame, ReturnSlot &out);
+        void install_exception_runtime(Attachment &context, std::span<const Handle> core);
         bool bind_arguments(Attachment &context, const SignatureLayout &signature, CallArgsView args,
                             std::optional<Value> receiver, RootScope &roots, std::vector<Value> &bound,
                             ReturnSlot &out, std::optional<FunctionDefaults> defaults = {});

@@ -20,7 +20,7 @@ All new C++ interfaces are internal and unstable until the M1-M4 gates pass.
 | M1 storage/environment | Experimental | B0-B2 storage and seed gates now pass; interfaces remain internal/unstable |
 | M2 types/methods/call | Experimental | Calls/construction, field tails, cells, B2 promotion and common hash/repr/str/truth/comparison/arithmetic dispatch exist; full protocols/reflection/mutation and weakrefs remain |
 | M3 builtins | Experimental | Int/bool seed, initial Unicode value/representation/hash, tuple and cell value semantics; complete numeric, container, iterator, codec/buffer and finalization matrices remain |
-| M4 execution | Experimental | Verified Code/Function/Frame, ObjectOps switch execution and non-recursive calls exist; regions/unwind, traceback, closure/namespace execution and suspension remain |
+| M4 execution | Experimental | Verified Code/Function/Frame, ObjectOps switch execution, non-recursive calls and explicit-error tracebacks exist; regions/unwind, full exception context, closure/namespace execution and suspension remain |
 | M5 frontend | Planned | ScopeInfo/CFG, source positions, validated Code, L0-L2 differential cases |
 | M6 boot/platform | Planned | RunRequest, loader/import, CLI/embedding, I/O, thread API and shutdown |
 | M7 libraries | Planned | Real workflows and dependency closures, including unittest |
@@ -165,7 +165,8 @@ overlap does not close either milestone.
 M4 now has verified Code/CodeBuilder, stable rooted Frame storage and
 constant/local/arithmetic/comparison/branch/call/return execution through ObjectOps.
 Ordinary Python calls now use a Frame loop. The next execution slice is
-structured regions/unwind and traceback, followed by typed suspension outcomes.
+structured regions/unwind and handled-exception context, followed by typed
+suspension outcomes. Explicit-error traceback construction is now implemented.
 The plan explicitly permits M3 expansion and M4 execution in parallel after a
 minimal builtin set exists. Full M3 is not an added prerequisite for this first
 executor. Remaining type/reflection/mutation, callable value semantics,
@@ -845,3 +846,63 @@ The scope remains M0-M9. Region/handler/cleanup validation, traceback, full
 exception normalization/context, finally/with, closure and namespace execution,
 typed Yield/resume, source compilation and release/performance gates remain
 unfinished. CALL scheduling does not approximate or close those requirements.
+
+## M4 Tracebacks On Explicit Raised Paths
+
+Traceback is a managed, non-subclassable object with traced next/actual-Frame
+edges, immutable frame/lasti/lineno fields and no external buffer. It uses the
+ordinary identity equality/hash and object repr/str protocols. No synthetic
+Frame or duplicate Code is manufactured for reflection. Completed Frames retain
+their real function, Code, locals and back edge, but release operand/pending-call
+state. The traceback object is 48 bytes on the current x86-64 build, before heap
+allocation metadata. Frame size remains 144 bytes; successful calls do not
+allocate tracebacks.
+
+At an explicit Raised exit, FrameActivation iteratively prepends the current
+Frame before releasing its active root and advancing to its parent. This also
+balances logical call permits. The boundary root is completed by the existing
+activation lifetime. Native-to-Python reentry constructs its own traceback
+segment; propagation through the native caller then adds that caller's Python
+Frame once. Native functions themselves do not acquire fake Python Frames.
+Binding failures before a callee Frame exists identify the caller's CALL.
+Repeated explicit RAISE_INSTANCE prepends a new node and preserves the old chain.
+No C++ host fault is relabeled as a Python exception or traceback.
+
+tb_lasti is an instruction index in our private in-memory bytecode, not a
+CPython byte offset. tb_lineno snapshots the failing instruction's source line,
+using co_firstlineno when that position is unknown. Manually constructed nodes
+with lineno=-1 resolve against their stored lasti, not the Frame's later PC;
+an out-of-range index returns None. Constructor positions use index conversion
+and signed 32-bit range checks, following the Python 3.12 constructor's C-int
+contract. Source position storage itself remains the existing uint32 format.
+
+tb_next accepts None or another traceback, checks for a loop before mutation
+and rejects deletion. tb_frame, tb_lasti and tb_lineno are read-only. The
+BaseException.__traceback__ descriptor and with_traceback method validate the
+same None/traceback contract; the latter returns the original exception.
+All construction, calls, binding and descriptors reuse existing ObjectOps.
+Exception/traceback/Frame/local cycles are ordinary tracing-GC graphs and are
+collected after their last external root disappears.
+
+If traceback allocation fails, the boundary returns the preallocated emergency
+MemoryError. Automatic propagation never attaches a traceback to that shared
+reserve: doing so would permanently retain arbitrary failed execution graphs.
+A previously raised exception may retain a partially extended traceback.
+Full Python low-memory chaining/reserve reentrancy is still an Experimental
+gate, not claimed to match CPython's emergency allocator behavior. This does
+not exclude ordinary, separately allocated MemoryError instances from normal
+traceback propagation. User assignment of __traceback__ remains explicit.
+
+Tests cover forced collection, scheduled and native-reentrant ordering, source
+positions, binding errors, repeated raises, mutation failures, construction and
+GC during index conversion, identity protocols, OOM/retry and cycle collection.
+A separate test propagates 6001 traceback nodes with native depth limited to
+16, validates completed Frames and the original live set, then retries.
+
+Python 3.12 reference contracts: [traceback objects](https://docs.python.org/3.12/reference/datamodel.html#traceback-objects),
+[BaseException.with_traceback](https://docs.python.org/3.12/library/exceptions.html#BaseException.with_traceback),
+and the fixed [CPython v3.12.14 traceback implementation](https://github.com/python/cpython/blob/v3.12.14/Python/traceback.c).
+These contract checks are not a pinned executable source-language differential
+suite. Region/handler/cleanup validation, bare raise, raise class/cause and
+handled-exception context, finally/with, closure/namespace execution and typed
+suspension/resume remain M4 requirements. M0-M9 remains active.

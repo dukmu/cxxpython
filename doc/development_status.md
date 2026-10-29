@@ -1,5 +1,59 @@
 # Development Status
 
+## 2026-10-29 M4 Managed Traceback Stable Point
+
+The full M0-M9 goal remains active. This entry is prepended; earlier development
+records are unchanged. Following the user's reminder, this verified traceback
+vertical slice is committed now rather than waiting for all region/finally work.
+The earlier region/context declarations had not been connected or verified;
+they were removed from this slice instead of committing unused scaffolding.
+
+- Added the actual managed traceback type, traced next/Frame ownership and
+  immutable frame/position snapshots. Ordinary object identity/hash/repr/str
+  and existing descriptors/binding/construction provide its public behavior.
+  No duplicate Code, synthetic Python Frame, collector or ownership layer exists.
+- Explicit Raised exits now iteratively add the current and parked Python
+  Frames before releasing execution roots, balancing logical call permits.
+  Native reentry adds each Python Frame once. Pre-Frame binding errors identify
+  the caller's CALL; repeated explicit raises preserve the old traceback chain.
+- Added tb_next mutation with loop/type/deletion rejection, read-only frame and
+  position fields, traceback construction with index conversion, and actual
+  BaseException.__traceback__/with_traceback descriptors through ObjectOps.
+  tb_lasti uses our private instruction index, not CPython byte offsets.
+- Traceback allocation failure returns the existing emergency MemoryError;
+  automatic propagation never stores an execution graph on that shared reserve.
+  Full low-memory chaining/reentrancy remains Experimental, not CPython parity.
+- Added 10 tests covering forced GC, scheduling/native reentry, source locations,
+  binding errors, repeated raises, mutation failures, constructor/index callbacks,
+  identity protocols, OOM/retry and exception/Frame/local cycle collection.
+  A 6000-deep exceptional call produces 6001 traceback nodes with native depth
+  capped at 16, returns to the original live set after clearing the traceback,
+  and successfully retries without leaked call permits.
+
+Verification:
+
+- Release foundation 218/218. Full CTest exit 0, discovery count 466
+  (248 legacy + 218 foundation).
+- ASan/UBSan/LeakSanitizer 218/218 outside the ptrace sandbox. TSan 218/218.
+- Independent foundation-only Release built with testing/legacy disabled.
+  Three benchmark samples ran after every build/sanitizer handle completed;
+  all exact-value and post-collection live-set checks passed.
+- GCC 11.4 / Release / x86-64 WSL2, no CPU binding/frequency control: 10000
+  direct four-instruction calls took 23.78/22.01/24.58 ms; scheduled caller/child
+  calls took 40.72/35.56/36.83 ms. Frame prefix remains 144 bytes. The traceback
+  prefix is 48 bytes, measured from the compiled type; buffers/heap/root metadata
+  remain separate costs. Successful calls do not allocate traceback nodes.
+- Raw probe rows, including slower samples and the increased rooted bootstrap
+  live set (404 objects), are retained in benchmarks/foundation-*.csv as
+  m4_traceback_final/direct/scheduled. No speedup or CPython parity is claimed.
+- User perf.data*, test2.py and the temporary_plan.md deletion are excluded.
+
+Next is structured region/handler/cleanup validation and explicit unwind with
+per-cleanup continuations and handled-exception restoration, then suspension
+and closure/namespace execution. These gates are not replaced by tracebacks.
+Full M2/M3, pinned source-language differential execution, original single/multi
+and resource-I/O performance acceptance, and M5-M9 remain unfinished.
+
 ## 2026-10-29 M4 Non-Recursive CALL Scheduling Stable Point
 
 The full M0-M9 goal remains active. This entry is prepended without altering any

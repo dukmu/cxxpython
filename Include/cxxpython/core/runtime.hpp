@@ -31,7 +31,7 @@ namespace cxxpython::core
         NameErrorType, UnboundLocalErrorType,
         NativeFunctionType, MethodDescriptorType, BoundMethodType,
         GetSetDescriptorType, MappingProxyType, StaticMethodType, ClassMethodType, MemberDescriptorType, CellType,
-        CodeType, FunctionType, FrameType,
+        CodeType, FunctionType, FrameType, TracebackType,
         None, NotImplemented, False, True, IntZero, IntOne, EmptyTuple, MemoryError, Count,
     };
     namespace detail

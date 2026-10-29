@@ -144,6 +144,16 @@ namespace cxxpython::core
         std::optional<Handle> defaults = {}, kwdefaults = {};
     };
     enum class FrameState { Created, Running, Completed };
+    struct TracebackObject
+    {
+        ObjectHeader header;
+        std::optional<Value> next;
+        const Value frame;
+        const std::int64_t lasti, lineno;
+        TracebackObject(ObjectHeader head, std::optional<Value> next, Value frame, std::int64_t lasti, std::int64_t lineno)
+            : header(head), next(next), frame(frame), lasti(lasti), lineno(lineno) {}
+        void trace(Tracer &tracer) const noexcept { if (next) tracer.visit(*next); tracer.visit(frame); }
+    };
     struct FrameObject
     {
         ObjectHeader header;

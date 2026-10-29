@@ -55,6 +55,17 @@ namespace cxxpython::core
                 parent.sp = base + 1; parent.pending_call.reset(); complete(child);
                 active_.ok(parent_value); context_.current_frame_ = parent_value; --depth_; context_.leave_call(); return false;
             }
+            void propagate(ReturnSlot &out)
+            {
+                for (;;)
+                {
+                    RootScope roots(context_);
+                    append_traceback(context_, roots.root(out.result().exception()), roots.root(current()), out);
+                    if (current() == root_) return;
+                    auto &child = context_.payload<FrameObject>(current()); const auto parent = *child.back;
+                    complete(child); active_.ok(parent); context_.current_frame_ = parent; --depth_; context_.leave_call();
+                }
+            }
         private:
             void complete(FrameObject &frame) noexcept
             {
@@ -257,11 +268,13 @@ namespace cxxpython::core
             ReturnSlot active(context); make_frame(context, function, args, receiver, active);
             if (raised(active)) { out.raised(active.result().exception()); return; }
             FrameActivation activation(context, active); run(context, activation, out);
+            if (raised(out)) activation.propagate(out);
         }
         LayoutDescriptor execution_layout(CoreObject type)
         {
             if (type == CoreObject::CodeType) return LayoutDescriptor::of<CodeObject>();
             if (type == CoreObject::FrameType) return LayoutDescriptor::of<FrameObject>();
+            if (type == CoreObject::TracebackType) return LayoutDescriptor::of<TracebackObject>();
             if (type == CoreObject::FunctionType)
                 return LayoutDescriptor::of<FunctionObject>();
             throw std::invalid_argument("not an execution object kind");

@@ -259,6 +259,7 @@ namespace cxxpython::core
             define(CoreObject::CodeType, "code", execution_layout(CoreObject::CodeType));
             define(CoreObject::FunctionType, "function", execution_layout(CoreObject::FunctionType));
             define(CoreObject::FrameType, "frame", execution_layout(CoreObject::FrameType));
+            define(CoreObject::TracebackType, "traceback", execution_layout(CoreObject::TracebackType));
             context.payload<TypeObject>(at(CoreObject::TupleType)).allow_slots = false;
             context.payload<TypeObject>(at(CoreObject::IntType)).allow_slots = false;
             for (auto type : core)
@@ -324,6 +325,7 @@ namespace cxxpython::core
             install_protocols(context, core);
             install_value_protocols(context, core);
             install_execution(context, core);
+            install_exception_runtime(context, core);
             for (std::size_t i = 0; i < static_cast<std::size_t>(CoreObject::None); ++i)
             {
                 context.payload<TypeObject>(core[i]).immutable = true;
@@ -335,7 +337,7 @@ namespace cxxpython::core
                             CoreObject::MethodDescriptorType, CoreObject::BoundMethodType,
                             CoreObject::GetSetDescriptorType, CoreObject::MappingProxyType,
                             CoreObject::MemberDescriptorType, CoreObject::CellType,
-                            CoreObject::CodeType, CoreObject::FunctionType, CoreObject::FrameType})
+                            CoreObject::CodeType, CoreObject::FunctionType, CoreObject::FrameType, CoreObject::TracebackType})
                 context.payload<TypeObject>(at(id)).subclassable = false;
         }
     }
