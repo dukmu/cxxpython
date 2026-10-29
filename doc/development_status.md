@@ -1,5 +1,53 @@
 # Development Status
 
+## 2026-10-29 Remove Repeated Root And Call Preparation Costs
+
+Prepended without rewriting history. The previous source milestone is 4a3b0fd.
+This turn advances the measured N3 execution costs under the complete active
+N0-N6/M0-M9 Plan 2 goal, not another root-safety checkpoint or a parity claim.
+
+- Reused RootCell's existing free-list link for each RootScope's live chain,
+  removing its vector and repeated host allocations without increasing cell
+  size or introducing another lifetime authority. Explicit non-LIFO release
+  unlinks before reuse; all arena/generation and thread ownership checks remain.
+- Added direct current-cell ReturnSlot accessors and mechanically migrated
+  immediate internal reads. Saved ResultViews still check generation/revision
+  and fail on overwrite/destruction/reuse. Slot writes still validate domain;
+  reads still require the attached owning thread and correct result tag.
+- Complete positional NativeEntry calls borrow the argument span, using a
+  bounded stack receiver prefix or vector for large arities. Other shapes use
+  the existing binder. Callback roots, defaults/keywords, both recursion limits
+  and return validation remain; no int/value/test2-specific path was added.
+- FrameActivation now validates and borrows the current nonmoving Frame/Code
+  at scheduler switches, not each opcode. The existing active slot roots the
+  borrow; return, exception and native-error unwinding refresh it. Safepoints,
+  shared-heap parallel execution and atomic reflection updates remain intact.
+- Added three focused tests for interleaved root reuse, direct slot versus
+  retained-view semantics and collecting native calls across zero/small/large
+  arities and bound receivers. Existing deep scheduling, callback/reentry,
+  shared mutation, failure, alias and stale-view tests also pass.
+- CTest 557/557 passes; foundation 308/308, ASan/UBSan/LSan 308/308 and TSan
+  306/306 pass. TSan excludes only the same two exhaustive per-allocation
+  bootstrap/promotion enumerations covered by Release/ASan. Pinned executable
+  source differential passes all three groups against actual CPython 3.12.14;
+  recorder unit tests pass 4/4. No timeout was increased or failure suppressed.
+- The existing recorder generated n3-rooted-execution and its paired -cpython
+  series from three idle Release runs, after both ordinary builds/tests ended
+  and before starting sanitizer builds. CSV/Markdown and raw binary/build
+  provenance are automatic; earlier slow samples remain. This reduces broad
+  call/protocol/VM costs but leaves a major absolute CPython gap, still a failed
+  performance acceptance gate. See the generated comparison, not a hand table.
+- Direct installed perf bypasses the incompatible launcher and collected real
+  cpu-clock samples of the full workflow. Retained generated post-change report
+  benchmarks/foundation-profile-rooted-2026-10-29.txt shows thread/domain/root
+  work still prominent, without the old per-scope Handle vector expansion.
+  Profile samples are not benchmark timings or a pure per-opcode breakdown.
+- Next: continue guarded general call execution and closure/source/runtime
+  dependencies needed by actual Python workflows. Do not spend another turn
+  adding root/cache guards, remove polls, add a GIL or reinterpret speedup as
+  completion. The full goal remains active. No subagents were used; the user's
+  temporary_plan.md deletion and untracked test2.py remain excluded.
+
 ## 2026-10-29 Source To Scope To CFG To Shared-Heap Execution
 
 Prepended without rewriting earlier history. The previous turn committed and

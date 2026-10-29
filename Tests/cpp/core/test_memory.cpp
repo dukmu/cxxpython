@@ -112,6 +112,33 @@ namespace
         EXPECT_EQ(context.stats().objects, 1U);
     }
 
+    TEST(FoundationMemory, InterleavedScopeReleaseAndCellReusePreserveEachOwner)
+    {
+        int destroyed = 0;
+        Interpreter interpreter;
+        Attachment context(interpreter);
+        RootScope outer(context);
+        auto retained = make_node(context, outer, &destroyed);
+        {
+            RootScope inner(context);
+            auto tail = make_node(context, inner, &destroyed);
+            auto middle = make_node(context, inner, &destroyed);
+            auto head = make_node(context, inner, &destroyed);
+            inner.release(middle);
+            auto reused = make_node(context, outer, &destroyed);
+            inner.release(head);
+            inner.release(tail);
+            make_node(context, inner, &destroyed);
+            context.collect();
+            EXPECT_EQ(destroyed, 3);
+            EXPECT_NO_THROW(reused.get(context));
+        }
+        context.collect();
+        EXPECT_EQ(destroyed, 4);
+        EXPECT_NO_THROW(retained.get(context));
+        EXPECT_EQ(context.stats().objects, 2U);
+    }
+
     TEST(FoundationMemory, HeaderTypeAndPayloadEdgesKeepCyclesAlive)
     {
         int destroyed = 0;
@@ -153,6 +180,32 @@ namespace
         out.reset();
         EXPECT_EQ(context.collect(), 1U);
         EXPECT_EQ(destroyed, 1);
+    }
+
+    TEST(FoundationMemory, CurrentSlotReadsTrackWritesWhileSavedViewsExpire)
+    {
+        Interpreter interpreter;
+        Attachment context(interpreter);
+        ReturnSlot out(context);
+        EXPECT_EQ(out.tag(), ResultTag::Empty);
+        EXPECT_THROW(out.value(), std::logic_error);
+        EXPECT_THROW(out.exception(), std::logic_error);
+        context.allocate<Node>(out);
+        const auto value = out.value(); auto previous = out.result();
+        EXPECT_EQ(out.tag(), ResultTag::Ok);
+        out.raised(value);
+        EXPECT_EQ(out.tag(), ResultTag::Raised);
+        EXPECT_EQ(out.exception(), value);
+        EXPECT_THROW(previous.value(), std::logic_error);
+        EXPECT_THROW(out.value(), std::logic_error);
+        {
+            NativeWait wait(context);
+            EXPECT_THROW(out.tag(), std::logic_error);
+            EXPECT_THROW(out.exception(), std::logic_error);
+        }
+        out.reset();
+        EXPECT_EQ(out.tag(), ResultTag::Empty);
+        EXPECT_THROW(out.exception(), std::logic_error);
     }
 
     TEST(FoundationMemory, ResultViewsRejectReleasedAndReusedCells)

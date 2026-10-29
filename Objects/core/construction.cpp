@@ -13,7 +13,7 @@ namespace cxxpython::core
             const std::string message(error.what());
             raise_error(context, error.error_type, {message.begin(), message.end()}, out);
         }
-        bool raised(ReturnSlot &out) { return out.result().tag() == ResultTag::Raised; }
+        bool raised(ReturnSlot &out) { return out.tag() == ResultTag::Raised; }
         bool is_type(Attachment &context, Value value)
         {
             return context.has_layout<TypeObject>(value) &&
@@ -92,20 +92,20 @@ namespace cxxpython::core
             else
             {
                 ReturnSlot name(context); make_str(context, U"__new__", name);
-                get_attribute(context, cls, roots.root(name.result().value()), target);
+                get_attribute(context, cls, roots.root(name.value()), target);
             }
-            if (raised(target)) { out.raised(target.result().exception()); return; }
+            if (raised(target)) { out.raised(target.exception()); return; }
             std::vector<Value> new_args{args[0]};
             new_args.insert(new_args.end(), positional.begin(), positional.end());
             ReturnSlot created(context);
-            call(context, roots.root(target.result().value()), {new_args, named}, created);
-            if (raised(created)) { out.raised(created.result().exception()); return; }
-            auto self = roots.root(created.result().value());
+            call(context, roots.root(target.value()), {new_args, named}, created);
+            if (raised(created)) { out.raised(created.exception()); return; }
+            auto self = roots.root(created.value());
             if (!is_subtype(context, context.type_of(self), args[0])) { out.ok(self.get(context)); return; }
             ReturnSlot initialized(context);
             detail::special(context, self.get(context), U"__init__", {positional, named}, initialized);
-            if (raised(initialized)) { out.raised(initialized.result().exception()); return; }
-            if (initialized.result().value() != context.builtin(CoreObject::None))
+            if (raised(initialized)) { out.raised(initialized.exception()); return; }
+            if (initialized.value() != context.builtin(CoreObject::None))
             { type_error(context, U"__init__ must return None", out); return; }
             out.ok(self.get(context));
         }
@@ -176,9 +176,9 @@ namespace cxxpython::core
                 context.allocate_instance<ClassMethodObject>(roots.root(context.builtin(CoreObject::ClassMethodType)), out, callable.get(context));
             else
                 context.allocate_instance<StaticMethodObject>(roots.root(context.builtin(CoreObject::StaticMethodType)), out, callable.get(context));
-            auto wrapper = roots.root(out.result().value());
+            auto wrapper = roots.root(out.value());
             make_str(context, name, out);
-            detail::name_store(context, dictionary, out.result().value(), wrapper.get(context));
+            detail::name_store(context, dictionary, out.value(), wrapper.get(context));
         }
         void finish_class(Attachment &context, Handle cls, std::span<const KeywordArg> named, ReturnSlot &out)
         {
@@ -197,12 +197,12 @@ namespace cxxpython::core
                 detail::special(context, entry.value, U"__set_name__", {args, {}}, callback);
                 if (raised(callback))
                 {
-                    const auto cause = callback.result().exception();
+                    const auto cause = callback.exception();
                     raise_error(context, CoreObject::RuntimeErrorType, U"error calling __set_name__", out);
-                    if (context.type_of(out.result().exception()) == context.builtin(CoreObject::RuntimeErrorType))
+                    if (context.type_of(out.exception()) == context.builtin(CoreObject::RuntimeErrorType))
                     {
-                        auto &error = context.payload<ExceptionObject>(out.result().exception());
-                        const auto wrapped = out.result().exception();
+                        auto &error = context.payload<ExceptionObject>(out.exception());
+                        const auto wrapped = out.exception();
                         context.store(wrapped, error.cause, cause); context.store(wrapped, error.context, cause);
                         error.suppress_context.store(true, std::memory_order_release);
                     }
@@ -216,8 +216,8 @@ namespace cxxpython::core
                 auto hook = dictionary.find(U"__init_subclass__");
                 if (!hook) continue;
                 detail::bind_descriptor(context, *hook, cls.get(context), cls.get(context), callback);
-                if (raised(callback)) { out.raised(callback.result().exception()); return; }
-                call(context, roots.root(callback.result().value()), {{}, named}, out);
+                if (raised(callback)) { out.raised(callback.exception()); return; }
+                call(context, roots.root(callback.value()), {{}, named}, out);
                 if (!raised(out)) out.ok(cls.get(context));
                 return;
             }
@@ -244,9 +244,9 @@ namespace cxxpython::core
             {
                 ReturnSlot bound(context);
                 detail::bind_descriptor(context, *constructor, {}, winner.get(context), bound);
-                if (raised(bound)) { out.raised(bound.result().exception()); return; }
+                if (raised(bound)) { out.raised(bound.exception()); return; }
                 std::array values{winner.get(context), args[1], args[2], args[3]};
-                call(context, roots.root(bound.result().value()), {values, named}, out);
+                call(context, roots.root(bound.value()), {values, named}, out);
                 return;
             }
             for (auto base : bases)
@@ -299,7 +299,7 @@ namespace cxxpython::core
                 definition_error(context, error, out);
                 return;
             }
-            auto cls = roots.root(created.result().value());
+            auto cls = roots.root(created.value());
             auto qualified = roots.root(detail::name_lookup(context, args[3], U"__qualname__").value_or(args[1]));
             detail::type_name_store(context, cls.get(context), args[1], false);
             detail::type_name_store(context, cls.get(context), qualified.get(context), true);
@@ -353,9 +353,9 @@ namespace cxxpython::core
                 auto function = *name_lookup(context, *TypeView(context, owner).dictionary(), name);
                 if (binding == Binding::Static) context.allocate_instance<StaticMethodObject>(at(CoreObject::StaticMethodType), out, function);
                 else context.allocate_instance<ClassMethodObject>(at(CoreObject::ClassMethodType), out, function);
-                auto wrapper = roots.root(out.result().value());
+                auto wrapper = roots.root(out.value());
                 context.allocate_instance<StrObject>(at(CoreObject::StrType), out, std::move(name));
-                name_store(context, *TypeView(context, owner).dictionary(), out.result().value(), wrapper.get(context));
+                name_store(context, *TypeView(context, owner).dictionary(), out.value(), wrapper.get(context));
             };
             SignatureLayout variadic;
             variadic.parameters = {{U"self", ParameterKind::PositionalOnly}};

@@ -301,7 +301,7 @@ namespace cxxpython::core
             if (context_.payload<StrObject>(names_[i]).value == value) return static_cast<std::uint32_t>(i);
         if (names_.size() >= std::numeric_limits<std::uint32_t>::max()) invalid(CodeErrorKind::SizeLimit, "too many names");
         ReturnSlot text(context_); make_str(context_, std::move(value), text);
-        const auto rooted = roots_.root(text.result().value()); names_.push_back(rooted.get(context_));
+        const auto rooted = roots_.root(text.value()); names_.push_back(rooted.get(context_));
         return static_cast<std::uint32_t>(names_.size() - 1);
     }
     CodeBuilder::Label CodeBuilder::label()
@@ -365,29 +365,29 @@ namespace cxxpython::core
         const auto maximum = verify(spec_, instructions, positions_, calls, regions, scopes_, constants_.size(), names_.size());
         VerifiedCode verified(std::move(instructions), positions_, std::move(calls), std::move(regions), spec_.signature, spec_.locals, maximum, spec_.first_line);
         RootScope roots(context_); ReturnSlot temporary(context_);
-        cxxpython::core::make_tuple(context_, constants_, temporary); auto constants = roots.root(temporary.result().value());
-        cxxpython::core::make_tuple(context_, names_, temporary); auto global_names = roots.root(temporary.result().value());
+        cxxpython::core::make_tuple(context_, constants_, temporary); auto constants = roots.root(temporary.value());
+        cxxpython::core::make_tuple(context_, names_, temporary); auto global_names = roots.root(temporary.value());
         std::vector<Value> names;
         for (const auto &name : spec_.locals)
-        { make_str(context_, name, temporary); names.push_back(roots.root(temporary.result().value()).get(context_)); }
-        cxxpython::core::make_tuple(context_, names, temporary); auto varnames = roots.root(temporary.result().value());
-        make_str(context_, spec_.name, temporary); auto name = roots.root(temporary.result().value());
-        make_str(context_, spec_.qualname.value_or(spec_.name), temporary); auto qualname = roots.root(temporary.result().value());
-        make_str(context_, spec_.filename, temporary); auto filename = roots.root(temporary.result().value());
+        { make_str(context_, name, temporary); names.push_back(roots.root(temporary.value()).get(context_)); }
+        cxxpython::core::make_tuple(context_, names, temporary); auto varnames = roots.root(temporary.value());
+        make_str(context_, spec_.name, temporary); auto name = roots.root(temporary.value());
+        make_str(context_, spec_.qualname.value_or(spec_.name), temporary); auto qualname = roots.root(temporary.value());
+        make_str(context_, spec_.filename, temporary); auto filename = roots.root(temporary.value());
         auto docstring = roots.root(context_.builtin(CoreObject::None));
-        if (spec_.docstring) { make_str(context_, *spec_.docstring, temporary); docstring = roots.root(temporary.result().value()); }
+        if (spec_.docstring) { make_str(context_, *spec_.docstring, temporary); docstring = roots.root(temporary.value()); }
         std::vector<Value> keyword_tables;
         for (const auto &site : calls_)
         {
             std::vector<Value> keys;
             for (const auto &key : site.keywords)
-            { make_str(context_, key, temporary); keys.push_back(roots.root(temporary.result().value()).get(context_)); }
+            { make_str(context_, key, temporary); keys.push_back(roots.root(temporary.value()).get(context_)); }
             cxxpython::core::make_tuple(context_, keys, temporary);
-            keyword_tables.push_back(roots.root(temporary.result().value()).get(context_));
+            keyword_tables.push_back(roots.root(temporary.value()).get(context_));
         }
         auto call_keywords = roots.root(context_.builtin(CoreObject::EmptyTuple));
         if (!keyword_tables.empty())
-        { cxxpython::core::make_tuple(context_, keyword_tables, temporary); call_keywords = roots.root(temporary.result().value()); }
+        { cxxpython::core::make_tuple(context_, keyword_tables, temporary); call_keywords = roots.root(temporary.value()); }
         auto type = roots.root(context_.builtin(CoreObject::CodeType));
         context_.allocate_instance<CodeObject>(type, out, std::move(verified), constants.get(context_), varnames.get(context_),
                                              name.get(context_), qualname.get(context_), filename.get(context_), call_keywords.get(context_), global_names.get(context_), docstring.get(context_));

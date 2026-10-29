@@ -58,9 +58,9 @@ namespace cxxpython::core
         }
         void type_error(Attachment &context, std::u32string message, ReturnSlot &out)
         { raise_error(context, CoreObject::TypeErrorType, std::move(message), out); }
-        bool raised(ReturnSlot &out) { return out.result().tag() == ResultTag::Raised; }
+        bool raised(ReturnSlot &out) { return out.tag() == ResultTag::Raised; }
         bool implemented(Attachment &context, ReturnSlot &out)
-        { return raised(out) || out.result().value() != context.builtin(CoreObject::NotImplemented); }
+        { return raised(out) || out.value() != context.builtin(CoreObject::NotImplemented); }
         void boolean(Attachment &context, bool value, ReturnSlot &out)
         { out.ok(context.builtin(value ? CoreObject::True : CoreObject::False)); }
         ResolvedSlot resolve(Attachment &context, Handle value, Protocol id, RootScope &roots)
@@ -79,12 +79,12 @@ namespace cxxpython::core
         {
             RootScope roots(context); ReturnSlot result(context);
             make_str(context, std::u32string(protocol_definition(reflected).name), result);
-            auto name = roots.root(result.result().value());
+            auto name = roots.root(result.value());
             auto lookup = [&](Handle type) -> std::optional<Handle> {
                 get_attribute(context, type, name, result);
-                if (!raised(result)) return roots.root(result.result().value());
-                if (!is_subtype(context, context.type_of(result.result().exception()), context.builtin(CoreObject::AttributeErrorType)))
-                    out.raised(result.result().exception());
+                if (!raised(result)) return roots.root(result.value());
+                if (!is_subtype(context, context.type_of(result.exception()), context.builtin(CoreObject::AttributeErrorType)))
+                    out.raised(result.exception());
                 return {};
             };
             // Class lookup can bind a descriptor or run a metaclass hook. Like
@@ -93,13 +93,13 @@ namespace cxxpython::core
             auto right = lookup(right_type);
             if (!right) return false;
             auto left = lookup(left_type);
-            if (!left) return out.result().tag() != ResultTag::Raised;
+            if (!left) return out.tag() != ResultTag::Raised;
             if (left->get(context) == right->get(context)) return false;
             rich_compare(context, *left, *right, CompareOp::Ne, result);
-            if (raised(result)) { out.raised(result.result().exception()); return false; }
-            ReturnSlot converted(context); truth(context, roots.root(result.result().value()), converted);
-            if (raised(converted)) { out.raised(converted.result().exception()); return false; }
-            return converted.result().value() == context.builtin(CoreObject::True);
+            if (raised(result)) { out.raised(result.exception()); return false; }
+            ReturnSlot converted(context); truth(context, roots.root(result.value()), converted);
+            if (raised(converted)) { out.raised(converted.exception()); return false; }
+            return converted.value() == context.builtin(CoreObject::True);
         }
         void object_eq(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
         {
@@ -111,11 +111,11 @@ namespace cxxpython::core
             RootScope roots(context); auto self = roots.root(args[0]);
             auto slot = resolve(context, self, Protocol::Eq, roots); ReturnSlot equal(context);
             invoke_protocol(context, self, slot, args.subspan(1), equal);
-            if (raised(equal)) { out.raised(equal.result().exception()); return; }
-            if (!implemented(context, equal)) { out.ok(equal.result().value()); return; }
-            ReturnSlot converted(context); truth(context, roots.root(equal.result().value()), converted);
-            if (raised(converted)) out.raised(converted.result().exception());
-            else boolean(context, converted.result().value() == context.builtin(CoreObject::False), out);
+            if (raised(equal)) { out.raised(equal.exception()); return; }
+            if (!implemented(context, equal)) { out.ok(equal.value()); return; }
+            ReturnSlot converted(context); truth(context, roots.root(equal.value()), converted);
+            if (raised(converted)) out.raised(converted.exception());
+            else boolean(context, converted.value() == context.builtin(CoreObject::False), out);
         }
         void none_bool(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
         {
@@ -193,9 +193,9 @@ namespace cxxpython::core
             if (is_int(context, self.get(context))) { copy_int(context, self.get(context), out); return; }
             auto slot = resolve(context, self, Protocol::Index, roots); ReturnSlot result(context);
             invoke_protocol(context, self, slot, {}, result);
-            if (raised(result)) { out.raised(result.result().exception()); return; }
-            if (!is_int(context, result.result().value())) { type_error(context, U"__index__ returned a non-int", out); return; }
-            copy_int(context, result.result().value(), out);
+            if (raised(result)) { out.raised(result.exception()); return; }
+            if (!is_int(context, result.value())) { type_error(context, U"__index__ returned a non-int", out); return; }
+            copy_int(context, result.value(), out);
         });
     }
     ResultView hash(Attachment &context, Handle value, ReturnSlot &out)
@@ -204,8 +204,8 @@ namespace cxxpython::core
             RootScope roots(context); auto self = roots.root(value.get(context)); out.reset(context);
             auto slot = resolve(context, self, Protocol::Hash, roots); ReturnSlot result(context);
             invoke_protocol(context, self, slot, {}, result);
-            if (raised(result)) { out.raised(result.result().exception()); return; }
-            const auto integer = result.result().value();
+            if (raised(result)) { out.raised(result.exception()); return; }
+            const auto integer = result.value();
             if (!is_int(context, integer)) { type_error(context, U"__hash__ returned a non-int", out); return; }
             std::int64_t word;
             if (!int_fits_signed(context, integer, word) || word < std::numeric_limits<std::intptr_t>::min() ||
@@ -223,8 +223,8 @@ namespace cxxpython::core
                 { out.ok(self.get(context)); return; }
                 auto slot = resolve(context, self, id, roots); ReturnSlot result(context);
                 invoke_protocol(context, self, slot, {}, result);
-                if (raised(result)) { out.raised(result.result().exception()); return; }
-                const auto text = result.result().value();
+                if (raised(result)) { out.raised(result.exception()); return; }
+                const auto text = result.value();
                 if (!is_subtype(context, context.type_of(text), context.builtin(CoreObject::StrType)) ||
                     !context.has_layout<StrObject>(text))
                 { type_error(context, U"string conversion returned a non-str", out); return; }
@@ -242,10 +242,10 @@ namespace cxxpython::core
             RootScope roots(context); auto self = roots.root(value.get(context)); out.reset(context);
             auto slot = resolve(context, self, Protocol::Len, roots); ReturnSlot result(context);
             invoke_protocol(context, self, slot, {}, result);
-            if (raised(result)) { out.raised(result.result().exception()); return; }
-            ReturnSlot converted(context); index(context, roots.root(result.result().value()), converted);
-            if (raised(converted)) { out.raised(converted.result().exception()); return; }
-            auto integer = converted.result().value();
+            if (raised(result)) { out.raised(result.exception()); return; }
+            ReturnSlot converted(context); index(context, roots.root(result.value()), converted);
+            if (raised(converted)) { out.raised(converted.exception()); return; }
+            auto integer = converted.value();
             if (int_sign(context, integer) < 0)
             { raise_error(context, CoreObject::ValueErrorType, U"__len__ returned a negative value", out); return; }
             std::int64_t size;
@@ -262,8 +262,8 @@ namespace cxxpython::core
             if (slot.state != SlotState::Missing)
             {
                 invoke_protocol(context, self, slot, {}, result);
-                if (raised(result)) { out.raised(result.result().exception()); return; }
-                auto boolean_value = result.result().value();
+                if (raised(result)) { out.raised(result.exception()); return; }
+                auto boolean_value = result.value();
                 if (context.type_of(boolean_value) != context.builtin(CoreObject::BoolType))
                 { type_error(context, U"__bool__ returned a non-bool", out); return; }
                 out.ok(boolean_value); return;
@@ -271,8 +271,8 @@ namespace cxxpython::core
             auto len = resolve(context, self, Protocol::Len, roots);
             if (len.state == SlotState::Missing) { boolean(context, true, out); return; }
             length(context, self, result);
-            if (raised(result)) out.raised(result.result().exception());
-            else boolean(context, int_sign(context, result.result().value()) != 0, out);
+            if (raised(result)) out.raised(result.exception());
+            else boolean(context, int_sign(context, result.value()) != 0, out);
         });
     }
     ResultView unary(Attachment &context, Handle value, UnaryOp op, ReturnSlot &out)
@@ -282,8 +282,8 @@ namespace cxxpython::core
             if (op == UnaryOp::Not)
             {
                 ReturnSlot result(context); truth(context, self, result);
-                if (raised(result)) out.raised(result.result().exception());
-                else boolean(context, result.result().value() == context.builtin(CoreObject::False), out);
+                if (raised(result)) out.raised(result.exception());
+                else boolean(context, result.value() == context.builtin(CoreObject::False), out);
                 return;
             }
             constexpr std::array protocols{Protocol::Pos, Protocol::Neg, Protocol::Invert};
@@ -315,8 +315,8 @@ namespace cxxpython::core
             RootScope roots(context); auto a = roots.root(left.get(context)); auto b = roots.root(right.get(context)); out.reset(context);
             if (a.get(context) == b.get(context)) { boolean(context, true, out); return; }
             ReturnSlot result(context); rich_compare(context, a, b, CompareOp::Eq, result);
-            if (raised(result)) out.raised(result.result().exception());
-            else truth(context, roots.root(result.result().value()), out);
+            if (raised(result)) out.raised(result.exception());
+            else truth(context, roots.root(result.value()), out);
         });
     }
     ResultView binary(Attachment &context, Handle left, Handle right, BinaryOp op, ReturnSlot &out)
@@ -333,7 +333,7 @@ namespace cxxpython::core
                 auto normal = resolve(context, b, ids[0], roots);
                 if (reflected.state != SlotState::Missing || normal.state != SlotState::Missing)
                     right_first = reflected_override(context, roots.root(ltype), roots.root(rtype), ids[1], out);
-                if (out.result().tag() == ResultTag::Raised) return;
+                if (out.tag() == ResultTag::Raised) return;
             }
             if (right_first && attempt(context, b, a, ids[1], out)) return;
             if (attempt(context, a, b, ids[0], out)) return;

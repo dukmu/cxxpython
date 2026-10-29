@@ -10,7 +10,7 @@ namespace cxxpython::core
     {
         #include "cxxpython/core/unicode_nonprintable.inc"
 
-        bool raised(ReturnSlot &out) { return out.result().tag() == ResultTag::Raised; }
+        bool raised(ReturnSlot &out) { return out.tag() == ResultTag::Raised; }
         void type_error(Attachment &context, ReturnSlot &out)
         { raise_error(context, CoreObject::TypeErrorType, U"descriptor received an incompatible value", out); }
         template <class T, CoreObject Type> bool instance_of(Attachment &context, Value value)
@@ -147,9 +147,9 @@ namespace cxxpython::core
             for (std::size_t i = 0; i < items.size(); ++i)
             {
                 RootScope item_roots(context); ReturnSlot text(context); repr(context, item_roots.root(items[i]), text);
-                if (raised(text)) { out.raised(text.result().exception()); return; }
+                if (raised(text)) { out.raised(text.exception()); return; }
                 if (i) result += U", ";
-                result += context.payload<StrObject>(text.result().value()).value;
+                result += context.payload<StrObject>(text.value()).value;
             }
             if (items.size() == 1) result += U',';
             result += U')'; make_str(context, std::move(result), out);
@@ -165,8 +165,8 @@ namespace cxxpython::core
             for (auto value : items)
             {
                 RootScope roots(context); ReturnSlot hashed(context); cxxpython::core::hash(context, roots.root(value), hashed);
-                if (raised(hashed)) { out.raised(hashed.result().exception()); return; }
-                std::int64_t lane = 0; (void)int_fits_signed(context, hashed.result().value(), lane);
+                if (raised(hashed)) { out.raised(hashed.exception()); return; }
+                std::int64_t lane = 0; (void)int_fits_signed(context, hashed.value(), lane);
                 accumulator += static_cast<std::uintptr_t>(lane) * prime2;
                 accumulator = std::rotl(accumulator, sizeof(std::uintptr_t) == 8 ? 31 : 13); accumulator *= prime1;
             }
@@ -185,8 +185,8 @@ namespace cxxpython::core
             {
                 RootScope roots(context); auto a = roots.root(left[i]); auto b = roots.root(right[i]); ReturnSlot equal(context);
                 container_equal(context, a, b, equal);
-                if (raised(equal)) { out.raised(equal.result().exception()); return; }
-                if (equal.result().value() == context.builtin(CoreObject::True)) continue;
+                if (raised(equal)) { out.raised(equal.exception()); return; }
+                if (equal.value() == context.builtin(CoreObject::True)) continue;
                 if constexpr (Op == CompareOp::Eq || Op == CompareOp::Ne) order_result<Op>(context, 1, out);
                 else rich_compare(context, a, b, Op, out);
                 return;
@@ -202,7 +202,7 @@ namespace cxxpython::core
             ReturnSlot left(context), right(context);
             const bool has_left = read_cell(context, args[0], left), has_right = read_cell(context, args[1], right);
             if (has_left && has_right)
-            { RootScope roots(context); rich_compare(context, roots.root(left.result().value()), roots.root(right.result().value()), Op, out); }
+            { RootScope roots(context); rich_compare(context, roots.root(left.value()), roots.root(right.value()), Op, out); }
             else order_result<Op>(context, static_cast<int>(has_left) - static_cast<int>(has_right), out);
         }
         void cell_repr(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
@@ -210,7 +210,7 @@ namespace cxxpython::core
             if (!instance_of<CellObject, CoreObject::CellType>(context, args[0])) { type_error(context, out); return; }
             ReturnSlot contents(context); const bool present = read_cell(context, args[0], contents);
             auto result = U"<cell at " + pointer_text(args[0]) + U": ";
-            result += present ? type_name(context, context.type_of(contents.result().value()), false).substr(0, 80) + U" object at " + pointer_text(contents.result().value()) : U"empty";
+            result += present ? type_name(context, context.type_of(contents.value()), false).substr(0, 80) + U" object at " + pointer_text(contents.value()) : U"empty";
             result += U'>'; make_str(context, std::move(result), out);
         }
         void proxy_hash(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
@@ -228,27 +228,27 @@ namespace cxxpython::core
         {
             if (!instance_of<ExceptionObject, CoreObject::BaseExceptionType>(context, args[0])) { type_error(context, out); return; }
             RootScope roots(context); ReturnSlot saved(context); context.load(args[0], context.payload<ExceptionObject>(args[0]).args, saved);
-            auto arguments = roots.root(saved.result().value());
+            auto arguments = roots.root(saved.value());
             const auto &values = context.payload<TupleObject>(arguments).items;
             auto name = type_name(context, context.type_of(args[0]), false); ReturnSlot text(context);
             if (values.size() == 1)
             {
                 repr(context, roots.root(values[0]), text);
-                if (!raised(text)) name += U"(" + context.payload<StrObject>(text.result().value()).value + U")";
+                if (!raised(text)) name += U"(" + context.payload<StrObject>(text.value()).value + U")";
             }
             else
             {
                 repr(context, arguments, text);
-                if (!raised(text)) name += context.payload<StrObject>(text.result().value()).value;
+                if (!raised(text)) name += context.payload<StrObject>(text.value()).value;
             }
-            if (raised(text)) { out.raised(text.result().exception()); return; }
+            if (raised(text)) { out.raised(text.exception()); return; }
             make_str(context, std::move(name), out);
         }
         void exception_str(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
         {
             if (!instance_of<ExceptionObject, CoreObject::BaseExceptionType>(context, args[0])) { type_error(context, out); return; }
             RootScope roots(context); ReturnSlot saved(context); context.load(args[0], context.payload<ExceptionObject>(args[0]).args, saved);
-            auto arguments = roots.root(saved.result().value());
+            auto arguments = roots.root(saved.value());
             const auto &values = context.payload<TupleObject>(arguments).items;
             if (values.empty()) make_str(context, U"", out);
             else str(context, values.size() == 1 ? roots.root(values[0]) : arguments, out);
@@ -278,14 +278,14 @@ namespace cxxpython::core
             for (auto [id, label] : {std::pair{CoreObject::None, U"None"}, {CoreObject::NotImplemented, U"NotImplemented"}})
             {
                 ReturnSlot text(context); context.allocate_instance<StrObject>(at(CoreObject::StrType), text, label);
-                auto name = roots.root(text.result().value());
+                auto name = roots.root(text.value());
                 install_native_attribute(context, core, roots.root(context.type_of(at(id))), U"__repr__", unary, singleton_repr,
                                          {at(id).get(context), name.get(context)});
             }
             for (auto id : {CoreObject::CellType, CoreObject::DictType})
             {
                 ReturnSlot text(context); context.allocate_instance<StrObject>(at(CoreObject::StrType), text, U"__hash__");
-                name_store(context, *TypeView(context, at(id)).dictionary(), text.result().value(), at(CoreObject::None).get(context));
+                name_store(context, *TypeView(context, at(id)).dictionary(), text.value(), at(CoreObject::None).get(context));
             }
             const std::array<std::u32string, 6> names{U"__eq__", U"__ne__", U"__lt__", U"__le__", U"__gt__", U"__ge__"};
             const std::array string_entries{string_compare<CompareOp::Eq>, string_compare<CompareOp::Ne>, string_compare<CompareOp::Lt>,

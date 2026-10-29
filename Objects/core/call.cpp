@@ -21,7 +21,7 @@ namespace cxxpython::core
         using detail::validate_return;
         void type_error(Attachment &context, std::u32string message, ReturnSlot &out)
         { raise_error(context, CoreObject::TypeErrorType, std::move(message), out); }
-        bool raised(ReturnSlot &out) { return out.result().tag() == ResultTag::Raised; }
+        bool raised(ReturnSlot &out) { return out.tag() == ResultTag::Raised; }
 
         template <class F> ResultView guarded(Attachment &context, ReturnSlot &out, F &&function)
         {
@@ -101,16 +101,15 @@ namespace cxxpython::core
             auto positional = [&](std::size_t index) {
                 return receiver && index == 0 ? *receiver : args.positional[index - prefix];
             };
-            const auto positional_count = static_cast<std::size_t>(std::count_if(
-                signature.parameters.begin(), signature.parameters.end(),
-                [](const Parameter &p) { return p.kind != ParameterKind::KeywordOnly; }));
-            if (args.keywords.empty() && !signature.varargs && !signature.varkwargs &&
-                given == signature.parameters.size() && given == positional_count)
+            if (args.keywords.empty() && signature.accepts_complete_positional(given))
             {
                 bound.reserve(given);
                 for (std::size_t i = 0; i < given; ++i) { const auto value = positional(i); roots.root(value); bound.push_back(value); }
                 return true;
             }
+            const auto positional_count = static_cast<std::size_t>(std::count_if(
+                signature.parameters.begin(), signature.parameters.end(),
+                [](const Parameter &p) { return p.kind != ParameterKind::KeywordOnly; }));
             if (given > positional_count && !signature.varargs)
             { type_error(context, U"too many positional arguments", out); return false; }
             std::vector<std::optional<Value>> slots(signature.parameters.size());
@@ -137,7 +136,7 @@ namespace cxxpython::core
                     slots[index] = keyword.value;
                 }
                 else if (signature.varkwargs)
-                    detail::name_store(context, extra_keywords.result().value(), keyword.name, keyword.value);
+                    detail::name_store(context, extra_keywords.value(), keyword.name, keyword.value);
                 else
                 { type_error(context, U"unexpected or positional-only keyword: " + name, out); return false; }
             }
@@ -166,9 +165,9 @@ namespace cxxpython::core
                 std::vector<Value> rest;
                 for (std::size_t i = positional_count; i < given; ++i) rest.push_back(positional(i));
                 cxxpython::core::make_tuple(context, rest, extra_positional);
-                bound.push_back(roots.root(extra_positional.result().value()).get(context));
+                bound.push_back(roots.root(extra_positional.value()).get(context));
             }
-            if (signature.varkwargs) bound.push_back(roots.root(extra_keywords.result().value()).get(context));
+            if (signature.varkwargs) bound.push_back(roots.root(extra_keywords.value()).get(context));
             return true;
         }
         std::optional<PreparedPythonCall> prepare_call(Attachment &context, Handle callable, CallArgsView args,
@@ -191,11 +190,11 @@ namespace cxxpython::core
     {
         void validate_return(Attachment &context, ReturnSlot &out)
         {
-            if (out.result().tag() == ResultTag::Empty)
+            if (out.tag() == ResultTag::Empty)
                 throw std::logic_error("call entry did not write a result");
-            if (out.result().tag() == ResultTag::Ok)
+            if (out.tag() == ResultTag::Ok)
             {
-                auto value = out.result().value();
+                auto value = out.value();
                 auto type = context.type_of(value);
                 auto &metadata = context.payload<TypeObject>(type);
                 if (metadata.state != TypeState::Ready ||
@@ -215,6 +214,30 @@ namespace cxxpython::core
         {
             auto &native = context.payload<NativeFunctionObject>(function);
             RootScope roots(context); std::vector<Value> bound;
+            const auto count = args.positional.size() + (receiver ? 1 : 0);
+            if (args.keywords.empty() && native.signature.accepts_complete_positional(count))
+            {
+                for (auto value : args.positional) roots.root(value);
+                if (!receiver) native.entry(context, function, args.positional, out);
+                else
+                {
+                    roots.root(*receiver);
+                    // A bounded stack prefix covers small calls; large arities use the same ABI.
+                    std::array prefixed{*receiver, *receiver, *receiver, *receiver};
+                    if (count <= prefixed.size())
+                    {
+                        std::copy(args.positional.begin(), args.positional.end(), prefixed.begin() + 1);
+                        native.entry(context, function, std::span<const Value>{prefixed}.first(count), out);
+                    }
+                    else
+                    {
+                        bound.reserve(count); bound.push_back(*receiver);
+                        bound.insert(bound.end(), args.positional.begin(), args.positional.end());
+                        native.entry(context, function, bound, out);
+                    }
+                }
+                validate_return(context, out); return;
+            }
             if (!detail::bind_arguments(context, native.signature, args, receiver, roots, bound, out)) return;
             native.entry(context, function, bound, out); validate_return(context, out);
         }
@@ -239,8 +262,8 @@ namespace cxxpython::core
             else
             {
                 ReturnSlot bound(context); bind_descriptor(context, descriptor, receiver, context.type_of(receiver), bound);
-                if (raised(bound)) { out.raised(bound.result().exception()); return; }
-                RootScope roots(context); invoke(context, roots.root(bound.result().value()), args, {}, out, preparation);
+                if (raised(bound)) { out.raised(bound.exception()); return; }
+                RootScope roots(context); invoke(context, roots.root(bound.value()), args, {}, out, preparation);
             }
         }
         void invoke(Attachment &context, Handle target, CallArgsView args,
@@ -337,8 +360,8 @@ namespace cxxpython::core
             else
             {
                 ReturnSlot dictionary(context);
-                if (dictionary_field(context, value, dictionary) && dictionary.result().tag() == ResultTag::Ok)
-                    if (auto stored = detail::name_lookup(context, dictionary.result().value(), text)) { out.ok(*stored); return; }
+                if (dictionary_field(context, value, dictionary) && dictionary.tag() == ResultTag::Ok)
+                    if (auto stored = detail::name_lookup(context, dictionary.value(), text)) { out.ok(*stored); return; }
             }
             if (attribute)
             { bind_descriptor(context, *attribute, value, type, out); return; }
@@ -371,19 +394,19 @@ namespace cxxpython::core
             }
             ReturnSlot dictionary(context);
             if (!dictionary_field(context, target, dictionary)) { raise_error(context, CoreObject::AttributeErrorType, U"object has no instance dictionary", out); return; }
-            if (dictionary.result().tag() == ResultTag::Empty)
+            if (dictionary.tag() == ResultTag::Empty)
             {
                 if (!value) { raise_error(context, CoreObject::AttributeErrorType, text, out); return; }
                 ReturnSlot created(context); context.allocate_instance<DictObject>(roots.root(context.builtin(CoreObject::DictType)), created);
                 for (;;)
                 {
-                    if (context.compare_exchange(target, *context.instance_dictionary(target), {}, created.result().value())) { dictionary.ok(created.result().value()); break; }
-                    context.load(target, *context.instance_dictionary(target), dictionary); if (dictionary.result().tag() == ResultTag::Ok) break;
+                    if (context.compare_exchange(target, *context.instance_dictionary(target), {}, created.value())) { dictionary.ok(created.value()); break; }
+                    context.load(target, *context.instance_dictionary(target), dictionary); if (dictionary.tag() == ResultTag::Ok) break;
                     context.poll();
                 }
             }
-            if (value) detail::name_store(context, dictionary.result().value(), name.get(context), value->get(context));
-            else if (!detail::name_erase(context, dictionary.result().value(), text))
+            if (value) detail::name_store(context, dictionary.value(), name.get(context), value->get(context));
+            else if (!detail::name_erase(context, dictionary.value(), text))
             { raise_error(context, CoreObject::AttributeErrorType, text, out); return; }
             out.ok(context.builtin(CoreObject::None));
         }
@@ -470,7 +493,7 @@ namespace cxxpython::core
             auto type = context.type_of(value);
             std::array args{name.get(context)};
             special(context, value, U"__getattribute__", {args, {}}, out);
-            if (raised(out) && is_subtype(context, context.type_of(out.result().exception()),
+            if (raised(out) && is_subtype(context, context.type_of(out.exception()),
                                          context.builtin(CoreObject::AttributeErrorType)) &&
                 type_attribute(context, type, U"__getattr__"))
             {
@@ -511,10 +534,10 @@ namespace cxxpython::core
             ReturnSlot function(context);
             allocate_function(context, at(CoreObject::NativeFunctionType), std::string(name.begin(), name.end()),
                               std::move(signature), entry, std::move(captures), function);
-            auto callable = roots.root(function.result().value());
+            auto callable = roots.root(function.value());
             ReturnSlot key(context);
             context.allocate_instance<StrObject>(at(CoreObject::StrType), key, std::move(name));
-            name_store(context, *TypeView(context, owner).dictionary(), key.result().value(), callable.get(context));
+            name_store(context, *TypeView(context, owner).dictionary(), key.value(), callable.get(context));
         }
         void install_call_descriptors(Attachment &context, std::span<const Handle> core)
         {

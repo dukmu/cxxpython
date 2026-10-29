@@ -18,7 +18,7 @@ namespace cxxpython::core
         using Integer = boost::multiprecision::cpp_int;
         void type_error(Attachment &context, ReturnSlot &out)
         { raise_error(context, CoreObject::TypeErrorType, U"integer operation received an incompatible value", out); }
-        bool raised(ReturnSlot &out) { return out.result().tag() == ResultTag::Raised; }
+        bool raised(ReturnSlot &out) { return out.tag() == ResultTag::Raised; }
         const IntObject &integer(Attachment &context, Value value)
         {
             if (!is_int(context, value)) throw std::invalid_argument("expected an integer value");
@@ -141,10 +141,10 @@ namespace cxxpython::core
                 auto slot = resolve_protocol(context, roots.root(context.type_of(value)), Protocol::Int, roots);
                 if (slot.state == SlotState::Missing) index(context, value, converted);
                 else invoke_protocol(context, value, slot, {}, converted);
-                if (raised(converted)) { out.raised(converted.result().exception()); return; }
-                if (!is_int(context, converted.result().value())) { type_error(context, out); return; }
+                if (raised(converted)) { out.raised(converted.exception()); return; }
+                if (!is_int(context, converted.value())) { type_error(context, out); return; }
             }
-            const auto value = converted.result().value();
+            const auto value = converted.value();
             if (cls.get(context) == context.builtin(CoreObject::IntType)) { copy_int(context, value, out); return; }
             const auto &source = integer(context, value);
             if (source.large)
@@ -293,9 +293,9 @@ namespace cxxpython::core
                 const auto dict = *TypeView(context, at(id)).dictionary();
                 auto function = *name_lookup(context, dict, U"__new__");
                 context.allocate_instance<StaticMethodObject>(at(CoreObject::StaticMethodType), out, function);
-                auto wrapper = roots.root(out.result().value());
+                auto wrapper = roots.root(out.value());
                 context.allocate_instance<StrObject>(at(CoreObject::StrType), out, U"__new__");
-                name_store(context, dict, out.result().value(), wrapper.get(context));
+                name_store(context, dict, out.value(), wrapper.get(context));
             }
         }
     }

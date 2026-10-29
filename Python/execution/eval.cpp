@@ -16,63 +16,74 @@ namespace cxxpython::core
         {
         public:
             FrameActivation(Attachment &context, ReturnSlot &active)
-                : context_(context), active_(active), root_(active.result().value()), previous_(context.current_frame_),
+                : context_(context), active_(active), root_(active.value()), current_(root_), previous_(context.current_frame_),
                   previous_exception_(context.handled_exception_)
             {
                 auto &data = context.payload<FrameObject>(root_);
                 data.back = previous_; data.handled_exception = previous_exception_;
-                data.state = FrameState::Running; context.current_frame_ = root_; sync();
+                data.state = FrameState::Running; activate(root_);
             }
             ~FrameActivation()
             {
                 while (current() != root_)
                 {
-                    auto &data = context_.payload<FrameObject>(current()); const auto parent = *data.back;
-                    complete(data); active_.ok(parent); context_.leave_call();
+                    const auto parent = *frame().back;
+                    complete(frame()); activate(parent); context_.leave_call();
                 }
-                complete(context_.payload<FrameObject>(root_)); context_.current_frame_ = previous_;
+                complete(frame()); context_.current_frame_ = previous_;
                 context_.handled_exception_ = previous_exception_;
             }
-            Value current() const { return active_.result().value(); }
-            void sync() { context_.handled_exception_ = context_.payload<FrameObject>(current()).handled_exception; }
+            Value current() const noexcept { return current_; }
+            FrameObject &frame() const noexcept { return *frame_; }
+            const CodeObject &code() const noexcept { return *code_; }
+            void sync() { context_.handled_exception_ = frame().handled_exception; }
             bool descend(Handle frame)
             {
                 if (!context_.enter_call()) return false;
                 auto &child = context_.payload<FrameObject>(frame);
                 child.back = current(); child.handled_exception = context_.handled_exception_; child.state = FrameState::Running;
-                active_.ok(frame.get(context_)); context_.current_frame_ = current(); sync(); return true;
+                activate(frame.get(context_)); return true;
             }
             bool returned(Value value, ReturnSlot &out)
             {
                 if (current() == root_) { out.ok(value); return true; }
-                auto &child = context_.payload<FrameObject>(current()); const auto parent_value = *child.back;
+                auto &child = frame(); const auto parent_value = *child.back;
                 auto &parent = context_.payload<FrameObject>(parent_value); const auto base = *parent.pending_call;
                 // Publish into the parent's traced stack before dropping the child root.
                 parent.operands[base] = value;
                 for (std::size_t i = base + 1; i < parent.sp; ++i) parent.operands[i] = context_.builtin(CoreObject::None);
                 parent.sp = base + 1; parent.pending_call.reset(); complete(child);
-                active_.ok(parent_value); context_.current_frame_ = parent_value; sync(); context_.leave_call(); return false;
+                activate(parent_value); context_.leave_call(); return false;
             }
             void raising(Value exception, bool traceback = true)
             {
-                auto &data = context_.payload<FrameObject>(current()); data.reason = ExceptionRaise{exception}; data.pending_call.reset();
+                auto &data = frame(); data.reason = ExceptionRaise{exception}; data.pending_call.reset();
                 if (traceback && exception != context_.builtin(CoreObject::MemoryError))
                 {
                     RootScope roots(context_); ReturnSlot out(context_);
                     append_traceback(context_, roots.root(exception), roots.root(current()), out);
-                    data.reason = ExceptionRaise{out.result().exception()};
+                    data.reason = ExceptionRaise{out.exception()};
                 }
             }
             bool failed(Value exception, ReturnSlot &out)
             {
                 if (current() == root_) { out.raised(exception); return true; }
-                auto &child = context_.payload<FrameObject>(current()); const auto parent_value = *child.back;
+                auto &child = frame(); const auto parent_value = *child.back;
                 auto &parent = context_.payload<FrameObject>(parent_value);
                 parent.reason = ExceptionRaise{exception}; parent.trim_stack(context_, *parent.pending_call); parent.pending_call.reset();
-                complete(child); active_.ok(parent_value); context_.current_frame_ = parent_value; sync(); context_.leave_call();
+                complete(child); activate(parent_value); context_.leave_call();
                 raising(exception); return false;
             }
         private:
+            void activate(Value value)
+            {
+                // The active slot roots this nonmoving Frame and its immutable Code.
+                // Refresh borrowed payloads only when the scheduler changes frames.
+                active_.ok(value); current_ = value;
+                frame_ = &context_.payload<FrameObject>(value);
+                code_ = &context_.payload<CodeObject>(frame_->code);
+                context_.current_frame_ = value; sync();
+            }
             void complete(FrameObject &frame) noexcept
             {
                 frame.trim_stack(context_, 0); frame.pending_call.reset(); frame.regions.clear(); frame.cleanups.clear();
@@ -81,6 +92,9 @@ namespace cxxpython::core
             Attachment &context_;
             ReturnSlot &active_;
             Value root_;
+            Value current_;
+            FrameObject *frame_ = nullptr;
+            const CodeObject *code_ = nullptr;
             std::optional<Value> previous_;
             std::optional<Value> previous_exception_;
         };
@@ -89,7 +103,7 @@ namespace cxxpython::core
     {
         void type_error(Attachment &context, std::u32string message, ReturnSlot &out)
         { raise_error(context, CoreObject::TypeErrorType, std::move(message), out); }
-        bool raised(ReturnSlot &out) { return out.result().tag() == ResultTag::Raised; }
+        bool raised(ReturnSlot &out) { return out.tag() == ResultTag::Raised; }
         template <class T, CoreObject Kind> bool kind(Attachment &context, Value value)
         { return is_subtype(context, context.type_of(value), context.builtin(Kind)) && context.has_layout<T>(value); }
         void unbound(Attachment &context, const CodeObject &code, std::uint32_t local, ReturnSlot &out)
@@ -116,7 +130,7 @@ namespace cxxpython::core
             if (!detail::bind_arguments(context, program.signature(), args, receiver, roots, bound, out, values)) return;
             context.allocate_instance<FrameObject>(roots.root(context.builtin(CoreObject::FrameType)), out,
                 function.get(context), code.get(context), program.local_names().size(), program.max_stack(), context.builtin(CoreObject::None), program.max_regions());
-            auto &data = context.payload<FrameObject>(out.result().value());
+            auto &data = context.payload<FrameObject>(out.value());
             for (std::size_t i = 0; i < bound.size(); ++i) data.locals[i] = bound[i];
         }
         void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &out)
@@ -126,7 +140,7 @@ namespace cxxpython::core
             for (;;)
             {
                 if (!--poll_budget) { context.poll(); poll_budget = 64; }
-                auto &data = context.payload<FrameObject>(activation.current()); const auto &code = context.payload<CodeObject>(data.code);
+                auto &data = activation.frame(); const auto &code = activation.code();
                 try
                 {
                     if (data.reason)
@@ -148,7 +162,7 @@ namespace cxxpython::core
                             data.operands[data.sp++] = context.payload<TupleObject>(code.constants).items[operand];
                             break;
                         case Opcode::LoadFast:
-                            if (!data.locals[operand]) { unbound(context, code, operand, result); activation.raising(result.result().exception()); break; }
+                            if (!data.locals[operand]) { unbound(context, code, operand, result); activation.raising(result.exception()); break; }
                             data.operands[data.sp++] = *data.locals[operand]; break;
                         case Opcode::LoadGlobal:
                         case Opcode::StoreGlobal:
@@ -165,7 +179,7 @@ namespace cxxpython::core
                                 else
                                 {
                                     raise_error(context, CoreObject::NameErrorType, U"name '" + name + U"' is not defined", result);
-                                    activation.raising(result.result().exception());
+                                    activation.raising(result.exception());
                                 }
                             }
                             else if (opcode == Opcode::StoreGlobal)
@@ -176,7 +190,7 @@ namespace cxxpython::core
                             else if (!detail::name_erase(context, function.globals, name))
                             {
                                 raise_error(context, CoreObject::NameErrorType, U"name '" + name + U"' is not defined", result);
-                                activation.raising(result.result().exception());
+                                activation.raising(result.exception());
                             }
                             break;
                         }
@@ -190,11 +204,11 @@ namespace cxxpython::core
                             if (operand & static_cast<std::uint32_t>(FunctionFlags::KeywordDefaults)) spec.kwdefaults = roots.root(data.operands[--cursor]);
                             if (operand & static_cast<std::uint32_t>(FunctionFlags::Defaults)) spec.defaults = roots.root(data.operands[--cursor]);
                             make_function(context, spec, result);
-                            if (raised(result)) { activation.raising(result.result().exception()); break; }
-                            data.trim_stack(context, cursor); data.operands[data.sp++] = result.result().value(); break;
+                            if (raised(result)) { activation.raising(result.exception()); break; }
+                            data.trim_stack(context, cursor); data.operands[data.sp++] = result.value(); break;
                         }
                         case Opcode::DeleteFast:
-                            if (!data.locals[operand]) { unbound(context, code, operand, result); activation.raising(result.result().exception()); break; }
+                            if (!data.locals[operand]) { unbound(context, code, operand, result); activation.raising(result.exception()); break; }
                             data.locals[operand].reset(); break;
                         case Opcode::PopTop:
                             data.operands[--data.sp] = context.builtin(CoreObject::None); break;
@@ -214,15 +228,15 @@ namespace cxxpython::core
                                 RootScope roots(context); context.allocate_instance<DictObject>(roots.root(context.builtin(CoreObject::DictType)), result);
                                 const auto &table = context.payload<TupleObject>(code.call_keywords).items;
                                 const auto &names = context.payload<TupleObject>(table[operand]).items;
-                                for (std::size_t i = 0; i < names.size(); ++i) detail::name_store(context, result.result().value(), names[i], data.operands[base + i]);
+                                for (std::size_t i = 0; i < names.size(); ++i) detail::name_store(context, result.value(), names[i], data.operands[base + i]);
                             }
-                            data.trim_stack(context, base); data.operands[data.sp++] = result.result().value(); break;
+                            data.trim_stack(context, base); data.operands[data.sp++] = result.value(); break;
                         }
                         case Opcode::Unary:
                         {
                             RootScope roots(context); unary(context, roots.root(data.operands[data.sp - 1]), static_cast<UnaryOp>(operand), result);
-                            if (raised(result)) activation.raising(result.result().exception());
-                            else data.operands[data.sp - 1] = result.result().value();
+                            if (raised(result)) activation.raising(result.exception());
+                            else data.operands[data.sp - 1] = result.value();
                             break;
                         }
                         case Opcode::LoadAttr:
@@ -234,8 +248,8 @@ namespace cxxpython::core
                             if (opcode == Opcode::LoadAttr) get_attribute(context, object, name, result);
                             else if (opcode == Opcode::StoreAttr) set_attribute(context, object, name, roots.root(data.operands[base + 1]), result);
                             else del_attribute(context, object, name, result);
-                            if (raised(result)) { activation.raising(result.result().exception()); break; }
-                            data.trim_stack(context, base); if (opcode == Opcode::LoadAttr) data.operands[data.sp++] = result.result().value();
+                            if (raised(result)) { activation.raising(result.exception()); break; }
+                            data.trim_stack(context, base); if (opcode == Opcode::LoadAttr) data.operands[data.sp++] = result.value();
                             break;
                         }
                         case Opcode::Binary:
@@ -247,28 +261,28 @@ namespace cxxpython::core
                             if (opcode == Opcode::Binary) binary(context, left, right, static_cast<BinaryOp>(operand), result);
                             else if (opcode == Opcode::Inplace) inplace(context, left, right, static_cast<BinaryOp>(operand), result);
                             else rich_compare(context, left, right, static_cast<CompareOp>(operand), result);
-                            if (raised(result)) { activation.raising(result.result().exception()); break; }
-                            data.operands[data.sp - 2] = result.result().value(); data.operands[--data.sp] = context.builtin(CoreObject::None); break;
+                            if (raised(result)) { activation.raising(result.exception()); break; }
+                            data.operands[data.sp - 2] = result.value(); data.operands[--data.sp] = context.builtin(CoreObject::None); break;
                         }
                         case Opcode::Jump:
                             data.pc = operand; break;
                         case Opcode::JumpIfFalse:
                         {
                             RootScope roots(context); truth(context, roots.root(data.operands[data.sp - 1]), result);
-                            if (raised(result)) { activation.raising(result.result().exception()); break; }
+                            if (raised(result)) { activation.raising(result.exception()); break; }
                             data.operands[--data.sp] = context.builtin(CoreObject::None);
-                            if (result.result().value() == context.builtin(CoreObject::False)) data.pc = operand;
+                            if (result.value() == context.builtin(CoreObject::False)) data.pc = operand;
                             break;
                         }
                         case Opcode::Return:
                             result.ok(data.operands[data.sp - 1]); detail::validate_return(context, result);
-                            data.reason = FunctionReturn{result.result().value()};
+                            data.reason = FunctionReturn{result.value()};
                             break;
                         case Opcode::RaiseInstance:
                         {
                             auto exception = data.operands[data.sp - 1];
                             if (!kind<ExceptionObject, CoreObject::BaseExceptionType>(context, exception))
-                            { type_error(context, U"RAISE_INSTANCE requires a BaseException instance", result); exception = result.result().exception(); }
+                            { type_error(context, U"RAISE_INSTANCE requires a BaseException instance", result); exception = result.exception(); }
                             else detail::link_exception_context(context, exception);
                             activation.raising(exception); break;
                         }
@@ -287,14 +301,14 @@ namespace cxxpython::core
                                 ReturnSlot child(context);
                                 make_frame(context, prepared->function, {prepared->positional, prepared->keywords},
                                            prepared->receiver ? std::optional<Value>{prepared->receiver->get(context)} : std::optional<Value>{}, child);
-                                if (raised(child)) { activation.raising(child.result().exception()); break; }
-                                if (!activation.descend(roots.root(child.result().value())))
-                                { raise_error(context, CoreObject::RecursionErrorType, U"maximum call depth exceeded", result); activation.raising(result.result().exception()); }
+                                if (raised(child)) { activation.raising(child.exception()); break; }
+                                if (!activation.descend(roots.root(child.value())))
+                                { raise_error(context, CoreObject::RecursionErrorType, U"maximum call depth exceeded", result); activation.raising(result.exception()); }
                             }
                             else
                             {
-                                if (raised(result)) { activation.raising(result.result().exception()); break; }
-                                data.operands[base] = result.result().value();
+                                if (raised(result)) { activation.raising(result.exception()); break; }
+                                data.operands[base] = result.value();
                                 for (std::size_t i = base + 1; i < data.sp; ++i) data.operands[i] = context.builtin(CoreObject::None);
                                 data.sp = base + 1; data.pending_call.reset();
                             }
@@ -306,10 +320,10 @@ namespace cxxpython::core
                         {
                             RootScope roots(context); auto manager = roots.root(data.operands[data.sp - 1]); ReturnSlot enter(context);
                             with_method(context, manager, Protocol::Enter, enter);
-                            if (raised(enter)) { activation.raising(enter.result().exception()); break; }
+                            if (raised(enter)) { activation.raising(enter.exception()); break; }
                             with_method(context, manager, Protocol::Exit, result);
-                            if (raised(result)) { activation.raising(result.result().exception()); break; }
-                            data.operands[data.sp - 1] = result.result().value(); data.operands[data.sp++] = enter.result().value(); break;
+                            if (raised(result)) { activation.raising(result.exception()); break; }
+                            data.operands[data.sp - 1] = result.value(); data.operands[data.sp++] = enter.value(); break;
                         }
                         case Opcode::EnterWith:
                             data.regions.push_back({{operand, RegionPhase::Protected}, data.sp - 1, {}}); break;
@@ -321,7 +335,7 @@ namespace cxxpython::core
                             data.operands[data.sp++] = error ? error->exception : context.builtin(CoreObject::None);
                             ReturnSlot traceback(context);
                             if (error) context.load(error->exception, context.payload<ExceptionObject>(error->exception).traceback, traceback);
-                            data.operands[data.sp++] = traceback.result().tag() == ResultTag::Ok ? traceback.result().value() : context.builtin(CoreObject::None);
+                            data.operands[data.sp++] = traceback.tag() == ResultTag::Ok ? traceback.value() : context.builtin(CoreObject::None);
                             break;
                         }
                         case Opcode::WithResult:
@@ -329,8 +343,8 @@ namespace cxxpython::core
                             if (std::holds_alternative<ExceptionRaise>(data.cleanups.back().saved_reason))
                             {
                                 RootScope roots(context); truth(context, roots.root(data.operands[data.sp - 1]), result);
-                                if (raised(result)) { activation.raising(result.result().exception()); break; }
-                                if (result.result().value() == context.builtin(CoreObject::True))
+                                if (raised(result)) { activation.raising(result.exception()); break; }
+                                if (result.value() == context.builtin(CoreObject::True))
                                     data.cleanups.back().saved_reason = NormalExit{code.program.regions()[operand].after_pc, code.program.regions()[operand].parent};
                             }
                             data.operands[--data.sp] = context.builtin(CoreObject::None); break;
@@ -347,12 +361,12 @@ namespace cxxpython::core
                             data.operands[data.sp++] = data.handled_exception.value_or(context.builtin(CoreObject::None)); break;
                         case Opcode::Reraise:
                             if (data.handled_exception) activation.raising(*data.handled_exception, false);
-                            else { raise_error(context, CoreObject::RuntimeErrorType, U"no active exception to reraise", result); activation.raising(result.result().exception()); }
+                            else { raise_error(context, CoreObject::RuntimeErrorType, U"no active exception to reraise", result); activation.raising(result.exception()); }
                             break;
                         case Opcode::ExceptionMatch:
                             detail::exception_match(context, data.operands[data.sp - 2], data.operands[data.sp - 1], result);
-                            if (raised(result)) { activation.raising(result.result().exception()); break; }
-                            data.operands[data.sp - 2] = result.result().value(); data.operands[--data.sp] = context.builtin(CoreObject::None); break;
+                            if (raised(result)) { activation.raising(result.exception()); break; }
+                            data.operands[data.sp - 2] = result.value(); data.operands[--data.sp] = context.builtin(CoreObject::None); break;
                         case Opcode::Count:
                             throw std::logic_error("unverified opcode reached execution");
                     }
@@ -442,7 +456,7 @@ namespace cxxpython::core
                               std::optional<Value> receiver, ReturnSlot &out)
         {
             ReturnSlot active(context); make_frame(context, function, args, receiver, active);
-            if (raised(active)) { out.raised(active.result().exception()); return; }
+            if (raised(active)) { out.raised(active.exception()); return; }
             FrameActivation activation(context, active); run(context, activation, out);
         }
         LayoutDescriptor execution_layout(CoreObject type)
@@ -460,9 +474,9 @@ namespace cxxpython::core
             auto field = [&](CoreObject kind, std::u32string name, NativeGetter getter) {
                 RootScope roots(context); ReturnSlot out(context);
                 context.allocate_instance<GetSetDescriptorObject>(at(CoreObject::GetSetDescriptorType), out, at(kind).get(context), getter, nullptr);
-                auto descriptor = roots.root(out.result().value());
+                auto descriptor = roots.root(out.value());
                 context.allocate_instance<StrObject>(at(CoreObject::StrType), out, std::move(name));
-                name_store(context, *TypeView(context, at(kind)).dictionary(), out.result().value(), descriptor.get(context));
+                name_store(context, *TypeView(context, at(kind)).dictionary(), out.value(), descriptor.get(context));
             };
             field(CoreObject::CodeType, U"co_name", code_name); field(CoreObject::CodeType, U"co_qualname", code_qualname);
             field(CoreObject::CodeType, U"co_filename", code_filename); field(CoreObject::CodeType, U"co_consts", code_constants);

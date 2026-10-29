@@ -12,15 +12,15 @@ namespace cxxpython::core
         if (context.has_layout<DictStorage>(*dictionary)) { storage_.ok(*dictionary); return; }
         auto &data = context.payload<DictObject>(*dictionary); ReturnSlot owner(context);
         context.load(*dictionary, data.namespace_owner, owner);
-        if (owner.result().tag() == ResultTag::Ok)
+        if (owner.tag() == ResultTag::Ok)
         {
-            TypeView type(context, owner.result().value());
+            TypeView type(context, owner.value());
             if (type.snapshot()) { if (auto storage = type.storage()) storage_.ok(*storage); return; }
         }
         context.load(*dictionary, data.storage, storage_);
     }
     std::optional<Value> DictView::storage() const
-    { return storage_.result().tag() == ResultTag::Ok ? std::optional<Value>{storage_.result().value()} : std::optional<Value>{}; }
+    { return storage_.tag() == ResultTag::Ok ? std::optional<Value>{storage_.value()} : std::optional<Value>{}; }
     std::span<const DictObject::Entry> DictView::entries() const
     { auto value = storage(); return value ? std::span<const DictObject::Entry>{context_.payload<DictStorage>(*value).entries} : std::span<const DictObject::Entry>{}; }
     std::optional<Value> DictView::find(const std::u32string &name) const
@@ -33,7 +33,7 @@ namespace cxxpython::core
     bool read_cell(Attachment &context, Value cell, ReturnSlot &out)
     {
         context.load(cell, context.payload<CellObject>(cell).contents, out);
-        return out.result().tag() == ResultTag::Ok;
+        return out.tag() == ResultTag::Ok;
     }
     void write_cell(Attachment &context, Value cell, std::optional<Value> value)
     { context.store(cell, context.payload<CellObject>(cell).contents, value); }
@@ -160,14 +160,14 @@ namespace cxxpython::core
             RootScope roots(context);
             ReturnSlot temporary(context);
             make_str(context, std::move(message), temporary);
-            auto text = roots.root(temporary.result().value());
+            auto text = roots.root(temporary.value());
             std::array args{text.get(context)};
             cxxpython::core::make_tuple(context, args, temporary);
-            auto arguments = roots.root(temporary.result().value());
+            auto arguments = roots.root(temporary.value());
             auto exception_type = roots.root(context.builtin(type));
             context.allocate_instance<ExceptionObject>(exception_type, temporary, arguments.get(context));
-            detail::link_exception_context(context, temporary.result().value());
-            out.raised(temporary.result().value());
+            detail::link_exception_context(context, temporary.value());
+            out.raised(temporary.value());
         }
         catch (const std::bad_alloc &) { out.raised(context.builtin(CoreObject::MemoryError)); }
     }
@@ -226,13 +226,13 @@ namespace cxxpython::core
             RootScope roots(context); roots.root(dictionary); roots.root(name); roots.root(value); (void)context.type_of(value);
             const auto &text = context.payload<StrObject>(name).value; auto &data = context.payload<DictObject>(dictionary); ReturnSlot staged(context);
             ReturnSlot owner(context); context.load(dictionary, data.namespace_owner, owner);
-            if (owner.result().tag() == ResultTag::Ok && TypeView(context, owner.result().value()).snapshot())
-            { type_namespace_change(context, owner.result().value(), text, name, value); return; }
+            if (owner.tag() == ResultTag::Ok && TypeView(context, owner.value()).snapshot())
+            { type_namespace_change(context, owner.value(), text, name, value); return; }
             for (;;)
             {
                 {
                     DictView old(context, dictionary); copy_name_storage(context, old.storage(), text, name, value, staged);
-                    if (context.compare_exchange(dictionary, data.storage, old.storage(), staged.result().value())) return;
+                    if (context.compare_exchange(dictionary, data.storage, old.storage(), staged.value())) return;
                 }
                 staged.reset(); context.poll();
             }
@@ -241,13 +241,13 @@ namespace cxxpython::core
         {
             RootScope roots(context); roots.root(dictionary); auto &data = context.payload<DictObject>(dictionary); ReturnSlot staged(context);
             ReturnSlot owner(context); context.load(dictionary, data.namespace_owner, owner);
-            if (owner.result().tag() == ResultTag::Ok && TypeView(context, owner.result().value()).snapshot())
-                return type_namespace_change(context, owner.result().value(), name, {}, {});
+            if (owner.tag() == ResultTag::Ok && TypeView(context, owner.value()).snapshot())
+                return type_namespace_change(context, owner.value(), name, {}, {});
             for (;;)
             {
                 {
                     DictView old(context, dictionary); if (!copy_name_storage(context, old.storage(), name, {}, {}, staged)) return false;
-                    if (context.compare_exchange(dictionary, data.storage, old.storage(), staged.result().value())) return true;
+                    if (context.compare_exchange(dictionary, data.storage, old.storage(), staged.value())) return true;
                 }
                 staged.reset(); context.poll();
             }
@@ -260,8 +260,8 @@ namespace cxxpython::core
             auto dictionary_type = roots.root(context.builtin(CoreObject::DictType));
             ReturnSlot out(context);
             context.allocate_instance<DictObject>(dictionary_type, out);
-            context.store(out.result().value(), context.payload<DictObject>(out.result().value()).namespace_owner, type.get(context));
-            payload.dictionary = out.result().value();
+            context.store(out.value(), context.payload<DictObject>(out.value()).namespace_owner, type.get(context));
+            payload.dictionary = out.value();
         }
         void allocate_function(Attachment &context, Handle type, std::string name, SignatureLayout signature,
                                NativeEntry entry, std::vector<Value> captures, ReturnSlot &out)
@@ -326,45 +326,45 @@ namespace cxxpython::core
             {
                 ReturnSlot dictionary(context);
                 context.allocate_instance<DictObject>(at(CoreObject::DictType), dictionary);
-                context.payload<TypeObject>(type).dictionary = dictionary.result().value();
+                context.payload<TypeObject>(type).dictionary = dictionary.value();
             }
             for (auto seed : {context.object_type(), context.type_type()})
             {
                 ReturnSlot dictionary(context);
                 context.allocate_instance<DictObject>(at(CoreObject::DictType), dictionary);
-                context.payload<TypeObject>(seed).dictionary = dictionary.result().value();
+                context.payload<TypeObject>(seed).dictionary = dictionary.value();
             }
             auto &none_out = *outputs[static_cast<std::size_t>(CoreObject::None)];
             context.allocate_instance<NoneObject>(at(CoreObject::NoneType), none_out);
-            core.push_back(roots.root(none_out.result().value()));
+            core.push_back(roots.root(none_out.value()));
             auto &not_implemented = *outputs[static_cast<std::size_t>(CoreObject::NotImplemented)];
             context.allocate_instance<NoneObject>(at(CoreObject::NotImplementedType), not_implemented);
-            core.push_back(roots.root(not_implemented.result().value()));
+            core.push_back(roots.root(not_implemented.value()));
             for (auto id : {CoreObject::False, CoreObject::True, CoreObject::IntZero, CoreObject::IntOne})
             {
                 auto &output = *outputs[static_cast<std::size_t>(id)];
                 const bool boolean = id == CoreObject::False || id == CoreObject::True;
                 const std::int64_t value = id == CoreObject::True || id == CoreObject::IntOne ? 1 : 0;
                 context.allocate_instance<IntObject>(at(boolean ? CoreObject::BoolType : CoreObject::IntType), output, value);
-                core.push_back(roots.root(output.result().value()));
+                core.push_back(roots.root(output.value()));
             }
             auto &tuple_out = *outputs[static_cast<std::size_t>(CoreObject::EmptyTuple)];
             context.allocate_instance<TupleObject>(at(CoreObject::TupleType), tuple_out, std::vector<Value>{});
-            core.push_back(roots.root(tuple_out.result().value()));
+            core.push_back(roots.root(tuple_out.value()));
             auto &error_out = *outputs[static_cast<std::size_t>(CoreObject::MemoryError)];
-            context.allocate_instance<ExceptionObject>(at(CoreObject::MemoryErrorType), error_out, tuple_out.result().value());
-            core.push_back(roots.root(error_out.result().value()));
+            context.allocate_instance<ExceptionObject>(at(CoreObject::MemoryErrorType), error_out, tuple_out.value());
+            core.push_back(roots.root(error_out.value()));
             ReturnSlot text(context);
             context.allocate_instance<StrObject>(at(CoreObject::StrType), text, U"__module__");
-            auto module_key = roots.root(text.result().value());
+            auto module_key = roots.root(text.value());
             context.allocate_instance<StrObject>(at(CoreObject::StrType), text, U"builtins");
-            auto module_value = roots.root(text.result().value());
+            auto module_value = roots.root(text.value());
             auto initialize_names = [&](Value type) {
                 auto &payload = context.payload<TypeObject>(type);
                 context.allocate_instance<StrObject>(at(CoreObject::StrType), text,
                                                      std::get<std::u32string>(payload.name));
-                payload.name = text.result().value();
-                payload.qualname = text.result().value();
+                payload.name = text.value();
+                payload.qualname = text.value();
                 payload.bootstrap_module.reset();
                 context.account_external(type, payload.external_bytes());
             };
@@ -402,8 +402,8 @@ namespace cxxpython::core
 
             auto &builtins = *outputs[static_cast<std::size_t>(CoreObject::Builtins)];
             context.allocate_instance<DictObject>(at(CoreObject::DictType), builtins);
-            core.push_back(roots.root(builtins.result().value()));
-            const auto mapping = builtins.result().value();
+            core.push_back(roots.root(builtins.value()));
+            const auto mapping = builtins.value();
             auto publish = [&](Value key, Value value) { name_store(context, mapping, key, value); };
             for (auto id : {CoreObject::StrType, CoreObject::TupleType, CoreObject::DictType, CoreObject::IntType, CoreObject::BoolType,
                             CoreObject::BaseExceptionType, CoreObject::ExceptionType, CoreObject::TypeErrorType, CoreObject::AttributeErrorType,
@@ -417,7 +417,7 @@ namespace cxxpython::core
                                    {U"False", CoreObject::False}, {U"NotImplemented", CoreObject::NotImplemented}})
             {
                 context.allocate_instance<StrObject>(at(CoreObject::StrType), text, name);
-                publish(text.result().value(), at(id).get(context));
+                publish(text.value(), at(id).get(context));
             }
             auto operation = [&](const char *name, std::u32string key, NativeEntry entry) {
                 SignatureLayout signature; signature.parameters = {{U"object", ParameterKind::PositionalOnly}};
@@ -425,7 +425,7 @@ namespace cxxpython::core
                 context.allocate_instance<NativeFunctionObject>(at(CoreObject::NativeFunctionType), function,
                     name, std::move(signature), entry, std::vector<Value>{});
                 context.allocate_instance<StrObject>(at(CoreObject::StrType), text, std::move(key));
-                publish(text.result().value(), function.result().value());
+                publish(text.value(), function.value());
             };
             operation("len", U"len", builtin_protocol<Protocol::Len>);
             operation("repr", U"repr", builtin_protocol<Protocol::Repr>);

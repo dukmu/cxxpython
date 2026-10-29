@@ -102,7 +102,7 @@ namespace cxxpython::core
                         chain.root(*cursor);
                         if (!seen.insert(cursor->object()).second) break;
                         context.load(*cursor, context.payload<ExceptionObject>(*cursor).context, link);
-                        const auto next = link.result().tag() == ResultTag::Ok ? std::optional<Value>{link.result().value()} : std::optional<Value>{};
+                        const auto next = link.tag() == ResultTag::Ok ? std::optional<Value>{link.value()} : std::optional<Value>{};
                         if (next == exception) { cut = cursor; break; }
                         cursor = next; if (seen.size() % 64 == 0) context.poll();
                     }

@@ -98,6 +98,11 @@ namespace cxxpython::core
         std::optional<std::u32string> varargs;
         std::optional<std::u32string> varkwargs;
         void validate() const;
+        bool accepts_complete_positional(std::size_t count) const noexcept
+        {
+            return !varargs && !varkwargs && count == parameters.size() &&
+                (parameters.empty() || parameters.back().kind != ParameterKind::KeywordOnly);
+        }
         void trace(Tracer &tracer) const noexcept;
         std::size_t external_bytes() const noexcept;
     };

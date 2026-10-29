@@ -18,7 +18,7 @@ namespace cxxpython::core
         std::optional<Value> optional_traceback(Attachment &context, Value value)
         { return value == context.builtin(CoreObject::None) ? std::optional<Value>{} : value; }
         void exception_traceback(Attachment &context, Value value, ReturnSlot &out)
-        { context.load(value, context.payload<ExceptionObject>(value).traceback, out); if (out.result().tag() == ResultTag::Empty) out.ok(context.builtin(CoreObject::None)); }
+        { context.load(value, context.payload<ExceptionObject>(value).traceback, out); if (out.tag() == ResultTag::Empty) out.ok(context.builtin(CoreObject::None)); }
         void set_exception_traceback(Attachment &context, Value self, std::optional<Value> value, ReturnSlot &out)
         {
             if (!value) { type_error(context, U"cannot delete __traceback__", out); return; }
@@ -32,10 +32,10 @@ namespace cxxpython::core
                 !is_subtype(context, context.type_of(args[0]), context.builtin(CoreObject::BaseExceptionType)))
             { type_error(context, U"with_traceback requires a BaseException instance", out); return; }
             set_exception_traceback(context, args[0], args[1], out);
-            if (out.result().tag() == ResultTag::Ok) out.ok(args[0]);
+            if (out.tag() == ResultTag::Ok) out.ok(args[0]);
         }
         void traceback_next(Attachment &context, Value value, ReturnSlot &out)
-        { context.load(value, context.payload<TracebackObject>(value).next, out); if (out.result().tag() == ResultTag::Empty) out.ok(context.builtin(CoreObject::None)); }
+        { context.load(value, context.payload<TracebackObject>(value).next, out); if (out.tag() == ResultTag::Empty) out.ok(context.builtin(CoreObject::None)); }
         void set_traceback_next(Attachment &context, Value self, std::optional<Value> value, ReturnSlot &out)
         {
             if (!value) { type_error(context, U"cannot delete tb_next", out); return; }
@@ -54,7 +54,7 @@ namespace cxxpython::core
                         chain.root(*cursor);
                         if (*cursor == self || !seen.insert(cursor->object()).second) { cycle = true; break; }
                         context.load(*cursor, context.payload<TracebackObject>(*cursor).next, link);
-                        cursor = link.result().tag() == ResultTag::Ok ? std::optional<Value>{link.result().value()} : std::optional<Value>{};
+                        cursor = link.tag() == ResultTag::Ok ? std::optional<Value>{link.value()} : std::optional<Value>{};
                         if (seen.size() % 64 == 0) context.poll();
                     }
                     if (context.publication_epoch(PublicationDomain::Exception) == epoch)
@@ -90,8 +90,8 @@ namespace cxxpython::core
         bool position(Attachment &context, Value value, std::int64_t &converted, ReturnSlot &out)
         {
             RootScope roots(context); ReturnSlot result(context); index(context, roots.root(value), result);
-            if (result.result().tag() == ResultTag::Raised) { out.raised(result.result().exception()); return false; }
-            if (!int_fits_signed(context, result.result().value(), converted) ||
+            if (result.tag() == ResultTag::Raised) { out.raised(result.exception()); return false; }
+            if (!int_fits_signed(context, result.value(), converted) ||
                 converted < std::numeric_limits<std::int32_t>::min() || converted > std::numeric_limits<std::int32_t>::max())
             { raise_error(context, CoreObject::OverflowErrorType, U"traceback position does not fit a signed 32-bit integer", out); return false; }
             return true;
@@ -130,9 +130,9 @@ namespace cxxpython::core
                 for (;;)
                 {
                     context.load(error, context.payload<ExceptionObject>(rooted_error).traceback, previous);
-                    const auto head = previous.result().tag() == ResultTag::Ok ? std::optional<Value>{previous.result().value()} : std::optional<Value>{};
+                    const auto head = previous.tag() == ResultTag::Ok ? std::optional<Value>{previous.value()} : std::optional<Value>{};
                     context.allocate_instance<TracebackObject>(type, node, head, active, lasti, static_cast<std::int64_t>(line ? line : program.first_line()));
-                    if (context.compare_exchange(error, context.payload<ExceptionObject>(rooted_error).traceback, head, node.result().value())) break;
+                    if (context.compare_exchange(error, context.payload<ExceptionObject>(rooted_error).traceback, head, node.value())) break;
                     context.poll();
                 }
                 out.raised(error);
@@ -145,9 +145,9 @@ namespace cxxpython::core
             auto field = [&](CoreObject kind, std::u32string name, NativeGetter getter, NativeSetter setter = nullptr) {
                 RootScope roots(context); ReturnSlot out(context);
                 context.allocate_instance<GetSetDescriptorObject>(at(CoreObject::GetSetDescriptorType), out, at(kind).get(context), getter, setter);
-                auto descriptor = roots.root(out.result().value());
+                auto descriptor = roots.root(out.value());
                 context.allocate_instance<StrObject>(at(CoreObject::StrType), out, std::move(name));
-                name_store(context, *TypeView(context, at(kind)).dictionary(), out.result().value(), descriptor.get(context));
+                name_store(context, *TypeView(context, at(kind)).dictionary(), out.value(), descriptor.get(context));
             };
             field(CoreObject::BaseExceptionType, U"__traceback__", exception_traceback, set_exception_traceback);
             field(CoreObject::TracebackType, U"tb_next", traceback_next, set_traceback_next);
@@ -162,9 +162,9 @@ namespace cxxpython::core
             RootScope roots(context); ReturnSlot out(context);
             auto dict = *TypeView(context, at(CoreObject::TracebackType)).dictionary();
             context.allocate_instance<StaticMethodObject>(at(CoreObject::StaticMethodType), out, *name_lookup(context, dict, U"__new__"));
-            auto wrapper = roots.root(out.result().value());
+            auto wrapper = roots.root(out.value());
             context.allocate_instance<StrObject>(at(CoreObject::StrType), out, U"__new__");
-            name_store(context, dict, out.result().value(), wrapper.get(context));
+            name_store(context, dict, out.value(), wrapper.get(context));
         }
     }
 }

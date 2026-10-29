@@ -431,7 +431,7 @@ namespace cxxpython::core
                     for (const auto &instruction : block.instructions)
                     {
                         const auto position = source().position(instruction.span); auto operand = instruction.operand;
-                        if (instruction.literal) { detail::literal(context, *instruction.literal, temporary); operand = builder.constant(roots.root(temporary.result().value())); }
+                        if (instruction.literal) { detail::literal(context, *instruction.literal, temporary); operand = builder.constant(roots.root(temporary.value())); }
                         else if (instruction.function) operand = builder.constant(codes[*instruction.function]);
                         else if (!instruction.name.empty()) operand = builder.name(instruction.name);
                         if (instruction.opcode == Opcode::Call) builder.call(operand, instruction.keywords, position);
@@ -445,7 +445,7 @@ namespace cxxpython::core
                     { builder.jump(Opcode::JumpIfFalse, labels[block.alternative], position); builder.jump(Opcode::Jump, labels[block.target], position); }
                     else throw std::logic_error("compiler left a CFG block unterminated");
                 }
-                builder.freeze(temporary); codes[id] = roots.root(temporary.result().value());
+                builder.freeze(temporary); codes[id] = roots.root(temporary.value());
             }
             out.ok(codes[0].get(context));
         }
@@ -464,12 +464,12 @@ namespace cxxpython::core
             if (const auto *source = std::get_if<const SourceUnit *>(&request.program))
             {
                 if (!*source) throw std::invalid_argument("RunRequest source is null");
-                (*source)->freeze(context, compiled); if (compiled.result().tag() == ResultTag::Raised) { out.raised(compiled.result().exception()); return out.result(); }
+                (*source)->freeze(context, compiled); if (compiled.tag() == ResultTag::Raised) { out.raised(compiled.exception()); return out.result(); }
             }
             else compiled.ok(input_code->get(context));
             if (input_globals) environment.ok(input_globals->get(context));
             else context.allocate_instance<DictObject>(roots.root(context.builtin(CoreObject::DictType)), environment);
-            const auto globals = roots.root(environment.result().value());
+            const auto globals = roots.root(environment.value());
             auto dictionary = [&](Value value) {
                 return context.has_layout<DictObject>(value) && is_subtype(context, context.type_of(value), context.builtin(CoreObject::DictType));
             };
@@ -482,16 +482,16 @@ namespace cxxpython::core
             { raise_error(context, CoreObject::TypeErrorType, U"RunRequest requires globals/builtins name dictionaries", out); return out.result(); }
             if (!detail::name_lookup(context, globals.get(context), U"__builtins__"))
             {
-                make_str(context, U"__builtins__", temporary); detail::name_store(context, globals.get(context), temporary.result().value(), builtins.get(context));
+                make_str(context, U"__builtins__", temporary); detail::name_store(context, globals.get(context), temporary.value(), builtins.get(context));
             }
             if (!input_globals)
             {
-                make_str(context, U"__name__", temporary); const auto name = roots.root(temporary.result().value());
-                make_str(context, U"__main__", temporary); detail::name_store(context, globals.get(context), name.get(context), temporary.result().value());
+                make_str(context, U"__name__", temporary); const auto name = roots.root(temporary.value());
+                make_str(context, U"__main__", temporary); detail::name_store(context, globals.get(context), name.get(context), temporary.value());
             }
-            make_function(context, {roots.root(compiled.result().value()), globals, {}, {}, builtins}, temporary);
-            if (temporary.result().tag() == ResultTag::Raised) out.raised(temporary.result().exception());
-            else call(context, roots.root(temporary.result().value()), {}, out);
+            make_function(context, {roots.root(compiled.value()), globals, {}, {}, builtins}, temporary);
+            if (temporary.tag() == ResultTag::Raised) out.raised(temporary.exception());
+            else call(context, roots.root(temporary.value()), {}, out);
         }
         catch (const std::bad_alloc &) { out.raised(context.builtin(CoreObject::MemoryError)); }
         return out.result();

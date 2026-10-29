@@ -105,6 +105,33 @@ namespace
         EXPECT_THROW(out.raised(context.builtin(CoreObject::None)), std::logic_error);
     }
 
+    TEST_F(CoreCalls, CompletePositionalNativeCallsRetainArgumentsThroughCollection)
+    {
+        auto cls = type("Receiver"); auto self = instance(cls);
+        auto key = text(U"method"); auto value = text(U"argument"); ReturnSlot out(context);
+        for (std::size_t count : {0U, 1U, 4U, 5U})
+        {
+            SignatureLayout signature;
+            for (std::size_t i = 0; i < count; ++i)
+                signature.parameters.push_back({U"arg" + std::u32string(i + 1, U'x'), Kind::PositionalOnly});
+            auto fn = function(signature,
+                [](Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out) {
+                    c.collect(); cxxpython::core::make_tuple(c, args, out);
+                });
+            std::vector<Value> args(count, value.get(context));
+            call(context, fn, {args, {}}, out);
+            ASSERT_EQ(out.result().tag(), ResultTag::Ok);
+            EXPECT_EQ(context.payload<TupleObject>(out.result().value()).items, args);
+            if (!count) continue;
+            set_attribute(context, cls, key, fn, out); get_attribute(context, self, key, out);
+            auto bound = roots.root(out.result().value()); args.erase(args.begin());
+            call(context, bound, {args, {}}, out);
+            ASSERT_EQ(out.result().tag(), ResultTag::Ok);
+            args.insert(args.begin(), self.get(context));
+            EXPECT_EQ(context.payload<TupleObject>(out.result().value()).items, args);
+        }
+    }
+
     TEST_F(CoreCalls, BinderHandlesAllParameterKindsAndDefaults)
     {
         auto a = text(U"a"); auto b = text(U"b"); auto c = text(U"c");

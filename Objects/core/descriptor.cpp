@@ -66,7 +66,7 @@ namespace cxxpython::core
             if (erase)
             {
                 context.exchange(args[1], slot, {}, out);
-                if (out.result().tag() == ResultTag::Empty)
+                if (out.tag() == ResultTag::Empty)
                 { raise_error(context, CoreObject::AttributeErrorType, U"slot is unbound", out); return; }
             }
             else context.store(args[1], slot, args[2]);
@@ -97,14 +97,14 @@ namespace cxxpython::core
         {
             auto *field = context.instance_dictionary(receiver);
             if (!field) throw std::logic_error("dictionary descriptor requires dictionary storage");
-            context.load(receiver, *field, out); if (out.result().tag() == ResultTag::Ok) return;
+            context.load(receiver, *field, out); if (out.tag() == ResultTag::Ok) return;
             RootScope roots(context);
             roots.root(receiver); ReturnSlot created(context);
             context.allocate_instance<DictObject>(roots.root(context.builtin(CoreObject::DictType)), created);
             for (;;)
             {
-                if (context.compare_exchange(receiver, *field, {}, created.result().value())) { out.ok(created.result().value()); return; }
-                context.load(receiver, *field, out); if (out.result().tag() == ResultTag::Ok) return;
+                if (context.compare_exchange(receiver, *field, {}, created.value())) { out.ok(created.value()); return; }
+                context.load(receiver, *field, out); if (out.tag() == ResultTag::Ok) return;
                 context.poll();
             }
         }
@@ -170,9 +170,9 @@ namespace cxxpython::core
             RootScope roots(context);
             ReturnSlot out(context);
             context.allocate_instance<GetSetDescriptorObject>(descriptor_type, out, owner.get(context), getter, setter);
-            auto field = roots.root(out.result().value());
+            auto field = roots.root(out.value());
             context.allocate_instance<StrObject>(string_type, out, std::move(name));
-            detail::name_store(context, *TypeView(context, owner).dictionary(), out.result().value(), field.get(context));
+            detail::name_store(context, *TypeView(context, owner).dictionary(), out.value(), field.get(context));
         }
     }
     namespace detail
@@ -186,7 +186,7 @@ namespace cxxpython::core
             roots.root(value); roots.root(*receiver);
             if (!member_receiver(context, *field, *receiver, out)) return;
             context.load(*receiver, context.instance_slot(*receiver, field->index), out);
-            if (out.result().tag() == ResultTag::Empty) raise_error(context, CoreObject::AttributeErrorType, U"slot is unbound", out);
+            if (out.tag() == ResultTag::Empty) raise_error(context, CoreObject::AttributeErrorType, U"slot is unbound", out);
         }
         void install_slot_descriptors(Attachment &context, Handle type, std::size_t first)
         {
@@ -197,9 +197,9 @@ namespace cxxpython::core
             for (std::size_t i = first; i < payload.slot_names.size(); ++i)
             {
                 context.allocate_instance<MemberDescriptorObject>(descriptor_type, out, type.get(context), i);
-                auto field = roots.root(out.result().value());
+                auto field = roots.root(out.value());
                 make_str(context, payload.slot_names[i], out);
-                name_store(context, *payload.dictionary, out.result().value(), field.get(context));
+                name_store(context, *payload.dictionary, out.value(), field.get(context));
             }
         }
         void get_native_field(Attachment &context, Value value, std::optional<Value> receiver, ReturnSlot &out)

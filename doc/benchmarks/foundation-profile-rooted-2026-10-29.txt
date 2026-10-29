@@ -1,0 +1,33 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 1K of event 'cpu-clock:u'
+# Event count (approx.): 1685685684
+#
+# Overhead|Symbol |IPC [IPC Coverage]
+ 16.57% |[.] cxxpython::core::Attachment::require_attached |- -
+ 10.87% |[.] cxxpython::core::Attachment::require_owns |- -
+ 6.77% |[.] __GI___pthread_self |- -
+ 6.29% |[.] cxxpython::core::RootScope::root |- -
+ 6.12% |[.] cxxpython::core::Attachment::acquire |- -
+ 6.00% |[.] cxxpython::core::(anonymous namespace)::run |- -
+ 4.57% |[.] cxxpython::core::Attachment::cell |- -
+ 4.51% |[.] cxxpython::core::Attachment::cached_protocol |- -
+ 3.44% |[.] cxxpython::core::Attachment::release |- -
+ 3.15% |[.] cxxpython::core::Handle::get |- -
+ 2.73% |[.] cxxpython::core::Attachment::require_safepoint |- -
+ 2.08% |[.] cxxpython::core::(anonymous namespace)::invoke |- -
+ 2.02% |[.] cxxpython::core::RootScope::~RootScope |- -
+ 1.66% |[.] cxxpython::core::Attachment::builtin |- -
+ 1.37% |[.] cxxpython::core::invoke_protocol |- -
+ 1.13% |[.] cxxpython::core::make_int |- -
+ 1.01% |[.] cxxpython::core::Attachment::reserve_storage |- -
+ 0.95% |[.] cxxpython::core::Attachment::require_layout |- -
+ 0.89% |[.] cxxpython::core::Attachment::adopt |- -
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

@@ -1667,3 +1667,52 @@ The same-source comparison exposes a large single-thread performance gap; real
 CPU parallelism is not CPython parity. Next performance work must remove repeated
 VM/native-call preparation at rooted boundaries, alongside remaining N4/N5 work,
 not add more cache scaffolding or waive the release goal.
+
+## Rooted Execution Boundary Costs
+
+RootScope now chains its live cells through the existing RootCell free-list
+link. Explicit release unlinks the cell before returning it to the thread's
+arena; destruction releases only that scope's remaining chain. Cell size,
+generation/arena checks, non-LIFO release and precise STW enumeration are
+unchanged. There is no per-scope vector, extra root authority or fixed root
+limit. Root insertion still cannot poll, and arena growth can still fail.
+
+ReturnSlot.tag()/value()/exception() read the current owner cell directly after
+the normal attached-thread check. A live noncopyable ReturnSlot owns that cell
+until destruction, so its own access does not need a temporary versioned handle
+round trip. value/exception check the tag; writes still check value domain and
+advance the revision. result() remains the versioned borrowing API: stored
+ResultViews still reject overwrite, destruction, reuse and foreign arenas.
+Internal immediate reads now use the direct accessors rather than construct and
+immediately recheck a ResultView. Neither API roots a copied Value beyond the
+existing slot lifetime.
+
+Native calls with all positional parameters present and no keyword/variadic
+binding use their input span directly. Bound receivers use a bounded stack
+prefix for small arities, a host vector for larger arities. Inputs remain in
+precise roots through callbacks/collection; missing/default/keyword-only/variadic
+shapes use the ordinary binder. Logical/native recursion guards and return
+validation remain on both paths. The signature shape applies to all native
+functions, not numeric types, values or a benchmark name.
+
+FrameActivation validates and borrows Frame/Code payloads when switching the
+active frame, rather than on every opcode. Its existing active ReturnSlot roots
+the nonmoving Frame and immutable Code for the full borrow. Descend, return,
+exception propagation and native-error cleanup refresh that pair before the
+next dispatch. This is not a no-safepoint execution region: periodic polls,
+callback allocation/collection and atomic last-instruction publication remain.
+No interpreter execution lock or shared mutable Code cache was added.
+
+The automatic n3-rooted-execution series retains three idle Release samples and
+the paired fixed-reference source runs. Generated CSV/Markdown, including old
+slower samples, remain the measurement authority. The large absolute CPython
+gap remains a failed release gate, not a reason to call multicore scaling parity.
+Directly invoking /usr/lib/linux-tools-5.15.0-198/perf works on this WSL kernel,
+unlike the previously tried version-selecting launcher. The generated
+benchmarks/foundation-profile-rooted-2026-10-29.txt is a cpu-clock user sampling
+report of the complete benchmark workflow, not per-probe timing or a pure VM
+profile. Ownership/thread/root work remains prominent; allocation of per-scope
+handle vectors no longer appears. The binary hash/build flags are retained in
+the corresponding raw benchmark records. Next work must advance guarded call
+execution and remaining closure/source/runtime dependencies, not extend this
+change into further root-safety scaffolding.

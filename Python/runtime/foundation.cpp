@@ -74,7 +74,7 @@ namespace cxxpython::core
         {
             ObjectHeader *object = nullptr;
             const void *scope = nullptr;
-            RootCell *next_free = nullptr;
+            RootCell *next = nullptr; // Owning RootScope chain, or arena free list after release.
             std::uint64_t generation = 0;
             std::uint64_t revision = 0;
             ResultTag tag = ResultTag::Empty;
@@ -532,7 +532,7 @@ namespace cxxpython::core
         auto &arena = thread_record_->roots;
         auto *cell = arena.free;
         if (cell)
-            arena.free = cell->next_free;
+            arena.free = cell->next;
         else
         {
             arena.cells.emplace_back();
@@ -542,6 +542,7 @@ namespace cxxpython::core
         cell->revision = 0;
         cell->object = nullptr;
         cell->scope = scope;
+        cell->next = nullptr;
         cell->tag = ResultTag::Empty;
         ++arena.count;
         Handle handle;
@@ -552,18 +553,14 @@ namespace cxxpython::core
         return handle;
     }
 
-    void Attachment::release(Handle handle) noexcept
+    void Attachment::release(detail::RootCell &cell) noexcept
     {
-        // A scope may retain old tokens after explicit, non-LIFO release.
         auto &arena = thread_record_->roots;
-        assert(handle.owner_ == state_.get() && handle.arena_id_ == arena.identity);
-        auto &cell = *handle.cell_;
-        if (!cell.scope || cell.generation != handle.generation_)
-            return;
+        assert(cell.scope);
         cell.object = nullptr;
         cell.scope = nullptr;
         cell.tag = ResultTag::Empty;
-        cell.next_free = arena.free;
+        cell.next = arena.free;
         arena.free = &cell;
         --arena.count;
     }
@@ -580,41 +577,41 @@ namespace cxxpython::core
     RootScope::~RootScope()
     {
         context_.require_safepoint();
-        for (auto handle : handles_)
-            context_.release(handle);
+        while (head_)
+        {
+            auto *cell = head_; head_ = cell->next;
+            context_.release(*cell);
+        }
     }
 
     Handle RootScope::root(Value value)
     {
         context_.require_owns(value);
         auto handle = context_.acquire(this);
-        try { handles_.push_back(handle); }
-        catch (...) { context_.release(handle); throw; }
-        auto &cell = context_.cell(handle);
+        auto &cell = *handle.cell_;
         cell.object = value.object();
         cell.tag = ResultTag::Ok;
+        cell.next = head_; head_ = &cell;
         return handle;
     }
 
     void RootScope::release(Handle handle)
     {
         context_.require_safepoint();
-        if (context_.cell(handle).scope != this)
+        auto &cell = context_.cell(handle);
+        if (cell.scope != this)
             throw std::logic_error("root belongs to another scope");
-        auto found = std::find_if(handles_.begin(), handles_.end(), [handle](Handle entry) {
-            return entry.cell_ == handle.cell_ && entry.generation_ == handle.generation_;
-        });
-        assert(found != handles_.end());
-        *found = handles_.back();
-        handles_.pop_back();
-        context_.release(handle);
+        auto **link = &head_;
+        while (*link != &cell) link = &(*link)->next;
+        *link = cell.next;
+        context_.release(cell);
     }
 
     ReturnSlot::ReturnSlot(Attachment &context) : context_(context), root_(context.acquire(this)) {}
     ReturnSlot::~ReturnSlot()
     {
         context_.require_attached();
-        context_.release(root_);
+        context_.release(*root_.cell_);
     }
     void ReturnSlot::reset() { write(ResultTag::Empty, nullptr); }
     void ReturnSlot::reset(const Attachment &caller)
@@ -639,7 +636,7 @@ namespace cxxpython::core
     {
         if (object)
             context_.require_owns(Value(*object));
-        (void)context_.cell(root_);
+        else context_.require_attached();
         store_root_noexcept(tag, object);
     }
     void ReturnSlot::store_root_noexcept(ResultTag tag, ObjectHeader *object) noexcept
@@ -649,8 +646,20 @@ namespace cxxpython::core
         cell.tag = tag;
         ++cell.revision;
     }
+    ResultTag ReturnSlot::tag() const
+    { context_.require_attached(); return root_.cell_->tag; }
+    Value ReturnSlot::value() const
+    {
+        if (tag() != ResultTag::Ok) throw std::logic_error("result is not Ok");
+        return Value(*root_.cell_->object);
+    }
+    Value ReturnSlot::exception() const
+    {
+        if (tag() != ResultTag::Raised) throw std::logic_error("result is not Raised");
+        return Value(*root_.cell_->object);
+    }
     ResultView ReturnSlot::result() const
-    { return ResultView(context_, root_, context_.cell(root_).revision); }
+    { context_.require_attached(); return ResultView(context_, root_, root_.cell_->revision); }
 
     detail::RootCell &ResultView::cell() const
     {
@@ -780,7 +789,7 @@ namespace cxxpython::core
     {
         require_safepoint(); const auto payload = value.get(*this); ReturnSlot out(*this);
         allocate<detail::TransferRecord>(out, payload);
-        auto &record = this->payload<detail::TransferRecord>(out.result().value());
+        auto &record = this->payload<detail::TransferRecord>(out.value());
         {
             std::lock_guard gate(state_->coordinator); NoSafepoint publish(*this);
             record.next = state_->transfer_head;
@@ -877,8 +886,8 @@ namespace cxxpython::core
             ReturnSlot object(*this);
             ReturnSlot type(*this);
             detail::build_type_seeds(*this, object, type);
-            state_->object_type = object.result().value().object();
-            state_->type_type = type.result().value().object();
+            state_->object_type = object.value().object();
+            state_->type_type = type.value().object();
         }
         catch (...)
         {
