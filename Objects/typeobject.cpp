@@ -40,7 +40,13 @@ std::optional<Value> TypeView::storage() const
     if (meta)
         return context_.payload<TypeSnapshot>(*meta).storage;
     DictView dictionary(context_, this->dictionary());
-    return dictionary.storage();
+    if (auto storage = dictionary.storage()) {
+        if (!staged_storage_)
+            staged_storage_.emplace(context_);
+        staged_storage_->ok(*storage);
+        return staged_storage_->value();
+    }
+    return {};
 }
 
 namespace {
@@ -373,7 +379,7 @@ void publish_type(Attachment &context, Value type)
         context.poll();
     }
     auto &data = context.payload<TypeObject>(type);
-    context.store(*view.dictionary(), context.payload<DictObject>(*view.dictionary()).storage, {});
+    discard_name_table(context, *view.dictionary());
     data.name = std::u32string{};
     data.qualname = std::u32string{};
     data.dictionary.reset();

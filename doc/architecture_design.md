@@ -35,6 +35,11 @@ cleanup continuations. `Python/traceback.cpp` owns traceback operations.
 `Python/bltinmodule.cpp` owns the ordinary __build_class__ builtin, coordinating
 base expansion, metaclass preparation, a normal class-body Frame and existing
 type construction. It is not a separate class VM or lifetime authority.
+`Python/import.cpp` owns the experimental registered-source/static-native
+initialization transaction and bootstrap __import__ policy. Host-only per-Interpreter
+records coordinate owners/waiters; the managed module table is the only completed
+module authority. File finders, source import statements, ModuleSpec/importlib
+policy and the dynamic C extension interface remain pending, not separate runtimes.
 
 ## Objects And Lifetime
 
@@ -58,6 +63,11 @@ and publication helper, without a second numeric implementation.
 `Objects/object.cpp` contains the initial values, name dictionaries,
 core image and common object construction. Generated Unicode tables are private
 to Objects and retain their generator/source provenance.
+`Objects/moduleobject.cpp` uses the ordinary instance dictionary as the module
+namespace, including descriptor lookup and module-level __getattr__. Module
+payloads add no second dictionary or lifetime manager. The CLI now executes in
+the actual registered __main__ namespace; RunRequest accepts a builtins module
+or dictionary and binds functions to that module's actual dictionary.
 
 `Python/gc.cpp` owns the precise heap, adjacent allocation metadata, thread-local
 spans/root arenas, attachment/parking, epoch rendezvous, transfer roots and core
@@ -75,8 +85,10 @@ Interpreter. Roots and active Frame state belong to each attached OS thread.
 GC uses request/ack/completed epochs and scans only frozen roots. NativeWait
 parks a thread without exclusive execution permission on resume.
 
-Mutable shared references use rooted atomic edge operations. Name dictionaries
-and type metadata publish immutable snapshots; Code and Function metadata are
+Mutable shared references use rooted atomic edge operations. Ordinary name
+dictionaries use per-object short commits, prepared host nodes and rooted views;
+replacement/deletion do not require managed allocation. Type dictionaries and
+metadata still publish immutable snapshots; Code and Function metadata are
 immutable. Closure Cell identities are shared, while each call owns its Frame
 and fresh local Cells. CodeKind distinguishes function, module and class-body
 namespace rules; a class Frame owns/traces its supplied mapping and implicit

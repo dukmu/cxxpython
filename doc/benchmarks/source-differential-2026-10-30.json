@@ -1,10 +1,10 @@
 {
-  "captured_at": "2026-10-29T16:13:21.667551+00:00",
+  "captured_at": "2026-10-29T17:27:22.672761+00:00",
   "reference_version": "Python 3.12.14",
   "provenance": {
     "binary": {
       "path": "/home/shefrin/repo/cxxpython/build/cxxpython",
-      "sha256": "a80c466c56410c320383830ff0faf305f8923a7e4fa71c47719d7b102f9486ad"
+      "sha256": "ac421eccd0e2fb9d8eef2f7bef975f19ca2673a94f0130cb953afca6d00075f2"
     },
     "reference": {
       "path": "/tmp/cxxpython-cpython31214-build/python",
@@ -1768,7 +1768,7 @@
     {
       "command": [
         "build/cxxpython",
-        "/tmp/tmpjsgegvaa/source.py",
+        "/tmp/tmp4k6jbz4z/source.py",
         "--eval",
         "f(41)"
       ],
@@ -2585,6 +2585,314 @@
         "\nprint(repr((ValueError('message').args, StopIteration.__new__(StopIteration, 9).value)))"
       ],
       "stdout": "(('message',), None)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "marker = object()",
+        "--eval",
+        "__import__('__main__').marker is marker"
+      ],
+      "stdout": "True\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "marker = object()\nprint(repr((__import__('__main__').marker is marker)))"
+      ],
+      "stdout": "True\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "",
+        "--eval",
+        "__import__('__main__').__package__, __import__('__main__').__spec__"
+      ],
+      "stdout": "(None, None)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nprint(repr((__import__('__main__').__package__, __import__('__main__').__spec__)))"
+      ],
+      "stdout": "(None, None)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "sys = __import__('sys')",
+        "--eval",
+        "type(sys).__name__, __import__('sys') is sys"
+      ],
+      "stdout": "('module', True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "sys = __import__('sys')\nprint(repr((type(sys).__name__, __import__('sys') is sys)))"
+      ],
+      "stdout": "('module', True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "b = __import__('builtins')",
+        "--eval",
+        "b.int is int, b.__dict__ is __builtins__"
+      ],
+      "stdout": "(True, False)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "b = __import__('builtins')\nprint(repr((b.int is int, b.__dict__ is __builtins__)))"
+      ],
+      "stdout": "(True, False)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "Module = type(__import__('sys'))\nm = Module(name='example', doc='document')\nm.answer = 42",
+        "--eval",
+        "m.__name__, m.__doc__, m.answer, repr(m), m.__dict__ is m.__dict__"
+      ],
+      "stdout": "('example', 'document', 42, \"<module 'example'>\", True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "Module = type(__import__('sys'))\nm = Module(name='example', doc='document')\nm.answer = 42\nprint(repr((m.__name__, m.__doc__, m.answer, repr(m), m.__dict__ is m.__dict__)))"
+      ],
+      "stdout": "('example', 'document', 42, \"<module 'example'>\", True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "Module = type(__import__('sys'))\nclass Child(Module): pass\nm = Child('example')",
+        "--eval",
+        "type(m).__name__, m.__name__"
+      ],
+      "stdout": "('Child', 'example')\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "Module = type(__import__('sys'))\nclass Child(Module): pass\nm = Child('example')\nprint(repr((type(m).__name__, m.__name__)))"
+      ],
+      "stdout": "('Child', 'example')\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "Module = type(__import__('sys'))\nm = Module('example')\ndef fallback(name): return name\nm.__getattr__ = fallback",
+        "--eval",
+        "m.missing"
+      ],
+      "stdout": "'missing'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "Module = type(__import__('sys'))\nm = Module('example')\ndef fallback(name): return name\nm.__getattr__ = fallback\nprint(repr((m.missing)))"
+      ],
+      "stdout": "'missing'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "try:\n    __import__('absent_cxxpython_module')\nexcept ModuleNotFoundError as error:\n    value = error.name, error.path",
+        "--eval",
+        "value"
+      ],
+      "stdout": "('absent_cxxpython_module', None)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "try:\n    __import__('absent_cxxpython_module')\nexcept ModuleNotFoundError as error:\n    value = error.name, error.path\nprint(repr((value)))"
+      ],
+      "stdout": "('absent_cxxpython_module', None)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "Module = type(__import__('sys'))\nm = Module('example')\ntry:\n    Module.__new__(1)\nexcept BaseException as error:\n    failure = type(error).__name__",
+        "--eval",
+        "failure"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "Module = type(__import__('sys'))\nm = Module('example')\ntry:\n    Module.__new__(1)\nexcept BaseException as error:\n    failure = type(error).__name__\nprint(repr((failure)))"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "Module = type(__import__('sys'))\nm = Module('example')\ntry:\n    Module.__repr__(1)\nexcept BaseException as error:\n    failure = type(error).__name__",
+        "--eval",
+        "failure"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "Module = type(__import__('sys'))\nm = Module('example')\ntry:\n    Module.__repr__(1)\nexcept BaseException as error:\n    failure = type(error).__name__\nprint(repr((failure)))"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "Module = type(__import__('sys'))\nm = Module('example')\ntry:\n    Module.__init__(1, 'x')\nexcept BaseException as error:\n    failure = type(error).__name__",
+        "--eval",
+        "failure"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "Module = type(__import__('sys'))\nm = Module('example')\ntry:\n    Module.__init__(1, 'x')\nexcept BaseException as error:\n    failure = type(error).__name__\nprint(repr((failure)))"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "Module = type(__import__('sys'))\nm = Module('example')\ntry:\n    __import__(1)\nexcept BaseException as error:\n    failure = type(error).__name__",
+        "--eval",
+        "failure"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "Module = type(__import__('sys'))\nm = Module('example')\ntry:\n    __import__(1)\nexcept BaseException as error:\n    failure = type(error).__name__\nprint(repr((failure)))"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "Module = type(__import__('sys'))\nm = Module('example')\ntry:\n    __import__('sys', level=-1)\nexcept BaseException as error:\n    failure = type(error).__name__",
+        "--eval",
+        "failure"
+      ],
+      "stdout": "'ValueError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "Module = type(__import__('sys'))\nm = Module('example')\ntry:\n    __import__('sys', level=-1)\nexcept BaseException as error:\n    failure = type(error).__name__\nprint(repr((failure)))"
+      ],
+      "stdout": "'ValueError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "Module = type(__import__('sys'))\nm = Module('example')\ntry:\n    m.__dict__ = ()\nexcept BaseException as error:\n    failure = type(error).__name__",
+        "--eval",
+        "failure"
+      ],
+      "stdout": "'AttributeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "Module = type(__import__('sys'))\nm = Module('example')\ntry:\n    m.__dict__ = ()\nexcept BaseException as error:\n    failure = type(error).__name__\nprint(repr((failure)))"
+      ],
+      "stdout": "'AttributeError'\n",
       "stderr": "",
       "exit_code": 0
     },

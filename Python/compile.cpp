@@ -1,4 +1,5 @@
 #include "cxxpython/floatobject.hpp"
+#include "cxxpython/moduleobject.hpp"
 #include "internal/compiler.hpp"
 
 #include <boost/multiprecision/cpp_int.hpp>
@@ -855,6 +856,8 @@ ResultView run(Attachment &context, const RunRequest &request, ReturnSlot &out)
         if (!input_builtins)
             if (auto supplied = detail::name_lookup(context, globals.get(context), U"__builtins__"))
                 builtins = roots.root(*supplied);
+        if (is_module(context, builtins.get(context)))
+            builtins = roots.root(module_dict(context, builtins.get(context)));
         if (!dictionary(builtins.get(context))) {
             raise_error(context, CoreObject::TypeErrorType,
                         U"RunRequest requires globals/builtins name dictionaries", out);

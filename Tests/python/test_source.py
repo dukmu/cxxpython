@@ -632,6 +632,25 @@ class SourceDifferential(unittest.TestCase):
                 self.assertIn(error, actual.stderr)
                 self.assertIn(error, expected.stderr)
 
+    def test_module_objects_native_import_and_main_namespace(self):
+        cases = [
+            ("marker = object()", "__import__('__main__').marker is marker"),
+            ("", "__import__('__main__').__package__, __import__('__main__').__spec__"),
+            ("sys = __import__('sys')", "type(sys).__name__, __import__('sys') is sys"),
+            ("b = __import__('builtins')", "b.int is int, b.__dict__ is __builtins__"),
+            ("Module = type(__import__('sys'))\nm = Module(name='example', doc='document')\nm.answer = 42", "m.__name__, m.__doc__, m.answer, repr(m), m.__dict__ is m.__dict__"),
+            ("Module = type(__import__('sys'))\nclass Child(Module): pass\nm = Child('example')", "type(m).__name__, m.__name__"),
+            ("Module = type(__import__('sys'))\nm = Module('example')\ndef fallback(name): return name\nm.__getattr__ = fallback", "m.missing"),
+            ("try:\n    __import__('absent_cxxpython_module')\nexcept ModuleNotFoundError as error:\n    value = error.name, error.path", "value"),
+        ]
+        for source, expression in cases:
+            with self.subTest(expression=expression):
+                self.check_program(source, expression)
+        for expression in ("Module.__new__(1)", "Module.__repr__(1)", "Module.__init__(1, 'x')", "__import__(1)", "__import__('sys', level=-1)", "m.__dict__ = ()"):
+            source = "Module = type(__import__('sys'))\nm = Module('example')\ntry:\n    " + expression + "\nexcept BaseException as error:\n    failure = type(error).__name__"
+            with self.subTest(expression=expression):
+                self.check_program(source, "failure")
+
     def test_file_entry_and_unicode_diagnostics(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "source.py"

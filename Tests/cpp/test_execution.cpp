@@ -505,7 +505,7 @@ TEST_F(CoreExecution, ImageBuiltinsUseOrdinaryProtocolsAndCalls)
               context.object_type());
 }
 
-TEST_F(CoreExecution, GlobalStoreAllocationFailureLeavesTheOldBindingIntact)
+TEST_F(CoreExecution, GlobalStoreUsesNoManagedAllocationAndRhsFailurePreservesBinding)
 {
     ReturnSlot out(context);
     auto globals = dictionary(), name = text(U"answer"), old = integer(7);
@@ -527,6 +527,27 @@ TEST_F(CoreExecution, GlobalStoreAllocationFailureLeavesTheOldBindingIntact)
     make_function(context, {code(builder), globals}, out);
     const auto fn = roots.root(out.result().value());
     call(context, fn, {}, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    context.set_allocation_limit(std::numeric_limits<std::size_t>::max());
+    EXPECT_EQ(detail::name_lookup(context, globals.get(context), U"answer"),
+              context.builtin(CoreObject::IntOne));
+    detail::name_store(context, globals.get(context), name.get(context), old.get(context));
+    make_native_function(
+        context, "fail before store", {},
+        [](Attachment &actor, Handle, std::span<const Value>, ReturnSlot &result) {
+            actor.set_allocation_limit(0);
+            make_str(actor, U"new value", result);
+        },
+        {}, out);
+    const auto failing = roots.root(out.value());
+    CodeBuilder failure(context);
+    failure.emit(Opcode::LoadConst, failure.constant(failing));
+    failure.call(0);
+    failure.emit(Opcode::StoreGlobal, failure.name(U"answer"));
+    failure.emit(Opcode::LoadConst, failure.constant(builtin(CoreObject::None)));
+    failure.emit(Opcode::Return);
+    make_function(context, {code(failure), globals}, out);
+    call(context, roots.root(out.value()), {}, out);
     error(out, CoreObject::MemoryErrorType);
     context.set_allocation_limit(std::numeric_limits<std::size_t>::max());
     EXPECT_EQ(detail::name_lookup(context, globals.get(context), U"answer"), old.get(context));

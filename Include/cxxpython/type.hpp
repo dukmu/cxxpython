@@ -79,6 +79,7 @@ class TypeView final {
   private:
     Attachment &context_;
     ReturnSlot owner_, metadata_;
+    mutable std::optional<ReturnSlot> staged_storage_;
 };
 
 struct TypeSpec {

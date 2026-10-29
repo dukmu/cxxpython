@@ -36,6 +36,46 @@ unfinished. These are remaining delivery requirements, not a reduction of the
 basic-language objective. Existing native VM/type/cleanup interfaces do not imply
 source or library support.
 
+## Experimental Module Foundation
+
+The active module/import stage remains incomplete and experimental. A module
+uses its ordinary instance dictionary as the single namespace; layout tracing
+owns its type/dictionary/tail fields. There is no second attribute map. The
+interpreter's managed Modules dictionary is the sole registry, later exposed as
+sys.modules. Native initialization and managed source use the same publication
+and rollback path. Host-only load records contain synchronization/definition
+metadata, never untraced Python values or a second cache of completed modules.
+
+Only a module's initializing owner may finish its lease. Same-thread cycles may
+observe its published partial namespace; different modules may execute in
+parallel. Waiters park through NativeWait, with initialization dependency cycles
+detected before waiting. No registry lock spans Python, allocation/GC or I/O.
+Failure removes an entry only if it still names that initialization's module;
+user replacements must survive. C/C++ extension ABI and Python import policy
+remain distinct from CPython binary compatibility, per Plan 2 section 11.2.
+
+Current inputs are registered immutable SourceUnits and statically linked C++
+initializers. __import__ handles their absolute/relative names, fromlist and
+__all__, and binds loaded children onto the parent. The low-level C++
+import_module entry loads a registered full-name transaction; it is not the
+unimplemented Python importlib API. Native callbacks must publish None or a
+Python exception; their code must outlive registration and every entry they
+create. This internal C++ function-pointer interface is not a dynamic C ABI.
+
+Module identity/equality/hash inherit object behavior. The ordinary dictionary
+tail traces namespace values; __dict__ is read-only as an attribute, while its
+bindings remain mutable. Constructors preserve subtype layouts. __getattribute__
+uses generic descriptors/namespace lookup before the module-level __getattr__
+callback, which receives only the name. ImportError name/path fields are traced
+tail slots with None defaults. The CLI's __main__ and imported __main__ are the
+same object/namespace; builtins module/dictionary identities are canonical.
+
+File finders, import/from syntax, complete sys/module/reflection methods,
+ModuleSpec/loader objects and Python importlib, general dictionary operations,
+mutable list-based path/argv, and dynamic C/extension loading are still gates.
+The bootstrap path/argv tuples are experimental, not full sys compatibility.
+This node therefore does not complete the active module-stage goal.
+
 ## Identity And Lifetime
 
 Value is a non-owning, non-null boxed identity. Python inheritance and immutable
@@ -78,8 +118,14 @@ requires single-initializer admission.
 ## Shared Fields And Calls
 
 Header/type references, instance field tails, Cell contents and exception graph
-edges use atomic rooted operations. Name Dict storage and Type metadata publish
-immutable snapshots, prepared outside short commits. Callbacks, allocation and
+edges use atomic rooted operations. Ordinary name dictionaries use local short
+critical sections: prepared insertion nodes, in-place value replacement and
+non-allocating conditional erasure, preserving insertion order. DictView owns
+rooted stable copies; a lazily materialized storage is borrowed from its view.
+TypeView retains its own materialization root until it is published. External
+byte accounting is a bounded non-GC metadata operation allowed in these commits.
+Type metadata/class dictionaries still publish immutable snapshots outside
+short commits. Callbacks, managed allocation and
 blocking do not occur under internal publication critical sections.
 TypeSnapshot includes actual managed bases/MRO tuples, materialized once at first
 publication and retained unchanged through name/dictionary updates. __bases__,
@@ -322,14 +368,16 @@ SourceUnit owns immutable native Source/ScopeInfo/CFG, contains no hidden Python
 identities and can be shared by parallel compilation tasks. Attached freeze roots
 all managed materialization. RunRequest and the single CLI use this same service,
 not a second language path. Native SourceError preserves source spans and category;
-runtime faults use Raised and real tracebacks. Globals/builtins are actual name
-dictionaries; arbitrary namespace mappings and Python compile/exec/eval are absent.
+runtime faults use Raised and real tracebacks. Globals use actual name dictionaries;
+builtins accept a module or dictionary and normalize to its canonical dictionary.
+Arbitrary RunRequest namespace mappings and Python compile/exec/eval remain absent.
 
 Native contracts live in Tests/cpp; actual executable differential drivers live
 in Tests/python and use fixed CPython 3.12.14 when configured. Lib is reserved for
 the interpreter's Python standard library. Benchmark source kernels
 are captured verbatim for the paired reference; raw runs retain version/build/hash
 provenance and generate tables. Same-Function source, closure, for-loop, exception and method probes
-exercise CPU parallelism, but absolute single-thread CPython parity remains a
-failed gate.
-Do not replace that requirement with multicore scaling or a native-only probe.
+exercise CPU parallelism, but the large absolute CPython cost remains outside the
+user's limited-regression acceptance. Scaling or a native-only probe cannot
+substitute for measured cost and complexity. Plan 2 section 12.2 permits limited
+explained regressions rather than requiring parity for every foundation slice.

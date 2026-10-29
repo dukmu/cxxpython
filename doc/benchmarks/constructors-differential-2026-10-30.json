@@ -1,10 +1,10 @@
 {
-  "captured_at": "2026-10-29T16:08:55.433617+00:00",
+  "captured_at": "2026-10-29T17:27:23.908993+00:00",
   "reference_version": "Python 3.12.14",
   "provenance": {
     "binary": {
       "path": "/home/shefrin/repo/cxxpython/build/cxxpython",
-      "sha256": "a80c466c56410c320383830ff0faf305f8923a7e4fa71c47719d7b102f9486ad"
+      "sha256": "ac421eccd0e2fb9d8eef2f7bef975f19ca2673a94f0130cb953afca6d00075f2"
     },
     "reference": {
       "path": "/tmp/cxxpython-cpython31214-build/python",

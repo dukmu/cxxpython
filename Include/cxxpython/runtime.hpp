@@ -52,6 +52,9 @@ enum class CoreObject : std::size_t {
     StopIterationType,
     NameErrorType,
     UnboundLocalErrorType,
+    ImportErrorType,
+    ModuleNotFoundErrorType,
+    SyntaxErrorType,
     NativeFunctionType,
     MethodDescriptorType,
     BoundMethodType,
@@ -69,6 +72,7 @@ enum class CoreObject : std::size_t {
     RangeIteratorType,
     TupleIteratorType,
     StrIteratorType,
+    ModuleType,
     None,
     NotImplemented,
     False,
@@ -78,6 +82,7 @@ enum class CoreObject : std::size_t {
     EmptyTuple,
     MemoryError,
     Builtins,
+    Modules,
     Count,
 };
 namespace detail {
@@ -86,6 +91,7 @@ struct RootCell;
 struct ThreadRecord;
 struct TransferRecord;
 struct BigInt;
+struct ImportState;
 class FrameActivation;
 std::uint64_t siphash24(std::span<const std::byte> data, std::array<std::uint64_t, 2> key) noexcept;
 template <class T> inline constexpr char native_layout_id = 0;
@@ -491,6 +497,7 @@ class Attachment final {
     std::optional<Value> current_frame() const;
     std::optional<Value> handled_exception() const;
     std::uint64_t keyed_hash(std::span<const std::byte> data) const;
+    detail::ImportState &imports();
     // Borrowed identities only; callers keep their objects rooted throughout.
     bool enter_repr(Handle object);
     void leave_repr(Value object) noexcept;

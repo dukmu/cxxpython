@@ -17,6 +17,7 @@ add_library(cxxpython_core
     Python/gc.cpp
     Python/compile.cpp
     Python/bltinmodule.cpp
+    Python/import.cpp
     Python/symtable.cpp
     Python/flowgraph.cpp
     Python/ceval.cpp
@@ -25,6 +26,7 @@ add_library(cxxpython_core
     Parser/parser.cpp
     Objects/typeobject.cpp
     Objects/object.cpp
+    Objects/moduleobject.cpp
     Objects/call.cpp
     Objects/descrobject.cpp
     Objects/typeconstruction.cpp
@@ -86,6 +88,8 @@ if(BUILD_TESTING)
         Tests/cpp/test_attributes.cpp
         Tests/cpp/test_construction.cpp
         Tests/cpp/test_constructors.cpp
+        Tests/cpp/test_modules.cpp
+        Tests/cpp/test_import.cpp
         Tests/cpp/test_tuple_constructor.cpp
         Tests/cpp/test_layout.cpp
         Tests/cpp/test_cell.cpp

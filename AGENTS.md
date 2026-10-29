@@ -25,6 +25,10 @@ compiler, VM, and extension platform implemented in a C/C++ mix.
   reads, explicit field synchronization and immutable metadata snapshots.
   No interpreter-wide mutex may surround ordinary execution in the final path.
   NativeWait/I/O progress and separate interpreters are not CPU-parallel proof.
+- Ordinary namespaces use prepared nodes and short per-object commits so rollback
+  deletion does not need managed allocation; read views own precise roots.
+  Type/class metadata retains immutable snapshot publication. See Plan 2 section
+  0.9; do not replace either contract with an interpreter-wide namespace lock.
 - During migration, identify the remaining serialized/unsafe boundaries
   explicitly; do not expose unconverted ObjectOps as concurrently safe.
   A transitional serial guard is not completion of N1-N3 or a hidden final GIL.

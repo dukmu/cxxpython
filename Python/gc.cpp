@@ -2,6 +2,7 @@
 #include "cxxpython/protocol.hpp"
 #include "cxxpython/runtime.hpp"
 #include "cxxpython/type.hpp"
+#include "internal/import.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -489,10 +490,16 @@ struct State {
     bool core_published = false;
     std::atomic<std::uint64_t> type_epoch{0}, exception_epoch{0};
     CallExecutor call_executor = nullptr;
+    ImportState imports;
 };
 } // namespace detail
 
 Interpreter::Interpreter(HeapConfig config) : state_(std::make_shared<detail::State>(config)) {}
+detail::ImportState &Attachment::imports()
+{
+    require_attached();
+    return state_->imports;
+}
 Interpreter::~Interpreter()
 {
     close();
@@ -1043,7 +1050,7 @@ void Attachment::account_external(Handle owner, std::size_t bytes)
 }
 void Attachment::account_external(Value owner, std::size_t bytes)
 {
-    require_safepoint();
+    require_attached();
     require_owns(owner);
     auto &allocation = detail::Allocation::from(owner.object());
     if (bytes > std::numeric_limits<std::size_t>::max() - allocation.span->layout.storage_size())

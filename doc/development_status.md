@@ -1,5 +1,70 @@
 # Development Status
 
+## 2026-10-30 Real Modules And GC-Safe Registered Initialization
+
+Prepended without rewriting history. Previous stable node: e4b6090 (runtime
+baseline 727625e). The active module/unified-import goal is NOT complete: this
+is its object/namespace/initialization foundation, not full source/file import.
+
+- Added a real ModuleObject with the existing dictionary tail as its only
+  namespace. Ordinary descriptors/attributes remain shared; __dict__ is
+  read-only as an attribute. Module construction, subclass layouts and
+  name/doc keywords work. Module-level __getattr__ receives only the name;
+  native entries validate receivers rather than reinterpreting arbitrary values.
+  ImportError/ModuleNotFoundError name/path are traced slots with None defaults;
+  SyntaxError has its normal exception type, not a C++ runtime-error fallback.
+- Added the per-Interpreter managed Modules dictionary and host-only definition/
+  in-progress/wait records. SourceUnit and statically linked C++ initializer
+  inputs run through the same publish-before-body transaction and existing VM.
+  Completed module identity lives only in that dictionary, not a second cache.
+  Record identity is the initialization generation; native records hold no
+  untraced Python values. Per-module leases never hold a registry lock across
+  a body, Python callback, allocation/GC or I/O.
+- Waiters use NativeWait and dependency-cycle detection. Tests demonstrate one
+  initialization for competing same-name loads, overlapping independent module
+  bodies, same-/cross-thread partial-module cycles and GC during parked waits.
+  Failure removes only the entry still naming its own module, preserves user
+  replacements and other successfully initialized modules, and permits retry.
+- Installed the experimental __import__ bootstrap helper for registered names,
+  parent binding, relative globals, fromlist and __all__. This is not Python
+  importlib or a new VM. sys exposes the actual table; builtins wraps the
+  canonical dictionary. The CLI now runs in the real registered __main__
+  namespace. RunRequest normalizes a supplied builtins module/dictionary to its
+  actual dictionary, preserving both CLI and imported-source conventions.
+- Real OOM rollback required changing ordinary B3 name dictionaries: whole-map
+  COW deletion would allocate exactly when initialization had exhausted memory.
+  Added prepared host nodes, per-object short commits, insertion-order retention
+  and allocation-free replacement/conditional removal. Rooted views retain old
+  values through mutation/collection. Type/class metadata remains immutable
+  TypeSnapshot/epoch publication, and releases its pre-publication native table.
+  Plan 2 section 0.9 and current contracts record this concrete route change.
+  These are still name dictionaries, not a claim of general Python dict support.
+- Forced-GC integration caught a newly introduced temporary-storage lifetime
+  error in TypeView. The view now owns a materialization root before allocation.
+  Actual executable differences also caught the old CLI's disconnected main
+  globals and missing import-error descriptors. Repaired these, kept the RHS
+  failure/old-binding assertion, and changed the obsolete assumption that every
+  global replacement must allocate. Failed pre-fix runs are not counted as passes.
+- Final normal CTest passes 366/366 (362 native cases, both executable drivers,
+  recorder and formatting). Final ASan/UBSan/LSan passes 362/362; TSan passes
+  360/360, excluding only the two established allocation enumerations covered
+  by normal/ASan. Twelve source and six numeric/construction differential groups
+  pass fixed CPython 3.12.14, also through the final ASan CLI. Output/hash evidence
+  is refreshed. One terra agent implemented the module object/bootstrap sidecar;
+  main implemented/reviewed/integrated the transaction/namespace/CLI work. Closed
+  that agent; no sol/astra and no upstream implementation copied in this node.
+- Three idle Release runs after builds/sanitizers appended module-transactions
+  raw data and regenerated the existing CSV/Markdown automatically. Single-worker
+  probe costs are broadly near the preceding node; some four-worker medians are
+  higher and all slow samples are retained. Absolute CPython costs remain far
+  outside limited-regression acceptance; no performance gate is marked passed.
+- Next complete file finders, import/from bytecode/source forms, real loader/spec
+  objects and Python policy, general namespace mapping/list APIs, complete sys
+  path/argv configuration and the versioned C/dynamic extension boundary.
+  The internal C++ callback interface is not a C ABI or DLL lease implementation.
+  Full library/product scope remains in Plan 2; no milestone or goal is falsely
+  closed. User temporary_plan.md deletion and untracked test2.py stay untouched.
+
 ## 2026-10-30 Module Stage Goal And Base-To-Full Scope Preserved
 
 Prepended without rewriting history. This is a requirements/route update after

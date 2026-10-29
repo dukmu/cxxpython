@@ -1,4 +1,5 @@
 #include "cxxpython/compiler.hpp"
+#include "cxxpython/import.hpp"
 
 #include <fstream>
 #include <iostream>
@@ -104,13 +105,11 @@ int main(int argc, char **argv)
         context.bootstrap_core();
         RootScope roots(context);
         ReturnSlot out(context);
-        context.allocate_instance<DictObject>(roots.root(context.builtin(CoreObject::DictType)),
-                                              out);
-        const auto globals = roots.root(out.result().value());
-        make_str(context, U"__name__", out);
-        const auto name = roots.root(out.result().value());
-        make_str(context, U"__main__", out);
-        detail::name_store(context, globals.get(context), name.get(context), out.result().value());
+        import_module(context, U"__main__", out);
+        if (out.tag() == ResultTag::Raised)
+            return report(context, out.exception());
+        const auto main_module = roots.root(out.value());
+        const auto globals = roots.root(module_dict(context, main_module.get(context)));
         if (executable) {
             run(context, {&*executable, globals}, out);
             if (out.result().tag() == ResultTag::Raised)

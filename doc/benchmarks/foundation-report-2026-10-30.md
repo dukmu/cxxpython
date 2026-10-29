@@ -270,6 +270,267 @@ Storage/native delivery probes do not establish Python VM parallelism. RSS is th
 | l1-float-operators-cpython | parallel_source_workers | 2 | wall_ns | ms | 3 | 6.031 | 5.962 | 6.094 |
 | l1-float-operators-cpython | parallel_source_workers | 4 | process_cpu_ns | ms | 3 | 5.770 | 5.710 | 5.955 |
 | l1-float-operators-cpython | parallel_source_workers | 4 | wall_ns | ms | 3 | 5.762 | 5.734 | 5.929 |
+| module-transactions | cleanup_iterations | - | active_region_bytes | bytes | 3 | 32.000 | 32.000 | 32.000 |
+| module-transactions | cleanup_iterations | - | cleanup_continuation_bytes | bytes | 3 | 48.000 | 48.000 | 48.000 |
+| module-transactions | cleanup_iterations | - | cleanup_function_ns | ms | 3 | 15.492 | 14.050 | 15.806 |
+| module-transactions | function_iterations | - | frame_prefix_bytes | bytes | 3 | 272.000 | 272.000 | 272.000 |
+| module-transactions | function_iterations | - | verified_function_ns | ms | 3 | 11.974 | 11.429 | 13.274 |
+| module-transactions | hash_iterations | - | string_hash_ns | ms | 3 | 65.221 | 56.660 | 65.552 |
+| module-transactions | hash_iterations | - | tuple_repr_ns | ms | 3 | 16.234 | 14.837 | 17.744 |
+| module-transactions | int_iterations | - | big_int_mul_ns | ms | 3 | 6.852 | 5.839 | 7.855 |
+| module-transactions | int_iterations | - | int_add_ns | ms | 3 | 60.240 | 53.176 | 60.746 |
+| module-transactions | int_iterations | - | int_object_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| module-transactions | iterations | - | allocation_and_auto_gc_ns | ms | 3 | 4.572 | 4.087 | 4.663 |
+| module-transactions | iterations | - | handle_bytes | bytes | 3 | 32.000 | 32.000 | 32.000 |
+| module-transactions | iterations | - | header_bytes | bytes | 3 | 8.000 | 8.000 | 8.000 |
+| module-transactions | iterations | - | last_gc_pause_ns | ms | 3 | 0.000 | 0.000 | 0.001 |
+| module-transactions | iterations | - | live_bytes | bytes | 3 | 0.000 | 0.000 | 0.000 |
+| module-transactions | iterations | - | node_bytes | bytes | 3 | 16.000 | 16.000 | 16.000 |
+| module-transactions | iterations | - | recorded_metadata_bytes | bytes | 3 | 3360.000 | 3360.000 | 3360.000 |
+| module-transactions | iterations | - | root_register_release_ns | ms | 3 | 2.835 | 2.478 | 2.936 |
+| module-transactions | native_call_iterations | - | core_live_bytes | bytes | 3 | 153189.000 | 153189.000 | 153189.000 |
+| module-transactions | native_call_iterations | - | core_metadata_bytes | bytes | 3 | 157248.000 | 157248.000 | 157248.000 |
+| module-transactions | native_call_iterations | - | core_reserved_bytes | bytes | 3 | 452368.000 | 452368.000 | 452368.000 |
+| module-transactions | native_call_iterations | - | lookup_bind_call_ns | ms | 3 | 19.631 | 18.118 | 22.769 |
+| module-transactions | native_call_iterations | - | native_call_ns | ms | 3 | 13.371 | 11.536 | 13.737 |
+| module-transactions | parallel_class_workers | 1 | finish_live_bytes | bytes | 3 | 202069.000 | 202069.000 | 202069.000 |
+| module-transactions | parallel_class_workers | 1 | finish_metadata_bytes | bytes | 3 | 252720.000 | 252720.000 | 252720.000 |
+| module-transactions | parallel_class_workers | 1 | finish_reserved_bytes | bytes | 3 | 674216.000 | 674216.000 | 674216.000 |
+| module-transactions | parallel_class_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.030 | 0.028 | 0.049 |
+| module-transactions | parallel_class_workers | 1 | max_rendezvous_ns | ms | 3 | 0.002 | 0.001 | 0.002 |
+| module-transactions | parallel_class_workers | 1 | process_cpu_ns | ms | 3 | 486.572 | 474.975 | 489.700 |
+| module-transactions | parallel_class_workers | 1 | source_freeze_run_ns | ms | 3 | 0.095 | 0.088 | 0.101 |
+| module-transactions | parallel_class_workers | 1 | wall_ns | ms | 3 | 460.624 | 448.934 | 496.772 |
+| module-transactions | parallel_class_workers | 2 | finish_live_bytes | bytes | 3 | 208237.000 | 203245.000 | 229165.000 |
+| module-transactions | parallel_class_workers | 2 | finish_metadata_bytes | bytes | 3 | 295376.000 | 295376.000 | 352048.000 |
+| module-transactions | parallel_class_workers | 2 | finish_reserved_bytes | bytes | 3 | 739864.000 | 739864.000 | 896120.000 |
+| module-transactions | parallel_class_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.053 | 0.042 | 0.065 |
+| module-transactions | parallel_class_workers | 2 | max_rendezvous_ns | ms | 3 | 0.167 | 0.136 | 0.899 |
+| module-transactions | parallel_class_workers | 2 | process_cpu_ns | ms | 3 | 496.505 | 488.300 | 520.728 |
+| module-transactions | parallel_class_workers | 2 | source_freeze_run_ns | ms | 3 | 0.123 | 0.089 | 0.292 |
+| module-transactions | parallel_class_workers | 2 | wall_ns | ms | 3 | 263.561 | 238.295 | 278.516 |
+| module-transactions | parallel_class_workers | 4 | finish_live_bytes | bytes | 3 | 252061.000 | 219229.000 | 261061.000 |
+| module-transactions | parallel_class_workers | 4 | finish_metadata_bytes | bytes | 3 | 364688.000 | 355056.000 | 402256.000 |
+| module-transactions | parallel_class_workers | 4 | finish_reserved_bytes | bytes | 3 | 900336.000 | 879432.000 | 965984.000 |
+| module-transactions | parallel_class_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.054 | 0.053 | 0.060 |
+| module-transactions | parallel_class_workers | 4 | max_rendezvous_ns | ms | 3 | 0.963 | 0.953 | 2.944 |
+| module-transactions | parallel_class_workers | 4 | process_cpu_ns | ms | 3 | 554.674 | 540.538 | 575.032 |
+| module-transactions | parallel_class_workers | 4 | source_freeze_run_ns | ms | 3 | 0.093 | 0.083 | 0.093 |
+| module-transactions | parallel_class_workers | 4 | wall_ns | ms | 3 | 192.060 | 157.878 | 192.074 |
+| module-transactions | parallel_closure_workers | 1 | finish_live_bytes | bytes | 3 | 298317.000 | 298317.000 | 298317.000 |
+| module-transactions | parallel_closure_workers | 1 | finish_metadata_bytes | bytes | 3 | 389024.000 | 389024.000 | 389024.000 |
+| module-transactions | parallel_closure_workers | 1 | finish_reserved_bytes | bytes | 3 | 858704.000 | 858704.000 | 858704.000 |
+| module-transactions | parallel_closure_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.078 | 0.069 | 0.088 |
+| module-transactions | parallel_closure_workers | 1 | max_rendezvous_ns | ms | 3 | 0.002 | 0.001 | 0.002 |
+| module-transactions | parallel_closure_workers | 1 | process_cpu_ns | ms | 3 | 253.967 | 243.868 | 263.666 |
+| module-transactions | parallel_closure_workers | 1 | source_freeze_run_ns | ms | 3 | 0.050 | 0.048 | 0.051 |
+| module-transactions | parallel_closure_workers | 1 | wall_ns | ms | 3 | 251.587 | 229.150 | 277.713 |
+| module-transactions | parallel_closure_workers | 2 | finish_live_bytes | bytes | 3 | 232053.000 | 221037.000 | 236565.000 |
+| module-transactions | parallel_closure_workers | 2 | finish_metadata_bytes | bytes | 3 | 318256.000 | 281232.000 | 318800.000 |
+| module-transactions | parallel_closure_workers | 2 | finish_reserved_bytes | bytes | 3 | 727408.000 | 665840.000 | 731488.000 |
+| module-transactions | parallel_closure_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.058 | 0.058 | 0.061 |
+| module-transactions | parallel_closure_workers | 2 | max_rendezvous_ns | ms | 3 | 0.152 | 0.146 | 0.193 |
+| module-transactions | parallel_closure_workers | 2 | process_cpu_ns | ms | 3 | 262.128 | 257.055 | 263.336 |
+| module-transactions | parallel_closure_workers | 2 | source_freeze_run_ns | ms | 3 | 0.049 | 0.049 | 0.050 |
+| module-transactions | parallel_closure_workers | 2 | wall_ns | ms | 3 | 134.816 | 132.152 | 134.985 |
+| module-transactions | parallel_closure_workers | 4 | finish_live_bytes | bytes | 3 | 252549.000 | 216261.000 | 315933.000 |
+| module-transactions | parallel_closure_workers | 4 | finish_metadata_bytes | bytes | 3 | 365104.000 | 328624.000 | 515920.000 |
+| module-transactions | parallel_closure_workers | 4 | finish_reserved_bytes | bytes | 3 | 797136.000 | 739648.000 | 1063808.000 |
+| module-transactions | parallel_closure_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.058 | 0.055 | 0.101 |
+| module-transactions | parallel_closure_workers | 4 | max_rendezvous_ns | ms | 3 | 0.316 | 0.253 | 1.317 |
+| module-transactions | parallel_closure_workers | 4 | process_cpu_ns | ms | 3 | 263.173 | 261.183 | 270.202 |
+| module-transactions | parallel_closure_workers | 4 | source_freeze_run_ns | ms | 3 | 0.051 | 0.050 | 0.065 |
+| module-transactions | parallel_closure_workers | 4 | wall_ns | ms | 3 | 77.720 | 76.144 | 93.509 |
+| module-transactions | parallel_exception_workers | 1 | finish_live_bytes | bytes | 3 | 265585.000 | 265585.000 | 265585.000 |
+| module-transactions | parallel_exception_workers | 1 | finish_metadata_bytes | bytes | 3 | 328240.000 | 328240.000 | 328240.000 |
+| module-transactions | parallel_exception_workers | 1 | finish_reserved_bytes | bytes | 3 | 756784.000 | 756784.000 | 756784.000 |
+| module-transactions | parallel_exception_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.063 | 0.054 | 0.074 |
+| module-transactions | parallel_exception_workers | 1 | max_rendezvous_ns | ms | 3 | 0.002 | 0.001 | 0.002 |
+| module-transactions | parallel_exception_workers | 1 | process_cpu_ns | ms | 3 | 397.852 | 392.598 | 411.834 |
+| module-transactions | parallel_exception_workers | 1 | source_freeze_run_ns | ms | 3 | 0.050 | 0.048 | 0.053 |
+| module-transactions | parallel_exception_workers | 1 | wall_ns | ms | 3 | 392.601 | 391.602 | 401.929 |
+| module-transactions | parallel_exception_workers | 2 | finish_live_bytes | bytes | 3 | 311049.000 | 168937.000 | 314641.000 |
+| module-transactions | parallel_exception_workers | 2 | finish_metadata_bytes | bytes | 3 | 425488.000 | 264976.000 | 458384.000 |
+| module-transactions | parallel_exception_workers | 2 | finish_reserved_bytes | bytes | 3 | 925744.000 | 642184.000 | 991408.000 |
+| module-transactions | parallel_exception_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.056 | 0.054 | 0.068 |
+| module-transactions | parallel_exception_workers | 2 | max_rendezvous_ns | ms | 3 | 0.130 | 0.044 | 0.177 |
+| module-transactions | parallel_exception_workers | 2 | process_cpu_ns | ms | 3 | 414.742 | 413.438 | 427.554 |
+| module-transactions | parallel_exception_workers | 2 | source_freeze_run_ns | ms | 3 | 0.048 | 0.046 | 0.049 |
+| module-transactions | parallel_exception_workers | 2 | wall_ns | ms | 3 | 204.339 | 202.024 | 211.874 |
+| module-transactions | parallel_exception_workers | 4 | finish_live_bytes | bytes | 3 | 212457.000 | 163841.000 | 223697.000 |
+| module-transactions | parallel_exception_workers | 4 | finish_metadata_bytes | bytes | 3 | 345968.000 | 343504.000 | 418640.000 |
+| module-transactions | parallel_exception_workers | 4 | finish_reserved_bytes | bytes | 3 | 761000.000 | 756784.000 | 888080.000 |
+| module-transactions | parallel_exception_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.069 | 0.048 | 0.089 |
+| module-transactions | parallel_exception_workers | 4 | max_rendezvous_ns | ms | 3 | 0.953 | 0.739 | 4.369 |
+| module-transactions | parallel_exception_workers | 4 | process_cpu_ns | ms | 3 | 438.510 | 423.298 | 453.159 |
+| module-transactions | parallel_exception_workers | 4 | source_freeze_run_ns | ms | 3 | 0.046 | 0.043 | 0.076 |
+| module-transactions | parallel_exception_workers | 4 | wall_ns | ms | 3 | 126.382 | 121.553 | 134.474 |
+| module-transactions | parallel_float_workers | 1 | finish_live_bytes | bytes | 3 | 214337.000 | 214337.000 | 214337.000 |
+| module-transactions | parallel_float_workers | 1 | finish_metadata_bytes | bytes | 3 | 302464.000 | 302464.000 | 302464.000 |
+| module-transactions | parallel_float_workers | 1 | finish_reserved_bytes | bytes | 3 | 686976.000 | 686976.000 | 686976.000 |
+| module-transactions | parallel_float_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.065 | 0.036 | 0.093 |
+| module-transactions | parallel_float_workers | 1 | max_rendezvous_ns | ms | 3 | 0.001 | 0.001 | 0.002 |
+| module-transactions | parallel_float_workers | 1 | process_cpu_ns | ms | 3 | 285.932 | 281.424 | 365.418 |
+| module-transactions | parallel_float_workers | 1 | source_freeze_run_ns | ms | 3 | 0.037 | 0.035 | 0.041 |
+| module-transactions | parallel_float_workers | 1 | wall_ns | ms | 3 | 285.941 | 272.893 | 334.982 |
+| module-transactions | parallel_float_workers | 2 | finish_live_bytes | bytes | 3 | 277921.000 | 272289.000 | 282849.000 |
+| module-transactions | parallel_float_workers | 2 | finish_metadata_bytes | bytes | 3 | 483792.000 | 470448.000 | 527600.000 |
+| module-transactions | parallel_float_workers | 2 | finish_reserved_bytes | bytes | 3 | 978864.000 | 949568.000 | 1044512.000 |
+| module-transactions | parallel_float_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.084 | 0.071 | 0.138 |
+| module-transactions | parallel_float_workers | 2 | max_rendezvous_ns | ms | 3 | 0.059 | 0.054 | 0.196 |
+| module-transactions | parallel_float_workers | 2 | process_cpu_ns | ms | 3 | 291.214 | 280.160 | 300.065 |
+| module-transactions | parallel_float_workers | 2 | source_freeze_run_ns | ms | 3 | 0.038 | 0.034 | 0.039 |
+| module-transactions | parallel_float_workers | 2 | wall_ns | ms | 3 | 148.388 | 140.871 | 149.665 |
+| module-transactions | parallel_float_workers | 4 | finish_live_bytes | bytes | 3 | 249353.000 | 224769.000 | 260665.000 |
+| module-transactions | parallel_float_workers | 4 | finish_metadata_bytes | bytes | 3 | 545168.000 | 545168.000 | 569392.000 |
+| module-transactions | parallel_float_workers | 4 | finish_reserved_bytes | bytes | 3 | 1073808.000 | 1073808.000 | 1110160.000 |
+| module-transactions | parallel_float_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.095 | 0.078 | 0.113 |
+| module-transactions | parallel_float_workers | 4 | max_rendezvous_ns | ms | 3 | 0.863 | 0.353 | 2.879 |
+| module-transactions | parallel_float_workers | 4 | process_cpu_ns | ms | 3 | 317.751 | 306.172 | 411.067 |
+| module-transactions | parallel_float_workers | 4 | source_freeze_run_ns | ms | 3 | 0.038 | 0.037 | 0.041 |
+| module-transactions | parallel_float_workers | 4 | wall_ns | ms | 3 | 94.927 | 83.124 | 114.837 |
+| module-transactions | parallel_for_workers | 1 | finish_live_bytes | bytes | 3 | 194905.000 | 194905.000 | 194905.000 |
+| module-transactions | parallel_for_workers | 1 | finish_metadata_bytes | bytes | 3 | 242864.000 | 242864.000 | 242864.000 |
+| module-transactions | parallel_for_workers | 1 | finish_reserved_bytes | bytes | 3 | 604520.000 | 604520.000 | 604520.000 |
+| module-transactions | parallel_for_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.028 | 0.024 | 0.029 |
+| module-transactions | parallel_for_workers | 1 | max_rendezvous_ns | ms | 3 | 0.001 | 0.001 | 0.002 |
+| module-transactions | parallel_for_workers | 1 | process_cpu_ns | ms | 3 | 165.804 | 161.345 | 172.964 |
+| module-transactions | parallel_for_workers | 1 | source_freeze_run_ns | ms | 3 | 0.040 | 0.038 | 0.043 |
+| module-transactions | parallel_for_workers | 1 | wall_ns | ms | 3 | 165.892 | 159.084 | 175.813 |
+| module-transactions | parallel_for_workers | 2 | finish_live_bytes | bytes | 3 | 285025.000 | 283577.000 | 295025.000 |
+| module-transactions | parallel_for_workers | 2 | finish_metadata_bytes | bytes | 3 | 398224.000 | 367440.000 | 405008.000 |
+| module-transactions | parallel_for_workers | 2 | finish_reserved_bytes | bytes | 3 | 867112.000 | 818160.000 | 883808.000 |
+| module-transactions | parallel_for_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.080 | 0.068 | 0.087 |
+| module-transactions | parallel_for_workers | 2 | max_rendezvous_ns | ms | 3 | 0.051 | 0.047 | 0.759 |
+| module-transactions | parallel_for_workers | 2 | process_cpu_ns | ms | 3 | 168.383 | 163.395 | 176.686 |
+| module-transactions | parallel_for_workers | 2 | source_freeze_run_ns | ms | 3 | 0.041 | 0.035 | 0.041 |
+| module-transactions | parallel_for_workers | 2 | wall_ns | ms | 3 | 86.640 | 82.425 | 97.885 |
+| module-transactions | parallel_for_workers | 4 | finish_live_bytes | bytes | 3 | 237601.000 | 225633.000 | 287369.000 |
+| module-transactions | parallel_for_workers | 4 | finish_metadata_bytes | bytes | 3 | 408400.000 | 384400.000 | 490320.000 |
+| module-transactions | parallel_for_workers | 4 | finish_reserved_bytes | bytes | 3 | 867112.000 | 834856.000 | 1015104.000 |
+| module-transactions | parallel_for_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.096 | 0.092 | 0.098 |
+| module-transactions | parallel_for_workers | 4 | max_rendezvous_ns | ms | 3 | 0.958 | 0.266 | 1.037 |
+| module-transactions | parallel_for_workers | 4 | process_cpu_ns | ms | 3 | 186.225 | 175.920 | 253.285 |
+| module-transactions | parallel_for_workers | 4 | source_freeze_run_ns | ms | 3 | 0.043 | 0.039 | 0.045 |
+| module-transactions | parallel_for_workers | 4 | wall_ns | ms | 3 | 76.354 | 54.562 | 82.618 |
+| module-transactions | parallel_source_workers | 1 | finish_live_bytes | bytes | 3 | 213057.000 | 213057.000 | 213057.000 |
+| module-transactions | parallel_source_workers | 1 | finish_metadata_bytes | bytes | 3 | 273472.000 | 273472.000 | 273472.000 |
+| module-transactions | parallel_source_workers | 1 | finish_reserved_bytes | bytes | 3 | 657552.000 | 657552.000 | 657552.000 |
+| module-transactions | parallel_source_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.031 | 0.028 | 0.075 |
+| module-transactions | parallel_source_workers | 1 | max_rendezvous_ns | ms | 3 | 0.001 | 0.001 | 0.002 |
+| module-transactions | parallel_source_workers | 1 | process_cpu_ns | ms | 3 | 248.340 | 237.132 | 254.247 |
+| module-transactions | parallel_source_workers | 1 | source_freeze_run_ns | ms | 3 | 0.043 | 0.037 | 0.056 |
+| module-transactions | parallel_source_workers | 1 | wall_ns | ms | 3 | 237.135 | 232.319 | 251.760 |
+| module-transactions | parallel_source_workers | 2 | finish_live_bytes | bytes | 3 | 156177.000 | 155793.000 | 164721.000 |
+| module-transactions | parallel_source_workers | 2 | finish_metadata_bytes | bytes | 3 | 240272.000 | 240272.000 | 240272.000 |
+| module-transactions | parallel_source_workers | 2 | finish_reserved_bytes | bytes | 3 | 591904.000 | 591904.000 | 591904.000 |
+| module-transactions | parallel_source_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.044 | 0.032 | 0.052 |
+| module-transactions | parallel_source_workers | 2 | max_rendezvous_ns | ms | 3 | 0.085 | 0.059 | 0.149 |
+| module-transactions | parallel_source_workers | 2 | process_cpu_ns | ms | 3 | 249.108 | 248.779 | 255.588 |
+| module-transactions | parallel_source_workers | 2 | source_freeze_run_ns | ms | 3 | 0.038 | 0.031 | 0.049 |
+| module-transactions | parallel_source_workers | 2 | wall_ns | ms | 3 | 127.931 | 117.850 | 129.512 |
+| module-transactions | parallel_source_workers | 4 | finish_live_bytes | bytes | 3 | 286809.000 | 196113.000 | 290729.000 |
+| module-transactions | parallel_source_workers | 4 | finish_metadata_bytes | bytes | 3 | 437936.000 | 361712.000 | 438480.000 |
+| module-transactions | parallel_source_workers | 4 | finish_reserved_bytes | bytes | 3 | 928304.000 | 788848.000 | 932384.000 |
+| module-transactions | parallel_source_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.075 | 0.075 | 0.077 |
+| module-transactions | parallel_source_workers | 4 | max_rendezvous_ns | ms | 3 | 0.327 | 0.290 | 0.404 |
+| module-transactions | parallel_source_workers | 4 | process_cpu_ns | ms | 3 | 263.793 | 259.474 | 266.959 |
+| module-transactions | parallel_source_workers | 4 | source_freeze_run_ns | ms | 3 | 0.037 | 0.035 | 0.038 |
+| module-transactions | parallel_source_workers | 4 | wall_ns | ms | 3 | 78.491 | 67.151 | 108.981 |
+| module-transactions | parallel_storage_workers | 1 | finish_live_bytes | bytes | 3 | 42720.000 | 42720.000 | 42720.000 |
+| module-transactions | parallel_storage_workers | 1 | finish_metadata_bytes | bytes | 3 | 97040.000 | 97040.000 | 97040.000 |
+| module-transactions | parallel_storage_workers | 1 | finish_reserved_bytes | bytes | 3 | 135504.000 | 135504.000 | 135504.000 |
+| module-transactions | parallel_storage_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.012 | 0.011 | 0.032 |
+| module-transactions | parallel_storage_workers | 1 | max_rendezvous_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| module-transactions | parallel_storage_workers | 1 | process_cpu_ns | ms | 3 | 2.318 | 2.210 | 2.431 |
+| module-transactions | parallel_storage_workers | 1 | wall_ns | ms | 3 | 2.277 | 2.263 | 2.418 |
+| module-transactions | parallel_storage_workers | 2 | finish_live_bytes | bytes | 3 | 59408.000 | 8768.000 | 61424.000 |
+| module-transactions | parallel_storage_workers | 2 | finish_metadata_bytes | bytes | 3 | 147008.000 | 59392.000 | 147008.000 |
+| module-transactions | parallel_storage_workers | 2 | finish_reserved_bytes | bytes | 3 | 205360.000 | 74064.000 | 205360.000 |
+| module-transactions | parallel_storage_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.015 | 0.015 | 0.027 |
+| module-transactions | parallel_storage_workers | 2 | max_rendezvous_ns | ms | 3 | 0.021 | 0.020 | 0.038 |
+| module-transactions | parallel_storage_workers | 2 | process_cpu_ns | ms | 3 | 2.637 | 2.494 | 2.676 |
+| module-transactions | parallel_storage_workers | 2 | wall_ns | ms | 3 | 1.591 | 1.520 | 1.755 |
+| module-transactions | parallel_storage_workers | 4 | finish_live_bytes | bytes | 3 | 61952.000 | 59664.000 | 65280.000 |
+| module-transactions | parallel_storage_workers | 4 | finish_metadata_bytes | bytes | 3 | 241248.000 | 241248.000 | 244096.000 |
+| module-transactions | parallel_storage_workers | 4 | finish_reserved_bytes | bytes | 3 | 336656.000 | 336656.000 | 340864.000 |
+| module-transactions | parallel_storage_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.031 | 0.022 | 0.036 |
+| module-transactions | parallel_storage_workers | 4 | max_rendezvous_ns | ms | 3 | 0.064 | 0.063 | 0.142 |
+| module-transactions | parallel_storage_workers | 4 | process_cpu_ns | ms | 3 | 3.309 | 3.159 | 3.360 |
+| module-transactions | parallel_storage_workers | 4 | wall_ns | ms | 3 | 2.449 | 2.057 | 3.031 |
+| module-transactions | parallel_vm_workers | 1 | finish_live_bytes | bytes | 3 | 239681.000 | 239681.000 | 239681.000 |
+| module-transactions | parallel_vm_workers | 1 | finish_metadata_bytes | bytes | 3 | 310944.000 | 310944.000 | 310944.000 |
+| module-transactions | parallel_vm_workers | 1 | finish_reserved_bytes | bytes | 3 | 723200.000 | 723200.000 | 723200.000 |
+| module-transactions | parallel_vm_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.035 | 0.034 | 0.039 |
+| module-transactions | parallel_vm_workers | 1 | max_rendezvous_ns | ms | 3 | 0.001 | 0.001 | 0.001 |
+| module-transactions | parallel_vm_workers | 1 | process_cpu_ns | ms | 3 | 209.618 | 207.971 | 217.404 |
+| module-transactions | parallel_vm_workers | 1 | source_freeze_run_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| module-transactions | parallel_vm_workers | 1 | wall_ns | ms | 3 | 205.957 | 199.282 | 209.599 |
+| module-transactions | parallel_vm_workers | 2 | finish_live_bytes | bytes | 3 | 190169.000 | 180089.000 | 194929.000 |
+| module-transactions | parallel_vm_workers | 2 | finish_metadata_bytes | bytes | 3 | 240624.000 | 240080.000 | 277648.000 |
+| module-transactions | parallel_vm_workers | 2 | finish_reserved_bytes | bytes | 3 | 595984.000 | 591904.000 | 657552.000 |
+| module-transactions | parallel_vm_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.038 | 0.022 | 0.058 |
+| module-transactions | parallel_vm_workers | 2 | max_rendezvous_ns | ms | 3 | 0.133 | 0.082 | 0.141 |
+| module-transactions | parallel_vm_workers | 2 | process_cpu_ns | ms | 3 | 220.358 | 217.082 | 232.132 |
+| module-transactions | parallel_vm_workers | 2 | source_freeze_run_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| module-transactions | parallel_vm_workers | 2 | wall_ns | ms | 3 | 112.689 | 111.578 | 113.650 |
+| module-transactions | parallel_vm_workers | 4 | finish_live_bytes | bytes | 3 | 203785.000 | 180825.000 | 206881.000 |
+| module-transactions | parallel_vm_workers | 4 | finish_metadata_bytes | bytes | 3 | 324848.000 | 324304.000 | 361872.000 |
+| module-transactions | parallel_vm_workers | 4 | finish_reserved_bytes | bytes | 3 | 731360.000 | 727280.000 | 792928.000 |
+| module-transactions | parallel_vm_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.040 | 0.037 | 0.062 |
+| module-transactions | parallel_vm_workers | 4 | max_rendezvous_ns | ms | 3 | 0.625 | 0.359 | 3.618 |
+| module-transactions | parallel_vm_workers | 4 | process_cpu_ns | ms | 3 | 227.411 | 226.825 | 234.741 |
+| module-transactions | parallel_vm_workers | 4 | source_freeze_run_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| module-transactions | parallel_vm_workers | 4 | wall_ns | ms | 3 | 63.803 | 63.166 | 70.727 |
+| module-transactions | process_peak_rss_kib | - | process_peak_rss_kib | KiB | 3 | 7144.000 | 7024.000 | 8932.000 |
+| module-transactions | scheduled_iterations | - | scheduled_function_ns | ms | 3 | 18.859 | 17.597 | 19.784 |
+| module-transactions | shared_edge_iterations | - | cell_object_bytes | bytes | 3 | 16.000 | 16.000 | 16.000 |
+| module-transactions | shared_edge_iterations | - | rooted_cell_read_ns | ms | 3 | 2.232 | 2.129 | 2.247 |
+| module-transactions | shared_edge_iterations | - | rooted_cell_store_read_ns | ms | 3 | 4.334 | 4.186 | 4.366 |
+| module-transactions | slot_iterations | - | generic_prefix_bytes | bytes | 3 | 8.000 | 8.000 | 8.000 |
+| module-transactions | slot_iterations | - | slot_instance_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| module-transactions | slot_iterations | - | slot_set_get_ns | ms | 3 | 32.068 | 27.461 | 36.741 |
+| module-transactions | source_parse_scope_cfg_ns | - | source_bytes | bytes | 3 | 92.000 | 92.000 | 92.000 |
+| module-transactions | source_parse_scope_cfg_ns | - | source_parse_scope_cfg_ns | ms | 3 | 0.031 | 0.028 | 0.053 |
+| module-transactions | transfer_iterations | - | transfer_roundtrip_ns | ms | 3 | 0.796 | 0.739 | 0.843 |
+| module-transactions | transfer_iterations | - | transfer_token_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| module-transactions | with_iterations | - | with_function_ns | ms | 3 | 25.422 | 23.531 | 27.095 |
+| module-transactions-cpython | parallel_class_workers | 1 | process_cpu_ns | ms | 3 | 8.829 | 8.425 | 9.151 |
+| module-transactions-cpython | parallel_class_workers | 1 | wall_ns | ms | 3 | 8.833 | 7.731 | 8.867 |
+| module-transactions-cpython | parallel_class_workers | 2 | process_cpu_ns | ms | 3 | 8.767 | 8.688 | 8.901 |
+| module-transactions-cpython | parallel_class_workers | 2 | wall_ns | ms | 3 | 8.600 | 8.058 | 8.710 |
+| module-transactions-cpython | parallel_class_workers | 4 | process_cpu_ns | ms | 3 | 8.583 | 8.389 | 8.607 |
+| module-transactions-cpython | parallel_class_workers | 4 | wall_ns | ms | 3 | 8.351 | 7.681 | 8.700 |
+| module-transactions-cpython | parallel_closure_workers | 1 | process_cpu_ns | ms | 3 | 6.100 | 6.003 | 6.121 |
+| module-transactions-cpython | parallel_closure_workers | 1 | wall_ns | ms | 3 | 5.820 | 5.620 | 6.124 |
+| module-transactions-cpython | parallel_closure_workers | 2 | process_cpu_ns | ms | 3 | 5.967 | 5.960 | 5.992 |
+| module-transactions-cpython | parallel_closure_workers | 2 | wall_ns | ms | 3 | 5.799 | 5.546 | 6.027 |
+| module-transactions-cpython | parallel_closure_workers | 4 | process_cpu_ns | ms | 3 | 5.939 | 5.872 | 6.069 |
+| module-transactions-cpython | parallel_closure_workers | 4 | wall_ns | ms | 3 | 5.849 | 5.556 | 5.906 |
+| module-transactions-cpython | parallel_exception_workers | 1 | process_cpu_ns | ms | 3 | 7.251 | 7.175 | 7.540 |
+| module-transactions-cpython | parallel_exception_workers | 1 | wall_ns | ms | 3 | 6.961 | 6.941 | 7.256 |
+| module-transactions-cpython | parallel_exception_workers | 2 | process_cpu_ns | ms | 3 | 7.381 | 6.999 | 8.372 |
+| module-transactions-cpython | parallel_exception_workers | 2 | wall_ns | ms | 3 | 7.132 | 6.479 | 8.390 |
+| module-transactions-cpython | parallel_exception_workers | 4 | process_cpu_ns | ms | 3 | 7.184 | 7.159 | 7.239 |
+| module-transactions-cpython | parallel_exception_workers | 4 | wall_ns | ms | 3 | 6.952 | 6.738 | 7.199 |
+| module-transactions-cpython | parallel_float_workers | 1 | process_cpu_ns | ms | 3 | 5.869 | 5.569 | 6.083 |
+| module-transactions-cpython | parallel_float_workers | 1 | wall_ns | ms | 3 | 6.048 | 5.113 | 6.081 |
+| module-transactions-cpython | parallel_float_workers | 2 | process_cpu_ns | ms | 3 | 5.846 | 5.675 | 5.924 |
+| module-transactions-cpython | parallel_float_workers | 2 | wall_ns | ms | 3 | 5.737 | 5.240 | 5.960 |
+| module-transactions-cpython | parallel_float_workers | 4 | process_cpu_ns | ms | 3 | 5.903 | 5.673 | 6.054 |
+| module-transactions-cpython | parallel_float_workers | 4 | wall_ns | ms | 3 | 5.736 | 5.272 | 6.124 |
+| module-transactions-cpython | parallel_for_workers | 1 | process_cpu_ns | ms | 3 | 4.645 | 4.639 | 4.695 |
+| module-transactions-cpython | parallel_for_workers | 1 | wall_ns | ms | 3 | 4.508 | 4.319 | 4.681 |
+| module-transactions-cpython | parallel_for_workers | 2 | process_cpu_ns | ms | 3 | 4.722 | 4.581 | 4.786 |
+| module-transactions-cpython | parallel_for_workers | 2 | wall_ns | ms | 3 | 4.637 | 4.360 | 4.744 |
+| module-transactions-cpython | parallel_for_workers | 4 | process_cpu_ns | ms | 3 | 4.461 | 4.437 | 4.505 |
+| module-transactions-cpython | parallel_for_workers | 4 | wall_ns | ms | 3 | 4.392 | 4.141 | 4.509 |
+| module-transactions-cpython | parallel_source_workers | 1 | process_cpu_ns | ms | 3 | 6.046 | 6.040 | 6.064 |
+| module-transactions-cpython | parallel_source_workers | 1 | wall_ns | ms | 3 | 5.886 | 5.571 | 6.078 |
+| module-transactions-cpython | parallel_source_workers | 2 | process_cpu_ns | ms | 3 | 5.969 | 5.924 | 6.011 |
+| module-transactions-cpython | parallel_source_workers | 2 | wall_ns | ms | 3 | 5.782 | 5.528 | 5.943 |
+| module-transactions-cpython | parallel_source_workers | 4 | process_cpu_ns | ms | 3 | 5.849 | 5.728 | 5.874 |
+| module-transactions-cpython | parallel_source_workers | 4 | wall_ns | ms | 3 | 5.668 | 5.446 | 5.770 |
 
 ## Fixed-Work Scaling
 
@@ -319,6 +580,48 @@ Derived from median wall/process CPU times. CPU/wall is not a speedup; 1-worker 
 | l1-float-operators-cpython | parallel_source_workers | 1 | 5.973 | 1.012 | 1.000 | 1.000 |
 | l1-float-operators-cpython | parallel_source_workers | 2 | 6.031 | 0.999 | 0.990 | 0.495 |
 | l1-float-operators-cpython | parallel_source_workers | 4 | 5.762 | 1.001 | 1.037 | 0.259 |
+| module-transactions | parallel_class_workers | 1 | 460.624 | 1.056 | 1.000 | 1.000 |
+| module-transactions | parallel_class_workers | 2 | 263.561 | 1.884 | 1.748 | 0.874 |
+| module-transactions | parallel_class_workers | 4 | 192.060 | 2.888 | 2.398 | 0.600 |
+| module-transactions | parallel_closure_workers | 1 | 251.587 | 1.009 | 1.000 | 1.000 |
+| module-transactions | parallel_closure_workers | 2 | 134.816 | 1.944 | 1.866 | 0.933 |
+| module-transactions | parallel_closure_workers | 4 | 77.720 | 3.386 | 3.237 | 0.809 |
+| module-transactions | parallel_exception_workers | 1 | 392.601 | 1.013 | 1.000 | 1.000 |
+| module-transactions | parallel_exception_workers | 2 | 204.339 | 2.030 | 1.921 | 0.961 |
+| module-transactions | parallel_exception_workers | 4 | 126.382 | 3.470 | 3.106 | 0.777 |
+| module-transactions | parallel_float_workers | 1 | 285.941 | 1.000 | 1.000 | 1.000 |
+| module-transactions | parallel_float_workers | 2 | 148.388 | 1.963 | 1.927 | 0.963 |
+| module-transactions | parallel_float_workers | 4 | 94.927 | 3.347 | 3.012 | 0.753 |
+| module-transactions | parallel_for_workers | 1 | 165.892 | 0.999 | 1.000 | 1.000 |
+| module-transactions | parallel_for_workers | 2 | 86.640 | 1.943 | 1.915 | 0.957 |
+| module-transactions | parallel_for_workers | 4 | 76.354 | 2.439 | 2.173 | 0.543 |
+| module-transactions | parallel_source_workers | 1 | 237.135 | 1.047 | 1.000 | 1.000 |
+| module-transactions | parallel_source_workers | 2 | 127.931 | 1.947 | 1.854 | 0.927 |
+| module-transactions | parallel_source_workers | 4 | 78.491 | 3.361 | 3.021 | 0.755 |
+| module-transactions | parallel_storage_workers | 1 | 2.277 | 1.018 | 1.000 | 1.000 |
+| module-transactions | parallel_storage_workers | 2 | 1.591 | 1.657 | 1.431 | 0.715 |
+| module-transactions | parallel_storage_workers | 4 | 2.449 | 1.351 | 0.930 | 0.232 |
+| module-transactions | parallel_vm_workers | 1 | 205.957 | 1.018 | 1.000 | 1.000 |
+| module-transactions | parallel_vm_workers | 2 | 112.689 | 1.955 | 1.828 | 0.914 |
+| module-transactions | parallel_vm_workers | 4 | 63.803 | 3.564 | 3.228 | 0.807 |
+| module-transactions-cpython | parallel_class_workers | 1 | 8.833 | 1.000 | 1.000 | 1.000 |
+| module-transactions-cpython | parallel_class_workers | 2 | 8.600 | 1.019 | 1.027 | 0.514 |
+| module-transactions-cpython | parallel_class_workers | 4 | 8.351 | 1.028 | 1.058 | 0.264 |
+| module-transactions-cpython | parallel_closure_workers | 1 | 5.820 | 1.048 | 1.000 | 1.000 |
+| module-transactions-cpython | parallel_closure_workers | 2 | 5.799 | 1.029 | 1.004 | 0.502 |
+| module-transactions-cpython | parallel_closure_workers | 4 | 5.849 | 1.015 | 0.995 | 0.249 |
+| module-transactions-cpython | parallel_exception_workers | 1 | 6.961 | 1.042 | 1.000 | 1.000 |
+| module-transactions-cpython | parallel_exception_workers | 2 | 7.132 | 1.035 | 0.976 | 0.488 |
+| module-transactions-cpython | parallel_exception_workers | 4 | 6.952 | 1.033 | 1.001 | 0.250 |
+| module-transactions-cpython | parallel_float_workers | 1 | 6.048 | 0.970 | 1.000 | 1.000 |
+| module-transactions-cpython | parallel_float_workers | 2 | 5.737 | 1.019 | 1.054 | 0.527 |
+| module-transactions-cpython | parallel_float_workers | 4 | 5.736 | 1.029 | 1.054 | 0.264 |
+| module-transactions-cpython | parallel_for_workers | 1 | 4.508 | 1.030 | 1.000 | 1.000 |
+| module-transactions-cpython | parallel_for_workers | 2 | 4.637 | 1.018 | 0.972 | 0.486 |
+| module-transactions-cpython | parallel_for_workers | 4 | 4.392 | 1.016 | 1.026 | 0.257 |
+| module-transactions-cpython | parallel_source_workers | 1 | 5.886 | 1.027 | 1.000 | 1.000 |
+| module-transactions-cpython | parallel_source_workers | 2 | 5.782 | 1.032 | 1.018 | 0.509 |
+| module-transactions-cpython | parallel_source_workers | 4 | 5.668 | 1.032 | 1.038 | 0.260 |
 
 ## Identical Source Comparison
 
@@ -344,3 +647,21 @@ The CPython probe executes the source kernel captured from the C++ benchmark, wi
 | l1-float-operators | parallel_source_workers | 1 | 249.761 | 5.973 | 41.815 |
 | l1-float-operators | parallel_source_workers | 2 | 129.810 | 6.031 | 21.524 |
 | l1-float-operators | parallel_source_workers | 4 | 84.256 | 5.762 | 14.623 |
+| module-transactions | parallel_class_workers | 1 | 460.624 | 8.833 | 52.145 |
+| module-transactions | parallel_class_workers | 2 | 263.561 | 8.600 | 30.646 |
+| module-transactions | parallel_class_workers | 4 | 192.060 | 8.351 | 22.998 |
+| module-transactions | parallel_closure_workers | 1 | 251.587 | 5.820 | 43.230 |
+| module-transactions | parallel_closure_workers | 2 | 134.816 | 5.799 | 23.247 |
+| module-transactions | parallel_closure_workers | 4 | 77.720 | 5.849 | 13.288 |
+| module-transactions | parallel_exception_workers | 1 | 392.601 | 6.961 | 56.398 |
+| module-transactions | parallel_exception_workers | 2 | 204.339 | 7.132 | 28.652 |
+| module-transactions | parallel_exception_workers | 4 | 126.382 | 6.952 | 18.179 |
+| module-transactions | parallel_float_workers | 1 | 285.941 | 6.048 | 47.276 |
+| module-transactions | parallel_float_workers | 2 | 148.388 | 5.737 | 25.864 |
+| module-transactions | parallel_float_workers | 4 | 94.927 | 5.736 | 16.549 |
+| module-transactions | parallel_for_workers | 1 | 165.892 | 4.508 | 36.798 |
+| module-transactions | parallel_for_workers | 2 | 86.640 | 4.637 | 18.685 |
+| module-transactions | parallel_for_workers | 4 | 76.354 | 4.392 | 17.385 |
+| module-transactions | parallel_source_workers | 1 | 237.135 | 5.886 | 40.289 |
+| module-transactions | parallel_source_workers | 2 | 127.931 | 5.782 | 22.126 |
+| module-transactions | parallel_source_workers | 4 | 78.491 | 5.668 | 13.847 |

@@ -3,6 +3,8 @@
 #include "cxxpython/type.hpp"
 
 #include <array>
+#include <list>
+#include <map>
 #include <unordered_map>
 
 namespace cxxpython::core {
@@ -91,13 +93,27 @@ struct DictObject {
         Value value;
     };
     ObjectHeader header;
-    AtomicGcEdge storage;
     AtomicGcEdge namespace_owner;
-    explicit DictObject(InitialType head) : header(head) {}
+    using Index = std::map<std::u32string, std::list<Entry>::iterator>;
+    struct Storage {
+        std::mutex mutex;
+        std::list<Entry> names;
+        Index index;
+        std::size_t bytes = 0;
+    };
+    const std::unique_ptr<Storage> contents;
+    explicit DictObject(InitialType head) : header(head), contents(std::make_unique<Storage>()) {}
     void trace(Tracer &tracer) const noexcept
     {
-        tracer.visit(storage);
         tracer.visit(namespace_owner);
+        for (const auto &entry : contents->names) {
+            tracer.visit(entry.key);
+            tracer.visit(entry.value);
+        }
+    }
+    std::size_t external_bytes() const noexcept
+    {
+        return sizeof(Storage) + contents->bytes;
     }
 };
 struct DictStorage {
@@ -122,7 +138,9 @@ class DictView final {
 
   private:
     Attachment &context_;
-    ReturnSlot storage_;
+    RootScope roots_;
+    mutable ReturnSlot storage_;
+    std::vector<DictObject::Entry> names_;
 };
 struct ExceptionObject {
     ObjectHeader header;
@@ -296,6 +314,9 @@ constexpr auto core_count = static_cast<std::size_t>(CoreObject::Count);
 void build_core_objects(Attachment &context, std::span<ReturnSlot *const> outputs);
 std::optional<Value> name_lookup(Attachment &context, Value dictionary, const std::u32string &name);
 void name_store(Attachment &context, Value dictionary, Value name, Value value);
+bool name_erase_if(Attachment &context, Value dictionary, const std::u32string &name,
+                   Value expected);
+void discard_name_table(Attachment &context, Value dictionary);
 bool name_erase(Attachment &context, Value dictionary, const std::u32string &name);
 bool copy_name_storage(Attachment &context, std::optional<Value> source, const std::u32string &name,
                        std::optional<Value> key, std::optional<Value> value, ReturnSlot &out);
@@ -321,6 +342,7 @@ void install_iteration(Attachment &context, std::span<const Handle> core);
 void install_ranges(Attachment &context, std::span<const Handle> core);
 void install_iterator_builtins(Attachment &context, std::span<const Handle> core, Value mapping);
 void install_class_builtins(Attachment &context, std::span<const Handle> core, Value mapping);
+void install_import_builtins(Attachment &context, std::span<const Handle> core, Value mapping);
 void stop_iteration(Attachment &context, ReturnSlot &out);
 void install_call_descriptors(Attachment &context, std::span<const Handle> core);
 void install_attribute_descriptors(Attachment &context, std::span<const Handle> core);
