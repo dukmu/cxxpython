@@ -217,6 +217,8 @@ namespace cxxpython::core
     }
     std::optional<Value> Attachment::current_frame() const
     { require_attached(); return current_frame_; }
+    std::optional<Value> Attachment::handled_exception() const
+    { require_attached(); return handled_exception_; }
 
     std::uint64_t Attachment::keyed_hash(std::span<const std::byte> data) const
     {

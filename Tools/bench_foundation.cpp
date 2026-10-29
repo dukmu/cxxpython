@@ -209,4 +209,25 @@ int main()
               << " caller_max_stack=" << context.payload<CodeObject>(caller_code).program.max_stack()
               << " callee_instructions=" << context.payload<CodeObject>(verified).program.instructions().size()
               << " scheduled_live_set_check=ok\n";
+
+    CodeBuilder cleanup(context, code_spec); auto region = cleanup.region(RegionKind::Finally);
+    cleanup.enter(region); cleanup.emit(Opcode::LoadFast, 0); cleanup.emit(Opcode::LoadFast, 1);
+    cleanup.emit(Opcode::Binary, static_cast<std::uint32_t>(BinaryOp::Add)); cleanup.emit(Opcode::Return); cleanup.leave(region);
+    cleanup.handler(region); cleanup.emit(Opcode::LoadConst, cleanup.constant(function));
+    cleanup.emit(Opcode::LoadConst, cleanup.constant(none)); cleanup.call(1); cleanup.emit(Opcode::PopTop); cleanup.end_handler(region);
+    cleanup.freeze(value); auto cleanup_code = scope.root(value.result().value());
+    make_function(context, {cleanup_code, globals}, value); auto cleanup_function = scope.root(value.result().value());
+    value.reset(); context.collect(); const auto before_cleanup = context.stats().objects;
+    const auto cleanup_ns = measure([&] {
+        for (int i = 0; i < method_iterations; ++i)
+            if (call(context, cleanup_function, {tuple_items, {}}, value).tag() != ResultTag::Ok) { valid = false; return; }
+    });
+    if (!valid || int_decimal(context, value.result().value()) != "42") return 1;
+    value.reset(); context.collect();
+    if (context.stats().objects != before_cleanup) return 1;
+    std::cout << "cleanup_iterations=" << method_iterations << " cleanup_function_ns=" << cleanup_ns
+              << " cleanup_instructions=" << context.payload<CodeObject>(cleanup_code).program.instructions().size()
+              << " cleanup_max_stack=" << context.payload<CodeObject>(cleanup_code).program.max_stack()
+              << " active_region_bytes=" << sizeof(ActiveRegion) << " cleanup_continuation_bytes=" << sizeof(CleanupContinuation)
+              << " cleanup_live_set_check=ok\n";
 }

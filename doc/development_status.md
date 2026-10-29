@@ -1,5 +1,71 @@
 # Development Status
 
+## 2026-10-29 M4 Structured Region Unwind Stable Point
+
+The preceding goal turn made verified progress in commit 408ade3. The full
+M0-M9 objective remains active. This entry is prepended without changing earlier
+records; this completed execution slice is committed promptly after verification.
+
+- Added builder-owned Loop/Except/Finally regions, explicit protected and handler
+  boundaries, loop destinations, metadata/disassembly and eight opcodes. Raw
+  branches cannot cross region phases. Validation rejects incomplete/forged
+  regions, invalid loop targets, consumption of protected operand prefixes and
+  mismatched exit heights before publishing Code.
+- Extended bounded height verification with exceptional edges and a finite set
+  of cleanup continuation reasons/destinations. A late-discovered continuation
+  requeues that cleanup's end rather than silently losing its successor. A test
+  rejects fallthrough discovered only after an earlier return path has already
+  passed through the cleanup, then verifies the repaired program.
+- Frames own typed Normal/Return/Raise/Break/Continue payloads, active regions,
+  handled exceptions and independent cleanup continuations. Storage reserves
+  the verified lexical depth before execution and is charged to heap pressure.
+  Reasons own their values before trimming; only the exited region's stack
+  base is restored. Inner catches preserve the pending outer cleanup reason.
+- An uncaught child error now reaches the parent's rooted reason and CALL
+  traceback before searching parent handlers. It no longer destroys the whole
+  chain first. Python/native reentry inherits/restores handled exceptions;
+  bare raise and resuming an old Raise avoid duplicate traceback nodes.
+- Added implicit context linking at error origins, terminating on existing
+  cycles and avoiding newly introduced context cycles. The shared emergency
+  MemoryError still receives no automatic traceback/context. bad_alloc inside
+  VM instructions or reason transfers can now reach handlers/finally, while
+  unrelated C++ faults remain host faults with internal Frame cleanup.
+- Added 15 forced-GC tests: structured validation, normal exits, ancestor catch,
+  temporary pending returns, nested handler/finally restoration, return/error/
+  break overrides, loop targets and retained outer operands, inherited bare
+  raise, allocation failure/retry, matching and context cycles. A negative test
+  initially found EXCEPTION_MATCH silently accepting a non-exception input;
+  it now raises TypeError. Earlier deep scheduling/traceback tests remain.
+
+Verification:
+
+- Release foundation 233/233. Full CTest exit 0, discovery count 481
+  (248 legacy + 233 foundation).
+- ASan/UBSan/LeakSanitizer 233/233 outside the ptrace sandbox; TSan 233/233.
+- Independent foundation-only Release built without testing/legacy. Three cost
+  probes ran without concurrent builds or sanitizers; exact-result and final
+  live-set checks passed. The later verifier-only test addition did not change
+  the benchmark executable; the complete test suites were rerun afterwards.
+- GCC 11.4 / Release / x86-64 WSL2, no CPU binding/frequency control: 10000
+  direct calls took 24.42/24.60/27.01 ms; scheduled caller/child calls took
+  41.02/38.86/41.06 ms. A new 11-instruction return-through-finally probe,
+  including a native cleanup call, took 34.92/33.35/36.32 ms per 10000 calls.
+- Frame prefix grew from 144 to 240 bytes; each reserved ActiveRegion is 32
+  bytes and CleanupContinuation is 48 bytes. Buffers/heap/root metadata remain
+  additional costs. Current direct-call samples are slower than the previous
+  tracebacks-only samples; both series and all other probe categories are
+  retained in benchmarks/foundation-*.csv as m4_unwind_*. No speedup, memory
+  parity or CPython performance acceptance is claimed.
+- Staged whitespace checks pass. User perf.data*, test2.py and the unrelated
+  temporary_plan.md deletion are not part of this stable-point commit. No
+  subagent, alternate GC/ownership layer or old-VM fallback was introduced.
+
+Next execution work remains with enter/exit lookup, suppression and binding
+cleanup; except-as cleanup lowering; complete exception normalization/chaining
+and reflection; typed suspension/resume; closures and namespace frames. Full
+M2/M3, pinned source-language differential execution, original single/multi/I/O
+performance acceptance, M5-M9 and replacement release remain unfinished.
+
 ## 2026-10-29 M4 Managed Traceback Stable Point
 
 The full M0-M9 goal remains active. This entry is prepended; earlier development

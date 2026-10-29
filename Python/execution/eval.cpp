@@ -10,39 +10,37 @@ namespace cxxpython::core
         if (defaults) tracer.visit(*defaults);
         if (kwdefaults) tracer.visit(*kwdefaults);
     }
-    void FrameObject::trace(Tracer &tracer) const noexcept
-    {
-        tracer.visit(function); tracer.visit(code); if (back) tracer.visit(*back);
-        for (const auto &value : locals) if (value) tracer.visit(*value);
-        for (std::size_t i = 0; i < sp; ++i) tracer.visit(operands[i]);
-    }
     namespace detail
     {
         class FrameActivation final
         {
         public:
             FrameActivation(Attachment &context, ReturnSlot &active)
-                : context_(context), active_(active), root_(active.result().value()), previous_(context.current_frame_)
+                : context_(context), active_(active), root_(active.result().value()), previous_(context.current_frame_),
+                  previous_exception_(context.handled_exception_)
             {
                 auto &data = context.payload<FrameObject>(root_);
-                data.back = previous_; data.state = FrameState::Running; context.current_frame_ = root_;
+                data.back = previous_; data.handled_exception = previous_exception_;
+                data.state = FrameState::Running; context.current_frame_ = root_; sync();
             }
             ~FrameActivation()
             {
                 while (current() != root_)
                 {
                     auto &data = context_.payload<FrameObject>(current()); const auto parent = *data.back;
-                    complete(data); active_.ok(parent); --depth_; context_.leave_call();
+                    complete(data); active_.ok(parent); context_.leave_call();
                 }
                 complete(context_.payload<FrameObject>(root_)); context_.current_frame_ = previous_;
+                context_.handled_exception_ = previous_exception_;
             }
             Value current() const { return active_.result().value(); }
+            void sync() { context_.handled_exception_ = context_.payload<FrameObject>(current()).handled_exception; }
             bool descend(Handle frame)
             {
                 if (!context_.enter_call()) return false;
                 auto &child = context_.payload<FrameObject>(frame);
-                child.back = current(); child.state = FrameState::Running;
-                active_.ok(frame.get(context_)); context_.current_frame_ = current(); ++depth_; return true;
+                child.back = current(); child.handled_exception = context_.handled_exception_; child.state = FrameState::Running;
+                active_.ok(frame.get(context_)); context_.current_frame_ = current(); sync(); return true;
             }
             bool returned(Value value, ReturnSlot &out)
             {
@@ -53,30 +51,38 @@ namespace cxxpython::core
                 parent.operands[base] = value;
                 for (std::size_t i = base + 1; i < parent.sp; ++i) parent.operands[i] = context_.builtin(CoreObject::None);
                 parent.sp = base + 1; parent.pending_call.reset(); complete(child);
-                active_.ok(parent_value); context_.current_frame_ = parent_value; --depth_; context_.leave_call(); return false;
+                active_.ok(parent_value); context_.current_frame_ = parent_value; sync(); context_.leave_call(); return false;
             }
-            void propagate(ReturnSlot &out)
+            void raising(Value exception, bool traceback = true)
             {
-                for (;;)
+                auto &data = context_.payload<FrameObject>(current()); data.reason = ExceptionRaise{exception}; data.pending_call.reset();
+                if (traceback && exception != context_.builtin(CoreObject::MemoryError))
                 {
-                    RootScope roots(context_);
-                    append_traceback(context_, roots.root(out.result().exception()), roots.root(current()), out);
-                    if (current() == root_) return;
-                    auto &child = context_.payload<FrameObject>(current()); const auto parent = *child.back;
-                    complete(child); active_.ok(parent); context_.current_frame_ = parent; --depth_; context_.leave_call();
+                    RootScope roots(context_); ReturnSlot out(context_);
+                    append_traceback(context_, roots.root(exception), roots.root(current()), out);
+                    data.reason = ExceptionRaise{out.result().exception()};
                 }
+            }
+            bool failed(Value exception, ReturnSlot &out)
+            {
+                if (current() == root_) { out.raised(exception); return true; }
+                auto &child = context_.payload<FrameObject>(current()); const auto parent_value = *child.back;
+                auto &parent = context_.payload<FrameObject>(parent_value);
+                parent.reason = ExceptionRaise{exception}; parent.trim_stack(context_, *parent.pending_call); parent.pending_call.reset();
+                complete(child); active_.ok(parent_value); context_.current_frame_ = parent_value; sync(); context_.leave_call();
+                raising(exception); return false;
             }
         private:
             void complete(FrameObject &frame) noexcept
             {
-                for (std::size_t i = 0; i < frame.sp; ++i) frame.operands[i] = context_.builtin(CoreObject::None);
-                frame.sp = 0; frame.pending_call.reset(); frame.state = FrameState::Completed;
+                frame.trim_stack(context_, 0); frame.pending_call.reset(); frame.regions.clear(); frame.cleanups.clear();
+                frame.reason.reset(); frame.handled_exception.reset(); frame.state = FrameState::Completed;
             }
             Attachment &context_;
             ReturnSlot &active_;
             Value root_;
             std::optional<Value> previous_;
-            std::size_t depth_ = 0;
+            std::optional<Value> previous_exception_;
         };
     }
     namespace
@@ -101,7 +107,7 @@ namespace cxxpython::core
             detail::FunctionDefaults values{context.payload<TupleObject>(defaults).items, keywords};
             if (!detail::bind_arguments(context, program.signature(), args, receiver, roots, bound, out, values)) return;
             context.allocate_instance<FrameObject>(roots.root(context.builtin(CoreObject::FrameType)), out,
-                function.get(context), code.get(context), program.local_names().size(), program.max_stack(), context.builtin(CoreObject::None));
+                function.get(context), code.get(context), program.local_names().size(), program.max_stack(), context.builtin(CoreObject::None), program.max_regions());
             auto &data = context.payload<FrameObject>(out.result().value());
             for (std::size_t i = 0; i < bound.size(); ++i) data.locals[i] = bound[i];
         }
@@ -111,88 +117,122 @@ namespace cxxpython::core
             for (;;)
             {
                 auto &data = context.payload<FrameObject>(activation.current()); const auto &code = context.payload<CodeObject>(data.code);
-                data.last_instruction = data.pc;
-                const auto [opcode, operand] = code.program.instructions()[data.pc++];
-                switch (opcode)
+                try
                 {
-                    case Opcode::LoadConst:
-                        data.operands[data.sp++] = context.payload<TupleObject>(code.constants).items[operand];
-                        break;
-                    case Opcode::LoadFast:
-                        if (!data.locals[operand]) { unbound(context, code, operand, out); return; }
-                        data.operands[data.sp++] = *data.locals[operand]; break;
-                    case Opcode::StoreFast:
-                        data.locals[operand] = data.operands[--data.sp]; data.operands[data.sp] = context.builtin(CoreObject::None); break;
-                    case Opcode::DeleteFast:
-                        if (!data.locals[operand]) { unbound(context, code, operand, out); return; }
-                        data.locals[operand].reset(); break;
-                    case Opcode::PopTop:
-                        data.operands[--data.sp] = context.builtin(CoreObject::None); break;
-                    case Opcode::DupTop:
-                        data.operands[data.sp] = data.operands[data.sp - 1]; ++data.sp; break;
-                    case Opcode::Binary:
-                    case Opcode::Compare:
+                    if (data.reason)
                     {
-                        RootScope roots(context);
-                        auto left = roots.root(data.operands[data.sp - 2]); auto right = roots.root(data.operands[data.sp - 1]);
-                        if (opcode == Opcode::Binary) binary(context, left, right, static_cast<BinaryOp>(operand), result);
-                        else rich_compare(context, left, right, static_cast<CompareOp>(operand), result);
-                        if (raised(result)) { out.raised(result.result().exception()); return; }
-                        data.operands[data.sp - 2] = result.result().value(); data.operands[--data.sp] = context.builtin(CoreObject::None); break;
+                        if (data.unwind(context)) { activation.sync(); continue; }
+                        if (const auto *returned = std::get_if<FunctionReturn>(&*data.reason))
+                        { if (activation.returned(returned->value, out)) return; }
+                        else if (const auto *error = std::get_if<ExceptionRaise>(&*data.reason))
+                        { if (activation.failed(error->exception, out)) return; }
+                        else throw std::logic_error("unverified control reason escaped its Frame");
+                        continue;
                     }
-                    case Opcode::Jump:
-                        data.pc = operand; break;
-                    case Opcode::JumpIfFalse:
+                    data.last_instruction = data.pc;
+                    const auto [opcode, operand] = code.program.instructions()[data.pc++];
+                    switch (opcode)
                     {
-                        RootScope roots(context); truth(context, roots.root(data.operands[data.sp - 1]), result);
-                        if (raised(result)) { out.raised(result.result().exception()); return; }
-                        data.operands[--data.sp] = context.builtin(CoreObject::None);
-                        if (result.result().value() == context.builtin(CoreObject::False)) data.pc = operand;
-                        break;
-                    }
-                    case Opcode::Return:
-                        result.ok(data.operands[data.sp - 1]); detail::validate_return(context, result);
-                        if (activation.returned(result.result().value(), out)) return;
-                        break;
-                    case Opcode::RaiseInstance:
-                    {
-                        auto exception = data.operands[data.sp - 1];
-                        if (!kind<ExceptionObject, CoreObject::BaseExceptionType>(context, exception))
-                            type_error(context, U"RAISE_INSTANCE requires a BaseException instance", out);
-                        else out.raised(exception);
-                        return;
-                    }
-                    case Opcode::Call:
-                    {
-                        const auto &layout = code.program.calls()[operand]; const auto base = data.sp - layout.argument_count() - 1;
-                        const auto &keywords = context.payload<TupleObject>(context.payload<TupleObject>(code.call_keywords).items[operand]).items;
-                        std::vector<KeywordArg> named;
-                        for (std::size_t i = 0; i < keywords.size(); ++i)
-                            named.push_back({keywords[i], data.operands[base + 1 + layout.positional + i]});
-                        CallArgsView args{{data.operands.data() + base + 1, layout.positional}, named};
-                        data.pending_call = base; RootScope roots(context);
-                        auto prepared = detail::prepare_call(context, roots.root(data.operands[base]), args, roots, result);
-                        if (prepared)
+                        case Opcode::LoadConst:
+                            data.operands[data.sp++] = context.payload<TupleObject>(code.constants).items[operand];
+                            break;
+                        case Opcode::LoadFast:
+                            if (!data.locals[operand]) { unbound(context, code, operand, result); activation.raising(result.result().exception()); break; }
+                            data.operands[data.sp++] = *data.locals[operand]; break;
+                        case Opcode::StoreFast:
+                            data.locals[operand] = data.operands[--data.sp]; data.operands[data.sp] = context.builtin(CoreObject::None); break;
+                        case Opcode::DeleteFast:
+                            if (!data.locals[operand]) { unbound(context, code, operand, result); activation.raising(result.result().exception()); break; }
+                            data.locals[operand].reset(); break;
+                        case Opcode::PopTop:
+                            data.operands[--data.sp] = context.builtin(CoreObject::None); break;
+                        case Opcode::DupTop:
+                            data.operands[data.sp] = data.operands[data.sp - 1]; ++data.sp; break;
+                        case Opcode::Binary:
+                        case Opcode::Compare:
                         {
-                            ReturnSlot child(context);
-                            make_frame(context, prepared->function, {prepared->positional, prepared->keywords},
-                                       prepared->receiver ? std::optional<Value>{prepared->receiver->get(context)} : std::optional<Value>{}, child);
-                            if (raised(child)) { out.raised(child.result().exception()); return; }
-                            if (!activation.descend(roots.root(child.result().value())))
-                            { raise_error(context, CoreObject::RecursionErrorType, U"maximum call depth exceeded", out); return; }
+                            RootScope roots(context);
+                            auto left = roots.root(data.operands[data.sp - 2]); auto right = roots.root(data.operands[data.sp - 1]);
+                            if (opcode == Opcode::Binary) binary(context, left, right, static_cast<BinaryOp>(operand), result);
+                            else rich_compare(context, left, right, static_cast<CompareOp>(operand), result);
+                            if (raised(result)) { activation.raising(result.result().exception()); break; }
+                            data.operands[data.sp - 2] = result.result().value(); data.operands[--data.sp] = context.builtin(CoreObject::None); break;
                         }
-                        else
+                        case Opcode::Jump:
+                            data.pc = operand; break;
+                        case Opcode::JumpIfFalse:
                         {
-                            if (raised(result)) { out.raised(result.result().exception()); return; }
-                            data.operands[base] = result.result().value();
-                            for (std::size_t i = base + 1; i < data.sp; ++i) data.operands[i] = context.builtin(CoreObject::None);
-                            data.sp = base + 1; data.pending_call.reset();
+                            RootScope roots(context); truth(context, roots.root(data.operands[data.sp - 1]), result);
+                            if (raised(result)) { activation.raising(result.result().exception()); break; }
+                            data.operands[--data.sp] = context.builtin(CoreObject::None);
+                            if (result.result().value() == context.builtin(CoreObject::False)) data.pc = operand;
+                            break;
                         }
-                        break;
+                        case Opcode::Return:
+                            result.ok(data.operands[data.sp - 1]); detail::validate_return(context, result);
+                            data.reason = FunctionReturn{result.result().value()};
+                            break;
+                        case Opcode::RaiseInstance:
+                        {
+                            auto exception = data.operands[data.sp - 1];
+                            if (!kind<ExceptionObject, CoreObject::BaseExceptionType>(context, exception))
+                            { type_error(context, U"RAISE_INSTANCE requires a BaseException instance", result); exception = result.result().exception(); }
+                            else detail::link_exception_context(context, exception);
+                            activation.raising(exception); break;
+                        }
+                        case Opcode::Call:
+                        {
+                            const auto &layout = code.program.calls()[operand]; const auto base = data.sp - layout.argument_count() - 1;
+                            const auto &keywords = context.payload<TupleObject>(context.payload<TupleObject>(code.call_keywords).items[operand]).items;
+                            std::vector<KeywordArg> named;
+                            for (std::size_t i = 0; i < keywords.size(); ++i)
+                                named.push_back({keywords[i], data.operands[base + 1 + layout.positional + i]});
+                            CallArgsView args{{data.operands.data() + base + 1, layout.positional}, named};
+                            data.pending_call = base; RootScope roots(context);
+                            auto prepared = detail::prepare_call(context, roots.root(data.operands[base]), args, roots, result);
+                            if (prepared)
+                            {
+                                ReturnSlot child(context);
+                                make_frame(context, prepared->function, {prepared->positional, prepared->keywords},
+                                           prepared->receiver ? std::optional<Value>{prepared->receiver->get(context)} : std::optional<Value>{}, child);
+                                if (raised(child)) { activation.raising(child.result().exception()); break; }
+                                if (!activation.descend(roots.root(child.result().value())))
+                                { raise_error(context, CoreObject::RecursionErrorType, U"maximum call depth exceeded", result); activation.raising(result.result().exception()); }
+                            }
+                            else
+                            {
+                                if (raised(result)) { activation.raising(result.result().exception()); break; }
+                                data.operands[base] = result.result().value();
+                                for (std::size_t i = base + 1; i < data.sp; ++i) data.operands[i] = context.builtin(CoreObject::None);
+                                data.sp = base + 1; data.pending_call.reset();
+                            }
+                            break;
+                        }
+                        case Opcode::EnterRegion:
+                            data.regions.push_back({{operand, RegionPhase::Protected}, data.sp, {}}); break;
+                        case Opcode::LeaveRegion:
+                            data.reason = NormalExit{code.program.regions()[operand].after_pc, code.program.regions()[operand].parent}; break;
+                        case Opcode::EndHandler:
+                            data.finish_handler(context); activation.sync(); break;
+                        case Opcode::BreakLoop:
+                            data.reason = LoopBreak{operand}; break;
+                        case Opcode::ContinueLoop:
+                            data.reason = LoopContinue{operand}; break;
+                        case Opcode::LoadException:
+                            data.operands[data.sp++] = data.handled_exception.value_or(context.builtin(CoreObject::None)); break;
+                        case Opcode::Reraise:
+                            if (data.handled_exception) activation.raising(*data.handled_exception, false);
+                            else { raise_error(context, CoreObject::RuntimeErrorType, U"no active exception to reraise", result); activation.raising(result.result().exception()); }
+                            break;
+                        case Opcode::ExceptionMatch:
+                            detail::exception_match(context, data.operands[data.sp - 2], data.operands[data.sp - 1], result);
+                            if (raised(result)) { activation.raising(result.result().exception()); break; }
+                            data.operands[data.sp - 2] = result.result().value(); data.operands[--data.sp] = context.builtin(CoreObject::None); break;
+                        case Opcode::Count:
+                            throw std::logic_error("unverified opcode reached execution");
                     }
-                    case Opcode::Count:
-                        throw std::logic_error("unverified opcode reached execution");
                 }
+                catch (const std::bad_alloc &) { activation.raising(context.builtin(CoreObject::MemoryError)); }
             }
         }
         void code_name(Attachment &c, Value value, ReturnSlot &out) { out.ok(c.payload<CodeObject>(value).name); }
@@ -268,7 +308,6 @@ namespace cxxpython::core
             ReturnSlot active(context); make_frame(context, function, args, receiver, active);
             if (raised(active)) { out.raised(active.result().exception()); return; }
             FrameActivation activation(context, active); run(context, activation, out);
-            if (raised(out)) activation.propagate(out);
         }
         LayoutDescriptor execution_layout(CoreObject type)
         {

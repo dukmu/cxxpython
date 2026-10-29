@@ -27,6 +27,7 @@ add_library(cxxpython_foundation
     Python/execution/code.cpp
     Python/execution/eval.cpp
     Python/execution/traceback.cpp
+    Python/execution/unwind.cpp
 )
 target_include_directories(cxxpython_foundation PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/Include)
 target_include_directories(cxxpython_foundation SYSTEM PRIVATE ${BOOST_MULTIPRECISION_INCLUDE_DIR})
@@ -166,6 +167,7 @@ add_executable(test_foundation
     Tests/cpp/core/test_execution.cpp
     Tests/cpp/core/test_scheduling.cpp
     Tests/cpp/core/test_traceback.cpp
+    Tests/cpp/core/test_unwind.cpp
 )
 target_link_libraries(test_foundation PRIVATE cxxpython_foundation GTest::gtest_main)
 target_compile_options(test_foundation PRIVATE -Wall -Wextra -Wpedantic -Werror)

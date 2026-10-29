@@ -14,3 +14,12 @@ m4_traceback_direct,10000,24576849,4,2,144,ok,0
 m4_traceback_scheduled,10000,40716390,5,3,144,ok,4
 m4_traceback_scheduled,10000,35564626,5,3,144,ok,4
 m4_traceback_scheduled,10000,36833672,5,3,144,ok,4
+m4_unwind_direct,10000,24422212,4,2,240,ok,0
+m4_unwind_direct,10000,24601781,4,2,240,ok,0
+m4_unwind_direct,10000,27011885,4,2,240,ok,0
+m4_unwind_scheduled,10000,41018727,5,3,240,ok,4
+m4_unwind_scheduled,10000,38864236,5,3,240,ok,4
+m4_unwind_scheduled,10000,41055997,5,3,240,ok,4
+m4_unwind_finally,10000,34919313,11,2,240,ok,0
+m4_unwind_finally,10000,33351172,11,2,240,ok,0
+m4_unwind_finally,10000,36320421,11,2,240,ok,0

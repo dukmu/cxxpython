@@ -20,7 +20,7 @@ All new C++ interfaces are internal and unstable until the M1-M4 gates pass.
 | M1 storage/environment | Experimental | B0-B2 storage and seed gates now pass; interfaces remain internal/unstable |
 | M2 types/methods/call | Experimental | Calls/construction, field tails, cells, B2 promotion and common hash/repr/str/truth/comparison/arithmetic dispatch exist; full protocols/reflection/mutation and weakrefs remain |
 | M3 builtins | Experimental | Int/bool seed, initial Unicode value/representation/hash, tuple and cell value semantics; complete numeric, container, iterator, codec/buffer and finalization matrices remain |
-| M4 execution | Experimental | Verified Code/Function/Frame, ObjectOps switch execution, non-recursive calls and explicit-error tracebacks exist; regions/unwind, full exception context, closure/namespace execution and suspension remain |
+| M4 execution | Experimental | Verified Code/Function/Frame, non-recursive calls, tracebacks and structured handler/finally/loop unwind exist; full exception normalization, with, closure/namespace execution and suspension remain |
 | M5 frontend | Planned | ScopeInfo/CFG, source positions, validated Code, L0-L2 differential cases |
 | M6 boot/platform | Planned | RunRequest, loader/import, CLI/embedding, I/O, thread API and shutdown |
 | M7 libraries | Planned | Real workflows and dependency closures, including unittest |
@@ -165,8 +165,9 @@ overlap does not close either milestone.
 M4 now has verified Code/CodeBuilder, stable rooted Frame storage and
 constant/local/arithmetic/comparison/branch/call/return execution through ObjectOps.
 Ordinary Python calls now use a Frame loop. The next execution slice is
-structured regions/unwind and handled-exception context, followed by typed
-suspension outcomes. Explicit-error traceback construction is now implemented.
+with/exception-normalization completion, typed suspension outcomes and
+closure/namespace execution. Structured region unwind and per-Frame handled
+exception restoration now run through the same scheduler as ordinary calls.
 The plan explicitly permits M3 expansion and M4 execution in parallel after a
 minimal builtin set exists. Full M3 is not an added prerequisite for this first
 executor. Remaining type/reflection/mutation, callable value semantics,
@@ -906,3 +907,88 @@ These contract checks are not a pinned executable source-language differential
 suite. Region/handler/cleanup validation, bare raise, raise class/cause and
 handled-exception context, finally/with, closure/namespace execution and typed
 suspension/resume remain M4 requirements. M0-M9 remains active.
+
+## M4 Structured Regions And Traced Unwind
+
+CodeBuilder declares Loop, Except and Finally regions, enters/leaves their
+protected bodies and marks handler boundaries. Each region has one immutable
+parent token (including Protected/Handler/Cleanup phase), entry/exit/handler
+PCs and a lexical depth. Loops additionally require explicit continue and break
+labels. Region IDs and labels belong to their builder. Ordinary branches keep
+their region token; crossing a boundary, entering a handler by a raw jump,
+incomplete/misnested regions and inactive loop targets are rejected before Code
+publication, including invalid operands in unreachable instructions.
+
+| Opcode | Normal Stack Effect | Region/Exceptional Effect |
+| --- | --- | --- |
+| ENTER_REGION id | 0 | Records the current stack base in a preallocated active-region array |
+| LEAVE_REGION id | 0 | Normal(after_pc, parent); skips except handlers or enters finally |
+| END_HANDLER id | 0 | Restores the previous handled exception; finally resumes its saved reason |
+| BREAK_LOOP id | 0 | Unwinds to and leaves the named active loop |
+| CONTINUE_LOOP id | 0 | Unwinds to the named loop, retaining that loop and its outer regions |
+| RERAISE | 0 | Raises the handled exception without adding a traceback node; absent state raises RuntimeError |
+| LOAD_EXCEPTION | +1 | Pushes the actual handled exception, or None outside handling |
+| EXCEPTION_MATCH | -1 | Consumes exception/matcher, produces bool; invalid instances/classes raise TypeError |
+
+All eight opcodes use the existing Opcode/uint32 private encoding and central
+metadata/disassembly. Matcher classes must really derive from BaseException;
+flat tuples validate every member even when an earlier one matches. Actual
+subtype checks do not call a metaclass __subclasscheck__. Raise class/cause
+normalization and exception groups are not supplied by RAISE_INSTANCE.
+
+The verifier joins one stack height per PC and propagates exceptional edges
+through lexical parents. A protected prefix cannot be consumed; normal region
+exits and handler ends must restore their base. Except entry gets base+1 for
+the exception; finally entry gets base. Each finally records a finite set of
+abstract (reason, destination) continuations. Discovering a new continuation
+requeues only that cleanup's end, so forward discovery cannot hide a normal
+or loop successor. Growing stack states still fail a merge; the verifier does
+not enumerate arbitrary heights or recurse over nested regions.
+
+Frames own typed NormalExit/FunctionReturn/ExceptionRaise/LoopBreak/LoopContinue
+reasons, active-region state and one saved continuation for each entered
+cleanup. Arrays reserve the verified maximum lexical depth during Frame
+construction and their capacity counts toward heap pressure. A reason owns
+its payload before stack trimming. Each exited region restores only its own
+stack base; outer operand prefixes remain alive. Normal cleanup completion
+resumes its saved reason. A new return/raise/break/continue discards only the
+continuations it actually exits. An exception caught inside a cleanup leaves
+the enclosing cleanup's saved reason intact. All reason payloads and saved
+exception contexts are traced fields, not Handles from a temporary RootScope.
+
+Raised exits no longer complete the whole chain before handlers can see them.
+The current Frame first gets its traceback node, then unwinds its own regions.
+Only an uncaught error crosses to a parked parent, rooted in the parent's
+reason before the child is cleared. Failed CALL operands/pending state are
+released, and the parent then adds its own CALL traceback node and searches its
+regions. Resuming an old Raise from finally or using bare RERAISE does not add
+a duplicate node. Native reentry and scheduled Python calls inherit and restore
+the same per-Frame handled exception. The Attachment view borrows that rooted
+Frame field; it is not a second owner or interpreter-global exception state.
+
+Native raise_error and explicit instance raises link implicit exception
+context at the origin, not at each propagation hop. Context linking avoids
+creating a new context cycle and terminates on existing user-created cycles.
+The emergency MemoryError reserve still receives no automatic mutable context
+or traceback. Managed/host bad_alloc during an instruction or a reason transfer
+becomes that reserve inside the current Frame, allowing handlers and finally
+to execute without allocating unwind storage. Other C++ faults still leave
+through the host-fault path, clearing internal state rather than fabricating a
+Python exception. Frame completion clears all transient unwind/handled fields.
+
+Fifteen focused tests exercise validation, late cleanup-continuation discovery,
+normal except/finally exits,
+ancestor catch and actual tracebacks, GC with pending temporary return values,
+nested internally caught errors, return/error/break overrides, loop targeting
+and operand preservation, Python/native inherited bare raise, allocation failure
+catch/retry, matcher rejection and existing/new context cycles. The invalid
+EXCEPTION_MATCH instance test initially failed and now raises TypeError.
+The older 6000-deep return/error scheduling and lifecycle suites remain enabled.
+
+Reference: fixed [CPython v3.12.14 raise logic](https://github.com/python/cpython/blob/v3.12.14/Python/ceval.c)
+and [implicit exception context handling](https://github.com/python/cpython/blob/v3.12.14/Python/errors.c).
+There is still no new source frontend or pinned executable language differential
+suite. With enter/exit lookup, suppression and binding cleanup; except-as target
+cleanup lowering; class/cause normalization and full exception reflection;
+yield/send/throw/close; closures and namespace frames remain M4-M5 gates. This
+is an Experimental execution slice, not complete M4 or Python-language support.

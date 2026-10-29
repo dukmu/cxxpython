@@ -324,6 +324,7 @@ namespace cxxpython::core
         void leave_native_call() noexcept;
         CallExecutor call_executor() const;
         std::optional<Value> current_frame() const;
+        std::optional<Value> handled_exception() const;
         std::uint64_t keyed_hash(std::span<const std::byte> data) const;
         // Borrowed identities only; callers keep their objects rooted throughout.
         bool enter_repr(Handle object);
@@ -389,6 +390,7 @@ namespace cxxpython::core
         std::size_t native_depth_ = 0;
         std::vector<Value> repr_stack_;
         std::optional<Value> current_frame_;
+        std::optional<Value> handled_exception_;
     };
 
     class NativeWait final

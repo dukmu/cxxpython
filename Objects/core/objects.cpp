@@ -127,6 +127,7 @@ namespace cxxpython::core
             auto arguments = roots.root(temporary.result().value());
             auto exception_type = roots.root(context.builtin(type));
             context.allocate_instance<ExceptionObject>(exception_type, temporary, arguments.get(context));
+            detail::link_exception_context(context, temporary.result().value());
             out.raised(temporary.result().value());
         }
         catch (const std::bad_alloc &) { out.raised(context.builtin(CoreObject::MemoryError)); }
