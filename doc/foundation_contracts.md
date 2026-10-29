@@ -19,8 +19,8 @@ is retained; the concurrency gates do not narrow language/library/release scope.
 | Concurrency Gate | Current Status | Remaining Evidence |
 | --- | --- | --- |
 | N0 access/publication contracts | Experimental | Plan 2 adopted; per-field migration contracts and implementation audits still required |
-| N1 roots/heap/GC | Experimental | Thread-owned roots/spans, adjacent stable metadata, batched pressure and request/ack/completed gate exist; TransferRecord, bounded rooted shared reads and native slow-path/timeout audits remain |
-| N2 shared objects/methods | Planned | TypeSnapshot/FunctionCallState, atomic/shared fields and callback-safe critical sections |
+| N1 roots/heap/GC | Experimental | Thread-owned roots/spans, epochs, bounded atomic load-to-root and managed transfer leases exist; native slow-path, duration/timeout and complete lifecycle audits remain |
+| N2 shared objects/methods | Experimental | Cell contents use rooted atomic access; header/tails, Dict/TypeSnapshot/FunctionCallState, exception fields and callback-safe critical sections remain |
 | N3 parallel VM | Planned | Dispatch polling exists; shared same Function/Code CPU progress, allocation-free VM loop acknowledgement and 1/2/4-worker Python costs remain |
 | N4-N6 completion/release | Planned | Remaining runtime, frontend/library, platform, performance and replacement gates |
 
@@ -154,6 +154,21 @@ test has a 15-second timeout. ASan/UBSan and TSan use separate builds of this
 same target and tests, not the old object code.
 
 ## Cost Baseline And Fixed Workloads
+
+New numeric tables are generated, not manually maintained:
+
+```sh
+python3 Tools/record_foundation_benchmarks.py --binary /tmp/cxxpython-foundation-release/bench_foundation --series <checkpoint> --runs 3
+python3 Tools/record_foundation_benchmarks.py --report-only --date 2026-10-29
+```
+
+The recorder appends raw runs/provenance to foundation-runs-<date>.jsonl and
+regenerates foundation-results-<date>.csv plus foundation-report-<date>.md.
+Repeated series append sample IDs instead of replacing slow cases. Binary hash,
+available CMake flags, platform, CPU count and captured output are retained.
+--input imports earlier captured output without claiming binary provenance.
+Historical wide CSVs remain unchanged; new measurements use this single producer.
+See [the generated report](benchmarks/foundation-report-2026-10-29.md).
 
 M1's opt-in `bench_foundation` (`CXXPYTHON_BUILD_BENCHMARKS=ON`) records 100000
 synthetic node allocations with automatic GC and 100000 root register/releases,
@@ -1314,10 +1329,101 @@ quota commits, concurrent external accounting and all existing forced-GC/type/
 tail-layout regressions. Native probes report core and frozen-worker reserved
 storage alongside time; neither is Python VM parallelism evidence.
 
-Remaining work includes bounded NoSafepoint rooted reads, TransferRecord, native
-allocator/constructor blocking preparation, fragmentation tuning under real
+The next slice below adds bounded atomic reads, NoSafepoint and TransferRecord.
+Remaining work includes native allocator/constructor blocking preparation, fragmentation tuning under real
 workloads, complete timeout diagnostics and N2 shared-field migration. The first
 refill still uses host allocation while Active, and non-hot layout selection
 scans a thread-local span list. These are disclosed slow-path limits, not another
 global heap lock. Same PythonFunction/Code CPU acceptance and the full release
 matrix remain mandatory; N1/N2/N3 are not declared complete by this slice.
+
+## Bounded Shared Edges And Managed Transfer Leases
+
+`AtomicGcEdge` is noncopyable and exposes no raw mutator load. Attachment validates
+the owner domain, native-prefix field range and caller-owned output before the
+bounded read. An acquire load is immediately written into the already-existing
+ReturnSlot by trusted noexcept publication, with no allocation, callback, wait
+or safepoint between them. Null produces Empty, not Python None or Raised.
+Stores validate inputs, then release-publish within the same short protocol.
+STW trace uses a relaxed atomic load after owner acknowledgement. Atomic edges
+provide data synchronization; NoSafepoint alone never makes ordinary data safe.
+
+NoSafepoint is a nonmovable, owner-local RAII scope. Entry validates attachment;
+all stop/detach paths reject an active scope, so exit needs only a debug ownership
+check and local depth decrement. It does not poll on exit or root borrowed values
+automatically. Prepare all input/output roots before entry; publish live values
+before the next poll. Managed allocation, poll/collect/stats, dynamic RootScope
+creation/release/destruction, root acquisition, calls, representation-stack growth,
+NativeWait and potentially contended pressure accounting are not allowed inside.
+Existing scalar root slots and the documented bounded edge operations are the
+intended interfaces. Raw host allocation, locks and blocking work are also
+forbidden by contract; a C++ scope cannot intercept arbitrary host code.
+Violating noexcept teardown remains a native invariant failure, not a Python
+exception. General scalar API validation remains outside the internal critical
+section; public misuse faults do not consume a transfer or overwrite its output.
+
+Allocation's finite live-metadata/caller-root commit now uses this scope. Native
+construction is a separate unpublished phase: an owner-local construction flag
+rejects runtime GC, root growth, calls and NativeWait until construction commits
+or rolls back. This prevents a constructor from collecting its own unpublished
+span. It does NOT make potentially long host constructors a bounded critical
+section. Staged/NativeWait host preparation and duration diagnostics remain open.
+Ordinary GcEdge store/clear also use bounded publication, but their data still
+requires construction ownership or an object lock; header.type is not atomic yet.
+
+CellObject.contents is an AtomicGcEdge. read_cell transfers directly to a caller
+slot; write_cell stores or clears through the common boundary. The Python
+cell_contents descriptor still raises ValueError for Empty, outside NoSafepoint,
+and deletion remains idempotent. Cell comparison roots both captured operands
+before rich-compare callbacks; repr roots its captured value before further work.
+Class-cell/class-dictionary-cell publication and all execution/unwind/with tests
+now use the same accessors, not a raw optional<Value> backdoor. Invalid Python
+cell types with coincident C++ layout are still rejected by the semantic layer.
+
+Transfer is a move-only native lease holding State and a managed TransferRecord.
+It is not Python object RC or a Python-visible object type. The record has an
+immutable payload, normal precise trace, and coordinator-owned intrusive root
+links. make_transfer allocates and roots the record before briefly linking it
+into State's pending roots. It allocates no queue node while holding that gate.
+The same collector marks registered records and follows their payloads after
+sender roots/arenas retire. Native token moves do not alter the managed graph.
+
+receive validates interpreter, token and output first. Under the coordinator it
+publishes the payload into the receiver's existing root BEFORE unlinking the
+record, in NoSafepoint. Source registration and receive/cancel are bounded O(1)
+native-root changes. Collector scan holds the same gate; it sees either a pending
+record or the acknowledged receiver root, never an unrooted delivery gap.
+Cancellation unlinks without reading payloads and permits later physical GC.
+Native token destruction/reset can run without an Attachment and outside Python;
+it must occur outside NoSafepoint. Physical TransferRecord destroy does not lock,
+follow other records, run callbacks or destroy a native token.
+
+The native token itself needs exclusive host ownership: move it through a
+synchronized host channel; concurrently borrowing one token for receive/reset
+is not supported. Shared Python values can be submitted through separate tokens.
+Close still rejects new attachment, while existing receivers may finish; a token
+also retains storage for cancellation after the Interpreter facade disappears.
+This is storage lifetime, not permission to reattach to a destroyed/closed facade.
+Current transfers carry a value, not a ResultTag/scheduled execution outcome;
+worker result/exception envelopes still require the same rooted delivery contract.
+M6 startup/join/queue/shutdown policy remains a later layer, not a global mailbox
+invented by this slice. HeapStats/gc_state expose pending transfer-root counts.
+
+Current field boundaries added by this slice:
+
+| Storage | Mutator Rule | Collector Rule |
+| --- | --- | --- |
+| AtomicGcEdge / Cell contents | Release store; acquire load directly to an existing owner root under NoSafepoint | Relaxed load only after all owners stop |
+| NoSafepoint depth / unpublished-construction flag | Owning Attachment only; no legal detach while nonzero | Never inspect Active owner fields |
+| TransferRecord payload | Initialize before registration; immutable thereafter | Trace registered records through the normal heap |
+| TransferRecord root links / root count | Native coordinator, outside object locks; no callbacks or allocation in commit | Root enumeration under the same gate |
+| Header, instance tails, Dict, Type/Function metadata and exception chains | Existing explicit core quarantine | Existing STW trace; N2 synchronization still required |
+
+The shared-Cell stress test submits inputs through real Transfer records, retires
+the producer, then runs two Active owners replacing/clearing contents and retaining
+rooted snapshots across concurrent explicit/automatic GC. It exercises actual
+CellObject storage/accessors without bootstrapping unsafe ObjectOps. Descriptor,
+class-construction and VM semantic tests remain serial under quarantine. This
+does not close N2 or prove same-Function/Code Python bytecode CPU parallelism.
+Native probes separately measure rooted reads, store/read and serial transfer
+roundtrips; no cross-thread throughput claim follows from the serial probe.

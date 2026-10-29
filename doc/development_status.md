@@ -1,5 +1,33 @@
 # Development Status
 
+## 2026-10-29 Rooted Shared Edges, Transfer Leases And Generated Measurements
+
+Prepended without changing earlier records. The full Plan 2 goal remains active.
+
+- Added bounded NoSafepoint and unpublished-construction checks; the original
+  regression allowed GC/allocation inside a protected operation and now rejects
+  them. Dynamic roots are prepared outside those scopes.
+- Added AtomicGcEdge load-to-existing-root/release-store and migrated Cell
+  descriptors, comparisons, class construction and VM tests to these accessors.
+- Added GC-managed TransferRecord roots with move-only native delivery/cancel
+  leases, including sender retirement and existing-receiver close behavior.
+  Shared Cell replacement/clear/GC tests use transferred inputs and rooted reads.
+- Release foundation 277/277; complete CTest 525/525; ASan/UBSan/LSan and TSan
+  each 277/277. Twenty-two epoch/transfer tests passed 30 repeats. The recorder's
+  two host Python tests pass; report-only regeneration is byte-for-byte stable.
+- Per user feedback, all new numeric tables now come from
+  Tools/record_foundation_benchmarks.py. Raw initial/final captures were imported,
+  followed by three automatically collected runs. See
+  benchmarks/foundation-report-2026-10-29.md and its raw JSONL/CSV, rather than
+  hand-copied summaries. Earlier wide CSVs are retained unchanged.
+- Stop expanding this slice or repeatedly hardening it. The next integrated
+  acceptance target is N2 shared metadata/fields through N3 same Function/Code
+  parallel execution, with callbacks, GC, return/exception paths and scaling.
+  Cell storage and value delivery alone are not that acceptance. Header/tails,
+  TypeSnapshot/FunctionCallState and exception synchronization remain; native
+  preparation/timeout diagnostics and full N0-N6/M0-M9 gates are not waived.
+  No subagent or legacy fallback was used; unrelated user files remain excluded.
+
 ## 2026-10-29 N1 Local Spans And Lock-Free Layout Lookup Stable Point
 
 This entry is prepended without changing any earlier record. The previous goal

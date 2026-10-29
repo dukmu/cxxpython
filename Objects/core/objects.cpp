@@ -5,6 +5,14 @@
 
 namespace cxxpython::core
 {
+    bool read_cell(Attachment &context, Value cell, ReturnSlot &out)
+    {
+        context.load(cell, context.payload<CellObject>(cell).contents, out);
+        return out.result().tag() == ResultTag::Ok;
+    }
+    void write_cell(Attachment &context, Value cell, std::optional<Value> value)
+    { context.store(cell, context.payload<CellObject>(cell).contents, value); }
+
     namespace
     {
         #include "cxxpython/core/unicode_identifiers.inc"

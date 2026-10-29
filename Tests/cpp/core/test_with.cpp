@@ -7,8 +7,9 @@ namespace
     using namespace cxxpython::core;
     void record(Attachment &c, Value cell, Value event)
     {
-        auto items = c.payload<TupleObject>(*c.payload<CellObject>(cell).contents).items; items.push_back(event);
-        ReturnSlot out(c); cxxpython::core::make_tuple(c, items, out); c.payload<CellObject>(cell).contents = out.result().value();
+        ReturnSlot previous(c); ASSERT_TRUE(read_cell(c, cell, previous));
+        auto items = c.payload<TupleObject>(previous.result().value()).items; items.push_back(event);
+        ReturnSlot out(c); cxxpython::core::make_tuple(c, items, out); write_cell(c, cell, out.result().value());
     }
     class CoreWith : public testing::Test
     {
@@ -43,12 +44,12 @@ namespace
         { ASSERT_EQ(out.result().tag(), ResultTag::Raised); EXPECT_EQ(context.type_of(out.result().exception()), context.builtin(kind)); }
         std::vector<std::string> events(Handle log)
         {
-            std::vector<std::string> result;
-            for (auto value : context.payload<TupleObject>(*context.payload<CellObject>(log).contents).items) result.push_back(int_decimal(context, value));
+            std::vector<std::string> result; ReturnSlot snapshot(context); read_cell(context, log.get(context), snapshot);
+            for (auto value : context.payload<TupleObject>(snapshot.result().value()).items) result.push_back(int_decimal(context, value));
             return result;
         }
-        std::span<const Value> arguments(const Manager &manager)
-        { return context.payload<TupleObject>(*context.payload<CellObject>(manager.arguments).contents).items; }
+        std::span<const Value> arguments(const Manager &manager, ReturnSlot &snapshot)
+        { read_cell(context, manager.arguments.get(context), snapshot); return context.payload<TupleObject>(snapshot.result().value()).items; }
         Manager manager(Handle log, Handle value, Handle exit_result, bool enter_error = false, bool exit_error = false,
                         std::int64_t enter_event = 1, std::int64_t exit_event = 2)
         {
@@ -69,7 +70,7 @@ namespace
             make_native_function(context, "exit", exit,
                 [](Attachment &c, Handle fn, std::span<const Value> args, ReturnSlot &out) {
                     const auto &v = c.payload<NativeFunctionObject>(fn).captures;
-                    cxxpython::core::make_tuple(c, args.subspan(1), out); c.payload<CellObject>(v[3]).contents = out.result().value();
+                    cxxpython::core::make_tuple(c, args.subspan(1), out); write_cell(c, v[3], out.result().value());
                     record(c, v[0], v[1]); c.collect();
                     if (args[2] != c.builtin(CoreObject::None)) { EXPECT_EQ(c.handled_exception(), args[2]); }
                     if (v[4] == c.builtin(CoreObject::True)) raise_error(c, CoreObject::RuntimeErrorType, U"exit error", out);
@@ -107,7 +108,7 @@ namespace
         builder.emit(Opcode::LoadFast); builder.emit(Opcode::Return); auto fn = function(builder); ReturnSlot out(context);
         call(context, fn, {}, out); ASSERT_EQ(out.result().tag(), ResultTag::Ok); EXPECT_EQ(out.result().value(), expected.get(context));
         EXPECT_EQ(events(recorded), (std::vector<std::string>{"1", "2"}));
-        ASSERT_EQ(arguments(owner).size(), 3U); for (auto arg : arguments(owner)) EXPECT_EQ(arg, context.builtin(CoreObject::None));
+        ASSERT_EQ(arguments(owner, out).size(), 3U); for (auto arg : arguments(owner, out)) EXPECT_EQ(arg, context.builtin(CoreObject::None));
         const auto code = roots.root(context.payload<FunctionObject>(fn).code); const auto &program = context.payload<CodeObject>(code).program;
         EXPECT_EQ(program.max_stack(), 5U); EXPECT_NE(disassemble(context, code).find("WITH_EXIT"), std::string::npos);
         EXPECT_FALSE(context.current_frame()); EXPECT_FALSE(context.handled_exception());
@@ -123,7 +124,7 @@ namespace
             ReturnSlot out(context); call(context, function(builder), {}, out);
             if (suppress) { ASSERT_EQ(out.result().tag(), ResultTag::Ok); EXPECT_EQ(out.result().value(), context.builtin(CoreObject::None)); }
             else { ASSERT_EQ(out.result().tag(), ResultTag::Raised); EXPECT_EQ(out.result().exception(), raised.get(context)); }
-            const auto args = arguments(owner); ASSERT_EQ(args.size(), 3U); EXPECT_EQ(args[0], context.builtin(CoreObject::ValueErrorType));
+            const auto args = arguments(owner, out); ASSERT_EQ(args.size(), 3U); EXPECT_EQ(args[0], context.builtin(CoreObject::ValueErrorType));
             EXPECT_EQ(args[1], raised.get(context)); EXPECT_EQ(context.type_of(args[2]), context.builtin(CoreObject::TracebackType));
             EXPECT_EQ(context.payload<ExceptionObject>(raised).traceback, args[2]);
             EXPECT_EQ(events(recorded), (std::vector<std::string>{"1", "2"})); EXPECT_FALSE(context.handled_exception());
@@ -136,7 +137,7 @@ namespace
         CodeBuilder builder(context); auto region = builder.region(RegionKind::With); load(builder, owner.instance); builder.enter(region);
         builder.emit(Opcode::PopTop); builder.leave(region); returned_none(builder); ReturnSlot out(context);
         call(context, function(builder), {}, out); error(out, CoreObject::ValueErrorType); EXPECT_EQ(events(recorded), (std::vector<std::string>{"1"}));
-        EXPECT_EQ(context.payload<CellObject>(owner.arguments).contents, context.builtin(CoreObject::None));
+        ASSERT_TRUE(read_cell(context, owner.arguments.get(context), out)); EXPECT_EQ(out.result().value(), context.builtin(CoreObject::None));
     }
 
     TEST_F(CoreWith, MissingExitIsDiagnosedBeforeCallingEnter)
@@ -169,7 +170,7 @@ namespace
         CodeBuilder builder(context); auto region = builder.region(RegionKind::With); load(builder, integer(42));
         load(builder, owner.instance); builder.enter(region); builder.emit(Opcode::PopTop); load(builder, integer(99)); builder.emit(Opcode::Return);
         builder.leave(region); call(context, function(builder), {}, out); ASSERT_EQ(out.result().tag(), ResultTag::Ok); EXPECT_EQ(int_decimal(context, out.result().value()), "99");
-        for (auto arg : arguments(owner)) { EXPECT_EQ(arg, context.builtin(CoreObject::None)); }
+        for (auto arg : arguments(owner, out)) { EXPECT_EQ(arg, context.builtin(CoreObject::None)); }
         EXPECT_FALSE(context.current_frame());
         CodeBuilder normal(context); region = normal.region(RegionKind::With); load(normal, owner.instance); normal.enter(region);
         normal.emit(Opcode::PopTop); normal.leave(region); returned_none(normal); call(context, function(normal), {}, out);
@@ -194,8 +195,8 @@ namespace
         load(builder, owner.instance); builder.enter(region); builder.emit(Opcode::StoreFast);
         load(builder, assign); builder.emit(Opcode::LoadFast); builder.call(1); builder.emit(Opcode::PopTop);
         builder.leave(region); returned_none(builder); call(context, function(builder), {}, out); error(out, CoreObject::TypeErrorType);
-        EXPECT_EQ(events(recorded), (std::vector<std::string>{"1", "2"})); ASSERT_EQ(arguments(owner).size(), 3U);
-        EXPECT_EQ(arguments(owner)[0], context.builtin(CoreObject::TypeErrorType));
+        EXPECT_EQ(events(recorded), (std::vector<std::string>{"1", "2"})); ASSERT_EQ(arguments(owner, out).size(), 3U);
+        EXPECT_EQ(arguments(owner, out)[0], context.builtin(CoreObject::TypeErrorType));
     }
 
     TEST_F(CoreWith, NestedManagersExitInReverseOrderAndOuterExitSeesSuppression)
@@ -207,7 +208,7 @@ namespace
         builder.emit(Opcode::PopTop); throw_instance(builder, raised); builder.leave(b); builder.leave(a); returned_none(builder); ReturnSlot out(context);
         call(context, function(builder), {}, out); ASSERT_EQ(out.result().tag(), ResultTag::Ok);
         EXPECT_EQ(events(recorded), (std::vector<std::string>{"1", "2", "3", "4"}));
-        EXPECT_EQ(arguments(inner)[1], raised.get(context)); for (auto arg : arguments(outer)) EXPECT_EQ(arg, context.builtin(CoreObject::None));
+        EXPECT_EQ(arguments(inner, out)[1], raised.get(context)); for (auto arg : arguments(outer, out)) EXPECT_EQ(arg, context.builtin(CoreObject::None));
     }
 
     TEST_F(CoreWith, ImplicitDescriptorLookupPrecedesEnterAndIgnoresInstanceAttributeHooks)
@@ -281,7 +282,7 @@ namespace
         builder.leave(region); builder.leave(loop); builder.bind(done); builder.emit(Opcode::LoadFast); builder.emit(Opcode::Return); ReturnSlot out(context);
         call(context, function(builder), {}, out); ASSERT_EQ(out.result().tag(), ResultTag::Ok); EXPECT_EQ(int_decimal(context, out.result().value()), "2");
         EXPECT_EQ(events(recorded), (std::vector<std::string>{"1", "2", "1", "2"}));
-        for (auto arg : arguments(owner)) { EXPECT_EQ(arg, context.builtin(CoreObject::None)); }
+        for (auto arg : arguments(owner, out)) { EXPECT_EQ(arg, context.builtin(CoreObject::None)); }
     }
 
     TEST_F(CoreWith, SuppressionTruthCallbackSeesTheOriginalErrorAndRestoresOuterHandling)
@@ -313,7 +314,7 @@ namespace
         make_native_function(context, "exit without allocation", exit,
             [](Attachment &c, Handle fn, std::span<const Value> args, ReturnSlot &out) {
                 EXPECT_EQ(args[2], c.builtin(CoreObject::MemoryError)); EXPECT_EQ(c.handled_exception(), args[2]);
-                c.payload<CellObject>(c.payload<NativeFunctionObject>(fn).captures[0]).contents = c.builtin(CoreObject::True);
+                write_cell(c, c.payload<NativeFunctionObject>(fn).captures[0], c.builtin(CoreObject::True));
                 c.collect(); out.ok(c.builtin(CoreObject::True));
             }, captures, out); set(cls, U"__exit__", roots.root(out.result().value()));
         context.allocate_instance<InstanceObject>(cls, out); auto self = roots.root(out.result().value());
@@ -324,7 +325,7 @@ namespace
         builder.leave(region); returned_none(builder); auto fn = function(builder); call(context, fn, {}, out);
         context.set_allocation_limit(std::numeric_limits<std::size_t>::max());
         ASSERT_EQ(out.result().tag(), ResultTag::Ok); EXPECT_EQ(out.result().value(), context.builtin(CoreObject::None));
-        EXPECT_EQ(context.payload<CellObject>(exited).contents, context.builtin(CoreObject::True)); EXPECT_FALSE(context.handled_exception());
+        ASSERT_TRUE(read_cell(context, exited.get(context), out)); EXPECT_EQ(out.result().value(), context.builtin(CoreObject::True)); EXPECT_FALSE(context.handled_exception());
         EXPECT_FALSE(context.payload<ExceptionObject>(context.builtin(CoreObject::MemoryError)).traceback);
     }
 

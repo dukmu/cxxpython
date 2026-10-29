@@ -302,14 +302,14 @@ namespace cxxpython::core
             wrap_definition(context, cls, U"__class_getitem__", true);
             if (classcell)
             {
-                context.payload<CellObject>(*classcell).contents = cls.get(context);
+                write_cell(context, *classcell, cls.get(context));
                 detail::name_erase(context, *payload.dictionary, U"__classcell__");
             }
             if (auto cell = detail::name_lookup(context, *payload.dictionary, U"__classdictcell__"))
             {
                 if (!is_instance(context, *cell, CoreObject::CellType))
                 { type_error(context, U"__classdictcell__ must be a cell", out); return; }
-                context.payload<CellObject>(*cell).contents = *payload.dictionary;
+                write_cell(context, *cell, *payload.dictionary);
                 detail::name_erase(context, *payload.dictionary, U"__classdictcell__");
             }
             finish_class(context, cls, named, out);

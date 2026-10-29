@@ -36,16 +36,17 @@ namespace
                 [](Attachment &c, Handle fn, std::span<const Value>, ReturnSlot &out) {
                     const auto &captures = c.payload<NativeFunctionObject>(fn).captures;
                     EXPECT_EQ(c.handled_exception().value_or(c.builtin(CoreObject::None)), captures[2]);
-                    const auto cell = captures[0]; auto items = c.payload<TupleObject>(*c.payload<CellObject>(cell).contents).items;
+                    const auto cell = captures[0]; ReturnSlot previous(c); ASSERT_TRUE(read_cell(c, cell, previous));
+                    auto items = c.payload<TupleObject>(previous.result().value()).items;
                     items.push_back(captures[1]); cxxpython::core::make_tuple(c, items, out);
-                    c.payload<CellObject>(cell).contents = out.result().value(); c.collect(); out.ok(c.builtin(CoreObject::None));
+                    write_cell(c, cell, out.result().value()); c.collect(); out.ok(c.builtin(CoreObject::None));
                 }, captures, out);
             return roots.root(out.result().value());
         }
         std::vector<std::string> events(Handle log)
         {
-            std::vector<std::string> result;
-            for (auto event : context.payload<TupleObject>(*context.payload<CellObject>(log).contents).items) result.push_back(int_decimal(context, event));
+            std::vector<std::string> result; ReturnSlot snapshot(context); read_cell(context, log.get(context), snapshot);
+            for (auto event : context.payload<TupleObject>(snapshot.result().value()).items) result.push_back(int_decimal(context, event));
             return result;
         }
         void load(CodeBuilder &builder, Handle value) { builder.emit(Opcode::LoadConst, builder.constant(value)); }

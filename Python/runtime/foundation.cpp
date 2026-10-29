@@ -36,6 +36,14 @@ namespace cxxpython::core
     }
     namespace detail
     {
+        struct TransferRecord
+        {
+            ObjectHeader header;
+            const Value payload;
+            TransferRecord *previous = nullptr, *next = nullptr; // Coordinator-owned root links, not heap edges.
+            TransferRecord(ObjectHeader head, Value value) : header(head), payload(value) {}
+            void trace(Tracer &tracer) const noexcept { tracer.visit(payload); }
+        };
         std::uint64_t siphash24(std::span<const std::byte> data, std::array<std::uint64_t, 2> key) noexcept
         {
             // SipHash-2-4: two compression rounds per word, four final rounds.
@@ -183,6 +191,7 @@ namespace cxxpython::core
                 for (const auto &thread : threads) { roots += thread->roots.count; cells += thread->roots.cells.size(); }
                 HeapStats result{0, 0, cells * sizeof(RootCell) + threads.size() * sizeof(ThreadRecord),
                     roots, cells, collections, reclaimed_bytes, last_pause_ns, threads.size(), last_rendezvous_ns, max_rendezvous_ns};
+                result.transfer_roots = transfer_count;
                 auto count = [&](const auto &spans) {
                     for (const auto &span : spans)
                     {
@@ -208,6 +217,13 @@ namespace cxxpython::core
                 auto charged = allocated_since_gc.load(std::memory_order_relaxed);
                 while (!allocated_since_gc.compare_exchange_weak(charged, saturated_add(charged, thread.pending_bytes), std::memory_order_relaxed)) {}
                 thread.pending_bytes = 0;
+            }
+            void unlink_transfer(TransferRecord &record) noexcept
+            {
+                if (record.previous) record.previous->next = record.next;
+                else { assert(transfer_head == &record); transfer_head = record.next; }
+                if (record.next) record.next->previous = record.previous;
+                record.previous = record.next = nullptr; assert(transfer_count); --transfer_count;
             }
             std::size_t rendezvous(ThreadRecord &caller, HeapStats *snapshot = nullptr)
             {
@@ -271,6 +287,7 @@ namespace cxxpython::core
                     for (const auto &cell : thread->roots.cells)
                         if (cell.scope && cell.tag != ResultTag::Empty)
                             mark(cell.object);
+                for (auto *record = transfer_head; record; record = record->next) mark(&record->header);
                 mark(object_type);
                 mark(type_type);
                 for (auto *object : core)
@@ -335,6 +352,8 @@ namespace cxxpython::core
             std::list<AllocationSpan> retired_spans;
             std::vector<std::shared_ptr<ThreadRecord>> threads;
             std::uint64_t next_arena_id = 1;
+            TransferRecord *transfer_head = nullptr;
+            std::size_t transfer_count = 0;
             Allocation *worklist = nullptr;
             std::atomic<std::size_t> allocated_since_gc{0};
             std::size_t budget;
@@ -364,6 +383,7 @@ namespace cxxpython::core
     {
         std::lock_guard gate(state_->coordinator);
         GcSnapshot result{state_->phase, state_->request_epoch.load(std::memory_order_acquire), state_->completed_epoch, state_->threads.size(), 0, 0, 0, state_->collections};
+        result.transfer_roots = state_->transfer_count;
         for (const auto &thread : state_->threads)
             switch (thread->state.load(std::memory_order_acquire))
             {
@@ -394,7 +414,7 @@ namespace cxxpython::core
     Attachment::~Attachment()
     {
         require_attached();
-        if (thread_record_->roots.count != 0 || !repr_stack_.empty() || current_frame_)
+        if (thread_record_->roots.count != 0 || !repr_stack_.empty() || current_frame_ || no_safepoint_depth_ || allocation_in_progress_)
             std::terminate();
         std::unique_lock gate(state_->coordinator);
         state_->flush_charge(*thread_record_);
@@ -410,6 +430,12 @@ namespace cxxpython::core
     {
         if (thread_record_->owner != std::this_thread::get_id() || thread_record_->state.load(std::memory_order_relaxed) != MutatorState::Active)
             throw std::logic_error("Python heap access requires an attached owning thread");
+    }
+    void Attachment::require_safepoint() const
+    {
+        require_attached();
+        if (no_safepoint_depth_ || allocation_in_progress_)
+            throw std::logic_error("operation may stop or allocate during a protected native operation");
     }
     CallExecutor Attachment::call_executor() const
     {
@@ -429,6 +455,7 @@ namespace cxxpython::core
     }
     bool Attachment::enter_repr(Handle object)
     {
+        require_safepoint();
         const auto value = object.get(*this);
         if (std::find(repr_stack_.begin(), repr_stack_.end(), value) != repr_stack_.end()) return false;
         repr_stack_.push_back(value); return true;
@@ -484,7 +511,7 @@ namespace cxxpython::core
 
     Handle Attachment::acquire(const void *scope)
     {
-        require_attached();
+        require_safepoint();
         auto &arena = thread_record_->roots;
         auto *cell = arena.free;
         if (cell)
@@ -532,10 +559,10 @@ namespace cxxpython::core
         return Value(*cell.object);
     }
 
-    RootScope::RootScope(Attachment &context) : context_(context) { context_.require_attached(); }
+    RootScope::RootScope(Attachment &context) : context_(context) { context_.require_safepoint(); }
     RootScope::~RootScope()
     {
-        context_.require_attached();
+        context_.require_safepoint();
         for (auto handle : handles_)
             context_.release(handle);
     }
@@ -554,6 +581,7 @@ namespace cxxpython::core
 
     void RootScope::release(Handle handle)
     {
+        context_.require_safepoint();
         if (context_.cell(handle).scope != this)
             throw std::logic_error("root belongs to another scope");
         auto found = std::find_if(handles_.begin(), handles_.end(), [handle](Handle entry) {
@@ -632,7 +660,7 @@ namespace cxxpython::core
 
     void Attachment::prepare_allocation(ReturnSlot &out, std::size_t bytes)
     {
-        require_attached();
+        require_safepoint();
         out.reset(*this);
         poll();
         if (state_->allocations_remaining.load(std::memory_order_relaxed) == 0) throw std::bad_alloc();
@@ -677,32 +705,86 @@ namespace cxxpython::core
             if (!remaining) throw std::bad_alloc();
             if (state_->allocations_remaining.compare_exchange_weak(remaining, remaining - 1, std::memory_order_relaxed)) break;
         }
-        allocation.external_bytes.store(external, std::memory_order_relaxed); allocation.live = true;
-        ++allocation.span->live_count; state_->charge(*thread_record_, bytes);
-        // No safepoint separates completed slot registration and caller-root
-        // publication. The immutable span establishes domain and layout.
-        out.store_root_noexcept(ResultTag::Ok, object);
+        {
+            NoSafepoint commit(*this);
+            allocation.external_bytes.store(external, std::memory_order_relaxed); allocation.live = true;
+            ++allocation.span->live_count; out.store_root_noexcept(ResultTag::Ok, object);
+        }
+        state_->charge(*thread_record_, bytes);
     }
 
-    void Attachment::require_edge(Handle owner, const GcEdge &edge) const
+    void Attachment::require_edge(Value value, const void *edge, std::size_t bytes) const
     {
-        Value value = owner.get(*this);
         const auto &layout = allocation_layout(value);
-        auto offset = reinterpret_cast<std::uintptr_t>(&edge) -
+        auto offset = reinterpret_cast<std::uintptr_t>(edge) -
                       reinterpret_cast<std::uintptr_t>(value.object());
-        if (offset > layout.size || layout.size - offset < sizeof(GcEdge))
+        if (offset > layout.size || layout.size - offset < bytes)
             throw std::logic_error("edge is outside owner storage");
     }
 
     void Attachment::store(Handle owner, GcEdge &edge, Handle value)
     {
-        require_edge(owner, edge);
-        edge.object_ = value.get(*this).object();
+        require_edge(owner.get(*this), &edge, sizeof(edge));
+        auto *object = value.get(*this).object(); NoSafepoint write(*this); edge.object_ = object;
     }
     void Attachment::clear(Handle owner, GcEdge &edge)
     {
-        require_edge(owner, edge);
-        edge.object_ = nullptr;
+        require_edge(owner.get(*this), &edge, sizeof(edge));
+        NoSafepoint write(*this); edge.object_ = nullptr;
+    }
+
+    void Attachment::load(Value owner, const AtomicGcEdge &edge, ReturnSlot &out)
+    {
+        out.check_caller(*this); require_edge(owner, &edge, sizeof(edge));
+        NoSafepoint read(*this);
+        auto *object = edge.object_.load(std::memory_order_acquire);
+        out.store_root_noexcept(object ? ResultTag::Ok : ResultTag::Empty, object);
+    }
+    void Attachment::store(Value owner, AtomicGcEdge &edge, std::optional<Value> value)
+    {
+        require_edge(owner, &edge, sizeof(edge)); if (value) require_owns(*value);
+        NoSafepoint write(*this); edge.object_.store(value ? value->object() : nullptr, std::memory_order_release);
+    }
+
+    Transfer Attachment::make_transfer(Handle value)
+    {
+        require_safepoint(); const auto payload = value.get(*this); ReturnSlot out(*this);
+        allocate<detail::TransferRecord>(out, payload);
+        auto &record = this->payload<detail::TransferRecord>(out.result().value());
+        {
+            std::lock_guard gate(state_->coordinator); NoSafepoint publish(*this);
+            record.next = state_->transfer_head;
+            if (record.next) record.next->previous = &record;
+            state_->transfer_head = &record; ++state_->transfer_count;
+        }
+        return Transfer(state_, &record);
+    }
+    void Attachment::receive(Transfer &transfer, ReturnSlot &out)
+    {
+        require_safepoint(); out.check_caller(*this);
+        if (transfer.state_.get() != state_.get() || !transfer.record_)
+            throw std::logic_error("transfer is empty or belongs to another interpreter");
+        {
+            std::lock_guard gate(state_->coordinator); NoSafepoint publish(*this);
+            auto &record = *transfer.record_;
+            out.store_root_noexcept(ResultTag::Ok, record.payload.object());
+            state_->unlink_transfer(record); transfer.record_ = nullptr;
+        }
+        transfer.state_.reset();
+    }
+    Transfer::~Transfer() { reset(); }
+    Transfer::Transfer(Transfer &&other) noexcept
+        : state_(std::move(other.state_)), record_(std::exchange(other.record_, nullptr)) {}
+    Transfer &Transfer::operator=(Transfer &&other) noexcept
+    {
+        if (this != &other) { reset(); state_ = std::move(other.state_); record_ = std::exchange(other.record_, nullptr); }
+        return *this;
+    }
+    void Transfer::reset() noexcept
+    {
+        auto state = std::move(state_);
+        if (auto *record = std::exchange(record_, nullptr))
+        { std::lock_guard gate(state->coordinator); state->unlink_transfer(*record); }
     }
 
     void Attachment::account_external(Handle owner, std::size_t bytes)
@@ -711,16 +793,17 @@ namespace cxxpython::core
     }
     void Attachment::account_external(Value owner, std::size_t bytes)
     {
+        require_safepoint();
         require_owns(owner); auto &allocation = detail::Allocation::from(owner.object());
         if (bytes > std::numeric_limits<std::size_t>::max() - allocation.span->layout.storage_size()) throw std::bad_alloc();
         const auto previous = allocation.external_bytes.exchange(bytes, std::memory_order_relaxed);
         if (bytes > previous) state_->charge(*thread_record_, bytes - previous);
     }
 
-    std::size_t Attachment::collect() { require_attached(); return state_->rendezvous(*thread_record_); }
+    std::size_t Attachment::collect() { require_safepoint(); return state_->rendezvous(*thread_record_); }
     void Attachment::poll()
     {
-        require_attached();
+        require_safepoint();
         if (state_->request_epoch.load(std::memory_order_acquire) == thread_record_->observed_epoch) return;
         std::unique_lock gate(state_->coordinator);
         if (state_->phase != GcPhase::Running)
@@ -802,7 +885,7 @@ namespace cxxpython::core
     void Attachment::invalidate_types() { require_attached(); ++state_->type_epoch; }
     bool Attachment::enter_call()
     {
-        require_attached();
+        require_safepoint();
         if (call_depth_ >= state_->config.max_call_depth)
             return false;
         ++call_depth_;
@@ -811,7 +894,7 @@ namespace cxxpython::core
     void Attachment::leave_call() noexcept { assert(call_depth_ != 0); --call_depth_; }
     bool Attachment::enter_native_call()
     {
-        require_attached();
+        require_safepoint();
         if (native_depth_ >= state_->config.max_native_depth) return false;
         ++native_depth_; return true;
     }
@@ -893,12 +976,21 @@ namespace cxxpython::core
     void Attachment::set_gc_enabled(bool enabled) { require_attached(); state_->gc_enabled = enabled; }
     HeapStats Attachment::stats() const
     {
-        require_attached(); HeapStats result{}; state_->rendezvous(*thread_record_, &result); return result;
+        require_safepoint(); HeapStats result{}; state_->rendezvous(*thread_record_, &result); return result;
+    }
+
+    NoSafepoint::NoSafepoint(Attachment &context) : context_(context)
+    { context_.require_attached(); ++context_.no_safepoint_depth_; }
+    NoSafepoint::~NoSafepoint()
+    {
+        // Stop/detach paths reject a live scope; ownership cannot change legally.
+        assert((context_.require_attached(), true));
+        assert(context_.no_safepoint_depth_); --context_.no_safepoint_depth_;
     }
 
     NativeWait::NativeWait(Attachment &context) : context_(context)
     {
-        context_.require_attached();
+        context_.require_safepoint();
         std::lock_guard gate(context_.state_->coordinator);
         context_.thread_record_->ack_epoch = context_.state_->request_epoch.load(std::memory_order_relaxed);
         context_.thread_record_->state.store(MutatorState::NativeWait, std::memory_order_release); context_.state_->changed.notify_all();

@@ -182,7 +182,7 @@ namespace
                 auto frame = *c.current_frame(); auto &data = c.payload<FrameObject>(frame);
                 EXPECT_EQ(data.state, FrameState::Running); EXPECT_EQ(data.sp, 2U);
                 EXPECT_EQ(data.operands[0], args[0]); auto *address = data.operands.data();
-                c.payload<CellObject>(c.payload<NativeFunctionObject>(fn).captures[0]).contents = frame;
+                write_cell(c, c.payload<NativeFunctionObject>(fn).captures[0], frame);
                 c.collect(); EXPECT_EQ(data.operands.data(), address); EXPECT_EQ(data.locals[0], args[0]);
                 RootScope roots(c); auto self = roots.root(frame); make_str(c, U"f_lineno", out);
                 get_attribute(c, self, roots.root(out.result().value()), out);
@@ -196,7 +196,8 @@ namespace
         builder.emit(Opcode::Binary, static_cast<std::uint32_t>(BinaryOp::Add), {41, 2, 41, 7}); builder.emit(Opcode::Return);
         auto program = code(builder); std::array args{self.get(context)};
         call(context, function(program), {args, {}}, out); ASSERT_EQ(out.result().tag(), ResultTag::Ok);
-        auto frame = roots.root(*context.payload<CellObject>(observed).contents); auto &data = context.payload<FrameObject>(frame);
+        ReturnSlot snapshot(context); ASSERT_TRUE(read_cell(context, observed.get(context), snapshot));
+        auto frame = roots.root(snapshot.result().value()); auto &data = context.payload<FrameObject>(frame);
         EXPECT_EQ(data.state, FrameState::Completed); EXPECT_EQ(data.sp, 0U); EXPECT_EQ(data.locals[0], self.get(context));
         for (auto value : data.operands) EXPECT_EQ(value, context.builtin(CoreObject::None));
         get_attribute(context, frame, text(U"f_code"), out); EXPECT_EQ(out.result().value(), program.get(context));
@@ -276,8 +277,8 @@ namespace
             [](Attachment &c, Handle fn, std::span<const Value> args, ReturnSlot &out) {
                 const auto &captures = c.payload<NativeFunctionObject>(fn).captures; const auto frame = *c.current_frame();
                 if (c.payload<FrameObject>(frame).back)
-                { c.payload<CellObject>(captures[1]).contents = frame; c.collect(); out.ok(args[1]); return; }
-                c.payload<CellObject>(captures[0]).contents = frame;
+                { write_cell(c, captures[1], frame); c.collect(); out.ok(args[1]); return; }
+                write_cell(c, captures[0], frame);
                 RootScope roots(c); std::array nested{args[0]}; call(c, roots.root(captures[2]), {nested, {}}, out);
                 EXPECT_EQ(c.current_frame(), frame); c.collect();
             }, captures, out);
@@ -285,18 +286,21 @@ namespace
         set_attribute(context, cls, name, observer, out); context.allocate_instance<InstanceObject>(cls, out);
         auto self = roots.root(out.result().value()); std::array args{self.get(context)};
         call(context, outer, {args, {}}, out); ASSERT_EQ(out.result().tag(), ResultTag::Ok);
-        auto outer_frame = *context.payload<CellObject>(outer_cell).contents;
-        auto inner_frame = *context.payload<CellObject>(inner_cell).contents;
+        ReturnSlot outer_snapshot(context), inner_snapshot(context);
+        ASSERT_TRUE(read_cell(context, outer_cell.get(context), outer_snapshot));
+        ASSERT_TRUE(read_cell(context, inner_cell.get(context), inner_snapshot));
+        auto outer_frame = outer_snapshot.result().value(); auto inner_frame = inner_snapshot.result().value();
         EXPECT_EQ(context.payload<FrameObject>(inner_frame).back, outer_frame); EXPECT_FALSE(context.current_frame());
         make_native_function(context, "host fault", signature,
             [](Attachment &c, Handle fn, std::span<const Value>, ReturnSlot &) {
-                c.payload<CellObject>(c.payload<NativeFunctionObject>(fn).captures[0]).contents = *c.current_frame();
+                write_cell(c, c.payload<NativeFunctionObject>(fn).captures[0], *c.current_frame());
                 throw std::runtime_error("native host fault");
             }, captures, out);
         set_attribute(context, cls, name, roots.root(out.result().value()), out);
         EXPECT_THROW(call(context, outer, {args, {}}, out), std::runtime_error);
         EXPECT_EQ(out.result().tag(), ResultTag::Empty); EXPECT_FALSE(context.current_frame());
-        const auto &failed = context.payload<FrameObject>(*context.payload<CellObject>(outer_cell).contents);
+        ASSERT_TRUE(read_cell(context, outer_cell.get(context), outer_snapshot));
+        const auto &failed = context.payload<FrameObject>(outer_snapshot.result().value());
         EXPECT_EQ(failed.state, FrameState::Completed); EXPECT_EQ(failed.sp, 0U);
         set_attribute(context, cls, name, observer, out); call(context, outer, {args, {}}, out);
         ASSERT_EQ(out.result().tag(), ResultTag::Ok); EXPECT_FALSE(context.current_frame());

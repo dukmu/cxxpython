@@ -127,13 +127,11 @@ namespace cxxpython::core
         { out.ok(context.payload<ClassMethodObject>(receiver).callable); }
         void cell_contents(Attachment &context, Value receiver, ReturnSlot &out)
         {
-            auto value = context.payload<CellObject>(receiver).contents;
-            if (!value) { raise_error(context, CoreObject::ValueErrorType, U"cell is empty", out); return; }
-            out.ok(*value);
+            if (!read_cell(context, receiver, out)) raise_error(context, CoreObject::ValueErrorType, U"cell is empty", out);
         }
         void cell_contents_set(Attachment &context, Value receiver, std::optional<Value> value, ReturnSlot &out)
         {
-            context.payload<CellObject>(receiver).contents = value;
+            write_cell(context, receiver, value);
             out.ok(context.builtin(CoreObject::None));
         }
         void type_name(Attachment &context, Value receiver, ReturnSlot &out)

@@ -79,9 +79,8 @@ namespace
         make_native_function(context, "closure", {},
             [](Attachment &c, Handle fn, std::span<const Value>, ReturnSlot &result) {
                 c.collect();
-                auto value = c.payload<CellObject>(c.payload<NativeFunctionObject>(fn).captures[0]).contents;
-                if (value) result.ok(*value);
-                else raise_error(c, CoreObject::ValueErrorType, U"empty closure", result);
+                if (!read_cell(c, c.payload<NativeFunctionObject>(fn).captures[0], result))
+                    raise_error(c, CoreObject::ValueErrorType, U"empty closure", result);
             }, captures, out);
         auto closure = roots.root(out.result().value());
         auto name = text(U"cell_contents"); auto first = text(U"first"); auto second = text(U"second");
@@ -106,10 +105,10 @@ namespace
         ReturnSlot out(context); define(dictionary, out, empty_bases());
         ASSERT_EQ(out.result().tag(), ResultTag::Ok);
         auto cls = roots.root(out.result().value());
-        EXPECT_EQ(context.payload<CellObject>(shared).contents, cls.get(context));
+        ASSERT_TRUE(read_cell(context, shared.get(context), out)); EXPECT_EQ(out.result().value(), cls.get(context));
         EXPECT_FALSE(detail::name_lookup(context, *context.payload<TypeObject>(cls).dictionary, U"__classcell__"));
         EXPECT_EQ(detail::name_lookup(context, dictionary.get(context), U"__classcell__"), shared.get(context));
-        context.collect(); EXPECT_EQ(context.payload<CellObject>(shared).contents, cls.get(context));
+        context.collect(); ASSERT_TRUE(read_cell(context, shared.get(context), out)); EXPECT_EQ(out.result().value(), cls.get(context));
     }
 
     TEST_F(CoreCells, SetNameSeesTheFilledCellAndCanMutateIt)
@@ -121,10 +120,10 @@ namespace
         make_native_function(context, "__set_name__", signature,
             [](Attachment &c, Handle fn, std::span<const Value> args, ReturnSlot &result) {
                 auto shared = c.payload<NativeFunctionObject>(fn).captures[0];
-                EXPECT_EQ(c.payload<CellObject>(shared).contents, args[1]);
+                ReturnSlot contents(c); ASSERT_TRUE(read_cell(c, shared, contents)); EXPECT_EQ(contents.result().value(), args[1]);
                 EXPECT_FALSE(detail::name_lookup(c, *c.payload<TypeObject>(args[1]).dictionary, U"__classcell__"));
                 c.collect();
-                c.payload<CellObject>(shared).contents = c.builtin(CoreObject::None);
+                write_cell(c, shared, c.builtin(CoreObject::None));
                 result.ok(c.builtin(CoreObject::None));
             }, captures, out);
         auto function = roots.root(out.result().value()); auto name = text(U"__set_name__");
@@ -132,7 +131,7 @@ namespace
         context.allocate_instance<InstanceObject>(type, out); auto descriptor = roots.root(out.result().value());
         put(dictionary, U"field", descriptor); put(dictionary, U"__classcell__", shared);
         define(dictionary, out, empty_bases()); ASSERT_EQ(out.result().tag(), ResultTag::Ok);
-        EXPECT_EQ(context.payload<CellObject>(shared).contents, context.builtin(CoreObject::None));
+        ASSERT_TRUE(read_cell(context, shared.get(context), out)); EXPECT_EQ(out.result().value(), context.builtin(CoreObject::None));
     }
 
     TEST_F(CoreCells, FailedCallbackLeavesThePublishedCellSideEffectIntact)
@@ -150,9 +149,8 @@ namespace
         std::array items{base.get(context)}; cxxpython::core::make_tuple(context, items, out);
         auto bases = roots.root(out.result().value()); define(dictionary, out, bases);
         expect_error(out, CoreObject::RuntimeErrorType);
-        auto value = context.payload<CellObject>(shared).contents;
-        ASSERT_TRUE(value.has_value()); EXPECT_EQ(context.type_of(*value), context.type_type());
-        EXPECT_TRUE(is_subtype(context, *value, base.get(context)));
+        ReturnSlot contents(context); ASSERT_TRUE(read_cell(context, shared.get(context), contents)); const auto value = contents.result().value();
+        EXPECT_EQ(context.type_of(value), context.type_type()); EXPECT_TRUE(is_subtype(context, value, base.get(context)));
     }
 
     TEST_F(CoreCells, InvalidClassCellDoesNotAcceptAnUnrelatedCppCellLayout)
@@ -162,7 +160,7 @@ namespace
         auto fake = roots.root(out.result().value()); auto dictionary = this->dictionary();
         put(dictionary, U"__classcell__", fake); define(dictionary, out, empty_bases());
         expect_error(out, CoreObject::TypeErrorType);
-        EXPECT_FALSE(context.payload<CellObject>(fake).contents.has_value());
+        EXPECT_FALSE(read_cell(context, fake.get(context), out));
     }
 
     TEST_F(CoreCells, AllocationFailuresNeverPublishAnUnpreparedDefinitionThroughTheCell)
@@ -178,15 +176,16 @@ namespace
         bool completed = false;
         for (std::size_t quota = 0; quota < 100; ++quota)
         {
-            context.payload<CellObject>(shared).contents.reset();
+            write_cell(context, shared.get(context), {});
             context.set_allocation_limit(quota);
             call(context, metaclass, {args, {}}, out);
             completed = out.result().tag() == ResultTag::Ok;
             if (!completed) { EXPECT_EQ(out.result().exception(), context.builtin(CoreObject::MemoryError)); }
             context.set_allocation_limit(std::numeric_limits<std::size_t>::max());
-            if (auto value = context.payload<CellObject>(shared).contents)
+            ReturnSlot contents(context);
+            if (read_cell(context, shared.get(context), contents))
             {
-                auto &type = context.payload<TypeObject>(*value);
+                auto &type = context.payload<TypeObject>(contents.result().value());
                 EXPECT_EQ(type.state, TypeState::Ready);
                 EXPECT_FALSE(detail::name_lookup(context, *type.dictionary, U"__classcell__"));
                 auto method = detail::name_lookup(context, *type.dictionary, U"__new__");
@@ -202,11 +201,11 @@ namespace
         auto shared = cell(); auto dictionary = this->dictionary(); put(dictionary, U"__classdictcell__", shared);
         ReturnSlot out(context); define(dictionary, out, empty_bases()); ASSERT_EQ(out.result().tag(), ResultTag::Ok);
         const auto target = *context.payload<TypeObject>(out.result().value()).dictionary;
-        EXPECT_EQ(context.payload<CellObject>(shared).contents, target);
+        ASSERT_TRUE(read_cell(context, shared.get(context), out)); EXPECT_EQ(out.result().value(), target);
         EXPECT_NE(target, dictionary.get(context));
         EXPECT_FALSE(detail::name_lookup(context, target, U"__classdictcell__"));
         EXPECT_EQ(detail::name_lookup(context, dictionary.get(context), U"__classdictcell__"), shared.get(context));
-        context.collect(); EXPECT_EQ(context.payload<CellObject>(shared).contents, target);
+        context.collect(); ASSERT_TRUE(read_cell(context, shared.get(context), out)); EXPECT_EQ(out.result().value(), target);
     }
 
     TEST_F(CoreCells, AliasedClassAndDictionaryCellsFollowTheDefinitionWriteOrder)
@@ -215,7 +214,7 @@ namespace
         put(dictionary, U"__classcell__", shared); put(dictionary, U"__classdictcell__", shared);
         ReturnSlot out(context); define(dictionary, out, empty_bases()); ASSERT_EQ(out.result().tag(), ResultTag::Ok);
         const auto target = *context.payload<TypeObject>(out.result().value()).dictionary;
-        EXPECT_EQ(context.payload<CellObject>(shared).contents, target);
+        ASSERT_TRUE(read_cell(context, shared.get(context), out)); EXPECT_EQ(out.result().value(), target);
         EXPECT_FALSE(detail::name_lookup(context, target, U"__classcell__"));
         EXPECT_FALSE(detail::name_lookup(context, target, U"__classdictcell__"));
     }
@@ -226,9 +225,8 @@ namespace
         put(dictionary, U"__classcell__", shared);
         put(dictionary, U"__classdictcell__", roots.root(context.builtin(CoreObject::None)));
         ReturnSlot out(context); define(dictionary, out, empty_bases()); expect_error(out, CoreObject::TypeErrorType);
-        auto value = context.payload<CellObject>(shared).contents;
-        ASSERT_TRUE(value.has_value());
-        EXPECT_EQ(context.payload<TypeObject>(*value).state, TypeState::Ready);
-        EXPECT_EQ(context.type_of(*value), context.type_type());
+        ASSERT_TRUE(read_cell(context, shared.get(context), out)); const auto value = out.result().value();
+        EXPECT_EQ(context.payload<TypeObject>(value).state, TypeState::Ready);
+        EXPECT_EQ(context.type_of(value), context.type_type());
     }
 }

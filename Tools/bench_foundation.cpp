@@ -265,6 +265,48 @@ int main()
               << " with_max_stack=" << context.payload<CodeObject>(with_code).program.max_stack()
               << " with_live_set_check=ok\n";
 
+    context.collect(); const auto edge_baseline = context.stats().objects;
+    std::int64_t cell_read_ns = 0, cell_store_read_ns = 0;
+    {
+        RootScope temporary(context); ReturnSlot cell(context), snapshot(context);
+        context.allocate_instance<CellObject>(temporary.root(context.builtin(CoreObject::CellType)), cell, context.builtin(CoreObject::None));
+        const auto owner = temporary.root(cell.result().value()); const auto owner_value = owner.get(context);
+        cell_read_ns = measure([&] { for (int i = 0; i < iterations; ++i) read_cell(context, owner_value, snapshot); });
+        if (snapshot.result().value() != context.builtin(CoreObject::None)) return 1;
+        cell_store_read_ns = measure([&] {
+            for (int i = 0; i < iterations; ++i)
+            {
+                write_cell(context, owner_value, context.builtin(i % 2 ? CoreObject::True : CoreObject::False));
+                read_cell(context, owner_value, snapshot);
+            }
+        });
+        if (snapshot.result().value() != context.builtin(CoreObject::True)) return 1;
+    }
+    context.collect(); if (context.stats().objects != edge_baseline) return 1;
+    std::cout << "shared_edge_iterations=" << iterations << " rooted_cell_read_ns=" << cell_read_ns
+              << " rooted_cell_store_read_ns=" << cell_store_read_ns << " cell_object_bytes=" << sizeof(CellObject)
+              << " shared_edge_live_set_check=ok\n";
+
+    // Serial delivery cost, separate from cross-thread correctness and VM scaling.
+    {
+        Interpreter transport; Attachment actor(transport); std::int64_t transfer_ns = 0;
+        constexpr int transfer_iterations = 10000;
+        {
+            RootScope roots(actor); ReturnSlot input(actor), delivered(actor); actor.allocate<Node>(input);
+            const auto source = roots.root(input.result().value());
+            transfer_ns = measure([&] {
+                for (int i = 0; i < transfer_iterations; ++i)
+                { auto token = actor.make_transfer(source); actor.receive(token, delivered); }
+            });
+            if (delivered.result().value() != source.get(actor)) return 1;
+        }
+        actor.collect(); const auto final = actor.stats();
+        if (final.objects || final.roots || final.transfer_roots || final.reserved_bytes) return 1;
+        std::cout << "transfer_iterations=" << transfer_iterations << " transfer_roundtrip_ns=" << transfer_ns
+                  << " transfer_token_bytes=" << sizeof(Transfer) << " transfer_collections=" << final.collections
+                  << " transfer_live_set_check=ok\n";
+    }
+
     // N1 storage/coordinator cost only, not Python VM parallelism evidence.
     constexpr int total = 60000;
     for (int workers : {1, 2, 4})

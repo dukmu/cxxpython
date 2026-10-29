@@ -200,18 +200,18 @@ namespace cxxpython::core
             if (!instance_of<CellObject, CoreObject::CellType>(context, args[0])) { type_error(context, out); return; }
             if (!instance_of<CellObject, CoreObject::CellType>(context, args[1]))
             { out.ok(context.builtin(CoreObject::NotImplemented)); return; }
-            const auto left = context.payload<CellObject>(args[0]).contents;
-            const auto right = context.payload<CellObject>(args[1]).contents;
-            if (left && right)
-            { RootScope roots(context); rich_compare(context, roots.root(*left), roots.root(*right), Op, out); }
-            else order_result<Op>(context, static_cast<int>(left.has_value()) - static_cast<int>(right.has_value()), out);
+            ReturnSlot left(context), right(context);
+            const bool has_left = read_cell(context, args[0], left), has_right = read_cell(context, args[1], right);
+            if (has_left && has_right)
+            { RootScope roots(context); rich_compare(context, roots.root(left.result().value()), roots.root(right.result().value()), Op, out); }
+            else order_result<Op>(context, static_cast<int>(has_left) - static_cast<int>(has_right), out);
         }
         void cell_repr(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
         {
             if (!instance_of<CellObject, CoreObject::CellType>(context, args[0])) { type_error(context, out); return; }
-            const auto contents = context.payload<CellObject>(args[0]).contents;
+            ReturnSlot contents(context); const bool present = read_cell(context, args[0], contents);
             auto result = U"<cell at " + pointer_text(args[0]) + U": ";
-            result += contents ? type_name(context, context.type_of(*contents), false).substr(0, 80) + U" object at " + pointer_text(*contents) : U"empty";
+            result += present ? type_name(context, context.type_of(contents.result().value()), false).substr(0, 80) + U" object at " + pointer_text(contents.result().value()) : U"empty";
             result += U'>'; make_str(context, std::move(result), out);
         }
         void proxy_hash(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)

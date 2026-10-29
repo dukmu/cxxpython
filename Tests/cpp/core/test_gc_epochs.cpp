@@ -20,6 +20,12 @@ namespace
         ~EpochLeaf() noexcept { if (destroyed) ++*destroyed; }
         void trace(Tracer &) const noexcept {}
     };
+    struct CollectingConstructor
+    {
+        ObjectHeader header;
+        CollectingConstructor(ObjectHeader head, Attachment &context) : header(head) { context.collect(); }
+        void trace(Tracer &) const noexcept {}
+    };
     void wait_request(Interpreter &interpreter)
     {
         while (interpreter.gc_state().phase != GcPhase::Requesting) std::this_thread::yield();
@@ -229,5 +235,188 @@ namespace
         const auto bytes = owner.stats().live_bytes; EXPECT_GE(bytes, sizeof(EpochLeaf) + 1024); EXPECT_LE(bytes, sizeof(EpochLeaf) + 4096);
         EXPECT_THROW(owner.account_external(shared, std::numeric_limits<std::size_t>::max()), std::bad_alloc);
         EXPECT_EQ(owner.stats().live_bytes, bytes); out.reset(); EXPECT_EQ(owner.collect(), 1U); EXPECT_EQ(owner.stats().reserved_bytes, 0U);
+    }
+
+    TEST(FoundationEpochs, NoSafepointRejectsStoppingAndGrowingRootsWithoutChangingOutput)
+    {
+        Interpreter interpreter; Attachment context(interpreter); RootScope roots(context); ReturnSlot out(context);
+        context.allocate<EpochLeaf>(out); const auto original = out.result().value(); const auto keep = roots.root(original);
+        {
+            NoSafepoint outer(context);
+            { NoSafepoint inner(context); EXPECT_THROW(context.poll(), std::logic_error); }
+            EXPECT_THROW(context.collect(), std::logic_error);
+            EXPECT_THROW(context.stats(), std::logic_error);
+            EXPECT_THROW(ReturnSlot another(context), std::logic_error);
+            EXPECT_THROW(RootScope another(context), std::logic_error);
+            EXPECT_THROW(roots.root(original), std::logic_error);
+            EXPECT_THROW(roots.release(keep), std::logic_error);
+            EXPECT_THROW(context.allocate<EpochLeaf>(out), std::logic_error); EXPECT_EQ(out.result().value(), original);
+            EXPECT_THROW(NativeWait wait(context), std::logic_error);
+            bool entered = false;
+            EXPECT_THROW(entered = context.enter_call(), std::logic_error); if (entered) context.leave_call();
+            EXPECT_EQ(keep.get(context), original);
+        }
+        EXPECT_NO_THROW(context.poll());
+        EXPECT_NO_THROW(context.collect());
+    }
+
+    TEST(FoundationEpochs, UnpublishedConstructionCannotEnterGcAndCanRetry)
+    {
+        Interpreter interpreter; Attachment context(interpreter); ReturnSlot out(context);
+        EXPECT_THROW(context.allocate<CollectingConstructor>(out, context), std::logic_error);
+        EXPECT_EQ(out.result().tag(), ResultTag::Empty); EXPECT_EQ(context.stats().objects, 0U);
+        EXPECT_EQ(context.stats().collections, 0U); context.collect(); EXPECT_EQ(context.stats().reserved_bytes, 0U);
+        context.allocate<EpochLeaf>(out); EXPECT_EQ(context.payload<EpochLeaf>(out.result().value()).value, 42);
+    }
+
+    TEST(FoundationEpochs, AtomicCellReadsKeepReplacedValuesRootedAndValidateBeforeWriting)
+    {
+        static_assert(!std::is_copy_constructible_v<AtomicGcEdge>);
+        EXPECT_EQ(sizeof(AtomicGcEdge), sizeof(void *));
+        std::atomic<int> destroyed{0}; Interpreter interpreter, foreign; Attachment context(interpreter), other(foreign);
+        RootScope roots(context); ReturnSlot out(context), other_out(other);
+        context.allocate<EpochLeaf>(out, &destroyed); const auto original = out.result().value(); const auto initial = roots.root(original);
+        context.allocate<CellObject>(out, initial.get(context)); const auto cell = roots.root(out.result().value()); roots.release(initial);
+        context.allocate<CellObject>(out); const auto second = roots.root(out.result().value());
+        ASSERT_TRUE(read_cell(context, cell.get(context), out)); const auto view = out.result();
+        other.allocate<EpochLeaf>(other_out); const auto foreign_value = other_out.result().value();
+        EXPECT_THROW(write_cell(context, cell.get(context), foreign_value), std::logic_error);
+        EXPECT_THROW(read_cell(context, cell.get(context), other_out), std::logic_error);
+        EXPECT_THROW(context.load(cell.get(context), context.payload<CellObject>(second).contents, out), std::logic_error);
+        EXPECT_EQ(view.value(), original); EXPECT_EQ(other_out.result().value(), foreign_value);
+        { NoSafepoint protected_read(context); ASSERT_TRUE(read_cell(context, cell.get(context), out)); write_cell(context, cell.get(context), {}); }
+        context.collect(); EXPECT_EQ(destroyed.load(), 0); EXPECT_EQ(context.payload<EpochLeaf>(out.result().value()).value, 42);
+        EXPECT_FALSE(read_cell(context, cell.get(context), out)); context.collect(); EXPECT_EQ(destroyed.load(), 1);
+    }
+
+    TEST(FoundationEpochs, AtomicCellLoadCanReplaceItsOnlyOwnerRoot)
+    {
+        std::atomic<int> destroyed{0}; Interpreter interpreter; Attachment context(interpreter); ReturnSlot out(context); RootScope roots(context);
+        context.allocate<EpochLeaf>(out, &destroyed); const auto value = out.result().value();
+        const auto initial = roots.root(value); context.allocate<CellObject>(out, initial.get(context)); roots.release(initial); const auto cell = out.result().value();
+        ASSERT_TRUE(read_cell(context, cell, out)); EXPECT_EQ(out.result().value(), value);
+        EXPECT_EQ(context.collect(), 1U); EXPECT_EQ(destroyed.load(), 0);
+        out.reset(); EXPECT_EQ(context.collect(), 1U); EXPECT_EQ(destroyed.load(), 1);
+    }
+
+    TEST(FoundationEpochs, TransferRootsSurviveSenderRetirementAndPublishBeforeUnlink)
+    {
+        std::atomic<int> destroyed{0}; Interpreter interpreter; Transfer transfer;
+        {
+            Attachment sender(interpreter); RootScope roots(sender); ReturnSlot out(sender);
+            sender.allocate<EpochLeaf>(out, &destroyed); transfer = sender.make_transfer(roots.root(out.result().value()));
+        }
+        EXPECT_EQ(interpreter.gc_state().registered, 0U); EXPECT_EQ(interpreter.gc_state().transfer_roots, 1U);
+        Attachment receiver(interpreter); ReturnSlot out(receiver); EXPECT_EQ(receiver.collect(), 0U); EXPECT_EQ(receiver.stats().objects, 2U);
+        receiver.receive(transfer, out); EXPECT_FALSE(transfer); EXPECT_EQ(receiver.stats().transfer_roots, 0U);
+        EXPECT_EQ(receiver.collect(), 1U); EXPECT_EQ(receiver.payload<EpochLeaf>(out.result().value()).value, 42);
+        out.reset(); EXPECT_EQ(receiver.collect(), 1U); EXPECT_EQ(destroyed.load(), 1); EXPECT_EQ(receiver.stats().reserved_bytes, 0U);
+    }
+
+    TEST(FoundationEpochs, TransferMovesAndCancellationUnlinkHeadMiddleAndTail)
+    {
+        std::atomic<int> destroyed{0}; Interpreter interpreter; std::array<Transfer, 4> tokens;
+        {
+            Attachment source(interpreter); source.set_gc_enabled(false); ReturnSlot out(source); RootScope roots(source);
+            for (std::size_t i = 0; i < tokens.size(); ++i)
+            { source.allocate<EpochLeaf>(out, &destroyed, i); tokens[i] = source.make_transfer(roots.root(out.result().value())); }
+        }
+        Attachment context(interpreter); ReturnSlot out(context); EXPECT_EQ(context.collect(), 0U);
+        tokens[2].reset(); tokens[0] = std::move(tokens[3]); Transfer moved(std::move(tokens[1])); tokens[1] = std::move(moved);
+        EXPECT_FALSE(tokens[3]); EXPECT_FALSE(moved); EXPECT_EQ(context.stats().transfer_roots, 2U);
+        EXPECT_EQ(context.collect(), 4U); EXPECT_EQ(destroyed.load(), 2);
+        context.receive(tokens[0], out); EXPECT_EQ(context.payload<EpochLeaf>(out.result().value()).value, 3);
+        EXPECT_EQ(context.collect(), 1U); tokens[1].reset(); EXPECT_EQ(context.collect(), 2U);
+        out.reset(); EXPECT_EQ(context.collect(), 1U); EXPECT_EQ(destroyed.load(), 4); EXPECT_EQ(context.stats().objects, 0U);
+    }
+
+    TEST(FoundationEpochs, TransferRejectsForeignAndProtectedUseWithoutConsumingOrOverwriting)
+    {
+        Interpreter interpreter, foreign; Attachment context(interpreter), other(foreign); RootScope roots(context), foreign_roots(other);
+        ReturnSlot out(context), other_out(other); context.allocate<EpochLeaf>(out); other.allocate<EpochLeaf>(other_out);
+        const auto value = roots.root(out.result().value()); auto transfer = context.make_transfer(value);
+        const auto before = out.result(); const auto foreign_before = other_out.result();
+        EXPECT_THROW(context.receive(transfer, other_out), std::logic_error);
+        EXPECT_THROW(other.receive(transfer, other_out), std::logic_error);
+        const auto foreign_value = foreign_roots.root(other_out.result().value());
+        EXPECT_THROW(context.make_transfer(foreign_value), std::logic_error);
+        {
+            NoSafepoint protected_read(context);
+            EXPECT_THROW(context.receive(transfer, out), std::logic_error);
+            EXPECT_THROW(context.make_transfer(value), std::logic_error);
+        }
+        EXPECT_TRUE(transfer); EXPECT_EQ(before.value(), value.get(context)); EXPECT_EQ(foreign_before.value(), foreign_value.get(other));
+        context.receive(transfer, out); const auto delivered = out.result();
+        EXPECT_THROW(context.receive(transfer, out), std::logic_error);
+        EXPECT_EQ(delivered.value(), value.get(context));
+    }
+
+    TEST(FoundationEpochs, TransferAllocationFailureLeavesNoPublishedRootAndCanRetry)
+    {
+        Interpreter interpreter; Attachment context(interpreter); RootScope roots(context); ReturnSlot out(context);
+        context.allocate<EpochLeaf>(out); const auto value = roots.root(out.result().value());
+        context.set_allocation_limit(0);
+        EXPECT_THROW(context.make_transfer(value), std::bad_alloc);
+        EXPECT_EQ(context.stats().transfer_roots, 0U); EXPECT_EQ(context.stats().objects, 1U); EXPECT_EQ(out.result().value(), value.get(context));
+        context.set_allocation_limit(std::numeric_limits<std::size_t>::max()); auto transfer = context.make_transfer(value);
+        transfer.reset(); EXPECT_EQ(context.collect(), 1U); out.reset(); roots.release(value); EXPECT_EQ(context.collect(), 1U);
+    }
+
+    TEST(FoundationEpochs, TransferLeaseKeepsClosedStorageAliveUntilNativeCancellation)
+    {
+        std::atomic<int> destroyed{0}; Transfer transfer;
+        {
+            Interpreter interpreter; Attachment context(interpreter); ReturnSlot out(context); RootScope roots(context);
+            context.allocate<EpochLeaf>(out, &destroyed); transfer = context.make_transfer(roots.root(out.result().value()));
+        }
+        EXPECT_EQ(destroyed.load(), 0);
+        auto cancel = std::async(std::launch::async, [token = std::move(transfer)]() mutable { token.reset(); }); cancel.get();
+        EXPECT_FALSE(transfer); EXPECT_EQ(destroyed.load(), 1);
+    }
+
+    TEST(FoundationEpochs, ExistingReceiverCanAcceptAfterInterpreterOwnerCloses)
+    {
+        std::atomic<int> destroyed{0}; auto interpreter = std::make_unique<Interpreter>(); Transfer transfer;
+        {
+            Attachment source(*interpreter); RootScope roots(source); ReturnSlot out(source);
+            source.allocate<EpochLeaf>(out, &destroyed); transfer = source.make_transfer(roots.root(out.result().value()));
+        }
+        Attachment receiver(*interpreter); interpreter.reset();
+        ReturnSlot out(receiver); receiver.receive(transfer, out); EXPECT_EQ(receiver.collect(), 1U);
+        EXPECT_EQ(receiver.payload<EpochLeaf>(out.result().value()).value, 42); out.reset(); receiver.collect(); EXPECT_EQ(destroyed.load(), 1);
+    }
+
+    TEST(FoundationEpochs, SharedCellReplacementsUseTransferredInputsAndRootedSnapshotsDuringGc)
+    {
+        std::atomic<int> destroyed{0}; Interpreter interpreter({.minimum_gc_budget = 4096}); std::array<Transfer, 2> inputs;
+        {
+            Attachment source(interpreter); RootScope roots(source); ReturnSlot out(source);
+            source.allocate<EpochLeaf>(out, &destroyed, 0); const auto initial = roots.root(out.result().value());
+            source.allocate<CellObject>(out, initial.get(source)); const auto shared = roots.root(out.result().value());
+            for (auto &input : inputs) input = source.make_transfer(shared);
+        }
+        std::barrier start(2);
+        auto reader = std::async(std::launch::async, [&, input = std::move(inputs[0])]() mutable {
+            Attachment context(interpreter); ReturnSlot cell(context), value(context); context.receive(input, cell); start.arrive_and_wait();
+            for (int n = 0; n < 1000; ++n)
+            {
+                const bool present = read_cell(context, cell.result().value(), value);
+                const auto expected = present ? context.payload<EpochLeaf>(value.result().value()).value : -1;
+                if (n % 17 == 0) context.collect(); else context.poll();
+                if (present) { EXPECT_EQ(context.payload<EpochLeaf>(value.result().value()).value, expected); }
+            }
+        });
+        auto writer = std::async(std::launch::async, [&, input = std::move(inputs[1])]() mutable {
+            Attachment context(interpreter); ReturnSlot cell(context), value(context); context.receive(input, cell); start.arrive_and_wait();
+            for (int n = 1; n <= 1000; ++n)
+            {
+                context.allocate<EpochLeaf>(value, &destroyed, n); write_cell(context, cell.result().value(), value.result().value()); value.reset();
+                if (n % 7 == 0) write_cell(context, cell.result().value(), {});
+                if (n % 31 == 0) context.collect();
+            }
+        });
+        reader.get(); writer.get(); Attachment observer(interpreter); observer.collect();
+        EXPECT_EQ(destroyed.load(), 1001); EXPECT_EQ(observer.stats().objects, 0U); EXPECT_EQ(observer.stats().transfer_roots, 0U);
+        EXPECT_EQ(observer.stats().reserved_bytes, 0U);
     }
 }

@@ -132,14 +132,15 @@ namespace
                 ASSERT_TRUE(data.back); const auto &parent = c.payload<FrameObject>(*data.back);
                 EXPECT_TRUE(parent.pending_call); EXPECT_EQ(parent.sp, 1U);
                 EXPECT_EQ(c.type_of(parent.operands[0]), c.builtin(CoreObject::FunctionType));
-                c.payload<CellObject>(c.payload<NativeFunctionObject>(fn).captures[0]).contents = child;
+                write_cell(c, c.payload<NativeFunctionObject>(fn).captures[0], child);
                 c.collect(); out.ok(c.builtin(CoreObject::None));
             }, captures, out);
         auto probe = roots.root(out.result().value()); CodeBuilder child(context);
         child.emit(Opcode::LoadConst, child.constant(probe)); child.call(0); child.emit(Opcode::PopTop);
         child.emit(Opcode::LoadConst, child.constant(integer(42))); child.emit(Opcode::Return);
         auto parent = caller(function(child), {}); call(context, parent, {}, out); ASSERT_EQ(out.result().tag(), ResultTag::Ok);
-        auto saved = roots.root(*context.payload<CellObject>(observed).contents); const auto &inner = context.payload<FrameObject>(saved);
+        ReturnSlot snapshot(context); ASSERT_TRUE(read_cell(context, observed.get(context), snapshot));
+        auto saved = roots.root(snapshot.result().value()); const auto &inner = context.payload<FrameObject>(saved);
         const auto &outer = context.payload<FrameObject>(*inner.back);
         for (const auto *frame : {&inner, &outer})
         { EXPECT_EQ(frame->state, FrameState::Completed); EXPECT_FALSE(frame->pending_call); EXPECT_EQ(frame->sp, 0U); }
@@ -161,12 +162,12 @@ namespace
         std::array captures{saved.get(context)};
         make_native_function(context, "host fault", {},
             [](Attachment &c, Handle fn, std::span<const Value>, ReturnSlot &) {
-                c.payload<CellObject>(c.payload<NativeFunctionObject>(fn).captures[0]).contents = *c.current_frame();
+                write_cell(c, c.payload<NativeFunctionObject>(fn).captures[0], *c.current_frame());
                 throw std::runtime_error("scheduled host fault");
             }, captures, out);
         auto native = roots.root(out.result().value()); auto child = caller(native, {}); auto parent = caller(child, {});
         EXPECT_THROW(call(context, parent, {}, out), std::runtime_error); EXPECT_FALSE(context.current_frame());
-        auto frame = *context.payload<CellObject>(saved).contents;
+        ReturnSlot snapshot(context); ASSERT_TRUE(read_cell(context, saved.get(context), snapshot)); auto frame = snapshot.result().value();
         for (;;)
         {
             const auto &data = context.payload<FrameObject>(frame); EXPECT_EQ(data.state, FrameState::Completed);
@@ -232,9 +233,10 @@ namespace
         make_native_function(context, "native recursion", {},
             [](Attachment &c, Handle function, std::span<const Value>, ReturnSlot &out) {
                 RootScope roots(c); const auto cell = c.payload<NativeFunctionObject>(function).captures[0];
-                call(c, roots.root(*c.payload<CellObject>(cell).contents), {}, out);
+                ReturnSlot contents(c); ASSERT_TRUE(read_cell(c, cell, contents));
+                call(c, roots.root(contents.result().value()), {}, out);
             }, captures, out);
-        auto native = roots.root(out.result().value()); context.payload<CellObject>(shared).contents = native.get(context);
+        auto native = roots.root(out.result().value()); write_cell(context, shared.get(context), native.get(context));
         call(context, native, {}, out); ASSERT_EQ(out.result().tag(), ResultTag::Raised);
         EXPECT_EQ(context.type_of(out.result().exception()), context.builtin(CoreObject::RecursionErrorType));
         call(context, fn, {base, {}}, out); ASSERT_EQ(out.result().tag(), ResultTag::Ok); EXPECT_FALSE(context.current_frame());

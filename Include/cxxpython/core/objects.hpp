@@ -169,10 +169,13 @@ namespace cxxpython::core
     struct CellObject
     {
         ObjectHeader header;
-        std::optional<Value> contents;
+        AtomicGcEdge contents;
         explicit CellObject(ObjectHeader head, std::optional<Value> value = {}) : header(head), contents(value) {}
-        void trace(Tracer &tracer) const noexcept { if (contents) tracer.visit(*contents); }
+        void trace(Tracer &tracer) const noexcept { tracer.visit(contents); }
     };
+
+    bool read_cell(Attachment &context, Value cell, ReturnSlot &out);
+    void write_cell(Attachment &context, Value cell, std::optional<Value> value);
 
     void make_str(Attachment &context, std::u32string value, ReturnSlot &out);
     void make_int(Attachment &context, std::int64_t value, ReturnSlot &out);

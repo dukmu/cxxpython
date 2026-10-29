@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <array>
+#include <atomic>
 #include <memory>
 #include <limits>
 #include <mutex>
@@ -22,6 +23,8 @@ namespace cxxpython::core
     class Attachment;
     class ReturnSlot;
     class Tracer;
+    class NoSafepoint;
+    class Transfer;
     enum class CoreObject : std::size_t
     {
         NoneType, StrType, TupleType, DictType, IntType, BoolType, NotImplementedType,
@@ -39,6 +42,7 @@ namespace cxxpython::core
         struct State;
         struct RootCell;
         struct ThreadRecord;
+        struct TransferRecord;
         struct BigInt;
         class FrameActivation;
         std::uint64_t siphash24(std::span<const std::byte> data, std::array<std::uint64_t, 2> key) noexcept;
@@ -70,6 +74,19 @@ namespace cxxpython::core
         ObjectHeader *object_ = nullptr;
     };
 
+    // Mutable shared edges expose only rooted reads through Attachment.
+    class AtomicGcEdge final
+    {
+    public:
+        explicit AtomicGcEdge(std::optional<Value> initial = {}) noexcept : object_(initial ? initial->object() : nullptr) {}
+        AtomicGcEdge(const AtomicGcEdge &) = delete;
+        AtomicGcEdge &operator=(const AtomicGcEdge &) = delete;
+    private:
+        friend class Attachment;
+        friend class Tracer;
+        std::atomic<ObjectHeader *> object_;
+    };
+
     struct ObjectHeader
     {
         GcEdge type;
@@ -79,6 +96,7 @@ namespace cxxpython::core
     {
     public:
         void visit(const GcEdge &edge) noexcept { visit_(state_, edge.object_); }
+        void visit(const AtomicGcEdge &edge) noexcept { visit_(state_, edge.object_.load(std::memory_order_relaxed)); }
         void visit(Value value) noexcept { visit_(state_, value.object()); }
 
     private:
@@ -185,6 +203,7 @@ namespace cxxpython::core
         std::size_t registered_threads;
         std::uint64_t last_rendezvous_ns, max_rendezvous_ns;
         std::size_t spans = 0, reserved_bytes = 0;
+        std::size_t transfer_roots = 0;
     };
     enum class MutatorState { PendingAttach, Active, Parked, NativeWait, Collector, Exiting };
     enum class GcPhase { Running, Requesting, Collecting };
@@ -193,6 +212,7 @@ namespace cxxpython::core
         GcPhase phase;
         std::uint64_t request_epoch, completed_epoch;
         std::size_t registered, active, parked, native_wait, collections;
+        std::size_t transfer_roots = 0;
     };
 
     class Interpreter final
@@ -286,6 +306,27 @@ namespace cxxpython::core
         Handle root_;
     };
 
+    // Move-only native delivery lease; the payload record is managed by GC.
+    // Token access/move/reset requires exclusive host ownership of this token.
+    class Transfer final
+    {
+    public:
+        Transfer() noexcept = default;
+        ~Transfer();
+        Transfer(const Transfer &) = delete;
+        Transfer &operator=(const Transfer &) = delete;
+        Transfer(Transfer &&other) noexcept;
+        Transfer &operator=(Transfer &&other) noexcept;
+        explicit operator bool() const noexcept { return record_ != nullptr; }
+        void reset() noexcept;
+    private:
+        friend class Attachment;
+        Transfer(std::shared_ptr<detail::State> state, detail::TransferRecord *record) noexcept
+            : state_(std::move(state)), record_(record) {}
+        std::shared_ptr<detail::State> state_;
+        detail::TransferRecord *record_ = nullptr;
+    };
+
     class Attachment final
     {
     public:
@@ -304,7 +345,7 @@ namespace cxxpython::core
         template <class T, class... Args>
         void allocate_instance(Handle type, ReturnSlot &out, Args &&...args)
         {
-            require_attached();
+            require_safepoint();
             out.reset(*this);
             auto layout = require_instance_layout(type, LayoutDescriptor::of<T>());
             allocate_layout<T>(layout, type, out, std::forward<Args>(args)...);
@@ -329,6 +370,10 @@ namespace cxxpython::core
 
         void store(Handle owner, GcEdge &edge, Handle value);
         void clear(Handle owner, GcEdge &edge);
+        void load(Value owner, const AtomicGcEdge &edge, ReturnSlot &out);
+        void store(Value owner, AtomicGcEdge &edge, std::optional<Value> value);
+        Transfer make_transfer(Handle value);
+        void receive(Transfer &transfer, ReturnSlot &out);
         void account_external(Handle owner, std::size_t bytes);
         void account_external(Value owner, std::size_t bytes);
         void bootstrap();
@@ -361,6 +406,7 @@ namespace cxxpython::core
         void require_attached() const;
 
     private:
+        friend class NoSafepoint;
         friend class NativeWait;
         friend class RootScope;
         friend class ReturnSlot;
@@ -368,11 +414,12 @@ namespace cxxpython::core
         friend class Handle;
         friend class detail::FrameActivation;
         void require_owns(Value value) const;
+        void require_safepoint() const;
         void require_layout(Value value, const void *family) const;
         const LayoutDescriptor &allocation_layout(Value value) const;
         bool has_native_layout(Value value, const void *family) const;
         LayoutDescriptor require_instance_layout(Handle type, const LayoutDescriptor &layout);
-        void require_edge(Handle owner, const GcEdge &edge) const;
+        void require_edge(Value owner, const void *edge, std::size_t bytes) const;
         detail::RootCell &cell(Handle handle) const;
         Handle acquire(const void *scope);
         void release(Handle handle) noexcept;
@@ -387,6 +434,7 @@ namespace cxxpython::core
             const auto bytes = layout.storage_size();
             prepare_allocation(out, bytes);
             void *storage = reserve_storage(layout);
+            allocation_in_progress_ = true;
             T *object = nullptr;
             try
             {
@@ -396,11 +444,13 @@ namespace cxxpython::core
                 std::size_t external = 0;
                 if constexpr (requires { object->external_bytes(); }) external = object->external_bytes();
                 adopt(&object->header, out, external);
+                allocation_in_progress_ = false;
             }
             catch (...)
             {
                 if (object) layout.destroy_storage(&object->header);
                 abandon_storage(reinterpret_cast<ObjectHeader *>(storage));
+                allocation_in_progress_ = false;
                 throw;
             }
         }
@@ -412,6 +462,19 @@ namespace cxxpython::core
         std::vector<Value> repr_stack_;
         std::optional<Value> current_frame_;
         std::optional<Value> handled_exception_;
+        std::size_t no_safepoint_depth_ = 0;
+        bool allocation_in_progress_ = false;
+    };
+
+    class NoSafepoint final
+    {
+    public:
+        explicit NoSafepoint(Attachment &context);
+        ~NoSafepoint();
+        NoSafepoint(const NoSafepoint &) = delete;
+        NoSafepoint &operator=(const NoSafepoint &) = delete;
+    private:
+        Attachment &context_;
     };
 
     class NativeWait final
