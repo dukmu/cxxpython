@@ -5,6 +5,14 @@
 namespace
 {
     using namespace cxxpython::core;
+    // Serial test observations: the owning graph stays rooted and no writer races this read.
+    template <class T, class Owner>
+    std::optional<Value> read_edge(Attachment &context, Owner owner, AtomicGcEdge T::*field)
+    {
+        const auto value = [&] { if constexpr (std::is_same_v<Owner, Handle>) return owner.get(context); else return owner; }();
+        ReturnSlot saved(context); context.load(value, context.payload<T>(value).*field, saved);
+        return saved.result().tag() == ResultTag::Ok ? std::optional<Value>{saved.result().value()} : std::optional<Value>{};
+    }
     class CoreUnwind : public testing::Test
     {
     protected:
@@ -123,11 +131,11 @@ namespace
         invoke(parent, probe(recorded, 1, error)); parent.emit(Opcode::LoadException); parent.emit(Opcode::Return); parent.end_handler(region);
         load(parent, builtin(CoreObject::None)); parent.emit(Opcode::Return); auto fn = function(parent); ReturnSlot out(context);
         call(context, fn, {}, out); ASSERT_EQ(out.result().tag(), ResultTag::Ok); EXPECT_EQ(out.result().value(), error.get(context));
-        auto trace = context.payload<ExceptionObject>(error).traceback; ASSERT_TRUE(trace);
+        auto trace = read_edge(context, error, &ExceptionObject::traceback); ASSERT_TRUE(trace);
         EXPECT_EQ(context.payload<FrameObject>(context.payload<TracebackObject>(*trace).frame).function, fn.get(context));
-        trace = context.payload<TracebackObject>(*trace).next; ASSERT_TRUE(trace);
+        trace = read_edge(context, *trace, &TracebackObject::next); ASSERT_TRUE(trace);
         EXPECT_EQ(context.payload<FrameObject>(context.payload<TracebackObject>(*trace).frame).function, target.get(context));
-        EXPECT_FALSE(context.payload<TracebackObject>(*trace).next); EXPECT_FALSE(context.current_frame()); EXPECT_FALSE(context.handled_exception());
+        EXPECT_FALSE(read_edge(context, *trace, &TracebackObject::next)); EXPECT_FALSE(context.current_frame()); EXPECT_FALSE(context.handled_exception());
     }
 
     TEST_F(CoreUnwind, NestedCleanupKeepsPendingReturnAcrossGcAndInternallyCaughtErrors)
@@ -166,8 +174,8 @@ namespace
         invoke(builder, probe(recorded, 3, first)); builder.end_handler(cleanup); builder.leave(caught); builder.handler(caught); builder.emit(Opcode::PopTop);
         invoke(builder, probe(recorded, 4, first)); builder.emit(Opcode::Reraise); builder.end_handler(caught);
         ReturnSlot out(context); call(context, function(builder), {}, out); ASSERT_EQ(out.result().tag(), ResultTag::Raised);
-        EXPECT_EQ(out.result().exception(), first.get(context)); EXPECT_EQ(context.payload<ExceptionObject>(second).context, first.get(context));
-        const auto trace = context.payload<ExceptionObject>(first).traceback; ASSERT_TRUE(trace); EXPECT_FALSE(context.payload<TracebackObject>(*trace).next);
+        EXPECT_EQ(out.result().exception(), first.get(context)); EXPECT_EQ(read_edge(context, second, &ExceptionObject::context), first.get(context));
+        const auto trace = read_edge(context, first, &ExceptionObject::traceback); ASSERT_TRUE(trace); EXPECT_FALSE(read_edge(context, *trace, &TracebackObject::next));
         EXPECT_EQ(events(recorded), (std::vector<std::string>{"1", "2", "3", "4"})); EXPECT_FALSE(context.handled_exception());
     }
 
@@ -177,7 +185,7 @@ namespace
         auto cleanup = builder.region(RegionKind::Finally); builder.enter(cleanup); throw_instance(builder, first); builder.leave(cleanup);
         builder.handler(cleanup); throw_instance(builder, second); builder.end_handler(cleanup);
         ReturnSlot out(context); call(context, function(builder), {}, out); ASSERT_EQ(out.result().tag(), ResultTag::Raised);
-        EXPECT_EQ(out.result().exception(), second.get(context)); EXPECT_EQ(context.payload<ExceptionObject>(second).context, first.get(context));
+        EXPECT_EQ(out.result().exception(), second.get(context)); EXPECT_EQ(read_edge(context, second, &ExceptionObject::context), first.get(context));
         EXPECT_FALSE(context.handled_exception());
     }
 
@@ -202,7 +210,7 @@ namespace
         auto error = exception(); CodeBuilder child(context); child.emit(Opcode::Reraise); auto target = function(child);
         for (bool native_bridge : {false, true})
         {
-            context.payload<ExceptionObject>(error).traceback.reset(); auto callable = target; ReturnSlot out(context);
+            context.store(error.get(context), context.payload<ExceptionObject>(error).traceback, {}); auto callable = target; ReturnSlot out(context);
             if (native_bridge)
             {
                 std::array captures{target.get(context)};
@@ -216,7 +224,7 @@ namespace
             parent.enter(inner); invoke(parent, callable); parent.leave(inner); parent.handler(inner); parent.emit(Opcode::PopTop); parent.end_handler(inner);
             parent.end_handler(outer); parent.emit(Opcode::LoadException); parent.emit(Opcode::Return);
             call(context, function(parent), {}, out); ASSERT_EQ(out.result().tag(), ResultTag::Ok); EXPECT_EQ(out.result().value(), context.builtin(CoreObject::None));
-            std::size_t count = 0; for (auto node = context.payload<ExceptionObject>(error).traceback; node; node = context.payload<TracebackObject>(*node).next) ++count;
+            std::size_t count = 0; for (auto node = read_edge(context, error, &ExceptionObject::traceback); node; node = read_edge(context, *node, &TracebackObject::next)) ++count;
             EXPECT_EQ(count, 2U); EXPECT_FALSE(context.handled_exception());
         }
         ReturnSlot out(context); call(context, target, {}, out); ASSERT_EQ(out.result().tag(), ResultTag::Raised);
@@ -237,14 +245,15 @@ namespace
     TEST_F(CoreUnwind, ImplicitContextAvoidsNewCyclesAndTerminatesOnExistingCycles)
     {
         auto first = exception(); auto second = exception(); auto third = exception();
-        context.payload<ExceptionObject>(first).context = second.get(context); context.payload<ExceptionObject>(second).context = first.get(context);
+        context.store(first.get(context), context.payload<ExceptionObject>(first).context, second.get(context));
+        context.store(second.get(context), context.payload<ExceptionObject>(second).context, first.get(context));
         CodeBuilder builder(context); auto outer = builder.region(RegionKind::Except); auto inner = builder.region(RegionKind::Except);
         builder.enter(outer); throw_instance(builder, first); builder.leave(outer); builder.handler(outer); builder.emit(Opcode::PopTop);
         builder.enter(inner); throw_instance(builder, third); builder.leave(inner); builder.handler(inner); builder.emit(Opcode::PopTop);
         throw_instance(builder, first); builder.end_handler(inner); builder.end_handler(outer);
         ReturnSlot out(context); call(context, function(builder), {}, out); ASSERT_EQ(out.result().tag(), ResultTag::Raised);
-        EXPECT_EQ(out.result().exception(), first.get(context)); EXPECT_EQ(context.payload<ExceptionObject>(first).context, third.get(context));
-        EXPECT_FALSE(context.payload<ExceptionObject>(third).context); EXPECT_FALSE(context.handled_exception());
+        EXPECT_EQ(out.result().exception(), first.get(context)); EXPECT_EQ(read_edge(context, first, &ExceptionObject::context), third.get(context));
+        EXPECT_FALSE(read_edge(context, third, &ExceptionObject::context)); EXPECT_FALSE(context.handled_exception());
     }
 
     TEST_F(CoreUnwind, ExceptionMatchChecksEveryClassAndRequiresAnExceptionInstance)

@@ -3,6 +3,7 @@
 #include "cxxpython/core/protocol.hpp"
 
 #include <string_view>
+#include <limits>
 #include <variant>
 
 namespace cxxpython::core
@@ -139,7 +140,7 @@ namespace cxxpython::core
         ObjectHeader header;
         const VerifiedCode program;
         const Value constants, varnames, name, qualname, filename, call_keywords;
-        CodeObject(ObjectHeader head, VerifiedCode code, Value consts, Value variables,
+        CodeObject(InitialType head, VerifiedCode code, Value consts, Value variables,
                    Value name, Value qualname, Value filename, Value call_keywords)
             : header(head), program(std::move(code)), constants(consts), varnames(variables),
               name(name), qualname(qualname), filename(filename), call_keywords(call_keywords) {}
@@ -191,10 +192,10 @@ namespace cxxpython::core
     struct FunctionObject
     {
         ObjectHeader header;
-        Value code, globals;
-        std::optional<Value> defaults, kwdefaults;
-        Value name, qualname;
-        FunctionObject(ObjectHeader head, Value code, Value globals, std::optional<Value> defaults,
+        const Value code, globals;
+        const std::optional<Value> defaults, kwdefaults;
+        const Value name, qualname;
+        FunctionObject(InitialType head, Value code, Value globals, std::optional<Value> defaults,
                        std::optional<Value> kwdefaults, Value name, Value qualname)
             : header(head), code(code), globals(globals), defaults(defaults), kwdefaults(kwdefaults), name(name), qualname(qualname) {}
         void trace(Tracer &tracer) const noexcept;
@@ -208,12 +209,12 @@ namespace cxxpython::core
     struct TracebackObject
     {
         ObjectHeader header;
-        std::optional<Value> next;
+        AtomicGcEdge next;
         const Value frame;
         const std::int64_t lasti, lineno;
-        TracebackObject(ObjectHeader head, std::optional<Value> next, Value frame, std::int64_t lasti, std::int64_t lineno)
+        TracebackObject(InitialType head, std::optional<Value> next, Value frame, std::int64_t lasti, std::int64_t lineno)
             : header(head), next(next), frame(frame), lasti(lasti), lineno(lineno) {}
-        void trace(Tracer &tracer) const noexcept { if (next) tracer.visit(*next); tracer.visit(frame); }
+        void trace(Tracer &tracer) const noexcept { tracer.visit(next); tracer.visit(frame); }
     };
     struct FrameObject
     {
@@ -221,18 +222,19 @@ namespace cxxpython::core
         // Cross-thread observation still requires N3 snapshots/STW, not raw reads.
         ObjectHeader header;
         const Value function, code;
+        // Set once before execution can expose this frame to Python callbacks.
         std::optional<Value> back;
         std::vector<std::optional<Value>> locals;
         std::vector<Value> operands;
         std::size_t pc = 0, sp = 0;
-        std::optional<std::size_t> last_instruction;
+        std::atomic<std::size_t> last_instruction{std::numeric_limits<std::size_t>::max()};
         std::optional<std::size_t> pending_call;
         std::vector<ActiveRegion> regions;
         std::vector<CleanupContinuation> cleanups;
         std::optional<TracedReason> reason;
         std::optional<Value> handled_exception;
         FrameState state = FrameState::Created;
-        FrameObject(ObjectHeader head, Value function, Value code, std::size_t local_count, std::size_t stack_count, Value padding, std::size_t max_regions = 0)
+        FrameObject(InitialType head, Value function, Value code, std::size_t local_count, std::size_t stack_count, Value padding, std::size_t max_regions = 0)
             : header(head), function(function), code(code), locals(local_count), operands(stack_count, padding)
         { regions.reserve(max_regions); cleanups.reserve(max_regions); }
         void trace(Tracer &tracer) const noexcept;

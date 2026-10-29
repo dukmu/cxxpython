@@ -15,7 +15,7 @@ namespace
     {
         ObjectHeader header;
         GcEdge child;
-        explicit Node(ObjectHeader head) : header(head) {}
+        explicit Node(InitialType head) : header(head) {}
         void trace(Tracer &tracer) const noexcept { tracer.visit(child); }
     };
 
@@ -305,6 +305,55 @@ int main()
         std::cout << "transfer_iterations=" << transfer_iterations << " transfer_roundtrip_ns=" << transfer_ns
                   << " transfer_token_bytes=" << sizeof(Transfer) << " transfer_collections=" << final.collections
                   << " transfer_live_set_check=ok\n";
+    }
+
+    // Fixed Python work, one Function and Code shared by every worker.
+    constexpr int vm_total = 120000;
+    for (int workers : {1, 2, 4})
+    {
+        Interpreter vm; Attachment controller(vm); controller.bootstrap_core(); RootScope roots(controller); ReturnSlot out(controller);
+        CodeSpec spec; spec.signature.parameters = {{U"n"}}; spec.locals = {U"n", U"sum"}; CodeBuilder builder(controller, spec);
+        const auto zero = builder.constant(roots.root(controller.builtin(CoreObject::IntZero)));
+        const auto one = builder.constant(roots.root(controller.builtin(CoreObject::IntOne)));
+        const auto loop = builder.label(), done = builder.label();
+        builder.emit(Opcode::LoadConst, zero); builder.emit(Opcode::StoreFast, 1); builder.bind(loop);
+        builder.emit(Opcode::LoadFast); builder.jump(Opcode::JumpIfFalse, done);
+        builder.emit(Opcode::LoadFast, 1); builder.emit(Opcode::LoadFast); builder.emit(Opcode::Binary, static_cast<std::uint32_t>(BinaryOp::Add));
+        builder.emit(Opcode::StoreFast, 1); builder.emit(Opcode::LoadFast); builder.emit(Opcode::LoadConst, one);
+        builder.emit(Opcode::Binary, static_cast<std::uint32_t>(BinaryOp::Subtract)); builder.emit(Opcode::StoreFast);
+        builder.jump(Opcode::Jump, loop); builder.bind(done); builder.emit(Opcode::LoadFast, 1); builder.emit(Opcode::Return);
+        builder.freeze(out); const auto code = roots.root(out.result().value());
+        controller.allocate_instance<DictObject>(roots.root(controller.builtin(CoreObject::DictType)), out); const auto globals = roots.root(out.result().value());
+        make_function(controller, {code, globals}, out); const auto function = roots.root(out.result().value());
+        make_int(controller, vm_total / workers, out); const auto argument = roots.root(out.result().value());
+        std::array values{function.get(controller), argument.get(controller)}; cxxpython::core::make_tuple(controller, values, out);
+        const auto packet = roots.root(out.result().value()); out.reset(); controller.collect(); const auto baseline = controller.stats();
+        std::vector<Transfer> inputs; for (int i = 0; i < workers; ++i) inputs.push_back(controller.make_transfer(packet));
+        std::barrier start(workers + 1), finish(workers + 1); std::vector<std::future<bool>> tasks;
+        std::int64_t wall_ns = 0, cpu_ns = 0;
+        {
+            NativeWait wait(controller);
+            for (auto &input : inputs)
+                tasks.push_back(std::async(std::launch::async, [&, input = std::move(input)]() mutable {
+                    Attachment context(vm); RootScope roots(context); ReturnSlot message(context), result(context); context.receive(input, message);
+                    const auto &values = context.payload<TupleObject>(message.result().value()).items; const auto target = roots.root(values[0]);
+                    std::array args{values[1]}; start.arrive_and_wait(); call(context, target, {args, {}}, result);
+                    std::int64_t number = 0; const auto n = static_cast<std::int64_t>(vm_total / workers);
+                    const bool correct = result.result().tag() == ResultTag::Ok && int_fits_signed(context, result.result().value(), number) && number == n * (n + 1) / 2;
+                    NativeWait wait(context); finish.arrive_and_wait(); finish.arrive_and_wait(); return correct;
+                }));
+            const auto cpu_start = std::clock(); wall_ns = measure([&] { start.arrive_and_wait(); finish.arrive_and_wait(); });
+            cpu_ns = static_cast<std::int64_t>((std::clock() - cpu_start) * (1000000000.0 / CLOCKS_PER_SEC));
+        }
+        const auto finished = controller.stats(); finish.arrive_and_wait();
+        for (auto &task : tasks) if (!task.get()) return 1;
+        controller.collect(); const auto final = controller.stats(); if (final.objects != baseline.objects || final.transfer_roots) return 1;
+        std::cout << "parallel_vm_workers=" << workers << " total_iterations=" << vm_total << " wall_ns=" << wall_ns
+                  << " process_cpu_ns=" << cpu_ns << " collections=" << final.collections - baseline.collections
+                  << " max_rendezvous_ns=" << final.max_rendezvous_ns << " last_mark_sweep_ns=" << final.last_pause_ns
+                  << " finish_reserved_bytes=" << finished.reserved_bytes << " finish_metadata_bytes=" << finished.metadata_bytes
+                  << " finish_live_bytes=" << finished.live_bytes << " finish_objects=" << finished.objects
+                  << " parallel_vm_live_set_check=ok\n";
     }
 
     // N1 storage/coordinator cost only, not Python VM parallelism evidence.

@@ -38,7 +38,8 @@ namespace
         {
             ASSERT_EQ(out.result().tag(), ResultTag::Raised);
             EXPECT_EQ(context.type_of(out.result().exception()), context.builtin(error));
-            auto &args = context.payload<TupleObject>(context.payload<ExceptionObject>(out.result().exception()).args);
+            ReturnSlot saved(context); context.load(out.result().exception(), context.payload<ExceptionObject>(out.result().exception()).args, saved);
+            auto &args = context.payload<TupleObject>(saved.result().value());
             ASSERT_EQ(args.items.size(), 1U);
             EXPECT_TRUE(context.has_layout<StrObject>(args.items[0]));
             context.collect();
@@ -147,10 +148,10 @@ namespace
         auto &bound = context.payload<TupleObject>(out.result().value()).items;
         ASSERT_EQ(bound.size(), 3U);
         EXPECT_EQ(context.payload<TupleObject>(bound[1]).items, (std::vector<Value>{value.get(context)}));
-        auto &dictionary = context.payload<DictObject>(bound[2]);
-        EXPECT_EQ(dictionary.entries.size(), 3U);
+        DictView dictionary(context, bound[2]);
+        EXPECT_EQ(dictionary.entries().size(), 3U);
         std::vector<Value> keys;
-        for (const auto &entry : dictionary.entries) keys.push_back(entry.key);
+        for (const auto &entry : dictionary.entries()) keys.push_back(entry.key);
         EXPECT_EQ(keys, (std::vector<Value>{z.get(context), a.get(context), x.get(context)}));
         EXPECT_EQ(detail::name_lookup(context, bound[2], U"x"), value.get(context));
     }
@@ -458,7 +459,8 @@ namespace
         ReturnSlot out(context);
         EXPECT_THROW(set_attribute(context, self, name, value, out), std::logic_error);
         ASSERT_NE(context.instance_dictionary(self.get(context)), nullptr);
-        EXPECT_FALSE(*context.instance_dictionary(self.get(context)));
+        ReturnSlot dictionary(context); context.load(self.get(context), *context.instance_dictionary(self.get(context)), dictionary);
+        EXPECT_EQ(dictionary.result().tag(), ResultTag::Empty);
     }
 
     TEST_F(CoreCalls, NativeStringLayoutDoesNotMakeAnUnrelatedTypeAStringName)

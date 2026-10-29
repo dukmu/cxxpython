@@ -12,7 +12,7 @@ namespace
         ObjectHeader header;
         std::u32string text;
         int *destroyed;
-        NativePayload(ObjectHeader head, int *count = nullptr) : header(head), text(U"native prefix"), destroyed(count) {}
+        NativePayload(InitialType head, int *count = nullptr) : header(head), text(U"native prefix"), destroyed(count) {}
         ~NativePayload() noexcept { if (destroyed) ++*destroyed; }
         void trace(Tracer &) const noexcept {}
         std::size_t external_bytes() const noexcept { return text.capacity() * sizeof(char32_t); }
@@ -20,7 +20,7 @@ namespace
     struct FailingPayload
     {
         ObjectHeader header;
-        explicit FailingPayload(ObjectHeader head) : header(head) { throw std::bad_alloc(); }
+        explicit FailingPayload(InitialType head) : header(head) { throw std::bad_alloc(); }
         void trace(Tracer &) const noexcept {}
     };
 
@@ -205,7 +205,7 @@ namespace
                 create_type(context, spec, temporary);
                 auto cls = local.root(temporary.result().value());
                 context.allocate_instance<NativePayload>(cls, temporary, &destroyed);
-                context.instance_slot(temporary.result().value(), 0) = temporary.result().value();
+                context.store(temporary.result().value(), context.instance_slot(temporary.result().value(), 0), temporary.result().value());
             }
             context.collect();
             EXPECT_EQ(destroyed, i + 1);
@@ -224,10 +224,10 @@ namespace
         }
         del_attribute(context, cls, name, out); ASSERT_EQ(out.result().tag(), ResultTag::Ok);
         context.collect();
-        auto value = context.instance_slot(self.get(context), 0);
-        ASSERT_TRUE(value.has_value());
-        EXPECT_EQ(context.payload<StrObject>(*value).value, U"owned by the slot only");
-        context.instance_slot(self.get(context), 0) = self.get(context);
+        ReturnSlot value(context); context.load(self.get(context), context.instance_slot(self.get(context), 0), value);
+        ASSERT_EQ(value.result().tag(), ResultTag::Ok);
+        EXPECT_EQ(context.payload<StrObject>(value.result().value()).value, U"owned by the slot only");
+        value.reset(); context.store(self.get(context), context.instance_slot(self.get(context), 0), self.get(context));
         const auto before = context.stats().objects;
         roots.release(self); out.reset(); context.collect();
         EXPECT_LT(context.stats().objects, before);

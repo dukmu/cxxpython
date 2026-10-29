@@ -163,7 +163,7 @@ namespace
         auto cls = roots.root(out.result().value());
         EXPECT_EQ(resolve_protocol(context, cls, Protocol::Hash, roots).state, SlotState::Disabled);
         auto late = type(); put(late, U"__eq__", equality);
-        EXPECT_FALSE(detail::name_lookup(context, *context.payload<TypeObject>(late).dictionary, U"__hash__"));
+        EXPECT_FALSE(detail::name_lookup(context, *TypeView(context, late).dictionary(), U"__hash__"));
         EXPECT_FALSE(detail::name_lookup(context, namespace_.get(context), U"__hash__"));
     }
 

@@ -22,17 +22,18 @@ namespace cxxpython::core
         }
         bool is_instance(Attachment &context, Value value, CoreObject type)
         { return is_subtype(context, context.type_of(value), context.builtin(type)); }
-        std::vector<KeywordArg> keywords(Attachment &context, Value dictionary)
+        std::vector<KeywordArg> keywords(Attachment &context, Value dictionary, RootScope &roots)
         {
             std::vector<KeywordArg> result;
-            for (const auto &entry : context.payload<DictObject>(dictionary).entries)
-                result.push_back({entry.key, entry.value});
+            DictView snapshot(context, dictionary);
+            for (const auto &entry : snapshot.entries())
+            { roots.root(entry.key); roots.root(entry.value); result.push_back({entry.key, entry.value}); }
             return result;
         }
         bool excess(Attachment &context, std::span<const Value> args)
         {
             return !context.payload<TupleObject>(args[1]).items.empty() ||
-                   !context.payload<DictObject>(args[2]).entries.empty();
+                   !DictView(context, args[2]).entries().empty();
         }
         Value unwrapped(Attachment &context, Value value)
         {
@@ -42,6 +43,7 @@ namespace cxxpython::core
         bool object_default(Attachment &context, Value type, const std::u32string &name)
         {
             auto method = detail::type_attribute(context, type, name);
+            RootScope roots(context); if (method) roots.root(*method);
             return method && unwrapped(context, *method) ==
                              unwrapped(context, *detail::type_attribute(context, context.object_type(), name));
         }
@@ -69,14 +71,14 @@ namespace cxxpython::core
         void type_call(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
         {
             if (!is_type(context, args[0])) { type_error(context, U"type.__call__ requires a type", out); return; }
+            RootScope roots(context);
             auto &positional = context.payload<TupleObject>(args[1]).items;
-            auto named = keywords(context, args[2]);
+            auto named = keywords(context, args[2], roots);
             if (args[0] == context.type_type())
             {
                 if (positional.size() == 1 && named.empty()) { out.ok(context.type_of(positional[0])); return; }
                 if (positional.size() != 3) { type_error(context, U"type() takes 1 or 3 arguments", out); return; }
             }
-            RootScope roots(context);
             auto cls = roots.root(args[0]);
             auto constructor = detail::type_attribute(context, args[0], U"__new__");
             if (!constructor) { type_error(context, U"type has no __new__", out); return; }
@@ -134,7 +136,7 @@ namespace cxxpython::core
             if (!is_instance(context, args[0], CoreObject::StaticMethodType))
             { type_error(context, U"staticmethod call requires a staticmethod", out); return; }
             RootScope roots(context);
-            auto named = keywords(context, args[2]);
+            auto named = keywords(context, args[2], roots);
             call(context, roots.root(context.payload<StaticMethodObject>(args[0]).callable),
                  {context.payload<TupleObject>(args[1]).items, named}, out);
         }
@@ -164,7 +166,7 @@ namespace cxxpython::core
         }
         void wrap_definition(Attachment &context, Handle cls, const std::u32string &name, bool class_method)
         {
-            auto dictionary = *context.payload<TypeObject>(cls).dictionary;
+            auto dictionary = *TypeView(context, cls.get(context)).dictionary();
             auto function = detail::name_lookup(context, dictionary, name);
             if (!function || context.type_of(*function) != context.builtin(CoreObject::NativeFunctionType)) return;
             RootScope roots(context);
@@ -182,7 +184,9 @@ namespace cxxpython::core
         {
             // Callbacks may resize/replace the namespace and collect removed
             // entries. Snapshot and root the original key/value pairs first.
-            auto entries = context.payload<DictObject>(*context.payload<TypeObject>(cls).dictionary).entries;
+            TypeView metadata(context, cls.get(context));
+            DictView namespace_view(context, metadata.storage());
+            auto entries = namespace_view.entries();
             RootScope roots(context);
             for (const auto &entry : entries) { roots.root(entry.key); roots.root(entry.value); }
             ReturnSlot callback(context);
@@ -198,7 +202,9 @@ namespace cxxpython::core
                     if (context.type_of(out.result().exception()) == context.builtin(CoreObject::RuntimeErrorType))
                     {
                         auto &error = context.payload<ExceptionObject>(out.result().exception());
-                        error.cause = cause; error.context = cause; error.suppress_context = true;
+                        const auto wrapped = out.result().exception();
+                        context.store(wrapped, error.cause, cause); context.store(wrapped, error.context, cause);
+                        error.suppress_context.store(true, std::memory_order_release);
                     }
                     return;
                 }
@@ -206,8 +212,8 @@ namespace cxxpython::core
             const auto &mro = context.payload<TypeObject>(cls).mro;
             for (auto base : std::span(mro).subspan(1))
             {
-                const auto dictionary = context.payload<TypeObject>(base).dictionary;
-                auto hook = dictionary ? detail::name_lookup(context, *dictionary, U"__init_subclass__") : std::optional<Value>{};
+                TypeView base_metadata(context, base); DictView dictionary(context, base_metadata.storage());
+                auto hook = dictionary.find(U"__init_subclass__");
                 if (!hook) continue;
                 detail::bind_descriptor(context, *hook, cls.get(context), cls.get(context), callback);
                 if (raised(callback)) { out.raised(callback.result().exception()); return; }
@@ -224,8 +230,8 @@ namespace cxxpython::core
                 !is_instance(context, args[2], CoreObject::TupleType) ||
                 !is_instance(context, args[3], CoreObject::DictType))
             { type_error(context, U"type.__new__ requires a metaclass, str, tuple and dict", out); return; }
-            auto named = keywords(context, args[4]);
             RootScope roots(context);
+            auto named = keywords(context, args[4], roots);
             std::vector<Handle> bases;
             for (auto base : context.payload<TupleObject>(args[2]).items)
                 bases.push_back(roots.root(base));
@@ -233,6 +239,7 @@ namespace cxxpython::core
             try { winner = detail::select_metaclass(context, roots.root(args[0]), bases, roots); }
             catch (const TypeDefinitionError &error) { definition_error(context, error, out); return; }
             auto constructor = detail::type_attribute(context, winner.get(context), U"__new__");
+            if (constructor) roots.root(*constructor);
             if (winner.get(context) != args[0] && constructor != detail::type_attribute(context, context.type_type(), U"__new__"))
             {
                 ReturnSlot bound(context);
@@ -273,12 +280,13 @@ namespace cxxpython::core
                 }
                 else if (is_instance(context, *slots, CoreObject::DictType))
                 {
-                    for (auto entry : context.payload<DictObject>(*slots).entries) valid &= append(entry.key);
+                    DictView names(context, *slots); for (auto entry : names.entries()) valid &= append(entry.key);
                 }
                 else valid = false;
                 if (!valid) { type_error(context, U"__slots__ requires string names from str, tuple or dict", out); return; }
             }
             auto classcell = detail::name_lookup(context, args[3], U"__classcell__");
+            if (classcell) roots.root(*classcell);
             if (classcell && !is_instance(context, *classcell, CoreObject::CellType))
             { type_error(context, U"__classcell__ must be a cell", out); return; }
             ReturnSlot created(context);
@@ -292,25 +300,26 @@ namespace cxxpython::core
                 return;
             }
             auto cls = roots.root(created.result().value());
-            auto &payload = context.payload<TypeObject>(cls);
-            payload.name = args[1];
-            payload.qualname = detail::name_lookup(context, args[3], U"__qualname__").value_or(args[1]);
-            context.account_external(cls, payload.external_bytes());
-            detail::name_erase(context, *context.payload<TypeObject>(cls).dictionary, U"__qualname__");
+            auto qualified = roots.root(detail::name_lookup(context, args[3], U"__qualname__").value_or(args[1]));
+            detail::type_name_store(context, cls.get(context), args[1], false);
+            detail::type_name_store(context, cls.get(context), qualified.get(context), true);
+            const auto dictionary = *TypeView(context, cls.get(context)).dictionary();
+            detail::name_erase(context, dictionary, U"__qualname__");
             wrap_definition(context, cls, U"__new__", false);
             wrap_definition(context, cls, U"__init_subclass__", true);
             wrap_definition(context, cls, U"__class_getitem__", true);
             if (classcell)
             {
+                detail::name_erase(context, dictionary, U"__classcell__");
                 write_cell(context, *classcell, cls.get(context));
-                detail::name_erase(context, *payload.dictionary, U"__classcell__");
             }
-            if (auto cell = detail::name_lookup(context, *payload.dictionary, U"__classdictcell__"))
+            if (auto cell = detail::name_lookup(context, dictionary, U"__classdictcell__"))
             {
+                roots.root(*cell);
                 if (!is_instance(context, *cell, CoreObject::CellType))
                 { type_error(context, U"__classdictcell__ must be a cell", out); return; }
-                write_cell(context, *cell, *payload.dictionary);
-                detail::name_erase(context, *payload.dictionary, U"__classdictcell__");
+                detail::name_erase(context, dictionary, U"__classdictcell__");
+                write_cell(context, *cell, dictionary);
             }
             finish_class(context, cls, named, out);
         }
@@ -318,7 +327,7 @@ namespace cxxpython::core
         {
             auto size = context.payload<TupleObject>(args[1]).items.size();
             if (!is_type(context, args[0]) || (size != 1 && size != 3) ||
-                (size == 1 && !context.payload<DictObject>(args[2]).entries.empty()))
+                (size == 1 && !DictView(context, args[2]).entries().empty()))
             { type_error(context, U"type.__init__ takes 1 or 3 arguments", out); return; }
             out.ok(context.builtin(CoreObject::None));
         }
@@ -341,12 +350,12 @@ namespace cxxpython::core
                 install_native_attribute(context, core, owner, name, std::move(signature), entry);
                 if (binding == Binding::Plain) return;
                 ReturnSlot out(context);
-                auto function = *name_lookup(context, *context.payload<TypeObject>(owner).dictionary, name);
+                auto function = *name_lookup(context, *TypeView(context, owner).dictionary(), name);
                 if (binding == Binding::Static) context.allocate_instance<StaticMethodObject>(at(CoreObject::StaticMethodType), out, function);
                 else context.allocate_instance<ClassMethodObject>(at(CoreObject::ClassMethodType), out, function);
                 auto wrapper = roots.root(out.result().value());
                 context.allocate_instance<StrObject>(at(CoreObject::StrType), out, std::move(name));
-                name_store(context, *context.payload<TypeObject>(owner).dictionary, out.result().value(), wrapper.get(context));
+                name_store(context, *TypeView(context, owner).dictionary(), out.result().value(), wrapper.get(context));
             };
             SignatureLayout variadic;
             variadic.parameters = {{U"self", ParameterKind::PositionalOnly}};

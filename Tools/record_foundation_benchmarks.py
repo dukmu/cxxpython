@@ -21,7 +21,7 @@ def parse_output(output, series, sample):
             continue
         fields = dict(token.split("=", 1) for token in line.split())
         probe = next(iter(fields))
-        workers = fields.get("parallel_storage_workers", "")
+        workers = next((value for key, value in fields.items() if key.endswith("_workers")), "")
         for metric, value in fields.items():
             if metric.endswith("live_set_check") and value != "ok":
                 raise ValueError(f"{metric}={value}")
@@ -54,6 +54,19 @@ def render_report(rows, failures):
         series, probe, workers, metric, unit = key
         lines.append(f"| {series} | {probe} | {workers or '-'} | {metric} | {unit} | {len(values)} | "
                      f"{statistics.median(values):.3f} | {min(values):.3f} | {max(values):.3f} |")
+    lines += ["", "## Fixed-Work Scaling", "",
+              "Derived from median wall/process CPU times. CPU/wall is not a speedup; 1-worker wall time is the speedup baseline.", "",
+              "| Series | Probe | Workers | Wall ms | CPU/Wall | Speedup | Efficiency |",
+              "| --- | --- | --- | --- | --- | --- | --- |"]
+    for (series, probe, workers, metric, unit), values in sorted(groups.items()):
+        baseline = groups.get((series, probe, "1", "wall_ns", "ms"))
+        cpu = groups.get((series, probe, workers, "process_cpu_ns", "ms"))
+        if metric != "wall_ns" or not workers or not baseline or not cpu:
+            continue
+        wall = statistics.median(values)
+        speedup = statistics.median(baseline) / wall
+        lines.append(f"| {series} | {probe} | {workers} | {wall:.3f} | {statistics.median(cpu) / wall:.3f} | "
+                     f"{speedup:.3f} | {speedup / int(workers):.3f} |")
     return "\n".join(lines) + "\n"
 
 

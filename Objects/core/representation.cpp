@@ -32,19 +32,18 @@ namespace cxxpython::core
         }
         std::u32string type_name(Attachment &context, Value type, bool qualified)
         {
-            const auto &data = context.payload<TypeObject>(type);
-            return context.payload<StrObject>(std::get<Value>(qualified ? data.qualname : data.name)).value;
+            TypeView data(context, type);
+            return context.payload<StrObject>(std::get<Value>(qualified ? data.qualname() : data.name())).value;
         }
         std::u32string display_type(Attachment &context, Value type)
         {
-            const auto &data = context.payload<TypeObject>(type);
-            auto module = data.dictionary ? detail::name_lookup(context, *data.dictionary, U"__module__") : std::optional<Value>{};
+            TypeView data(context, type); DictView names(context, data.storage()); auto module = names.find(U"__module__");
             if (module && string_value(context, *module))
             {
                 const auto &name = context.payload<StrObject>(*module).value;
-                if (name != U"builtins") return name + U"." + type_name(context, type, true);
+                if (name != U"builtins") return name + U"." + context.payload<StrObject>(std::get<Value>(data.qualname())).value;
             }
-            return type_name(context, type, false);
+            return context.payload<StrObject>(std::get<Value>(data.name())).value;
         }
         void object_hash(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
         { make_int(context, signed_hash(std::rotr(reinterpret_cast<std::uintptr_t>(args[0].object()), 4)), out); }
@@ -222,7 +221,8 @@ namespace cxxpython::core
         void exception_repr(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
         {
             if (!instance_of<ExceptionObject, CoreObject::BaseExceptionType>(context, args[0])) { type_error(context, out); return; }
-            RootScope roots(context); auto arguments = roots.root(context.payload<ExceptionObject>(args[0]).args);
+            RootScope roots(context); ReturnSlot saved(context); context.load(args[0], context.payload<ExceptionObject>(args[0]).args, saved);
+            auto arguments = roots.root(saved.result().value());
             const auto &values = context.payload<TupleObject>(arguments).items;
             auto name = type_name(context, context.type_of(args[0]), false); ReturnSlot text(context);
             if (values.size() == 1)
@@ -241,7 +241,8 @@ namespace cxxpython::core
         void exception_str(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
         {
             if (!instance_of<ExceptionObject, CoreObject::BaseExceptionType>(context, args[0])) { type_error(context, out); return; }
-            RootScope roots(context); auto arguments = roots.root(context.payload<ExceptionObject>(args[0]).args);
+            RootScope roots(context); ReturnSlot saved(context); context.load(args[0], context.payload<ExceptionObject>(args[0]).args, saved);
+            auto arguments = roots.root(saved.result().value());
             const auto &values = context.payload<TupleObject>(arguments).items;
             if (values.empty()) make_str(context, U"", out);
             else str(context, values.size() == 1 ? roots.root(values[0]) : arguments, out);
@@ -277,7 +278,7 @@ namespace cxxpython::core
             for (auto id : {CoreObject::CellType, CoreObject::DictType})
             {
                 ReturnSlot text(context); context.allocate_instance<StrObject>(at(CoreObject::StrType), text, U"__hash__");
-                name_store(context, *context.payload<TypeObject>(at(id)).dictionary, text.result().value(), at(CoreObject::None).get(context));
+                name_store(context, *TypeView(context, at(id)).dictionary(), text.result().value(), at(CoreObject::None).get(context));
             }
             const std::array<std::u32string, 6> names{U"__eq__", U"__ne__", U"__lt__", U"__le__", U"__gt__", U"__ge__"};
             const std::array string_entries{string_compare<CompareOp::Eq>, string_compare<CompareOp::Ne>, string_compare<CompareOp::Lt>,

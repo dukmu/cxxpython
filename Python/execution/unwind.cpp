@@ -1,5 +1,7 @@
 #include "cxxpython/core/execution.hpp"
 
+#include <unordered_set>
+
 namespace cxxpython::core
 {
     namespace
@@ -87,16 +89,33 @@ namespace cxxpython::core
         {
             auto handled = context.handled_exception();
             if (!handled || *handled == exception || exception == context.builtin(CoreObject::MemoryError)) return;
-            auto cursor = *handled; auto slow = cursor; bool advance = false;
-            while (auto next = context.payload<ExceptionObject>(cursor).context)
+            RootScope roots(context); roots.root(exception); roots.root(*handled);
+            for (;;)
             {
-                if (*next == exception) { context.payload<ExceptionObject>(cursor).context.reset(); break; }
-                cursor = *next;
-                if (cursor == slow) break;
-                if (advance) slow = *context.payload<ExceptionObject>(slow).context;
-                advance = !advance;
+                const auto epoch = context.publication_epoch(PublicationDomain::Exception);
+                if (!(epoch & 1))
+                {
+                    RootScope chain(context); ReturnSlot link(context); std::unordered_set<ObjectHeader *> seen;
+                    std::optional<Value> cut;
+                    for (auto cursor = handled; cursor;)
+                    {
+                        chain.root(*cursor);
+                        if (!seen.insert(cursor->object()).second) break;
+                        context.load(*cursor, context.payload<ExceptionObject>(*cursor).context, link);
+                        const auto next = link.result().tag() == ResultTag::Ok ? std::optional<Value>{link.result().value()} : std::optional<Value>{};
+                        if (next == exception) { cut = cursor; break; }
+                        cursor = next; if (seen.size() % 64 == 0) context.poll();
+                    }
+                    NoSafepoint commit(context);
+                    if (context.begin_publication(PublicationDomain::Exception, epoch))
+                    {
+                        if (cut) context.store(*cut, context.payload<ExceptionObject>(*cut).context, {});
+                        context.store(exception, context.payload<ExceptionObject>(exception).context, handled);
+                        context.end_publication(PublicationDomain::Exception, epoch); return;
+                    }
+                }
+                context.poll(); std::this_thread::yield();
             }
-            context.payload<ExceptionObject>(exception).context = handled;
         }
         void exception_match(Attachment &context, Value exception, Value matcher, ReturnSlot &out)
         {

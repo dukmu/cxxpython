@@ -5,6 +5,14 @@
 namespace
 {
     using namespace cxxpython::core;
+    // Serial test observations: the owning graph stays rooted and no writer races this read.
+    template <class T, class Owner>
+    std::optional<Value> read_edge(Attachment &context, Owner owner, AtomicGcEdge T::*field)
+    {
+        const auto value = [&] { if constexpr (std::is_same_v<Owner, Handle>) return owner.get(context); else return owner; }();
+        ReturnSlot saved(context); context.load(value, context.payload<T>(value).*field, saved);
+        return saved.result().tag() == ResultTag::Ok ? std::optional<Value>{saved.result().value()} : std::optional<Value>{};
+    }
     class CoreTraceback : public testing::Test
     {
     protected:
@@ -106,7 +114,7 @@ namespace
         exception = failure(function(bad)); trace = get(exception, U"__traceback__");
         EXPECT_EQ(context.type_of(exception), context.builtin(CoreObject::TypeErrorType));
         EXPECT_EQ(context.payload<TracebackObject>(trace).lasti, 2); EXPECT_EQ(context.payload<TracebackObject>(trace).lineno, 90);
-        EXPECT_FALSE(context.payload<TracebackObject>(trace).next);
+        EXPECT_FALSE(read_edge(context, trace, &TracebackObject::next));
     }
 
     TEST_F(CoreTraceback, ExplicitRepeatedRaisePrependsWithoutCloningCodeOrReplacingOldNodes)
@@ -132,12 +140,12 @@ namespace
         for (const auto &field : {U"tb_frame", U"tb_lasti", U"tb_lineno"})
         { set_attribute(context, first, text(field), builtin(CoreObject::None), out); error(out, CoreObject::AttributeErrorType); }
         set_attribute(context, first, name, builtin(CoreObject::None), out); ASSERT_EQ(out.result().tag(), ResultTag::Ok);
-        EXPECT_FALSE(context.payload<TracebackObject>(first).next);
+        EXPECT_FALSE(read_edge(context, first, &TracebackObject::next));
         name = text(U"__traceback__"); set_attribute(context, exception, name, integer(1), out); error(out, CoreObject::TypeErrorType);
         del_attribute(context, exception, name, out); error(out, CoreObject::TypeErrorType);
         EXPECT_EQ(get(exception, U"__traceback__").get(context), first.get(context));
         set_attribute(context, exception, name, builtin(CoreObject::None), out); EXPECT_EQ(out.result().tag(), ResultTag::Ok);
-        EXPECT_FALSE(context.payload<ExceptionObject>(exception).traceback);
+        EXPECT_FALSE(read_edge(context, exception, &ExceptionObject::traceback));
         auto method = get(exception, U"with_traceback"); std::array args{last.get(context)};
         call(context, method, {args, {}}, out); ASSERT_EQ(out.result().tag(), ResultTag::Ok);
         EXPECT_EQ(out.result().value(), exception.get(context)); EXPECT_EQ(get(exception, U"__traceback__").get(context), last.get(context));
@@ -190,11 +198,11 @@ namespace
         auto leaf = raiser(); auto parent = caller(leaf); ReturnSlot out(context);
         context.set_allocation_limit(2); call(context, parent, {}, out); error(out, CoreObject::MemoryErrorType);
         EXPECT_EQ(out.result().exception(), context.builtin(CoreObject::MemoryError)); EXPECT_FALSE(context.current_frame());
-        EXPECT_FALSE(context.payload<ExceptionObject>(context.builtin(CoreObject::MemoryError)).traceback);
+        EXPECT_FALSE(read_edge(context, context.builtin(CoreObject::MemoryError), &ExceptionObject::traceback));
         context.set_allocation_limit(std::numeric_limits<std::size_t>::max());
         out.reset(); context.collect(); const auto before = context.stats().objects;
         auto exception = failure(parent); EXPECT_EQ(context.type_of(exception), context.builtin(CoreObject::ValueErrorType));
-        EXPECT_TRUE(context.payload<ExceptionObject>(exception).traceback);
+        EXPECT_TRUE(read_edge(context, exception, &ExceptionObject::traceback));
         auto trace = text(U"__traceback__"); set_attribute(context, exception, trace, builtin(CoreObject::None), out);
         out.reset(); context.collect(); EXPECT_EQ(context.stats().objects, before + 1U);
     }
@@ -212,8 +220,8 @@ namespace
             context.allocate_instance<DictObject>(roots.root(context.builtin(CoreObject::DictType)), out); auto globals = roots.root(out.result().value());
             make_function(context, {code, globals}, out); auto fn = roots.root(out.result().value());
             std::array args{exception.get(context)}; call(context, fn, {args, {}}, out); ASSERT_EQ(out.result().tag(), ResultTag::Raised);
-            auto &error = context.payload<ExceptionObject>(exception); ASSERT_TRUE(error.traceback);
-            const auto frame = context.payload<TracebackObject>(*error.traceback).frame;
+            const auto trace = read_edge(context, exception, &ExceptionObject::traceback); ASSERT_TRUE(trace);
+            const auto frame = context.payload<TracebackObject>(*trace).frame;
             EXPECT_EQ(context.payload<FrameObject>(frame).locals[0], exception.get(context)); context.collect();
             EXPECT_EQ(context.payload<FrameObject>(frame).state, FrameState::Completed);
         }
@@ -241,11 +249,11 @@ namespace
         call(context, fn, {args, {}}, out); ASSERT_EQ(out.result().tag(), ResultTag::Raised);
         EXPECT_EQ(out.result().exception(), exception.get(context)); EXPECT_FALSE(context.current_frame());
         auto &data = context.payload<ExceptionObject>(exception); std::size_t count = 0;
-        for (auto trace = data.traceback; trace; trace = context.payload<TracebackObject>(*trace).next)
+        for (auto trace = read_edge(context, exception, &ExceptionObject::traceback); trace; trace = read_edge(context, *trace, &TracebackObject::next))
         { ++count; EXPECT_EQ(context.payload<FrameObject>(context.payload<TracebackObject>(*trace).frame).state, FrameState::Completed); }
-        EXPECT_EQ(count, 6001U); data.traceback.reset(); out.reset(); context.collect(); EXPECT_EQ(context.stats().objects, baseline);
+        EXPECT_EQ(count, 6001U); context.store(exception.get(context), data.traceback, {}); out.reset(); context.collect(); EXPECT_EQ(context.stats().objects, baseline);
         args[1] = context.builtin(CoreObject::IntZero); call(context, fn, {args, {}}, out);
-        ASSERT_EQ(out.result().tag(), ResultTag::Raised); ASSERT_TRUE(data.traceback);
-        EXPECT_FALSE(context.payload<TracebackObject>(*data.traceback).next);
+        ASSERT_EQ(out.result().tag(), ResultTag::Raised); const auto trace = read_edge(context, exception, &ExceptionObject::traceback); ASSERT_TRUE(trace);
+        EXPECT_FALSE(read_edge(context, *trace, &TracebackObject::next));
     }
 }

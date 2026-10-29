@@ -32,6 +32,8 @@ compiler, VM, and extension platform implemented in a C/C++ mix.
   Do not mark a whole milestone complete based on a narrower passing slice.
 - Preserve development history: append new entries or insert them at the top
   of `doc/development_status.md`; do not rewrite earlier entries.
+- Generate measurement tables with `Tools/record_foundation_benchmarks.py`
+  from retained raw runs. Do not hand-copy benchmark rows or derived speedups.
 - The user authorizes timely stable-point commits after verification. Commit
   completed vertical slices promptly, excluding unrelated user changes.
 

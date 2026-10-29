@@ -15,7 +15,7 @@ namespace
         ObjectHeader header;
         std::atomic<int> *destroyed;
         const std::int64_t value;
-        EpochLeaf(ObjectHeader header, std::atomic<int> *destroyed = nullptr, std::int64_t value = 42)
+        EpochLeaf(InitialType header, std::atomic<int> *destroyed = nullptr, std::int64_t value = 42)
             : header(header), destroyed(destroyed), value(value) {}
         ~EpochLeaf() noexcept { if (destroyed) ++*destroyed; }
         void trace(Tracer &) const noexcept {}
@@ -23,7 +23,7 @@ namespace
     struct CollectingConstructor
     {
         ObjectHeader header;
-        CollectingConstructor(ObjectHeader head, Attachment &context) : header(head) { context.collect(); }
+        CollectingConstructor(InitialType head, Attachment &context) : header(head) { context.collect(); }
         void trace(Tracer &) const noexcept {}
     };
     void wait_request(Interpreter &interpreter)
@@ -134,10 +134,12 @@ namespace
         wait_request(interpreter); go.set_value(); EXPECT_EQ(collector.get(), 1U); observer.get(); EXPECT_EQ(destroyed.load(), 1);
     }
 
-    TEST(FoundationEpochs, UnconvertedObjectOpsParallelAdmissionIsExplicitlyRejected)
+    TEST(FoundationEpochs, PublishedObjectOpsAllowsMultipleActiveMutators)
     {
         Interpreter interpreter; Attachment owner(interpreter); owner.bootstrap_core();
-        auto denied = std::async(std::launch::async, [&] { EXPECT_THROW(Attachment other(interpreter), std::logic_error); }); denied.get();
+        auto admitted = std::async(std::launch::async, [&] {
+            Attachment other(interpreter); EXPECT_TRUE(other.core_ready()); EXPECT_EQ(interpreter.gc_state().active, 2U);
+        }); admitted.get();
         {
             NativeWait wait(owner);
             auto admitted = std::async(std::launch::async, [&] { Attachment other(interpreter); EXPECT_TRUE(other.core_ready()); other.collect(); }); admitted.get();

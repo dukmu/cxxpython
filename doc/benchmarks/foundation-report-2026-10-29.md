@@ -174,3 +174,183 @@ Storage/native delivery probes do not establish Python VM parallelism. RSS is th
 | n1_shared_initial | transfer_iterations | - | transfer_roundtrip_ns | ms | 3 | 0.989 | 0.929 | 1.005 |
 | n1_shared_initial | transfer_iterations | - | transfer_token_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
 | n1_shared_initial | with_iterations | - | with_function_ns | ms | 3 | 43.556 | 42.467 | 44.760 |
+| n2-n3-shared-vm | cleanup_iterations | - | active_region_bytes | bytes | 3 | 32.000 | 32.000 | 32.000 |
+| n2-n3-shared-vm | cleanup_iterations | - | cleanup_continuation_bytes | bytes | 3 | 48.000 | 48.000 | 48.000 |
+| n2-n3-shared-vm | cleanup_iterations | - | cleanup_function_ns | ms | 3 | 31.701 | 30.456 | 32.692 |
+| n2-n3-shared-vm | function_iterations | - | frame_prefix_bytes | bytes | 3 | 232.000 | 232.000 | 232.000 |
+| n2-n3-shared-vm | function_iterations | - | verified_function_ns | ms | 3 | 24.707 | 24.382 | 27.465 |
+| n2-n3-shared-vm | hash_iterations | - | string_hash_ns | ms | 3 | 120.249 | 118.525 | 155.134 |
+| n2-n3-shared-vm | hash_iterations | - | tuple_repr_ns | ms | 3 | 36.327 | 34.808 | 36.477 |
+| n2-n3-shared-vm | int_iterations | - | big_int_mul_ns | ms | 3 | 14.014 | 13.424 | 29.697 |
+| n2-n3-shared-vm | int_iterations | - | int_add_ns | ms | 3 | 125.093 | 121.946 | 156.743 |
+| n2-n3-shared-vm | int_iterations | - | int_object_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| n2-n3-shared-vm | iterations | - | allocation_and_auto_gc_ns | ms | 3 | 4.827 | 4.819 | 6.103 |
+| n2-n3-shared-vm | iterations | - | handle_bytes | bytes | 3 | 32.000 | 32.000 | 32.000 |
+| n2-n3-shared-vm | iterations | - | header_bytes | bytes | 3 | 8.000 | 8.000 | 8.000 |
+| n2-n3-shared-vm | iterations | - | last_gc_pause_ns | ms | 3 | 0.001 | 0.000 | 0.002 |
+| n2-n3-shared-vm | iterations | - | live_bytes | bytes | 3 | 0.000 | 0.000 | 0.000 |
+| n2-n3-shared-vm | iterations | - | node_bytes | bytes | 3 | 16.000 | 16.000 | 16.000 |
+| n2-n3-shared-vm | iterations | - | recorded_metadata_bytes | bytes | 3 | 288.000 | 288.000 | 288.000 |
+| n2-n3-shared-vm | iterations | - | root_register_release_ns | ms | 3 | 3.681 | 3.634 | 10.988 |
+| n2-n3-shared-vm | native_call_iterations | - | core_live_bytes | bytes | 3 | 88080.000 | 88080.000 | 88080.000 |
+| n2-n3-shared-vm | native_call_iterations | - | core_metadata_bytes | bytes | 3 | 96400.000 | 96400.000 | 96400.000 |
+| n2-n3-shared-vm | native_call_iterations | - | core_reserved_bytes | bytes | 3 | 321152.000 | 321152.000 | 321152.000 |
+| n2-n3-shared-vm | native_call_iterations | - | lookup_bind_call_ns | ms | 3 | 28.096 | 27.757 | 68.473 |
+| n2-n3-shared-vm | native_call_iterations | - | native_call_ns | ms | 3 | 31.078 | 29.222 | 66.654 |
+| n2-n3-shared-vm | parallel_storage_workers | 1 | finish_live_bytes | bytes | 3 | 42720.000 | 42720.000 | 42720.000 |
+| n2-n3-shared-vm | parallel_storage_workers | 1 | finish_metadata_bytes | bytes | 3 | 90896.000 | 90896.000 | 90896.000 |
+| n2-n3-shared-vm | parallel_storage_workers | 1 | finish_reserved_bytes | bytes | 3 | 135504.000 | 135504.000 | 135504.000 |
+| n2-n3-shared-vm | parallel_storage_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.018 | 0.011 | 0.022 |
+| n2-n3-shared-vm | parallel_storage_workers | 1 | max_rendezvous_ns | ms | 3 | 0.001 | 0.000 | 0.001 |
+| n2-n3-shared-vm | parallel_storage_workers | 1 | process_cpu_ns | ms | 3 | 2.304 | 2.232 | 2.792 |
+| n2-n3-shared-vm | parallel_storage_workers | 1 | wall_ns | ms | 3 | 2.319 | 2.231 | 2.705 |
+| n2-n3-shared-vm | parallel_storage_workers | 2 | finish_live_bytes | bytes | 3 | 18304.000 | 4400.000 | 41856.000 |
+| n2-n3-shared-vm | parallel_storage_workers | 2 | finish_metadata_bytes | bytes | 3 | 91136.000 | 91136.000 | 134944.000 |
+| n2-n3-shared-vm | parallel_storage_workers | 2 | finish_reserved_bytes | bytes | 3 | 135504.000 | 135504.000 | 201152.000 |
+| n2-n3-shared-vm | parallel_storage_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.015 | 0.007 | 0.020 |
+| n2-n3-shared-vm | parallel_storage_workers | 2 | max_rendezvous_ns | ms | 3 | 0.067 | 0.041 | 3.320 |
+| n2-n3-shared-vm | parallel_storage_workers | 2 | process_cpu_ns | ms | 3 | 2.738 | 2.659 | 3.044 |
+| n2-n3-shared-vm | parallel_storage_workers | 2 | wall_ns | ms | 3 | 3.689 | 1.730 | 8.711 |
+| n2-n3-shared-vm | parallel_storage_workers | 4 | finish_live_bytes | bytes | 3 | 42800.000 | 35312.000 | 52144.000 |
+| n2-n3-shared-vm | parallel_storage_workers | 4 | finish_metadata_bytes | bytes | 3 | 223040.000 | 223040.000 | 225888.000 |
+| n2-n3-shared-vm | parallel_storage_workers | 4 | finish_reserved_bytes | bytes | 3 | 332448.000 | 332448.000 | 336656.000 |
+| n2-n3-shared-vm | parallel_storage_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.024 | 0.020 | 0.027 |
+| n2-n3-shared-vm | parallel_storage_workers | 4 | max_rendezvous_ns | ms | 3 | 0.126 | 0.021 | 0.251 |
+| n2-n3-shared-vm | parallel_storage_workers | 4 | process_cpu_ns | ms | 3 | 2.857 | 2.689 | 4.141 |
+| n2-n3-shared-vm | parallel_storage_workers | 4 | wall_ns | ms | 3 | 2.711 | 1.546 | 2.767 |
+| n2-n3-shared-vm | parallel_vm_workers | 1 | finish_live_bytes | bytes | 3 | 118836.000 | 118836.000 | 118836.000 |
+| n2-n3-shared-vm | parallel_vm_workers | 1 | finish_metadata_bytes | bytes | 3 | 172336.000 | 172336.000 | 172336.000 |
+| n2-n3-shared-vm | parallel_vm_workers | 1 | finish_reserved_bytes | bytes | 3 | 460648.000 | 460648.000 | 460648.000 |
+| n2-n3-shared-vm | parallel_vm_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.022 | 0.021 | 0.023 |
+| n2-n3-shared-vm | parallel_vm_workers | 1 | max_rendezvous_ns | ms | 3 | 0.001 | 0.001 | 0.001 |
+| n2-n3-shared-vm | parallel_vm_workers | 1 | process_cpu_ns | ms | 3 | 498.714 | 459.023 | 500.345 |
+| n2-n3-shared-vm | parallel_vm_workers | 1 | wall_ns | ms | 3 | 496.701 | 454.189 | 497.716 |
+| n2-n3-shared-vm | parallel_vm_workers | 2 | finish_live_bytes | bytes | 3 | 115620.000 | 114516.000 | 116628.000 |
+| n2-n3-shared-vm | parallel_vm_workers | 2 | finish_metadata_bytes | bytes | 3 | 173632.000 | 173632.000 | 211200.000 |
+| n2-n3-shared-vm | parallel_vm_workers | 2 | finish_reserved_bytes | bytes | 3 | 460648.000 | 460648.000 | 526296.000 |
+| n2-n3-shared-vm | parallel_vm_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.057 | 0.018 | 0.091 |
+| n2-n3-shared-vm | parallel_vm_workers | 2 | max_rendezvous_ns | ms | 3 | 3.229 | 0.184 | 5.760 |
+| n2-n3-shared-vm | parallel_vm_workers | 2 | process_cpu_ns | ms | 3 | 515.255 | 502.733 | 520.745 |
+| n2-n3-shared-vm | parallel_vm_workers | 2 | wall_ns | ms | 3 | 293.508 | 285.416 | 307.856 |
+| n2-n3-shared-vm | parallel_vm_workers | 4 | finish_live_bytes | bytes | 3 | 151188.000 | 126636.000 | 154684.000 |
+| n2-n3-shared-vm | parallel_vm_workers | 4 | finish_metadata_bytes | bytes | 3 | 326496.000 | 288928.000 | 327104.000 |
+| n2-n3-shared-vm | parallel_vm_workers | 4 | finish_reserved_bytes | bytes | 3 | 723240.000 | 657592.000 | 727328.000 |
+| n2-n3-shared-vm | parallel_vm_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.069 | 0.069 | 0.084 |
+| n2-n3-shared-vm | parallel_vm_workers | 4 | max_rendezvous_ns | ms | 3 | 10.065 | 2.420 | 26.265 |
+| n2-n3-shared-vm | parallel_vm_workers | 4 | process_cpu_ns | ms | 3 | 528.814 | 493.603 | 540.991 |
+| n2-n3-shared-vm | parallel_vm_workers | 4 | wall_ns | ms | 3 | 331.797 | 181.489 | 550.575 |
+| n2-n3-shared-vm | process_peak_rss_kib | - | process_peak_rss_kib | KiB | 3 | 6072.000 | 5884.000 | 6296.000 |
+| n2-n3-shared-vm | scheduled_iterations | - | scheduled_function_ns | ms | 3 | 37.527 | 36.286 | 44.641 |
+| n2-n3-shared-vm | shared_edge_iterations | - | cell_object_bytes | bytes | 3 | 16.000 | 16.000 | 16.000 |
+| n2-n3-shared-vm | shared_edge_iterations | - | rooted_cell_read_ns | ms | 3 | 3.637 | 2.745 | 4.231 |
+| n2-n3-shared-vm | shared_edge_iterations | - | rooted_cell_store_read_ns | ms | 3 | 5.594 | 5.184 | 6.961 |
+| n2-n3-shared-vm | slot_iterations | - | generic_prefix_bytes | bytes | 3 | 8.000 | 8.000 | 8.000 |
+| n2-n3-shared-vm | slot_iterations | - | slot_instance_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| n2-n3-shared-vm | slot_iterations | - | slot_set_get_ns | ms | 3 | 46.158 | 44.181 | 67.332 |
+| n2-n3-shared-vm | transfer_iterations | - | transfer_roundtrip_ns | ms | 3 | 1.034 | 0.928 | 1.135 |
+| n2-n3-shared-vm | transfer_iterations | - | transfer_token_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| n2-n3-shared-vm | with_iterations | - | with_function_ns | ms | 3 | 60.635 | 52.905 | 64.972 |
+| n2-n3-shared-vm-idle | cleanup_iterations | - | active_region_bytes | bytes | 3 | 32.000 | 32.000 | 32.000 |
+| n2-n3-shared-vm-idle | cleanup_iterations | - | cleanup_continuation_bytes | bytes | 3 | 48.000 | 48.000 | 48.000 |
+| n2-n3-shared-vm-idle | cleanup_iterations | - | cleanup_function_ns | ms | 3 | 32.047 | 29.122 | 35.984 |
+| n2-n3-shared-vm-idle | function_iterations | - | frame_prefix_bytes | bytes | 3 | 232.000 | 232.000 | 232.000 |
+| n2-n3-shared-vm-idle | function_iterations | - | verified_function_ns | ms | 3 | 25.140 | 24.421 | 27.869 |
+| n2-n3-shared-vm-idle | hash_iterations | - | string_hash_ns | ms | 3 | 118.728 | 118.721 | 118.970 |
+| n2-n3-shared-vm-idle | hash_iterations | - | tuple_repr_ns | ms | 3 | 34.821 | 34.186 | 37.009 |
+| n2-n3-shared-vm-idle | int_iterations | - | big_int_mul_ns | ms | 3 | 13.099 | 12.491 | 13.446 |
+| n2-n3-shared-vm-idle | int_iterations | - | int_add_ns | ms | 3 | 115.678 | 115.157 | 122.059 |
+| n2-n3-shared-vm-idle | int_iterations | - | int_object_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| n2-n3-shared-vm-idle | iterations | - | allocation_and_auto_gc_ns | ms | 3 | 4.876 | 4.849 | 5.706 |
+| n2-n3-shared-vm-idle | iterations | - | handle_bytes | bytes | 3 | 32.000 | 32.000 | 32.000 |
+| n2-n3-shared-vm-idle | iterations | - | header_bytes | bytes | 3 | 8.000 | 8.000 | 8.000 |
+| n2-n3-shared-vm-idle | iterations | - | last_gc_pause_ns | ms | 3 | 0.001 | 0.001 | 0.002 |
+| n2-n3-shared-vm-idle | iterations | - | live_bytes | bytes | 3 | 0.000 | 0.000 | 0.000 |
+| n2-n3-shared-vm-idle | iterations | - | node_bytes | bytes | 3 | 16.000 | 16.000 | 16.000 |
+| n2-n3-shared-vm-idle | iterations | - | recorded_metadata_bytes | bytes | 3 | 288.000 | 288.000 | 288.000 |
+| n2-n3-shared-vm-idle | iterations | - | root_register_release_ns | ms | 3 | 3.884 | 3.684 | 3.978 |
+| n2-n3-shared-vm-idle | native_call_iterations | - | core_live_bytes | bytes | 3 | 88080.000 | 88080.000 | 88080.000 |
+| n2-n3-shared-vm-idle | native_call_iterations | - | core_metadata_bytes | bytes | 3 | 96400.000 | 96400.000 | 96400.000 |
+| n2-n3-shared-vm-idle | native_call_iterations | - | core_reserved_bytes | bytes | 3 | 321152.000 | 321152.000 | 321152.000 |
+| n2-n3-shared-vm-idle | native_call_iterations | - | lookup_bind_call_ns | ms | 3 | 27.360 | 26.973 | 27.602 |
+| n2-n3-shared-vm-idle | native_call_iterations | - | native_call_ns | ms | 3 | 29.834 | 29.677 | 29.869 |
+| n2-n3-shared-vm-idle | parallel_storage_workers | 1 | finish_live_bytes | bytes | 3 | 42720.000 | 42720.000 | 42720.000 |
+| n2-n3-shared-vm-idle | parallel_storage_workers | 1 | finish_metadata_bytes | bytes | 3 | 90896.000 | 90896.000 | 90896.000 |
+| n2-n3-shared-vm-idle | parallel_storage_workers | 1 | finish_reserved_bytes | bytes | 3 | 135504.000 | 135504.000 | 135504.000 |
+| n2-n3-shared-vm-idle | parallel_storage_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.020 | 0.012 | 0.020 |
+| n2-n3-shared-vm-idle | parallel_storage_workers | 1 | max_rendezvous_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| n2-n3-shared-vm-idle | parallel_storage_workers | 1 | process_cpu_ns | ms | 3 | 2.380 | 2.261 | 2.519 |
+| n2-n3-shared-vm-idle | parallel_storage_workers | 1 | wall_ns | ms | 3 | 2.338 | 2.288 | 2.535 |
+| n2-n3-shared-vm-idle | parallel_storage_workers | 2 | finish_live_bytes | bytes | 3 | 5056.000 | 4160.000 | 9584.000 |
+| n2-n3-shared-vm-idle | parallel_storage_workers | 2 | finish_metadata_bytes | bytes | 3 | 91136.000 | 91136.000 | 91136.000 |
+| n2-n3-shared-vm-idle | parallel_storage_workers | 2 | finish_reserved_bytes | bytes | 3 | 135504.000 | 135504.000 | 135504.000 |
+| n2-n3-shared-vm-idle | parallel_storage_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.018 | 0.005 | 0.020 |
+| n2-n3-shared-vm-idle | parallel_storage_workers | 2 | max_rendezvous_ns | ms | 3 | 0.040 | 0.032 | 0.068 |
+| n2-n3-shared-vm-idle | parallel_storage_workers | 2 | process_cpu_ns | ms | 3 | 2.591 | 2.566 | 2.679 |
+| n2-n3-shared-vm-idle | parallel_storage_workers | 2 | wall_ns | ms | 3 | 1.669 | 1.666 | 1.880 |
+| n2-n3-shared-vm-idle | parallel_storage_workers | 4 | finish_live_bytes | bytes | 3 | 48224.000 | 45616.000 | 59872.000 |
+| n2-n3-shared-vm-idle | parallel_storage_workers | 4 | finish_metadata_bytes | bytes | 3 | 228736.000 | 184928.000 | 266848.000 |
+| n2-n3-shared-vm-idle | parallel_storage_workers | 4 | finish_reserved_bytes | bytes | 3 | 340864.000 | 275216.000 | 398096.000 |
+| n2-n3-shared-vm-idle | parallel_storage_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.041 | 0.015 | 0.043 |
+| n2-n3-shared-vm-idle | parallel_storage_workers | 4 | max_rendezvous_ns | ms | 3 | 0.119 | 0.089 | 0.161 |
+| n2-n3-shared-vm-idle | parallel_storage_workers | 4 | process_cpu_ns | ms | 3 | 3.727 | 3.333 | 4.184 |
+| n2-n3-shared-vm-idle | parallel_storage_workers | 4 | wall_ns | ms | 3 | 2.405 | 2.008 | 2.434 |
+| n2-n3-shared-vm-idle | parallel_vm_workers | 1 | finish_live_bytes | bytes | 3 | 118836.000 | 118836.000 | 118836.000 |
+| n2-n3-shared-vm-idle | parallel_vm_workers | 1 | finish_metadata_bytes | bytes | 3 | 172336.000 | 172336.000 | 172336.000 |
+| n2-n3-shared-vm-idle | parallel_vm_workers | 1 | finish_reserved_bytes | bytes | 3 | 460648.000 | 460648.000 | 460648.000 |
+| n2-n3-shared-vm-idle | parallel_vm_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.022 | 0.021 | 0.049 |
+| n2-n3-shared-vm-idle | parallel_vm_workers | 1 | max_rendezvous_ns | ms | 3 | 0.001 | 0.001 | 0.002 |
+| n2-n3-shared-vm-idle | parallel_vm_workers | 1 | process_cpu_ns | ms | 3 | 462.583 | 457.978 | 475.070 |
+| n2-n3-shared-vm-idle | parallel_vm_workers | 1 | wall_ns | ms | 3 | 462.564 | 457.954 | 468.426 |
+| n2-n3-shared-vm-idle | parallel_vm_workers | 2 | finish_live_bytes | bytes | 3 | 116316.000 | 113940.000 | 118428.000 |
+| n2-n3-shared-vm-idle | parallel_vm_workers | 2 | finish_metadata_bytes | bytes | 3 | 211200.000 | 173632.000 | 211200.000 |
+| n2-n3-shared-vm-idle | parallel_vm_workers | 2 | finish_reserved_bytes | bytes | 3 | 526296.000 | 460648.000 | 526296.000 |
+| n2-n3-shared-vm-idle | parallel_vm_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.046 | 0.019 | 0.112 |
+| n2-n3-shared-vm-idle | parallel_vm_workers | 2 | max_rendezvous_ns | ms | 3 | 0.161 | 0.155 | 0.190 |
+| n2-n3-shared-vm-idle | parallel_vm_workers | 2 | process_cpu_ns | ms | 3 | 485.850 | 483.809 | 504.121 |
+| n2-n3-shared-vm-idle | parallel_vm_workers | 2 | wall_ns | ms | 3 | 250.011 | 239.909 | 258.978 |
+| n2-n3-shared-vm-idle | parallel_vm_workers | 4 | finish_live_bytes | bytes | 3 | 138156.000 | 116276.000 | 157844.000 |
+| n2-n3-shared-vm-idle | parallel_vm_workers | 4 | finish_metadata_bytes | bytes | 3 | 288928.000 | 252576.000 | 327712.000 |
+| n2-n3-shared-vm-idle | parallel_vm_workers | 4 | finish_reserved_bytes | bytes | 3 | 657592.000 | 600120.000 | 731416.000 |
+| n2-n3-shared-vm-idle | parallel_vm_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.057 | 0.038 | 0.072 |
+| n2-n3-shared-vm-idle | parallel_vm_workers | 4 | max_rendezvous_ns | ms | 3 | 0.357 | 0.272 | 4.412 |
+| n2-n3-shared-vm-idle | parallel_vm_workers | 4 | process_cpu_ns | ms | 3 | 494.822 | 489.910 | 529.415 |
+| n2-n3-shared-vm-idle | parallel_vm_workers | 4 | wall_ns | ms | 3 | 147.308 | 141.942 | 150.979 |
+| n2-n3-shared-vm-idle | process_peak_rss_kib | - | process_peak_rss_kib | KiB | 3 | 7184.000 | 5992.000 | 7224.000 |
+| n2-n3-shared-vm-idle | scheduled_iterations | - | scheduled_function_ns | ms | 3 | 37.023 | 34.815 | 41.899 |
+| n2-n3-shared-vm-idle | shared_edge_iterations | - | cell_object_bytes | bytes | 3 | 16.000 | 16.000 | 16.000 |
+| n2-n3-shared-vm-idle | shared_edge_iterations | - | rooted_cell_read_ns | ms | 3 | 3.232 | 3.121 | 3.890 |
+| n2-n3-shared-vm-idle | shared_edge_iterations | - | rooted_cell_store_read_ns | ms | 3 | 5.435 | 5.263 | 6.238 |
+| n2-n3-shared-vm-idle | slot_iterations | - | generic_prefix_bytes | bytes | 3 | 8.000 | 8.000 | 8.000 |
+| n2-n3-shared-vm-idle | slot_iterations | - | slot_instance_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| n2-n3-shared-vm-idle | slot_iterations | - | slot_set_get_ns | ms | 3 | 44.126 | 43.763 | 44.904 |
+| n2-n3-shared-vm-idle | transfer_iterations | - | transfer_roundtrip_ns | ms | 3 | 0.975 | 0.928 | 1.135 |
+| n2-n3-shared-vm-idle | transfer_iterations | - | transfer_token_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| n2-n3-shared-vm-idle | with_iterations | - | with_function_ns | ms | 3 | 55.915 | 53.066 | 63.551 |
+
+## Fixed-Work Scaling
+
+Derived from median wall/process CPU times. CPU/wall is not a speedup; 1-worker wall time is the speedup baseline.
+
+| Series | Probe | Workers | Wall ms | CPU/Wall | Speedup | Efficiency |
+| --- | --- | --- | --- | --- | --- | --- |
+| n1_shared_auto | parallel_storage_workers | 1 | 2.349 | 0.977 | 1.000 | 1.000 |
+| n1_shared_auto | parallel_storage_workers | 2 | 2.019 | 1.485 | 1.163 | 0.582 |
+| n1_shared_auto | parallel_storage_workers | 4 | 2.563 | 1.636 | 0.917 | 0.229 |
+| n1_shared_final | parallel_storage_workers | 1 | 2.181 | 0.953 | 1.000 | 1.000 |
+| n1_shared_final | parallel_storage_workers | 2 | 2.280 | 1.199 | 0.957 | 0.478 |
+| n1_shared_final | parallel_storage_workers | 4 | 2.243 | 1.544 | 0.972 | 0.243 |
+| n1_shared_initial | parallel_storage_workers | 1 | 2.238 | 0.963 | 1.000 | 1.000 |
+| n1_shared_initial | parallel_storage_workers | 2 | 2.240 | 1.283 | 0.999 | 0.499 |
+| n1_shared_initial | parallel_storage_workers | 4 | 2.401 | 1.658 | 0.932 | 0.233 |
+| n2-n3-shared-vm | parallel_storage_workers | 1 | 2.319 | 0.993 | 1.000 | 1.000 |
+| n2-n3-shared-vm | parallel_storage_workers | 2 | 3.689 | 0.742 | 0.629 | 0.314 |
+| n2-n3-shared-vm | parallel_storage_workers | 4 | 2.711 | 1.054 | 0.856 | 0.214 |
+| n2-n3-shared-vm | parallel_vm_workers | 1 | 496.701 | 1.004 | 1.000 | 1.000 |
+| n2-n3-shared-vm | parallel_vm_workers | 2 | 293.508 | 1.756 | 1.692 | 0.846 |
+| n2-n3-shared-vm | parallel_vm_workers | 4 | 331.797 | 1.594 | 1.497 | 0.374 |
+| n2-n3-shared-vm-idle | parallel_storage_workers | 1 | 2.338 | 1.018 | 1.000 | 1.000 |
+| n2-n3-shared-vm-idle | parallel_storage_workers | 2 | 1.669 | 1.553 | 1.401 | 0.701 |
+| n2-n3-shared-vm-idle | parallel_storage_workers | 4 | 2.405 | 1.549 | 0.972 | 0.243 |
+| n2-n3-shared-vm-idle | parallel_vm_workers | 1 | 462.564 | 1.000 | 1.000 | 1.000 |
+| n2-n3-shared-vm-idle | parallel_vm_workers | 2 | 250.011 | 1.943 | 1.850 | 0.925 |
+| n2-n3-shared-vm-idle | parallel_vm_workers | 4 | 147.308 | 3.359 | 3.140 | 0.785 |

@@ -232,7 +232,7 @@ namespace
         auto empty = roots.root(out.result().value()); repr(context, empty, out); expect_text(out, U"Exception()");
         str(context, empty, out); expect_text(out, U"");
         std::array values{integer("1").get(context), text(U"x").get(context)}; auto args = tuple(values);
-        context.payload<ExceptionObject>(error).args = args.get(context);
+        context.store(error.get(context), context.payload<ExceptionObject>(error).args, args.get(context));
         repr(context, error, out); expect_text(out, U"ValueError(1, 'x')");
         str(context, error, out); expect_text(out, U"(1, 'x')");
     }

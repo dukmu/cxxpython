@@ -35,13 +35,22 @@ namespace cxxpython::core
     {
         std::optional<TypeAttribute> find_type_attribute(Attachment &context, Value type, const std::u32string &name)
         {
-            for (auto base : context.payload<TypeObject>(type).mro)
+            RootScope roots(context); roots.root(type);
+            for (;;)
             {
-                auto &dictionary = context.payload<TypeObject>(base).dictionary;
-                if (dictionary)
-                    if (auto value = name_lookup(context, *dictionary, name)) return TypeAttribute{base, *value};
+                const auto epoch = context.type_epoch();
+                if (!(epoch & 1))
+                {
+                    std::optional<TypeAttribute> result;
+                    for (auto base : context.payload<TypeObject>(type).mro)
+                    {
+                        TypeView metadata(context, base); DictView dictionary(context, metadata.storage());
+                        if (auto value = dictionary.find(name)) { result = TypeAttribute{base, *value}; break; }
+                    }
+                    if (context.type_epoch() == epoch) return result;
+                }
+                context.poll(); std::this_thread::yield();
             }
-            return {};
         }
         std::optional<Value> type_attribute(Attachment &context, Value type, const std::u32string &name)
         {
@@ -64,6 +73,7 @@ namespace cxxpython::core
         void bind_descriptor(Attachment &context, Value descriptor, std::optional<Value> receiver,
                              Value owner, ReturnSlot &out)
         {
+            RootScope roots(context); roots.root(descriptor); roots.root(owner); if (receiver) roots.root(*receiver);
             const auto type = context.type_of(descriptor);
             // Native binding retains the absent/None distinction. Python-level
             // __get__ wrappers translate None only at their explicit boundary.
@@ -97,6 +107,7 @@ namespace cxxpython::core
             if (given > positional_count && !signature.varargs)
             { type_error(context, U"too many positional arguments", out); return false; }
             std::vector<std::optional<Value>> slots(signature.parameters.size());
+            DictView keyword_defaults(context, defaults ? defaults->keywords : std::optional<Value>{});
             for (std::size_t i = 0; i < std::min(given, positional_count); ++i) slots[i] = positional(i);
             ReturnSlot extra_keywords(context);
             if (signature.varkwargs)
@@ -135,7 +146,7 @@ namespace cxxpython::core
                             value = defaults->positional[i + count - positional_count];
                     }
                     else if (defaults->keywords)
-                        value = name_lookup(context, *defaults->keywords, signature.parameters[i].name);
+                        value = keyword_defaults.find(signature.parameters[i].name);
                 }
                 if (!value)
                 { type_error(context, U"missing required argument: " + signature.parameters[i].name, out); return false; }
@@ -284,11 +295,15 @@ namespace cxxpython::core
             return type_attribute(context, type, U"__set__").has_value() ||
                    type_attribute(context, type, U"__delete__").has_value();
         }
-        std::optional<Value> *dictionary_field(Attachment &context, Value object)
+        bool dictionary_field(Attachment &context, Value object, ReturnSlot &out)
         {
             if (is_subtype(context, context.type_of(object), context.type_type()))
-                return &context.payload<TypeObject>(object).dictionary;
-            return context.instance_dictionary(object);
+            {
+                TypeView metadata(context, object); if (!metadata.dictionary()) throw std::logic_error("ready type has no namespace");
+                out.ok(*metadata.dictionary()); return true;
+            }
+            auto *field = context.instance_dictionary(object); if (!field) return false;
+            context.load(object, *field, out); return true;
         }
         bool attribute_name(Attachment &context, Handle name, ReturnSlot &out)
         {
@@ -300,10 +315,10 @@ namespace cxxpython::core
         void get_default(Attachment &context, Handle object, Handle name, bool type_lookup, ReturnSlot &out)
         {
             auto value = object.get(context);
-            auto type = context.type_of(value);
+            RootScope roots(context); auto type_root = roots.root(context.type_of(value)); const auto type = type_root.get(context);
             const auto &text = context.payload<StrObject>(name).value;
             auto attribute = type_attribute(context, type, text);
-            RootScope roots(context);
+            if (attribute) roots.root(*attribute);
             if (attribute && data_descriptor(context, *attribute) &&
                 type_attribute(context, context.type_of(*attribute), U"__get__"))
             { bind_descriptor(context, *attribute, value, type, out); return; }
@@ -312,10 +327,11 @@ namespace cxxpython::core
                 if (auto class_attribute = type_attribute(context, value, text))
                 { bind_descriptor(context, *class_attribute, {}, value, out); return; }
             }
-            else if (auto field = dictionary_field(context, value); field && *field)
+            else
             {
-                if (auto stored = detail::name_lookup(context, **field, text))
-                { out.ok(*stored); return; }
+                ReturnSlot dictionary(context);
+                if (dictionary_field(context, value, dictionary) && dictionary.result().tag() == ResultTag::Ok)
+                    if (auto stored = detail::name_lookup(context, dictionary.result().value(), text)) { out.ok(*stored); return; }
             }
             if (attribute)
             { bind_descriptor(context, *attribute, value, type, out); return; }
@@ -334,6 +350,7 @@ namespace cxxpython::core
                 if (type.immutable) { type_error(context, U"cannot modify immutable type", out); return; }
             }
             auto descriptor = type_attribute(context, context.type_of(target), text);
+            if (descriptor) roots.root(*descriptor);
             if (descriptor && data_descriptor(context, *descriptor))
             {
                 const auto method = value ? U"__set__" : U"__delete__";
@@ -345,19 +362,22 @@ namespace cxxpython::core
                 if (!raised(out)) out.ok(context.builtin(CoreObject::None));
                 return;
             }
-            auto field = dictionary_field(context, target);
-            if (!field) { raise_error(context, CoreObject::AttributeErrorType, U"object has no instance dictionary", out); return; }
-            if (!*field)
+            ReturnSlot dictionary(context);
+            if (!dictionary_field(context, target, dictionary)) { raise_error(context, CoreObject::AttributeErrorType, U"object has no instance dictionary", out); return; }
+            if (dictionary.result().tag() == ResultTag::Empty)
             {
                 if (!value) { raise_error(context, CoreObject::AttributeErrorType, text, out); return; }
-                ReturnSlot dictionary(context);
-                context.allocate_instance<DictObject>(roots.root(context.builtin(CoreObject::DictType)), dictionary);
-                *field = dictionary.result().value();
+                ReturnSlot created(context); context.allocate_instance<DictObject>(roots.root(context.builtin(CoreObject::DictType)), created);
+                for (;;)
+                {
+                    if (context.compare_exchange(target, *context.instance_dictionary(target), {}, created.result().value())) { dictionary.ok(created.result().value()); break; }
+                    context.load(target, *context.instance_dictionary(target), dictionary); if (dictionary.result().tag() == ResultTag::Ok) break;
+                    context.poll();
+                }
             }
-            if (value) detail::name_store(context, **field, name.get(context), value->get(context));
-            else if (!detail::name_erase(context, **field, text))
+            if (value) detail::name_store(context, dictionary.result().value(), name.get(context), value->get(context));
+            else if (!detail::name_erase(context, dictionary.result().value(), text))
             { raise_error(context, CoreObject::AttributeErrorType, text, out); return; }
-            if (type_mutation) context.invalidate_types();
             out.ok(context.builtin(CoreObject::None));
         }
 
@@ -416,7 +436,8 @@ namespace cxxpython::core
             { type_error(context, U"call wrapper requires a compatible receiver", out); return; }
             auto &positional = context.payload<TupleObject>(args[1]).items;
             std::vector<KeywordArg> keywords;
-            for (const auto &entry : context.payload<DictObject>(args[2]).entries)
+            DictView named(context, args[2]);
+            for (const auto &entry : named.entries())
                 keywords.push_back({entry.key, entry.value});
             RootScope roots(context);
             call(context, roots.root(args[0]), {positional, keywords}, out);
@@ -486,7 +507,7 @@ namespace cxxpython::core
             auto callable = roots.root(function.result().value());
             ReturnSlot key(context);
             context.allocate_instance<StrObject>(at(CoreObject::StrType), key, std::move(name));
-            name_store(context, *context.payload<TypeObject>(owner).dictionary, key.result().value(), callable.get(context));
+            name_store(context, *TypeView(context, owner).dictionary(), key.result().value(), callable.get(context));
         }
         void install_call_descriptors(Attachment &context, std::span<const Handle> core)
         {

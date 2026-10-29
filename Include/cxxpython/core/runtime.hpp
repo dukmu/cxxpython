@@ -87,9 +87,24 @@ namespace cxxpython::core
         std::atomic<ObjectHeader *> object_;
     };
 
+    class InitialType final
+    {
+    public:
+        InitialType() noexcept = default;
+    private:
+        friend class Attachment;
+        friend struct ObjectHeader;
+        explicit InitialType(ObjectHeader *type) noexcept : type_(type) {}
+        ObjectHeader *type_ = nullptr;
+    };
+
     struct ObjectHeader
     {
-        GcEdge type;
+        AtomicGcEdge type;
+        explicit ObjectHeader(InitialType initial = {}) noexcept
+            : type(initial.type_ ? std::optional<Value>{Value(*initial.type_)} : std::optional<Value>{}) {}
+        ObjectHeader(const ObjectHeader &) = delete;
+        ObjectHeader &operator=(const ObjectHeader &) = delete;
     };
 
     class Tracer final
@@ -130,14 +145,14 @@ namespace cxxpython::core
             if (fields.dictionary && fields.slots == limit) throw std::bad_alloc();
             const auto count = fields.slots + static_cast<std::size_t>(fields.dictionary);
             if (!count) return size;
-            constexpr auto padding = alignof(std::optional<Value>) - 1;
+            constexpr auto padding = alignof(AtomicGcEdge) - 1;
             if (size > limit - padding) throw std::bad_alloc();
             const auto offset = (size + padding) & ~padding;
-            if (count > (limit - offset) / sizeof(std::optional<Value>)) throw std::bad_alloc();
-            return offset + count * sizeof(std::optional<Value>);
+            if (count > (limit - offset) / sizeof(AtomicGcEdge)) throw std::bad_alloc();
+            return offset + count * sizeof(AtomicGcEdge);
         }
         std::size_t storage_alignment() const noexcept
-        { return alignment < alignof(std::optional<Value>) ? alignof(std::optional<Value>) : alignment; }
+        { return alignment < alignof(AtomicGcEdge) ? alignof(AtomicGcEdge) : alignment; }
         void *allocate_storage(std::size_t bytes) const
         {
             if (storage_alignment() <= alignof(std::max_align_t)) return ::operator new(bytes);
@@ -148,18 +163,18 @@ namespace cxxpython::core
             if (storage_alignment() <= alignof(std::max_align_t)) ::operator delete(storage);
             else ::operator delete(storage, std::align_val_t(storage_alignment()));
         }
-        std::optional<Value> *field_cells(ObjectHeader *object) const noexcept
+        AtomicGcEdge *field_cells(ObjectHeader *object) const noexcept
         {
-            constexpr auto padding = alignof(std::optional<Value>) - 1;
+            constexpr auto padding = alignof(AtomicGcEdge) - 1;
             const auto offset = (size + padding) & ~padding;
-            return reinterpret_cast<std::optional<Value> *>(reinterpret_cast<std::byte *>(object) + offset);
+            return reinterpret_cast<AtomicGcEdge *>(reinterpret_cast<std::byte *>(object) + offset);
         }
         void construct_fields(ObjectHeader *object) const noexcept
         {
             const auto count = fields.slots + static_cast<std::size_t>(fields.dictionary);
             if (!count) return;
             // Placement array new establishes the array lifetime in the aligned tail.
-            ::new (static_cast<void *>(field_cells(object))) std::optional<Value>[count]();
+            ::new (static_cast<void *>(field_cells(object))) AtomicGcEdge[count]();
         }
         void trace_storage(const ObjectHeader &object, Tracer &tracer) const noexcept;
         // End payload/tail lifetimes; only the owning span frees raw storage.
@@ -207,6 +222,7 @@ namespace cxxpython::core
     };
     enum class MutatorState { PendingAttach, Active, Parked, NativeWait, Collector, Exiting };
     enum class GcPhase { Running, Requesting, Collecting };
+    enum class PublicationDomain { Type, Exception };
     struct GcSnapshot
     {
         GcPhase phase;
@@ -365,13 +381,17 @@ namespace cxxpython::core
         template <class T> bool has_layout(Value object) const
         { return has_native_layout(object, &detail::native_layout_id<T>); }
 
-        std::optional<Value> *instance_dictionary(Value object);
-        std::optional<Value> &instance_slot(Value object, std::size_t index);
+        AtomicGcEdge *instance_dictionary(Value object);
+        AtomicGcEdge &instance_slot(Value object, std::size_t index);
 
         void store(Handle owner, GcEdge &edge, Handle value);
         void clear(Handle owner, GcEdge &edge);
         void load(Value owner, const AtomicGcEdge &edge, ReturnSlot &out);
         void store(Value owner, AtomicGcEdge &edge, std::optional<Value> value);
+        void store(Handle owner, AtomicGcEdge &edge, Handle value) { store(owner.get(*this), edge, value.get(*this)); }
+        void clear(Handle owner, AtomicGcEdge &edge) { store(owner.get(*this), edge, {}); }
+        bool compare_exchange(Value owner, AtomicGcEdge &edge, std::optional<Value> expected, std::optional<Value> desired);
+        void exchange(Value owner, AtomicGcEdge &edge, std::optional<Value> value, ReturnSlot &previous);
         Transfer make_transfer(Handle value);
         void receive(Transfer &transfer, ReturnSlot &out);
         void account_external(Handle owner, std::size_t bytes);
@@ -382,6 +402,9 @@ namespace cxxpython::core
         Value builtin(CoreObject object) const;
         std::uint64_t type_epoch() const;
         void invalidate_types();
+        std::uint64_t publication_epoch(PublicationDomain domain) const;
+        bool begin_publication(PublicationDomain domain, std::uint64_t epoch);
+        void end_publication(PublicationDomain domain, std::uint64_t epoch);
         bool enter_call();
         void leave_call() noexcept;
         bool enter_native_call();
@@ -438,9 +461,8 @@ namespace cxxpython::core
             T *object = nullptr;
             try
             {
-                object = std::construct_at(static_cast<T *>(storage), ObjectHeader{}, std::forward<Args>(args)...);
+                object = std::construct_at(static_cast<T *>(storage), type ? InitialType(type->get(*this).object()) : InitialType{}, std::forward<Args>(args)...);
                 layout.construct_fields(&object->header);
-                if (type) object->header.type.object_ = type->get(*this).object();
                 std::size_t external = 0;
                 if constexpr (requires { object->external_bytes(); }) external = object->external_bytes();
                 adopt(&object->header, out, external);

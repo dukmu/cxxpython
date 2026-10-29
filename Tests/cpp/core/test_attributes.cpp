@@ -134,7 +134,7 @@ namespace
         auto cls = type("Owner"); auto self = instance(cls); auto key = text(U"value");
         auto first = text(U"first"); auto second = text(U"second");
         auto dictionary = get(self, U"__dict__");
-        EXPECT_TRUE(context.payload<DictObject>(dictionary).entries.empty());
+        EXPECT_TRUE(DictView(context, dictionary.get(context)).entries().empty());
         set(self, U"value", first);
         EXPECT_EQ(detail::name_lookup(context, dictionary.get(context), U"value"), first.get(context));
         ReturnSlot out(context);
@@ -149,7 +149,7 @@ namespace
         ASSERT_EQ(out.result().tag(), ResultTag::Ok);
         auto fresh = get(self, U"__dict__");
         EXPECT_NE(fresh.get(context), replacement.get(context));
-        EXPECT_TRUE(context.payload<DictObject>(fresh).entries.empty());
+        EXPECT_TRUE(DictView(context, fresh.get(context)).entries().empty());
         EXPECT_EQ(detail::name_lookup(context, replacement.get(context), U"value"), second.get(context));
         set_attribute(context, self, name, first, out);
         expect_error(out, CoreObject::TypeErrorType);
@@ -170,7 +170,7 @@ namespace
     TEST_F(CoreAttributes, InheritedDictionaryDescriptorDoesNotAddAnotherAuthority)
     {
         auto base = type("Base"); auto cls = type("Child", {base}); auto self = instance(cls);
-        auto &own = context.payload<TypeObject>(cls).dictionary;
+        auto own = TypeView(context, cls).dictionary();
         EXPECT_FALSE(detail::name_lookup(context, *own, U"__dict__"));
         auto descriptor = get(base, U"__dict__");
         EXPECT_EQ(context.type_of(descriptor), context.builtin(CoreObject::MappingProxyType));
@@ -183,7 +183,7 @@ namespace
         auto cls = type("Owner"); auto proxy = get(cls, U"__dict__");
         ASSERT_EQ(context.type_of(proxy), context.builtin(CoreObject::MappingProxyType));
         const auto mapping = context.payload<MappingProxyObject>(proxy).mapping;
-        EXPECT_EQ(mapping, *context.payload<TypeObject>(cls).dictionary);
+        EXPECT_EQ(mapping, *TypeView(context, cls).dictionary());
         auto value = text(U"visible through existing proxy"); set(cls, U"value", value);
         context.collect();
         EXPECT_EQ(detail::name_lookup(context, mapping, U"value"), value.get(context));
@@ -253,7 +253,7 @@ namespace
         }
         context.collect();
         const auto owner = context.payload<GetSetDescriptorObject>(out.result().value()).owner;
-        EXPECT_EQ(context.payload<StrObject>(std::get<Value>(context.payload<TypeObject>(owner).name)).value, U"TemporaryOwner");
+        EXPECT_EQ(context.payload<StrObject>(std::get<Value>(TypeView(context, owner).name())).value, U"TemporaryOwner");
         out.reset();
         context.collect();
     }
@@ -264,7 +264,7 @@ namespace
         {
             ReturnSlot temporary(context);
             auto callback = [](Attachment &c, Value receiver, ReturnSlot &out) {
-                auto dictionary = *c.payload<TypeObject>(c.type_of(receiver)).dictionary;
+                auto dictionary = *TypeView(c, c.type_of(receiver)).dictionary();
                 auto field = *detail::name_lookup(c, dictionary, U"field");
                 detail::name_erase(c, dictionary, U"field");
                 c.collect();
@@ -274,11 +274,11 @@ namespace
             context.allocate_instance<GetSetDescriptorObject>(roots.root(context.builtin(CoreObject::GetSetDescriptorType)),
                                                               temporary, cls.get(context), callback, nullptr);
             auto key = text(U"field");
-            detail::name_store(context, *context.payload<TypeObject>(cls).dictionary,
+            detail::name_store(context, *TypeView(context, cls).dictionary(),
                                key.get(context), temporary.result().value());
         }
         EXPECT_EQ(get(self, U"field").get(context), self.get(context));
-        EXPECT_FALSE(detail::name_lookup(context, *context.payload<TypeObject>(cls).dictionary, U"field"));
+        EXPECT_FALSE(detail::name_lookup(context, *TypeView(context, cls).dictionary(), U"field"));
     }
 
     TEST_F(CoreAttributes, DefaultWrappersAreCallableAndHooksCanDelegate)

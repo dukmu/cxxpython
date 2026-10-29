@@ -29,7 +29,7 @@ namespace
         EXPECT_EQ(context.payload<TypeObject>(type).state, TypeState::Structural);
         ReturnSlot out(context); context.allocate_instance<InstanceObject>(type, out);
         auto self = roots.root(out.result().value());
-        context.instance_slot(self.get(context), 0) = context.object_type();
+        context.store(self.get(context), context.instance_slot(self.get(context), 0), context.object_type());
         context.bootstrap_core();
         EXPECT_TRUE(context.core_ready()); EXPECT_EQ(type.get(context), identity);
         EXPECT_EQ(context.payload<TypeObject>(type).state, TypeState::Ready);

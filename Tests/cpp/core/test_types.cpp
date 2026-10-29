@@ -16,7 +16,7 @@ namespace
     {
         ObjectHeader header;
         std::int64_t value;
-        NativeNumber(ObjectHeader head, std::int64_t value_in) : header(head), value(value_in) {}
+        NativeNumber(InitialType head, std::int64_t value_in) : header(head), value(value_in) {}
         void trace(Tracer &) const noexcept {}
     };
 
@@ -24,7 +24,7 @@ namespace
     {
         ObjectHeader header;
         double value;
-        OtherLayout(ObjectHeader head, double value_in) : header(head), value(value_in) {}
+        OtherLayout(InitialType head, double value_in) : header(head), value(value_in) {}
         void trace(Tracer &) const noexcept {}
     };
 

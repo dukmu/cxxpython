@@ -5,6 +5,23 @@
 
 namespace cxxpython::core
 {
+    TypeView::TypeView(Attachment &context, Value type) : context_(context), owner_(context), metadata_(context)
+    { owner_.ok(type); context.load(type, context.payload<TypeObject>(type).metadata, metadata_); }
+    std::optional<Value> TypeView::snapshot() const
+    { return metadata_.result().tag() == ResultTag::Ok ? std::optional<Value>{metadata_.result().value()} : std::optional<Value>{}; }
+    std::variant<std::u32string, Value> TypeView::name() const
+    { auto meta = snapshot(); return meta ? std::variant<std::u32string, Value>{context_.payload<TypeSnapshot>(*meta).name} : context_.payload<TypeObject>(owner_.result().value()).name; }
+    std::variant<std::u32string, Value> TypeView::qualname() const
+    { auto meta = snapshot(); return meta ? std::variant<std::u32string, Value>{context_.payload<TypeSnapshot>(*meta).qualname} : context_.payload<TypeObject>(owner_.result().value()).qualname; }
+    std::optional<Value> TypeView::dictionary() const
+    { auto meta = snapshot(); return meta ? std::optional<Value>{context_.payload<TypeSnapshot>(*meta).dictionary} : context_.payload<TypeObject>(owner_.result().value()).dictionary; }
+    std::optional<Value> TypeView::storage() const
+    {
+        auto meta = snapshot();
+        if (meta) return context_.payload<TypeSnapshot>(*meta).storage;
+        DictView dictionary(context_, this->dictionary()); return dictionary.storage();
+    }
+
     namespace
     {
         TypeObject &ready_type(Attachment &context, Handle handle)
@@ -182,6 +199,7 @@ namespace cxxpython::core
 
     void TypeObject::trace(Tracer &tracer) const noexcept
     {
+        tracer.visit(metadata);
         if (auto value = std::get_if<Value>(&name)) tracer.visit(*value);
         if (auto value = std::get_if<Value>(&qualname)) tracer.visit(*value);
         for (auto base : bases)
@@ -281,6 +299,59 @@ namespace cxxpython::core
 
     namespace detail
     {
+        namespace
+        {
+            bool commit_type(Attachment &context, Value type, std::optional<Value> expected, Value desired)
+            {
+                const auto epoch = context.type_epoch(); NoSafepoint commit(context);
+                if (!context.begin_publication(PublicationDomain::Type, epoch)) return false;
+                const bool published = context.compare_exchange(type, context.payload<TypeObject>(type).metadata, expected, desired);
+                context.end_publication(PublicationDomain::Type, epoch); return published;
+            }
+        }
+        void publish_type(Attachment &context, Value type)
+        {
+            TypeView view(context, type); if (view.snapshot()) return;
+            if (!view.dictionary()) throw std::logic_error("ready type has no namespace");
+            context.store(*view.dictionary(), context.payload<DictObject>(*view.dictionary()).namespace_owner, type);
+            ReturnSlot staged(context); context.allocate<TypeSnapshot>(staged, std::get<Value>(view.name()), std::get<Value>(view.qualname()), *view.dictionary(), view.storage());
+            if (!commit_type(context, type, {}, staged.result().value())) throw std::logic_error("unpublished type changed concurrently");
+            auto &data = context.payload<TypeObject>(type);
+            context.store(*view.dictionary(), context.payload<DictObject>(*view.dictionary()).storage, {});
+            data.name = std::u32string{}; data.qualname = std::u32string{}; data.dictionary.reset(); context.account_external(type, data.external_bytes());
+        }
+        void type_name_store(Attachment &context, Value type, Value name, bool qualified)
+        {
+            RootScope roots(context); roots.root(type); roots.root(name); ReturnSlot staged(context);
+            for (;;)
+            {
+                {
+                    TypeView old(context, type);
+                    if (!old.snapshot()) throw std::logic_error("type mutation requires published metadata");
+                    context.allocate<TypeSnapshot>(staged, qualified ? std::get<Value>(old.name()) : name,
+                        qualified ? name : std::get<Value>(old.qualname()), *old.dictionary(), old.storage());
+                    if (commit_type(context, type, old.snapshot(), staged.result().value())) return;
+                }
+                staged.reset(); context.poll();
+            }
+        }
+        bool type_namespace_change(Attachment &context, Value type, const std::u32string &name,
+                                   std::optional<Value> key, std::optional<Value> value)
+        {
+            RootScope roots(context); roots.root(type); if (key) roots.root(*key); if (value) roots.root(*value);
+            ReturnSlot storage(context), staged(context);
+            for (;;)
+            {
+                {
+                    TypeView old(context, type);
+                    if (!old.snapshot()) throw std::logic_error("type mutation requires published metadata");
+                    if (!copy_name_storage(context, old.storage(), name, key, value, storage)) return false;
+                    context.allocate<TypeSnapshot>(staged, std::get<Value>(old.name()), std::get<Value>(old.qualname()), *old.dictionary(), storage.result().value());
+                    if (commit_type(context, type, old.snapshot(), staged.result().value())) return true;
+                }
+                staged.reset(); storage.reset(); context.poll();
+            }
+        }
         void type_ready(Attachment &context, Handle type, std::optional<Handle> source)
         {
             auto &payload = ready_type(context, type);
@@ -296,8 +367,11 @@ namespace cxxpython::core
             context.account_external(type, payload.external_bytes());
             initialize_type_dictionary(context, type);
             if (source)
-                for (const auto &entry : context.payload<DictObject>(*source).entries)
+            {
+                DictView dictionary(context, source->get(context));
+                for (const auto &entry : dictionary.entries())
                     name_store(context, *payload.dictionary, entry.key, entry.value);
+            }
             if (name_lookup(context, *payload.dictionary, U"__eq__") &&
                 !name_lookup(context, *payload.dictionary, U"__hash__"))
             {
@@ -321,6 +395,7 @@ namespace cxxpython::core
             payload.bootstrap_module.reset();
             context.account_external(type, payload.external_bytes());
             payload.state = TypeState::Ready;
+            if (context.core_ready()) publish_type(context, type.get(context));
         }
         Handle select_metaclass(Attachment &context, Handle metaclass, std::span<const Handle> bases, RootScope &roots)
         {

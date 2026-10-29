@@ -1,5 +1,58 @@
 # Development Status
 
+## 2026-10-29 Shared ObjectOps And Same-Function Parallel VM Stable Point
+
+Prepended without modifying earlier records. The full Plan 2 N0-N6/M0-M9 goal
+remains active; this is the integrated N2 -> N3 checkpoint requested above,
+not another Cell-only or native-thread micro-checkpoint.
+
+- Removed the ObjectOps quarantine and exclusive NativeWait resume. Only image
+  initialization/B2 promotion excludes new attachments; normal Python bytecode,
+  lookup/binding/calls and GC now run with multiple Active mutators in one
+  Interpreter/shared heap, using the existing epoch collector.
+- Migrated header types and instance tails to rooted atomic access; published
+  immutable DictStorage and TypeSnapshot with COW/CAS updates. Type namespaces
+  retain their real Dict identity for mappingproxy and __classdictcell__, with
+  one snapshot authority. Protocol resolution records the matching epoch.
+- Made value buffers and Function/native callable metadata const; retained a
+  keyword-default snapshot through binding and rooted copied class keywords.
+  No duplicate FunctionCallState allocation was added while setters are absent.
+- Converted exception references/traceback links to atomic edges, CAS traceback
+  prepend and bounded graph commits after rooted, pollable cycle validation.
+  Frame reflection reads an atomic instruction index; invocation-private arrays
+  remain owner-only and collector-readable after stop acknowledgement.
+- Fixed the COW-exposed class-construction failure: namespace removal must
+  succeed before Cell publication. Fixed bootstrap rollback roots retaining
+  newly staged Types during cleanup. Existing failure-at-every-allocation,
+  classcell/dictcell, descriptor and unwind behavior tests pass unchanged in
+  meaning, through the migrated accessors.
+- Added five real parallel VM integration tests: same Function/Code CPU loops
+  plus GC; type rename/method replacement and collecting protocol callbacks;
+  atomic slots/COW instance dictionary updates; concurrent opposite traceback
+  links; shared exceptions through CALL/with/finally; allocation-free bytecode
+  GC acknowledgement and live f_lineno observation. The initial CPU test first
+  failed on production quarantine (one worker rejected), then passed without it.
+- Release foundation 282/282 and complete CTest 530/530 pass. Final
+  ASan/UBSan/LSan 282/282 pass. TSan full integration 281/281 passed before the
+  final cache-version/rooting edits and added traceback-cycle case; the final
+  parallel-VM/bootstrap/readiness selection passes 12/12. Three host recorder
+  tests pass. No sanitizer race or memory failure was reported.
+- Expanded the existing benchmark/recorder, not a second reporting system:
+  same Function/Code fixed-work VM runs at 1/2/4 workers, exact results and live
+  sets checked; raw wall/CPU/GC/storage data generate median/range and derived
+  speedup/efficiency tables automatically. See
+  benchmarks/foundation-report-2026-10-29.md, series n2-n3-shared-vm-idle.
+  The earlier n2-n3-shared-vm samples overlapped builds and remain visible.
+  No manual measurement rows were added or slow runs removed.
+- Next: use these VM costs to remove repeated protocol/call work through
+  thread-private guarded caches, then advance the remaining execution/frontend,
+  thread/I/O and library dependencies. Do not repeat this checkpoint's defensive
+  test matrix for every small change. CPython parity and test2.py on the new
+  runtime are not achieved yet; neither native concurrency nor this narrow
+  CodeBuilder workload substitutes for the remaining product gates.
+- No subagents or legacy fallback were used. Unrelated temporary_plan.md
+  deletion and the user's untracked test2.py remain outside this change.
+
 ## 2026-10-29 Rooted Shared Edges, Transfer Leases And Generated Measurements
 
 Prepended without changing earlier records. The full Plan 2 goal remains active.

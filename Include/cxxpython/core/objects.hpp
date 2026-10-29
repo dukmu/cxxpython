@@ -7,30 +7,29 @@
 
 namespace cxxpython::core
 {
-    // Plan 2 migration boundary: these public payloads are not concurrent APIs.
-    // Mutable fields still require transitional serial admission until N2;
-    // immutable value buffers need const-view/publication interfaces in N1-N2.
+    // Value/call buffers are immutable after construction. Shared mutable
+    // references are atomic edges; load them into a caller-owned ReturnSlot.
     struct NoneObject
     {
         ObjectHeader header;
-        explicit NoneObject(ObjectHeader head) : header(head) {}
+        explicit NoneObject(InitialType head) : header(head) {}
         void trace(Tracer &) const noexcept {}
     };
     struct StrObject
     {
         ObjectHeader header;
-        std::u32string value;
-        StrObject(ObjectHeader head, std::u32string text) : header(head), value(std::move(text)) {}
+        const std::u32string value;
+        StrObject(InitialType head, std::u32string text) : header(head), value(std::move(text)) {}
         void trace(Tracer &) const noexcept {}
         std::size_t external_bytes() const noexcept;
     };
     struct IntObject
     {
         ObjectHeader header;
-        std::int64_t small;
-        std::unique_ptr<detail::BigInt> large;
-        IntObject(ObjectHeader head, std::int64_t value);
-        IntObject(ObjectHeader head, std::unique_ptr<detail::BigInt> value);
+        const std::int64_t small;
+        const std::unique_ptr<const detail::BigInt> large;
+        IntObject(InitialType head, std::int64_t value);
+        IntObject(InitialType head, std::unique_ptr<detail::BigInt> value);
         ~IntObject() noexcept;
         void trace(Tracer &) const noexcept {}
         std::size_t external_bytes() const noexcept;
@@ -38,8 +37,8 @@ namespace cxxpython::core
     struct TupleObject
     {
         ObjectHeader header;
-        std::vector<Value> items;
-        TupleObject(ObjectHeader head, std::vector<Value> values) : header(head), items(std::move(values)) {}
+        const std::vector<Value> items;
+        TupleObject(InitialType head, std::vector<Value> values) : header(head), items(std::move(values)) {}
         void trace(Tracer &tracer) const noexcept { for (auto item : items) tracer.visit(item); }
         std::size_t external_bytes() const noexcept { return items.capacity() * sizeof(Value); }
     };
@@ -49,22 +48,40 @@ namespace cxxpython::core
     {
         struct Entry { Value key; Value value; };
         ObjectHeader header;
-        std::vector<Entry> entries;
-        std::unordered_map<std::u32string, std::size_t> index;
-        std::size_t index_string_bytes = 0;
-        explicit DictObject(ObjectHeader head) : header(head) {}
+        AtomicGcEdge storage;
+        AtomicGcEdge namespace_owner;
+        explicit DictObject(InitialType head) : header(head) {}
+        void trace(Tracer &tracer) const noexcept { tracer.visit(storage); tracer.visit(namespace_owner); }
+    };
+    struct DictStorage
+    {
+        ObjectHeader header;
+        const std::vector<DictObject::Entry> entries;
+        const std::unordered_map<std::u32string, std::size_t> index;
+        const std::size_t index_string_bytes;
+        DictStorage(InitialType head, std::vector<DictObject::Entry> entries,
+                    std::unordered_map<std::u32string, std::size_t> index, std::size_t string_bytes)
+            : header(head), entries(std::move(entries)), index(std::move(index)), index_string_bytes(string_bytes) {}
         void trace(Tracer &tracer) const noexcept;
         std::size_t external_bytes() const noexcept;
+    };
+    class DictView final
+    {
+    public:
+        DictView(Attachment &context, std::optional<Value> dictionary);
+        std::span<const DictObject::Entry> entries() const;
+        std::optional<Value> find(const std::u32string &name) const;
+        std::optional<Value> storage() const;
+    private:
+        Attachment &context_;
+        ReturnSlot storage_;
     };
     struct ExceptionObject
     {
         ObjectHeader header;
-        Value args;
-        std::optional<Value> traceback;
-        std::optional<Value> cause;
-        std::optional<Value> context;
-        bool suppress_context = false;
-        ExceptionObject(ObjectHeader head, Value arguments) : header(head), args(arguments) {}
+        AtomicGcEdge args, traceback, cause, context;
+        std::atomic<bool> suppress_context{false};
+        ExceptionObject(InitialType head, Value arguments) : header(head), args(arguments) {}
         void trace(Tracer &tracer) const noexcept;
     };
 
@@ -95,11 +112,11 @@ namespace cxxpython::core
     struct NativeFunctionObject
     {
         ObjectHeader header;
-        std::string name;
-        SignatureLayout signature;
-        NativeEntry entry;
-        std::vector<Value> captures;
-        NativeFunctionObject(ObjectHeader head, std::string name_in, SignatureLayout signature_in,
+        const std::string name;
+        const SignatureLayout signature;
+        const NativeEntry entry;
+        const std::vector<Value> captures;
+        NativeFunctionObject(InitialType head, std::string name_in, SignatureLayout signature_in,
                              NativeEntry entry_in, std::vector<Value> captures_in)
             : header(head), name(std::move(name_in)), signature(std::move(signature_in)),
               entry(entry_in), captures(std::move(captures_in)) {}
@@ -109,18 +126,18 @@ namespace cxxpython::core
     struct MethodDescriptorObject
     {
         ObjectHeader header;
-        Value function;
-        Value owner;
-        MethodDescriptorObject(ObjectHeader head, Value function_in, Value owner_in)
+        const Value function;
+        const Value owner;
+        MethodDescriptorObject(InitialType head, Value function_in, Value owner_in)
             : header(head), function(function_in), owner(owner_in) {}
         void trace(Tracer &tracer) const noexcept { tracer.visit(function); tracer.visit(owner); }
     };
     struct BoundMethodObject
     {
         ObjectHeader header;
-        Value function;
-        Value self;
-        BoundMethodObject(ObjectHeader head, Value function_in, Value self_in)
+        const Value function;
+        const Value self;
+        BoundMethodObject(InitialType head, Value function_in, Value self_in)
             : header(head), function(function_in), self(self_in) {}
         void trace(Tracer &tracer) const noexcept { tracer.visit(function); tracer.visit(self); }
     };
@@ -129,40 +146,40 @@ namespace cxxpython::core
     struct GetSetDescriptorObject
     {
         ObjectHeader header;
-        Value owner;
-        NativeGetter getter;
-        NativeSetter setter;
-        GetSetDescriptorObject(ObjectHeader head, Value owner_in, NativeGetter get, NativeSetter set)
+        const Value owner;
+        const NativeGetter getter;
+        const NativeSetter setter;
+        GetSetDescriptorObject(InitialType head, Value owner_in, NativeGetter get, NativeSetter set)
             : header(head), owner(owner_in), getter(get), setter(set) {}
         void trace(Tracer &tracer) const noexcept { tracer.visit(owner); }
     };
     struct MappingProxyObject
     {
         ObjectHeader header;
-        Value mapping;
-        MappingProxyObject(ObjectHeader head, Value dictionary) : header(head), mapping(dictionary) {}
+        const Value mapping;
+        MappingProxyObject(InitialType head, Value dictionary) : header(head), mapping(dictionary) {}
         void trace(Tracer &tracer) const noexcept { tracer.visit(mapping); }
     };
     struct StaticMethodObject
     {
         ObjectHeader header;
-        Value callable;
-        StaticMethodObject(ObjectHeader head, Value value) : header(head), callable(value) {}
+        const Value callable;
+        StaticMethodObject(InitialType head, Value value) : header(head), callable(value) {}
         void trace(Tracer &tracer) const noexcept { tracer.visit(callable); }
     };
     struct ClassMethodObject
     {
         ObjectHeader header;
-        Value callable;
-        ClassMethodObject(ObjectHeader head, Value value) : header(head), callable(value) {}
+        const Value callable;
+        ClassMethodObject(InitialType head, Value value) : header(head), callable(value) {}
         void trace(Tracer &tracer) const noexcept { tracer.visit(callable); }
     };
     struct MemberDescriptorObject
     {
         ObjectHeader header;
-        Value owner;
-        std::size_t index;
-        MemberDescriptorObject(ObjectHeader head, Value type, std::size_t slot)
+        const Value owner;
+        const std::size_t index;
+        MemberDescriptorObject(InitialType head, Value type, std::size_t slot)
             : header(head), owner(type), index(slot) {}
         void trace(Tracer &tracer) const noexcept { tracer.visit(owner); }
     };
@@ -170,7 +187,7 @@ namespace cxxpython::core
     {
         ObjectHeader header;
         AtomicGcEdge contents;
-        explicit CellObject(ObjectHeader head, std::optional<Value> value = {}) : header(head), contents(value) {}
+        explicit CellObject(InitialType head, std::optional<Value> value = {}) : header(head), contents(value) {}
         void trace(Tracer &tracer) const noexcept { tracer.visit(contents); }
     };
 
@@ -204,6 +221,8 @@ namespace cxxpython::core
         std::optional<Value> name_lookup(Attachment &context, Value dictionary, const std::u32string &name);
         void name_store(Attachment &context, Value dictionary, Value name, Value value);
         bool name_erase(Attachment &context, Value dictionary, const std::u32string &name);
+        bool copy_name_storage(Attachment &context, std::optional<Value> source, const std::u32string &name,
+                               std::optional<Value> key, std::optional<Value> value, ReturnSlot &out);
         std::optional<Value> type_attribute(Attachment &context, Value type, const std::u32string &name);
         struct TypeAttribute { Value owner; Value value; };
         std::optional<TypeAttribute> find_type_attribute(Attachment &context, Value type, const std::u32string &name);

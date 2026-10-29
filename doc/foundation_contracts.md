@@ -20,15 +20,15 @@ is retained; the concurrency gates do not narrow language/library/release scope.
 | --- | --- | --- |
 | N0 access/publication contracts | Experimental | Plan 2 adopted; per-field migration contracts and implementation audits still required |
 | N1 roots/heap/GC | Experimental | Thread-owned roots/spans, epochs, bounded atomic load-to-root and managed transfer leases exist; native slow-path, duration/timeout and complete lifecycle audits remain |
-| N2 shared objects/methods | Experimental | Cell contents use rooted atomic access; header/tails, Dict/TypeSnapshot/FunctionCallState, exception fields and callback-safe critical sections remain |
-| N3 parallel VM | Planned | Dispatch polling exists; shared same Function/Code CPU progress, allocation-free VM loop acknowledgement and 1/2/4-worker Python costs remain |
+| N2 shared objects/methods | Experimental | Atomic header/tails/exception edges, immutable DictStorage/TypeSnapshot and const Function call data implemented; general containers, future mutable Function setters and full native-duration audit remain |
+| N3 parallel VM | Experimental | Same Function/Code CPU loops, collecting callbacks, shared exception CALL/with/finally, allocation-free polling and generated 1/2/4-worker costs now run; full language/thread API and performance acceptance remain |
 | N4-N6 completion/release | Planned | Remaining runtime, frontend/library, platform, performance and replacement gates |
 
 State::execution and whole-Attachment execution permission have been removed.
-Unbootstrapped storage permits multiple Active mutators. Core bootstrap requires
-one registered thread and quarantines unconverted ObjectOps: a second Active
-admission is explicitly rejected; NativeWait return waits for exclusive admission.
-This temporary boundary is NOT N2 completion or Python CPU-parallel support.
+Storage, ObjectOps and ordinary VM calls permit multiple Active mutators.
+Only core image initialization requires a single registered initializer and
+holds a bootstrap admission flag; it excludes new attachments until publication
+or rollback. NativeWait resume uses the GC epoch gate, not exclusive execution.
 The central heap/layout map and its mutex have been removed. Normal allocation
 uses thread-owned layout-homogeneous spans; payload validation uses immutable
 domain/layout metadata adjacent to the object. Shared pressure is updated in
@@ -166,6 +166,8 @@ The recorder appends raw runs/provenance to foundation-runs-<date>.jsonl and
 regenerates foundation-results-<date>.csv plus foundation-report-<date>.md.
 Repeated series append sample IDs instead of replacing slow cases. Binary hash,
 available CMake flags, platform, CPU count and captured output are retained.
+Fixed-work worker probes also derive speedup, efficiency and CPU/wall tables
+from the same raw samples; no measurement table is maintained by hand.
 --input imports earlier captured output without claiming binary provenance.
 Historical wide CSVs remain unchanged; new measurements use this single producer.
 See [the generated report](benchmarks/foundation-report-2026-10-29.md).
@@ -1427,3 +1429,61 @@ class-construction and VM semantic tests remain serial under quarantine. This
 does not close N2 or prove same-Function/Code Python bytecode CPU parallelism.
 Native probes separately measure rooted reads, store/read and serial transfer
 roundtrips; no cross-thread throughput claim follows from the serial probe.
+
+## Shared Object Publication And Parallel VM Checkpoint
+
+The ObjectOps quarantine is removed. Multiple attachments now run ordinary
+calls and bytecode on the same Interpreter/shared heap. BootstrapAdmission only
+protects image initialization and B2 promotion; it does not surround execution.
+The existing request/ack/completed collector remains the sole lifetime authority.
+
+- ObjectHeader.type, Cell contents, instance dictionary/slot tails, exception
+  args/traceback/cause/context and traceback next use AtomicGcEdge. Rooted loads
+  and exchange publish into preexisting ReturnSlots before any safepoint;
+  release stores and acquire/CAS reads publish completed objects.
+- Name dictionaries publish immutable DictStorage entries/index snapshots.
+  Writers root the source, prepare a replacement outside NoSafepoint and CAS
+  the edge. A failed CAS retries after polling; readers/callbacks retain their
+  old storage through a DictView. Distinct concurrent keys cannot lose updates.
+  This is the current internal name dictionary, not a completed general dict.
+- TypeSnapshot owns managed name/qualname, original Python Dict identity and
+  immutable namespace storage. The namespace dictionary routes reads/writes
+  through its owning Type. This keeps mappingproxy and __classdictcell__
+  identities without leaving a second mutable namespace authority. Builder-only
+  names/dictionary are cleared at first publication; MRO/layout/flags are frozen.
+- Type publication uses a short even/odd epoch commit. MRO lookup retries an
+  overlapping publication; resolved protocol caches retain the version that
+  actually produced their descriptor, not an unrelated later epoch. No callback,
+  buffer growth, managed allocation or blocking wait runs in that commit.
+- Function and native callable metadata are const constructor data. Their
+  mutable globals/keyword-default dictionaries have independent snapshots;
+  binding roots a keyword-default view through the complete operation. There is
+  no redundant FunctionCallState allocation while Function setters are absent.
+  Adding those setters requires immutable call-state publication, not raw writes.
+- Exception reference fields are independent atomic Python attributes, not a
+  promised multi-attribute transaction. Traceback prepend retries CAS; traceback
+  cycle checks and implicit-context cycle cutting use the exception publication
+  epoch. Chain walks are rooted and poll outside the bounded graph commit.
+  The emergency MemoryError still receives no automatic traceback/context graph.
+- Frames keep invocation-owned execution state; code/function/back are fixed
+  before callbacks can expose the frame. f_lineno observes an atomic published
+  instruction index. GC reads mutable execution arrays only after owner ack.
+- Class construction removes each hidden Cell namespace entry before the
+  corresponding nonallocating Cell publication. COW allocation failure cannot
+  publish the earlier unprepared definition; classcell/dictcell ordering and
+  original dictionary identity remain covered by the existing tests.
+
+Tests exercise shared same-Function/Code CPU summation, concurrent type rename
+and method replacement, descriptor/protocol calls that collect, instance slots
+and dictionary updates, opposite traceback-edge updates, shared exceptions
+through ordinary CALL/with/finally, and a managed-allocation-free bytecode loop
+that acknowledges GC while another attachment observes f_lineno.
+
+The opt-in benchmark now runs a fixed total of 120000 Python loop iterations
+with 1/2/4 OS workers sharing one Function/Code. Wall time, process CPU, collection
+and storage diagnostics plus exact results/final live-set checks are captured.
+The generated report derives scaling; n2-n3-shared-vm overlaps compiler activity,
+while n2-n3-shared-vm-idle was collected after builds finished. Neither series
+claims CPython parity. Full source/frontend, threading/I/O APIs, duration bounds,
+platform and release acceptance remain the next Plan 2 dependencies, not waived
+by this checkpoint. Do not extend this checkpoint into more defensive scaffolding.

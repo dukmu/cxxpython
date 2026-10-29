@@ -128,7 +128,7 @@ namespace cxxpython::core
             std::size_t size;
             if constexpr (std::is_same_v<T, StrObject>) size = data.value.size();
             else if constexpr (std::is_same_v<T, TupleObject>) size = data.items.size();
-            else size = data.entries.size();
+            else size = DictView(context, args[0]).entries().size();
             if (size > static_cast<std::size_t>(std::numeric_limits<std::int64_t>::max())) throw std::overflow_error("native container size exceeds addressable storage");
             make_int(context, static_cast<std::int64_t>(size), out);
         }
@@ -143,11 +143,22 @@ namespace cxxpython::core
             context.payload<TypeObject>(type).state != TypeState::Ready)
             throw std::invalid_argument("protocol resolution requires a ready type");
         auto rooted_type = roots.root(value);
-        auto attribute = detail::find_type_attribute(context, value, std::u32string(definition.name));
-        if (!attribute) return {id, SlotState::Missing, rooted_type, {}, {}, context.type_epoch()};
-        auto state = definition.none_disables && attribute->value == context.builtin(CoreObject::None) ? SlotState::Disabled :
-            context.type_of(attribute->value) == context.builtin(CoreObject::NativeFunctionType) ? SlotState::Native : SlotState::PythonDescriptor;
-        return {id, state, rooted_type, roots.root(attribute->owner), roots.root(attribute->value), context.type_epoch()};
+        for (;;)
+        {
+            const auto epoch = context.type_epoch();
+            if (!(epoch & 1))
+            {
+                auto attribute = detail::find_type_attribute(context, value, std::u32string(definition.name));
+                if (context.type_epoch() == epoch)
+                {
+                    if (!attribute) return {id, SlotState::Missing, rooted_type, {}, {}, epoch};
+                    auto state = definition.none_disables && attribute->value == context.builtin(CoreObject::None) ? SlotState::Disabled :
+                        context.type_of(attribute->value) == context.builtin(CoreObject::NativeFunctionType) ? SlotState::Native : SlotState::PythonDescriptor;
+                    return {id, state, rooted_type, roots.root(attribute->owner), roots.root(attribute->value), epoch};
+                }
+            }
+            context.poll(); std::this_thread::yield();
+        }
     }
     ResultView invoke_protocol(Attachment &context, Handle receiver, const ResolvedSlot &slot,
                                std::span<const Value> args, ReturnSlot &out)

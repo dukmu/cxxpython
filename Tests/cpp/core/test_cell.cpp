@@ -106,7 +106,7 @@ namespace
         ASSERT_EQ(out.result().tag(), ResultTag::Ok);
         auto cls = roots.root(out.result().value());
         ASSERT_TRUE(read_cell(context, shared.get(context), out)); EXPECT_EQ(out.result().value(), cls.get(context));
-        EXPECT_FALSE(detail::name_lookup(context, *context.payload<TypeObject>(cls).dictionary, U"__classcell__"));
+        EXPECT_FALSE(detail::name_lookup(context, *TypeView(context, cls).dictionary(), U"__classcell__"));
         EXPECT_EQ(detail::name_lookup(context, dictionary.get(context), U"__classcell__"), shared.get(context));
         context.collect(); ASSERT_TRUE(read_cell(context, shared.get(context), out)); EXPECT_EQ(out.result().value(), cls.get(context));
     }
@@ -121,7 +121,7 @@ namespace
             [](Attachment &c, Handle fn, std::span<const Value> args, ReturnSlot &result) {
                 auto shared = c.payload<NativeFunctionObject>(fn).captures[0];
                 ReturnSlot contents(c); ASSERT_TRUE(read_cell(c, shared, contents)); EXPECT_EQ(contents.result().value(), args[1]);
-                EXPECT_FALSE(detail::name_lookup(c, *c.payload<TypeObject>(args[1]).dictionary, U"__classcell__"));
+                EXPECT_FALSE(detail::name_lookup(c, *TypeView(c, args[1]).dictionary(), U"__classcell__"));
                 c.collect();
                 write_cell(c, shared, c.builtin(CoreObject::None));
                 result.ok(c.builtin(CoreObject::None));
@@ -187,8 +187,9 @@ namespace
             {
                 auto &type = context.payload<TypeObject>(contents.result().value());
                 EXPECT_EQ(type.state, TypeState::Ready);
-                EXPECT_FALSE(detail::name_lookup(context, *type.dictionary, U"__classcell__"));
-                auto method = detail::name_lookup(context, *type.dictionary, U"__new__");
+                TypeView metadata(context, contents.result().value());
+                EXPECT_FALSE(detail::name_lookup(context, *metadata.dictionary(), U"__classcell__"));
+                auto method = detail::name_lookup(context, *metadata.dictionary(), U"__new__");
                 ASSERT_TRUE(method.has_value()); EXPECT_EQ(context.type_of(*method), context.builtin(CoreObject::StaticMethodType));
             }
             if (completed) break;
@@ -200,7 +201,7 @@ namespace
     {
         auto shared = cell(); auto dictionary = this->dictionary(); put(dictionary, U"__classdictcell__", shared);
         ReturnSlot out(context); define(dictionary, out, empty_bases()); ASSERT_EQ(out.result().tag(), ResultTag::Ok);
-        const auto target = *context.payload<TypeObject>(out.result().value()).dictionary;
+        const auto target = *TypeView(context, out.result().value()).dictionary();
         ASSERT_TRUE(read_cell(context, shared.get(context), out)); EXPECT_EQ(out.result().value(), target);
         EXPECT_NE(target, dictionary.get(context));
         EXPECT_FALSE(detail::name_lookup(context, target, U"__classdictcell__"));
@@ -213,7 +214,7 @@ namespace
         auto shared = cell(); auto dictionary = this->dictionary();
         put(dictionary, U"__classcell__", shared); put(dictionary, U"__classdictcell__", shared);
         ReturnSlot out(context); define(dictionary, out, empty_bases()); ASSERT_EQ(out.result().tag(), ResultTag::Ok);
-        const auto target = *context.payload<TypeObject>(out.result().value()).dictionary;
+        const auto target = *TypeView(context, out.result().value()).dictionary();
         ASSERT_TRUE(read_cell(context, shared.get(context), out)); EXPECT_EQ(out.result().value(), target);
         EXPECT_FALSE(detail::name_lookup(context, target, U"__classcell__"));
         EXPECT_FALSE(detail::name_lookup(context, target, U"__classdictcell__"));

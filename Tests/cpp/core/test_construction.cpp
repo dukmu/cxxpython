@@ -215,8 +215,8 @@ namespace
         EXPECT_EQ(context.payload<StrObject>(get(cls, U"__qualname__")).value, context.payload<StrObject>(qualname).value);
         EXPECT_EQ(get(cls, U"__module__").get(context), module.get(context));
         EXPECT_EQ(get(cls, U"value").get(context), value.get(context));
-        EXPECT_NE(*context.payload<TypeObject>(cls).dictionary, space.get(context));
-        EXPECT_FALSE(detail::name_lookup(context, *context.payload<TypeObject>(cls).dictionary, U"__qualname__"));
+        EXPECT_NE(*TypeView(context, cls).dictionary(), space.get(context));
+        EXPECT_FALSE(detail::name_lookup(context, *TypeView(context, cls).dictionary(), U"__qualname__"));
         EXPECT_EQ(detail::name_lookup(context, space.get(context), U"__qualname__"), qualname.get(context));
         put(space, U"value", text(U"changed source only"));
         EXPECT_EQ(get(cls, U"value").get(context), value.get(context));
@@ -289,7 +289,7 @@ namespace
         ASSERT_EQ(out.result().tag(), ResultTag::Ok);
         auto self = roots.root(out.result().value());
         EXPECT_EQ(get(self, U"__new__").get(context), fn.get(context));
-        const auto stored = *detail::name_lookup(context, *context.payload<TypeObject>(cls).dictionary, U"__new__");
+        const auto stored = *detail::name_lookup(context, *TypeView(context, cls).dictionary(), U"__new__");
         EXPECT_EQ(context.type_of(stored), context.builtin(CoreObject::StaticMethodType));
     }
 
@@ -299,7 +299,7 @@ namespace
         auto naming = function({{{U"self"}, {U"owner"}, {U"name"}}, {}, {}},
             [](Attachment &c, Handle fn, std::span<const Value> args, ReturnSlot &out) {
                 const auto &captures = c.payload<NativeFunctionObject>(fn).captures;
-                const auto target_space = *c.payload<TypeObject>(args[1]).dictionary;
+                const auto target_space = *TypeView(c, args[1]).dictionary();
                 for (auto key : {U"first", U"second"})
                 {
                     detail::name_erase(c, target_space, key);
@@ -332,14 +332,14 @@ namespace
         ReturnSlot out(context); define(text(U"Base"), tuple(), base_space, out);
         ASSERT_EQ(out.result().tag(), ResultTag::Ok);
         auto base = roots.root(out.result().value());
-        auto base_hook = *detail::name_lookup(context, *context.payload<TypeObject>(base).dictionary, U"__init_subclass__");
+        auto base_hook = *detail::name_lookup(context, *TypeView(context, base).dictionary(), U"__init_subclass__");
         EXPECT_EQ(context.type_of(base_hook), context.builtin(CoreObject::ClassMethodType));
         auto keyword_name = text(U"token");
         std::array named{KeywordArg{keyword_name.get(context), token.get(context)}};
         define(text(U"Child"), tuple({base.get(context)}), space, out, named);
         ASSERT_EQ(out.result().tag(), ResultTag::Ok);
         auto cls = roots.root(out.result().value());
-        const auto &entries = context.payload<DictObject>(events).entries;
+        DictView namespace_view(context, events.get(context)); const auto entries = namespace_view.entries();
         ASSERT_EQ(entries.size(), 3U);
         EXPECT_EQ(context.payload<StrObject>(entries[0].key).value, U"first");
         EXPECT_EQ(context.payload<StrObject>(entries[1].key).value, U"second");
@@ -359,11 +359,13 @@ namespace
         define(text(U"Failed"), tuple(), space, out);
         expect_error(out, CoreObject::RuntimeErrorType);
         auto &error = context.payload<ExceptionObject>(out.result().exception());
-        ASSERT_TRUE(error.cause.has_value());
-        EXPECT_EQ(error.context, error.cause);
-        EXPECT_TRUE(error.suppress_context);
-        EXPECT_EQ(context.type_of(*error.cause), context.builtin(CoreObject::RuntimeErrorType));
-        EXPECT_NE(*error.cause, out.result().exception());
+        ReturnSlot cause(context), linked(context); context.load(out.result().exception(), error.cause, cause);
+        context.load(out.result().exception(), error.context, linked);
+        ASSERT_EQ(cause.result().tag(), ResultTag::Ok);
+        EXPECT_EQ(linked.result().value(), cause.result().value());
+        EXPECT_TRUE(error.suppress_context.load());
+        EXPECT_EQ(context.type_of(cause.result().value()), context.builtin(CoreObject::RuntimeErrorType));
+        EXPECT_NE(cause.result().value(), out.result().exception());
     }
 
     TEST_F(CoreConstruction, InitSubclassErrorsPropagateAndDefaultRejectsKeywords)
@@ -377,7 +379,8 @@ namespace
         define(name, tuple({base.get(context)}), space, out);
         expect_error(out, CoreObject::RuntimeErrorType);
         auto &error = context.payload<ExceptionObject>(out.result().exception());
-        EXPECT_FALSE(error.cause.has_value());
+        ReturnSlot cause(context); context.load(out.result().exception(), error.cause, cause);
+        EXPECT_EQ(cause.result().tag(), ResultTag::Empty);
     }
 
     TEST_F(CoreConstruction, WinningMetaclassNewIsInvokedRatherThanBypassed)
@@ -457,7 +460,7 @@ namespace
         context.collect();
         EXPECT_EQ(get(cls, U"__name__").get(context), name.get(context));
         auto module = text(U"renamed_module"); set(cls, U"__module__", module);
-        EXPECT_EQ(detail::name_lookup(context, *context.payload<TypeObject>(cls).dictionary, U"__module__"), module.get(context));
+        EXPECT_EQ(detail::name_lookup(context, *TypeView(context, cls).dictionary(), U"__module__"), module.get(context));
         ReturnSlot out(context); auto name_key = text(U"__name__");
         set_attribute(context, cls, name_key, roots.root(context.builtin(CoreObject::None)), out);
         expect_error(out, CoreObject::TypeErrorType);

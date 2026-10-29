@@ -163,8 +163,8 @@ namespace cxxpython::core
             else { RootScope roots(context); truth(context, roots.root(values[0]), out); }
         }
     }
-    IntObject::IntObject(ObjectHeader head, std::int64_t value) : header(head), small(value) {}
-    IntObject::IntObject(ObjectHeader head, std::unique_ptr<detail::BigInt> value)
+    IntObject::IntObject(InitialType head, std::int64_t value) : header(head), small(value) {}
+    IntObject::IntObject(InitialType head, std::unique_ptr<detail::BigInt> value)
         : header(head), small(0), large(std::move(value)) {}
     IntObject::~IntObject() noexcept = default;
     std::size_t IntObject::external_bytes() const noexcept
@@ -279,7 +279,7 @@ namespace cxxpython::core
                 install_native_attribute(context, core, at(id), U"__new__", constructor,
                                          id == CoreObject::IntType ? int_new : bool_new);
                 RootScope roots(context); ReturnSlot out(context);
-                const auto dict = *context.payload<TypeObject>(at(id)).dictionary;
+                const auto dict = *TypeView(context, at(id)).dictionary();
                 auto function = *name_lookup(context, dict, U"__new__");
                 context.allocate_instance<StaticMethodObject>(at(CoreObject::StaticMethodType), out, function);
                 auto wrapper = roots.root(out.result().value());

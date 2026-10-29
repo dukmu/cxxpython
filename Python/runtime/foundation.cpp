@@ -22,7 +22,7 @@ namespace cxxpython::core
         if (!count) return;
         auto cells = field_cells(const_cast<ObjectHeader *>(&object));
         for (std::size_t i = 0; i < count; ++i)
-            if (cells[i]) tracer.visit(*cells[i]);
+            tracer.visit(cells[i]);
     }
     void LayoutDescriptor::destroy_storage(ObjectHeader *object) const noexcept
     {
@@ -41,7 +41,7 @@ namespace cxxpython::core
             ObjectHeader header;
             const Value payload;
             TransferRecord *previous = nullptr, *next = nullptr; // Coordinator-owned root links, not heap edges.
-            TransferRecord(ObjectHeader head, Value value) : header(head), payload(value) {}
+            TransferRecord(InitialType head, Value value) : header(head), payload(value) {}
             void trace(Tracer &tracer) const noexcept { tracer.visit(payload); }
         };
         std::uint64_t siphash24(std::span<const std::byte> data, std::array<std::uint64_t, 2> key) noexcept
@@ -179,9 +179,10 @@ namespace cxxpython::core
                     return thread.get() != self && thread->state.load(std::memory_order_acquire) == MutatorState::Active;
                 });
             }
+
             void resume(ThreadRecord &thread, std::unique_lock<std::mutex> &gate)
             {
-                changed.wait(gate, [&] { return phase == GcPhase::Running && (!core_quarantine || !other_active(&thread)); });
+                changed.wait(gate, [&] { return phase == GcPhase::Running; });
                 thread.observed_epoch = completed_epoch;
                 thread.state.store(MutatorState::Active, std::memory_order_release);
             }
@@ -347,7 +348,7 @@ namespace cxxpython::core
             bool collection_request = false;
             std::atomic<std::uint64_t> request_epoch{0};
             std::uint64_t completed_epoch = 0;
-            bool core_quarantine = false;
+            bool bootstrapping = false;
             std::atomic<bool> accepting{true};
             std::list<AllocationSpan> retired_spans;
             std::vector<std::shared_ptr<ThreadRecord>> threads;
@@ -367,7 +368,7 @@ namespace cxxpython::core
             ObjectHeader *type_type = nullptr;
             std::array<ObjectHeader *, detail::core_count> core{};
             bool core_published = false;
-            std::uint64_t type_epoch = 1;
+            std::atomic<std::uint64_t> type_epoch{0}, exception_epoch{0};
             CallExecutor call_executor = nullptr;
         };
     }
@@ -399,11 +400,9 @@ namespace cxxpython::core
         : state_(interpreter.state_)
     {
         std::unique_lock gate(state_->coordinator);
-        state_->changed.wait(gate, [&] { return !state_->accepting.load(std::memory_order_acquire) || state_->phase == GcPhase::Running; });
+        state_->changed.wait(gate, [&] { return !state_->accepting.load(std::memory_order_acquire) || (state_->phase == GcPhase::Running && !state_->bootstrapping); });
         if (!state_->accepting.load(std::memory_order_acquire))
             throw std::logic_error("interpreter is closing");
-        if (state_->core_quarantine && state_->other_active())
-            throw std::logic_error("parallel ObjectOps admission is unavailable until N2 migration");
         if (!state_->next_arena_id) throw std::overflow_error("root arena identities exhausted");
         thread_record_ = std::make_shared<detail::ThreadRecord>(state_->next_arena_id++);
         state_->threads.push_back(thread_record_);
@@ -488,12 +487,12 @@ namespace cxxpython::core
     {
         require_owns(value); return detail::Allocation::from(value.object()).span->layout;
     }
-    std::optional<Value> *Attachment::instance_dictionary(Value object)
+    AtomicGcEdge *Attachment::instance_dictionary(Value object)
     {
         const auto &layout = allocation_layout(object);
         return layout.fields.dictionary ? layout.field_cells(object.object()) + layout.fields.slots : nullptr;
     }
-    std::optional<Value> &Attachment::instance_slot(Value object, std::size_t index)
+    AtomicGcEdge &Attachment::instance_slot(Value object, std::size_t index)
     {
         const auto &layout = allocation_layout(object);
         if (index >= layout.fields.slots) throw std::logic_error("slot is outside immutable instance layout");
@@ -718,7 +717,8 @@ namespace cxxpython::core
         const auto &layout = allocation_layout(value);
         auto offset = reinterpret_cast<std::uintptr_t>(edge) -
                       reinterpret_cast<std::uintptr_t>(value.object());
-        if (offset > layout.size || layout.size - offset < bytes)
+        const auto size = layout.storage_size();
+        if (offset > size || size - offset < bytes)
             throw std::logic_error("edge is outside owner storage");
     }
 
@@ -744,6 +744,18 @@ namespace cxxpython::core
     {
         require_edge(owner, &edge, sizeof(edge)); if (value) require_owns(*value);
         NoSafepoint write(*this); edge.object_.store(value ? value->object() : nullptr, std::memory_order_release);
+    }
+    bool Attachment::compare_exchange(Value owner, AtomicGcEdge &edge, std::optional<Value> expected, std::optional<Value> desired)
+    {
+        require_edge(owner, &edge, sizeof(edge)); if (expected) require_owns(*expected); if (desired) require_owns(*desired);
+        auto *observed = expected ? expected->object() : nullptr; NoSafepoint commit(*this);
+        return edge.object_.compare_exchange_strong(observed, desired ? desired->object() : nullptr, std::memory_order_acq_rel, std::memory_order_acquire);
+    }
+    void Attachment::exchange(Value owner, AtomicGcEdge &edge, std::optional<Value> value, ReturnSlot &previous)
+    {
+        previous.check_caller(*this); require_edge(owner, &edge, sizeof(edge)); if (value) require_owns(*value);
+        NoSafepoint commit(*this); auto *object = edge.object_.exchange(value ? value->object() : nullptr, std::memory_order_acq_rel);
+        previous.store_root_noexcept(object ? ResultTag::Ok : ResultTag::Empty, object);
     }
 
     Transfer Attachment::make_transfer(Handle value)
@@ -816,16 +828,30 @@ namespace cxxpython::core
     void Attachment::set_allocation_limit(std::size_t remaining)
     { require_attached(); state_->allocations_remaining.store(remaining, std::memory_order_relaxed); }
 
+    namespace
+    {
+        class BootstrapAdmission final
+        {
+        public:
+            explicit BootstrapAdmission(detail::State &state) : state_(state)
+            {
+                std::lock_guard gate(state_.coordinator);
+                if (state_.threads.size() != 1 || state_.bootstrapping)
+                    throw std::logic_error("core bootstrap requires a single attached initializer");
+                state_.bootstrapping = true;
+            }
+            ~BootstrapAdmission()
+            { std::lock_guard gate(state_.coordinator); state_.bootstrapping = false; state_.changed.notify_all(); }
+        private:
+            detail::State &state_;
+        };
+    }
     void Attachment::bootstrap()
     {
         require_attached();
         if (state_->type_type)
             return;
-        {
-            std::lock_guard gate(state_->coordinator);
-            if (state_->threads.size() != 1) throw std::logic_error("core bootstrap requires exclusive migration admission");
-            state_->core_quarantine = true;
-        }
+        BootstrapAdmission admission(*state_);
         const bool previous_gc = state_->gc_enabled;
         state_->gc_enabled = false;
         try
@@ -866,7 +892,7 @@ namespace cxxpython::core
     Value Attachment::type_of(Value object) const
     {
         require_owns(object);
-        auto *type = object.object()->type.object_;
+        auto *type = object.object()->type.object_.load(std::memory_order_acquire);
         if (!type)
             throw std::logic_error("synthetic storage object has no Python type");
         return Value(*type);
@@ -881,8 +907,26 @@ namespace cxxpython::core
             throw std::logic_error("B3 core objects have not been initialized");
         return Value(*state_->core[index]);
     }
-    std::uint64_t Attachment::type_epoch() const { require_attached(); return state_->type_epoch; }
-    void Attachment::invalidate_types() { require_attached(); ++state_->type_epoch; }
+    std::uint64_t Attachment::publication_epoch(PublicationDomain domain) const
+    { require_attached(); return (domain == PublicationDomain::Type ? state_->type_epoch : state_->exception_epoch).load(std::memory_order_acquire); }
+    bool Attachment::begin_publication(PublicationDomain domain, std::uint64_t epoch)
+    {
+        require_attached(); assert(no_safepoint_depth_);
+        return !(epoch & 1) && (domain == PublicationDomain::Type ? state_->type_epoch : state_->exception_epoch)
+            .compare_exchange_strong(epoch, epoch + 1, std::memory_order_acq_rel, std::memory_order_acquire);
+    }
+    void Attachment::end_publication(PublicationDomain domain, std::uint64_t epoch)
+    { require_attached(); assert(no_safepoint_depth_); (domain == PublicationDomain::Type ? state_->type_epoch : state_->exception_epoch).store(epoch + 2, std::memory_order_release); }
+    std::uint64_t Attachment::type_epoch() const { return publication_epoch(PublicationDomain::Type); }
+    void Attachment::invalidate_types()
+    {
+        for (;;)
+        {
+            const auto epoch = type_epoch();
+            { NoSafepoint commit(*this); if (begin_publication(PublicationDomain::Type, epoch)) { end_publication(PublicationDomain::Type, epoch); return; } }
+            poll(); std::this_thread::yield();
+        }
+    }
     bool Attachment::enter_call()
     {
         require_safepoint();
@@ -905,6 +949,7 @@ namespace cxxpython::core
         bootstrap();
         if (core_ready())
             return;
+        BootstrapAdmission admission(*state_);
         struct TypeSnapshot
         {
             Handle type;
@@ -922,7 +967,7 @@ namespace cxxpython::core
                 if (span.layout.native_family != &detail::native_layout_id<TypeObject>) continue;
                 for (std::size_t i = 0; i < span.extent; ++i)
                 {
-                    auto &allocation = span.at(i); if (!allocation.live || !allocation.object()->type.object_) continue;
+                    auto &allocation = span.at(i); if (!allocation.live || !allocation.object()->type.object_.load(std::memory_order_relaxed)) continue;
                     auto value = Value(*allocation.object()); auto &type = payload<TypeObject>(value);
                     if (type.state != TypeState::Structural || !is_subtype(*this, type_of(value), type_type())) continue;
                     previous_types.push_back({roots.root(value), type.name, type.qualname, type.bootstrap_module, type.dictionary, type.state});
@@ -944,11 +989,22 @@ namespace cxxpython::core
             detail::build_core_objects(*this, outputs);
             for (std::size_t i = 0; i < outputs.size(); ++i)
                 state_->core[i] = outputs[i]->result().value().object();
-            // Core quarantine excludes other Active owners; publish only after
-            // all preexisting B2 types are ready.
+            // Only image construction excludes new attachments. Ordinary
+            // ObjectOps and bytecode execute concurrently after publication.
             for (const auto &saved : previous_types) detail::type_ready(*this, saved.type);
             payload<TypeObject>(object_type()).immutable = true;
             payload<TypeObject>(type_type()).immutable = true;
+            RootScope publication_roots(*this);
+            std::vector<Handle> ready_types;
+            auto remember_types = [&](auto &spans) {
+                for (auto &span : spans)
+                    if (span.layout.native_family == &detail::native_layout_id<TypeObject>)
+                        for (std::size_t i = 0; i < span.extent; ++i)
+                            if (auto &allocation = span.at(i); allocation.live && payload<TypeObject>(Value(*allocation.object())).state == TypeState::Ready)
+                                ready_types.push_back(publication_roots.root(Value(*allocation.object())));
+            };
+            remember_types(state_->retired_spans); for (const auto &thread : state_->threads) remember_types(thread->spans);
+            for (auto type : ready_types) detail::publish_type(*this, type.get(*this));
             state_->call_executor = detail::execute_function;
             state_->core_published = true;
         }
@@ -957,6 +1013,7 @@ namespace cxxpython::core
             for (auto &saved : previous_types)
             {
                 auto &type = payload<TypeObject>(saved.type);
+                store(saved.type.get(*this), type.metadata, {});
                 type.name = std::move(saved.name);
                 type.qualname = std::move(saved.qualname);
                 type.bootstrap_module = std::move(saved.module);

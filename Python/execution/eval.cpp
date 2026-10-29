@@ -140,7 +140,7 @@ namespace cxxpython::core
                         else throw std::logic_error("unverified control reason escaped its Frame");
                         continue;
                     }
-                    data.last_instruction = data.pc;
+                    data.last_instruction.store(data.pc, std::memory_order_release);
                     const auto [opcode, operand] = code.program.instructions()[data.pc++];
                     switch (opcode)
                     {
@@ -238,7 +238,9 @@ namespace cxxpython::core
                             data.operands[data.sp++] = data.operands[data.regions.back().stack_base - 1];
                             data.operands[data.sp++] = error ? context.type_of(error->exception) : context.builtin(CoreObject::None);
                             data.operands[data.sp++] = error ? error->exception : context.builtin(CoreObject::None);
-                            data.operands[data.sp++] = error ? context.payload<ExceptionObject>(error->exception).traceback.value_or(context.builtin(CoreObject::None)) : context.builtin(CoreObject::None);
+                            ReturnSlot traceback(context);
+                            if (error) context.load(error->exception, context.payload<ExceptionObject>(error->exception).traceback, traceback);
+                            data.operands[data.sp++] = traceback.result().tag() == ResultTag::Ok ? traceback.result().value() : context.builtin(CoreObject::None);
                             break;
                         }
                         case Opcode::WithResult:
@@ -302,7 +304,8 @@ namespace cxxpython::core
         void frame_lineno(Attachment &c, Value value, ReturnSlot &out)
         {
             const auto &frame = c.payload<FrameObject>(value); const auto &program = c.payload<CodeObject>(frame.code).program;
-            auto line = frame.last_instruction ? program.positions()[*frame.last_instruction].line : 0;
+            const auto lasti = frame.last_instruction.load(std::memory_order_acquire);
+            auto line = lasti != std::numeric_limits<std::size_t>::max() ? program.positions()[lasti].line : 0;
             make_int(c, line ? line : program.first_line(), out);
         }
         std::u32string address(Value value)
@@ -368,7 +371,7 @@ namespace cxxpython::core
                 context.allocate_instance<GetSetDescriptorObject>(at(CoreObject::GetSetDescriptorType), out, at(kind).get(context), getter, nullptr);
                 auto descriptor = roots.root(out.result().value());
                 context.allocate_instance<StrObject>(at(CoreObject::StrType), out, std::move(name));
-                name_store(context, *context.payload<TypeObject>(at(kind)).dictionary, out.result().value(), descriptor.get(context));
+                name_store(context, *TypeView(context, at(kind)).dictionary(), out.result().value(), descriptor.get(context));
             };
             field(CoreObject::CodeType, U"co_name", code_name); field(CoreObject::CodeType, U"co_qualname", code_qualname);
             field(CoreObject::CodeType, U"co_filename", code_filename); field(CoreObject::CodeType, U"co_consts", code_constants);

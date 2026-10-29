@@ -20,7 +20,7 @@ namespace
         ObjectHeader header;
         GcEdge child;
         int *destroyed;
-        explicit Node(ObjectHeader head, int *count = nullptr)
+        explicit Node(InitialType head, int *count = nullptr)
             : header(head), destroyed(count) {}
         ~Node() noexcept { if (destroyed) ++*destroyed; }
         void trace(Tracer &tracer) const noexcept { tracer.visit(child); }
@@ -30,14 +30,14 @@ namespace
     {
         ObjectHeader header;
         std::byte payload[128]{};
-        explicit AlignedLeaf(ObjectHeader head) : header(head) {}
+        explicit AlignedLeaf(InitialType head) : header(head) {}
         void trace(Tracer &) const noexcept {}
     };
 
     struct FailingNode
     {
         ObjectHeader header;
-        explicit FailingNode(ObjectHeader head) : header(head)
+        explicit FailingNode(InitialType head) : header(head)
         { throw std::bad_alloc(); }
         void trace(Tracer &) const noexcept {}
     };
@@ -46,7 +46,7 @@ namespace
     {
         ObjectHeader header;
         std::byte payload[128 * 1024]{};
-        explicit LargeLeaf(ObjectHeader head) : header(head) {}
+        explicit LargeLeaf(InitialType head) : header(head) {}
         void trace(Tracer &) const noexcept {}
     };
 

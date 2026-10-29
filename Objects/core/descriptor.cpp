@@ -63,9 +63,13 @@ namespace cxxpython::core
             auto *field = member(context, args[0], out);
             if (!field || !member_receiver(context, *field, args[1], out)) return;
             auto &slot = context.instance_slot(args[1], field->index);
-            if (erase && !slot)
-            { raise_error(context, CoreObject::AttributeErrorType, U"slot is unbound", out); return; }
-            slot = erase ? std::optional<Value>{} : args[2];
+            if (erase)
+            {
+                context.exchange(args[1], slot, {}, out);
+                if (out.result().tag() == ResultTag::Empty)
+                { raise_error(context, CoreObject::AttributeErrorType, U"slot is unbound", out); return; }
+            }
+            else context.store(args[1], slot, args[2]);
             out.ok(context.builtin(CoreObject::None));
         }
         void member_set(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
@@ -93,11 +97,16 @@ namespace cxxpython::core
         {
             auto *field = context.instance_dictionary(receiver);
             if (!field) throw std::logic_error("dictionary descriptor requires dictionary storage");
-            auto &dictionary = *field;
-            if (dictionary) { out.ok(*dictionary); return; }
+            context.load(receiver, *field, out); if (out.result().tag() == ResultTag::Ok) return;
             RootScope roots(context);
-            context.allocate_instance<DictObject>(roots.root(context.builtin(CoreObject::DictType)), out);
-            dictionary = out.result().value();
+            roots.root(receiver); ReturnSlot created(context);
+            context.allocate_instance<DictObject>(roots.root(context.builtin(CoreObject::DictType)), created);
+            for (;;)
+            {
+                if (context.compare_exchange(receiver, *field, {}, created.result().value())) { out.ok(created.result().value()); return; }
+                context.load(receiver, *field, out); if (out.result().tag() == ResultTag::Ok) return;
+                context.poll();
+            }
         }
         void instance_dict_set(Attachment &context, Value receiver, std::optional<Value> value, ReturnSlot &out)
         {
@@ -106,12 +115,12 @@ namespace cxxpython::core
             { type_error(context, U"__dict__ must be set to a dictionary", out); return; }
             auto *dictionary = context.instance_dictionary(receiver);
             if (!dictionary) throw std::logic_error("dictionary descriptor requires dictionary storage");
-            *dictionary = value;
+            context.store(receiver, *dictionary, value);
             out.ok(context.builtin(CoreObject::None));
         }
         void type_dict_get(Attachment &context, Value receiver, ReturnSlot &out)
         {
-            auto dictionary = context.payload<TypeObject>(receiver).dictionary;
+            auto dictionary = TypeView(context, receiver).dictionary();
             if (!dictionary) throw std::logic_error("ready type has no namespace");
             RootScope roots(context);
             context.allocate_instance<MappingProxyObject>(roots.root(context.builtin(CoreObject::MappingProxyType)),
@@ -135,9 +144,9 @@ namespace cxxpython::core
             out.ok(context.builtin(CoreObject::None));
         }
         void type_name(Attachment &context, Value receiver, ReturnSlot &out)
-        { out.ok(std::get<Value>(context.payload<TypeObject>(receiver).name)); }
+        { TypeView metadata(context, receiver); out.ok(std::get<Value>(metadata.name())); }
         void type_qualname(Attachment &context, Value receiver, ReturnSlot &out)
-        { out.ok(std::get<Value>(context.payload<TypeObject>(receiver).qualname)); }
+        { TypeView metadata(context, receiver); out.ok(std::get<Value>(metadata.qualname())); }
         void change_type_name(Attachment &context, Value receiver, std::optional<Value> value, bool qualified, ReturnSlot &out)
         {
             auto &type = context.payload<TypeObject>(receiver);
@@ -147,9 +156,7 @@ namespace cxxpython::core
             const auto &text = context.payload<StrObject>(*value).value;
             if (!qualified && text.find(U'\0') != std::u32string::npos)
             { raise_error(context, CoreObject::ValueErrorType, U"type name must not contain null characters", out); return; }
-            (qualified ? type.qualname : type.name) = *value;
-            context.account_external(receiver, type.external_bytes());
-            context.invalidate_types();
+            detail::type_name_store(context, receiver, *value, qualified);
             out.ok(context.builtin(CoreObject::None));
         }
         void type_name_set(Attachment &context, Value receiver, std::optional<Value> value, ReturnSlot &out)
@@ -165,7 +172,7 @@ namespace cxxpython::core
             context.allocate_instance<GetSetDescriptorObject>(descriptor_type, out, owner.get(context), getter, setter);
             auto field = roots.root(out.result().value());
             context.allocate_instance<StrObject>(string_type, out, std::move(name));
-            detail::name_store(context, *context.payload<TypeObject>(owner).dictionary, out.result().value(), field.get(context));
+            detail::name_store(context, *TypeView(context, owner).dictionary(), out.result().value(), field.get(context));
         }
     }
     namespace detail
@@ -178,9 +185,8 @@ namespace cxxpython::core
             RootScope roots(context);
             roots.root(value); roots.root(*receiver);
             if (!member_receiver(context, *field, *receiver, out)) return;
-            const auto slot = context.instance_slot(*receiver, field->index);
-            if (!slot) { raise_error(context, CoreObject::AttributeErrorType, U"slot is unbound", out); return; }
-            out.ok(*slot);
+            context.load(*receiver, context.instance_slot(*receiver, field->index), out);
+            if (out.result().tag() == ResultTag::Empty) raise_error(context, CoreObject::AttributeErrorType, U"slot is unbound", out);
         }
         void install_slot_descriptors(Attachment &context, Handle type, std::size_t first)
         {

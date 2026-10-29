@@ -5,6 +5,14 @@
 namespace
 {
     using namespace cxxpython::core;
+    // Serial test observations: the owning graph stays rooted and no writer races this read.
+    template <class T, class Owner>
+    std::optional<Value> read_edge(Attachment &context, Owner owner, AtomicGcEdge T::*field)
+    {
+        const auto value = [&] { if constexpr (std::is_same_v<Owner, Handle>) return owner.get(context); else return owner; }();
+        ReturnSlot saved(context); context.load(value, context.payload<T>(value).*field, saved);
+        return saved.result().tag() == ResultTag::Ok ? std::optional<Value>{saved.result().value()} : std::optional<Value>{};
+    }
     void record(Attachment &c, Value cell, Value event)
     {
         ReturnSlot previous(c); ASSERT_TRUE(read_cell(c, cell, previous));
@@ -126,7 +134,7 @@ namespace
             else { ASSERT_EQ(out.result().tag(), ResultTag::Raised); EXPECT_EQ(out.result().exception(), raised.get(context)); }
             const auto args = arguments(owner, out); ASSERT_EQ(args.size(), 3U); EXPECT_EQ(args[0], context.builtin(CoreObject::ValueErrorType));
             EXPECT_EQ(args[1], raised.get(context)); EXPECT_EQ(context.type_of(args[2]), context.builtin(CoreObject::TracebackType));
-            EXPECT_EQ(context.payload<ExceptionObject>(raised).traceback, args[2]);
+            EXPECT_EQ(read_edge(context, raised, &ExceptionObject::traceback), args[2]);
             EXPECT_EQ(events(recorded), (std::vector<std::string>{"1", "2"})); EXPECT_FALSE(context.handled_exception());
         }
     }
@@ -155,7 +163,7 @@ namespace
         CodeBuilder builder(context); auto region = builder.region(RegionKind::With); load(builder, owner.instance); builder.enter(region);
         builder.emit(Opcode::PopTop); throw_instance(builder, raised); builder.leave(region); returned_none(builder); ReturnSlot out(context);
         call(context, function(builder), {}, out); error(out, CoreObject::RuntimeErrorType);
-        EXPECT_EQ(context.payload<ExceptionObject>(out.result().exception()).context, raised.get(context));
+        EXPECT_EQ(read_edge(context, out.result().exception(), &ExceptionObject::context), raised.get(context));
         EXPECT_FALSE(context.handled_exception()); EXPECT_EQ(events(recorded), (std::vector<std::string>{"1", "2"}));
     }
 
@@ -178,7 +186,7 @@ namespace
         auto original = exception(); CodeBuilder exceptional(context); region = exceptional.region(RegionKind::With);
         load(exceptional, owner.instance); exceptional.enter(region); exceptional.emit(Opcode::PopTop); throw_instance(exceptional, original);
         exceptional.leave(region); returned_none(exceptional); call(context, function(exceptional), {}, out); error(out, CoreObject::ValueErrorType);
-        EXPECT_EQ(context.payload<ExceptionObject>(out.result().exception()).context, original.get(context));
+        EXPECT_EQ(read_edge(context, out.result().exception(), &ExceptionObject::context), original.get(context));
     }
 
     TEST_F(CoreWith, BindingFailureInsideTheRegisteredBodyStillCallsExit)
@@ -300,7 +308,7 @@ namespace
         load(builder, owner.instance); builder.enter(region); builder.emit(Opcode::PopTop); throw_instance(builder, second); builder.leave(region);
         builder.emit(Opcode::LoadException); builder.emit(Opcode::Return); builder.end_handler(caught); returned_none(builder);
         call(context, function(builder), {}, out); ASSERT_EQ(out.result().tag(), ResultTag::Ok); EXPECT_EQ(out.result().value(), first.get(context));
-        EXPECT_EQ(context.payload<ExceptionObject>(second).context, first.get(context)); EXPECT_FALSE(context.handled_exception());
+        EXPECT_EQ(read_edge(context, second, &ExceptionObject::context), first.get(context)); EXPECT_FALSE(context.handled_exception());
     }
 
     TEST_F(CoreWith, AllocationFailureAfterEnterCanBeSuppressedByAnAllocationFreeExit)
@@ -326,7 +334,7 @@ namespace
         context.set_allocation_limit(std::numeric_limits<std::size_t>::max());
         ASSERT_EQ(out.result().tag(), ResultTag::Ok); EXPECT_EQ(out.result().value(), context.builtin(CoreObject::None));
         ASSERT_TRUE(read_cell(context, exited.get(context), out)); EXPECT_EQ(out.result().value(), context.builtin(CoreObject::True)); EXPECT_FALSE(context.handled_exception());
-        EXPECT_FALSE(context.payload<ExceptionObject>(context.builtin(CoreObject::MemoryError)).traceback);
+        EXPECT_FALSE(read_edge(context, context.builtin(CoreObject::MemoryError), &ExceptionObject::traceback));
     }
 
     TEST(CoreWithLifecycle, PythonEnterAndExitUseTheFrameSchedulerAtDeepWithNesting)

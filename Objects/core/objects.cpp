@@ -5,6 +5,30 @@
 
 namespace cxxpython::core
 {
+    DictView::DictView(Attachment &context, std::optional<Value> dictionary) : context_(context), storage_(context)
+    {
+        if (!dictionary) return;
+        if (context.has_layout<DictStorage>(*dictionary)) { storage_.ok(*dictionary); return; }
+        auto &data = context.payload<DictObject>(*dictionary); ReturnSlot owner(context);
+        context.load(*dictionary, data.namespace_owner, owner);
+        if (owner.result().tag() == ResultTag::Ok)
+        {
+            TypeView type(context, owner.result().value());
+            if (type.snapshot()) { if (auto storage = type.storage()) storage_.ok(*storage); return; }
+        }
+        context.load(*dictionary, data.storage, storage_);
+    }
+    std::optional<Value> DictView::storage() const
+    { return storage_.result().tag() == ResultTag::Ok ? std::optional<Value>{storage_.result().value()} : std::optional<Value>{}; }
+    std::span<const DictObject::Entry> DictView::entries() const
+    { auto value = storage(); return value ? std::span<const DictObject::Entry>{context_.payload<DictStorage>(*value).entries} : std::span<const DictObject::Entry>{}; }
+    std::optional<Value> DictView::find(const std::u32string &name) const
+    {
+        auto value = storage(); if (!value) return {};
+        const auto &data = context_.payload<DictStorage>(*value); auto found = data.index.find(name);
+        return found == data.index.end() ? std::optional<Value>{} : data.entries[found->second].value;
+    }
+
     bool read_cell(Attachment &context, Value cell, ReturnSlot &out)
     {
         context.load(cell, context.payload<CellObject>(cell).contents, out);
@@ -49,14 +73,14 @@ namespace cxxpython::core
     }
     std::size_t NativeFunctionObject::external_bytes() const noexcept
     { return string_bytes(name) + signature.external_bytes() + captures.capacity() * sizeof(Value); }
-    std::size_t DictObject::external_bytes() const noexcept
+    std::size_t DictStorage::external_bytes() const noexcept
     {
-        auto bytes = entries.capacity() * sizeof(Entry);
+        auto bytes = entries.capacity() * sizeof(DictObject::Entry);
         if (index.bucket_count() > 1) bytes += index.bucket_count() * sizeof(void *);
         bytes += index.size() * sizeof(decltype(index)::value_type);
         return bytes + index_string_bytes;
     }
-    void DictObject::trace(Tracer &tracer) const noexcept
+    void DictStorage::trace(Tracer &tracer) const noexcept
     {
         for (const auto &entry : entries)
         { tracer.visit(entry.key); tracer.visit(entry.value); }
@@ -64,9 +88,7 @@ namespace cxxpython::core
     void ExceptionObject::trace(Tracer &tracer) const noexcept
     {
         tracer.visit(args);
-        if (traceback) tracer.visit(*traceback);
-        if (cause) tracer.visit(*cause);
-        if (context) tracer.visit(*context);
+        tracer.visit(traceback); tracer.visit(cause); tracer.visit(context);
     }
     void SignatureLayout::trace(Tracer &tracer) const noexcept
     {
@@ -165,42 +187,61 @@ namespace cxxpython::core
     {
         std::optional<Value> name_lookup(Attachment &context, Value dictionary, const std::u32string &name)
         {
-            auto &data = context.payload<DictObject>(dictionary);
-            auto found = data.index.find(name);
-            return found == data.index.end() ? std::optional<Value>{} : data.entries[found->second].value;
+            return DictView(context, dictionary).find(name);
+        }
+        bool copy_name_storage(Attachment &context, std::optional<Value> source, const std::u32string &name,
+                               std::optional<Value> key, std::optional<Value> value, ReturnSlot &out)
+        {
+            DictView old(context, source); std::vector<DictObject::Entry> entries(old.entries().begin(), old.entries().end());
+            auto found = std::find_if(entries.begin(), entries.end(), [&](const auto &entry) { return context.payload<StrObject>(entry.key).value == name; });
+            if (value)
+            {
+                if (found != entries.end()) found->value = *value;
+                else { if (!key) throw std::logic_error("new name requires a managed key"); entries.push_back({*key, *value}); }
+            }
+            else
+            {
+                if (found == entries.end()) return false;
+                entries.erase(found);
+            }
+            std::unordered_map<std::u32string, std::size_t> index; std::size_t bytes = 0;
+            for (std::size_t i = 0; i < entries.size(); ++i)
+            {
+                auto [entry, inserted] = index.emplace(context.payload<StrObject>(entries[i].key).value, i); (void)inserted;
+                bytes += string_bytes(entry->first); if (i % 64 == 63) context.poll();
+            }
+            context.allocate<DictStorage>(out, std::move(entries), std::move(index), bytes); return true;
         }
         void name_store(Attachment &context, Value dictionary, Value name, Value value)
         {
-            (void)context.type_of(value);
-            auto &data = context.payload<DictObject>(dictionary);
-            auto &text = context.payload<StrObject>(name).value;
-            auto found = data.index.find(text);
-            if (found != data.index.end()) data.entries[found->second].value = value;
-            else
+            RootScope roots(context); roots.root(dictionary); roots.root(name); roots.root(value); (void)context.type_of(value);
+            const auto &text = context.payload<StrObject>(name).value; auto &data = context.payload<DictObject>(dictionary); ReturnSlot staged(context);
+            ReturnSlot owner(context); context.load(dictionary, data.namespace_owner, owner);
+            if (owner.result().tag() == ResultTag::Ok && TypeView(context, owner.result().value()).snapshot())
+            { type_namespace_change(context, owner.result().value(), text, name, value); return; }
+            for (;;)
             {
-                data.entries.push_back({name, value});
-                try
                 {
-                    auto [entry, inserted] = data.index.emplace(text, data.entries.size() - 1);
-                    (void)inserted;
-                    data.index_string_bytes += string_bytes(entry->first);
+                    DictView old(context, dictionary); copy_name_storage(context, old.storage(), text, name, value, staged);
+                    if (context.compare_exchange(dictionary, data.storage, old.storage(), staged.result().value())) return;
                 }
-                catch (...) { data.entries.pop_back(); context.account_external(dictionary, data.external_bytes()); throw; }
+                staged.reset(); context.poll();
             }
-            context.account_external(dictionary, data.external_bytes());
         }
         bool name_erase(Attachment &context, Value dictionary, const std::u32string &name)
         {
-            auto &data = context.payload<DictObject>(dictionary);
-            auto found = data.index.find(name);
-            if (found == data.index.end()) return false;
-            auto position = found->second;
-            data.index_string_bytes -= string_bytes(found->first);
-            data.index.erase(found);
-            data.entries.erase(data.entries.begin() + static_cast<std::ptrdiff_t>(position));
-            for (auto &[key, index] : data.index) { (void)key; if (index > position) --index; }
-            context.account_external(dictionary, data.external_bytes());
-            return true;
+            RootScope roots(context); roots.root(dictionary); auto &data = context.payload<DictObject>(dictionary); ReturnSlot staged(context);
+            ReturnSlot owner(context); context.load(dictionary, data.namespace_owner, owner);
+            if (owner.result().tag() == ResultTag::Ok && TypeView(context, owner.result().value()).snapshot())
+                return type_namespace_change(context, owner.result().value(), name, {}, {});
+            for (;;)
+            {
+                {
+                    DictView old(context, dictionary); if (!copy_name_storage(context, old.storage(), name, {}, {}, staged)) return false;
+                    if (context.compare_exchange(dictionary, data.storage, old.storage(), staged.result().value())) return true;
+                }
+                staged.reset(); context.poll();
+            }
         }
         void initialize_type_dictionary(Attachment &context, Handle type)
         {
@@ -210,6 +251,7 @@ namespace cxxpython::core
             auto dictionary_type = roots.root(context.builtin(CoreObject::DictType));
             ReturnSlot out(context);
             context.allocate_instance<DictObject>(dictionary_type, out);
+            context.store(out.result().value(), context.payload<DictObject>(out.result().value()).namespace_owner, type.get(context));
             payload.dictionary = out.result().value();
         }
         void allocate_function(Attachment &context, Handle type, std::string name, SignatureLayout signature,
