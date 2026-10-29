@@ -1,86 +1,58 @@
-# 开发指南
+# Development Guide
 
-## 工作方式
+Follow `cxxpython_foundation_redesign_plan_2.md`, the current runtime contracts
+and `AGENTS.md`. The user's repository consolidation retires legacy source now;
+it does not waive the remaining language/library/performance acceptance gates.
 
-采用测试驱动开发：
+## Build And Check
 
-1. 写 feature note 或更新特性矩阵。
-2. 写 C++ focused test。
-3. 写 Python script integration test。
-4. 实现最小正确 vertical slice。
-5. 跑 focused tests。
-6. 跑全量 tests。
-7. 按本指南做提交前技术债审查。
-8. 更新文档、兼容性说明和 `doc/development_status.md`。
-
-## 代码质量原则
-
-- 不为通过当前测试牺牲 Python 语义。
-- 不使用 string prefix 解析异常类型。
-- 不把 typed runtime state 放进用户可见 dict。
-- 不复制核心逻辑到 opcode、builtin、type method 三处。
-- 不创建没有所有权模型的裸指针长期对象。
-- 不新增无测试的 public API。
-- 不为尚未实现的系统能力写 placeholder 行为。例如 POSIX、IO、socket、
-  time 等 native hook 必须接真实 substrate 或明确抛 Python 异常，不能返回
-  空列表、空字符串、固定成功值来通过测试。
-- Public stdlib 优先写在 `Lib/`。C++ native module 默认只能是私有 hook
-  或 bootstrap seed；如果新增 public native API，必须在
-  `doc/development_status.md` 说明为什么它无法脚本化。
-- 每次提交前审查一遍可能造成技术债的设计或者代码，并把结果写入
-  `doc/development_status.md`。
-
-## 对象类型实现清单
-
-每个新类型必须回答：
-
-- identity 是什么？
-- truthiness 是什么？
-- hashable 吗？
-- equality/order 如何实现？
-- repr/str 是什么？
-- 是否支持 instance dict？
-- 是否是 descriptor？
-- GC 如何 visit refs？
-- 构造路径是 type call、literal、opcode，还是 native API？
-- 错误类型与 CPython 是否一致？
-
-## VM opcode 实现清单
-
-每个 opcode 必须记录：
-
-- opcode name and numeric id
-- operand encoding
-- stack input/output
-- fast path and generic path
-- possible Python exceptions
-- line/trace behavior
-- focused bytecode test
-- compiler integration test
-
-## C/C++ 扩展开发规则
-
-- 所有 extension 返回 Python object handle。
-- 所有参数解析失败设置并抛 Python `TypeError`。
-- native function 不允许返回 null；除非同时设置异常并走统一异常路径。
-- 提供 RAII root guard，保护跨分配和跨 GC 的临时对象。
-- 模块初始化必须可重复失败清理，不污染 `sys.modules`。
-
-## 测试分层
-
-```text
-Tests/cpp/          C++ unit tests for object and VM internals
-Tests/bytecode/     direct bytecode behavior tests
-Tests/python/       Python-level golden behavior tests
-Tests/compat/       CPython comparison snippets
-Tests/extensions/   C/C++ extension ABI tests
+```sh
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCXXPYTHON_BUILD_BENCHMARKS=ON \
+    -DCXXPYTHON_REFERENCE_PYTHON=/path/to/python3.12.14
+cmake --build build -j 4
+ctest --test-dir build --output-on-failure -j 4
 ```
 
-推荐先建立 golden behavior snippets：同一段 Python 在 CPython 和 cxxpython 上比较 stdout、exception type、repr、MRO、dict behavior。
+The current targets are `cxxpython_core`, `cxxpython`, `test_runtime` and optional
+`bench_runtime`. There is no legacy build option or alternate CLI. A system GTest
+is used when available; otherwise CMake fetches the pinned source archive.
+Set `BOOST_MULTIPRECISION_INCLUDE_DIR` when Boost headers are not on the compiler
+search path. Configure sanitizers with the compiler/linker flags in a separate
+build directory; never measure performance while compiling or running sanitizers.
 
-`Tests/python/` 规则：
+## Formatting
 
-- 每个测试用例是一个 `.py` 文件。
-- 必须提供同名 `.py.out`，内容是 CLI 合并 stdout/stderr 后的精确输出。
-- 期望退出码默认为 `0`；非零退出码用同名 `.py.exit` 指定。
-- 新增脚本测试时优先覆盖用户可见语义，不在 C++ test 中重复手写同一段脚本包装。
+Use clang-format 14 and the repository's `.clang-format`: four-space indentation,
+function braces on a separate line, control braces on the same line, no tabs and
+a 100-column limit. Do not maintain a second hand-formatted C++ style.
+
+```sh
+cmake --build build --target format
+cmake --build build --target format-check
+```
+
+The format targets cover project C++ headers, implementation, tests and benchmark
+sources. CTest runs the same dry-run check. Generated Unicode `.inc` data and
+third-party source are excluded; change their generator rather than hand-edit
+data. Python drivers follow ordinary Python formatting.
+
+## Semantic Changes
+
+- Add focused native contracts and, where supported, executable source tests.
+- Define ownership/traversal, synchronization, failure and callback boundaries
+  with the behavior. No unrooted object may span an allocating/polling operation.
+- Do not add a compatibility interpreter, a hidden GIL or value/workload-specific
+  shortcuts. New object types/opcodes must implement their full documented slice.
+- Keep the actual capability boundary explicit. The current source subset does
+  not imply that removed legacy standard-library or extension features exist.
+
+## Evidence And Commits
+
+Use `Lib/test/test_source.py --binary build/cxxpython --reference ... --report ...`
+for retained fixed-reference evidence. Generate benchmark tables with
+`Tools/benchmarks/record.py`; retain slow samples and actual build provenance.
+Existing `foundation-*` artifact names identify the historical series and are
+retained, even though the executable/target names are now consolidated.
+
+Append or prepend verified progress in `doc/development_status.md`; never rewrite
+earlier entries. Keep stable commits timely and exclude unrelated user changes.

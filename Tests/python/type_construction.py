@@ -1,5 +1,0 @@
-print(object().__class__)
-print(type(object()))
-print(list())
-print(list().__class__)
-print(type(list()))

@@ -9,9 +9,13 @@ compiler, VM, and extension platform implemented in a C/C++ mix.
   plan. It supersedes the first plan's serial execution choice. Where older
   documents or this guide disagree, follow the second plan and
   update the conflicting guidance.
-- Build the replacement in `cxxpython::core`, with headers under
-  `Include/cxxpython/core/` and an independent `cxxpython_foundation` target.
-  It must not link the legacy Runtime, Object, parser or VM to fill gaps.
+- The current implementation is `cxxpython::core`, built as `cxxpython_core`
+  with one `cxxpython` executable. Headers live in `Include/cxxpython/`;
+  compiler-private IR lives in `Include/internal/`. Use the CPython-shaped
+  `Objects/`, `Python/`, `Parser/` and `Programs/` boundaries described in
+  `doc/architecture_design.md`. Legacy source, libraries, tests and extension
+  APIs have been deleted at the user's request; do not bring them back as a
+  fallback or expose the old interpreter's capabilities as current support.
 - The first foundation uses boxed values, immutable native layouts, stable
   precise roots, caller-owned result slots, tracing GC without Python object
   reference counting. Multiple OS threads must execute Python bytecode and
@@ -24,15 +28,15 @@ compiler, VM, and extension platform implemented in a C/C++ mix.
 - During migration, identify the remaining serialized/unsafe boundaries
   explicitly; do not expose unconverted ObjectOps as concurrently safe.
   A transitional serial guard is not completion of N1-N3 or a hidden final GIL.
-- The existing CLI and its tests remain a legacy comparison path until the
-  replacement meets the migration gates. Earlier no-GIL/refcount design notes
-  describe the old path, not requirements for the new foundation.
+- The user-directed repository consolidation overrides earlier legacy-retention
+  instructions, not the language/library/concurrency/performance acceptance
+  gates. Historical plans live in `doc/archive/`; they are not active contracts.
 - Advance through N0-N6 and the complete M0-M9 acceptance gates. Record actual tests,
   remaining gates and the next dependency in `doc/development_status.md`.
   Do not mark a whole milestone complete based on a narrower passing slice.
 - Preserve development history: append new entries or insert them at the top
   of `doc/development_status.md`; do not rewrite earlier entries.
-- Generate measurement tables with `Tools/record_foundation_benchmarks.py`
+- Generate measurement tables with `Tools/benchmarks/record.py`
   from retained raw runs. Do not hand-copy benchmark rows or derived speedups.
 - The user authorizes timely stable-point commits after verification. Commit
   completed vertical slices promptly, excluding unrelated user changes.
@@ -55,6 +59,11 @@ compiler, VM, and extension platform implemented in a C/C++ mix.
 ## Engineering Rules
 
 - Read existing design docs in `doc/` before implementing a subsystem.
+- Use the checked-in `.clang-format` for all C++ sources. Run
+  `cmake --build build --target format` after edits and `format-check` before
+  committing. CTest also checks formatting. Do not hand-format generated Unicode
+  tables or third-party code. Python test drivers belong in `Lib/test/`, native
+  contract tests in `Tests/cpp/`, benchmarks in `Tools/benchmarks/`.
 - Small vertical slices are preferred: parser/compiler bytecode, runtime
   behavior, and tests should land together.
 - New object types must define ownership, traversal, identity, equality, hash,

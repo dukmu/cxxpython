@@ -1,10 +1,10 @@
 {
-  "captured_at": "2026-10-29T12:28:36.323326+00:00",
+  "captured_at": "2026-10-29T12:59:03.818514+00:00",
   "reference_version": "Python 3.12.14",
   "provenance": {
     "binary": {
-      "path": "/home/shefrin/repo/cxxpython/build/cxxpython_next",
-      "sha256": "0a1d350ed561cb1509d730c847496e66c21f5ac1b77b9efabb07011616fea356"
+      "path": "/home/shefrin/repo/cxxpython/build/cxxpython",
+      "sha256": "e332c23e1077f7ec17e1ff70acd48abf81c6dacb7e10aece4943768546fa0789"
     },
     "reference": {
       "path": "/tmp/cxxpython-cpython31214-build/python",
@@ -15,7 +15,7 @@
   "observations": [
     {
       "command": [
-        "build/cxxpython_next",
+        "build/cxxpython",
         "-c",
         "return 1"
       ],
@@ -35,7 +35,7 @@
     },
     {
       "command": [
-        "build/cxxpython_next",
+        "build/cxxpython",
         "-c",
         "break"
       ],
@@ -55,7 +55,7 @@
     },
     {
       "command": [
-        "build/cxxpython_next",
+        "build/cxxpython",
         "-c",
         "if 1:\nx = 2"
       ],
@@ -75,7 +75,7 @@
     },
     {
       "command": [
-        "build/cxxpython_next",
+        "build/cxxpython",
         "-c",
         "def f(a, a): pass"
       ],
@@ -95,7 +95,7 @@
     },
     {
       "command": [
-        "build/cxxpython_next",
+        "build/cxxpython",
         "-c",
         "x = 1\nglobal x"
       ],
@@ -115,7 +115,7 @@
     },
     {
       "command": [
-        "build/cxxpython_next",
+        "build/cxxpython",
         "-c",
         "def f():\n    nonlocal missing"
       ],
@@ -135,7 +135,7 @@
     },
     {
       "command": [
-        "build/cxxpython_next",
+        "build/cxxpython",
         "-c",
         "def f(x):\n    nonlocal x"
       ],
@@ -155,7 +155,7 @@
     },
     {
       "command": [
-        "build/cxxpython_next",
+        "build/cxxpython",
         "-c",
         "def f():\n    global x\n    nonlocal x"
       ],
@@ -175,7 +175,7 @@
     },
     {
       "command": [
-        "build/cxxpython_next",
+        "build/cxxpython",
         "-c",
         "def f():\n    return 1 // 0\nx = f()"
       ],
@@ -185,7 +185,7 @@
     },
     {
       "command": [
-        "build/cxxpython_next",
+        "build/cxxpython",
         "-c",
         "def f():\n    def inner():\n        return x\n    return x\n    x = 1\nf()"
       ],
@@ -205,7 +205,7 @@
     },
     {
       "command": [
-        "build/cxxpython_next",
+        "build/cxxpython",
         "-c",
         "def f():\n    x = 1\n    def inner():\n        return x\n    del x\n    return inner\nf()()"
       ],
@@ -225,8 +225,8 @@
     },
     {
       "command": [
-        "build/cxxpython_next",
-        "/tmp/tmpd3tx8dhy/source.py",
+        "build/cxxpython",
+        "/tmp/tmpvi8fa_hn/source.py",
         "--eval",
         "f(41)"
       ],
@@ -236,7 +236,7 @@
     },
     {
       "command": [
-        "build/cxxpython_next",
+        "build/cxxpython",
         "--eval",
         "'\\u4f60' + )"
       ],
@@ -246,7 +246,7 @@
     },
     {
       "command": [
-        "build/cxxpython_next",
+        "build/cxxpython",
         "-c",
         "",
         "--eval",
@@ -268,7 +268,7 @@
     },
     {
       "command": [
-        "build/cxxpython_next",
+        "build/cxxpython",
         "-c",
         "",
         "--eval",
@@ -290,7 +290,7 @@
     },
     {
       "command": [
-        "build/cxxpython_next",
+        "build/cxxpython",
         "-c",
         "",
         "--eval",
@@ -312,7 +312,7 @@
     },
     {
       "command": [
-        "build/cxxpython_next",
+        "build/cxxpython",
         "-c",
         "",
         "--eval",
@@ -334,7 +334,7 @@
     },
     {
       "command": [
-        "build/cxxpython_next",
+        "build/cxxpython",
         "-c",
         "def f(n):\n    total = 0\n    while n:\n        total += n\n        n -= 1\n    return total",
         "--eval",
@@ -356,7 +356,7 @@
     },
     {
       "command": [
-        "build/cxxpython_next",
+        "build/cxxpython",
         "-c",
         "def fact(n):\n    if n <= 1:\n        return 1\n    return n * fact(n - 1)",
         "--eval",
@@ -378,7 +378,7 @@
     },
     {
       "command": [
-        "build/cxxpython_next",
+        "build/cxxpython",
         "-c",
         "count = 0\ndef bump():\n    global count\n    count += 1\n    return count\ndef f(a=bump(), *, b=bump()):\n    return a * 10 + b\nx = f()\ny = f()",
         "--eval",
@@ -400,7 +400,7 @@
     },
     {
       "command": [
-        "build/cxxpython_next",
+        "build/cxxpython",
         "-c",
         "def f(a, /, b=2, *, c=3):\n    return a + b + c",
         "--eval",
@@ -422,7 +422,7 @@
     },
     {
       "command": [
-        "build/cxxpython_next",
+        "build/cxxpython",
         "-c",
         "def f(*args, **kwargs):\n    return len(args) * 10 + len(kwargs)",
         "--eval",
@@ -444,7 +444,7 @@
     },
     {
       "command": [
-        "build/cxxpython_next",
+        "build/cxxpython",
         "-c",
         "i = 0\nx = 0\nwhile i < 10:\n    i += 1\n    if i == 3:\n        continue\n    elif i == 7:\n        break\n    x += i\nelse:\n    x = 999",
         "--eval",
@@ -466,7 +466,7 @@
     },
     {
       "command": [
-        "build/cxxpython_next",
+        "build/cxxpython",
         "-c",
         "def factory():\n    def child():\n        return 42\n    return child\na = factory()\nb = factory()",
         "--eval",
@@ -488,7 +488,7 @@
     },
     {
       "command": [
-        "build/cxxpython_next",
+        "build/cxxpython",
         "-c",
         "'module doc'\ndef f():\n    'function doc'\n    return __debug__",
         "--eval",
@@ -510,7 +510,7 @@
     },
     {
       "command": [
-        "build/cxxpython_next",
+        "build/cxxpython",
         "-c",
         "'module doc'\nglobal __doc__",
         "--eval",
@@ -532,7 +532,7 @@
     },
     {
       "command": [
-        "build/cxxpython_next",
+        "build/cxxpython",
         "-c",
         "def outer(x):\n    def middle():\n        def inner():\n            return x\n        return inner\n    return middle",
         "--eval",
@@ -554,7 +554,7 @@
     },
     {
       "command": [
-        "build/cxxpython_next",
+        "build/cxxpython",
         "-c",
         "def outer(x):\n    def read():\n        return x\n    def bump():\n        nonlocal x\n        x += 1\n    bump()\n    return read\na = outer(40)\nb = outer(10)",
         "--eval",
@@ -576,7 +576,7 @@
     },
     {
       "command": [
-        "build/cxxpython_next",
+        "build/cxxpython",
         "-c",
         "def outer(x, /, *args, flag=2, **kw):\n    def inner(step=x, *, extra=flag):\n        return x + flag + len(args) + len(kw) + step + extra\n    x += 1\n    return inner\na = outer(10, 1, 2, flag=3, key=1)",
         "--eval",
@@ -598,7 +598,7 @@
     },
     {
       "command": [
-        "build/cxxpython_next",
+        "build/cxxpython",
         "-c",
         "def outer(z, a):\n    x = 1\n    y = 2\n    def inner():\n        return z + a + x + y\n    return inner",
         "--eval",
@@ -620,7 +620,7 @@
     },
     {
       "command": [
-        "build/cxxpython_next",
+        "build/cxxpython",
         "-c",
         "def outer(z, a):\n    x = 1\n    y = 2\n    def inner():\n        return z + a + x + y\n    return inner",
         "--eval",
@@ -642,7 +642,7 @@
     },
     {
       "command": [
-        "build/cxxpython_next",
+        "build/cxxpython",
         "-c",
         "def outer(z, a):\n    x = 1\n    y = 2\n    def inner():\n        return z + a + x + y\n    return inner",
         "--eval",
@@ -664,7 +664,7 @@
     },
     {
       "command": [
-        "build/cxxpython_next",
+        "build/cxxpython",
         "-c",
         "def outer():\n    def fact(n):\n        if n <= 1:\n            return 1\n        return n * fact(n - 1)\n    return fact",
         "--eval",
@@ -686,7 +686,7 @@
     },
     {
       "command": [
-        "build/cxxpython_next",
+        "build/cxxpython",
         "-c",
         "x = 42\ndef outer():\n    x = 1\n    def middle():\n        global x\n        def inner():\n            return x\n        return inner\n    return middle",
         "--eval",
@@ -708,7 +708,7 @@
     },
     {
       "command": [
-        "build/cxxpython_next",
+        "build/cxxpython",
         "-c",
         "def outer(x):\n    def read():\n        return x\n    return read\na = outer(1)\nb = outer(2)",
         "--eval",

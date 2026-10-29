@@ -1,4 +1,0 @@
-Traceback (most recent call last):
-  File "{{script}}", line 10, in <module>
-  File "{{script}}", line 7, in local_value
-UnboundLocalError: cannot access local variable 'value' where it is not associated with a value

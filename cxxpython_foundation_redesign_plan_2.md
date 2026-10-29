@@ -68,6 +68,14 @@
 
 把本版并发合同纳入仓库权威计划；修改 `AGENTS.md` 的 execution-lock 条目和 `doc/foundation_contracts.md` 中相应前提，在 `doc/development_status.md` 顶部追加新路线与实际验收状态。保留开发历史。旧 `doc/nogil_gc_threading_design.md` 的 RC 路线继续标为 legacy，不再参与新 core 的所有权决定。用户最新的共享堆并行要求取代旧计划的串行选择，无需再次把该选择作为待确认事项。[R01]、[R03]、[R04]、[R36]
 
+### 0.6 2026-10-29：按用户要求整合仓库与代码格式
+
+用户最新要求删除旧实现及其测试，只保留当前项目，并按 CPython 的职责重新组织代码、启用 clang-format。该要求取代此前“保留 legacy CLI 作为迁移对照”的仓库保留策略，不取代本计划的语言、库、无 GIL、性能和发布验收目标。
+
+当前实现统一为 `cxxpython_core` 库和唯一的 `cxxpython` 程序；使用 `Include/cxxpython/`、`Include/internal/`、`Objects/`、`Parser/`、`Python/`、`Programs/`，原生测试位于 `Tests/cpp/`，Python 测试驱动位于 `Lib/test/`，测量工具位于 `Tools/benchmarks/`。旧 Runtime/Object/VM、标准库、扩展 API 和专属测试已移除，不保留构建开关或兼容入口。现有 namespace 和生命周期/同步合同不变，不借目录整理引入另一套运行时。
+
+`.clang-format` 与 `format`、`format-check` 构建目标统一项目 C++ 格式，CTest 同时检查。旧设计及原迁移合同移入 `doc/archive/`；当前架构、开发指南和运行时合同在 `doc/`，`doc/development_status.md` 继续只追加或前插，原始性能证据保留。删除 legacy 不表示 N6/M9、完整 Python 能力或 CPython 性能门槛已经通过。
+
 ## 1. 先确定兼容合同和架构边界
 
 “兼容 Python 3”需要拆成可验证的承诺。建议第一阶段固定 Python 3.12 的核心语言语义，按能力完成；只有对应矩阵全部通过，才扩大对外承诺。选择 3.12 是为了沿用本轮已经核验的语义和测试基线。

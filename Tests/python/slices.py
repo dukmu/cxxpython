@@ -1,8 +1,0 @@
-print(slice(1, 5, 2))
-print(slice(4).indices(10))
-print(slice(1, 5, 2).indices(10))
-print(slice(None, None, -1).indices(4))
-print([0, 1, 2, 3][1:3])
-print([0, 1, 2, 3][::-1])
-print((0, 1, 2, 3)[::2])
-print('abcd'[::-1])

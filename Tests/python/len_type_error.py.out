@@ -1,3 +1,0 @@
-Traceback (most recent call last):
-  File "{{script}}", line 1, in <module>
-TypeError: object of type 'int' has no len()

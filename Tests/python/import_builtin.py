@@ -1,6 +1,0 @@
-first = __import__('import_target')
-second = __import__('import_target')
-print(first.value)
-print(first is second)
-print(first.__name__)
-print(first.__file__.__contains__('import_target.py'))

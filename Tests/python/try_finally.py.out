@@ -1,7 +1,0 @@
-['body', 'finally']
-boom
-['body', 'finally', 'cleanup']
-['except', 'finally']
-body
-['finally']
-finally

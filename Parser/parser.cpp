@@ -1,2116 +1,1084 @@
-#include "cxxpython/compiler_internal.hpp"
+#include "internal/compiler.hpp"
 
-#include <sstream>
+#include <algorithm>
+#include <unordered_set>
 
-namespace cxxpython::compiler_internal
+namespace cxxpython::core {
+SourceBuffer::SourceBuffer(std::string text, std::string filename) : filename_(std::move(filename))
 {
-    namespace
+    for (std::size_t i = 0; i < text.size(); ++i) {
+        auto ch = text[i];
+        if (ch == '\r') {
+            if (i + 1 < text.size() && text[i + 1] == '\n')
+                ++i;
+            ch = '\n';
+        }
+        text_.push_back(ch);
+        if (ch == '\n')
+            lines_.push_back(text_.size());
+    }
+    (void)detail::decode_source(*this, {0, text_.size()});
+}
+SourcePosition SourceBuffer::position(Span span) const
+{
+    auto at = [&](std::size_t offset) {
+        offset = std::min(offset, text_.size());
+        const auto row = static_cast<std::size_t>(
+            std::upper_bound(lines_.begin(), lines_.end(), offset) - lines_.begin() - 1);
+        return std::pair{static_cast<std::uint32_t>(row + 1),
+                         static_cast<std::uint32_t>(offset - lines_[row])};
+    };
+    const auto [line, column] = at(span.begin);
+    const auto [end_line, end_column] = at(span.end);
+    return {line, column, end_line, end_column};
+}
+std::string SourceBuffer::line(std::uint32_t number) const
+{
+    if (!number || number > lines_.size())
+        return {};
+    const auto start = lines_[number - 1];
+    const auto end = text_.find('\n', start);
+    return text_.substr(start, end == std::string::npos ? end : end - start + 1);
+}
+SourceError::SourceError(const SourceBuffer &source, Span where, std::string message,
+                         SourceErrorKind category)
+    : std::invalid_argument(std::move(message)), kind(category), span(where),
+      position(source.position(where)), filename(source.filename()),
+      source_line(source.line(position.line)),
+      offset(source.character_column(position.line, position.column) + 1),
+      end_offset(source.character_column(position.end_line, position.end_column) + 1)
+{}
+std::uint32_t SourceBuffer::character_column(std::uint32_t number, std::uint32_t byte_column) const
+{
+    const auto text = line(number);
+    const auto end = text.begin() + std::min<std::size_t>(byte_column, text.size());
+    return static_cast<std::uint32_t>(
+        std::count_if(text.begin(), end, [](unsigned char byte) { return (byte & 0xc0) != 0x80; }));
+}
+std::string source_utf8(std::u32string_view text)
+{
+    std::string out;
+    for (auto point : text) {
+        if (point >= 0xd800 && point <= 0xdfff) {
+            constexpr char hex[] = "0123456789abcdef";
+            out += "\\u";
+            for (int shift : {12, 8, 4, 0})
+                out += hex[(point >> shift) & 15];
+        } else if (point < 0x80)
+            out += static_cast<char>(point);
+        else if (point < 0x800) {
+            out += static_cast<char>(0xc0 | (point >> 6));
+            out += static_cast<char>(0x80 | (point & 63));
+        } else if (point < 0x10000) {
+            out += static_cast<char>(0xe0 | (point >> 12));
+            out += static_cast<char>(0x80 | ((point >> 6) & 63));
+            out += static_cast<char>(0x80 | (point & 63));
+        } else if (point <= 0x10ffff) {
+            out += static_cast<char>(0xf0 | (point >> 18));
+            out += static_cast<char>(0x80 | ((point >> 12) & 63));
+            out += static_cast<char>(0x80 | ((point >> 6) & 63));
+            out += static_cast<char>(0x80 | (point & 63));
+        } else
+            throw std::invalid_argument("invalid Unicode codepoint");
+    }
+    return out;
+}
+} // namespace cxxpython::core
+
+namespace cxxpython::core::detail {
+static std::u32string decode_utf8(const SourceBuffer &source, std::string_view text, Span span)
+{
+    std::u32string out;
+    for (auto i = span.begin; i < span.end;) {
+        const auto start = i;
+        const auto first = static_cast<unsigned char>(text[i++]);
+        char32_t point;
+        int extra;
+        if (first < 0x80) {
+            point = first;
+            extra = 0;
+        } else if (first >= 0xc2 && first <= 0xdf) {
+            point = first & 31;
+            extra = 1;
+        } else if (first >= 0xe0 && first <= 0xef) {
+            point = first & 15;
+            extra = 2;
+        } else if (first >= 0xf0 && first <= 0xf4) {
+            point = first & 7;
+            extra = 3;
+        } else
+            throw SourceError(source, {start, i}, "invalid UTF-8 source",
+                              SourceErrorKind::Encoding);
+        for (int n = 0; n < extra; ++n) {
+            if (i == span.end || (static_cast<unsigned char>(text[i]) & 0xc0) != 0x80)
+                throw SourceError(source, {start, i}, "invalid UTF-8 source",
+                                  SourceErrorKind::Encoding);
+            point = (point << 6) | (static_cast<unsigned char>(text[i++]) & 63);
+        }
+        if (!point || (extra == 1 && point < 0x80) || (extra == 2 && point < 0x800) ||
+            (extra == 3 && point < 0x10000) || point > 0x10ffff ||
+            (point >= 0xd800 && point <= 0xdfff))
+            throw SourceError(source, {start, i}, "invalid UTF-8 source or null character",
+                              SourceErrorKind::Encoding);
+        out.push_back(point);
+    }
+    return out;
+}
+std::u32string decode_source(const SourceBuffer &source, Span span)
+{
+    return decode_utf8(source, source.text(), span);
+}
+std::u32string decode_filename(const SourceBuffer &source)
+{
+    return decode_utf8(source, source.filename(), {0, source.filename().size()});
+}
+namespace {
+enum class TokenKind {
+    End,
+    Newline,
+    Indent,
+    Dedent,
+    Name,
+    Integer,
+    String,
+    Left,
+    Right,
+    Colon,
+    Comma,
+    Dot,
+    Semi,
+    Plus,
+    Minus,
+    Star,
+    Power,
+    Slash,
+    Floor,
+    Mod,
+    Tilde,
+    Assign,
+    AddAssign,
+    SubAssign,
+    MulAssign,
+    FloorAssign,
+    ModAssign,
+    Eq,
+    Ne,
+    Lt,
+    Le,
+    Gt,
+    Ge,
+    If,
+    Elif,
+    Else,
+    While,
+    Def,
+    Return,
+    Pass,
+    Break,
+    Continue,
+    Global,
+    Nonlocal,
+    Delete,
+    And,
+    Or,
+    Not,
+    Is,
+    None,
+    True,
+    False,
+    Unsupported,
+};
+struct Token {
+    TokenKind kind;
+    Span span;
+    std::u32string text = {};
+};
+bool alpha(char ch)
+{
+    return (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '_';
+}
+bool digit(char ch)
+{
+    return ch >= '0' && ch <= '9';
+}
+class Lexer final {
+  public:
+    explicit Lexer(const SourceBuffer &source) : source_(source), text_(source.text()) {}
+    std::vector<Token> scan()
     {
-        class Parser final
-        {
-        public:
-            Parser(Runtime &runtime, const std::vector<Token> &tokens, std::string filename)
-                : runtime_(runtime), tokens_(tokens), filename_(std::move(filename))
-            {
-            }
-
-            std::unique_ptr<Expr> parse_eval_input()
-            {
-                skip_newlines();
-                std::unique_ptr<Expr> expression = parse_expression_only();
-                skip_newlines();
-                if (peek().kind != TokenKind::End)
-                    raise_at(peek(), "unexpected token after expression");
-                return expression;
-            }
-
-            Module parse_file_input()
-            {
-                Module module;
-                skip_newlines();
-                while (peek().kind != TokenKind::End)
-                {
-                    ParsedStatement parsed = parse_statement();
-                    const bool compound = parsed.compound;
-                    append_statement_with_inline_tail(module.statements, std::move(parsed));
-                    if (peek().kind == TokenKind::Newline)
-                    {
-                        skip_newlines();
-                    }
-                    else if (compound)
-                    {
-                        continue;
-                    }
-                    else if (starts_statement())
-                    {
-                        continue;
-                    }
-                    else if (peek().kind != TokenKind::End)
-                    {
-                        raise_at(peek(), "expected newline after statement");
+        while (index_ < text_.size()) {
+            if (line_start_) {
+                const auto start = index_;
+                std::size_t column = 0, alternate = 0;
+                while (index_ < text_.size() &&
+                       (text_[index_] == ' ' || text_[index_] == '\t' || text_[index_] == '\f')) {
+                    const auto ch = text_[index_++];
+                    if (ch == '\f')
+                        column = alternate = 0;
+                    else {
+                        column = ch == '\t' ? (column / 8 + 1) * 8 : column + 1;
+                        ++alternate;
                     }
                 }
-                return module;
-            }
-
-        private:
-            struct ParsedStatement
-            {
-                std::unique_ptr<Stmt> statement;
-                bool compound;
-            };
-
-            class FunctionDepthGuard final
-            {
-            public:
-                explicit FunctionDepthGuard(std::size_t &depth)
-                    : depth_(depth)
-                {
-                    ++depth_;
-                }
-
-                ~FunctionDepthGuard()
-                {
-                    --depth_;
-                }
-
-                FunctionDepthGuard(const FunctionDepthGuard &) = delete;
-                FunctionDepthGuard &operator=(const FunctionDepthGuard &) = delete;
-
-            private:
-                std::size_t &depth_;
-            };
-
-            class ClassDepthGuard final
-            {
-            public:
-                explicit ClassDepthGuard(std::size_t &depth)
-                    : depth_(depth)
-                {
-                    ++depth_;
-                }
-
-                ~ClassDepthGuard()
-                {
-                    --depth_;
-                }
-
-                ClassDepthGuard(const ClassDepthGuard &) = delete;
-                ClassDepthGuard &operator=(const ClassDepthGuard &) = delete;
-
-            private:
-                std::size_t &depth_;
-            };
-
-            class LoopDepthGuard final
-            {
-            public:
-                explicit LoopDepthGuard(std::size_t &depth)
-                    : depth_(depth)
-                {
-                    ++depth_;
-                }
-
-                ~LoopDepthGuard()
-                {
-                    --depth_;
-                }
-
-                LoopDepthGuard(const LoopDepthGuard &) = delete;
-                LoopDepthGuard &operator=(const LoopDepthGuard &) = delete;
-
-            private:
-                std::size_t &depth_;
-            };
-
-            ParsedStatement parse_statement()
-            {
-                std::vector<std::unique_ptr<Expr>> decorators = parse_decorators();
-                if (!decorators.empty())
-                {
-                    if (peek().kind == TokenKind::Def)
-                        return parse_function_def_statement(std::move(decorators));
-                    if (peek().kind == TokenKind::Class)
-                        return parse_class_def_statement(std::move(decorators));
-                    raise_at(peek(), "expected function or class definition after decorator");
-                }
-
-                if (peek().kind == TokenKind::If)
-                    return parse_if_statement();
-                if (peek().kind == TokenKind::For)
-                    return parse_for_statement();
-                if (peek().kind == TokenKind::While)
-                    return parse_while_statement();
-                if (peek().kind == TokenKind::With)
-                    return parse_with_statement();
-                if (peek().kind == TokenKind::Try)
-                    return parse_try_statement();
-                if (peek().kind == TokenKind::Def)
-                    return parse_function_def_statement({});
-                if (peek().kind == TokenKind::Class)
-                    return parse_class_def_statement({});
-                return parse_simple_statement();
-            }
-
-            ParsedStatement parse_simple_statement()
-            {
-                if (peek().kind == TokenKind::Del)
-                    return parse_delete_statement();
-                if (peek().kind == TokenKind::Return)
-                    return parse_return_statement();
-                if (peek().kind == TokenKind::Raise)
-                    return parse_raise_statement();
-                if (peek().kind == TokenKind::Import)
-                    return parse_import_statement();
-                if (peek().kind == TokenKind::From)
-                    return parse_from_import_statement();
-                if (peek().kind == TokenKind::Global)
-                    return parse_global_statement();
-                if (peek().kind == TokenKind::Nonlocal)
-                    return parse_nonlocal_statement();
-                if (peek().kind == TokenKind::Break)
-                    return parse_break_statement();
-                if (peek().kind == TokenKind::Continue)
-                    return parse_continue_statement();
-                if (peek().kind == TokenKind::Pass)
-                    return parse_pass_statement();
-
-                const std::size_t line = peek().line;
-                std::unique_ptr<Expr> target_or_expression = parse_expression_only();
-                if (peek().kind == TokenKind::Equal)
-                {
-                    const Token &equals = advance();
-                    std::unique_ptr<Expr> value = parse_expression_only();
-                    std::unique_ptr<AssignTarget> target =
-                        make_assignment_target(std::move(target_or_expression), equals);
-                    auto statement = std::make_unique<AssignStmt>(std::move(target), std::move(value));
-                    statement->line = line;
-                    return ParsedStatement{
-                        std::move(statement),
-                        false,
-                    };
-                }
-                if (starts_augmented_assignment())
-                {
-                    const Token &op_token = advance();
-                    std::unique_ptr<Expr> value = parse_expression_only();
-                    std::unique_ptr<AssignTarget> target =
-                        make_assignment_target(std::move(target_or_expression), op_token);
-                    auto statement = std::make_unique<AugAssignStmt>(
-                        std::move(target),
-                        augmented_assignment_op(op_token),
-                        std::move(value));
-                    statement->line = line;
-                    return ParsedStatement{
-                        std::move(statement),
-                        false,
-                    };
-                }
-                auto statement = std::make_unique<ExprStmt>(std::move(target_or_expression));
-                statement->line = line;
-                return ParsedStatement{
-                    std::move(statement),
-                    false,
-                };
-            }
-
-            void append_statement_with_inline_tail(std::vector<std::unique_ptr<Stmt>> &statements,
-                                                   ParsedStatement parsed)
-            {
-                const bool compound = parsed.compound;
-                statements.push_back(std::move(parsed.statement));
-                if (compound && peek().kind == TokenKind::Semicolon)
-                    raise_at(peek(), "compound statements cannot be chained with ';'");
-                while (peek().kind == TokenKind::Semicolon)
-                {
-                    advance();
-                    if (peek().kind == TokenKind::Newline ||
-                        peek().kind == TokenKind::Dedent ||
-                        peek().kind == TokenKind::End)
-                        break;
-                    statements.push_back(parse_simple_statement().statement);
-                }
-            }
-
-            std::vector<std::unique_ptr<Stmt>> parse_suite(const char *newline_message)
-            {
-                if (peek().kind == TokenKind::Newline)
-                {
-                    advance();
-                    return parse_block();
-                }
-
-                if (peek().kind == TokenKind::Dedent || peek().kind == TokenKind::End)
-                    raise_at(peek(), newline_message);
-
-                std::vector<std::unique_ptr<Stmt>> body;
-                body.push_back(parse_simple_statement().statement);
-                while (peek().kind == TokenKind::Semicolon)
-                {
-                    advance();
-                    if (peek().kind == TokenKind::Newline ||
-                        peek().kind == TokenKind::Dedent ||
-                        peek().kind == TokenKind::End)
-                        break;
-                    body.push_back(parse_simple_statement().statement);
-                }
-                if (peek().kind == TokenKind::Newline)
-                    advance();
-                return body;
-            }
-
-            std::vector<std::unique_ptr<Expr>> parse_decorators()
-            {
-                std::vector<std::unique_ptr<Expr>> decorators;
-                while (peek().kind == TokenKind::At)
-                {
-                    advance();
-                    decorators.push_back(parse_expression_only());
-                    consume(TokenKind::Newline, "expected newline after decorator");
-                }
-                return decorators;
-            }
-
-            ParsedStatement parse_delete_statement()
-            {
-                const Token &del_token = advance();
-                std::unique_ptr<Expr> target_expression = parse_expression_only();
-                std::unique_ptr<AssignTarget> target =
-                    make_assignment_target(std::move(target_expression), del_token);
-                auto statement = std::make_unique<DeleteStmt>(std::move(target));
-                statement->line = del_token.line;
-                return ParsedStatement{
-                    std::move(statement),
-                    false,
-                };
-            }
-
-            ParsedStatement parse_return_statement()
-            {
-                const Token &return_token = advance();
-                if (function_depth_ == 0)
-                    raise_at(return_token, "'return' outside function");
-                std::unique_ptr<Expr> value;
-                if (peek().kind != TokenKind::Newline &&
-                    peek().kind != TokenKind::Dedent &&
-                    peek().kind != TokenKind::End)
-                    value = parse_expression_only();
-                auto statement = std::make_unique<ReturnStmt>(std::move(value));
-                statement->line = return_token.line;
-                return ParsedStatement{
-                    std::move(statement),
-                    false,
-                };
-            }
-
-            ParsedStatement parse_raise_statement()
-            {
-                const Token &raise_token = advance();
-                std::unique_ptr<Expr> value;
-                if (peek().kind != TokenKind::Newline &&
-                    peek().kind != TokenKind::Dedent &&
-                    peek().kind != TokenKind::End)
-                    value = parse_expression_only();
-                auto statement = std::make_unique<RaiseStmt>(std::move(value));
-                statement->line = raise_token.line;
-                return ParsedStatement{
-                    std::move(statement),
-                    false,
-                };
-            }
-
-            ParsedStatement parse_global_statement()
-            {
-                const Token &global_token = advance();
-                auto statement = std::make_unique<GlobalStmt>(parse_name_list("global"));
-                statement->line = global_token.line;
-                return ParsedStatement{
-                    std::move(statement),
-                    false,
-                };
-            }
-
-            ParsedStatement parse_nonlocal_statement()
-            {
-                const Token &nonlocal_token = advance();
-                if (function_depth_ == 0)
-                    raise_at(nonlocal_token, "nonlocal declaration not allowed at module level");
-                auto statement = std::make_unique<NonlocalStmt>(parse_name_list("nonlocal"));
-                statement->line = nonlocal_token.line;
-                return ParsedStatement{
-                    std::move(statement),
-                    false,
-                };
-            }
-
-            ParsedStatement parse_break_statement()
-            {
-                const Token &break_token = advance();
-                if (loop_depth_ == 0)
-                    raise_at(break_token, "'break' outside loop");
-                auto statement = std::make_unique<BreakStmt>();
-                statement->line = break_token.line;
-                return ParsedStatement{
-                    std::move(statement),
-                    false,
-                };
-            }
-
-            ParsedStatement parse_continue_statement()
-            {
-                const Token &continue_token = advance();
-                if (loop_depth_ == 0)
-                    raise_at(continue_token, "'continue' outside loop");
-                auto statement = std::make_unique<ContinueStmt>();
-                statement->line = continue_token.line;
-                return ParsedStatement{
-                    std::move(statement),
-                    false,
-                };
-            }
-
-            ParsedStatement parse_pass_statement()
-            {
-                const Token &pass_token = advance();
-                auto statement = std::make_unique<PassStmt>();
-                statement->line = pass_token.line;
-                return ParsedStatement{
-                    std::move(statement),
-                    false,
-                };
-            }
-
-            ParsedStatement parse_import_statement()
-            {
-                const Token &import_token = advance();
-                std::vector<ImportAlias> aliases;
-                while (true)
-                {
-                    std::string name = parse_dotted_name("expected module name after import");
-                    std::string binding = import_binding_for(name);
-                    bool bind_full_module = false;
-                    if (peek().kind == TokenKind::As)
-                    {
-                        advance();
-                        if (peek().kind != TokenKind::Identifier)
-                            raise_at(peek(), "expected name after import alias");
-                        binding = advance().lexeme;
-                        bind_full_module = true;
-                    }
-
-                    for (const ImportAlias &existing : aliases)
-                    {
-                        if (existing.binding == binding)
-                            raise_at(previous(), "duplicate binding in import statement");
-                    }
-                    aliases.emplace_back(std::move(name), std::move(binding), bind_full_module);
-                    if (peek().kind != TokenKind::Comma)
-                        break;
-                    advance();
-                }
-                auto statement = std::make_unique<ImportStmt>(std::move(aliases));
-                statement->line = import_token.line;
-                return ParsedStatement{
-                    std::move(statement),
-                    false,
-                };
-            }
-
-            ParsedStatement parse_from_import_statement()
-            {
-                const Token &from_token = advance();
-                std::uint32_t level = 0;
-                while (peek().kind == TokenKind::Dot)
-                {
-                    advance();
-                    ++level;
-                }
-                std::string module;
-                if (peek().kind == TokenKind::Identifier)
-                    module = parse_dotted_name("expected module name after from");
-                else if (level == 0)
-                    raise_at(peek(), "expected module name after from");
-                consume(TokenKind::Import, "expected import after from module name");
-
-                std::vector<ImportAlias> aliases;
-                bool import_star = false;
-                if (peek().kind == TokenKind::Star)
-                {
-                    if (function_depth_ != 0 || class_depth_ != 0)
-                        raise_at(peek(), "import * only allowed at module level");
-                    advance();
-                    import_star = true;
-                }
-                while (true)
-                {
-                    if (import_star)
-                        break;
-                    if (peek().kind != TokenKind::Identifier)
-                        raise_at(peek(), "expected name in from import statement");
-                    std::string name = advance().lexeme;
-                    std::string binding = name;
-                    if (peek().kind == TokenKind::As)
-                    {
-                        advance();
-                        if (peek().kind != TokenKind::Identifier)
-                            raise_at(peek(), "expected name after import alias");
-                        binding = advance().lexeme;
-                    }
-                    for (const ImportAlias &existing : aliases)
-                    {
-                        if (existing.binding == binding)
-                            raise_at(previous(), "duplicate binding in from import statement");
-                    }
-                    aliases.emplace_back(std::move(name), std::move(binding));
-                    if (peek().kind != TokenKind::Comma)
-                        break;
-                    advance();
-                }
-                auto statement = std::make_unique<FromImportStmt>(
-                    std::move(module),
-                    std::move(aliases),
-                    import_star,
-                    level);
-                statement->line = from_token.line;
-                return ParsedStatement{
-                    std::move(statement),
-                    false,
-                };
-            }
-
-            std::string parse_dotted_name(const char *message)
-            {
-                if (peek().kind != TokenKind::Identifier)
-                    raise_at(peek(), message);
-                std::string name = advance().lexeme;
-                while (peek().kind == TokenKind::Dot)
-                {
-                    advance();
-                    if (peek().kind != TokenKind::Identifier)
-                        raise_at(peek(), "expected identifier after '.'");
-                    name += ".";
-                    name += advance().lexeme;
-                }
-                return name;
-            }
-
-            std::string import_binding_for(std::string_view module_name)
-            {
-                const std::size_t dot = module_name.find('.');
-                if (dot == std::string_view::npos)
-                    return std::string(module_name);
-                return std::string(module_name.substr(0, dot));
-            }
-
-            std::vector<std::string> parse_name_list(const char *statement_name)
-            {
-                std::vector<std::string> names;
-                while (true)
-                {
-                    if (peek().kind != TokenKind::Identifier)
-                    {
-                        std::ostringstream message;
-                        message << "expected name after " << statement_name;
-                        raise_at(peek(), message.str());
-                    }
-                    std::string name = advance().lexeme;
-                    for (const std::string &existing : names)
-                    {
-                        if (existing == name)
-                        {
-                            std::ostringstream message;
-                            message << "duplicate name in " << statement_name << " statement";
-                            raise_at(previous(), message.str());
+                line_start_ = false;
+                if (index_ == text_.size() || text_[index_] == '#' || text_[index_] == '\n')
+                    continue;
+                if (groups_.empty() && !continued_) {
+                    if (column == indents_.back().first && alternate != indents_.back().second)
+                        tab(start);
+                    if (column > indents_.back().first) {
+                        if (alternate <= indents_.back().second)
+                            tab(start);
+                        indents_.push_back({column, alternate});
+                        push(TokenKind::Indent, start);
+                    } else {
+                        while (column < indents_.back().first) {
+                            indents_.pop_back();
+                            push(TokenKind::Dedent, start);
                         }
+                        if (column != indents_.back().first)
+                            fail({start, index_},
+                                 "unindent does not match an outer indentation level",
+                                 SourceErrorKind::Indentation);
+                        if (alternate != indents_.back().second)
+                            tab(start);
                     }
-                    names.push_back(std::move(name));
-                    if (peek().kind != TokenKind::Comma)
-                        break;
-                    advance();
                 }
-                return names;
+                continued_ = false;
             }
-
-            ParsedStatement parse_try_statement()
-            {
-                const Token &try_token = advance();
-                consume(TokenKind::Colon, "expected ':' after try");
-                std::vector<std::unique_ptr<Stmt>> body = parse_suite("expected newline after try");
-                std::vector<ExceptHandler> handlers;
-                std::vector<std::unique_ptr<Stmt>> finally_body;
-
-                while (peek().kind == TokenKind::Except)
-                {
-                    advance();
-                    std::unique_ptr<Expr> exception_type;
-                    std::optional<std::string> exception_name;
-                    if (peek().kind != TokenKind::Colon)
-                    {
-                        exception_type = parse_expression_only();
-                        if (peek().kind == TokenKind::As)
-                        {
-                            advance();
-                            if (peek().kind != TokenKind::Identifier)
-                                raise_at(peek(), "expected name after 'as'");
-                            exception_name = advance().lexeme;
-                        }
-                    }
-                    consume(TokenKind::Colon, "expected ':' after except");
-                    handlers.emplace_back(std::move(exception_type),
-                                          std::move(exception_name),
-                                          parse_suite("expected newline after except"));
+            const auto start = index_;
+            const auto ch = text_[index_++];
+            if (ch == ' ' || ch == '\t' || ch == '\f')
+                continue;
+            if (ch == '#') {
+                while (index_ < text_.size() && text_[index_] != '\n')
+                    ++index_;
+                continue;
+            }
+            if (ch == '\n') {
+                if (groups_.empty())
+                    push(TokenKind::Newline, start);
+                line_start_ = true;
+                continue;
+            }
+            if (ch == '\\') {
+                if (index_ == text_.size() || text_[index_++] != '\n')
+                    fail({start, index_}, "unexpected character after line continuation character");
+                line_start_ = continued_ = true;
+                continue;
+            }
+            if (alpha(ch)) {
+                while (index_ < text_.size() && (alpha(text_[index_]) || digit(text_[index_])))
+                    ++index_;
+                auto word = text_.substr(start, index_ - start);
+                if (index_ < text_.size() && (text_[index_] == '\'' || text_[index_] == '"')) {
+                    if (word != "r" && word != "R")
+                        fail(
+                            {start, index_},
+                            "prefixed bytes/f-string literals require the later literal capability",
+                            SourceErrorKind::Capability);
+                    string(start, true);
+                    continue;
                 }
-
-                if (peek().kind == TokenKind::Finally)
-                {
-                    advance();
-                    consume(TokenKind::Colon, "expected ':' after finally");
-                    finally_body = parse_suite("expected newline after finally");
-                }
-
-                if (handlers.empty() && finally_body.empty())
-                    raise_at(peek(), "expected except or finally after try block");
-
-                auto statement = std::make_unique<TryStmt>(
-                    std::move(body),
-                    std::move(handlers),
-                    std::move(finally_body));
-                statement->line = try_token.line;
-                return ParsedStatement{
-                    std::move(statement),
-                    true,
+                constexpr std::pair<std::string_view, TokenKind> words[] = {
+                    {"if", TokenKind::If},
+                    {"elif", TokenKind::Elif},
+                    {"else", TokenKind::Else},
+                    {"while", TokenKind::While},
+                    {"def", TokenKind::Def},
+                    {"return", TokenKind::Return},
+                    {"pass", TokenKind::Pass},
+                    {"break", TokenKind::Break},
+                    {"continue", TokenKind::Continue},
+                    {"global", TokenKind::Global},
+                    {"nonlocal", TokenKind::Nonlocal},
+                    {"del", TokenKind::Delete},
+                    {"and", TokenKind::And},
+                    {"or", TokenKind::Or},
+                    {"not", TokenKind::Not},
+                    {"is", TokenKind::Is},
+                    {"None", TokenKind::None},
+                    {"True", TokenKind::True},
+                    {"False", TokenKind::False},
+                    {"for", TokenKind::Unsupported},
+                    {"in", TokenKind::Unsupported},
+                    {"lambda", TokenKind::Unsupported},
+                    {"class", TokenKind::Unsupported},
+                    {"try", TokenKind::Unsupported},
+                    {"except", TokenKind::Unsupported},
+                    {"finally", TokenKind::Unsupported},
+                    {"with", TokenKind::Unsupported},
+                    {"raise", TokenKind::Unsupported},
+                    {"yield", TokenKind::Unsupported},
+                    {"import", TokenKind::Unsupported},
+                    {"from", TokenKind::Unsupported},
+                    {"async", TokenKind::Unsupported},
+                    {"await", TokenKind::Unsupported},
+                    {"assert", TokenKind::Unsupported},
+                    {"as", TokenKind::Unsupported},
                 };
-            }
-
-            ParsedStatement parse_if_statement()
-            {
-                const Token &if_token = advance();
-                std::unique_ptr<Expr> condition = parse_or_expression();
-                consume(TokenKind::Colon, "expected ':' after if condition");
-                std::vector<std::unique_ptr<Stmt>> then_body = parse_suite("expected newline after if condition");
-                std::vector<std::unique_ptr<Stmt>> else_body;
-
-                if (peek().kind == TokenKind::Elif)
-                {
-                    ParsedStatement elif_statement = parse_if_statement();
-                    else_body.push_back(std::move(elif_statement.statement));
-                }
-                else if (peek().kind == TokenKind::Else)
-                {
-                    advance();
-                    consume(TokenKind::Colon, "expected ':' after else");
-                    else_body = parse_suite("expected newline after else");
-                }
-
-                auto statement = std::make_unique<IfStmt>(
-                        std::move(condition),
-                        std::move(then_body),
-                        std::move(else_body));
-                statement->line = if_token.line;
-                return ParsedStatement{
-                    std::move(statement),
-                    true,
-                };
-            }
-
-            ParsedStatement parse_for_statement()
-            {
-                const Token &for_token = advance();
-                if (peek().kind != TokenKind::Identifier)
-                    raise_at(peek(), "expected name after for");
-                std::string target = advance().lexeme;
-                consume(TokenKind::In, "expected 'in' after for target");
-                std::unique_ptr<Expr> iterable = parse_expression_only();
-                consume(TokenKind::Colon, "expected ':' after for iterable");
-                LoopDepthGuard loop_guard(loop_depth_);
-                std::vector<std::unique_ptr<Stmt>> body = parse_suite("expected newline after for statement");
-                std::vector<std::unique_ptr<Stmt>> else_body;
-                if (peek().kind == TokenKind::Else)
-                {
-                    advance();
-                    consume(TokenKind::Colon, "expected ':' after else");
-                    else_body = parse_suite("expected newline after else");
-                }
-                auto statement =
-                    std::make_unique<ForStmt>(
-                        std::move(target),
-                        std::move(iterable),
-                        std::move(body),
-                        std::move(else_body));
-                statement->line = for_token.line;
-                return ParsedStatement{
-                    std::move(statement),
-                    true,
-                };
-            }
-
-            ParsedStatement parse_while_statement()
-            {
-                const Token &while_token = advance();
-                std::unique_ptr<Expr> condition = parse_or_expression();
-                consume(TokenKind::Colon, "expected ':' after while condition");
-                LoopDepthGuard loop_guard(loop_depth_);
-                std::vector<std::unique_ptr<Stmt>> body = parse_suite("expected newline after while condition");
-                std::vector<std::unique_ptr<Stmt>> else_body;
-                if (peek().kind == TokenKind::Else)
-                {
-                    advance();
-                    consume(TokenKind::Colon, "expected ':' after else");
-                    else_body = parse_suite("expected newline after else");
-                }
-                auto statement = std::make_unique<WhileStmt>(
-                    std::move(condition),
-                    std::move(body),
-                    std::move(else_body));
-                statement->line = while_token.line;
-                return ParsedStatement{
-                    std::move(statement),
-                    true,
-                };
-            }
-
-            ParsedStatement parse_with_statement()
-            {
-                const Token &with_token = advance();
-                std::vector<WithItem> items;
-                while (true)
-                {
-                    std::unique_ptr<Expr> context = parse_expression_only();
-                    std::unique_ptr<AssignTarget> target;
-                    if (peek().kind == TokenKind::As)
-                    {
-                        const Token &as_token = advance();
-                        target = make_assignment_target(parse_expression_only(), as_token);
-                    }
-                    items.emplace_back(std::move(context), std::move(target));
-                    if (peek().kind != TokenKind::Comma)
+                auto kind = TokenKind::Name;
+                for (auto [name, value] : words)
+                    if (word == name) {
+                        kind = value;
                         break;
-                    advance();
-                }
-                consume(TokenKind::Colon, "expected ':' after with statement");
-                auto statement = std::make_unique<WithStmt>(
-                    std::move(items),
-                    parse_suite("expected newline after with statement"));
-                statement->line = with_token.line;
-                return ParsedStatement{
-                    std::move(statement),
-                    true,
-                };
-            }
-
-            ParsedStatement parse_function_def_statement(std::vector<std::unique_ptr<Expr>> decorators)
-            {
-                const Token &def_token = advance();
-                if (peek().kind != TokenKind::Identifier)
-                    raise_at(peek(), "expected function name");
-                std::string name = advance().lexeme;
-                consume(TokenKind::LeftParen, "expected '(' after function name");
-                FunctionParameters params = parse_parameters_until(TokenKind::RightParen, true);
-                consume(TokenKind::RightParen, "expected ')' after parameters");
-                std::unique_ptr<Expr> return_annotation;
-                if (peek().kind == TokenKind::Arrow)
-                {
-                    advance();
-                    return_annotation = parse_expression_only();
-                }
-                consume(TokenKind::Colon, "expected ':' after function signature");
-
-                FunctionDepthGuard guard(function_depth_);
-                std::vector<std::unique_ptr<Stmt>> body = parse_suite("expected newline after function signature");
-                auto statement = std::make_unique<FunctionDefStmt>(
-                    std::move(name),
-                    std::move(params),
-                    std::move(return_annotation),
-                    std::move(body),
-                    std::move(decorators));
-                statement->line = def_token.line;
-                return ParsedStatement{
-                    std::move(statement),
-                    true,
-                };
-            }
-
-            ParsedStatement parse_class_def_statement(std::vector<std::unique_ptr<Expr>> decorators)
-            {
-                const Token &class_token = advance();
-                if (peek().kind != TokenKind::Identifier)
-                    raise_at(peek(), "expected class name");
-                std::string name = advance().lexeme;
-                std::vector<std::unique_ptr<Expr>> bases;
-                std::vector<CallArgument> keywords;
-                std::vector<std::string> keyword_names;
-                bool seen_keyword = false;
-                if (peek().kind == TokenKind::LeftParen)
-                {
-                    advance();
-                    if (peek().kind != TokenKind::RightParen)
-                    {
-                        while (true)
-                        {
-                            if (peek().kind == TokenKind::Identifier && peek_next().kind == TokenKind::Equal)
-                            {
-                                seen_keyword = true;
-                                std::string keyword = advance().lexeme;
-                                advance();
-                                for (const std::string &existing : keyword_names)
-                                {
-                                    if (existing == keyword)
-                                        raise_at(previous(), "class keyword repeated");
-                                }
-                                keyword_names.push_back(keyword);
-                                keywords.emplace_back(std::move(keyword), parse_expression_only());
-                            }
-                            else
-                            {
-                                if (seen_keyword)
-                                    raise_at(peek(), "positional base follows class keyword");
-                                bases.push_back(parse_expression_only());
-                            }
-                            if (peek().kind != TokenKind::Comma)
-                                break;
-                            advance();
-                            if (peek().kind == TokenKind::RightParen)
-                                break;
-                        }
                     }
-                    consume(TokenKind::RightParen, "expected ')' after class bases");
-                }
-                consume(TokenKind::Colon, "expected ':' after class name");
-                ClassDepthGuard guard(class_depth_);
-                std::vector<std::unique_ptr<Stmt>> body = parse_suite("expected newline after class definition");
-                auto statement = std::make_unique<ClassDefStmt>(
-                    std::move(name),
-                    std::move(bases),
-                    std::move(keywords),
-                    std::move(body),
-                    std::move(decorators));
-                statement->line = class_token.line;
-                return ParsedStatement{
-                    std::move(statement),
-                    true,
-                };
+                tokens_.push_back({kind, {start, index_}, {word.begin(), word.end()}});
+                continue;
             }
-
-            std::vector<std::unique_ptr<Stmt>> parse_block()
-            {
-                skip_newlines();
-                if (peek().kind != TokenKind::Indent)
-                    raise_at(peek(), "expected indented block");
-                advance();
-
-                std::vector<std::unique_ptr<Stmt>> body;
-                skip_newlines();
-                while (peek().kind != TokenKind::Dedent && peek().kind != TokenKind::End)
-                {
-                    ParsedStatement parsed = parse_statement();
-                    const bool compound = parsed.compound;
-                    append_statement_with_inline_tail(body, std::move(parsed));
-                    if (peek().kind == TokenKind::Newline)
-                        skip_newlines();
-                    else if (compound)
-                        continue;
-                    else if (starts_statement())
-                        continue;
-                    else if (peek().kind != TokenKind::Dedent && peek().kind != TokenKind::End)
-                        raise_at(peek(), "expected newline after statement");
-                }
-                consume(TokenKind::Dedent, "expected dedent after block");
-                if (body.empty())
-                    raise_at(previous(), "expected indented block");
-                return body;
+            if (digit(ch)) {
+                while (index_ < text_.size() && (alpha(text_[index_]) || digit(text_[index_])))
+                    ++index_;
+                const auto word = text_.substr(start, index_ - start);
+                if ((index_ < text_.size() && text_[index_] == '.') ||
+                    (!(word.size() > 1 && word[0] == '0' && (word[1] == 'x' || word[1] == 'X')) &&
+                     word.find_first_of("eEjJ") != std::string::npos))
+                    fail({start, index_},
+                         "float/complex literals require the corresponding numeric types",
+                         SourceErrorKind::Capability);
+                tokens_.push_back(
+                    {TokenKind::Integer, {start, index_}, {word.begin(), word.end()}});
+                continue;
             }
-
-            std::unique_ptr<AssignTarget> make_assignment_target(std::unique_ptr<Expr> expression,
-                                                                 const Token &equals) const
-            {
-                if (auto *target = dynamic_cast<NameExpr *>(expression.get()))
-                    return std::make_unique<NameTarget>(target->value);
-                if (auto *target = dynamic_cast<AttributeExpr *>(expression.get()))
-                {
-                    return std::make_unique<AttributeTarget>(
-                        std::move(target->object),
-                        target->name);
-                }
-                if (auto *target = dynamic_cast<SubscriptExpr *>(expression.get()))
-                {
-                    return std::make_unique<SubscriptTarget>(
-                        std::move(target->object),
-                        std::move(target->key));
-                }
-                raise_at(equals, "invalid assignment target");
+            if (ch == '\'' || ch == '"') {
+                --index_;
+                string(start, false);
+                continue;
             }
-
-            void ensure_unique_parameter(const FunctionParameters &params,
-                                         const std::string &name,
-                                         const Token &token) const
-            {
-                for (const std::string &existing : params.positional)
-                {
-                    if (existing == name)
-                        raise_at(token, "duplicate parameter name");
-                }
-                if (params.varargs && *params.varargs == name)
-                    raise_at(token, "duplicate parameter name");
-                for (const auto &existing : params.keyword_only)
-                {
-                    if (existing.name == name)
-                        raise_at(token, "duplicate parameter name");
-                }
-                if (params.varkeywords && *params.varkeywords == name)
-                    raise_at(token, "duplicate parameter name");
-            }
-
-            FunctionParameters parse_parameters_until(TokenKind end_kind, bool allow_annotations)
-            {
-                FunctionParameters params;
-                if (peek().kind == end_kind)
-                    return params;
-
-                bool seen_varargs = false;
-                bool seen_varkeywords = false;
-                bool seen_default = false;
-                bool keyword_only_section = false;
-                bool seen_positional_only_marker = false;
-                while (true)
-                {
-                    bool is_varargs = false;
-                    bool is_varkeywords = false;
-                    if (peek().kind == TokenKind::Slash)
-                    {
-                        if (seen_positional_only_marker || keyword_only_section || params.positional.empty())
-                            raise_at(peek(), "invalid positional-only marker");
-                        seen_positional_only_marker = true;
-                        params.positional_only_count =
-                            static_cast<std::uint32_t>(params.positional.size());
-                        advance();
-                        if (peek().kind != TokenKind::Comma)
-                            raise_at(peek(), "expected ',' after positional-only marker");
-                        advance();
-                        if (peek().kind == end_kind)
-                            break;
-                        continue;
-                    }
-                    if (peek().kind == TokenKind::Star)
-                    {
-                        if (seen_varargs)
-                            raise_at(peek(), "duplicate * parameter");
-                        is_varargs = true;
-                        seen_varargs = true;
-                        advance();
-                        keyword_only_section = true;
-                        if (peek().kind == TokenKind::Comma)
-                        {
-                            advance();
-                            if (peek().kind == end_kind)
-                                raise_at(peek(), "named arguments must follow bare *");
-                            continue;
-                        }
-                    }
-                    else if (peek().kind == TokenKind::DoubleStar)
-                    {
-                        if (seen_varkeywords)
-                            raise_at(peek(), "duplicate ** parameter");
-                        is_varkeywords = true;
-                        seen_varkeywords = true;
-                        advance();
-                    }
-                    if (peek().kind != TokenKind::Identifier)
-                        raise_at(peek(), "expected parameter name");
-                    std::string param = advance().lexeme;
-                    ensure_unique_parameter(params, param, previous());
-                    std::unique_ptr<Expr> annotation;
-                    if (peek().kind == TokenKind::Colon && allow_annotations)
-                    {
-                        advance();
-                        annotation = parse_expression_only();
-                    }
-                    std::unique_ptr<Expr> default_value;
-                    if (!is_varargs && !is_varkeywords && peek().kind == TokenKind::Equal)
-                    {
-                        advance();
-                        default_value = parse_expression_only();
-                        if (!keyword_only_section)
-                            seen_default = true;
-                    }
-                    else if (!is_varargs && !is_varkeywords && !keyword_only_section && seen_default)
-                    {
-                        raise_at(previous(), "non-default argument follows default argument");
-                    }
-                    if (is_varkeywords)
-                    {
-                        params.varkeywords_annotation = std::move(annotation);
-                        params.varkeywords = std::move(param);
-                    }
-                    else if (is_varargs)
-                    {
-                        params.varargs_annotation = std::move(annotation);
-                        params.varargs = std::move(param);
-                    }
-                    else if (keyword_only_section)
-                    {
-                        params.keyword_only.push_back(
-                            FunctionParameters::KeywordOnlyParameter{
-                                std::move(param),
-                                std::move(default_value),
-                                std::move(annotation),
-                            });
-                    }
-                    else
-                    {
-                        if (annotation)
-                        {
-                            params.annotations.push_back(FunctionParameters::Annotation{
-                                param,
-                                std::move(annotation),
-                            });
-                        }
-                        params.positional.push_back(std::move(param));
-                        if (default_value)
-                            params.defaults.push_back(std::move(default_value));
-                    }
-                    if (peek().kind != TokenKind::Comma)
-                        break;
-                    advance();
-                    if (peek().kind == end_kind)
-                        break;
-                    if (seen_varkeywords)
-                        raise_at(peek(), "expected end of parameters after ** parameter");
-                }
-                return params;
-            }
-
-            std::unique_ptr<Expr> parse_expression_only()
-            {
-                if (peek().kind == TokenKind::Lambda)
-                    return parse_lambda_expression();
-                std::unique_ptr<Expr> body = parse_or_expression();
-                if (peek().kind != TokenKind::If)
-                    return body;
-
-                advance();
-                std::unique_ptr<Expr> condition = parse_or_expression();
-                consume(TokenKind::Else, "expected else after conditional expression");
-                std::unique_ptr<Expr> else_body = parse_expression_only();
-                return std::make_unique<ConditionalExpr>(
-                    std::move(body),
-                    std::move(condition),
-                    std::move(else_body));
-            }
-
-            std::unique_ptr<Expr> parse_lambda_expression()
-            {
-                const Token &lambda_token = advance();
-                FunctionParameters params = parse_parameters_until(TokenKind::Colon, false);
-                consume(TokenKind::Colon, "expected ':' after lambda parameters");
-                return std::make_unique<LambdaExpr>(
-                    std::move(params),
-                    parse_expression_only(),
-                    lambda_token.line);
-            }
-
-            std::unique_ptr<Expr> parse_or_expression()
-            {
-                std::vector<std::unique_ptr<Expr>> values;
-                values.push_back(parse_bitwise_or_expression());
-                while (peek().kind == TokenKind::Or)
-                {
-                    advance();
-                    values.push_back(parse_bitwise_or_expression());
-                }
-                if (values.size() == 1)
-                    return std::move(values.front());
-                return std::make_unique<BoolExpr>(BoolOp::Or, std::move(values));
-            }
-
-            std::unique_ptr<Expr> parse_bitwise_or_expression()
-            {
-                std::unique_ptr<Expr> left = parse_bitwise_xor_expression();
-                while (peek().kind == TokenKind::Pipe)
-                {
-                    advance();
-                    std::unique_ptr<Expr> right = parse_bitwise_xor_expression();
-                    left = std::make_unique<BinaryExpr>(std::move(left), BinaryOp::BitOr, std::move(right));
-                }
-                return left;
-            }
-
-            std::unique_ptr<Expr> parse_bitwise_xor_expression()
-            {
-                std::unique_ptr<Expr> left = parse_bitwise_and_expression();
-                while (peek().kind == TokenKind::Caret)
-                {
-                    advance();
-                    std::unique_ptr<Expr> right = parse_bitwise_and_expression();
-                    left = std::make_unique<BinaryExpr>(std::move(left), BinaryOp::BitXor, std::move(right));
-                }
-                return left;
-            }
-
-            std::unique_ptr<Expr> parse_bitwise_and_expression()
-            {
-                std::unique_ptr<Expr> left = parse_and_expression();
-                while (peek().kind == TokenKind::Ampersand)
-                {
-                    advance();
-                    std::unique_ptr<Expr> right = parse_and_expression();
-                    left = std::make_unique<BinaryExpr>(std::move(left), BinaryOp::BitAnd, std::move(right));
-                }
-                return left;
-            }
-
-            std::unique_ptr<Expr> parse_and_expression()
-            {
-                std::vector<std::unique_ptr<Expr>> values;
-                values.push_back(parse_not_expression());
-                while (peek().kind == TokenKind::And)
-                {
-                    advance();
-                    values.push_back(parse_not_expression());
-                }
-                if (values.size() == 1)
-                    return std::move(values.front());
-                return std::make_unique<BoolExpr>(BoolOp::And, std::move(values));
-            }
-
-            std::unique_ptr<Expr> parse_not_expression()
-            {
-                if (peek().kind == TokenKind::Not)
-                {
-                    advance();
-                    return std::make_unique<UnaryExpr>(UnaryOp::Not, parse_not_expression());
-                }
-                return parse_comparison();
-            }
-
-            std::unique_ptr<Expr> parse_comparison()
-            {
-                std::unique_ptr<Expr> left = parse_sum();
-                if (!starts_comparison())
-                    return left;
-
-                std::vector<Comparison> comparisons;
-                while (starts_comparison())
-                {
-                    ComparisonOp op = comparison_op();
-                    comparisons.emplace_back(op, parse_sum());
-                }
-
-                return std::make_unique<CompareExpr>(std::move(left), std::move(comparisons));
-            }
-
-            std::unique_ptr<Expr> parse_sum()
-            {
-                std::unique_ptr<Expr> left = parse_shift();
-                while (peek().kind == TokenKind::Plus || peek().kind == TokenKind::Minus)
-                {
-                    const TokenKind op_kind = advance().kind;
-                    std::unique_ptr<Expr> right = parse_shift();
-                    const BinaryOp op = op_kind == TokenKind::Plus ? BinaryOp::Add : BinaryOp::Subtract;
-                    left = std::make_unique<BinaryExpr>(std::move(left), op, std::move(right));
-                }
-                return left;
-            }
-
-            std::unique_ptr<Expr> parse_shift()
-            {
-                std::unique_ptr<Expr> left = parse_term();
-                while (peek().kind == TokenKind::LeftShift || peek().kind == TokenKind::RightShift)
-                {
-                    const TokenKind op_kind = advance().kind;
-                    std::unique_ptr<Expr> right = parse_term();
-                    const BinaryOp op = op_kind == TokenKind::LeftShift ? BinaryOp::ShiftLeft : BinaryOp::ShiftRight;
-                    left = std::make_unique<BinaryExpr>(std::move(left), op, std::move(right));
-                }
-                return left;
-            }
-
-            std::unique_ptr<Expr> parse_term()
-            {
-                std::unique_ptr<Expr> left = parse_factor();
-                while (peek().kind == TokenKind::Star ||
-                       peek().kind == TokenKind::Slash ||
-                       peek().kind == TokenKind::DoubleSlash ||
-                       peek().kind == TokenKind::Percent)
-                {
-                    const TokenKind op_kind = advance().kind;
-                    std::unique_ptr<Expr> right = parse_factor();
-                    BinaryOp op = BinaryOp::Multiply;
-                    if (op_kind == TokenKind::Star)
-                        op = BinaryOp::Multiply;
-                    else if (op_kind == TokenKind::Slash)
-                        op = BinaryOp::TrueDivide;
-                    else if (op_kind == TokenKind::DoubleSlash)
-                        op = BinaryOp::FloorDivide;
-                    else if (op_kind == TokenKind::Percent)
-                        op = BinaryOp::Modulo;
-                    left = std::make_unique<BinaryExpr>(std::move(left), op, std::move(right));
-                }
-                return left;
-            }
-
-            std::unique_ptr<Expr> parse_factor()
-            {
-                if (peek().kind == TokenKind::DoubleStar)
-                {
-                    advance();
-                    raise_at(previous(), "unexpected '**'");
-                }
-                std::unique_ptr<Expr> left = parse_unary();
-                return left;
-            }
-
-            std::unique_ptr<Expr> parse_unary()
-            {
-                if (peek().kind == TokenKind::Plus ||
-                    peek().kind == TokenKind::Minus ||
-                    peek().kind == TokenKind::Tilde)
-                {
-                    const TokenKind op_kind = advance().kind;
-                    UnaryOp op = UnaryOp::Invert;
-                    if (op_kind == TokenKind::Plus)
-                        op = UnaryOp::Positive;
-                    else if (op_kind == TokenKind::Minus)
-                        op = UnaryOp::Negative;
-                    return std::make_unique<UnaryExpr>(op, parse_unary());
-                }
-                std::unique_ptr<Expr> left = parse_postfix();
-                if (peek().kind == TokenKind::DoubleStar)
-                {
-                    advance();
-                    std::unique_ptr<Expr> right = parse_factor();
-                    left = std::make_unique<BinaryExpr>(std::move(left), BinaryOp::Power, std::move(right));
-                }
-                return left;
-            }
-
-            std::unique_ptr<Expr> parse_postfix()
-            {
-                std::unique_ptr<Expr> expression = parse_primary();
-                while (peek().kind == TokenKind::LeftParen ||
-                       peek().kind == TokenKind::Dot ||
-                       peek().kind == TokenKind::LeftBracket)
-                {
-                    if (peek().kind == TokenKind::LeftParen)
-                    {
-                        advance();
-                        std::vector<CallArgument> args;
-                        std::vector<std::string> keyword_names;
-                        bool seen_keyword = false;
-                        bool seen_unpack = false;
-                        if (peek().kind != TokenKind::RightParen)
-                        {
-                            while (true)
-                            {
-                                if (peek().kind == TokenKind::Star)
-                                {
-                                    seen_unpack = true;
-                                    advance();
-                                    args.emplace_back(CallArgumentKind::PositionalUnpack, parse_expression_only());
-                                }
-                                else if (peek().kind == TokenKind::DoubleStar)
-                                {
-                                    seen_unpack = true;
-                                    seen_keyword = true;
-                                    advance();
-                                    args.emplace_back(CallArgumentKind::KeywordUnpack, parse_expression_only());
-                                }
-                                else if (peek().kind == TokenKind::Identifier && peek_next().kind == TokenKind::Equal)
-                                {
-                                    seen_keyword = true;
-                                    std::string keyword = advance().lexeme;
-                                    advance();
-                                    if (!seen_unpack)
-                                    {
-                                        for (const std::string &existing : keyword_names)
-                                        {
-                                            if (existing == keyword)
-                                                raise_at(previous(), "keyword argument repeated");
-                                        }
-                                    }
-                                    keyword_names.push_back(keyword);
-                                    args.emplace_back(std::move(keyword), parse_expression_only());
-                                }
-                                else
-                                {
-                                    if (seen_keyword)
-                                        raise_at(peek(), "positional argument follows keyword argument");
-                                    args.emplace_back(parse_expression_only());
-                                }
-                                if (peek().kind != TokenKind::Comma)
-                                    break;
-                                advance();
-                                if (peek().kind == TokenKind::RightParen)
-                                    break;
-                            }
-                        }
-                        consume(TokenKind::RightParen, "expected ')' after arguments");
-                        expression = std::make_unique<CallExpr>(std::move(expression), std::move(args));
-                        continue;
-                    }
-
-                    if (peek().kind == TokenKind::LeftBracket)
-                    {
-                        advance();
-                        std::unique_ptr<Expr> key = parse_subscript_key();
-                        consume(TokenKind::RightBracket, "expected ']' after subscript");
-                        expression = std::make_unique<SubscriptExpr>(std::move(expression), std::move(key));
-                        continue;
-                    }
-
-                    advance();
-                    if (peek().kind != TokenKind::Identifier)
-                        raise_at(peek(), "expected attribute name");
-                    expression = std::make_unique<AttributeExpr>(std::move(expression), advance().lexeme);
-                }
-                return expression;
-            }
-
-            std::unique_ptr<Expr> parse_subscript_key()
-            {
-                if (peek().kind == TokenKind::Colon)
-                {
-                    advance();
-                    std::unique_ptr<Expr> stop;
-                    std::unique_ptr<Expr> step;
-                    if (peek().kind != TokenKind::Colon && peek().kind != TokenKind::RightBracket)
-                        stop = parse_expression_only();
-                    if (peek().kind == TokenKind::Colon)
-                    {
-                        advance();
-                        if (peek().kind != TokenKind::RightBracket)
-                            step = parse_expression_only();
-                    }
-                    return std::make_unique<SliceExpr>(nullptr, std::move(stop), std::move(step));
-                }
-
-                std::unique_ptr<Expr> first = parse_expression_only();
-                if (peek().kind != TokenKind::Colon)
-                    return first;
-
-                advance();
-                std::unique_ptr<Expr> stop;
-                std::unique_ptr<Expr> step;
-                if (peek().kind != TokenKind::Colon && peek().kind != TokenKind::RightBracket)
-                    stop = parse_expression_only();
-                if (peek().kind == TokenKind::Colon)
-                {
-                    advance();
-                    if (peek().kind != TokenKind::RightBracket)
-                        step = parse_expression_only();
-                }
-                return std::make_unique<SliceExpr>(std::move(first), std::move(stop), std::move(step));
-            }
-
-            std::unique_ptr<Expr> parse_parenthesized_expression()
-            {
-                advance();
-                skip_newlines();
-                if (peek().kind == TokenKind::RightParen)
-                {
-                    advance();
-                    return std::make_unique<TupleExpr>(std::vector<std::unique_ptr<Expr>>{});
-                }
-
-                std::unique_ptr<Expr> first = parse_expression_only();
-                if (peek().kind != TokenKind::Comma)
-                {
-                    consume(TokenKind::RightParen, "expected ')' after expression");
-                    return first;
-                }
-
-                std::vector<std::unique_ptr<Expr>> items;
-                items.push_back(std::move(first));
-                while (peek().kind == TokenKind::Comma)
-                {
-                    advance();
-                    skip_newlines();
-                    if (peek().kind == TokenKind::RightParen)
-                        break;
-                    items.push_back(parse_expression_only());
-                }
-                skip_newlines();
-                consume(TokenKind::RightParen, "expected ')' after tuple literal");
-                return std::make_unique<TupleExpr>(std::move(items));
-            }
-
-            std::unique_ptr<Expr> parse_dict_expression()
-            {
-                advance();
-                std::vector<DictItem> items;
-                skip_newlines();
-                if (peek().kind == TokenKind::RightBrace)
-                {
-                    advance();
-                    return std::make_unique<DictExpr>(std::move(items));
-                }
-
-                while (true)
-                {
-                    std::unique_ptr<Expr> key = parse_expression_only();
-                    skip_newlines();
-                    consume(TokenKind::Colon, "expected ':' after dict key");
-                    std::unique_ptr<Expr> value = parse_expression_only();
-                    items.emplace_back(std::move(key), std::move(value));
-                    skip_newlines();
-                    if (peek().kind != TokenKind::Comma)
-                        break;
-                    advance();
-                    skip_newlines();
-                    if (peek().kind == TokenKind::RightBrace)
-                        break;
-                }
-                skip_newlines();
-                consume(TokenKind::RightBrace, "expected '}' after dict literal");
-                return std::make_unique<DictExpr>(std::move(items));
-            }
-
-            std::unique_ptr<Expr> parse_list_expression()
-            {
-                advance();
-                std::vector<std::unique_ptr<Expr>> items;
-                skip_newlines();
-                if (peek().kind == TokenKind::RightBracket)
-                {
-                    advance();
-                    return std::make_unique<ListExpr>(std::move(items));
-                }
-
-                while (true)
-                {
-                    items.push_back(parse_expression_only());
-                    skip_newlines();
-                    if (peek().kind != TokenKind::Comma)
-                        break;
-                    advance();
-                    skip_newlines();
-                    if (peek().kind == TokenKind::RightBracket)
-                        break;
-                }
-                skip_newlines();
-                consume(TokenKind::RightBracket, "expected ']' after list literal");
-                return std::make_unique<ListExpr>(std::move(items));
-            }
-
-            std::unique_ptr<Expr> parse_fstring_expression()
-            {
-                const Token &token = advance();
-                return parse_fstring_text(token.lexeme, token);
-            }
-
-            std::unique_ptr<Expr> parse_fstring_text(const std::string &text, const Token &token)
-            {
-                std::vector<FStringPart> parts;
-                std::string literal;
-                std::size_t index = 0;
-                while (index < text.size())
-                {
-                    const char ch = text[index];
-                    if (ch == '{')
-                    {
-                        if (index + 1 < text.size() && text[index + 1] == '{')
-                        {
-                            literal.push_back('{');
-                            index += 2;
-                            continue;
-                        }
-                        if (!literal.empty())
-                        {
-                            parts.emplace_back(std::move(literal));
-                            literal.clear();
-                        }
-                        ParsedFStringExpression parsed = parse_fstring_part_expression(text, index, token);
-                        if (parsed.expression_source.empty())
-                            raise_at(token, "empty expression in f-string");
-                        std::vector<Token> expression_tokens =
-                            lex_source(runtime_, parsed.expression_source, filename_);
-                        std::unique_ptr<Expr> format_spec;
-                        if (!parsed.format_spec.empty())
-                            format_spec = parse_fstring_text(parsed.format_spec, token);
-                        parts.emplace_back(parse_expression(runtime_, expression_tokens, filename_),
-                                           parsed.conversion,
-                                           std::move(format_spec));
-                        index = parsed.next_index;
-                        continue;
-                    }
-                    if (ch == '}')
-                    {
-                        if (index + 1 < text.size() && text[index + 1] == '}')
-                        {
-                            literal.push_back('}');
-                            index += 2;
-                            continue;
-                        }
-                        raise_at(token, "single '}' is not allowed in f-string");
-                    }
-                    literal.push_back(ch);
-                    ++index;
-                }
-                if (!literal.empty())
-                    parts.emplace_back(std::move(literal));
-                return std::make_unique<FStringExpr>(std::move(parts));
-            }
-
-            struct ParsedFStringExpression final
-            {
-                std::string expression_source;
-                FStringConversion conversion = FStringConversion::None;
-                std::string format_spec;
-                std::size_t next_index = 0;
-            };
-
-            std::size_t skip_fstring_delimited(const std::string &text,
-                                               std::size_t start,
-                                               const Token &token) const
-            {
-                std::size_t nesting = 0;
-                char quote = '\0';
-                bool escaped = false;
-                for (std::size_t index = start; index < text.size(); ++index)
-                {
-                    const char ch = text[index];
-                    if (quote != '\0')
-                    {
-                        if (escaped)
-                        {
-                            escaped = false;
-                            continue;
-                        }
-                        if (ch == '\\')
-                        {
-                            escaped = true;
-                            continue;
-                        }
-                        if (ch == quote)
-                            quote = '\0';
-                        continue;
-                    }
-                    if (ch == '\'' || ch == '"')
-                    {
-                        quote = ch;
-                        continue;
-                    }
-                    if (ch == '(' || ch == '[' || ch == '{')
-                    {
-                        ++nesting;
-                        continue;
-                    }
-                    if (ch == ')' || ch == ']')
-                    {
-                        if (nesting == 0)
-                            raise_at(token, "unmatched delimiter in f-string expression");
-                        --nesting;
-                        continue;
-                    }
-                    if (ch == '}')
-                    {
-                        if (nesting == 0)
-                            return index;
-                        --nesting;
-                    }
-                }
-                raise_at(token, "unterminated expression in f-string");
-            }
-
-            ParsedFStringExpression parse_fstring_part_expression(const std::string &text,
-                                                                  std::size_t opening_brace_index,
-                                                                  const Token &token) const
-            {
-                const std::size_t expression_start = opening_brace_index + 1;
-                std::size_t index = expression_start;
-                std::size_t nesting = 0;
-                char quote = '\0';
-                bool escaped = false;
-                while (index < text.size())
-                {
-                    const char ch = text[index];
-                    if (quote != '\0')
-                    {
-                        if (escaped)
-                        {
-                            escaped = false;
-                            ++index;
-                            continue;
-                        }
-                        if (ch == '\\')
-                        {
-                            escaped = true;
-                            ++index;
-                            continue;
-                        }
-                        if (ch == quote)
-                            quote = '\0';
-                        ++index;
-                        continue;
-                    }
-                    if (ch == '\'' || ch == '"')
-                    {
-                        quote = ch;
-                        ++index;
-                        continue;
-                    }
-                    if (ch == '(' || ch == '[' || ch == '{')
-                    {
-                        ++nesting;
-                        ++index;
-                        continue;
-                    }
-                    if (ch == ')' || ch == ']')
-                    {
-                        if (nesting == 0)
-                            raise_at(token, "unmatched delimiter in f-string expression");
-                        --nesting;
-                        ++index;
-                        continue;
-                    }
-                    if (ch == '}')
-                    {
-                        if (nesting == 0)
-                            break;
-                        --nesting;
-                        ++index;
-                        continue;
-                    }
-                    if ((ch == '!' || ch == ':') && nesting == 0)
-                        break;
-                    ++index;
-                }
-                if (index >= text.size())
-                    raise_at(token, "unterminated expression in f-string");
-
-                ParsedFStringExpression parsed;
-                parsed.expression_source = text.substr(expression_start, index - expression_start);
-                if (text[index] == '!')
-                {
-                    ++index;
-                    if (index >= text.size())
-                        raise_at(token, "unterminated expression in f-string");
-                    if (text[index] == 'r')
-                        parsed.conversion = FStringConversion::Repr;
-                    else if (text[index] == 's')
-                        parsed.conversion = FStringConversion::Str;
-                    else
-                        raise_at(token, "unsupported f-string conversion");
-                    ++index;
-                }
-                if (index < text.size() && text[index] == ':')
-                {
-                    const std::size_t spec_start = index + 1;
-                    const std::size_t spec_end = skip_fstring_delimited(text, spec_start, token);
-                    parsed.format_spec = text.substr(spec_start, spec_end - spec_start);
-                    index = spec_end;
-                }
-                if (index >= text.size() || text[index] != '}')
-                    raise_at(token, "unterminated expression in f-string");
-                parsed.next_index = index + 1;
-                return parsed;
-            }
-
-            std::unique_ptr<Expr> parse_primary()
-            {
-                const Token &token = peek();
-                switch (token.kind)
-                {
-                case TokenKind::Integer:
-                    return std::make_unique<IntegerExpr>(advance().int_value);
-                case TokenKind::Float:
-                    return std::make_unique<FloatExpr>(advance().float_value);
-                case TokenKind::String:
-                    return std::make_unique<StringExpr>(advance().lexeme);
-                case TokenKind::FString:
-                    return parse_fstring_expression();
-                case TokenKind::TrueLiteral:
-                    advance();
-                    return std::make_unique<SingletonExpr>(SingletonKind::TrueValue);
-                case TokenKind::FalseLiteral:
-                    advance();
-                    return std::make_unique<SingletonExpr>(SingletonKind::FalseValue);
-                case TokenKind::NoneLiteral:
-                    advance();
-                    return std::make_unique<SingletonExpr>(SingletonKind::NoneValue);
-                case TokenKind::Identifier:
-                    return std::make_unique<NameExpr>(advance().lexeme);
-                case TokenKind::LeftParen:
-                    return parse_parenthesized_expression();
-                case TokenKind::LeftBracket:
-                    return parse_list_expression();
-                case TokenKind::LeftBrace:
-                    return parse_dict_expression();
-                case TokenKind::End:
-                case TokenKind::Newline:
-                case TokenKind::Plus:
-                case TokenKind::Minus:
-                case TokenKind::Arrow:
-                case TokenKind::Star:
-                case TokenKind::DoubleStar:
-                case TokenKind::Slash:
-                case TokenKind::SlashEqual:
-                case TokenKind::DoubleSlash:
-                case TokenKind::DoubleSlashEqual:
-                case TokenKind::Percent:
-                case TokenKind::PercentEqual:
-                case TokenKind::LeftShift:
-                case TokenKind::LeftShiftEqual:
-                case TokenKind::RightShift:
-                case TokenKind::RightShiftEqual:
-                case TokenKind::Ampersand:
-                case TokenKind::AmpersandEqual:
-                case TokenKind::Caret:
-                case TokenKind::CaretEqual:
-                case TokenKind::Pipe:
-                case TokenKind::PipeEqual:
-                case TokenKind::At:
-                case TokenKind::Tilde:
-                case TokenKind::RightParen:
-                case TokenKind::Comma:
-                case TokenKind::Dot:
-                case TokenKind::RightBracket:
-                case TokenKind::RightBrace:
-                case TokenKind::Colon:
-                case TokenKind::Semicolon:
-                case TokenKind::Equal:
-                case TokenKind::PlusEqual:
-                case TokenKind::MinusEqual:
-                case TokenKind::StarEqual:
-                case TokenKind::EqualEqual:
-                case TokenKind::BangEqual:
-                case TokenKind::Less:
-                case TokenKind::LessEqual:
-                case TokenKind::Greater:
-                case TokenKind::GreaterEqual:
-                case TokenKind::If:
-                case TokenKind::Elif:
-                case TokenKind::Else:
-                case TokenKind::For:
-                case TokenKind::While:
-                case TokenKind::With:
-                case TokenKind::Break:
-                case TokenKind::Continue:
-                case TokenKind::Def:
-                case TokenKind::Return:
-                case TokenKind::Raise:
-                case TokenKind::Import:
-                case TokenKind::From:
-                case TokenKind::Global:
-                case TokenKind::Nonlocal:
-                case TokenKind::Try:
-                case TokenKind::Except:
-                case TokenKind::Finally:
-                case TokenKind::As:
-                case TokenKind::In:
-                case TokenKind::Is:
-                case TokenKind::Not:
-                case TokenKind::And:
-                case TokenKind::Or:
-                case TokenKind::Lambda:
-                case TokenKind::Class:
-                case TokenKind::Del:
-                case TokenKind::Pass:
-                case TokenKind::Indent:
-                case TokenKind::Dedent:
-                    raise_at(token, "expected expression");
-                }
-                raise_at(token, "expected expression");
-            }
-
-            void consume(TokenKind kind, const std::string &message)
-            {
-                if (peek().kind != kind)
-                    raise_at(peek(), message);
-                advance();
-            }
-
-            void skip_newlines()
-            {
-                while (peek().kind == TokenKind::Newline)
-                    advance();
-            }
-
-            const Token &peek() const
-            {
-                return tokens_[index_];
-            }
-
-            const Token &peek_next() const
-            {
-                return tokens_[index_ + 1];
-            }
-
-            const Token &advance()
-            {
-                return tokens_[index_++];
-            }
-
-            const Token &previous() const
-            {
-                return tokens_[index_ - 1];
-            }
-
-            bool starts_comparison() const
-            {
-                const TokenKind kind = peek().kind;
-                return kind == TokenKind::EqualEqual ||
-                       kind == TokenKind::BangEqual ||
-                       kind == TokenKind::Less ||
-                       kind == TokenKind::LessEqual ||
-                       kind == TokenKind::Greater ||
-                       kind == TokenKind::GreaterEqual ||
-                       kind == TokenKind::In ||
-                       kind == TokenKind::Is ||
-                       (kind == TokenKind::Not && peek_next().kind == TokenKind::In);
-            }
-
-            bool starts_augmented_assignment() const
-            {
-                const TokenKind kind = peek().kind;
-                return kind == TokenKind::PlusEqual ||
-                       kind == TokenKind::MinusEqual ||
-                       kind == TokenKind::StarEqual ||
-                       kind == TokenKind::SlashEqual ||
-                       kind == TokenKind::DoubleSlashEqual ||
-                       kind == TokenKind::PercentEqual ||
-                       kind == TokenKind::LeftShiftEqual ||
-                       kind == TokenKind::RightShiftEqual ||
-                       kind == TokenKind::AmpersandEqual ||
-                       kind == TokenKind::CaretEqual ||
-                       kind == TokenKind::PipeEqual;
-            }
-
-            bool starts_statement() const
-            {
-                switch (peek().kind)
-                {
-                case TokenKind::Integer:
-                case TokenKind::Float:
-                case TokenKind::String:
-                case TokenKind::FString:
-                case TokenKind::Identifier:
-                case TokenKind::Plus:
-                case TokenKind::Minus:
-                case TokenKind::Arrow:
-                case TokenKind::Tilde:
-                case TokenKind::LeftParen:
-                case TokenKind::LeftBracket:
-                case TokenKind::LeftBrace:
-                case TokenKind::If:
-                case TokenKind::Lambda:
-                case TokenKind::For:
-                case TokenKind::While:
-                case TokenKind::With:
-                case TokenKind::Def:
-                case TokenKind::Return:
-                case TokenKind::Raise:
-                case TokenKind::Import:
-                case TokenKind::From:
-                case TokenKind::Global:
-                case TokenKind::Nonlocal:
-                case TokenKind::Try:
-                case TokenKind::Class:
-                case TokenKind::Del:
-                case TokenKind::Pass:
-                case TokenKind::Break:
-                case TokenKind::Continue:
-                case TokenKind::TrueLiteral:
-                case TokenKind::FalseLiteral:
-                case TokenKind::NoneLiteral:
+            if (static_cast<unsigned char>(ch) >= 128)
+                fail({start, index_}, "non-ASCII identifiers require Unicode NFKC normalization",
+                     SourceErrorKind::Capability);
+            auto equals = [&] {
+                if (index_ < text_.size() && text_[index_] == '=') {
+                    ++index_;
                     return true;
-                case TokenKind::Star:
-                case TokenKind::DoubleStar:
-                case TokenKind::Slash:
-                case TokenKind::SlashEqual:
-                case TokenKind::DoubleSlash:
-                case TokenKind::DoubleSlashEqual:
-                case TokenKind::Percent:
-                case TokenKind::PercentEqual:
-                case TokenKind::LeftShift:
-                case TokenKind::LeftShiftEqual:
-                case TokenKind::RightShift:
-                case TokenKind::RightShiftEqual:
-                case TokenKind::At:
-                case TokenKind::RightParen:
-                case TokenKind::Comma:
-                case TokenKind::Dot:
-                case TokenKind::RightBracket:
-                case TokenKind::RightBrace:
-                case TokenKind::Colon:
-                case TokenKind::Semicolon:
-                case TokenKind::Equal:
-                case TokenKind::PlusEqual:
-                case TokenKind::MinusEqual:
-                case TokenKind::StarEqual:
-                case TokenKind::EqualEqual:
-                case TokenKind::BangEqual:
-                case TokenKind::Less:
-                case TokenKind::LessEqual:
-                case TokenKind::Greater:
-                case TokenKind::GreaterEqual:
-                case TokenKind::Ampersand:
-                case TokenKind::AmpersandEqual:
-                case TokenKind::Caret:
-                case TokenKind::CaretEqual:
-                case TokenKind::Pipe:
-                case TokenKind::PipeEqual:
-                case TokenKind::Elif:
-                case TokenKind::Else:
-                case TokenKind::Except:
-                case TokenKind::Finally:
-                case TokenKind::As:
-                case TokenKind::In:
-                case TokenKind::Is:
-                case TokenKind::Not:
-                case TokenKind::And:
-                case TokenKind::Or:
-                case TokenKind::Indent:
-                case TokenKind::Dedent:
-                case TokenKind::Newline:
-                case TokenKind::End:
-                    return false;
                 }
                 return false;
+            };
+            switch (ch) {
+            case '(':
+                groups_.push_back(start);
+                push(TokenKind::Left, start);
+                break;
+            case ')':
+                if (groups_.empty())
+                    fail({start, index_}, "unmatched ')'");
+                groups_.pop_back();
+                push(TokenKind::Right, start);
+                break;
+            case ':':
+                push(TokenKind::Colon, start);
+                break;
+            case ',':
+                push(TokenKind::Comma, start);
+                break;
+            case '.':
+                push(TokenKind::Dot, start);
+                break;
+            case ';':
+                push(TokenKind::Semi, start);
+                break;
+            case '+':
+                push(equals() ? TokenKind::AddAssign : TokenKind::Plus, start);
+                break;
+            case '-':
+                push(equals() ? TokenKind::SubAssign : TokenKind::Minus, start);
+                break;
+            case '*':
+                if (index_ < text_.size() && text_[index_] == '*') {
+                    ++index_;
+                    push(TokenKind::Power, start);
+                } else
+                    push(equals() ? TokenKind::MulAssign : TokenKind::Star, start);
+                break;
+            case '/':
+                if (index_ < text_.size() && text_[index_] == '/') {
+                    ++index_;
+                    push(equals() ? TokenKind::FloorAssign : TokenKind::Floor, start);
+                } else
+                    push(TokenKind::Slash, start);
+                break;
+            case '%':
+                push(equals() ? TokenKind::ModAssign : TokenKind::Mod, start);
+                break;
+            case '~':
+                push(TokenKind::Tilde, start);
+                break;
+            case '=':
+                push(equals() ? TokenKind::Eq : TokenKind::Assign, start);
+                break;
+            case '!':
+                if (!equals())
+                    fail({start, index_}, "invalid syntax");
+                push(TokenKind::Ne, start);
+                break;
+            case '<':
+                push(equals() ? TokenKind::Le : TokenKind::Lt, start);
+                break;
+            case '>':
+                push(equals() ? TokenKind::Ge : TokenKind::Gt, start);
+                break;
+            case '[':
+            case ']':
+            case '{':
+            case '}':
+            case '@':
+            case '&':
+            case '|':
+            case '^':
+                fail({start, index_},
+                     "this container/operator syntax is outside the current L0 capability",
+                     SourceErrorKind::Capability);
+            default:
+                fail({start, index_}, "invalid character in source");
             }
-
-            ComparisonOp comparison_op()
-            {
-                const Token &token = advance();
-                switch (token.kind)
-                {
-                case TokenKind::EqualEqual:
-                    return ComparisonOp::Equal;
-                case TokenKind::BangEqual:
-                    return ComparisonOp::NotEqual;
-                case TokenKind::Less:
-                    return ComparisonOp::Less;
-                case TokenKind::LessEqual:
-                    return ComparisonOp::LessEqual;
-                case TokenKind::Greater:
-                    return ComparisonOp::Greater;
-                case TokenKind::GreaterEqual:
-                    return ComparisonOp::GreaterEqual;
-                case TokenKind::In:
-                    return ComparisonOp::In;
-                case TokenKind::Is:
-                    if (peek().kind == TokenKind::Not)
-                    {
-                        advance();
-                        return ComparisonOp::IsNot;
-                    }
-                    return ComparisonOp::Is;
-                case TokenKind::Not:
-                    if (peek().kind == TokenKind::In)
-                    {
-                        advance();
-                        return ComparisonOp::NotIn;
-                    }
-                    break;
-                case TokenKind::Integer:
-                case TokenKind::Float:
-                case TokenKind::String:
-                case TokenKind::FString:
-                case TokenKind::Identifier:
-                case TokenKind::Plus:
-                case TokenKind::Minus:
-                case TokenKind::Arrow:
-                case TokenKind::Star:
-                case TokenKind::DoubleStar:
-                case TokenKind::Slash:
-                case TokenKind::SlashEqual:
-                case TokenKind::DoubleSlash:
-                case TokenKind::DoubleSlashEqual:
-                case TokenKind::Percent:
-                case TokenKind::PercentEqual:
-                case TokenKind::LeftShift:
-                case TokenKind::LeftShiftEqual:
-                case TokenKind::RightShift:
-                case TokenKind::RightShiftEqual:
-                case TokenKind::Ampersand:
-                case TokenKind::AmpersandEqual:
-                case TokenKind::Caret:
-                case TokenKind::CaretEqual:
-                case TokenKind::Pipe:
-                case TokenKind::PipeEqual:
-                case TokenKind::At:
-                case TokenKind::Tilde:
-                case TokenKind::LeftParen:
-                case TokenKind::RightParen:
-                case TokenKind::Comma:
-                case TokenKind::Dot:
-                case TokenKind::LeftBracket:
-                case TokenKind::RightBracket:
-                case TokenKind::LeftBrace:
-                case TokenKind::RightBrace:
-                case TokenKind::Colon:
-                case TokenKind::Semicolon:
-                case TokenKind::Equal:
-                case TokenKind::PlusEqual:
-                case TokenKind::MinusEqual:
-                case TokenKind::StarEqual:
-                case TokenKind::If:
-                case TokenKind::Elif:
-                case TokenKind::Else:
-                case TokenKind::For:
-                case TokenKind::While:
-                case TokenKind::With:
-                case TokenKind::Break:
-                case TokenKind::Continue:
-                case TokenKind::Def:
-                case TokenKind::Return:
-                case TokenKind::Raise:
-                case TokenKind::Import:
-                case TokenKind::From:
-                case TokenKind::Global:
-                case TokenKind::Nonlocal:
-                case TokenKind::Try:
-                case TokenKind::Except:
-                case TokenKind::Finally:
-                case TokenKind::As:
-                case TokenKind::And:
-                case TokenKind::Or:
-                case TokenKind::Lambda:
-                case TokenKind::Class:
-                case TokenKind::Del:
-                case TokenKind::Pass:
-                case TokenKind::TrueLiteral:
-                case TokenKind::FalseLiteral:
-                case TokenKind::NoneLiteral:
-                case TokenKind::Indent:
-                case TokenKind::Dedent:
-                case TokenKind::Newline:
-                case TokenKind::End:
-                    break;
-                }
-                raise_at(token, "expected comparison operator");
-            }
-
-            BinaryOp augmented_assignment_op(const Token &token) const
-            {
-                switch (token.kind)
-                {
-                case TokenKind::PlusEqual:
-                    return BinaryOp::Add;
-                case TokenKind::MinusEqual:
-                    return BinaryOp::Subtract;
-                case TokenKind::StarEqual:
-                    return BinaryOp::Multiply;
-                case TokenKind::SlashEqual:
-                    return BinaryOp::TrueDivide;
-                case TokenKind::DoubleSlashEqual:
-                    return BinaryOp::FloorDivide;
-                case TokenKind::PercentEqual:
-                    return BinaryOp::Modulo;
-                case TokenKind::LeftShiftEqual:
-                    return BinaryOp::ShiftLeft;
-                case TokenKind::RightShiftEqual:
-                    return BinaryOp::ShiftRight;
-                case TokenKind::AmpersandEqual:
-                    return BinaryOp::BitAnd;
-                case TokenKind::CaretEqual:
-                    return BinaryOp::BitXor;
-                case TokenKind::PipeEqual:
-                    return BinaryOp::BitOr;
-                case TokenKind::Integer:
-                case TokenKind::Float:
-                case TokenKind::String:
-                case TokenKind::FString:
-                case TokenKind::Identifier:
-                case TokenKind::Plus:
-                case TokenKind::Minus:
-                case TokenKind::Arrow:
-                case TokenKind::Star:
-                case TokenKind::DoubleStar:
-                case TokenKind::Slash:
-                case TokenKind::DoubleSlash:
-                case TokenKind::Percent:
-                case TokenKind::LeftShift:
-                case TokenKind::RightShift:
-                case TokenKind::Ampersand:
-                case TokenKind::Caret:
-                case TokenKind::Pipe:
-                case TokenKind::At:
-                case TokenKind::Tilde:
-                case TokenKind::LeftParen:
-                case TokenKind::RightParen:
-                case TokenKind::Comma:
-                case TokenKind::Dot:
-                case TokenKind::LeftBracket:
-                case TokenKind::RightBracket:
-                case TokenKind::LeftBrace:
-                case TokenKind::RightBrace:
-                case TokenKind::Colon:
-                case TokenKind::Semicolon:
-                case TokenKind::Equal:
-                case TokenKind::EqualEqual:
-                case TokenKind::BangEqual:
-                case TokenKind::Less:
-                case TokenKind::LessEqual:
-                case TokenKind::Greater:
-                case TokenKind::GreaterEqual:
-                case TokenKind::If:
-                case TokenKind::Elif:
-                case TokenKind::Else:
-                case TokenKind::For:
-                case TokenKind::While:
-                case TokenKind::With:
-                case TokenKind::Break:
-                case TokenKind::Continue:
-                case TokenKind::Def:
-                case TokenKind::Return:
-                case TokenKind::Raise:
-                case TokenKind::Import:
-                case TokenKind::From:
-                case TokenKind::Global:
-                case TokenKind::Nonlocal:
-                case TokenKind::Try:
-                case TokenKind::Except:
-                case TokenKind::Finally:
-                case TokenKind::As:
-                case TokenKind::In:
-                case TokenKind::Is:
-                case TokenKind::Not:
-                case TokenKind::And:
-                case TokenKind::Or:
-                case TokenKind::Lambda:
-                case TokenKind::Class:
-                case TokenKind::Del:
-                case TokenKind::Pass:
-                case TokenKind::TrueLiteral:
-                case TokenKind::FalseLiteral:
-                case TokenKind::NoneLiteral:
-                case TokenKind::Indent:
-                case TokenKind::Dedent:
-                case TokenKind::Newline:
-                case TokenKind::End:
-                    break;
-                }
-                raise_at(token, "expected augmented assignment operator");
-            }
-
-            [[noreturn]] void raise_at(const Token &token, const std::string &message) const
-            {
-                std::ostringstream out;
-                out << filename_ << ":" << token.line << ":" << token.column << ": " << message;
-                raise_syntax_error(&runtime_, out.str());
-            }
-
-            Runtime &runtime_;
-            const std::vector<Token> &tokens_;
-            std::string filename_;
-            std::size_t index_ = 0;
-            std::size_t function_depth_ = 0;
-            std::size_t class_depth_ = 0;
-            std::size_t loop_depth_ = 0;
-        };
+        }
+        if (!groups_.empty())
+            fail({groups_.back(), groups_.back() + 1}, "'(' was never closed");
+        if (!tokens_.empty() && tokens_.back().kind != TokenKind::Newline)
+            push(TokenKind::Newline, index_);
+        while (indents_.size() > 1) {
+            indents_.pop_back();
+            push(TokenKind::Dedent, index_);
+        }
+        push(TokenKind::End, index_);
+        return std::move(tokens_);
     }
 
-    std::unique_ptr<Expr> parse_expression(Runtime &runtime,
-                                           const std::vector<Token> &tokens,
-                                           std::string filename)
+  private:
+    [[noreturn]] void fail(Span where, std::string message,
+                           SourceErrorKind kind = SourceErrorKind::Syntax) const
     {
-        Parser parser(runtime, tokens, std::move(filename));
-        return parser.parse_eval_input();
+        throw SourceError(source_, where, std::move(message), kind);
+    }
+    [[noreturn]] void tab(std::size_t start) const
+    {
+        fail({start, index_}, "inconsistent use of tabs and spaces in indentation",
+             SourceErrorKind::Tab);
+    }
+    void push(TokenKind kind, std::size_t start)
+    {
+        tokens_.push_back({kind, {start, index_}});
+    }
+    void string(std::size_t start, bool raw)
+    {
+        const auto quote = text_[index_++];
+        const bool triple =
+            index_ + 1 < text_.size() && text_[index_] == quote && text_[index_ + 1] == quote;
+        if (triple)
+            index_ += 2;
+        std::u32string value;
+        while (index_ < text_.size()) {
+            if (text_[index_] == quote &&
+                (!triple || (index_ + 2 < text_.size() && text_[index_ + 1] == quote &&
+                             text_[index_ + 2] == quote))) {
+                index_ += triple ? 3 : 1;
+                tokens_.push_back({TokenKind::String, {start, index_}, std::move(value)});
+                return;
+            }
+            const auto begin = index_;
+            const auto ch = text_[index_++];
+            if (ch == '\n' && !triple)
+                fail({start, index_}, "unterminated string literal");
+            if (ch != '\\') {
+                const auto byte = static_cast<unsigned char>(ch);
+                index_ = begin + (byte < 0x80 ? 1 : byte < 0xe0 ? 2 : byte < 0xf0 ? 3 : 4);
+                value += decode_source(source_, {begin, index_});
+                continue;
+            }
+            if (index_ == text_.size())
+                break;
+            const auto escape = text_[index_++];
+            if (static_cast<unsigned char>(escape) >= 128) {
+                const auto byte = static_cast<unsigned char>(escape);
+                const auto begin = index_ - 1;
+                index_ = begin + (byte < 0xe0 ? 2 : byte < 0xf0 ? 3 : 4);
+                value += U'\\';
+                value += decode_source(source_, {begin, index_});
+                continue;
+            }
+            if (raw) {
+                value += U'\\';
+                value += static_cast<unsigned char>(escape);
+                continue;
+            }
+            switch (escape) {
+            case '\n':
+                break;
+            case '\\':
+                value += U'\\';
+                break;
+            case '\'':
+                value += U'\'';
+                break;
+            case '"':
+                value += U'"';
+                break;
+            case 'n':
+                value += U'\n';
+                break;
+            case 'r':
+                value += U'\r';
+                break;
+            case 't':
+                value += U'\t';
+                break;
+            case 'a':
+                value += U'\a';
+                break;
+            case 'b':
+                value += U'\b';
+                break;
+            case 'f':
+                value += U'\f';
+                break;
+            case 'v':
+                value += U'\v';
+                break;
+            case 'x':
+            case 'u':
+            case 'U': {
+                const auto count = escape == 'x' ? 2 : escape == 'u' ? 4 : 8;
+                char32_t point = 0;
+                for (int n = 0; n < count; ++n) {
+                    if (index_ == text_.size())
+                        fail({begin, index_}, "truncated Unicode/hex escape");
+                    const auto digit = text_[index_++];
+                    const auto value = digit >= '0' && digit <= '9'   ? digit - '0'
+                                       : digit >= 'a' && digit <= 'f' ? digit - 'a' + 10
+                                       : digit >= 'A' && digit <= 'F' ? digit - 'A' + 10
+                                                                      : -1;
+                    if (value < 0)
+                        fail({begin, index_}, "invalid Unicode/hex escape");
+                    point = (point << 4) | value;
+                }
+                if (point > 0x10ffff)
+                    fail({begin, index_}, "illegal Unicode character");
+                value += point;
+                break;
+            }
+            case 'N':
+                fail({begin, index_}, "named Unicode escapes require the Unicode-name database",
+                     SourceErrorKind::Capability);
+            default:
+                if (escape >= '0' && escape <= '7') {
+                    char32_t point = escape - '0';
+                    for (int n = 1; n < 3 && index_ < text_.size() && text_[index_] >= '0' &&
+                                    text_[index_] <= '7';
+                         ++n)
+                        point = point * 8 + text_[index_++] - '0';
+                    value += point;
+                } else {
+                    value += U'\\';
+                    value += static_cast<unsigned char>(escape);
+                }
+            }
+        }
+        fail({start, index_}, "unterminated string literal");
+    }
+    const SourceBuffer &source_;
+    const std::string &text_;
+    std::size_t index_ = 0;
+    bool line_start_ = true, continued_ = false;
+    std::vector<std::pair<std::size_t, std::size_t>> indents_{{0, 0}};
+    std::vector<std::size_t> groups_;
+    std::vector<Token> tokens_;
+};
+
+class Parser final {
+  public:
+    explicit Parser(const SourceBuffer &source) : source_(source), tokens_(Lexer(source).scan()) {}
+    Suite parse(InputMode mode)
+    {
+        Suite result;
+        newlines();
+        if (mode == InputMode::Eval) {
+            auto value = expression();
+            const auto span = value->span;
+            result.push_back(statement(ReturnStmt{std::move(value)}, span));
+            newlines();
+            expect(TokenKind::End);
+            return result;
+        }
+        while (!is(TokenKind::End)) {
+            append(result, compound());
+            newlines();
+        }
+        return result;
     }
 
-    Module parse_module(Runtime &runtime, const std::vector<Token> &tokens, std::string filename)
+  private:
+    using K = TokenKind;
+    class Recursion final {
+      public:
+        explicit Recursion(Parser &parser) : parser_(parser)
+        {
+            if (++parser_.recursion_ > 256)
+                parser_.fail(parser_.peek(), "source nesting exceeds the current compiler limit");
+        }
+        ~Recursion()
+        {
+            --parser_.recursion_;
+        }
+
+      private:
+        Parser &parser_;
+    };
+    bool is(K kind) const
     {
-        Parser parser(runtime, tokens, std::move(filename));
-        return parser.parse_file_input();
+        return tokens_[index_].kind == kind;
     }
+    const Token &peek() const
+    {
+        return tokens_[index_];
+    }
+    bool accept(K kind)
+    {
+        if (!is(kind))
+            return false;
+        ++index_;
+        return true;
+    }
+    Token take()
+    {
+        return tokens_[index_++];
+    }
+    Token expect(K kind)
+    {
+        if (!is(kind)) {
+            if (kind == K::Name)
+                throw SourceError(source_, peek().span, "expected an identifier");
+            fail(peek(), "invalid syntax");
+        }
+        return take();
+    }
+    [[noreturn]] void fail(const Token &token, std::string message,
+                           SourceErrorKind kind = SourceErrorKind::Syntax) const
+    {
+        if (token.kind == K::Unsupported && kind == SourceErrorKind::Syntax) {
+            kind = SourceErrorKind::Capability;
+            message =
+                "syntax '" + source_utf8(token.text) + "' requires a later language capability";
+        }
+        if (token.kind == K::Indent && kind == SourceErrorKind::Syntax) {
+            kind = SourceErrorKind::Indentation;
+            message = "unexpected indent";
+        }
+        throw SourceError(source_, token.span, std::move(message), kind);
+    }
+    void newlines()
+    {
+        while (accept(K::Newline)) {
+        }
+    }
+    template <class T> ExprPtr node(T value, Span span, std::size_t depth = 1)
+    {
+        if (depth > 128)
+            throw SourceError(source_, span,
+                              "expression nesting exceeds the current compiler limit");
+        return std::make_unique<Expr>(Expr{span, depth, std::move(value)});
+    }
+    template <class T> std::unique_ptr<Stmt> statement(T value, Span span)
+    {
+        return std::make_unique<Stmt>(Stmt{span, std::move(value)});
+    }
+    static void append(Suite &to, Suite from)
+    {
+        for (auto &item : from)
+            to.push_back(std::move(item));
+    }
+    Suite suite()
+    {
+        expect(K::Colon);
+        if (!accept(K::Newline))
+            return simple_line();
+        newlines();
+        if (!accept(K::Indent))
+            fail(peek(), "expected an indented block", SourceErrorKind::Indentation);
+        if (++suite_depth_ > 128)
+            fail(peek(), "too many nested suites");
+        Suite body;
+        newlines();
+        while (!is(K::Dedent) && !is(K::End)) {
+            append(body, compound());
+            newlines();
+        }
+        expect(K::Dedent);
+        --suite_depth_;
+        return body;
+    }
+    Suite compound()
+    {
+        Recursion recursion(*this);
+        if (is(K::If) || is(K::While)) {
+            const auto first = take();
+            auto test = expression();
+            auto body = suite();
+            Suite alternative;
+            if (first.kind == K::If && is(K::Elif)) {
+                tokens_[index_].kind = K::If;
+                alternative = compound();
+            } else if (accept(K::Else))
+                alternative = suite();
+            Suite result;
+            const Span span{first.span.begin, tokens_[index_ - 1].span.end};
+            if (first.kind == K::If)
+                result.push_back(statement(
+                    IfStmt{std::move(test), std::move(body), std::move(alternative)}, span));
+            else
+                result.push_back(statement(
+                    WhileStmt{std::move(test), std::move(body), std::move(alternative)}, span));
+            return result;
+        }
+        if (accept(K::Def)) {
+            const auto start = tokens_[index_ - 1].span.begin;
+            FunctionStmt fn;
+            fn.name = expect(K::Name).text;
+            expect(K::Left);
+            bool keyword_only = false, slash = false, default_seen = false, bare_star = false;
+            std::unordered_set<std::u32string> names;
+            auto parameter_name = [&] {
+                auto token = expect(K::Name);
+                if (token.text == U"__debug__")
+                    fail(token, "cannot assign __debug__");
+                if (!names.insert(token.text).second)
+                    fail(token, "duplicate parameter name");
+                return token;
+            };
+            while (!is(K::Right)) {
+                if (accept(K::Slash)) {
+                    if (slash || keyword_only || fn.parameters.empty())
+                        fail(tokens_[index_ - 1], "invalid positional-only separator");
+                    for (auto &parameter : fn.parameters)
+                        parameter.kind = ParameterKind::PositionalOnly;
+                    slash = true;
+                } else if (accept(K::Power)) {
+                    fn.varkwargs = parameter_name().text;
+                    accept(K::Comma);
+                    if (!is(K::Right))
+                        fail(peek(), "arguments follow **kwargs");
+                    break;
+                } else if (accept(K::Star)) {
+                    if (keyword_only)
+                        fail(tokens_[index_ - 1], "multiple * separators");
+                    keyword_only = true;
+                    if (is(K::Name))
+                        fn.varargs = parameter_name().text;
+                    else
+                        bare_star = true;
+                } else {
+                    auto token = parameter_name();
+                    ExprPtr value;
+                    if (accept(K::Assign))
+                        value = expression();
+                    if (!keyword_only && default_seen && !value)
+                        fail(token, "non-default argument follows default argument");
+                    if (!keyword_only)
+                        default_seen |= static_cast<bool>(value);
+                    fn.parameters.push_back({token.text,
+                                             keyword_only ? ParameterKind::KeywordOnly
+                                                          : ParameterKind::PositionalOrKeyword,
+                                             std::move(value), token.span});
+                }
+                if (is(K::Colon))
+                    fail(peek(), "annotations require the later annotation-scope capability",
+                         SourceErrorKind::Capability);
+                if (!accept(K::Comma))
+                    break;
+            }
+            if (bare_star &&
+                std::none_of(fn.parameters.begin(), fn.parameters.end(),
+                             [](const auto &p) { return p.kind == ParameterKind::KeywordOnly; }))
+                fail(peek(), "named arguments must follow bare *");
+            expect(K::Right);
+            fn.body = suite();
+            Suite result;
+            result.push_back(statement(std::move(fn), {start, tokens_[index_ - 1].span.end}));
+            return result;
+        }
+        return simple_line();
+    }
+    bool line_end() const
+    {
+        return is(K::Newline) || is(K::Semi) || is(K::End) || is(K::Dedent);
+    }
+    void target(const Expr &value)
+    {
+        if (!std::holds_alternative<NameExpr>(value.node) &&
+            !std::holds_alternative<AttributeExpr>(value.node))
+            throw SourceError(source_, value.span, "cannot assign/delete this expression");
+    }
+    Suite simple_line()
+    {
+        Suite result;
+        do {
+            const auto start = peek().span.begin;
+            if (is(K::Pass) || is(K::Break) || is(K::Continue)) {
+                const auto token = take();
+                result.push_back(statement(token.kind == K::Pass    ? ControlStmt::Pass
+                                           : token.kind == K::Break ? ControlStmt::Break
+                                                                    : ControlStmt::Continue,
+                                           token.span));
+            } else if (accept(K::Return)) {
+                auto value = line_end() ? ExprPtr{} : expression();
+                result.push_back(
+                    statement(ReturnStmt{std::move(value)}, {start, tokens_[index_ - 1].span.end}));
+            } else if (is(K::Global) || is(K::Nonlocal)) {
+                DeclareStmt declaration{take().kind == K::Nonlocal, {}};
+                do {
+                    auto token = expect(K::Name);
+                    declaration.names.push_back({token.text, token.span});
+                } while (accept(K::Comma));
+                result.push_back(
+                    statement(std::move(declaration), {start, tokens_[index_ - 1].span.end}));
+            } else if (accept(K::Delete)) {
+                DeleteStmt deletion;
+                do {
+                    auto value = expression();
+                    target(*value);
+                    deletion.targets.push_back(std::move(value));
+                } while (accept(K::Comma));
+                result.push_back(
+                    statement(std::move(deletion), {start, tokens_[index_ - 1].span.end}));
+            } else {
+                auto value = expression();
+                if (accept(K::Assign)) {
+                    AssignStmt assign;
+                    do {
+                        target(*value);
+                        assign.targets.push_back(std::move(value));
+                        value = expression();
+                    } while (accept(K::Assign));
+                    assign.value = std::move(value);
+                    result.push_back(
+                        statement(std::move(assign), {start, tokens_[index_ - 1].span.end}));
+                } else if (is(K::AddAssign) || is(K::SubAssign) || is(K::MulAssign) ||
+                           is(K::FloorAssign) || is(K::ModAssign)) {
+                    target(*value);
+                    const auto kind = take().kind;
+                    const auto op = kind == K::AddAssign     ? BinaryOp::Add
+                                    : kind == K::SubAssign   ? BinaryOp::Subtract
+                                    : kind == K::MulAssign   ? BinaryOp::Multiply
+                                    : kind == K::FloorAssign ? BinaryOp::FloorDivide
+                                                             : BinaryOp::Modulo;
+                    auto right = expression();
+                    result.push_back(
+                        statement(AugAssignStmt{std::move(value), op, std::move(right)},
+                                  {start, tokens_[index_ - 1].span.end}));
+                } else
+                    result.push_back(statement(ExprStmt{std::move(value)},
+                                               {start, tokens_[index_ - 1].span.end}));
+            }
+        } while (accept(K::Semi) && !line_end());
+        if (!accept(K::Newline) && !is(K::End) && !is(K::Dedent))
+            fail(peek(), "expected a statement separator");
+        return result;
+    }
+    ExprPtr expression()
+    {
+        return boolean(false);
+    }
+    ExprPtr boolean(bool conjunction)
+    {
+        auto left = conjunction ? logical_not() : boolean(true);
+        while (accept(conjunction ? K::And : K::Or)) {
+            auto right = conjunction ? logical_not() : boolean(true);
+            const Span span{left->span.begin, right->span.end};
+            const auto depth = std::max(left->depth, right->depth) + 1;
+            left = node(BoolExpr{conjunction, std::move(left), std::move(right)}, span, depth);
+        }
+        return left;
+    }
+    ExprPtr logical_not()
+    {
+        Recursion recursion(*this);
+        if (!accept(K::Not))
+            return comparison();
+        const auto start = tokens_[index_ - 1].span.begin;
+        auto value = logical_not();
+        const auto end = value->span.end, depth = value->depth + 1;
+        return node(UnaryExpr{UnaryOp::Not, std::move(value)}, {start, end}, depth);
+    }
+    ExprPtr comparison()
+    {
+        CompareExpr compare;
+        compare.values.push_back(arithmetic(false));
+        std::size_t depth = compare.values[0]->depth;
+        while (is(K::Eq) || is(K::Ne) || is(K::Lt) || is(K::Le) || is(K::Gt) || is(K::Ge) ||
+               is(K::Is)) {
+            const auto kind = take().kind;
+            auto op = kind == K::Eq   ? CompareOp::Eq
+                      : kind == K::Ne ? CompareOp::Ne
+                      : kind == K::Lt ? CompareOp::Lt
+                      : kind == K::Le ? CompareOp::Le
+                      : kind == K::Gt ? CompareOp::Gt
+                      : kind == K::Ge ? CompareOp::Ge
+                                      : CompareOp::Is;
+            if (kind == K::Is && accept(K::Not))
+                op = CompareOp::IsNot;
+            compare.ops.push_back(op);
+            compare.values.push_back(arithmetic(false));
+            depth = std::max(depth, compare.values.back()->depth);
+        }
+        if (compare.ops.empty())
+            return std::move(compare.values[0]);
+        const Span span{compare.values.front()->span.begin, compare.values.back()->span.end};
+        return node(std::move(compare), span, depth + 1);
+    }
+    ExprPtr arithmetic(bool term)
+    {
+        auto left = term ? factor() : arithmetic(true);
+        while (is(term ? K::Star : K::Plus) || is(term ? K::Floor : K::Minus) ||
+               (term && is(K::Mod))) {
+            const auto kind = take().kind;
+            const auto op = kind == K::Plus    ? BinaryOp::Add
+                            : kind == K::Minus ? BinaryOp::Subtract
+                            : kind == K::Star  ? BinaryOp::Multiply
+                            : kind == K::Floor ? BinaryOp::FloorDivide
+                                               : BinaryOp::Modulo;
+            auto right = term ? factor() : arithmetic(true);
+            const Span span{left->span.begin, right->span.end};
+            const auto depth = std::max(left->depth, right->depth) + 1;
+            left = node(BinaryExpr{op, std::move(left), std::move(right)}, span, depth);
+        }
+        if (is(K::Slash) || is(K::Power))
+            fail(peek(), "true division/power require the corresponding numeric protocol",
+                 SourceErrorKind::Capability);
+        return left;
+    }
+    ExprPtr factor()
+    {
+        Recursion recursion(*this);
+        if (is(K::Plus) || is(K::Minus) || is(K::Tilde)) {
+            const auto token = take();
+            auto value = factor();
+            const auto end = value->span.end, depth = value->depth + 1;
+            return node(UnaryExpr{token.kind == K::Plus    ? UnaryOp::Positive
+                                  : token.kind == K::Minus ? UnaryOp::Negative
+                                                           : UnaryOp::Invert,
+                                  std::move(value)},
+                        {token.span.begin, end}, depth);
+        }
+        auto value = atom();
+        while (is(K::Left) || is(K::Dot)) {
+            const auto start = value->span.begin;
+            if (accept(K::Dot)) {
+                const auto name = expect(K::Name);
+                const auto depth = value->depth + 1;
+                value =
+                    node(AttributeExpr{std::move(value), name.text}, {start, name.span.end}, depth);
+                continue;
+            }
+            expect(K::Left);
+            CallExpr call;
+            call.target = std::move(value);
+            std::unordered_set<std::u32string> keywords;
+            auto depth = call.target->depth;
+            while (!is(K::Right)) {
+                if (is(K::Star) || is(K::Power))
+                    fail(peek(), "call unpacking requires the unpacking capability",
+                         SourceErrorKind::Capability);
+                if (is(K::Name) && tokens_[index_ + 1].kind == K::Assign) {
+                    const auto name = take();
+                    take();
+                    if (!keywords.insert(name.text).second)
+                        fail(name, "keyword argument repeated");
+                    auto argument = expression();
+                    depth = std::max(depth, argument->depth);
+                    call.keywords.push_back({name.text, std::move(argument)});
+                } else {
+                    if (!keywords.empty())
+                        fail(peek(), "positional argument follows keyword argument");
+                    auto argument = expression();
+                    depth = std::max(depth, argument->depth);
+                    call.positional.push_back(std::move(argument));
+                }
+                if (!accept(K::Comma))
+                    break;
+            }
+            const auto end = expect(K::Right).span.end;
+            value = node(std::move(call), {start, end}, depth + 1);
+        }
+        return value;
+    }
+    ExprPtr atom()
+    {
+        const auto token = take();
+        switch (token.kind) {
+        case K::Name:
+            return node(NameExpr{token.text}, token.span);
+        case K::Integer: {
+            auto text = token.text;
+            unsigned base = 10;
+            std::size_t begin = 0;
+            if (text.size() > 1 && text[0] == U'0') {
+                const auto ch = text[1];
+                base = ch == U'x' || ch == U'X'   ? 16
+                       : ch == U'o' || ch == U'O' ? 8
+                       : ch == U'b' || ch == U'B' ? 2
+                                                  : 10;
+                if (base != 10)
+                    begin = 2;
+            }
+            bool previous_digit = false, nonzero = false, any = false;
+            for (auto i = begin; i < text.size(); ++i) {
+                if (text[i] == U'_') {
+                    if ((!previous_digit && !(i == begin && begin)) || i + 1 == text.size())
+                        fail(token, "invalid integer literal");
+                    previous_digit = false;
+                    continue;
+                }
+                const auto ch = text[i];
+                const auto value = ch >= U'0' && ch <= U'9'   ? ch - U'0'
+                                   : ch >= U'a' && ch <= U'f' ? ch - U'a' + 10
+                                   : ch >= U'A' && ch <= U'F' ? ch - U'A' + 10
+                                                              : 99;
+                if (value >= base)
+                    fail(token, "invalid integer literal");
+                previous_digit = any = true;
+                nonzero |= value != 0;
+            }
+            if (!any || (base == 10 && text.size() > 1 && text[0] == U'0' && nonzero))
+                fail(token, "invalid leading zero or integer literal");
+            return node(Literal{Literal::Kind::Integer, std::move(text)}, token.span);
+        }
+        case K::String: {
+            auto text = token.text;
+            auto end = token.span.end;
+            while (is(K::String)) {
+                auto next = take();
+                text += next.text;
+                end = next.span.end;
+            }
+            return node(Literal{Literal::Kind::String, std::move(text)}, {token.span.begin, end});
+        }
+        case K::None:
+        case K::True:
+        case K::False:
+            return node(Literal{token.kind == K::None   ? Literal::Kind::None
+                                : token.kind == K::True ? Literal::Kind::True
+                                                        : Literal::Kind::False,
+                                {}},
+                        token.span);
+        case K::Left: {
+            if (++expression_depth_ > 128)
+                fail(token, "too many nested parentheses");
+            auto value = expression();
+            expect(K::Right);
+            --expression_depth_;
+            return value;
+        }
+        default:
+            fail(token, "expected an expression");
+        }
+    }
+    const SourceBuffer &source_;
+    std::vector<Token> tokens_;
+    std::size_t index_ = 0, suite_depth_ = 0, expression_depth_ = 0, recursion_ = 0;
+};
+} // namespace
+Suite parse_source(const SourceBuffer &source, InputMode mode)
+{
+    return Parser(source).parse(mode);
 }
+} // namespace cxxpython::core::detail

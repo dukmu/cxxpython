@@ -1,5 +1,60 @@
 # Development Status
 
+## 2026-10-29 One Current Runtime And CPython-Shaped Source Layout
+
+Prepended without rewriting history. The previous stable node is e3c4beb.
+The user explicitly requested removing old implementation/tests, retaining only
+the current project, reorganizing along CPython responsibilities and enabling
+clang-format. The full Plan 2 goal remains active. Its new section 0.6 records
+that this overrides legacy retention, not language/performance/release gates.
+
+- Removed the contents of 304 legacy source/library/test files: the old
+  Runtime/Object/VM/parser, fourteen old Lib modules, eighteen old module files,
+  old extension API and extension fixtures, and their exclusive native/script
+  tests. No disabled legacy build branch, alternate interpreter or compatibility
+  wrapper remains. Old build products were cleaned before reconfiguration.
+- Moved forty-nine current implementation/test/tool files into the ordinary
+  Include/cxxpython, Include/internal, Objects, Parser, Python, Programs,
+  Tests/cpp, Lib/test and Tools directories. Names now reflect responsibilities:
+  Python/gc.cpp, compile.cpp, flowgraph.cpp, ceval.cpp, traceback.cpp/unwind.cpp;
+  Objects/typeobject.cpp, longobject.cpp, abstract.cpp, descrobject.cpp and the
+  existing object/call/construction/representation boundaries. Namespace,
+  algorithms, ownership and synchronization were not redesigned by this move.
+- Consolidated CMake into cxxpython_core plus the single cxxpython executable,
+  test_runtime and optional bench_runtime. The old CLI name/build option are
+  absent. Python test drivers now live in Lib/test; this is not a claim that a
+  standard library has been ported. Updated include/tool/report paths and CLI
+  diagnostics; retained benchmark artifact names/raw history for provenance.
+- Added .clang-format for clang-format 14 and formatted all project C++ sources.
+  The format and format-check targets use the same configuration; CTest includes
+  the dry-run check. Generated Unicode data and third-party sources are excluded.
+  The Unicode data itself is unchanged; generator/provenance paths were moved.
+- Added current README/architecture/development guidance, replaced the live
+  contract ledger with current contracts, and archived nine previous design/
+  ledger documents unchanged. Updated AGENTS and the Plan 2 consolidation note.
+  Earlier development entries and all raw benchmark samples remain untouched.
+- Fresh normal build passes. CTest 317/317 passes: all 314 existing current-core
+  cases, actual executable source differential, report unit tests and formatting.
+  The lower total compared with the prior mixed tree is legacy-test removal,
+  not removal of current-core coverage. Fixed CPython 3.12.14 differential
+  evidence is regenerated for build/cxxpython, and the README CLI example gives
+  42. The current target graph has no foundation/legacy alternate executable.
+- Independently compared all forty-three moved C++ source/header files with
+  e3c4beb after only known include/CLI-name replacement and clang-format; every
+  normalized file matches exactly. Thus this node changes paths/build/tooling,
+  not runtime execution/GC algorithms. Prior e3c4beb sanitizer evidence remains
+  applicable to those unchanged algorithms; no fresh sanitizer pass is claimed.
+- The moved recorder generated repository-consolidation from three idle Release
+  runs plus the paired fixed reference, after builds/tests completed. Source and
+  closure strong scaling remain present and timings near the previous node;
+  the large absolute CPython gap remains open. Tables were generated, not filled
+  manually. No new feature, fallback, guard framework or subagent was added.
+- Continue the complete N0-N6/M0-M9 work from this single tree. Basic objects/
+  iteration, class/exception source lowering, real libraries/thread/I/O APIs,
+  platform/install and performance acceptance remain unfinished. The user's
+  untracked test2.py and pre-existing temporary_plan.md deletion remain excluded
+  from this repository consolidation commit.
+
 ## 2026-10-29 Lexical Closures Through The Parallel Source VM
 
 Prepended without changing previous entries. The previous turn committed and
