@@ -234,6 +234,224 @@ TEST_F(CoreSource, ExceptionConstructionAndStopIterationValueUseIndependentManag
     EXPECT_EQ(result(out), "None");
 }
 
+TEST_F(CoreSource, ExceptionHandlersClearAliasesAndReuseCapturedCellsOnEveryExit)
+{
+    const auto globals = dictionary();
+    ReturnSlot out(context);
+    exec(R"(events = 0
+def f():
+    global events
+    error = 'old'
+    def read():
+        return error
+    try:
+        raise ValueError(7)
+    except TypeError:
+        events = 99
+    except (TypeError, ValueError) as error:
+        value = read().args[0]
+    else:
+        value = 99
+    finally:
+        events = events * 10 + 1
+    try:
+        read()
+    except NameError:
+        cleared = True
+    return value, cleared, events
+def returning():
+    try:
+        raise ValueError(8)
+    except Exception as error:
+        return error
+saved = returning()
+)",
+         globals, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    eval("f()", out, globals);
+    EXPECT_EQ(result(out), "(7, True, 1)");
+    eval("saved.args", out, globals);
+    EXPECT_EQ(result(out), "(8,)");
+    exec("error = 'previous'\ntry:\n    raise ValueError\nexcept Exception as error:\n    del "
+         "error\n",
+         globals, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    eval("error", out, globals);
+    raised(out, CoreObject::NameErrorType);
+}
+
+TEST_F(CoreSource, FinallyComposesWithLoopControlReturnsAndSeparateElsePaths)
+{
+    const auto globals = dictionary();
+    ReturnSlot out(context);
+    exec(R"(def total():
+    value = 0
+    for item in range(5):
+        try:
+            if item == 2:
+                continue
+            if item == 4:
+                break
+            value += item
+        finally:
+            value += 10
+    else:
+        value = 999
+    return value
+def normal():
+    value = 0
+    try:
+        try:
+            value = 1
+        except TypeError:
+            value = 99
+        else:
+            raise TypeError(3)
+    except TypeError as error:
+        value += error.args[0]
+    finally:
+        value += 10
+    return value
+def override():
+    try:
+        return 1
+    finally:
+        return 2
+)",
+         globals, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    eval("total(), normal(), override()", out, globals);
+    EXPECT_EQ(result(out), "(54, 14, 2)");
+}
+
+TEST_F(CoreSource, RaiseNormalizationReraiseAndChainingUseManagedExceptionFields)
+{
+    const auto globals = dictionary();
+    ReturnSlot out(context);
+    exec(R"(inner = ValueError('inner')
+def reraiser():
+    raise
+try:
+    raise inner
+except ValueError:
+    try:
+        reraiser()
+    except ValueError as error:
+        same = error is inner
+    try:
+        raise TypeError('outer') from None
+    except TypeError as error:
+        outer = error
+try:
+    raise ValueError from TypeError
+except ValueError as error:
+    explicit = error
+)",
+         globals, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    eval("same, outer.__context__ is inner, outer.__cause__ is None, outer.__suppress_context__, "
+         "type(explicit.__cause__) is TypeError",
+         out, globals);
+    EXPECT_EQ(result(out), "(True, True, True, True, True)");
+    exec("raise", globals, out);
+    raised(out, CoreObject::RuntimeErrorType);
+    exec("raise 1", globals, out);
+    raised(out, CoreObject::TypeErrorType);
+    exec("raise ValueError from 1", globals, out);
+    raised(out, CoreObject::TypeErrorType);
+}
+
+TEST_F(CoreSource, WithUsesOrdinaryPythonMethodsAndReversesNestedExitsIncludingSuppression)
+{
+    const auto globals = dictionary();
+    ReturnSlot out(context);
+    exec(R"(events = 0
+count = 0
+suppress = False
+def __enter__(self):
+    global events, count
+    count += 1
+    self.tag = count
+    events = events * 10 + self.tag
+    return 4, 5
+def __exit__(self, kind, error, traceback):
+    global events
+    events = events * 10 + self.tag
+    return suppress
+Manager = type('Manager', (), __enter__.__globals__)
+with (Manager(), Manager() as (a, b),):
+    value = a + b
+normal = events
+events = 0
+count = 0
+suppress = True
+with Manager(), (Manager()) as value:
+    raise ValueError('suppressed')
+suppressed = events
+events = 0
+count = 0
+def returned():
+    with Manager() as value:
+        return value
+saved = returned()
+)",
+         globals, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    eval("normal, suppressed, saved, events", out, globals);
+    EXPECT_EQ(result(out), "(1221, 1221, (4, 5), 11)");
+    exec("suppress = False\nwith Manager() as (a, b, c):\n    pass", globals, out);
+    raised(out, CoreObject::ValueErrorType);
+    exec("with None:\n    pass", globals, out);
+    raised(out, CoreObject::TypeErrorType);
+}
+
+TEST_F(CoreSource, ExceptionMatcherFailuresKeepTheirContextAndOuterHandler)
+{
+    const auto globals = dictionary();
+    ReturnSlot out(context);
+    exec(R"(original = ValueError(1)
+try:
+    try:
+        raise original
+    except None:
+        pass
+except TypeError as error:
+    saved = error
+)",
+         globals, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    eval("saved.__context__ is original", out, globals);
+    EXPECT_EQ(result(out), "True");
+}
+
+TEST_F(CoreSource, ExceptionChainDescriptorsValidateAndPublishTheirActualFields)
+{
+    const auto globals = dictionary();
+    ReturnSlot out(context);
+    exec(R"(error = ValueError()
+other = TypeError()
+error.__context__ = other
+error.__cause__ = other
+error.__suppress_context__ = False
+)",
+         globals, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    eval("error.__context__ is other, error.__cause__ is other, error.__suppress_context__", out,
+         globals);
+    EXPECT_EQ(result(out), "(True, True, False)");
+    exec("error.__cause__ = None\nerror.__context__ = None", globals, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    eval("error.__context__, error.__cause__, error.__suppress_context__", out, globals);
+    EXPECT_EQ(result(out), "(None, None, True)");
+    for (auto source :
+         {"error.__cause__ = ValueError", "error.__context__ = 1", "error.__suppress_context__ = 1",
+          "del error.__cause__", "del error.__context__", "del error.__suppress_context__"}) {
+        SCOPED_TRACE(source);
+        exec(source, globals, out);
+        raised(out, CoreObject::TypeErrorType);
+    }
+}
+
 TEST_F(CoreSource, FunctionsLoopsDefaultsKeywordsAndRuntimeCodeIdentityCompose)
 {
     auto globals = dictionary();
@@ -519,14 +737,32 @@ TEST_F(CoreSource, SourceLocationsAndStructuredDiagnosticsPreserveTheOriginalLin
 
 TEST(SourceDiagnostics, InvalidProgramsDoNotSilentlyCompileThroughAnotherLanguagePath)
 {
-    for (auto source :
-         {"return 1", "break", "continue", "def f(a, a): pass", "def f(a=1, b): pass", "1 = 2",
-          "True = 1", "x = 09", "x = 1__2", "if 1:\nx = 2", "  x = 1", "x = (1", "x = 1 x",
-          "global x\nnonlocal x", "nonlocal x", "x = 1\nglobal x"}) {
+    for (auto source : {"return 1",
+                        "break",
+                        "continue",
+                        "def f(a, a): pass",
+                        "def f(a=1, b): pass",
+                        "1 = 2",
+                        "True = 1",
+                        "x = 09",
+                        "x = 1__2",
+                        "if 1:\nx = 2",
+                        "  x = 1",
+                        "x = (1",
+                        "x = 1 x",
+                        "global x\nnonlocal x",
+                        "nonlocal x",
+                        "x = 1\nglobal x",
+                        "try: pass",
+                        "try: pass\nelse: pass\nfinally: pass",
+                        "try: pass\nexcept: pass\nexcept ValueError: pass",
+                        "try: pass\nexcept ValueError as __debug__: pass",
+                        "try: pass\nfinally: break"}) {
         SCOPED_TRACE(source);
         EXPECT_THROW(SourceUnit{SourceBuffer(source)}, SourceError);
     }
-    for (auto source : {"import x", "class X: pass", "f'{x}'", "x = 1.5", "x = [1]"}) {
+    for (auto source : {"import x", "class X: pass", "f'{x}'", "x = 1.5", "x = [1]",
+                        "try:\n    pass\nexcept* Exception:\n    pass"}) {
         SCOPED_TRACE(source);
         try {
             SourceUnit unit{SourceBuffer(source)};
@@ -595,7 +831,8 @@ TEST_F(CoreSource, RecursiveClosureCyclesReturnToTheOriginalLiveSet)
 
 TEST(SourceParallel, ImmutableNativeGraphsFreezeConcurrentlyWithoutSharedPythonState)
 {
-    const SourceUnit unit(SourceBuffer("def f(n=40):\n    return n + 2\nresult = f()\n"));
+    const SourceUnit unit(SourceBuffer("def f(n=40):\n    try:\n        return n + 2\n    "
+                                       "finally:\n        pass\nresult = f()\n"));
     Interpreter interpreter;
     Attachment owner(interpreter);
     owner.bootstrap_core();
@@ -637,19 +874,33 @@ TEST(SourceParallel, ImmutableNativeGraphsFreezeConcurrentlyWithoutSharedPythonS
 
 TEST(SourceParallel, OneFrozenSourceAndFunctionRunInOneSharedInterpreter)
 {
-    for (unsigned variant : {0U, 1U, 2U}) {
+    for (unsigned variant : {0U, 1U, 2U, 3U}) {
         const bool closure = variant == 1;
-        SCOPED_TRACE(closure ? "shared closure" : "plain function");
+        SCOPED_TRACE(variant);
         const SourceUnit unit(SourceBuffer(
-            variant == 2 ? "def total(n):\n    result = 0\n    for item in range(n, 0, -1):\n      "
-                           "  result += item\n    return result\n"
-            : closure    ? "def outer(step):\n    shared = 0\n    def total(n):\n        "
-                           "nonlocal shared\n        result = 0\n"
-                           "        while n:\n            shared = n\n            result "
-                           "+= n * step\n            n -= 1\n"
-                           "        return result\n    return total\ntotal = outer(1)\n"
-                         : "def total(n):\n    result = 0\n    while n:\n        result += "
-                           "n\n        n -= 1\n    return result\n"));
+            variant == 3 ? R"(def total(n):
+    result = 0
+    for item in range(n, 0, -1):
+        try:
+            if item % 7 == 0:
+                raise ValueError(item)
+            result += item
+        except ValueError as error:
+            result += error.args[0]
+        finally:
+            pass
+    return result
+)"
+            : variant == 2
+                ? "def total(n):\n    result = 0\n    for item in range(n, 0, -1):\n      "
+                  "  result += item\n    return result\n"
+            : closure ? "def outer(step):\n    shared = 0\n    def total(n):\n        "
+                        "nonlocal shared\n        result = 0\n"
+                        "        while n:\n            shared = n\n            result "
+                        "+= n * step\n            n -= 1\n"
+                        "        return result\n    return total\ntotal = outer(1)\n"
+                      : "def total(n):\n    result = 0\n    while n:\n        result += "
+                        "n\n        n -= 1\n    return result\n"));
         Interpreter interpreter;
         Attachment source(interpreter);
         source.bootstrap_core();

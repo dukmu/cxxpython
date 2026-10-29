@@ -9,6 +9,207 @@ Storage/native delivery probes do not establish Python VM parallelism. RSS is th
 
 | Series | Probe | Workers | Metric | Unit | Samples | Median | Min | Max |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| l1-source-exceptions | cleanup_iterations | - | active_region_bytes | bytes | 3 | 32.000 | 32.000 | 32.000 |
+| l1-source-exceptions | cleanup_iterations | - | cleanup_continuation_bytes | bytes | 3 | 48.000 | 48.000 | 48.000 |
+| l1-source-exceptions | cleanup_iterations | - | cleanup_function_ns | ms | 3 | 15.273 | 15.053 | 17.760 |
+| l1-source-exceptions | function_iterations | - | frame_prefix_bytes | bytes | 3 | 256.000 | 256.000 | 256.000 |
+| l1-source-exceptions | function_iterations | - | verified_function_ns | ms | 3 | 12.821 | 12.686 | 14.337 |
+| l1-source-exceptions | hash_iterations | - | string_hash_ns | ms | 3 | 62.673 | 62.089 | 65.088 |
+| l1-source-exceptions | hash_iterations | - | tuple_repr_ns | ms | 3 | 18.965 | 17.043 | 19.236 |
+| l1-source-exceptions | int_iterations | - | big_int_mul_ns | ms | 3 | 7.534 | 6.882 | 7.776 |
+| l1-source-exceptions | int_iterations | - | int_add_ns | ms | 3 | 60.194 | 59.407 | 65.209 |
+| l1-source-exceptions | int_iterations | - | int_object_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| l1-source-exceptions | iterations | - | allocation_and_auto_gc_ns | ms | 3 | 4.815 | 4.507 | 4.834 |
+| l1-source-exceptions | iterations | - | handle_bytes | bytes | 3 | 32.000 | 32.000 | 32.000 |
+| l1-source-exceptions | iterations | - | header_bytes | bytes | 3 | 8.000 | 8.000 | 8.000 |
+| l1-source-exceptions | iterations | - | last_gc_pause_ns | ms | 3 | 0.001 | 0.000 | 0.002 |
+| l1-source-exceptions | iterations | - | live_bytes | bytes | 3 | 0.000 | 0.000 | 0.000 |
+| l1-source-exceptions | iterations | - | node_bytes | bytes | 3 | 16.000 | 16.000 | 16.000 |
+| l1-source-exceptions | iterations | - | recorded_metadata_bytes | bytes | 3 | 3360.000 | 3360.000 | 3360.000 |
+| l1-source-exceptions | iterations | - | root_register_release_ns | ms | 3 | 2.877 | 2.805 | 3.935 |
+| l1-source-exceptions | native_call_iterations | - | core_live_bytes | bytes | 3 | 116152.000 | 116152.000 | 116152.000 |
+| l1-source-exceptions | native_call_iterations | - | core_metadata_bytes | bytes | 3 | 100240.000 | 100240.000 | 100240.000 |
+| l1-source-exceptions | native_call_iterations | - | core_reserved_bytes | bytes | 3 | 321152.000 | 321152.000 | 321152.000 |
+| l1-source-exceptions | native_call_iterations | - | lookup_bind_call_ns | ms | 3 | 17.778 | 17.703 | 19.157 |
+| l1-source-exceptions | native_call_iterations | - | native_call_ns | ms | 3 | 12.962 | 12.803 | 14.903 |
+| l1-source-exceptions | parallel_closure_workers | 1 | finish_live_bytes | bytes | 3 | 159156.000 | 159156.000 | 159156.000 |
+| l1-source-exceptions | parallel_closure_workers | 1 | finish_metadata_bytes | bytes | 3 | 181776.000 | 181776.000 | 181776.000 |
+| l1-source-exceptions | parallel_closure_workers | 1 | finish_reserved_bytes | bytes | 3 | 464904.000 | 464904.000 | 464904.000 |
+| l1-source-exceptions | parallel_closure_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.044 | 0.044 | 0.062 |
+| l1-source-exceptions | parallel_closure_workers | 1 | max_rendezvous_ns | ms | 3 | 0.001 | 0.001 | 0.002 |
+| l1-source-exceptions | parallel_closure_workers | 1 | process_cpu_ns | ms | 3 | 252.808 | 249.023 | 254.698 |
+| l1-source-exceptions | parallel_closure_workers | 1 | source_freeze_run_ns | ms | 3 | 0.091 | 0.087 | 0.092 |
+| l1-source-exceptions | parallel_closure_workers | 1 | wall_ns | ms | 3 | 243.912 | 239.899 | 250.925 |
+| l1-source-exceptions | parallel_closure_workers | 2 | finish_live_bytes | bytes | 3 | 173564.000 | 149564.000 | 179876.000 |
+| l1-source-exceptions | parallel_closure_workers | 2 | finish_metadata_bytes | bytes | 3 | 224288.000 | 186720.000 | 224288.000 |
+| l1-source-exceptions | parallel_closure_workers | 2 | finish_reserved_bytes | bytes | 3 | 534712.000 | 469064.000 | 534712.000 |
+| l1-source-exceptions | parallel_closure_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.063 | 0.048 | 0.064 |
+| l1-source-exceptions | parallel_closure_workers | 2 | max_rendezvous_ns | ms | 3 | 0.184 | 0.087 | 0.188 |
+| l1-source-exceptions | parallel_closure_workers | 2 | process_cpu_ns | ms | 3 | 256.939 | 249.450 | 263.206 |
+| l1-source-exceptions | parallel_closure_workers | 2 | source_freeze_run_ns | ms | 3 | 0.090 | 0.088 | 0.093 |
+| l1-source-exceptions | parallel_closure_workers | 2 | wall_ns | ms | 3 | 126.691 | 126.487 | 129.569 |
+| l1-source-exceptions | parallel_closure_workers | 4 | finish_live_bytes | bytes | 3 | 218708.000 | 149564.000 | 242148.000 |
+| l1-source-exceptions | parallel_closure_workers | 4 | finish_metadata_bytes | bytes | 3 | 383296.000 | 270592.000 | 384448.000 |
+| l1-source-exceptions | parallel_closure_workers | 4 | finish_reserved_bytes | bytes | 3 | 797304.000 | 600360.000 | 805624.000 |
+| l1-source-exceptions | parallel_closure_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.073 | 0.058 | 0.098 |
+| l1-source-exceptions | parallel_closure_workers | 4 | max_rendezvous_ns | ms | 3 | 0.894 | 0.733 | 5.466 |
+| l1-source-exceptions | parallel_closure_workers | 4 | process_cpu_ns | ms | 3 | 267.914 | 263.299 | 282.532 |
+| l1-source-exceptions | parallel_closure_workers | 4 | source_freeze_run_ns | ms | 3 | 0.096 | 0.096 | 0.125 |
+| l1-source-exceptions | parallel_closure_workers | 4 | wall_ns | ms | 3 | 77.233 | 74.135 | 89.456 |
+| l1-source-exceptions | parallel_exception_workers | 1 | finish_live_bytes | bytes | 3 | 143644.000 | 143644.000 | 143644.000 |
+| l1-source-exceptions | parallel_exception_workers | 1 | finish_metadata_bytes | bytes | 3 | 158560.000 | 158560.000 | 158560.000 |
+| l1-source-exceptions | parallel_exception_workers | 1 | finish_reserved_bytes | bytes | 3 | 428632.000 | 428632.000 | 428632.000 |
+| l1-source-exceptions | parallel_exception_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.052 | 0.049 | 0.060 |
+| l1-source-exceptions | parallel_exception_workers | 1 | max_rendezvous_ns | ms | 3 | 0.001 | 0.001 | 0.001 |
+| l1-source-exceptions | parallel_exception_workers | 1 | process_cpu_ns | ms | 3 | 399.205 | 398.136 | 411.195 |
+| l1-source-exceptions | parallel_exception_workers | 1 | source_freeze_run_ns | ms | 3 | 0.090 | 0.085 | 0.094 |
+| l1-source-exceptions | parallel_exception_workers | 1 | wall_ns | ms | 3 | 391.026 | 375.001 | 405.688 |
+| l1-source-exceptions | parallel_exception_workers | 2 | finish_live_bytes | bytes | 3 | 236676.000 | 233484.000 | 241036.000 |
+| l1-source-exceptions | parallel_exception_workers | 2 | finish_metadata_bytes | bytes | 3 | 330976.000 | 293408.000 | 330976.000 |
+| l1-source-exceptions | parallel_exception_workers | 2 | finish_reserved_bytes | bytes | 3 | 728968.000 | 663320.000 | 728968.000 |
+| l1-source-exceptions | parallel_exception_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.077 | 0.068 | 0.078 |
+| l1-source-exceptions | parallel_exception_workers | 2 | max_rendezvous_ns | ms | 3 | 0.169 | 0.153 | 0.273 |
+| l1-source-exceptions | parallel_exception_workers | 2 | process_cpu_ns | ms | 3 | 400.782 | 397.641 | 405.029 |
+| l1-source-exceptions | parallel_exception_workers | 2 | source_freeze_run_ns | ms | 3 | 0.088 | 0.081 | 0.090 |
+| l1-source-exceptions | parallel_exception_workers | 2 | wall_ns | ms | 3 | 201.407 | 191.475 | 203.543 |
+| l1-source-exceptions | parallel_exception_workers | 4 | finish_live_bytes | bytes | 3 | 133100.000 | 130484.000 | 205868.000 |
+| l1-source-exceptions | parallel_exception_workers | 4 | finish_metadata_bytes | bytes | 3 | 286528.000 | 286528.000 | 361664.000 |
+| l1-source-exceptions | parallel_exception_workers | 4 | finish_reserved_bytes | bytes | 3 | 625576.000 | 625576.000 | 756872.000 |
+| l1-source-exceptions | parallel_exception_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.089 | 0.078 | 0.103 |
+| l1-source-exceptions | parallel_exception_workers | 4 | max_rendezvous_ns | ms | 3 | 0.450 | 0.412 | 3.171 |
+| l1-source-exceptions | parallel_exception_workers | 4 | process_cpu_ns | ms | 3 | 430.977 | 430.114 | 433.994 |
+| l1-source-exceptions | parallel_exception_workers | 4 | source_freeze_run_ns | ms | 3 | 0.085 | 0.079 | 0.089 |
+| l1-source-exceptions | parallel_exception_workers | 4 | wall_ns | ms | 3 | 125.361 | 118.112 | 137.107 |
+| l1-source-exceptions | parallel_for_workers | 1 | finish_live_bytes | bytes | 3 | 225156.000 | 225156.000 | 225156.000 |
+| l1-source-exceptions | parallel_for_workers | 1 | finish_metadata_bytes | bytes | 3 | 261024.000 | 261024.000 | 261024.000 |
+| l1-source-exceptions | parallel_for_workers | 1 | finish_reserved_bytes | bytes | 3 | 604608.000 | 604608.000 | 604608.000 |
+| l1-source-exceptions | parallel_for_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.062 | 0.060 | 0.062 |
+| l1-source-exceptions | parallel_for_workers | 1 | max_rendezvous_ns | ms | 3 | 0.001 | 0.001 | 0.002 |
+| l1-source-exceptions | parallel_for_workers | 1 | process_cpu_ns | ms | 3 | 163.457 | 162.941 | 167.940 |
+| l1-source-exceptions | parallel_for_workers | 1 | source_freeze_run_ns | ms | 3 | 0.082 | 0.080 | 0.082 |
+| l1-source-exceptions | parallel_for_workers | 1 | wall_ns | ms | 3 | 160.092 | 153.461 | 164.486 |
+| l1-source-exceptions | parallel_for_workers | 2 | finish_live_bytes | bytes | 3 | 134772.000 | 127236.000 | 233028.000 |
+| l1-source-exceptions | parallel_for_workers | 2 | finish_metadata_bytes | bytes | 3 | 190976.000 | 190976.000 | 310496.000 |
+| l1-source-exceptions | parallel_for_workers | 2 | finish_reserved_bytes | bytes | 3 | 473312.000 | 473312.000 | 687032.000 |
+| l1-source-exceptions | parallel_for_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.056 | 0.049 | 0.079 |
+| l1-source-exceptions | parallel_for_workers | 2 | max_rendezvous_ns | ms | 3 | 0.065 | 0.034 | 0.314 |
+| l1-source-exceptions | parallel_for_workers | 2 | process_cpu_ns | ms | 3 | 174.999 | 170.016 | 177.391 |
+| l1-source-exceptions | parallel_for_workers | 2 | source_freeze_run_ns | ms | 3 | 0.081 | 0.074 | 0.081 |
+| l1-source-exceptions | parallel_for_workers | 2 | wall_ns | ms | 3 | 87.951 | 87.319 | 94.350 |
+| l1-source-exceptions | parallel_for_workers | 4 | finish_live_bytes | bytes | 3 | 137460.000 | 136020.000 | 167628.000 |
+| l1-source-exceptions | parallel_for_workers | 4 | finish_metadata_bytes | bytes | 3 | 283104.000 | 276288.000 | 327488.000 |
+| l1-source-exceptions | parallel_for_workers | 4 | finish_reserved_bytes | bytes | 3 | 621384.000 | 604608.000 | 703808.000 |
+| l1-source-exceptions | parallel_for_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.054 | 0.051 | 0.067 |
+| l1-source-exceptions | parallel_for_workers | 4 | max_rendezvous_ns | ms | 3 | 0.298 | 0.242 | 0.958 |
+| l1-source-exceptions | parallel_for_workers | 4 | process_cpu_ns | ms | 3 | 183.726 | 179.032 | 187.588 |
+| l1-source-exceptions | parallel_for_workers | 4 | source_freeze_run_ns | ms | 3 | 0.096 | 0.081 | 0.110 |
+| l1-source-exceptions | parallel_for_workers | 4 | wall_ns | ms | 3 | 53.587 | 53.315 | 56.774 |
+| l1-source-exceptions | parallel_source_workers | 1 | finish_live_bytes | bytes | 3 | 133268.000 | 133268.000 | 133268.000 |
+| l1-source-exceptions | parallel_source_workers | 1 | finish_metadata_bytes | bytes | 3 | 141360.000 | 141360.000 | 141360.000 |
+| l1-source-exceptions | parallel_source_workers | 1 | finish_reserved_bytes | bytes | 3 | 395048.000 | 395048.000 | 395048.000 |
+| l1-source-exceptions | parallel_source_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.024 | 0.022 | 0.060 |
+| l1-source-exceptions | parallel_source_workers | 1 | max_rendezvous_ns | ms | 3 | 0.001 | 0.001 | 0.002 |
+| l1-source-exceptions | parallel_source_workers | 1 | process_cpu_ns | ms | 3 | 251.040 | 249.808 | 252.809 |
+| l1-source-exceptions | parallel_source_workers | 1 | source_freeze_run_ns | ms | 3 | 0.077 | 0.075 | 0.082 |
+| l1-source-exceptions | parallel_source_workers | 1 | wall_ns | ms | 3 | 245.885 | 244.667 | 249.028 |
+| l1-source-exceptions | parallel_source_workers | 2 | finish_live_bytes | bytes | 3 | 168164.000 | 156380.000 | 186428.000 |
+| l1-source-exceptions | parallel_source_workers | 2 | finish_metadata_bytes | bytes | 3 | 221440.000 | 220864.000 | 258432.000 |
+| l1-source-exceptions | parallel_source_workers | 2 | finish_reserved_bytes | bytes | 3 | 530504.000 | 526344.000 | 591992.000 |
+| l1-source-exceptions | parallel_source_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.034 | 0.027 | 0.050 |
+| l1-source-exceptions | parallel_source_workers | 2 | max_rendezvous_ns | ms | 3 | 0.083 | 0.051 | 0.150 |
+| l1-source-exceptions | parallel_source_workers | 2 | process_cpu_ns | ms | 3 | 258.140 | 255.302 | 261.493 |
+| l1-source-exceptions | parallel_source_workers | 2 | source_freeze_run_ns | ms | 3 | 0.079 | 0.078 | 0.081 |
+| l1-source-exceptions | parallel_source_workers | 2 | wall_ns | ms | 3 | 128.480 | 127.043 | 136.443 |
+| l1-source-exceptions | parallel_source_workers | 4 | finish_live_bytes | bytes | 3 | 193172.000 | 163172.000 | 208196.000 |
+| l1-source-exceptions | parallel_source_workers | 4 | finish_metadata_bytes | bytes | 3 | 342880.000 | 268320.000 | 380448.000 |
+| l1-source-exceptions | parallel_source_workers | 4 | finish_reserved_bytes | bytes | 3 | 727448.000 | 600312.000 | 793096.000 |
+| l1-source-exceptions | parallel_source_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.077 | 0.055 | 0.083 |
+| l1-source-exceptions | parallel_source_workers | 4 | max_rendezvous_ns | ms | 3 | 0.750 | 0.171 | 1.412 |
+| l1-source-exceptions | parallel_source_workers | 4 | process_cpu_ns | ms | 3 | 268.016 | 266.533 | 281.162 |
+| l1-source-exceptions | parallel_source_workers | 4 | source_freeze_run_ns | ms | 3 | 0.080 | 0.074 | 0.086 |
+| l1-source-exceptions | parallel_source_workers | 4 | wall_ns | ms | 3 | 78.092 | 77.681 | 112.013 |
+| l1-source-exceptions | parallel_storage_workers | 1 | finish_live_bytes | bytes | 3 | 42720.000 | 42720.000 | 42720.000 |
+| l1-source-exceptions | parallel_storage_workers | 1 | finish_metadata_bytes | bytes | 3 | 97040.000 | 97040.000 | 97040.000 |
+| l1-source-exceptions | parallel_storage_workers | 1 | finish_reserved_bytes | bytes | 3 | 135504.000 | 135504.000 | 135504.000 |
+| l1-source-exceptions | parallel_storage_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.023 | 0.020 | 0.026 |
+| l1-source-exceptions | parallel_storage_workers | 1 | max_rendezvous_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| l1-source-exceptions | parallel_storage_workers | 1 | process_cpu_ns | ms | 3 | 2.230 | 2.221 | 2.267 |
+| l1-source-exceptions | parallel_storage_workers | 1 | wall_ns | ms | 3 | 2.230 | 2.132 | 2.275 |
+| l1-source-exceptions | parallel_storage_workers | 2 | finish_live_bytes | bytes | 3 | 12368.000 | 4624.000 | 12464.000 |
+| l1-source-exceptions | parallel_storage_workers | 2 | finish_metadata_bytes | bytes | 3 | 100352.000 | 100352.000 | 103200.000 |
+| l1-source-exceptions | parallel_storage_workers | 2 | finish_reserved_bytes | bytes | 3 | 135504.000 | 135504.000 | 139712.000 |
+| l1-source-exceptions | parallel_storage_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.017 | 0.013 | 0.031 |
+| l1-source-exceptions | parallel_storage_workers | 2 | max_rendezvous_ns | ms | 3 | 0.021 | 0.019 | 0.041 |
+| l1-source-exceptions | parallel_storage_workers | 2 | process_cpu_ns | ms | 3 | 2.568 | 2.497 | 2.605 |
+| l1-source-exceptions | parallel_storage_workers | 2 | wall_ns | ms | 3 | 1.610 | 1.505 | 1.671 |
+| l1-source-exceptions | parallel_storage_workers | 4 | finish_live_bytes | bytes | 3 | 44496.000 | 2944.000 | 58176.000 |
+| l1-source-exceptions | parallel_storage_workers | 4 | finish_metadata_bytes | bytes | 3 | 200288.000 | 153632.000 | 285056.000 |
+| l1-source-exceptions | parallel_storage_workers | 4 | finish_reserved_bytes | bytes | 3 | 275216.000 | 205360.000 | 402304.000 |
+| l1-source-exceptions | parallel_storage_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.021 | 0.019 | 0.025 |
+| l1-source-exceptions | parallel_storage_workers | 4 | max_rendezvous_ns | ms | 3 | 0.077 | 0.055 | 0.096 |
+| l1-source-exceptions | parallel_storage_workers | 4 | process_cpu_ns | ms | 3 | 3.267 | 3.087 | 3.672 |
+| l1-source-exceptions | parallel_storage_workers | 4 | wall_ns | ms | 3 | 1.940 | 1.842 | 2.212 |
+| l1-source-exceptions | parallel_vm_workers | 1 | finish_live_bytes | bytes | 3 | 173420.000 | 173420.000 | 173420.000 |
+| l1-source-exceptions | parallel_vm_workers | 1 | finish_metadata_bytes | bytes | 3 | 216400.000 | 216400.000 | 216400.000 |
+| l1-source-exceptions | parallel_vm_workers | 1 | finish_reserved_bytes | bytes | 3 | 526344.000 | 526344.000 | 526344.000 |
+| l1-source-exceptions | parallel_vm_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.041 | 0.029 | 0.041 |
+| l1-source-exceptions | parallel_vm_workers | 1 | max_rendezvous_ns | ms | 3 | 0.001 | 0.001 | 0.002 |
+| l1-source-exceptions | parallel_vm_workers | 1 | process_cpu_ns | ms | 3 | 210.993 | 208.108 | 213.811 |
+| l1-source-exceptions | parallel_vm_workers | 1 | source_freeze_run_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| l1-source-exceptions | parallel_vm_workers | 1 | wall_ns | ms | 3 | 203.802 | 203.048 | 206.640 |
+| l1-source-exceptions | parallel_vm_workers | 2 | finish_live_bytes | bytes | 3 | 230556.000 | 223836.000 | 232260.000 |
+| l1-source-exceptions | parallel_vm_workers | 2 | finish_metadata_bytes | bytes | 3 | 296384.000 | 296384.000 | 333952.000 |
+| l1-source-exceptions | parallel_vm_workers | 2 | finish_reserved_bytes | bytes | 3 | 661800.000 | 661800.000 | 727448.000 |
+| l1-source-exceptions | parallel_vm_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.057 | 0.054 | 0.074 |
+| l1-source-exceptions | parallel_vm_workers | 2 | max_rendezvous_ns | ms | 3 | 0.185 | 0.159 | 0.200 |
+| l1-source-exceptions | parallel_vm_workers | 2 | process_cpu_ns | ms | 3 | 216.240 | 213.176 | 218.095 |
+| l1-source-exceptions | parallel_vm_workers | 2 | source_freeze_run_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| l1-source-exceptions | parallel_vm_workers | 2 | wall_ns | ms | 3 | 108.834 | 105.984 | 111.215 |
+| l1-source-exceptions | parallel_vm_workers | 4 | finish_live_bytes | bytes | 3 | 181484.000 | 163244.000 | 197580.000 |
+| l1-source-exceptions | parallel_vm_workers | 4 | finish_metadata_bytes | bytes | 3 | 341920.000 | 304352.000 | 342496.000 |
+| l1-source-exceptions | parallel_vm_workers | 4 | finish_reserved_bytes | bytes | 3 | 723288.000 | 657640.000 | 727448.000 |
+| l1-source-exceptions | parallel_vm_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.073 | 0.064 | 0.080 |
+| l1-source-exceptions | parallel_vm_workers | 4 | max_rendezvous_ns | ms | 3 | 1.174 | 0.756 | 13.657 |
+| l1-source-exceptions | parallel_vm_workers | 4 | process_cpu_ns | ms | 3 | 229.121 | 227.698 | 246.237 |
+| l1-source-exceptions | parallel_vm_workers | 4 | source_freeze_run_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| l1-source-exceptions | parallel_vm_workers | 4 | wall_ns | ms | 3 | 84.115 | 66.412 | 105.560 |
+| l1-source-exceptions | process_peak_rss_kib | - | process_peak_rss_kib | KiB | 3 | 6896.000 | 6780.000 | 6956.000 |
+| l1-source-exceptions | scheduled_iterations | - | scheduled_function_ns | ms | 3 | 20.788 | 19.146 | 21.993 |
+| l1-source-exceptions | shared_edge_iterations | - | cell_object_bytes | bytes | 3 | 16.000 | 16.000 | 16.000 |
+| l1-source-exceptions | shared_edge_iterations | - | rooted_cell_read_ns | ms | 3 | 2.254 | 2.057 | 2.492 |
+| l1-source-exceptions | shared_edge_iterations | - | rooted_cell_store_read_ns | ms | 3 | 4.359 | 4.279 | 5.044 |
+| l1-source-exceptions | slot_iterations | - | generic_prefix_bytes | bytes | 3 | 8.000 | 8.000 | 8.000 |
+| l1-source-exceptions | slot_iterations | - | slot_instance_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| l1-source-exceptions | slot_iterations | - | slot_set_get_ns | ms | 3 | 29.402 | 28.637 | 32.176 |
+| l1-source-exceptions | source_parse_scope_cfg_ns | - | source_bytes | bytes | 3 | 92.000 | 92.000 | 92.000 |
+| l1-source-exceptions | source_parse_scope_cfg_ns | - | source_parse_scope_cfg_ns | ms | 3 | 0.037 | 0.032 | 0.042 |
+| l1-source-exceptions | transfer_iterations | - | transfer_roundtrip_ns | ms | 3 | 0.815 | 0.806 | 0.934 |
+| l1-source-exceptions | transfer_iterations | - | transfer_token_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| l1-source-exceptions | with_iterations | - | with_function_ns | ms | 3 | 25.250 | 25.219 | 29.718 |
+| l1-source-exceptions-cpython | parallel_closure_workers | 1 | process_cpu_ns | ms | 3 | 6.047 | 5.982 | 6.067 |
+| l1-source-exceptions-cpython | parallel_closure_workers | 1 | wall_ns | ms | 3 | 5.900 | 5.727 | 5.945 |
+| l1-source-exceptions-cpython | parallel_closure_workers | 2 | process_cpu_ns | ms | 3 | 6.003 | 5.958 | 6.188 |
+| l1-source-exceptions-cpython | parallel_closure_workers | 2 | wall_ns | ms | 3 | 5.896 | 5.673 | 6.038 |
+| l1-source-exceptions-cpython | parallel_closure_workers | 4 | process_cpu_ns | ms | 3 | 5.725 | 5.713 | 5.791 |
+| l1-source-exceptions-cpython | parallel_closure_workers | 4 | wall_ns | ms | 3 | 5.681 | 5.501 | 5.695 |
+| l1-source-exceptions-cpython | parallel_exception_workers | 1 | process_cpu_ns | ms | 3 | 7.276 | 7.264 | 7.306 |
+| l1-source-exceptions-cpython | parallel_exception_workers | 1 | wall_ns | ms | 3 | 7.154 | 6.889 | 7.168 |
+| l1-source-exceptions-cpython | parallel_exception_workers | 2 | process_cpu_ns | ms | 3 | 7.141 | 6.972 | 7.339 |
+| l1-source-exceptions-cpython | parallel_exception_workers | 2 | wall_ns | ms | 3 | 6.844 | 6.770 | 7.348 |
+| l1-source-exceptions-cpython | parallel_exception_workers | 4 | process_cpu_ns | ms | 3 | 7.360 | 7.053 | 7.489 |
+| l1-source-exceptions-cpython | parallel_exception_workers | 4 | wall_ns | ms | 3 | 7.191 | 6.726 | 7.401 |
+| l1-source-exceptions-cpython | parallel_for_workers | 1 | process_cpu_ns | ms | 3 | 4.781 | 4.702 | 4.895 |
+| l1-source-exceptions-cpython | parallel_for_workers | 1 | wall_ns | ms | 3 | 4.803 | 4.470 | 4.946 |
+| l1-source-exceptions-cpython | parallel_for_workers | 2 | process_cpu_ns | ms | 3 | 4.660 | 4.615 | 4.681 |
+| l1-source-exceptions-cpython | parallel_for_workers | 2 | wall_ns | ms | 3 | 4.532 | 4.450 | 4.603 |
+| l1-source-exceptions-cpython | parallel_for_workers | 4 | process_cpu_ns | ms | 3 | 4.504 | 4.452 | 4.541 |
+| l1-source-exceptions-cpython | parallel_for_workers | 4 | wall_ns | ms | 3 | 4.471 | 4.322 | 4.473 |
+| l1-source-exceptions-cpython | parallel_source_workers | 1 | process_cpu_ns | ms | 3 | 6.428 | 6.359 | 6.460 |
+| l1-source-exceptions-cpython | parallel_source_workers | 1 | wall_ns | ms | 3 | 6.230 | 6.112 | 6.294 |
+| l1-source-exceptions-cpython | parallel_source_workers | 2 | process_cpu_ns | ms | 3 | 6.303 | 6.155 | 6.387 |
+| l1-source-exceptions-cpython | parallel_source_workers | 2 | wall_ns | ms | 3 | 6.148 | 5.858 | 6.308 |
+| l1-source-exceptions-cpython | parallel_source_workers | 4 | process_cpu_ns | ms | 3 | 5.772 | 5.752 | 5.837 |
+| l1-source-exceptions-cpython | parallel_source_workers | 4 | wall_ns | ms | 3 | 5.689 | 5.566 | 5.764 |
 | n1_shared_auto | cleanup_iterations | - | active_region_bytes | bytes | 3 | 32.000 | 32.000 | 32.000 |
 | n1_shared_auto | cleanup_iterations | - | cleanup_continuation_bytes | bytes | 3 | 48.000 | 48.000 | 48.000 |
 | n1_shared_auto | cleanup_iterations | - | cleanup_function_ns | ms | 3 | 29.177 | 28.270 | 29.958 |
@@ -1265,6 +1466,36 @@ Derived from median wall/process CPU times. CPU/wall is not a speedup; 1-worker 
 
 | Series | Probe | Workers | Wall ms | CPU/Wall | Speedup | Efficiency |
 | --- | --- | --- | --- | --- | --- | --- |
+| l1-source-exceptions | parallel_closure_workers | 1 | 243.912 | 1.036 | 1.000 | 1.000 |
+| l1-source-exceptions | parallel_closure_workers | 2 | 126.691 | 2.028 | 1.925 | 0.963 |
+| l1-source-exceptions | parallel_closure_workers | 4 | 77.233 | 3.469 | 3.158 | 0.790 |
+| l1-source-exceptions | parallel_exception_workers | 1 | 391.026 | 1.021 | 1.000 | 1.000 |
+| l1-source-exceptions | parallel_exception_workers | 2 | 201.407 | 1.990 | 1.941 | 0.971 |
+| l1-source-exceptions | parallel_exception_workers | 4 | 125.361 | 3.438 | 3.119 | 0.780 |
+| l1-source-exceptions | parallel_for_workers | 1 | 160.092 | 1.021 | 1.000 | 1.000 |
+| l1-source-exceptions | parallel_for_workers | 2 | 87.951 | 1.990 | 1.820 | 0.910 |
+| l1-source-exceptions | parallel_for_workers | 4 | 53.587 | 3.429 | 2.988 | 0.747 |
+| l1-source-exceptions | parallel_source_workers | 1 | 245.885 | 1.021 | 1.000 | 1.000 |
+| l1-source-exceptions | parallel_source_workers | 2 | 128.480 | 2.009 | 1.914 | 0.957 |
+| l1-source-exceptions | parallel_source_workers | 4 | 78.092 | 3.432 | 3.149 | 0.787 |
+| l1-source-exceptions | parallel_storage_workers | 1 | 2.230 | 1.000 | 1.000 | 1.000 |
+| l1-source-exceptions | parallel_storage_workers | 2 | 1.610 | 1.595 | 1.385 | 0.692 |
+| l1-source-exceptions | parallel_storage_workers | 4 | 1.940 | 1.684 | 1.150 | 0.287 |
+| l1-source-exceptions | parallel_vm_workers | 1 | 203.802 | 1.035 | 1.000 | 1.000 |
+| l1-source-exceptions | parallel_vm_workers | 2 | 108.834 | 1.987 | 1.873 | 0.936 |
+| l1-source-exceptions | parallel_vm_workers | 4 | 84.115 | 2.724 | 2.423 | 0.606 |
+| l1-source-exceptions-cpython | parallel_closure_workers | 1 | 5.900 | 1.025 | 1.000 | 1.000 |
+| l1-source-exceptions-cpython | parallel_closure_workers | 2 | 5.896 | 1.018 | 1.001 | 0.500 |
+| l1-source-exceptions-cpython | parallel_closure_workers | 4 | 5.681 | 1.008 | 1.039 | 0.260 |
+| l1-source-exceptions-cpython | parallel_exception_workers | 1 | 7.154 | 1.017 | 1.000 | 1.000 |
+| l1-source-exceptions-cpython | parallel_exception_workers | 2 | 6.844 | 1.043 | 1.045 | 0.523 |
+| l1-source-exceptions-cpython | parallel_exception_workers | 4 | 7.191 | 1.023 | 0.995 | 0.249 |
+| l1-source-exceptions-cpython | parallel_for_workers | 1 | 4.803 | 0.995 | 1.000 | 1.000 |
+| l1-source-exceptions-cpython | parallel_for_workers | 2 | 4.532 | 1.028 | 1.060 | 0.530 |
+| l1-source-exceptions-cpython | parallel_for_workers | 4 | 4.471 | 1.007 | 1.074 | 0.269 |
+| l1-source-exceptions-cpython | parallel_source_workers | 1 | 6.230 | 1.032 | 1.000 | 1.000 |
+| l1-source-exceptions-cpython | parallel_source_workers | 2 | 6.148 | 1.025 | 1.013 | 0.507 |
+| l1-source-exceptions-cpython | parallel_source_workers | 4 | 5.689 | 1.015 | 1.095 | 0.274 |
 | n1_shared_auto | parallel_storage_workers | 1 | 2.349 | 0.977 | 1.000 | 1.000 |
 | n1_shared_auto | parallel_storage_workers | 2 | 2.019 | 1.485 | 1.163 | 0.582 |
 | n1_shared_auto | parallel_storage_workers | 4 | 2.563 | 1.636 | 0.917 | 0.229 |
@@ -1398,6 +1629,18 @@ The CPython probe executes the source kernel captured from the C++ benchmark, wi
 
 | Series | Probe | Workers | cxxpython ms | CPython ms | cxxpython/CPython |
 | --- | --- | --- | --- | --- | --- |
+| l1-source-exceptions | parallel_closure_workers | 1 | 243.912 | 5.900 | 41.340 |
+| l1-source-exceptions | parallel_closure_workers | 2 | 126.691 | 5.896 | 21.486 |
+| l1-source-exceptions | parallel_closure_workers | 4 | 77.233 | 5.681 | 13.595 |
+| l1-source-exceptions | parallel_exception_workers | 1 | 391.026 | 7.154 | 54.660 |
+| l1-source-exceptions | parallel_exception_workers | 2 | 201.407 | 6.844 | 29.427 |
+| l1-source-exceptions | parallel_exception_workers | 4 | 125.361 | 7.191 | 17.432 |
+| l1-source-exceptions | parallel_for_workers | 1 | 160.092 | 4.803 | 33.332 |
+| l1-source-exceptions | parallel_for_workers | 2 | 87.951 | 4.532 | 19.407 |
+| l1-source-exceptions | parallel_for_workers | 4 | 53.587 | 4.471 | 11.986 |
+| l1-source-exceptions | parallel_source_workers | 1 | 245.885 | 6.230 | 39.468 |
+| l1-source-exceptions | parallel_source_workers | 2 | 128.480 | 6.148 | 20.898 |
+| l1-source-exceptions | parallel_source_workers | 4 | 78.092 | 5.689 | 13.728 |
 | n3-rooted-execution | parallel_source_workers | 1 | 245.852 | 5.958 | 41.263 |
 | n3-rooted-execution | parallel_source_workers | 2 | 131.902 | 6.280 | 21.005 |
 | n3-rooted-execution | parallel_source_workers | 4 | 80.991 | 5.755 | 14.072 |

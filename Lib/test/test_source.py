@@ -7,6 +7,7 @@ import json
 import shutil
 import subprocess
 import tempfile
+from textwrap import dedent
 import unittest
 from pathlib import Path
 
@@ -137,6 +138,258 @@ class SourceDifferential(unittest.TestCase):
                 self.assertNotEqual(expected.returncode, 0)
                 self.assertIn(error, actual.stderr)
                 self.assertIn(error, expected.stderr)
+
+    def test_exception_control_flow_workflows(self):
+        cases = [
+            ("""
+             events = 0
+             try:
+                 raise ValueError(7)
+             except (TypeError, ValueError) as error:
+                 value = error.args[0]
+             else:
+                 value = 99
+             finally:
+                 events += 1
+             try:
+                 error
+             except NameError:
+                 cleared = True
+             """, "value, events, cleared"),
+            ("""
+             def f():
+                 error = 1
+                 def read():
+                     return error
+                 try:
+                     raise ValueError
+                 except ValueError as error:
+                     pass
+                 try:
+                     read()
+                 except NameError:
+                     return True
+             """, "f()"),
+            ("""
+             original = ValueError('inner')
+             def reraiser():
+                 raise
+             try:
+                 raise original
+             except ValueError:
+                 try:
+                     reraiser()
+                 except ValueError as error:
+                     same = error is original
+                 try:
+                     raise TypeError('outer') from None
+                 except TypeError as error:
+                     saved = error
+             """, "same, saved.__context__ is original, saved.__cause__, saved.__suppress_context__"),
+            ("""
+             cause = TypeError('cause')
+             try:
+                 raise ValueError(1) from cause
+             except ValueError as error:
+                 saved = error
+             """, "saved.__cause__ is cause, saved.__context__, saved.__suppress_context__"),
+            ("""
+             try:
+                 raise ValueError from TypeError
+             except ValueError as error:
+                 saved = error
+             """, "type(saved) is ValueError, type(saved.__cause__) is TypeError"),
+            ("""
+             value = 0
+             try:
+                 try:
+                     value = 1
+                 except TypeError:
+                     value = 99
+                 else:
+                     raise TypeError(3)
+             except TypeError as error:
+                 value += error.args[0]
+             finally:
+                 value += 10
+             """, "value"),
+            ("""
+             original = ValueError(1)
+             try:
+                 try:
+                     raise original
+                 except None:
+                     pass
+             except TypeError as error:
+                 saved = error
+             """, "saved.__context__ is original"),
+            ("""
+             def f():
+                 try:
+                     raise ValueError
+                 finally:
+                     return 42
+             """, "f()"),
+            ("""
+             error = ValueError()
+             other = TypeError()
+             error.__context__ = other
+             error.__cause__ = other
+             error.__suppress_context__ = False
+             """, "error.__context__ is other, error.__cause__ is other, error.__suppress_context__"),
+            ("""
+             error = ValueError()
+             error.__cause__ = None
+             """, "error.__cause__, error.__suppress_context__"),
+            ("""
+             value = 0
+             try:
+                 raise ValueError
+             except ():
+                 value = 99
+             except:
+                 value = 42
+             """, "value"),
+            ("""
+             events = 0
+             def __new__(cls):
+                 global events
+                 events = events * 10 + 3
+                 return BaseException.__new__(cls)
+             Custom = type('Custom', (ValueError,), __new__.__globals__)
+             def first():
+                 global events
+                 events = events * 10 + 1
+                 return Custom
+             def second():
+                 global events
+                 events = events * 10 + 2
+                 return TypeError
+             try:
+                 raise first() from second()
+             except ValueError as error:
+                 saved = error
+             """, "events, type(saved) is Custom, type(saved.__cause__) is TypeError"),
+            ("""
+             def __new__(cls):
+                 return 1
+             Invalid = type('Invalid', (ValueError,), __new__.__globals__)
+             try:
+                 raise Invalid
+             except TypeError:
+                 caught = True
+             """, "caught"),
+        ]
+        for source, expression in cases:
+            with self.subTest(expression=expression):
+                self.check_program(dedent(source), expression)
+        for header, increment in [("for item in range(5):", ""), ("while item < 4:", "            item += 1\n")]:
+            for action in ["break", "continue", "return events", "raise TypeError"]:
+                source = (
+                    "def f():\n    events = 0\n    item = -1\n    try:\n        " + header + "\n" + increment
+                    + "            try:\n                if item == 2:\n                    " + action + "\n"
+                    "                events = events * 10 + 1\n            finally:\n                events = events * 10 + 2\n"
+                    "        else:\n            events = events * 10 + 5\n"
+                    "    except TypeError:\n        events = events * 10 + 3\n"
+                    "    finally:\n        events = events * 10 + 4\n    return events\n"
+                )
+                with self.subTest(loop=header, action=action):
+                    self.check_program(source, "f()")
+
+    def test_source_context_managers(self):
+        manager = dedent("""
+            events = 0
+            count = 0
+            errors = 0
+            suppress = False
+            fail_enter = 0
+            fail_exit = 0
+            def __enter__(self):
+                global events, count
+                count += 1
+                self.tag = count
+                events = events * 10 + self.tag
+                if self.tag == fail_enter:
+                    raise ValueError('enter')
+                return 4, 5
+            def __exit__(self, kind, error, traceback):
+                global events, errors
+                events = events * 10 + self.tag
+                if error is not None:
+                    errors += 1
+                if self.tag == fail_exit:
+                    raise TypeError('exit')
+                return suppress
+            Manager = type('Manager', (), __enter__.__globals__)
+        """)
+        for body, expression in [
+            ("with (Manager(), Manager() as (a, b),):\n    value = a + b", "value, events, errors"),
+            ("with (Manager()) as value:\n    pass", "value, events, errors"),
+            ("suppress = True\nwith Manager(), Manager():\n    raise ValueError", "events, errors"),
+            ("suppress = True\nvalue = 0\nwith Manager() as (a, b, c):\n    value = 99", "value, events, errors"),
+            ("suppress = True\nfail_enter = 2\nwith Manager(), Manager():\n    pass", "events, errors"),
+            ("def f():\n    with Manager() as value:\n        return value\nsaved = f()", "saved, events, errors"),
+            ("fail_exit = 2\ntry:\n    with Manager(), Manager():\n        raise ValueError\nexcept TypeError as error:\n    saved = error", "events, errors, type(saved.__context__) is ValueError"),
+            ("for i in range(3):\n    with Manager():\n        continue", "events, errors"),
+        ]:
+            with self.subTest(body=body):
+                self.check_program(manager + body, expression)
+
+    def test_exception_syntax_and_runtime_errors(self):
+        for source in [
+            "try: pass",
+            "try: pass\nelse: pass\nfinally: pass",
+            "try: pass\nexcept: pass\nexcept ValueError: pass",
+            "try: pass\nexcept ValueError as x.y: pass",
+            "try: pass\nexcept ValueError as __debug__: pass",
+            "try: pass\nfinally: break",
+        ]:
+            with self.subTest(source=source):
+                actual = self.execute([self.binary, "-c", source])
+                expected = self.execute([self.reference, "-c", source])
+                self.assertEqual(actual.returncode, 1, actual.stderr)
+                self.assertNotEqual(expected.returncode, 0)
+                self.assertIn("SyntaxError", actual.stderr)
+                self.assertIn("SyntaxError", expected.stderr)
+        for source, error in [
+            ("raise", "RuntimeError"), ("raise 1", "TypeError"),
+            ("raise ValueError from 1", "TypeError"),
+            ("try:\n    raise ValueError\nexcept None:\n    pass", "TypeError"),
+            ("with None: pass", "TypeError"),
+            ("with (): pass", "TypeError"),
+            ("error = ValueError()\nerror.__cause__ = ValueError", "TypeError"),
+            ("error = ValueError()\nerror.__context__ = 1", "TypeError"),
+            ("error = ValueError()\nerror.__suppress_context__ = 1", "TypeError"),
+        ]:
+            with self.subTest(source=source):
+                actual = self.execute([self.binary, "-c", source])
+                expected = self.execute([self.reference, "-c", source])
+                self.assertEqual(actual.returncode, 1, actual.stderr)
+                self.assertNotEqual(expected.returncode, 0)
+                self.assertIn(error, actual.stderr)
+                self.assertIn(error, expected.stderr)
+
+    def test_uncaught_exception_chain_rendering(self):
+        for source, marker in [
+            ("raise ValueError('outer') from TypeError('cause')", "direct cause"),
+            ("try:\n    raise TypeError('inner')\nexcept:\n    raise ValueError('outer')", "During handling"),
+        ]:
+            with self.subTest(source=source):
+                actual = self.execute([self.binary, "-c", source])
+                expected = self.execute([self.reference, "-c", source])
+                self.assertEqual(actual.returncode, 1, actual.stderr)
+                self.assertNotEqual(expected.returncode, 0)
+                for text in [marker, "ValueError: outer", "TypeError:"]:
+                    self.assertIn(text, actual.stderr)
+                    self.assertIn(text, expected.stderr)
+        source = "try:\n    raise TypeError('inner')\nexcept:\n    raise ValueError('outer') from None"
+        actual = self.execute([self.binary, "-c", source])
+        self.assertEqual(actual.returncode, 1)
+        self.assertNotIn("TypeError", actual.stderr)
+        self.assertIn("ValueError: outer", actual.stderr)
+        actual = self.execute([self.binary, "-c", "error = ValueError('cycle')\nerror.__context__ = error\nraise error"])
+        self.assertEqual(actual.returncode, 1)
+        self.assertEqual(actual.stderr.count("ValueError"), 1)
 
     def test_file_entry_and_unicode_diagnostics(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -388,7 +388,6 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 if (status == NextStatus::Raised)
                     activation.raising(result.exception());
                 else if (status == NextStatus::Done) {
-                    data.operands[--data.sp] = context.builtin(CoreObject::None);
                     data.pc = operand;
                 } else
                     data.operands[data.sp++] = result.value();
@@ -549,6 +548,35 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 detail::validate_return(context, result);
                 data.reason = FunctionReturn{result.value()};
                 break;
+            case Opcode::Raise: {
+                RootScope roots(context);
+                const auto base = data.sp - operand;
+                detail::normalize_exception(context, roots.root(data.operands[base]), result);
+                if (raised(result)) {
+                    activation.raising(result.exception());
+                    break;
+                }
+                const auto exception = roots.root(result.value());
+                if (operand == 2) {
+                    std::optional<Value> cause;
+                    if (data.operands[base + 1] != context.builtin(CoreObject::None)) {
+                        ReturnSlot converted(context);
+                        detail::normalize_exception(context, roots.root(data.operands[base + 1]),
+                                                    converted);
+                        if (raised(converted)) {
+                            activation.raising(converted.exception());
+                            break;
+                        }
+                        cause = roots.root(converted.value()).get(context);
+                    }
+                    auto &error = context.payload<ExceptionObject>(exception);
+                    context.store(exception.get(context), error.cause, cause);
+                    error.suppress_context.store(true, std::memory_order_release);
+                }
+                detail::link_exception_context(context, exception.get(context));
+                activation.raising(exception.get(context));
+                break;
+            }
             case Opcode::RaiseInstance: {
                 auto exception = data.operands[data.sp - 1];
                 if (!kind<ExceptionObject, CoreObject::BaseExceptionType>(context, exception)) {
@@ -663,7 +691,7 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 break;
             }
             case Opcode::LeaveRegion:
-                data.reason = NormalExit{code.program.regions()[operand].after_pc,
+                data.reason = NormalExit{code.program.regions()[operand].normal_pc,
                                          code.program.regions()[operand].parent};
                 break;
             case Opcode::EndHandler:

@@ -22,6 +22,11 @@ Scope analysis is complete before lowering; the emitter does not guess bindings.
 AST visitors fail at compile time if a new expression/statement has no explicit
 scope or lowering rule. Syntax additions extend these passes rather than adding
 another parser, execution path or managed compiler-state layer.
+CFG block identity and physical order are separate: lexical region phases remain
+contiguous even when branch targets are reserved early. Native region descriptors
+and entry/exit markers replay CodeBuilder's existing Loop/Except/Finally/With
+operations during freeze. Source control flow uses the same traced cleanup
+continuations as native bytecode, not a second source-only exception mechanism.
 
 `Python/ceval.cpp` prepares and schedules invocation-owned Frames, executes the
 verified bytecode and calls normal object protocols. Python-to-Python calls do

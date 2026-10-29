@@ -177,6 +177,13 @@ enum class TokenKind {
     In,
     Def,
     Return,
+    Raise,
+    From,
+    Try,
+    Except,
+    Finally,
+    With,
+    As,
     Pass,
     Break,
     Continue,
@@ -308,18 +315,18 @@ class Lexer final {
                     {"in", TokenKind::In},
                     {"lambda", TokenKind::Unsupported},
                     {"class", TokenKind::Unsupported},
-                    {"try", TokenKind::Unsupported},
-                    {"except", TokenKind::Unsupported},
-                    {"finally", TokenKind::Unsupported},
-                    {"with", TokenKind::Unsupported},
-                    {"raise", TokenKind::Unsupported},
+                    {"try", TokenKind::Try},
+                    {"except", TokenKind::Except},
+                    {"finally", TokenKind::Finally},
+                    {"with", TokenKind::With},
+                    {"raise", TokenKind::Raise},
                     {"yield", TokenKind::Unsupported},
                     {"import", TokenKind::Unsupported},
-                    {"from", TokenKind::Unsupported},
+                    {"from", TokenKind::From},
                     {"async", TokenKind::Unsupported},
                     {"await", TokenKind::Unsupported},
                     {"assert", TokenKind::Unsupported},
-                    {"as", TokenKind::Unsupported},
+                    {"as", TokenKind::As},
                 };
                 auto kind = TokenKind::Name;
                 for (auto [name, value] : words)
@@ -722,6 +729,82 @@ class Parser final {
     Suite compound()
     {
         Recursion recursion(*this);
+        if (accept(K::Try)) {
+            const auto start = tokens_[index_ - 1].span.begin;
+            TryStmt attempt;
+            attempt.body = suite();
+            bool bare = false;
+            while (accept(K::Except)) {
+                const auto token = tokens_[index_ - 1];
+                if (bare)
+                    fail(token, "default except must be last");
+                if (is(K::Star))
+                    fail(peek(), "except* requires exception-group support",
+                         SourceErrorKind::Capability);
+                ExceptHandler handler;
+                if (!is(K::Colon)) {
+                    handler.type = expression();
+                    if (accept(K::As)) {
+                        const auto name = expect(K::Name);
+                        handler.name = {name.text, name.span};
+                    }
+                } else
+                    bare = true;
+                handler.body = suite();
+                handler.span = {token.span.begin, tokens_[index_ - 1].span.end};
+                attempt.handlers.push_back(std::move(handler));
+            }
+            if (accept(K::Else)) {
+                if (attempt.handlers.empty())
+                    fail(tokens_[index_ - 1], "try else requires except");
+                attempt.alternative = suite();
+            }
+            if (accept(K::Finally))
+                attempt.cleanup = suite();
+            if (attempt.handlers.empty() && attempt.cleanup.empty())
+                fail(peek(), "expected except or finally");
+            Suite result;
+            result.push_back(statement(std::move(attempt), {start, tokens_[index_ - 1].span.end}));
+            return result;
+        }
+        if (accept(K::With)) {
+            const auto start = tokens_[index_ - 1].span.begin;
+            bool parenthesized = false;
+            if (is(K::Left)) {
+                std::size_t depth = 0;
+                for (auto i = index_; i < tokens_.size(); ++i) {
+                    if (tokens_[i].kind == K::Left)
+                        ++depth;
+                    else if (tokens_[i].kind == K::Right && --depth == 0) {
+                        parenthesized = i > index_ + 1 && i + 1 < tokens_.size() &&
+                                        tokens_[i + 1].kind == K::Colon;
+                        break;
+                    }
+                }
+            }
+            if (parenthesized)
+                expect(K::Left);
+            WithStmt manager;
+            do {
+                auto value = expression();
+                ExprPtr assigned;
+                if (accept(K::As)) {
+                    assigned = expression();
+                    target(*assigned);
+                }
+                manager.items.push_back({std::move(value), std::move(assigned)});
+                if (!accept(K::Comma))
+                    break;
+                if (parenthesized && is(K::Right))
+                    break;
+            } while (true);
+            if (parenthesized)
+                expect(K::Right);
+            manager.body = suite();
+            Suite result;
+            result.push_back(statement(std::move(manager), {start, tokens_[index_ - 1].span.end}));
+            return result;
+        }
         if (accept(K::For)) {
             const auto start = tokens_[index_ - 1].span.begin;
             auto assigned = expression_list();
@@ -857,6 +940,15 @@ class Parser final {
                 auto value = line_end() ? ExprPtr{} : expression_list();
                 result.push_back(
                     statement(ReturnStmt{std::move(value)}, {start, tokens_[index_ - 1].span.end}));
+            } else if (accept(K::Raise)) {
+                RaiseStmt raised;
+                if (!line_end()) {
+                    raised.exception = expression();
+                    if (accept(K::From))
+                        raised.cause = expression();
+                }
+                result.push_back(
+                    statement(std::move(raised), {start, tokens_[index_ - 1].span.end}));
             } else if (is(K::Global) || is(K::Nonlocal)) {
                 DeclareStmt declaration{take().kind == K::Nonlocal, {}};
                 do {

@@ -23,8 +23,10 @@ operations, if/while/for control flow, calls, function definitions/defaults/vari
 binding, globals/nonlocal, closures, docstrings, tuple expressions, recursive
 non-starred unpacking and integer/protocol subscripts. Experimental range,
 tuple/string iteration, iter(obj), next(it[, default]) and exception construction
-use ordinary object protocols. Mutable containers, slices, full iteration APIs,
-class and exception source lowering, imports, suspension, f-strings, float/power
+use ordinary object protocols. Raise/reraise/chaining, try/except/else/finally and
+synchronous with use verified regions and the existing frame scheduler.
+Mutable containers, slices, full iteration APIs, class source lowering,
+exception groups, imports, suspension, f-strings, float/power
 protocols, full Unicode source handling and the remaining Python 3.12 matrix are
 unfinished. These are remaining delivery requirements, not a reduction of the
 basic-language objective. Existing native VM/type/cleanup interfaces do not imply
@@ -93,6 +95,9 @@ CodeBuilder verifies opcode domains, bounds, stack joins, call shapes, control
 regions and source positions before immutable publication, including unreachable
 instructions. Shared Code has actual managed name/constant/metadata tuples.
 Private bytecode encoding is not a CPython compatibility promise.
+Protected normal exits may explicitly target an else block in the parent scope;
+handled exits use the after-handler target. Both are checked independently, so
+else exceptions cannot be caught by the preceding try's handlers.
 
 Frame state belongs to one invocation/attachment. Its operand storage is fixed
 before execution. The scheduler transfers returns into parent traced storage
@@ -141,8 +146,11 @@ indices raise IndexError. Range slicing, reverse/membership helpers and the full
 container method matrices remain gates.
 
 FOR_ITER has distinct taken/fallthrough stack effects, both checked by the Code
-verifier. Loop exhaustion removes the iterator before else; break removes it
-without executing else; continue preserves it. UNPACK_SEQUENCE collects and roots
+verifier; exhaustion retains the iterator until explicit cleanup outside the
+loop's protected region. Source loops use the same verified Loop regions as
+native code. Exhaustion removes the iterator before else; break removes it without
+executing else; continue preserves it, including transfers across with/finally.
+UNPACK_SEQUENCE collects and roots
 the required values, probes for surplus and only then exposes target stores.
 Subscript augmented assignment evaluates owner/key once, using the same typed
 getitem/setitem dispatch as the public runtime API. List/dict syntax and starred
@@ -152,8 +160,43 @@ BaseException construction uses the native exception layout and a managed args
 tuple; args replacement consumes an iterable before atomically publishing its
 tuple. StopIteration.value is an independent traced atomic tail field: assigning
 args or calling BaseException.__init__ does not overwrite it, while calling
-StopIteration.__init__ resets it. This is not a claim of complete exception
-subtype-specific constructors or source try/raise support.
+StopIteration.__init__ resets it. Complete exception subtype-specific constructor
+matrices remain a gate.
+
+## Source Exceptions And Cleanup
+
+RAISE takes one exception or an exception plus cause; its operand, stack effect
+and exceptional control edge are verified. Values may be BaseException instances
+or derived types constructed through the ordinary call path; invalid values or
+constructor results raise TypeError. Both source operands are evaluated before
+normalization. RERAISE retains the active exception without adding a synthetic
+traceback node. Called functions inherit and restore handled state.
+
+The compiler lays out CFG blocks in lexical region-phase order and replays the
+same CodeBuilder region operations used by native tests. It does not recreate
+unwind in generated Python calls or hidden native state. Except clauses test
+ordinary expressions against the real exception hierarchy; alias binding uses
+the normal local/global/Cell classification. A small finally region clears an
+alias even when the handler deletes it, returns, raises, breaks or continues.
+Handlers restore the previous handled exception; else runs only on protected
+normal completion; finally runs for every transfer and may replace its reason.
+
+Multiple with items lower to nested With regions. The region is registered after
+enter succeeds and before target binding; exit is already cached by the existing preparation
+template. Binding failure invokes exit. Exits run in reverse order, receive the
+actual type/exception/traceback on errors and may suppress only exceptions, not
+return/break/continue. Allocation, calls and suppression truth conversion use the
+same rooted and scheduled protocol paths as native with code.
+
+BaseException exposes its actual __context__, __cause__ and __suppress_context__
+fields. Links accept instances/None, not classes, and cannot be deleted; explicit
+cause assignment enables suppression. The suppression flag accepts only bool.
+References and flags remain atomic; explicit graph setters use the existing
+exception publication epoch shared with implicit context-cycle repair. These
+individual field operations are safe but not a multi-field transaction.
+The CLI displays cause/context chains in order, honors suppression and terminates
+on explicit graph cycles. This does not promise byte-for-byte CPython diagnostic
+formatting, exception-group rendering or the complete traceback library.
 
 ## Frontend And Measurement
 
@@ -167,7 +210,7 @@ dictionaries; arbitrary namespace mappings and Python compile/exec/eval are abse
 Native contracts live in Tests/cpp; actual executable differential drivers live
 in Lib/test and use fixed CPython 3.12.14 when configured. Benchmark source kernels
 are captured verbatim for the paired reference; raw runs retain version/build/hash
-provenance and generate tables. Same-Function source, closure and for-loop probes
+provenance and generate tables. Same-Function source, closure, for-loop and exception probes
 exercise CPU parallelism, but absolute single-thread CPython parity remains a
 failed gate.
 Do not replace that requirement with multicore scaling or a native-only probe.

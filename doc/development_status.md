@@ -1,5 +1,68 @@
 # Development Status
 
+## 2026-10-29 Source Exceptions And With Through Verified Regions
+
+Prepended without rewriting history. The previous stable node is 9d1bde6.
+The complete Plan 2 N0-N6/M0-M9 goal remains active. This advances L1 source
+execution; it does not declare complete language, library or performance support.
+
+- Added raise, bare reraise, explicit cause/from None, try/except/else/finally
+  and synchronous with (including multiple and parenthesized items) to the
+  existing AST, scope pass, CFG and attached freeze path. Except* remains an
+  explicit experimental capability error, now tested. No alternate interpreter,
+  source-only exception engine, new object type or global execution lock.
+- Separated native CFG block identity from physical layout order. Structured
+  phases replay the existing CodeBuilder Loop/Except/Finally/With operations.
+  Source while/for now use those same Loop regions, so break/continue/return
+  execute crossed cleanups. FOR_ITER retains its iterator on exhaustion until
+  the explicit outer PopTop; both branch effects and protected-prefix checks
+  remain verified. The private bytecode is not a compatibility surface.
+- Added a normal parent-scope exit destination separate from the handled exit.
+  This makes try else run only on successful protected completion without
+  allowing the original handlers to catch errors from else. Foreign, unbound
+  and cross-scope destinations retain builder/verifier error paths.
+- Handlers match real exception types/tuples, preserve arbitrary matcher errors
+  and restore handled state. Alias bindings use actual local/global/Cell slots;
+  a finally region clears the alias on every exit, even after explicit deletion.
+  Closures see the resulting empty Cell, not a hidden retained exception.
+- RAISE validates its arity and stack effects, normalizes instances or exception
+  classes through ordinary calls, rejects invalid constructor results and stores
+  traced cause/suppression fields. Both operands evaluate before normalization.
+  Bare reraise and called-function handled-state inheritance use existing VM
+  behavior and do not fabricate traceback frames.
+- Exposed actual BaseException context/cause/suppression descriptors with Python
+  value validation. Edges/flags remain atomic; explicit graph setters share the
+  existing exception publication epoch with implicit context-cycle repair.
+  The CLI now displays cause/context chains, honors suppression and terminates
+  on explicit cycles, using str and the actual exception type. Complete
+  exception-group/traceback-library and diagnostic-format compatibility remain.
+- Added eight focused native cases and expanded concurrent source freeze and
+  same-Function/Code execution with try/except/finally under GC. Normal CTest
+  passes 333/333, including all 330 native cases, source differential, recorder
+  tests and clang-format. Fresh ASan/UBSan/LSan passes 330/330; its actual CLI
+  also passes all nine differential driver groups. TSan passes 328/328,
+  excluding only the two existing exhaustive allocation enumerations covered
+  by normal/ASan runs. No failure was suppressed and no timeout was increased.
+- Added 29 positive source workflows (including the for/while cleanup-control
+  combinations and constructing exception subclasses), 15 compile/runtime
+  error workflows and four uncaught-chain checks against CPython 3.12.14.
+  Difference testing caught and fixed with () being wrongly rejected at
+  compile time; it now reaches the required runtime TypeError. Retained
+  executable output/hash evidence is regenerated for the final normal CLI.
+- Extended the existing benchmark/recorder with the exact source exception
+  kernel and paired 1/2/4-worker CPython runs. Three idle Release samples after
+  all builds/sanitizers generated l1-source-exceptions raw JSONL, CSV and
+  Markdown tables automatically; previous records remain. Plain/closure/for
+  costs remain near the previous node and exception CPU parallelism scales,
+  but the large absolute CPython gap remains a failed acceptance gate.
+- Next advance L1 class-body/namespace compilation through existing type and
+  descriptor construction; complete the numeric/container/iteration and other
+  basic-language gaps, not just keyword parsing. Source imports/f-strings,
+  suspension, actual library/thread/I/O workflows, finalization/weakrefs,
+  platform/install and performance release acceptance still remain.
+  No subagents were used. The user's temporary_plan.md deletion and untracked
+  test2.py remain excluded.
+
 ## 2026-10-29 Source Iteration, Unpacking And Ordinary Item Protocols
 
 Prepended without rewriting history. The previous stable node is d474073.

@@ -323,7 +323,7 @@ TEST_F(CoreExecution, IterationAndUnpackOpcodesVerifyBothBranchStackEffects)
     EXPECT_EQ(item.pops, 0U);
     EXPECT_EQ(item.pushes, 1U);
     EXPECT_EQ(done.inputs, 1U);
-    EXPECT_EQ(done.pops, 1U);
+    EXPECT_EQ(done.pops, 0U);
     EXPECT_EQ(done.pushes, 0U);
     const auto effect = instruction_effect({Opcode::UnpackSequence, 3});
     EXPECT_EQ(effect.inputs, 1U);
@@ -338,6 +338,7 @@ TEST_F(CoreExecution, IterationAndUnpackOpcodesVerifyBothBranchStackEffects)
     loop.emit(Opcode::PopTop);
     loop.jump(Opcode::Jump, again);
     loop.bind(exhausted);
+    loop.emit(Opcode::PopTop);
     loop.emit(Opcode::LoadConst, loop.constant(builtin(CoreObject::None)));
     loop.emit(Opcode::Return);
     const auto program = code(loop);
@@ -347,6 +348,34 @@ TEST_F(CoreExecution, IterationAndUnpackOpcodesVerifyBothBranchStackEffects)
     call(context, function(program), {}, out);
     ASSERT_EQ(out.tag(), ResultTag::Ok);
     EXPECT_EQ(out.value(), context.builtin(CoreObject::None));
+}
+
+TEST_F(CoreExecution, RaiseOpcodeValidatesArityAndNormalizesExceptionTypesAndCauses)
+{
+    CodeBuilder missing(context);
+    missing.emit(Opcode::Raise, 0);
+    invalid(missing, CodeErrorKind::Operand);
+    CodeBuilder underflow(context);
+    underflow.emit(Opcode::Raise, 2);
+    invalid(underflow, CodeErrorKind::StackUnderflow);
+    const auto effect = instruction_effect({Opcode::Raise, 2});
+    EXPECT_EQ(effect.inputs, 2U);
+    EXPECT_EQ(effect.pops, 2U);
+    EXPECT_EQ(effect.pushes, 0U);
+    CodeBuilder builder(context);
+    builder.emit(Opcode::LoadConst, builder.constant(builtin(CoreObject::ValueErrorType)));
+    builder.emit(Opcode::LoadConst, builder.constant(builtin(CoreObject::TypeErrorType)));
+    builder.emit(Opcode::Raise, 2);
+    const auto program = code(builder);
+    EXPECT_NE(disassemble(context, program).find("RAISE 2"), std::string::npos);
+    ReturnSlot out(context);
+    call(context, function(program), {}, out);
+    ASSERT_EQ(out.tag(), ResultTag::Raised);
+    EXPECT_EQ(context.type_of(out.exception()), context.builtin(CoreObject::ValueErrorType));
+    const auto exception = roots.root(out.exception());
+    get_attribute(context, exception, text(U"__cause__"), out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(context.type_of(out.value()), context.builtin(CoreObject::TypeErrorType));
 }
 
 TEST_F(CoreExecution, GlobalLookupUsesLiveGlobalsThenTheFunctionsBuiltinsMapping)

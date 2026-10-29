@@ -18,9 +18,6 @@ class GraphPass final {
     }
 
   private:
-    struct Loop {
-        std::size_t test, done;
-    };
     [[noreturn]] void error(Span span, std::string message) const
     {
         throw SourceError(program_.source, span, std::move(message));
@@ -34,6 +31,20 @@ class GraphPass final {
         auto &blocks = program_.graphs[scope_].blocks;
         blocks.emplace_back();
         return blocks.size() - 1;
+    }
+    void select(std::size_t id)
+    {
+        block_ = id;
+        program_.graphs[scope_].order.push_back(id);
+    }
+    std::size_t region(RegionKind kind, Span span, std::optional<std::size_t> continued = {},
+                       std::optional<std::size_t> broken = {})
+    {
+        auto &regions = program_.graphs[scope_].regions;
+        const auto id = regions.size();
+        regions.push_back({kind, continued, broken, {}});
+        emit(Opcode::EnterRegion, span, static_cast<std::uint32_t>(id));
+        return id;
     }
     void emit(Opcode opcode, Span span, std::uint32_t operand = 0, std::u32string name = {})
     {
@@ -91,7 +102,7 @@ class GraphPass final {
             const auto right = block();
             test(*node->left, node->conjunction ? right : yes, node->conjunction ? no : right,
                  preserve);
-            block_ = right;
+            select(right);
             if (preserve)
                 emit(Opcode::PopTop, value.span);
             test(*node->right, yes, no, preserve);
@@ -115,12 +126,12 @@ class GraphPass final {
                 }
                 const auto again = block(), failed = block();
                 branch(again, failed, value.span);
-                block_ = failed;
+                select(failed);
                 if (preserve)
                     emit(Opcode::Swap, value.span, 2);
                 emit(Opcode::PopTop, value.span);
                 jump(no, value.span);
-                block_ = again;
+                select(again);
                 if (preserve)
                     emit(Opcode::PopTop, value.span);
             }
@@ -166,11 +177,11 @@ class GraphPass final {
                     const auto right = block(), done = block();
                     test(*node.left, node.conjunction ? right : done,
                          node.conjunction ? done : right, true);
-                    block_ = right;
+                    select(right);
                     emit(Opcode::PopTop, value.span);
                     expression(*node.right);
                     jump(done, value.span);
-                    block_ = done;
+                    select(done);
                 } else if constexpr (std::is_same_v<T, CompareExpr>) {
                     expression(*node.values[0]);
                     const auto done = block();
@@ -186,16 +197,16 @@ class GraphPass final {
                             emit(Opcode::DupTop, value.span);
                             const auto again = block(), failed = block();
                             branch(again, failed, value.span);
-                            block_ = failed;
+                            select(failed);
                             emit(Opcode::Swap, value.span, 2);
                             emit(Opcode::PopTop, value.span);
                             jump(done, value.span);
-                            block_ = again;
+                            select(again);
                             emit(Opcode::PopTop, value.span);
                         }
                     }
                     jump(done, value.span);
-                    block_ = done;
+                    select(done);
                 } else if constexpr (std::is_same_v<T, CallExpr>) {
                     expression(*node.target);
                     for (const auto &item : node.positional)
@@ -238,6 +249,99 @@ class GraphPass final {
             emit(erase ? Opcode::DeleteAttr : Opcode::StoreAttr, target.span, 0, attribute.name);
         }
     }
+    void close_protected(std::size_t id, Span span)
+    {
+        const auto leave = block();
+        if (current().exit == FlowBlock::Exit::Open)
+            jump(leave, span);
+        select(leave);
+        current().exit = FlowBlock::Exit::Leave;
+        current().target = id;
+        current().span = span;
+    }
+    void close_handler(std::size_t id, Span span)
+    {
+        const auto end = block();
+        if (current().exit == FlowBlock::Exit::Open)
+            jump(end, span);
+        select(end);
+        current().exit = FlowBlock::Exit::EndHandler;
+        current().target = id;
+        current().span = span;
+    }
+    void finally_handler(std::size_t id, const Suite &cleanup, Span span)
+    {
+        close_protected(id, span);
+        select(block());
+        current().handler = id;
+        suite(cleanup);
+        close_handler(id, span);
+        select(block());
+    }
+    void try_except(const TryStmt &node, Span span)
+    {
+        if (node.handlers.empty()) {
+            suite(node.body);
+            return;
+        }
+        const auto id = region(RegionKind::Except, span);
+        const auto normal = block(), done = block(), finished = block();
+        program_.graphs[scope_].regions[id].normal_target = normal;
+        suite(node.body);
+        close_protected(id, span);
+        select(block());
+        current().handler = id;
+        for (const auto &handler : node.handlers) {
+            std::optional<std::size_t> next;
+            if (handler.type) {
+                emit(Opcode::DupTop, handler.span);
+                expression(*handler.type);
+                emit(Opcode::ExceptionMatch, handler.span);
+                const auto matched = block();
+                next = block();
+                branch(matched, *next, handler.span);
+                select(matched);
+            }
+            if (handler.name) {
+                const auto &[text, location] = *handler.name;
+                name(text, location, Opcode::StoreFast, Opcode::StoreGlobal);
+                const auto cleanup = region(RegionKind::Finally, handler.span);
+                suite(handler.body);
+                close_protected(cleanup, handler.span);
+                select(block());
+                current().handler = cleanup;
+                none(location);
+                name(text, location, Opcode::StoreFast, Opcode::StoreGlobal);
+                name(text, location, Opcode::DeleteFast, Opcode::DeleteGlobal);
+                close_handler(cleanup, handler.span);
+                select(block());
+            } else {
+                emit(Opcode::PopTop, handler.span);
+                suite(handler.body);
+            }
+            if (current().exit == FlowBlock::Exit::Open)
+                jump(finished, handler.span);
+            if (next)
+                select(*next);
+            else
+                break;
+        }
+        if (node.handlers.back().type) {
+            emit(Opcode::Reraise, span);
+            current().exit = FlowBlock::Exit::Stop;
+        }
+        select(finished);
+        current().exit = FlowBlock::Exit::EndHandler;
+        current().target = id;
+        current().span = span;
+        select(block());
+        jump(done, span);
+        select(normal);
+        suite(node.alternative);
+        if (current().exit == FlowBlock::Exit::Open)
+            jump(done, span);
+        select(done);
+    }
     void suite(const Suite &body)
     {
         for (std::size_t index = 0; index < body.size(); ++index) {
@@ -251,7 +355,7 @@ class GraphPass final {
                 continue;
             }
             if (current().exit != FlowBlock::Exit::Open)
-                block_ = block();
+                select(block());
             const auto span = statement->span;
             std::visit(
                 [&](const auto &node) {
@@ -295,58 +399,69 @@ class GraphPass final {
                     } else if constexpr (std::is_same_v<T, IfStmt>) {
                         const auto yes = block(), no = block(), done = block();
                         test(*node.test, yes, no);
-                        block_ = yes;
+                        select(yes);
                         suite(node.body);
                         if (current().exit == FlowBlock::Exit::Open)
                             jump(done, span);
-                        block_ = no;
+                        select(no);
                         suite(node.alternative);
                         if (current().exit == FlowBlock::Exit::Open)
                             jump(done, span);
-                        block_ = done;
+                        select(done);
                     } else if constexpr (std::is_same_v<T, WhileStmt>) {
                         const auto test = block(), body = block(), exhausted = block(),
                                    done = block();
+                        const auto loop = region(RegionKind::Loop, span, test, done);
                         jump(test, span);
-                        block_ = test;
+                        select(test);
                         this->test(*node.test, body, exhausted);
-                        block_ = body;
-                        loops_.push_back({test, done});
+                        select(body);
+                        loops_.push_back(loop);
                         suite(node.body);
                         loops_.pop_back();
                         if (current().exit == FlowBlock::Exit::Open)
                             jump(test, span);
-                        block_ = exhausted;
+                        select(exhausted);
+                        current().exit = FlowBlock::Exit::Leave;
+                        current().target = loop;
+                        current().span = span;
+                        select(block());
                         suite(node.alternative);
                         if (current().exit == FlowBlock::Exit::Open)
                             jump(done, span);
-                        block_ = done;
+                        select(done);
                     } else if constexpr (std::is_same_v<T, ForStmt>) {
                         expression(*node.iterable);
                         emit(Opcode::GetIter, span);
                         const auto test = block(), body = block(), exhausted = block(),
                                    broken = block(), done = block();
+                        const auto loop = region(RegionKind::Loop, span, test, broken);
                         jump(test, span);
-                        block_ = test;
+                        select(test);
                         current().exit = FlowBlock::Exit::IterNext;
                         current().target = body;
                         current().alternative = exhausted;
                         current().span = span;
-                        block_ = body;
+                        select(body);
                         store(*node.target);
-                        loops_.push_back({test, broken});
+                        loops_.push_back(loop);
                         suite(node.body);
                         loops_.pop_back();
                         if (current().exit == FlowBlock::Exit::Open)
                             jump(test, span);
-                        block_ = broken;
+                        select(exhausted);
+                        current().exit = FlowBlock::Exit::Leave;
+                        current().target = loop;
+                        current().span = span;
+                        select(block());
                         emit(Opcode::PopTop, span);
-                        jump(done, span);
-                        block_ = exhausted;
                         suite(node.alternative);
                         if (current().exit == FlowBlock::Exit::Open)
                             jump(done, span);
-                        block_ = done;
+                        select(broken);
+                        emit(Opcode::PopTop, span);
+                        jump(done, span);
+                        select(done);
                     } else if constexpr (std::is_same_v<T, ReturnStmt>) {
                         if (!scope_ && program_.mode != InputMode::Eval)
                             error(span, "'return' outside function");
@@ -356,13 +471,46 @@ class GraphPass final {
                             none(span);
                         current().exit = FlowBlock::Exit::Return;
                         current().span = span;
+                    } else if constexpr (std::is_same_v<T, RaiseStmt>) {
+                        if (node.exception) {
+                            expression(*node.exception);
+                            if (node.cause)
+                                expression(*node.cause);
+                            emit(Opcode::Raise, span, node.cause ? 2 : 1);
+                        } else
+                            emit(Opcode::Reraise, span);
+                        current().exit = FlowBlock::Exit::Stop;
+                    } else if constexpr (std::is_same_v<T, TryStmt>) {
+                        if (node.cleanup.empty())
+                            try_except(node, span);
+                        else {
+                            const auto id = region(RegionKind::Finally, span);
+                            try_except(node, span);
+                            finally_handler(id, node.cleanup, span);
+                        }
+                    } else if constexpr (std::is_same_v<T, WithStmt>) {
+                        std::vector<std::size_t> managers;
+                        for (const auto &item : node.items) {
+                            expression(*item.context);
+                            managers.push_back(region(RegionKind::With, item.context->span));
+                            if (item.target)
+                                store(*item.target);
+                            else
+                                emit(Opcode::PopTop, span);
+                        }
+                        suite(node.body);
+                        for (auto i = managers.size(); i-- > 0;) {
+                            close_protected(managers[i], span);
+                            select(block());
+                        }
                     } else if constexpr (std::is_same_v<T, ControlStmt>) {
                         if (node == ControlStmt::Pass)
                             return;
                         if (loops_.empty())
                             error(span, "'break'/'continue' outside loop");
-                        jump(node == ControlStmt::Break ? loops_.back().done : loops_.back().test,
-                             span);
+                        emit(node == ControlStmt::Break ? Opcode::BreakLoop : Opcode::ContinueLoop,
+                             span, static_cast<std::uint32_t>(loops_.back()));
+                        current().exit = FlowBlock::Exit::Stop;
                     } else if constexpr (std::is_same_v<T, FunctionStmt>) {
                         const auto parent_scope = scope_, parent_block = block_;
                         auto parent_loops = std::move(loops_);
@@ -420,7 +568,7 @@ class GraphPass final {
     void function(std::size_t scope, const Suite &body, const FunctionStmt *definition = nullptr)
     {
         scope_ = scope;
-        block_ = block();
+        select(block());
         loops_.clear();
         first_statement_ = nullptr;
         if (!body.empty())
@@ -446,7 +594,7 @@ class GraphPass final {
     }
     SourceProgram &program_;
     std::size_t scope_ = 0, block_ = 0;
-    std::vector<Loop> loops_;
+    std::vector<std::size_t> loops_;
     const Stmt *first_statement_ = nullptr;
 };
 
@@ -535,9 +683,17 @@ void SourceUnit::freeze(Attachment &context, ReturnSlot &out) const
             std::vector<CodeBuilder::Label> labels;
             for (std::size_t i = 0; i < graph.blocks.size(); ++i)
                 labels.push_back(builder.label());
-            for (std::size_t i = 0; i < graph.blocks.size(); ++i) {
-                builder.bind(labels[i]);
+            std::vector<CodeBuilder::Region> regions;
+            for (const auto &region : graph.regions)
+                regions.push_back(region.kind == RegionKind::Loop
+                                      ? builder.loop(labels[*region.continue_target],
+                                                     labels[*region.break_target])
+                                      : builder.region(region.kind));
+            for (auto i : graph.order) {
                 const auto &block = graph.blocks[i];
+                if (block.handler)
+                    builder.handler(regions[*block.handler]);
+                builder.bind(labels[i]);
                 for (const auto &instruction : block.instructions) {
                     const auto position = source().position(instruction.span);
                     auto operand = instruction.operand;
@@ -548,7 +704,12 @@ void SourceUnit::freeze(Attachment &context, ReturnSlot &out) const
                         operand = builder.constant(codes[*instruction.function]);
                     else if (!instruction.name.empty())
                         operand = builder.name(instruction.name);
-                    if (instruction.opcode == Opcode::Call)
+                    if (instruction.opcode == Opcode::EnterRegion)
+                        builder.enter(regions[operand], position);
+                    else if (instruction.opcode == Opcode::BreakLoop ||
+                             instruction.opcode == Opcode::ContinueLoop)
+                        builder.control(instruction.opcode, regions[operand]);
+                    else if (instruction.opcode == Opcode::Call)
                         builder.call(operand, instruction.keywords, position);
                     else if (instruction.opcode == Opcode::BuildNameDict)
                         builder.name_dict(instruction.keywords, position);
@@ -566,7 +727,14 @@ void SourceUnit::freeze(Attachment &context, ReturnSlot &out) const
                 } else if (block.exit == detail::FlowBlock::Exit::Branch) {
                     builder.jump(Opcode::JumpIfFalse, labels[block.alternative], position);
                     builder.jump(Opcode::Jump, labels[block.target], position);
-                } else
+                } else if (block.exit == detail::FlowBlock::Exit::Leave) {
+                    if (const auto normal = graph.regions[block.target].normal_target)
+                        builder.leave(regions[block.target], labels[*normal], position);
+                    else
+                        builder.leave(regions[block.target], position);
+                } else if (block.exit == detail::FlowBlock::Exit::EndHandler)
+                    builder.end_handler(regions[block.target]);
+                else if (block.exit != detail::FlowBlock::Exit::Stop)
                     throw std::logic_error("compiler left a CFG block unterminated");
             }
             builder.freeze(temporary);

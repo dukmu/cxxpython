@@ -3,6 +3,7 @@
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <unordered_set>
 
 namespace {
 using namespace cxxpython::core;
@@ -10,27 +11,57 @@ int report(Attachment &context, Value exception)
 {
     RootScope roots(context);
     const auto error = roots.root(exception);
-    ReturnSlot text(context), trace(context);
-    std::string output;
-    context.load(exception, context.payload<ExceptionObject>(exception).traceback, trace);
-    if (trace.result().tag() == ResultTag::Ok)
-        output = "Traceback (most recent call last):\n";
-    while (trace.result().tag() == ResultTag::Ok) {
-        const auto value = trace.result().value();
-        const auto &node = context.payload<TracebackObject>(value);
-        const auto &frame = context.payload<FrameObject>(node.frame);
-        const auto &code = context.payload<CodeObject>(frame.code);
-        output += "  File \"" + source_utf8(context.payload<StrObject>(code.filename).value) +
-                  "\", line " + std::to_string(node.lineno) + ", in " +
-                  source_utf8(context.payload<StrObject>(code.name).value) + "\n";
-        context.load(value, node.next, trace);
+    ReturnSlot text(context), trace(context), link(context);
+    enum class Chain { Context, Cause };
+    std::vector<std::pair<Handle, Chain>> chain;
+    std::unordered_set<ObjectHeader *> seen;
+    auto current = error;
+    while (seen.insert(current.get(context).object()).second) {
+        Chain relation = Chain::Context;
+        const auto &data = context.payload<ExceptionObject>(current);
+        context.load(current.get(context), data.cause, link);
+        if (link.tag() == ResultTag::Ok)
+            relation = Chain::Cause;
+        else if (!data.suppress_context.load(std::memory_order_acquire))
+            context.load(current.get(context), data.context, link);
+        chain.push_back({current, relation});
+        if (link.tag() == ResultTag::Empty)
+            break;
+        current = roots.root(link.value());
     }
-    repr(context, error, text);
-    output += text.result().tag() == ResultTag::Ok
-                  ? source_utf8(context.payload<StrObject>(text.result().value()).value)
-                  : "<exception representation failed>";
+    std::string output;
+    for (auto i = chain.size(); i-- > 0;) {
+        const auto [owner, relation] = chain[i];
+        if (i + 1 < chain.size())
+            output +=
+                relation == Chain::Cause
+                    ? "\nThe above exception was the direct cause of the following exception:\n\n"
+                    : "\nDuring handling of the above exception, another exception occurred:\n\n";
+        context.load(owner.get(context), context.payload<ExceptionObject>(owner).traceback, trace);
+        if (trace.tag() == ResultTag::Ok)
+            output += "Traceback (most recent call last):\n";
+        while (trace.tag() == ResultTag::Ok) {
+            const auto value = trace.value();
+            const auto &node = context.payload<TracebackObject>(value);
+            const auto &frame = context.payload<FrameObject>(node.frame);
+            const auto &code = context.payload<CodeObject>(frame.code);
+            output += "  File \"" + source_utf8(context.payload<StrObject>(code.filename).value) +
+                      "\", line " + std::to_string(node.lineno) + ", in " +
+                      source_utf8(context.payload<StrObject>(code.name).value) + "\n";
+            context.load(value, node.next, trace);
+        }
+        const auto name = TypeView(context, context.type_of(owner)).name();
+        output += source_utf8(context.payload<StrObject>(std::get<Value>(name)).value);
+        str(context, owner, text);
+        const auto message = text.tag() == ResultTag::Ok
+                                 ? source_utf8(context.payload<StrObject>(text.value()).value)
+                                 : "<exception str() failed>";
+        if (!message.empty())
+            output += ": " + message;
+        output += '\n';
+    }
     NativeWait wait(context);
-    std::cerr << output << '\n';
+    std::cerr << output;
     return 1;
 }
 } // namespace

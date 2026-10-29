@@ -95,6 +95,27 @@ struct FunctionStmt {
 struct ReturnStmt {
     ExprPtr value;
 };
+struct RaiseStmt {
+    ExprPtr exception, cause;
+};
+struct ExceptHandler {
+    ExprPtr type;
+    std::optional<std::pair<std::u32string, Span>> name;
+    Suite body;
+    Span span;
+};
+struct TryStmt {
+    Suite body;
+    std::vector<ExceptHandler> handlers;
+    Suite alternative, cleanup;
+};
+struct WithItem {
+    ExprPtr context, target;
+};
+struct WithStmt {
+    std::vector<WithItem> items;
+    Suite body;
+};
 struct DeclareStmt {
     bool nonlocal;
     std::vector<std::pair<std::u32string, Span>> names;
@@ -103,7 +124,7 @@ enum class ControlStmt { Pass, Break, Continue };
 struct Stmt {
     Span span;
     std::variant<ExprStmt, AssignStmt, AugAssignStmt, DeleteStmt, IfStmt, WhileStmt, ForStmt,
-                 FunctionStmt, ReturnStmt, DeclareStmt, ControlStmt>
+                 FunctionStmt, ReturnStmt, RaiseStmt, TryStmt, WithStmt, DeclareStmt, ControlStmt>
         node;
 };
 // CFG instructions use native literals/names until one attached freeze task
@@ -118,13 +139,30 @@ struct FlowInstruction {
     std::optional<std::size_t> function;
 };
 struct FlowBlock {
-    enum class Exit { Open, Jump, Branch, Return, IterNext } exit = Exit::Open;
+    enum class Exit {
+        Open,
+        Jump,
+        Branch,
+        Return,
+        IterNext,
+        Stop,
+        Leave,
+        EndHandler
+    } exit = Exit::Open;
     std::vector<FlowInstruction> instructions;
     std::size_t target = 0, alternative = 0;
     Span span;
+    std::optional<std::size_t> handler;
+};
+struct FlowRegion {
+    RegionKind kind;
+    std::optional<std::size_t> continue_target, break_target, normal_target;
 };
 struct FunctionGraph {
     std::vector<FlowBlock> blocks;
+    // Physical layout follows lexical region phases, not block allocation order.
+    std::vector<std::size_t> order;
+    std::vector<FlowRegion> regions;
     SignatureLayout signature;
     std::optional<std::u32string> docstring;
 };

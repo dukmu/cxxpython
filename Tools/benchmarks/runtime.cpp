@@ -472,6 +472,19 @@ int main()
     const SourceUnit for_program(
         SourceBuffer("def total(n):\n    value = 0\n    for item in range(n, 0, -1):\n"
                      "        value += item\n    return value\n"));
+    const SourceUnit exception_program(SourceBuffer(R"(def total(n):
+    value = 0
+    for item in range(n, 0, -1):
+        try:
+            if item % 64 == 0:
+                raise ValueError(item)
+            value += item
+        except ValueError as error:
+            value += error.args[0]
+        finally:
+            pass
+    return value
+)"));
     auto hex_source = [](const SourceUnit &source) {
         std::string result;
         constexpr char hex[] = "0123456789abcdef";
@@ -485,9 +498,10 @@ int main()
               << " source_bytes=" << source_program->source().text().size()
               << " source_kernel_hex=" << hex_source(*source_program)
               << " closure_kernel_hex=" << hex_source(closure_program)
-              << " for_kernel_hex=" << hex_source(for_program) << '\n';
-    for (const auto *source : std::array<const SourceUnit *, 4>{nullptr, &*source_program,
-                                                                &closure_program, &for_program})
+              << " for_kernel_hex=" << hex_source(for_program)
+              << " exception_kernel_hex=" << hex_source(exception_program) << '\n';
+    for (const auto *source : std::array<const SourceUnit *, 5>{
+             nullptr, &*source_program, &closure_program, &for_program, &exception_program})
         for (int workers : {1, 2, 4}) {
             Interpreter vm;
             Attachment controller(vm);
@@ -594,7 +608,8 @@ int main()
             const auto final = controller.stats();
             if (final.objects != baseline.objects || final.transfer_roots)
                 return 1;
-            std::cout << (source == &for_program       ? "parallel_for_workers="
+            std::cout << (source == &exception_program ? "parallel_exception_workers="
+                          : source == &for_program     ? "parallel_for_workers="
                           : source == &closure_program ? "parallel_closure_workers="
                           : source                     ? "parallel_source_workers="
                                                        : "parallel_vm_workers=")

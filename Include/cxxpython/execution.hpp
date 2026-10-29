@@ -56,6 +56,7 @@ enum class Opcode : std::uint8_t {
     DeleteItem,
     Copy,
     UnpackSequence,
+    Raise,
     Count,
 };
 enum class OperandDomain {
@@ -72,7 +73,8 @@ enum class OperandDomain {
     Unary,
     StackDepth,
     Count,
-    Cell
+    Cell,
+    RaiseArity
 };
 enum class FunctionFlags : std::uint32_t {
     None = 0,
@@ -92,6 +94,8 @@ struct RegionLayout {
     RegionKind kind;
     std::optional<RegionToken> parent;
     std::uint32_t enter_pc = 0, leave_pc = 0, handler_pc = 0, end_handler_pc = 0, after_pc = 0;
+    // A successful try enters else; a handled exception skips it via after_pc.
+    std::uint32_t normal_pc = 0;
     std::uint32_t continue_pc = 0, break_pc = 0;
     std::size_t depth = 1;
 };
@@ -325,6 +329,7 @@ class CodeBuilder final {
     Region loop(Label continue_target, Label break_target);
     void enter(Region region, SourcePosition source = {});
     void leave(Region region, SourcePosition source = {});
+    void leave(Region region, Label destination, SourcePosition source = {});
     void handler(Region region);
     void end_handler(Region region);
     void control(Opcode opcode, Region loop);
@@ -350,7 +355,7 @@ class CodeBuilder final {
     struct RegionSpec {
         RegionLayout layout;
         bool entered = false, closed = false, handler_started = false, complete = false;
-        std::optional<Label> continue_target, break_target;
+        std::optional<Label> continue_target, break_target, normal_target;
     };
     std::vector<RegionSpec> regions_;
     std::vector<std::optional<RegionToken>> scopes_;
@@ -439,5 +444,6 @@ std::string disassemble(Attachment &context, Handle code);
 void make_function(Attachment &context, const FunctionSpec &spec, ReturnSlot &out);
 namespace detail {
 void exception_match(Attachment &context, Value exception, Value matcher, ReturnSlot &out);
-}
+void normalize_exception(Attachment &context, Handle value, ReturnSlot &out);
+} // namespace detail
 } // namespace cxxpython::core

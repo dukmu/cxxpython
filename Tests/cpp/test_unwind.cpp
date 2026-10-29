@@ -225,6 +225,51 @@ TEST_F(CoreUnwind, NormalExitSkipsExceptButRunsFinallyAndPreservesFastLocals)
               std::string::npos);
 }
 
+TEST_F(CoreUnwind, ExplicitNormalDestinationSeparatesTryElseFromHandledExit)
+{
+    CodeSpec spec;
+    spec.signature.parameters = {{U"fail"}};
+    spec.locals = {U"fail"};
+    CodeBuilder builder(context, spec), foreign(context);
+    const auto normal = builder.label(), body = builder.label();
+    const auto region = builder.region(RegionKind::Except);
+    builder.enter(region);
+    builder.emit(Opcode::LoadFast);
+    builder.jump(Opcode::JumpIfFalse, body);
+    throw_instance(builder, exception());
+    builder.bind(body);
+    EXPECT_THROW(builder.leave(region, foreign.label()), CodeValidationError);
+    builder.leave(region, normal);
+    builder.handler(region);
+    builder.emit(Opcode::PopTop);
+    builder.end_handler(region);
+    load(builder, integer(1));
+    builder.emit(Opcode::Return);
+    builder.bind(normal);
+    load(builder, integer(2));
+    builder.emit(Opcode::Return);
+    const auto fn = function(builder);
+    ReturnSlot out(context);
+    for (bool fail : {false, true}) {
+        std::array args{context.builtin(fail ? CoreObject::True : CoreObject::False)};
+        call(context, fn, {args, {}}, out);
+        ASSERT_EQ(out.tag(), ResultTag::Ok);
+        EXPECT_EQ(int_decimal(context, out.value()), fail ? "1" : "2");
+    }
+    CodeBuilder invalid_target(context);
+    const auto protected_label = invalid_target.label();
+    const auto caught = invalid_target.region(RegionKind::Except);
+    invalid_target.enter(caught);
+    invalid_target.bind(protected_label);
+    invalid_target.leave(caught, protected_label);
+    invalid_target.handler(caught);
+    invalid_target.emit(Opcode::PopTop);
+    invalid_target.end_handler(caught);
+    load(invalid_target, builtin(CoreObject::None));
+    invalid_target.emit(Opcode::Return);
+    invalid(invalid_target, CodeErrorKind::RegionJump);
+}
+
 TEST_F(CoreUnwind, VerifierRevisitsCleanupEndForALateNormalContinuation)
 {
     CodeBuilder builder(context);

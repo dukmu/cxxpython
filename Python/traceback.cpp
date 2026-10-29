@@ -50,6 +50,65 @@ void set_exception_args(Attachment &context, Value self, std::optional<Value> va
     context.store(owner.get(context), context.payload<ExceptionObject>(owner).args, tuple.value());
     out.ok(context.builtin(CoreObject::None));
 }
+template <AtomicGcEdge ExceptionObject::*Field>
+void exception_link(Attachment &context, Value self, ReturnSlot &out)
+{
+    context.load(self, context.payload<ExceptionObject>(self).*Field, out);
+    if (out.tag() == ResultTag::Empty)
+        out.ok(context.builtin(CoreObject::None));
+}
+template <AtomicGcEdge ExceptionObject::*Field>
+void set_exception_link(Attachment &context, Value self, std::optional<Value> value,
+                        ReturnSlot &out)
+{
+    if (!value || (*value != context.builtin(CoreObject::None) &&
+                   (!context.has_layout<ExceptionObject>(*value) ||
+                    !is_subtype(context, context.type_of(*value),
+                                context.builtin(CoreObject::BaseExceptionType))))) {
+        type_error(context, U"exception link requires an exception instance or None", out);
+        return;
+    }
+    const auto link = *value == context.builtin(CoreObject::None) ? std::optional<Value>{} : value;
+    RootScope roots(context);
+    roots.root(self);
+    if (link)
+        roots.root(*link);
+    for (;;) {
+        const auto epoch = context.publication_epoch(PublicationDomain::Exception);
+        if (!(epoch & 1)) {
+            NoSafepoint commit(context);
+            if (context.begin_publication(PublicationDomain::Exception, epoch)) {
+                auto &error = context.payload<ExceptionObject>(self);
+                context.store(self, error.*Field, link);
+                if constexpr (Field == &ExceptionObject::cause)
+                    error.suppress_context.store(true, std::memory_order_release);
+                context.end_publication(PublicationDomain::Exception, epoch);
+                out.ok(context.builtin(CoreObject::None));
+                return;
+            }
+        }
+        context.poll();
+    }
+}
+void exception_suppressed(Attachment &context, Value self, ReturnSlot &out)
+{
+    out.ok(context.builtin(
+        context.payload<ExceptionObject>(self).suppress_context.load(std::memory_order_acquire)
+            ? CoreObject::True
+            : CoreObject::False));
+}
+void set_exception_suppressed(Attachment &context, Value self, std::optional<Value> value,
+                              ReturnSlot &out)
+{
+    if (!value || (*value != context.builtin(CoreObject::True) &&
+                   *value != context.builtin(CoreObject::False))) {
+        type_error(context, U"__suppress_context__ requires a bool", out);
+        return;
+    }
+    context.payload<ExceptionObject>(self).suppress_context.store(
+        *value == context.builtin(CoreObject::True), std::memory_order_release);
+    out.ok(context.builtin(CoreObject::None));
+}
 bool traceback_or_none(Attachment &context, Value value, ReturnSlot &out)
 {
     if (value == context.builtin(CoreObject::None) ||
@@ -264,18 +323,17 @@ void install_exception_runtime(Attachment &context, std::span<const Handle> core
     auto at = [&](CoreObject id) { return core[static_cast<std::size_t>(id)]; };
     auto field = [&](CoreObject kind, std::u32string name, NativeGetter getter,
                      NativeSetter setter = nullptr) {
-        RootScope roots(context);
-        ReturnSlot out(context);
-        context.allocate_instance<GetSetDescriptorObject>(at(CoreObject::GetSetDescriptorType), out,
-                                                          at(kind).get(context), getter, setter);
-        auto descriptor = roots.root(out.value());
-        context.allocate_instance<StrObject>(at(CoreObject::StrType), out, std::move(name));
-        name_store(context, *TypeView(context, at(kind)).dictionary(), out.value(),
-                   descriptor.get(context));
+        install_native_field(context, core, at(kind), std::move(name), getter, setter);
     };
     field(CoreObject::BaseExceptionType, U"__traceback__", exception_traceback,
           set_exception_traceback);
     field(CoreObject::BaseExceptionType, U"args", exception_args, set_exception_args);
+    field(CoreObject::BaseExceptionType, U"__context__", exception_link<&ExceptionObject::context>,
+          set_exception_link<&ExceptionObject::context>);
+    field(CoreObject::BaseExceptionType, U"__cause__", exception_link<&ExceptionObject::cause>,
+          set_exception_link<&ExceptionObject::cause>);
+    field(CoreObject::BaseExceptionType, U"__suppress_context__", exception_suppressed,
+          set_exception_suppressed);
     field(CoreObject::TracebackType, U"tb_next", traceback_next, set_traceback_next);
     field(CoreObject::TracebackType, U"tb_frame", traceback_frame);
     field(CoreObject::TracebackType, U"tb_lasti", traceback_lasti);

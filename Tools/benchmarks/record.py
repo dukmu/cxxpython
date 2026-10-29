@@ -16,7 +16,7 @@ import subprocess
 
 REFERENCE_PROBE = r'''
 import sys, threading, time
-for probe, encoded in zip(("parallel_source_workers", "parallel_closure_workers", "parallel_for_workers"), sys.argv[1:]):
+for probe, encoded in zip(("parallel_source_workers", "parallel_closure_workers", "parallel_for_workers", "parallel_exception_workers"), sys.argv[1:]):
     kernel = bytes.fromhex(encoded).decode("utf-8")
     namespace = {}; exec(compile(kernel, "<foundation-benchmark>", "exec"), namespace)
     target = namespace["total"]
@@ -96,7 +96,7 @@ def render_report(rows, failures):
               "| Series | Probe | Workers | cxxpython ms | CPython ms | cxxpython/CPython |",
               "| --- | --- | --- | --- | --- | --- |"]
     for (series, probe, workers, metric, unit), values in sorted(groups.items()):
-        if probe not in ("parallel_source_workers", "parallel_closure_workers", "parallel_for_workers") or metric != "wall_ns":
+        if probe not in ("parallel_source_workers", "parallel_closure_workers", "parallel_for_workers", "parallel_exception_workers") or metric != "wall_ns":
             continue
         reference = groups.get((series + "-cpython", probe, workers, metric, unit))
         if reference:
@@ -182,6 +182,8 @@ def main():
                 reference_command.append(fields["closure_kernel_hex"])
             if "for_kernel_hex" in fields:
                 reference_command.append(fields["for_kernel_hex"])
+            if "exception_kernel_hex" in fields:
+                reference_command.append(fields["exception_kernel_hex"])
             measured = subprocess.run(reference_command, capture_output=True, text=True)
             version = subprocess.check_output([str(reference), "--version"], text=True).strip()
             reference_build = json.loads(subprocess.check_output([str(reference), "-c", "import json,sysconfig; print(json.dumps({k:sysconfig.get_config_var(k) for k in ('CC','CFLAGS','CPPFLAGS','LDFLAGS','CONFIG_ARGS','PY_CFLAGS')}))"], text=True))
@@ -189,7 +191,8 @@ def main():
                                     exit_code=measured.returncode, command=reference_command, build=reference_build, reference_version=version,
                                     binary_sha256=hashlib.sha256(reference.read_bytes()).hexdigest(), source_kernel_hex=kernel,
                                     closure_kernel_hex=fields.get("closure_kernel_hex"),
-                                    for_kernel_hex=fields.get("for_kernel_hex"))
+                                    for_kernel_hex=fields.get("for_kernel_hex"),
+                                    exception_kernel_hex=fields.get("exception_kernel_hex"))
             if measured.returncode == 0:
                 parse_output(reference_record["output"], reference_record["series"], sample)
             with raw.open("a") as stream:

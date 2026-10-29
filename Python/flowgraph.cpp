@@ -60,6 +60,7 @@ constexpr std::array definitions{
     OpcodeDefinition{"DELETE_ITEM", 2, 2, 0, OperandDomain::None, FlowKind::Next, true, true},
     OpcodeDefinition{"COPY", 0, 0, 1, OperandDomain::StackDepth, FlowKind::Next, false, false},
     OpcodeDefinition{"UNPACK_SEQUENCE", 1, 1, 0, OperandDomain::Count, FlowKind::Next, true, true},
+    OpcodeDefinition{"RAISE", 0, 0, 0, OperandDomain::RaiseArity, FlowKind::Stop, true, true},
 };
 static_assert(definitions.size() == static_cast<std::size_t>(Opcode::Count));
 [[noreturn]] void invalid(CodeErrorKind kind, const char *message,
@@ -181,6 +182,11 @@ std::size_t verify(const CodeSpec &spec, std::span<const Instruction> instructio
             break;
         case OperandDomain::Count:
             break;
+        case OperandDomain::RaiseArity:
+            if (operand != 1 && operand != 2)
+                invalid(CodeErrorKind::Operand, "raise expects an exception and optional cause",
+                        pc);
+            break;
         case OperandDomain::CallSite:
             if (operand >= calls.size())
                 invalid(CodeErrorKind::CallBounds, "call-site index out of bounds", pc);
@@ -232,6 +238,9 @@ std::size_t verify(const CodeSpec &spec, std::span<const Instruction> instructio
     }
     for (std::uint32_t id = 0; id < regions.size(); ++id) {
         const auto &region = regions[id];
+        if (region.normal_pc < instructions.size() && scopes[region.normal_pc] != region.parent)
+            invalid(CodeErrorKind::RegionJump, "normal exit must target the region's parent",
+                    region.enter_pc);
         if (region.kind == RegionKind::Loop &&
             (region.continue_pc >= instructions.size() || region.break_pc >= instructions.size() ||
              scopes[region.continue_pc] != RegionToken{id, RegionPhase::Protected} ||
@@ -355,7 +364,7 @@ std::size_t verify(const CodeSpec &spec, std::span<const Instruction> instructio
             if (height != stack_base(instruction.operand))
                 invalid(CodeErrorKind::StackBase, "region exit must restore its stack base", pc);
             if (definition.flow == FlowKind::Leave)
-                route({ReasonKind::Normal, region.after_pc, region.parent}, scopes[pc], height);
+                route({ReasonKind::Normal, region.normal_pc, region.parent}, scopes[pc], height);
             else if (region.kind == RegionKind::Except)
                 join(region.after_pc, height, region.parent);
             else
@@ -385,7 +394,9 @@ StackEffect instruction_effect(Instruction instruction, std::span<const CallLayo
 {
     const auto &definition = opcode_definition(instruction.opcode);
     if (instruction.opcode == Opcode::ForIter && jump_taken)
-        return {1, 1, 0};
+        return {1, 0, 0};
+    if (instruction.opcode == Opcode::Raise)
+        return {instruction.operand, instruction.operand, 0};
     if (instruction.opcode == Opcode::UnpackSequence)
         return {1, 1, instruction.operand};
     if (definition.operand == OperandDomain::CallSite && instruction.operand >= calls.size())
@@ -529,6 +540,12 @@ void CodeBuilder::freeze(ReturnSlot &out)
         if (!region.complete)
             invalid(CodeErrorKind::RegionStructure, "incomplete region");
         auto layout = region.layout;
+        layout.normal_pc = layout.after_pc;
+        if (region.normal_target) {
+            if (!labels_[region.normal_target->index])
+                invalid(CodeErrorKind::UnboundLabel, "unbound normal exit target");
+            layout.normal_pc = static_cast<std::uint32_t>(*labels_[region.normal_target->index]);
+        }
         if (layout.kind == RegionKind::Loop) {
             if (!region.continue_target || !region.break_target)
                 invalid(CodeErrorKind::LoopTarget, "loop requires explicit targets");
@@ -714,6 +731,20 @@ void CodeBuilder::leave(Region id, SourcePosition source)
         positions_.resize(count);
         scopes_.resize(count);
         calls_.resize(sites);
+        throw;
+    }
+}
+void CodeBuilder::leave(Region id, Label target, SourcePosition source)
+{
+    if (target.owner != this || target.index >= labels_.size())
+        invalid(CodeErrorKind::ForeignLabel, "normal exit label belongs to a different builder");
+    auto &region = require_region(id);
+    const auto previous = region.normal_target;
+    region.normal_target = target;
+    try {
+        leave(id, source);
+    } catch (...) {
+        region.normal_target = previous;
         throw;
     }
 }

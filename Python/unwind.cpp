@@ -123,6 +123,29 @@ void FrameObject::finish_handler(Attachment &context)
     }
 }
 namespace detail {
+void normalize_exception(Attachment &context, Handle value, ReturnSlot &out)
+{
+    RootScope roots(context);
+    const auto input = roots.root(value.get(context));
+    const auto base = context.builtin(CoreObject::BaseExceptionType);
+    if (context.has_layout<ExceptionObject>(input.get(context)) &&
+        is_subtype(context, context.type_of(input), base)) {
+        out.ok(input.get(context));
+        return;
+    }
+    if (context.has_layout<TypeObject>(input.get(context)) &&
+        is_subtype(context, context.type_of(input), context.type_type()) &&
+        is_subtype(context, input.get(context), base)) {
+        call(context, input, {}, out);
+        if (out.tag() == ResultTag::Raised)
+            return;
+        if (context.has_layout<ExceptionObject>(out.value()) &&
+            is_subtype(context, context.type_of(out.value()), base))
+            return;
+    }
+    raise_error(context, CoreObject::TypeErrorType, U"exceptions must derive from BaseException",
+                out);
+}
 void link_exception_context(Attachment &context, Value exception)
 {
     auto handled = context.handled_exception();

@@ -1,10 +1,10 @@
 {
-  "captured_at": "2026-10-29T14:00:32.218279+00:00",
+  "captured_at": "2026-10-29T14:30:55.395023+00:00",
   "reference_version": "Python 3.12.14",
   "provenance": {
     "binary": {
       "path": "/home/shefrin/repo/cxxpython/build/cxxpython",
-      "sha256": "519c15be1ff15d975825a59eadd1fdf8e1524ac6b2645ac6c14b33cdfc9cee47"
+      "sha256": "b3e22b49d5f98a74109b9dbc875d645208bec4878d7d1b683bc0ab897ee11919"
     },
     "reference": {
       "path": "/tmp/cxxpython-cpython31214-build/python",
@@ -180,7 +180,7 @@
         "def f():\n    return 1 // 0\nx = f()"
       ],
       "stdout": "",
-      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 3, in <module>\n  File \"<string>\", line 2, in f\nZeroDivisionError('integer division or modulo by zero')\n",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 3, in <module>\n  File \"<string>\", line 2, in f\nZeroDivisionError: integer division or modulo by zero\n",
       "exit_code": 1
     },
     {
@@ -190,7 +190,7 @@
         "def f():\n    def inner():\n        return x\n    return x\n    x = 1\nf()"
       ],
       "stdout": "",
-      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 6, in <module>\n  File \"<string>\", line 4, in f\nUnboundLocalError(\"local variable 'x' is not bound\")\n",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 6, in <module>\n  File \"<string>\", line 4, in f\nUnboundLocalError: local variable 'x' is not bound\n",
       "exit_code": 1
     },
     {
@@ -210,7 +210,7 @@
         "def f():\n    x = 1\n    def inner():\n        return x\n    del x\n    return inner\nf()()"
       ],
       "stdout": "",
-      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 7, in <module>\n  File \"<string>\", line 4, in inner\nNameError(\"cannot access free variable 'x' where it is not associated with a value in enclosing scope\")\n",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 7, in <module>\n  File \"<string>\", line 4, in inner\nNameError: cannot access free variable 'x' where it is not associated with a value in enclosing scope\n",
       "exit_code": 1
     },
     {
@@ -226,7 +226,769 @@
     {
       "command": [
         "build/cxxpython",
-        "/tmp/tmp6hjis0ew/source.py",
+        "-c",
+        "\nevents = 0\ntry:\n    raise ValueError(7)\nexcept (TypeError, ValueError) as error:\n    value = error.args[0]\nelse:\n    value = 99\nfinally:\n    events += 1\ntry:\n    error\nexcept NameError:\n    cleared = True\n",
+        "--eval",
+        "value, events, cleared"
+      ],
+      "stdout": "(7, 1, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nevents = 0\ntry:\n    raise ValueError(7)\nexcept (TypeError, ValueError) as error:\n    value = error.args[0]\nelse:\n    value = 99\nfinally:\n    events += 1\ntry:\n    error\nexcept NameError:\n    cleared = True\n\nprint(repr((value, events, cleared)))"
+      ],
+      "stdout": "(7, 1, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\ndef f():\n    error = 1\n    def read():\n        return error\n    try:\n        raise ValueError\n    except ValueError as error:\n        pass\n    try:\n        read()\n    except NameError:\n        return True\n",
+        "--eval",
+        "f()"
+      ],
+      "stdout": "True\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\ndef f():\n    error = 1\n    def read():\n        return error\n    try:\n        raise ValueError\n    except ValueError as error:\n        pass\n    try:\n        read()\n    except NameError:\n        return True\n\nprint(repr((f())))"
+      ],
+      "stdout": "True\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\noriginal = ValueError('inner')\ndef reraiser():\n    raise\ntry:\n    raise original\nexcept ValueError:\n    try:\n        reraiser()\n    except ValueError as error:\n        same = error is original\n    try:\n        raise TypeError('outer') from None\n    except TypeError as error:\n        saved = error\n",
+        "--eval",
+        "same, saved.__context__ is original, saved.__cause__, saved.__suppress_context__"
+      ],
+      "stdout": "(True, True, None, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\noriginal = ValueError('inner')\ndef reraiser():\n    raise\ntry:\n    raise original\nexcept ValueError:\n    try:\n        reraiser()\n    except ValueError as error:\n        same = error is original\n    try:\n        raise TypeError('outer') from None\n    except TypeError as error:\n        saved = error\n\nprint(repr((same, saved.__context__ is original, saved.__cause__, saved.__suppress_context__)))"
+      ],
+      "stdout": "(True, True, None, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\ncause = TypeError('cause')\ntry:\n    raise ValueError(1) from cause\nexcept ValueError as error:\n    saved = error\n",
+        "--eval",
+        "saved.__cause__ is cause, saved.__context__, saved.__suppress_context__"
+      ],
+      "stdout": "(True, None, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\ncause = TypeError('cause')\ntry:\n    raise ValueError(1) from cause\nexcept ValueError as error:\n    saved = error\n\nprint(repr((saved.__cause__ is cause, saved.__context__, saved.__suppress_context__)))"
+      ],
+      "stdout": "(True, None, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\ntry:\n    raise ValueError from TypeError\nexcept ValueError as error:\n    saved = error\n",
+        "--eval",
+        "type(saved) is ValueError, type(saved.__cause__) is TypeError"
+      ],
+      "stdout": "(True, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\ntry:\n    raise ValueError from TypeError\nexcept ValueError as error:\n    saved = error\n\nprint(repr((type(saved) is ValueError, type(saved.__cause__) is TypeError)))"
+      ],
+      "stdout": "(True, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nvalue = 0\ntry:\n    try:\n        value = 1\n    except TypeError:\n        value = 99\n    else:\n        raise TypeError(3)\nexcept TypeError as error:\n    value += error.args[0]\nfinally:\n    value += 10\n",
+        "--eval",
+        "value"
+      ],
+      "stdout": "14\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nvalue = 0\ntry:\n    try:\n        value = 1\n    except TypeError:\n        value = 99\n    else:\n        raise TypeError(3)\nexcept TypeError as error:\n    value += error.args[0]\nfinally:\n    value += 10\n\nprint(repr((value)))"
+      ],
+      "stdout": "14\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\noriginal = ValueError(1)\ntry:\n    try:\n        raise original\n    except None:\n        pass\nexcept TypeError as error:\n    saved = error\n",
+        "--eval",
+        "saved.__context__ is original"
+      ],
+      "stdout": "True\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\noriginal = ValueError(1)\ntry:\n    try:\n        raise original\n    except None:\n        pass\nexcept TypeError as error:\n    saved = error\n\nprint(repr((saved.__context__ is original)))"
+      ],
+      "stdout": "True\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\ndef f():\n    try:\n        raise ValueError\n    finally:\n        return 42\n",
+        "--eval",
+        "f()"
+      ],
+      "stdout": "42\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\ndef f():\n    try:\n        raise ValueError\n    finally:\n        return 42\n\nprint(repr((f())))"
+      ],
+      "stdout": "42\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nerror = ValueError()\nother = TypeError()\nerror.__context__ = other\nerror.__cause__ = other\nerror.__suppress_context__ = False\n",
+        "--eval",
+        "error.__context__ is other, error.__cause__ is other, error.__suppress_context__"
+      ],
+      "stdout": "(True, True, False)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nerror = ValueError()\nother = TypeError()\nerror.__context__ = other\nerror.__cause__ = other\nerror.__suppress_context__ = False\n\nprint(repr((error.__context__ is other, error.__cause__ is other, error.__suppress_context__)))"
+      ],
+      "stdout": "(True, True, False)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nerror = ValueError()\nerror.__cause__ = None\n",
+        "--eval",
+        "error.__cause__, error.__suppress_context__"
+      ],
+      "stdout": "(None, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nerror = ValueError()\nerror.__cause__ = None\n\nprint(repr((error.__cause__, error.__suppress_context__)))"
+      ],
+      "stdout": "(None, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nvalue = 0\ntry:\n    raise ValueError\nexcept ():\n    value = 99\nexcept:\n    value = 42\n",
+        "--eval",
+        "value"
+      ],
+      "stdout": "42\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nvalue = 0\ntry:\n    raise ValueError\nexcept ():\n    value = 99\nexcept:\n    value = 42\n\nprint(repr((value)))"
+      ],
+      "stdout": "42\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nevents = 0\ndef __new__(cls):\n    global events\n    events = events * 10 + 3\n    return BaseException.__new__(cls)\nCustom = type('Custom', (ValueError,), __new__.__globals__)\ndef first():\n    global events\n    events = events * 10 + 1\n    return Custom\ndef second():\n    global events\n    events = events * 10 + 2\n    return TypeError\ntry:\n    raise first() from second()\nexcept ValueError as error:\n    saved = error\n",
+        "--eval",
+        "events, type(saved) is Custom, type(saved.__cause__) is TypeError"
+      ],
+      "stdout": "(123, True, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nevents = 0\ndef __new__(cls):\n    global events\n    events = events * 10 + 3\n    return BaseException.__new__(cls)\nCustom = type('Custom', (ValueError,), __new__.__globals__)\ndef first():\n    global events\n    events = events * 10 + 1\n    return Custom\ndef second():\n    global events\n    events = events * 10 + 2\n    return TypeError\ntry:\n    raise first() from second()\nexcept ValueError as error:\n    saved = error\n\nprint(repr((events, type(saved) is Custom, type(saved.__cause__) is TypeError)))"
+      ],
+      "stdout": "(123, True, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\ndef __new__(cls):\n    return 1\nInvalid = type('Invalid', (ValueError,), __new__.__globals__)\ntry:\n    raise Invalid\nexcept TypeError:\n    caught = True\n",
+        "--eval",
+        "caught"
+      ],
+      "stdout": "True\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\ndef __new__(cls):\n    return 1\nInvalid = type('Invalid', (ValueError,), __new__.__globals__)\ntry:\n    raise Invalid\nexcept TypeError:\n    caught = True\n\nprint(repr((caught)))"
+      ],
+      "stdout": "True\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "def f():\n    events = 0\n    item = -1\n    try:\n        for item in range(5):\n            try:\n                if item == 2:\n                    break\n                events = events * 10 + 1\n            finally:\n                events = events * 10 + 2\n        else:\n            events = events * 10 + 5\n    except TypeError:\n        events = events * 10 + 3\n    finally:\n        events = events * 10 + 4\n    return events\n",
+        "--eval",
+        "f()"
+      ],
+      "stdout": "121224\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "def f():\n    events = 0\n    item = -1\n    try:\n        for item in range(5):\n            try:\n                if item == 2:\n                    break\n                events = events * 10 + 1\n            finally:\n                events = events * 10 + 2\n        else:\n            events = events * 10 + 5\n    except TypeError:\n        events = events * 10 + 3\n    finally:\n        events = events * 10 + 4\n    return events\n\nprint(repr((f())))"
+      ],
+      "stdout": "121224\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "def f():\n    events = 0\n    item = -1\n    try:\n        for item in range(5):\n            try:\n                if item == 2:\n                    continue\n                events = events * 10 + 1\n            finally:\n                events = events * 10 + 2\n        else:\n            events = events * 10 + 5\n    except TypeError:\n        events = events * 10 + 3\n    finally:\n        events = events * 10 + 4\n    return events\n",
+        "--eval",
+        "f()"
+      ],
+      "stdout": "12122121254\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "def f():\n    events = 0\n    item = -1\n    try:\n        for item in range(5):\n            try:\n                if item == 2:\n                    continue\n                events = events * 10 + 1\n            finally:\n                events = events * 10 + 2\n        else:\n            events = events * 10 + 5\n    except TypeError:\n        events = events * 10 + 3\n    finally:\n        events = events * 10 + 4\n    return events\n\nprint(repr((f())))"
+      ],
+      "stdout": "12122121254\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "def f():\n    events = 0\n    item = -1\n    try:\n        for item in range(5):\n            try:\n                if item == 2:\n                    return events\n                events = events * 10 + 1\n            finally:\n                events = events * 10 + 2\n        else:\n            events = events * 10 + 5\n    except TypeError:\n        events = events * 10 + 3\n    finally:\n        events = events * 10 + 4\n    return events\n",
+        "--eval",
+        "f()"
+      ],
+      "stdout": "1212\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "def f():\n    events = 0\n    item = -1\n    try:\n        for item in range(5):\n            try:\n                if item == 2:\n                    return events\n                events = events * 10 + 1\n            finally:\n                events = events * 10 + 2\n        else:\n            events = events * 10 + 5\n    except TypeError:\n        events = events * 10 + 3\n    finally:\n        events = events * 10 + 4\n    return events\n\nprint(repr((f())))"
+      ],
+      "stdout": "1212\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "def f():\n    events = 0\n    item = -1\n    try:\n        for item in range(5):\n            try:\n                if item == 2:\n                    raise TypeError\n                events = events * 10 + 1\n            finally:\n                events = events * 10 + 2\n        else:\n            events = events * 10 + 5\n    except TypeError:\n        events = events * 10 + 3\n    finally:\n        events = events * 10 + 4\n    return events\n",
+        "--eval",
+        "f()"
+      ],
+      "stdout": "1212234\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "def f():\n    events = 0\n    item = -1\n    try:\n        for item in range(5):\n            try:\n                if item == 2:\n                    raise TypeError\n                events = events * 10 + 1\n            finally:\n                events = events * 10 + 2\n        else:\n            events = events * 10 + 5\n    except TypeError:\n        events = events * 10 + 3\n    finally:\n        events = events * 10 + 4\n    return events\n\nprint(repr((f())))"
+      ],
+      "stdout": "1212234\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "def f():\n    events = 0\n    item = -1\n    try:\n        while item < 4:\n            item += 1\n            try:\n                if item == 2:\n                    break\n                events = events * 10 + 1\n            finally:\n                events = events * 10 + 2\n        else:\n            events = events * 10 + 5\n    except TypeError:\n        events = events * 10 + 3\n    finally:\n        events = events * 10 + 4\n    return events\n",
+        "--eval",
+        "f()"
+      ],
+      "stdout": "121224\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "def f():\n    events = 0\n    item = -1\n    try:\n        while item < 4:\n            item += 1\n            try:\n                if item == 2:\n                    break\n                events = events * 10 + 1\n            finally:\n                events = events * 10 + 2\n        else:\n            events = events * 10 + 5\n    except TypeError:\n        events = events * 10 + 3\n    finally:\n        events = events * 10 + 4\n    return events\n\nprint(repr((f())))"
+      ],
+      "stdout": "121224\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "def f():\n    events = 0\n    item = -1\n    try:\n        while item < 4:\n            item += 1\n            try:\n                if item == 2:\n                    continue\n                events = events * 10 + 1\n            finally:\n                events = events * 10 + 2\n        else:\n            events = events * 10 + 5\n    except TypeError:\n        events = events * 10 + 3\n    finally:\n        events = events * 10 + 4\n    return events\n",
+        "--eval",
+        "f()"
+      ],
+      "stdout": "12122121254\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "def f():\n    events = 0\n    item = -1\n    try:\n        while item < 4:\n            item += 1\n            try:\n                if item == 2:\n                    continue\n                events = events * 10 + 1\n            finally:\n                events = events * 10 + 2\n        else:\n            events = events * 10 + 5\n    except TypeError:\n        events = events * 10 + 3\n    finally:\n        events = events * 10 + 4\n    return events\n\nprint(repr((f())))"
+      ],
+      "stdout": "12122121254\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "def f():\n    events = 0\n    item = -1\n    try:\n        while item < 4:\n            item += 1\n            try:\n                if item == 2:\n                    return events\n                events = events * 10 + 1\n            finally:\n                events = events * 10 + 2\n        else:\n            events = events * 10 + 5\n    except TypeError:\n        events = events * 10 + 3\n    finally:\n        events = events * 10 + 4\n    return events\n",
+        "--eval",
+        "f()"
+      ],
+      "stdout": "1212\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "def f():\n    events = 0\n    item = -1\n    try:\n        while item < 4:\n            item += 1\n            try:\n                if item == 2:\n                    return events\n                events = events * 10 + 1\n            finally:\n                events = events * 10 + 2\n        else:\n            events = events * 10 + 5\n    except TypeError:\n        events = events * 10 + 3\n    finally:\n        events = events * 10 + 4\n    return events\n\nprint(repr((f())))"
+      ],
+      "stdout": "1212\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "def f():\n    events = 0\n    item = -1\n    try:\n        while item < 4:\n            item += 1\n            try:\n                if item == 2:\n                    raise TypeError\n                events = events * 10 + 1\n            finally:\n                events = events * 10 + 2\n        else:\n            events = events * 10 + 5\n    except TypeError:\n        events = events * 10 + 3\n    finally:\n        events = events * 10 + 4\n    return events\n",
+        "--eval",
+        "f()"
+      ],
+      "stdout": "1212234\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "def f():\n    events = 0\n    item = -1\n    try:\n        while item < 4:\n            item += 1\n            try:\n                if item == 2:\n                    raise TypeError\n                events = events * 10 + 1\n            finally:\n                events = events * 10 + 2\n        else:\n            events = events * 10 + 5\n    except TypeError:\n        events = events * 10 + 3\n    finally:\n        events = events * 10 + 4\n    return events\n\nprint(repr((f())))"
+      ],
+      "stdout": "1212234\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "try: pass"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 1\ntry: pass\n         ^\nSyntaxError: expected except or finally\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "try: pass"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 1\n    try: pass\n             ^\nSyntaxError: expected 'except' or 'finally' block\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "try: pass\nelse: pass\nfinally: pass"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 2\nelse: pass\n^\nSyntaxError: try else requires except\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "try: pass\nelse: pass\nfinally: pass"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 2\n    else: pass\n    ^^^^\nSyntaxError: expected 'except' or 'finally' block\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "try: pass\nexcept: pass\nexcept ValueError: pass"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 3\nexcept ValueError: pass\n^\nSyntaxError: default except must be last\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "try: pass\nexcept: pass\nexcept ValueError: pass"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 2\nSyntaxError: default 'except:' must be last\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "try: pass\nexcept ValueError as x.y: pass"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 2\nexcept ValueError as x.y: pass\n                      ^\nSyntaxError: invalid syntax\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "try: pass\nexcept ValueError as x.y: pass"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 2\n    except ValueError as x.y: pass\n                          ^\nSyntaxError: invalid syntax\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "try: pass\nexcept ValueError as __debug__: pass"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 2\nexcept ValueError as __debug__: pass\n                     ^\nSyntaxError: cannot assign __debug__\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "try: pass\nexcept ValueError as __debug__: pass"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 2\nSyntaxError: cannot assign to __debug__\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "try: pass\nfinally: break"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 2\nfinally: break\n         ^\nSyntaxError: 'break'/'continue' outside loop\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "try: pass\nfinally: break"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 2\nSyntaxError: 'break' outside loop\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "raise"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nRuntimeError: no active exception to reraise\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "raise"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nRuntimeError: No active exception to reraise\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "raise 1"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError: exceptions must derive from BaseException\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "raise 1"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError: exceptions must derive from BaseException\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "raise ValueError from 1"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError: exceptions must derive from BaseException\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "raise ValueError from 1"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError: exception causes must derive from BaseException\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "try:\n    raise ValueError\nexcept None:\n    pass"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 2, in <module>\nValueError\n\nDuring handling of the above exception, another exception occurred:\n\nTraceback (most recent call last):\n  File \"<string>\", line 3, in <module>\nTypeError: catching classes must derive from BaseException\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "try:\n    raise ValueError\nexcept None:\n    pass"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 2, in <module>\nValueError\n\nDuring handling of the above exception, another exception occurred:\n\nTraceback (most recent call last):\n  File \"<string>\", line 3, in <module>\nTypeError: catching classes that do not inherit from BaseException is not allowed\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "with None: pass"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError: context manager is missing __enter__\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "with None: pass"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError: 'NoneType' object does not support the context manager protocol\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "with (): pass"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError: context manager is missing __enter__\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "with (): pass"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError: 'tuple' object does not support the context manager protocol\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "error = ValueError()\nerror.__cause__ = ValueError"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 2, in <module>\nTypeError: exception link requires an exception instance or None\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "error = ValueError()\nerror.__cause__ = ValueError"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 2, in <module>\nTypeError: exception cause must be None or derive from BaseException\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "error = ValueError()\nerror.__context__ = 1"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 2, in <module>\nTypeError: exception link requires an exception instance or None\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "error = ValueError()\nerror.__context__ = 1"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 2, in <module>\nTypeError: exception context must be None or derive from BaseException\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "error = ValueError()\nerror.__suppress_context__ = 1"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 2, in <module>\nTypeError: __suppress_context__ requires a bool\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "error = ValueError()\nerror.__suppress_context__ = 1"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 2, in <module>\nTypeError: attribute value type must be bool\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "/tmp/tmpzjl8lhqm/source.py",
         "--eval",
         "f(41)"
       ],
@@ -251,7 +1013,7 @@
         "next(iter(()))"
       ],
       "stdout": "",
-      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nStopIteration()\n",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nStopIteration\n",
       "exit_code": 1
     },
     {
@@ -271,7 +1033,7 @@
         "next(iter(range(0)))"
       ],
       "stdout": "",
-      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nStopIteration()\n",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nStopIteration\n",
       "exit_code": 1
     },
     {
@@ -291,7 +1053,7 @@
         "iter(None)"
       ],
       "stdout": "",
-      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError('operation is missing or explicitly disabled')\n",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError: operation is missing or explicitly disabled\n",
       "exit_code": 1
     },
     {
@@ -311,7 +1073,7 @@
         "next((1, 2))"
       ],
       "stdout": "",
-      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError('operation is missing or explicitly disabled')\n",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError: operation is missing or explicitly disabled\n",
       "exit_code": 1
     },
     {
@@ -331,7 +1093,7 @@
         "range(0, 3, 0)"
       ],
       "stdout": "",
-      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nValueError('range() arg 3 must not be zero')\n",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nValueError: range() arg 3 must not be zero\n",
       "exit_code": 1
     },
     {
@@ -351,7 +1113,7 @@
         "range(stop=3)"
       ],
       "stdout": "",
-      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError('unexpected or positional-only keyword: stop')\n",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError: unexpected or positional-only keyword: stop\n",
       "exit_code": 1
     },
     {
@@ -371,7 +1133,7 @@
         "len(range(1000000000000000000000000000000))"
       ],
       "stdout": "",
-      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nOverflowError('range length does not fit Py_ssize_t')\n",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nOverflowError: range length does not fit Py_ssize_t\n",
       "exit_code": 1
     },
     {
@@ -391,7 +1153,7 @@
         "range(3)[3]"
       ],
       "stdout": "",
-      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nIndexError('range object index out of range')\n",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nIndexError: range object index out of range\n",
       "exit_code": 1
     },
     {
@@ -411,7 +1173,7 @@
         "(1, 2)[1000000000000000000000000000000]"
       ],
       "stdout": "",
-      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nIndexError('sequence index is out of range')\n",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nIndexError: sequence index is out of range\n",
       "exit_code": 1
     },
     {
@@ -431,7 +1193,7 @@
         "'abc'[-4]"
       ],
       "stdout": "",
-      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nIndexError('sequence index is out of range')\n",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nIndexError: sequence index is out of range\n",
       "exit_code": 1
     },
     {
@@ -451,7 +1213,7 @@
         "(1, 2)[None]"
       ],
       "stdout": "",
-      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError('operation is missing or explicitly disabled')\n",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError: operation is missing or explicitly disabled\n",
       "exit_code": 1
     },
     {
@@ -471,7 +1233,7 @@
         "a, b = (1,)"
       ],
       "stdout": "",
-      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nValueError('not enough values to unpack')\n",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nValueError: not enough values to unpack\n",
       "exit_code": 1
     },
     {
@@ -491,7 +1253,7 @@
         "a, b = range(3)"
       ],
       "stdout": "",
-      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nValueError('too many values to unpack')\n",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nValueError: too many values to unpack\n",
       "exit_code": 1
     },
     {
@@ -511,7 +1273,7 @@
         "a, b = None"
       ],
       "stdout": "",
-      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError('operation is missing or explicitly disabled')\n",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError: operation is missing or explicitly disabled\n",
       "exit_code": 1
     },
     {
@@ -531,7 +1293,7 @@
         "value = (1, 2)\nvalue[0] = 3"
       ],
       "stdout": "",
-      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 2, in <module>\nTypeError('operation is missing or explicitly disabled')\n",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 2, in <module>\nTypeError: operation is missing or explicitly disabled\n",
       "exit_code": 1
     },
     {
@@ -551,7 +1313,7 @@
         "value = (1, 2)\ndel value[0]"
       ],
       "stdout": "",
-      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 2, in <module>\nTypeError('operation is missing or explicitly disabled')\n",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 2, in <module>\nTypeError: operation is missing or explicitly disabled\n",
       "exit_code": 1
     },
     {
@@ -571,7 +1333,7 @@
         "error = ValueError()\ndel error.args"
       ],
       "stdout": "",
-      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 2, in <module>\nTypeError('cannot delete exception args')\n",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 2, in <module>\nTypeError: cannot delete exception args\n",
       "exit_code": 1
     },
     {
@@ -1043,6 +1805,182 @@
         "\nprint(repr((ValueError('message').args, StopIteration.__new__(StopIteration, 9).value)))"
       ],
       "stdout": "(('message',), None)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nevents = 0\ncount = 0\nerrors = 0\nsuppress = False\nfail_enter = 0\nfail_exit = 0\ndef __enter__(self):\n    global events, count\n    count += 1\n    self.tag = count\n    events = events * 10 + self.tag\n    if self.tag == fail_enter:\n        raise ValueError('enter')\n    return 4, 5\ndef __exit__(self, kind, error, traceback):\n    global events, errors\n    events = events * 10 + self.tag\n    if error is not None:\n        errors += 1\n    if self.tag == fail_exit:\n        raise TypeError('exit')\n    return suppress\nManager = type('Manager', (), __enter__.__globals__)\nwith (Manager(), Manager() as (a, b),):\n    value = a + b",
+        "--eval",
+        "value, events, errors"
+      ],
+      "stdout": "(9, 1221, 0)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nevents = 0\ncount = 0\nerrors = 0\nsuppress = False\nfail_enter = 0\nfail_exit = 0\ndef __enter__(self):\n    global events, count\n    count += 1\n    self.tag = count\n    events = events * 10 + self.tag\n    if self.tag == fail_enter:\n        raise ValueError('enter')\n    return 4, 5\ndef __exit__(self, kind, error, traceback):\n    global events, errors\n    events = events * 10 + self.tag\n    if error is not None:\n        errors += 1\n    if self.tag == fail_exit:\n        raise TypeError('exit')\n    return suppress\nManager = type('Manager', (), __enter__.__globals__)\nwith (Manager(), Manager() as (a, b),):\n    value = a + b\nprint(repr((value, events, errors)))"
+      ],
+      "stdout": "(9, 1221, 0)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nevents = 0\ncount = 0\nerrors = 0\nsuppress = False\nfail_enter = 0\nfail_exit = 0\ndef __enter__(self):\n    global events, count\n    count += 1\n    self.tag = count\n    events = events * 10 + self.tag\n    if self.tag == fail_enter:\n        raise ValueError('enter')\n    return 4, 5\ndef __exit__(self, kind, error, traceback):\n    global events, errors\n    events = events * 10 + self.tag\n    if error is not None:\n        errors += 1\n    if self.tag == fail_exit:\n        raise TypeError('exit')\n    return suppress\nManager = type('Manager', (), __enter__.__globals__)\nwith (Manager()) as value:\n    pass",
+        "--eval",
+        "value, events, errors"
+      ],
+      "stdout": "((4, 5), 11, 0)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nevents = 0\ncount = 0\nerrors = 0\nsuppress = False\nfail_enter = 0\nfail_exit = 0\ndef __enter__(self):\n    global events, count\n    count += 1\n    self.tag = count\n    events = events * 10 + self.tag\n    if self.tag == fail_enter:\n        raise ValueError('enter')\n    return 4, 5\ndef __exit__(self, kind, error, traceback):\n    global events, errors\n    events = events * 10 + self.tag\n    if error is not None:\n        errors += 1\n    if self.tag == fail_exit:\n        raise TypeError('exit')\n    return suppress\nManager = type('Manager', (), __enter__.__globals__)\nwith (Manager()) as value:\n    pass\nprint(repr((value, events, errors)))"
+      ],
+      "stdout": "((4, 5), 11, 0)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nevents = 0\ncount = 0\nerrors = 0\nsuppress = False\nfail_enter = 0\nfail_exit = 0\ndef __enter__(self):\n    global events, count\n    count += 1\n    self.tag = count\n    events = events * 10 + self.tag\n    if self.tag == fail_enter:\n        raise ValueError('enter')\n    return 4, 5\ndef __exit__(self, kind, error, traceback):\n    global events, errors\n    events = events * 10 + self.tag\n    if error is not None:\n        errors += 1\n    if self.tag == fail_exit:\n        raise TypeError('exit')\n    return suppress\nManager = type('Manager', (), __enter__.__globals__)\nsuppress = True\nwith Manager(), Manager():\n    raise ValueError",
+        "--eval",
+        "events, errors"
+      ],
+      "stdout": "(1221, 1)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nevents = 0\ncount = 0\nerrors = 0\nsuppress = False\nfail_enter = 0\nfail_exit = 0\ndef __enter__(self):\n    global events, count\n    count += 1\n    self.tag = count\n    events = events * 10 + self.tag\n    if self.tag == fail_enter:\n        raise ValueError('enter')\n    return 4, 5\ndef __exit__(self, kind, error, traceback):\n    global events, errors\n    events = events * 10 + self.tag\n    if error is not None:\n        errors += 1\n    if self.tag == fail_exit:\n        raise TypeError('exit')\n    return suppress\nManager = type('Manager', (), __enter__.__globals__)\nsuppress = True\nwith Manager(), Manager():\n    raise ValueError\nprint(repr((events, errors)))"
+      ],
+      "stdout": "(1221, 1)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nevents = 0\ncount = 0\nerrors = 0\nsuppress = False\nfail_enter = 0\nfail_exit = 0\ndef __enter__(self):\n    global events, count\n    count += 1\n    self.tag = count\n    events = events * 10 + self.tag\n    if self.tag == fail_enter:\n        raise ValueError('enter')\n    return 4, 5\ndef __exit__(self, kind, error, traceback):\n    global events, errors\n    events = events * 10 + self.tag\n    if error is not None:\n        errors += 1\n    if self.tag == fail_exit:\n        raise TypeError('exit')\n    return suppress\nManager = type('Manager', (), __enter__.__globals__)\nsuppress = True\nvalue = 0\nwith Manager() as (a, b, c):\n    value = 99",
+        "--eval",
+        "value, events, errors"
+      ],
+      "stdout": "(0, 11, 1)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nevents = 0\ncount = 0\nerrors = 0\nsuppress = False\nfail_enter = 0\nfail_exit = 0\ndef __enter__(self):\n    global events, count\n    count += 1\n    self.tag = count\n    events = events * 10 + self.tag\n    if self.tag == fail_enter:\n        raise ValueError('enter')\n    return 4, 5\ndef __exit__(self, kind, error, traceback):\n    global events, errors\n    events = events * 10 + self.tag\n    if error is not None:\n        errors += 1\n    if self.tag == fail_exit:\n        raise TypeError('exit')\n    return suppress\nManager = type('Manager', (), __enter__.__globals__)\nsuppress = True\nvalue = 0\nwith Manager() as (a, b, c):\n    value = 99\nprint(repr((value, events, errors)))"
+      ],
+      "stdout": "(0, 11, 1)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nevents = 0\ncount = 0\nerrors = 0\nsuppress = False\nfail_enter = 0\nfail_exit = 0\ndef __enter__(self):\n    global events, count\n    count += 1\n    self.tag = count\n    events = events * 10 + self.tag\n    if self.tag == fail_enter:\n        raise ValueError('enter')\n    return 4, 5\ndef __exit__(self, kind, error, traceback):\n    global events, errors\n    events = events * 10 + self.tag\n    if error is not None:\n        errors += 1\n    if self.tag == fail_exit:\n        raise TypeError('exit')\n    return suppress\nManager = type('Manager', (), __enter__.__globals__)\nsuppress = True\nfail_enter = 2\nwith Manager(), Manager():\n    pass",
+        "--eval",
+        "events, errors"
+      ],
+      "stdout": "(121, 1)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nevents = 0\ncount = 0\nerrors = 0\nsuppress = False\nfail_enter = 0\nfail_exit = 0\ndef __enter__(self):\n    global events, count\n    count += 1\n    self.tag = count\n    events = events * 10 + self.tag\n    if self.tag == fail_enter:\n        raise ValueError('enter')\n    return 4, 5\ndef __exit__(self, kind, error, traceback):\n    global events, errors\n    events = events * 10 + self.tag\n    if error is not None:\n        errors += 1\n    if self.tag == fail_exit:\n        raise TypeError('exit')\n    return suppress\nManager = type('Manager', (), __enter__.__globals__)\nsuppress = True\nfail_enter = 2\nwith Manager(), Manager():\n    pass\nprint(repr((events, errors)))"
+      ],
+      "stdout": "(121, 1)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nevents = 0\ncount = 0\nerrors = 0\nsuppress = False\nfail_enter = 0\nfail_exit = 0\ndef __enter__(self):\n    global events, count\n    count += 1\n    self.tag = count\n    events = events * 10 + self.tag\n    if self.tag == fail_enter:\n        raise ValueError('enter')\n    return 4, 5\ndef __exit__(self, kind, error, traceback):\n    global events, errors\n    events = events * 10 + self.tag\n    if error is not None:\n        errors += 1\n    if self.tag == fail_exit:\n        raise TypeError('exit')\n    return suppress\nManager = type('Manager', (), __enter__.__globals__)\ndef f():\n    with Manager() as value:\n        return value\nsaved = f()",
+        "--eval",
+        "saved, events, errors"
+      ],
+      "stdout": "((4, 5), 11, 0)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nevents = 0\ncount = 0\nerrors = 0\nsuppress = False\nfail_enter = 0\nfail_exit = 0\ndef __enter__(self):\n    global events, count\n    count += 1\n    self.tag = count\n    events = events * 10 + self.tag\n    if self.tag == fail_enter:\n        raise ValueError('enter')\n    return 4, 5\ndef __exit__(self, kind, error, traceback):\n    global events, errors\n    events = events * 10 + self.tag\n    if error is not None:\n        errors += 1\n    if self.tag == fail_exit:\n        raise TypeError('exit')\n    return suppress\nManager = type('Manager', (), __enter__.__globals__)\ndef f():\n    with Manager() as value:\n        return value\nsaved = f()\nprint(repr((saved, events, errors)))"
+      ],
+      "stdout": "((4, 5), 11, 0)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nevents = 0\ncount = 0\nerrors = 0\nsuppress = False\nfail_enter = 0\nfail_exit = 0\ndef __enter__(self):\n    global events, count\n    count += 1\n    self.tag = count\n    events = events * 10 + self.tag\n    if self.tag == fail_enter:\n        raise ValueError('enter')\n    return 4, 5\ndef __exit__(self, kind, error, traceback):\n    global events, errors\n    events = events * 10 + self.tag\n    if error is not None:\n        errors += 1\n    if self.tag == fail_exit:\n        raise TypeError('exit')\n    return suppress\nManager = type('Manager', (), __enter__.__globals__)\nfail_exit = 2\ntry:\n    with Manager(), Manager():\n        raise ValueError\nexcept TypeError as error:\n    saved = error",
+        "--eval",
+        "events, errors, type(saved.__context__) is ValueError"
+      ],
+      "stdout": "(1221, 2, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nevents = 0\ncount = 0\nerrors = 0\nsuppress = False\nfail_enter = 0\nfail_exit = 0\ndef __enter__(self):\n    global events, count\n    count += 1\n    self.tag = count\n    events = events * 10 + self.tag\n    if self.tag == fail_enter:\n        raise ValueError('enter')\n    return 4, 5\ndef __exit__(self, kind, error, traceback):\n    global events, errors\n    events = events * 10 + self.tag\n    if error is not None:\n        errors += 1\n    if self.tag == fail_exit:\n        raise TypeError('exit')\n    return suppress\nManager = type('Manager', (), __enter__.__globals__)\nfail_exit = 2\ntry:\n    with Manager(), Manager():\n        raise ValueError\nexcept TypeError as error:\n    saved = error\nprint(repr((events, errors, type(saved.__context__) is ValueError)))"
+      ],
+      "stdout": "(1221, 2, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nevents = 0\ncount = 0\nerrors = 0\nsuppress = False\nfail_enter = 0\nfail_exit = 0\ndef __enter__(self):\n    global events, count\n    count += 1\n    self.tag = count\n    events = events * 10 + self.tag\n    if self.tag == fail_enter:\n        raise ValueError('enter')\n    return 4, 5\ndef __exit__(self, kind, error, traceback):\n    global events, errors\n    events = events * 10 + self.tag\n    if error is not None:\n        errors += 1\n    if self.tag == fail_exit:\n        raise TypeError('exit')\n    return suppress\nManager = type('Manager', (), __enter__.__globals__)\nfor i in range(3):\n    with Manager():\n        continue",
+        "--eval",
+        "events, errors"
+      ],
+      "stdout": "(112233, 0)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nevents = 0\ncount = 0\nerrors = 0\nsuppress = False\nfail_enter = 0\nfail_exit = 0\ndef __enter__(self):\n    global events, count\n    count += 1\n    self.tag = count\n    events = events * 10 + self.tag\n    if self.tag == fail_enter:\n        raise ValueError('enter')\n    return 4, 5\ndef __exit__(self, kind, error, traceback):\n    global events, errors\n    events = events * 10 + self.tag\n    if error is not None:\n        errors += 1\n    if self.tag == fail_exit:\n        raise TypeError('exit')\n    return suppress\nManager = type('Manager', (), __enter__.__globals__)\nfor i in range(3):\n    with Manager():\n        continue\nprint(repr((events, errors)))"
+      ],
+      "stdout": "(112233, 0)\n",
       "stderr": "",
       "exit_code": 0
     },
@@ -1529,6 +2467,66 @@
       "stdout": "True\n",
       "stderr": "",
       "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "raise ValueError('outer') from TypeError('cause')"
+      ],
+      "stdout": "",
+      "stderr": "TypeError: cause\n\nThe above exception was the direct cause of the following exception:\n\nTraceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nValueError: outer\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "raise ValueError('outer') from TypeError('cause')"
+      ],
+      "stdout": "",
+      "stderr": "TypeError: cause\n\nThe above exception was the direct cause of the following exception:\n\nTraceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nValueError: outer\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "try:\n    raise TypeError('inner')\nexcept:\n    raise ValueError('outer')"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 2, in <module>\nTypeError: inner\n\nDuring handling of the above exception, another exception occurred:\n\nTraceback (most recent call last):\n  File \"<string>\", line 4, in <module>\nValueError: outer\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "try:\n    raise TypeError('inner')\nexcept:\n    raise ValueError('outer')"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 2, in <module>\nTypeError: inner\n\nDuring handling of the above exception, another exception occurred:\n\nTraceback (most recent call last):\n  File \"<string>\", line 4, in <module>\nValueError: outer\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "try:\n    raise TypeError('inner')\nexcept:\n    raise ValueError('outer') from None"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 4, in <module>\nValueError: outer\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "error = ValueError('cycle')\nerror.__context__ = error\nraise error"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 3, in <module>\nValueError: cycle\n",
+      "exit_code": 1
     }
   ]
 }

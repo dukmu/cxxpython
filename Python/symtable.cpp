@@ -202,6 +202,33 @@ class ScopePass final {
                     } else if constexpr (std::is_same_v<T, ReturnStmt>) {
                         if (node.value)
                             expression(*node.value, scope);
+                    } else if constexpr (std::is_same_v<T, RaiseStmt>) {
+                        if (node.exception)
+                            expression(*node.exception, scope);
+                        if (node.cause)
+                            expression(*node.cause, scope);
+                    } else if constexpr (std::is_same_v<T, TryStmt>) {
+                        collect(node.body, scope);
+                        for (auto &handler : node.handlers) {
+                            if (handler.type)
+                                expression(*handler.type, scope);
+                            if (handler.name) {
+                                const auto &[name, span] = *handler.name;
+                                if (name == U"__debug__")
+                                    error(span, "cannot assign __debug__");
+                                bindings_[scope].get(name, span).bound = true;
+                            }
+                            collect(handler.body, scope);
+                        }
+                        collect(node.alternative, scope);
+                        collect(node.cleanup, scope);
+                    } else if constexpr (std::is_same_v<T, WithStmt>) {
+                        for (const auto &item : node.items) {
+                            expression(*item.context, scope);
+                            if (item.target)
+                                target(*item.target, scope);
+                        }
+                        collect(node.body, scope);
                     } else if constexpr (std::is_same_v<T, DeclareStmt>) {
                         if (node.nonlocal && program_.scopes[scope].kind == ScopeKind::Module)
                             error(statement->span,
