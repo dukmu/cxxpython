@@ -1,3 +1,4 @@
+#include "cxxpython/floatobject.hpp"
 #include "internal/compiler.hpp"
 
 #include <algorithm>
@@ -140,6 +141,7 @@ enum class TokenKind {
     Dedent,
     Name,
     Integer,
+    Float,
     String,
     Left,
     Right,
@@ -162,6 +164,7 @@ enum class TokenKind {
     AddAssign,
     SubAssign,
     MulAssign,
+    DivAssign,
     FloorAssign,
     ModAssign,
     Eq,
@@ -339,18 +342,40 @@ class Lexer final {
                 tokens_.push_back({kind, {start, index_}, {word.begin(), word.end()}});
                 continue;
             }
-            if (digit(ch)) {
+            if (digit(ch) || (ch == '.' && index_ < text_.size() && digit(text_[index_]))) {
+                const bool prefixed =
+                    ch == '0' && index_ < text_.size() &&
+                    std::string_view("xXoObB").find(text_[index_]) != std::string_view::npos;
+                bool floating = ch == '.';
+                if (!prefixed) {
+                    auto digits = [&] {
+                        while (index_ < text_.size() &&
+                               (digit(text_[index_]) || text_[index_] == '_'))
+                            ++index_;
+                    };
+                    digits();
+                    if (!floating && index_ < text_.size() && text_[index_] == '.') {
+                        floating = true;
+                        ++index_;
+                        digits();
+                    }
+                    if (index_ < text_.size() && (text_[index_] == 'e' || text_[index_] == 'E')) {
+                        floating = true;
+                        ++index_;
+                        if (index_ < text_.size() && (text_[index_] == '+' || text_[index_] == '-'))
+                            ++index_;
+                        digits();
+                    }
+                }
                 while (index_ < text_.size() && (alpha(text_[index_]) || digit(text_[index_])))
                     ++index_;
                 const auto word = text_.substr(start, index_ - start);
-                if ((index_ < text_.size() && text_[index_] == '.') ||
-                    (!(word.size() > 1 && word[0] == '0' && (word[1] == 'x' || word[1] == 'X')) &&
-                     word.find_first_of("eEjJ") != std::string::npos))
-                    fail({start, index_},
-                         "float/complex literals require the corresponding numeric types",
+                if (!prefixed && word.find_first_of("jJ") != std::string::npos)
+                    fail({start, index_}, "complex literals require the complex numeric type",
                          SourceErrorKind::Capability);
-                tokens_.push_back(
-                    {TokenKind::Integer, {start, index_}, {word.begin(), word.end()}});
+                tokens_.push_back({floating ? TokenKind::Float : TokenKind::Integer,
+                                   {start, index_},
+                                   {word.begin(), word.end()}});
                 continue;
             }
             if (ch == '\'' || ch == '"') {
@@ -419,7 +444,7 @@ class Lexer final {
                     ++index_;
                     push(equals() ? TokenKind::FloorAssign : TokenKind::Floor, start);
                 } else
-                    push(TokenKind::Slash, start);
+                    push(equals() ? TokenKind::DivAssign : TokenKind::Slash, start);
                 break;
             case '%':
                 push(equals() ? TokenKind::ModAssign : TokenKind::Mod, start);
@@ -1019,7 +1044,7 @@ class Parser final {
                     result.push_back(
                         statement(std::move(assign), {start, tokens_[index_ - 1].span.end}));
                 } else if (is(K::AddAssign) || is(K::SubAssign) || is(K::MulAssign) ||
-                           is(K::FloorAssign) || is(K::ModAssign)) {
+                           is(K::FloorAssign) || is(K::ModAssign) || is(K::DivAssign)) {
                     target(*value);
                     if (std::holds_alternative<TupleExpr>(value->node))
                         fail(peek(), "illegal augmented assignment target");
@@ -1028,6 +1053,7 @@ class Parser final {
                                     : kind == K::SubAssign   ? BinaryOp::Subtract
                                     : kind == K::MulAssign   ? BinaryOp::Multiply
                                     : kind == K::FloorAssign ? BinaryOp::FloorDivide
+                                    : kind == K::DivAssign   ? BinaryOp::TrueDivide
                                                              : BinaryOp::Modulo;
                     auto right = expression();
                     result.push_back(
@@ -1147,20 +1173,21 @@ class Parser final {
     {
         auto left = term ? factor() : arithmetic(true);
         while (is(term ? K::Star : K::Plus) || is(term ? K::Floor : K::Minus) ||
-               (term && is(K::Mod))) {
+               (term && (is(K::Mod) || is(K::Slash)))) {
             const auto kind = take().kind;
             const auto op = kind == K::Plus    ? BinaryOp::Add
                             : kind == K::Minus ? BinaryOp::Subtract
                             : kind == K::Star  ? BinaryOp::Multiply
                             : kind == K::Floor ? BinaryOp::FloorDivide
+                            : kind == K::Slash ? BinaryOp::TrueDivide
                                                : BinaryOp::Modulo;
             auto right = term ? factor() : arithmetic(true);
             const Span span{left->span.begin, right->span.end};
             const auto depth = std::max(left->depth, right->depth) + 1;
             left = node(BinaryExpr{op, std::move(left), std::move(right)}, span, depth);
         }
-        if (is(K::Slash) || is(K::Power))
-            fail(peek(), "true division/power require the corresponding numeric protocol",
+        if (is(K::Power))
+            fail(peek(), "power requires the corresponding numeric protocol",
                  SourceErrorKind::Capability);
         return left;
     }
@@ -1210,6 +1237,12 @@ class Parser final {
         switch (token.kind) {
         case K::Name:
             return node(NameExpr{token.text}, token.span);
+        case K::Float: {
+            double number;
+            if (!detail::parse_float(token.text, number))
+                fail(token, "invalid float literal");
+            return node(Literal{Literal::Kind::Float, token.text, number}, token.span);
+        }
         case K::Integer: {
             auto text = token.text;
             unsigned base = 10;

@@ -42,6 +42,9 @@ enum class Protocol : std::size_t {
     GetItem,
     SetItem,
     DelItem,
+    TrueDiv,
+    RTrueDiv,
+    ITrueDiv,
     Count,
 };
 enum class ProtocolResult { Any, Boolean, Length, Integer, String, Hash };
@@ -61,7 +64,7 @@ struct ResolvedSlot {
     std::uint64_t epoch;
 };
 enum class CompareOp { Eq, Ne, Lt, Le, Gt, Ge, Is, IsNot };
-enum class BinaryOp { Add, Subtract, Multiply, FloorDivide, Modulo };
+enum class BinaryOp { Add, Subtract, Multiply, FloorDivide, Modulo, TrueDivide };
 enum class UnaryOp { Positive, Negative, Invert, Not };
 enum class NextStatus { Item, Done, Raised };
 

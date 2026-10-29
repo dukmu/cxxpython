@@ -43,7 +43,8 @@ Run benchmarks after builds and other CPU-heavy work have finished.
 - `Parser/`: independent source decoding, tokenizing and parsing.
 - `Python/`: heap/GC/thread state, compilation, verification and VM execution.
 - `Programs/`: the single `cxxpython` host entry point.
-- `Lib/test/`: current Python test drivers and fixed-reference differential tests.
+- `Lib/`: reserved for the interpreter's Python standard library.
+- `Tests/python/`: host-side Python test drivers and fixed-reference differential tests.
 - `Tests/cpp/`: native runtime/GC/concurrency/semantic contract tests.
 - `Tools/benchmarks/` and `Tools/scripts/`: measurement and generated-data tools.
 

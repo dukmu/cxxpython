@@ -7,22 +7,7 @@
 #include <limits>
 
 namespace cxxpython::core {
-namespace {
-void type_error(Attachment &context, std::u32string message, ReturnSlot &out)
-{
-    raise_error(context, CoreObject::TypeErrorType, std::move(message), out);
-}
-
-const FloatObject *require_float(Attachment &context, Value value, ReturnSlot &out)
-{
-    if (!is_float(context, value)) {
-        type_error(context, U"float descriptor requires a float", out);
-        return nullptr;
-    }
-    return &context.payload<FloatObject>(value);
-}
-
-bool parse_float(std::u32string_view input, double &value)
+bool detail::parse_float(std::u32string_view input, double &value)
 {
     while (!input.empty() && detail::numeric_whitespace(input.front()))
         input.remove_prefix(1);
@@ -97,6 +82,21 @@ bool parse_float(std::u32string_view input, double &value)
     return parsed.ec == std::errc{} && parsed.ptr == last;
 }
 
+namespace {
+void type_error(Attachment &context, std::u32string message, ReturnSlot &out)
+{
+    raise_error(context, CoreObject::TypeErrorType, std::move(message), out);
+}
+
+const FloatObject *require_float(Attachment &context, Value value, ReturnSlot &out)
+{
+    if (!is_float(context, value)) {
+        type_error(context, U"float descriptor requires a float", out);
+        return nullptr;
+    }
+    return &context.payload<FloatObject>(value);
+}
+
 bool integer_to_double(Attachment &context, Value value, double &number, ReturnSlot &out)
 {
     auto integer = detail::integer_value(context.payload<IntObject>(value));
@@ -165,7 +165,7 @@ void float_new(Attachment &context, Handle, std::span<const Value> args, ReturnS
             if (!integer_to_double(context, value, number, out))
                 return;
         } else if (context.type_of(value) == context.builtin(CoreObject::StrType)) {
-            if (!parse_float(context.payload<StrObject>(value).value, number)) {
+            if (!detail::parse_float(context.payload<StrObject>(value).value, number)) {
                 raise_error(context, CoreObject::ValueErrorType, U"invalid float literal", out);
                 return;
             }
@@ -180,7 +180,7 @@ void float_new(Attachment &context, Handle, std::span<const Value> args, ReturnS
                 if (slot.state == SlotState::Missing && context.has_layout<StrObject>(value) &&
                     is_subtype(context, context.type_of(value),
                                context.builtin(CoreObject::StrType))) {
-                    if (!parse_float(context.payload<StrObject>(value).value, number)) {
+                    if (!detail::parse_float(context.payload<StrObject>(value).value, number)) {
                         raise_error(context, CoreObject::ValueErrorType, U"invalid float literal",
                                     out);
                         return;
@@ -223,6 +223,77 @@ void float_identity(Attachment &context, Handle, std::span<const Value> args, Re
         out.ok(args[0]);
     else
         make_float(context, value->value, out);
+}
+
+void float_negative(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    const auto *value = require_float(context, args[0], out);
+    if (value)
+        make_float(context, -value->value, out);
+}
+
+bool operand_double(Attachment &context, Value value, double &number, ReturnSlot &out)
+{
+    if (is_float(context, value)) {
+        number = context.payload<FloatObject>(value).value;
+        return true;
+    }
+    if (is_int(context, value))
+        return integer_to_double(context, value, number, out);
+    out.ok(context.builtin(CoreObject::NotImplemented));
+    return false;
+}
+
+template <BinaryOp Op, bool Reflected>
+void float_arithmetic(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    const auto *self = require_float(context, args[0], out);
+    if (!self)
+        return;
+    double a = self->value, b;
+    if (!operand_double(context, args[1], b, out))
+        return;
+    if constexpr (Reflected)
+        std::swap(a, b);
+    if constexpr (Op == BinaryOp::TrueDivide || Op == BinaryOp::FloorDivide ||
+                  Op == BinaryOp::Modulo)
+        if (b == 0.0) {
+            raise_error(context, CoreObject::ZeroDivisionErrorType,
+                        U"float division or modulo by zero", out);
+            return;
+        }
+    double result;
+    if constexpr (Op == BinaryOp::Add)
+        result = a + b;
+    if constexpr (Op == BinaryOp::Subtract)
+        result = a - b;
+    if constexpr (Op == BinaryOp::Multiply)
+        result = a * b;
+    if constexpr (Op == BinaryOp::TrueDivide)
+        result = a / b;
+    if constexpr (Op == BinaryOp::FloorDivide || Op == BinaryOp::Modulo) {
+        double remainder = std::fmod(a, b);
+        double quotient = (a - remainder) / b;
+        if (remainder != 0.0) {
+            if ((remainder < 0) != (b < 0)) {
+                remainder += b;
+                quotient -= 1.0;
+            }
+        } else
+            remainder = std::copysign(0.0, b);
+        if constexpr (Op == BinaryOp::Modulo)
+            result = remainder;
+        else {
+            if (quotient != 0.0) {
+                result = std::floor(quotient);
+                // Recover an integral quotient rounded just below its exact value.
+                if (quotient - result > 0.5)
+                    result += 1.0;
+            } else
+                result = std::copysign(0.0, a / b);
+        }
+    }
+    make_float(context, result, out);
 }
 
 void float_int(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
@@ -329,27 +400,47 @@ void float_hash(Attachment &context, Handle, std::span<const Value> args, Return
     make_int(context, result == -1 ? -2 : result, out);
 }
 
-template <bool Negate>
-void float_equal(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+template <CompareOp Op>
+void float_compare(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     const auto *left = require_float(context, args[0], out);
     if (!left)
         return;
-    bool equal;
-    if (is_float(context, args[1]))
-        equal = left->value == context.payload<FloatObject>(args[1]).value;
-    else if (is_int(context, args[1])) {
-        if (!std::isfinite(left->value) || std::trunc(left->value) != left->value)
-            equal = false;
-        else {
-            detail::Integer integer(left->value);
-            equal = integer == detail::integer_value(context.payload<IntObject>(args[1]));
+    const double number = left->value;
+    bool unordered = std::isnan(number);
+    int order = 0;
+    if (is_float(context, args[1])) {
+        const double right = context.payload<FloatObject>(args[1]).value;
+        unordered |= std::isnan(right);
+        order = (number > right) - (number < right);
+    } else if (is_int(context, args[1])) {
+        if (std::isinf(number))
+            order = number > 0 ? 1 : -1;
+        else if (!unordered) {
+            const detail::Integer truncated(number);
+            const auto right = detail::integer_value(context.payload<IntObject>(args[1]));
+            order = (truncated > right) - (truncated < right);
+            if (order == 0 && std::trunc(number) != number)
+                order = number > 0 ? 1 : -1;
         }
     } else {
         out.ok(context.builtin(CoreObject::NotImplemented));
         return;
     }
-    out.ok(context.builtin(equal != Negate ? CoreObject::True : CoreObject::False));
+    bool result;
+    if constexpr (Op == CompareOp::Eq)
+        result = !unordered && order == 0;
+    if constexpr (Op == CompareOp::Ne)
+        result = unordered || order != 0;
+    if constexpr (Op == CompareOp::Lt)
+        result = !unordered && order < 0;
+    if constexpr (Op == CompareOp::Le)
+        result = !unordered && order <= 0;
+    if constexpr (Op == CompareOp::Gt)
+        result = !unordered && order > 0;
+    if constexpr (Op == CompareOp::Ge)
+        result = !unordered && order >= 0;
+    out.ok(context.builtin(result ? CoreObject::True : CoreObject::False));
 }
 } // namespace
 
@@ -379,12 +470,30 @@ void detail::install_floats(Attachment &context, std::span<const Handle> core)
     };
     install(U"__bool__", float_bool);
     install(U"__float__", float_identity);
+    install(U"__pos__", float_identity);
+    install(U"__neg__", float_negative);
     install(U"__int__", float_int);
     install(U"__repr__", float_repr);
     install(U"__str__", float_repr);
     install(U"__hash__", float_hash);
-    install(U"__eq__", float_equal<false>, true);
-    install(U"__ne__", float_equal<true>, true);
+    install(U"__eq__", float_compare<CompareOp::Eq>, true);
+    install(U"__ne__", float_compare<CompareOp::Ne>, true);
+    install(U"__lt__", float_compare<CompareOp::Lt>, true);
+    install(U"__le__", float_compare<CompareOp::Le>, true);
+    install(U"__gt__", float_compare<CompareOp::Gt>, true);
+    install(U"__ge__", float_compare<CompareOp::Ge>, true);
+    install(U"__add__", float_arithmetic<BinaryOp::Add, false>, true);
+    install(U"__radd__", float_arithmetic<BinaryOp::Add, true>, true);
+    install(U"__sub__", float_arithmetic<BinaryOp::Subtract, false>, true);
+    install(U"__rsub__", float_arithmetic<BinaryOp::Subtract, true>, true);
+    install(U"__mul__", float_arithmetic<BinaryOp::Multiply, false>, true);
+    install(U"__rmul__", float_arithmetic<BinaryOp::Multiply, true>, true);
+    install(U"__truediv__", float_arithmetic<BinaryOp::TrueDivide, false>, true);
+    install(U"__rtruediv__", float_arithmetic<BinaryOp::TrueDivide, true>, true);
+    install(U"__floordiv__", float_arithmetic<BinaryOp::FloorDivide, false>, true);
+    install(U"__rfloordiv__", float_arithmetic<BinaryOp::FloorDivide, true>, true);
+    install(U"__mod__", float_arithmetic<BinaryOp::Modulo, false>, true);
+    install(U"__rmod__", float_arithmetic<BinaryOp::Modulo, true>, true);
     SignatureLayout constructor;
     constructor.parameters = {{U"cls", ParameterKind::PositionalOnly}};
     constructor.varargs = U"args";

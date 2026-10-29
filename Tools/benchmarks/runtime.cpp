@@ -495,6 +495,12 @@ def total(n):
         value += operation.item(item)
     return value
 )"));
+    const SourceUnit float_program(SourceBuffer(R"(def total(n):
+    value = 0.0
+    for item in range(n, 0, -1):
+        value += item / 2.0
+    return int(value * 2.0)
+)"));
     auto hex_source = [](const SourceUnit &source) {
         std::string result;
         constexpr char hex[] = "0123456789abcdef";
@@ -510,10 +516,11 @@ def total(n):
               << " closure_kernel_hex=" << hex_source(closure_program)
               << " for_kernel_hex=" << hex_source(for_program)
               << " exception_kernel_hex=" << hex_source(exception_program)
-              << " class_kernel_hex=" << hex_source(class_program) << '\n';
-    for (const auto *source :
-         std::array<const SourceUnit *, 6>{nullptr, &*source_program, &closure_program,
-                                           &for_program, &exception_program, &class_program})
+              << " class_kernel_hex=" << hex_source(class_program)
+              << " float_kernel_hex=" << hex_source(float_program) << '\n';
+    for (const auto *source : std::array<const SourceUnit *, 7>{
+             nullptr, &*source_program, &closure_program, &for_program, &exception_program,
+             &class_program, &float_program})
         for (int workers : {1, 2, 4}) {
             Interpreter vm;
             Attachment controller(vm);
@@ -620,7 +627,8 @@ def total(n):
             const auto final = controller.stats();
             if (final.objects != baseline.objects || final.transfer_roots)
                 return 1;
-            std::cout << (source == &class_program       ? "parallel_class_workers="
+            std::cout << (source == &float_program       ? "parallel_float_workers="
+                          : source == &class_program     ? "parallel_class_workers="
                           : source == &exception_program ? "parallel_exception_workers="
                           : source == &for_program       ? "parallel_for_workers="
                           : source == &closure_program   ? "parallel_closure_workers="

@@ -1,8 +1,10 @@
+#include "cxxpython/floatobject.hpp"
 #include "cxxpython/protocol.hpp"
 #include "internal/long.hpp"
 
 #include <boost/multiprecision/cpp_int.hpp>
 #include <boost/version.hpp>
+#include <cmath>
 
 #if BOOST_VERSION < 107400
 #error Boost 1.74 or newer is required
@@ -50,6 +52,68 @@ void publish(Attachment &context, Integer value, ReturnSlot &out)
 void boolean(Attachment &context, bool value, ReturnSlot &out)
 {
     out.ok(context.builtin(value ? CoreObject::True : CoreObject::False));
+}
+template <bool Reflected>
+void true_divide(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!is_int(context, args[0])) {
+        type_error(context, out);
+        return;
+    }
+    if (!is_int(context, args[1])) {
+        out.ok(context.builtin(CoreObject::NotImplemented));
+        return;
+    }
+    Integer numerator = expanded(integer(context, args[Reflected ? 1 : 0]));
+    Integer denominator = expanded(integer(context, args[Reflected ? 0 : 1]));
+    if (denominator == 0) {
+        raise_error(context, CoreObject::ZeroDivisionErrorType, U"division by zero", out);
+        return;
+    }
+    const bool negative = (numerator < 0) != (denominator < 0);
+    if (numerator < 0)
+        numerator = -numerator;
+    if (denominator < 0)
+        denominator = -denominator;
+    if (numerator == 0) {
+        make_float(context, negative ? -0.0 : 0.0, out);
+        return;
+    }
+    const auto nbits = boost::multiprecision::msb(numerator);
+    const auto dbits = boost::multiprecision::msb(denominator);
+    if (nbits > dbits && nbits - dbits > 1024) {
+        raise_error(context, CoreObject::OverflowErrorType,
+                    U"integer division result too large for a float", out);
+        return;
+    }
+    if (dbits > nbits && dbits - nbits > 1075) {
+        make_float(context, negative ? -0.0 : 0.0, out);
+        return;
+    }
+    int exponent =
+        nbits >= dbits ? static_cast<int>(nbits - dbits) : -static_cast<int>(dbits - nbits);
+    if (exponent >= 0 ? numerator < (denominator << exponent)
+                      : (numerator << -exponent) < denominator)
+        --exponent;
+    const int shift = exponent < -1022 ? 1074 : 52 - exponent;
+    Integer scaled_numerator = numerator;
+    Integer scaled_denominator = denominator;
+    if (shift >= 0)
+        scaled_numerator <<= shift;
+    else
+        scaled_denominator <<= -shift;
+    Integer quotient = scaled_numerator / scaled_denominator;
+    Integer remainder = scaled_numerator % scaled_denominator;
+    const Integer twice = remainder << 1;
+    if (twice > scaled_denominator || (twice == scaled_denominator && (quotient & 1) != 0))
+        ++quotient;
+    double result = std::ldexp(quotient.convert_to<double>(), -shift);
+    if (std::isinf(result)) {
+        raise_error(context, CoreObject::OverflowErrorType,
+                    U"integer division result too large for a float", out);
+        return;
+    }
+    make_float(context, negative ? -result : result, out);
 }
 template <BinaryOp Op, bool Reflected>
 void arithmetic(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
@@ -537,6 +601,8 @@ void install_numbers(Attachment &context, std::span<const Handle> core)
     install(U"__rsub__", arithmetic<BinaryOp::Subtract, true>, true);
     install(U"__mul__", arithmetic<BinaryOp::Multiply, false>, true);
     install(U"__rmul__", arithmetic<BinaryOp::Multiply, true>, true);
+    install(U"__truediv__", true_divide<false>, true);
+    install(U"__rtruediv__", true_divide<true>, true);
     install(U"__floordiv__", arithmetic<BinaryOp::FloorDivide, false>, true);
     install(U"__rfloordiv__", arithmetic<BinaryOp::FloorDivide, true>, true);
     install(U"__mod__", arithmetic<BinaryOp::Modulo, false>, true);

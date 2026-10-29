@@ -1,10 +1,11 @@
-"""Run experimental constructor slices through both actual executables."""
+"""Host-side differential tests of numeric and constructor slices."""
 
 import argparse
 from datetime import datetime, timezone
 import hashlib
 import json
 from pathlib import Path
+import random
 import shutil
 import subprocess
 import unittest
@@ -201,6 +202,75 @@ class Broken:
         ):
             with self.subTest(expression=expression):
                 self.check_expression(expression, setup)
+
+    def test_float_operators_and_source_literals(self):
+        huge = "int(" + repr("9" * 400) + ")"
+        for expression in (
+            "0., .5, 1.e2, 001.25, 1_2.3_4e+0_2, 1e309, -1e-9999",
+            "1.25 + 2, 2 + 1.25, 3 - .5, .5 - 3, 2 * .25, .25 * 2",
+            "7.5 / 2, 7 / 2.5, 7.5 // 2, 7 // 2.5, -7.5 % 2, 7.5 % -2",
+            "-0.0 / 3, 0.0 / -3, -0.0 // 3, 0.0 // -3, 0.0 % -3",
+            "1.0 // .1, 1.0 % .1, -1.0 // .1, -1.0 % .1",
+            "float('nan') < 1, float('nan') >= 1, float('nan') != 1",
+            "float('inf') > " + huge + ", float('-inf') < -" + huge,
+            "9007199254740992.0 < 9007199254740993, 9007199254740993 > 9007199254740992.0",
+            "1.5 > 1, 1.5 < 2, -1.5 < -1, -1.5 > -2, -.5 < 0",
+            "float('inf') // 2, 2.0 // float('-inf'), -2.0 % float('inf')",
+            "+1.5, -(-0.0), +(-0.0), not 0.0, bool(float('nan'))",
+            "1.0 / 0, 1.0 // 0.0, float('nan') % 0.0",
+            "1.0 + " + huge, "1 / 0", "1.0 + '2'", "~1.0",
+            "float.__rsub__(2.5, 9)", "float.__add__(1, 1.0)",
+        ):
+            with self.subTest(expression=expression):
+                self.check_expression(expression)
+        setup = """
+events = 0
+class Left:
+    def __itruediv__(self, other):
+        global events
+        events = events * 10 + 1
+        return NotImplemented
+    def __truediv__(self, other):
+        global events
+        events = events * 10 + 2
+        return NotImplemented
+class Right:
+    def __rtruediv__(self, other):
+        global events
+        events = events * 10 + 3
+        return 42
+class Child(float):
+    def __radd__(self, other): return 97
+class Pretend:
+    def __float__(self): return 9.0
+value = Left()
+value /= Right()
+number = 8
+number /= 4
+"""
+        for expression in ("value, events, number, 1.0 + Child(2.0)", "1.0 + Pretend()"):
+            with self.subTest(expression=expression):
+                self.check_expression(expression, setup)
+
+    def test_integer_true_division(self):
+        pairs = [
+            (7, 2), (0, -1), (1, 0),
+            ((1 << 4000) + 1, 1 << 4000),
+            ((1 << 53) + 1, 1 << 53), ((1 << 53) + 3, 1 << 53),
+            (1, 1 << 1074), (1, 1 << 1075), (-1, 1 << 1075), (3, 1 << 1075),
+            ((1 << 1024) - (1 << 971), 1),
+            ((1 << 1024) - (1 << 970), 1),
+            ((1 << 1024) - (1 << 970) - 1, 1),
+        ]
+        rng = random.Random(31214)
+        for _ in range(40):
+            a = rng.getrandbits(rng.randrange(1, 2000))
+            b = rng.getrandbits(rng.randrange(1, 2000)) or 1
+            pairs.append((a if rng.randrange(2) else -a, b if rng.randrange(2) else -b))
+        for a, b in pairs:
+            expression = f"({a}) / ({b})"
+            with self.subTest(expression=expression):
+                self.check_expression(expression)
 
 
 if __name__ == "__main__":

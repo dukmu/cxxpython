@@ -1,3 +1,4 @@
+#include "cxxpython/floatobject.hpp"
 #include "internal/compiler.hpp"
 
 #include <boost/multiprecision/cpp_int.hpp>
@@ -657,6 +658,10 @@ class GraphPass final {
 
 void literal(Attachment &context, const Literal &value, ReturnSlot &out)
 {
+    if (value.kind == Literal::Kind::Float) {
+        make_float(context, value.number, out);
+        return;
+    }
     if (value.kind == Literal::Kind::String) {
         make_str(context, value.text, out);
         return;

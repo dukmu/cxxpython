@@ -6,8 +6,9 @@ namespace cxxpython::core::detail {
 struct Expr;
 using ExprPtr = std::unique_ptr<Expr>;
 struct Literal {
-    enum class Kind { Integer, String, None, True, False } kind;
+    enum class Kind { Integer, Float, String, None, True, False } kind;
     std::u32string text;
+    double number = 0.0;
 };
 struct NameExpr {
     std::u32string name;

@@ -41,6 +41,9 @@ constexpr std::array definitions{
     ProtocolDefinition{U"__getitem__", 1, ProtocolResult::Any},
     ProtocolDefinition{U"__setitem__", 2, ProtocolResult::Any},
     ProtocolDefinition{U"__delitem__", 1, ProtocolResult::Any},
+    ProtocolDefinition{U"__truediv__", 1, ProtocolResult::Any},
+    ProtocolDefinition{U"__rtruediv__", 1, ProtocolResult::Any},
+    ProtocolDefinition{U"__itruediv__", 1, ProtocolResult::Any},
 };
 static_assert(definitions.size() == static_cast<std::size_t>(Protocol::Count));
 constexpr std::array comparisons{Protocol::Eq, Protocol::Ne, Protocol::Lt,
@@ -53,6 +56,7 @@ constexpr std::array operations{
     std::array{Protocol::Mul, Protocol::RMul, Protocol::IMul},
     std::array{Protocol::FloorDiv, Protocol::RFloorDiv, Protocol::IFloorDiv},
     std::array{Protocol::Mod, Protocol::RMod, Protocol::IMod},
+    std::array{Protocol::TrueDiv, Protocol::RTrueDiv, Protocol::ITrueDiv},
 };
 template <class F> ResultView guarded(Attachment &context, ReturnSlot &out, F &&function)
 {

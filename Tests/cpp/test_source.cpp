@@ -78,6 +78,70 @@ TEST_F(CoreSource, LiteralArithmeticBooleanAndComparisonProgramsUseOrdinaryProto
     }
 }
 
+TEST_F(CoreSource, FloatLiteralsAndArithmeticUseOrdinaryNumericProtocolsDuringGc)
+{
+    ReturnSlot out(context);
+    for (auto [source, expected] : {
+             std::pair{".5, 1., 1.e2, 001.25, 1_2.3_4e+0_2", "(0.5, 1.0, 100.0, 1.25, 1234.0)"},
+             {"1e309, -1e-9999, 0x1e + 2", "(inf, -0.0, 32)"},
+             {"1.25 + 2, 3 - .5, .25 * 2, 7.5 / 2", "(3.25, 2.5, 0.5, 3.75)"},
+             {"7.5 // 2, -7.5 % 2, 7.5 % -2", "(3.0, 0.5, -0.5)"},
+             {"0.0 / -3, -0.0 // 3, 0.0 % -3", "(-0.0, -0.0, -0.0)"},
+             {"9007199254740992.0 < 9007199254740993, -1.5 < -1, -.5 < 0", "(True, True, True)"},
+             {"float('nan') < 1, float('nan') >= 1, float('nan') != 1", "(False, False, True)"},
+         }) {
+        SCOPED_TRACE(source);
+        eval(source, out);
+        ASSERT_EQ(out.tag(), ResultTag::Ok);
+        EXPECT_EQ(result(out), expected);
+        context.collect();
+        EXPECT_EQ(result(out), expected);
+    }
+    for (auto source : {"1e", "1e+", "1._0", "1e_2", "1.2.3", ".1__2", "1.0_", "1e2x"}) {
+        SCOPED_TRACE(source);
+        EXPECT_THROW(SourceUnit{SourceBuffer(source)}, SourceError);
+    }
+}
+
+TEST_F(CoreSource, TrueDivisionInplaceAndFloatSubclassReflectionKeepCallbackOrder)
+{
+    const auto globals = dictionary();
+    ReturnSlot out(context);
+    exec(R"(events = 0
+class Left:
+    def __itruediv__(self, other):
+        global events
+        events = events * 10 + 1
+        return NotImplemented
+    def __truediv__(self, other):
+        global events
+        events = events * 10 + 2
+        return NotImplemented
+class Right:
+    def __rtruediv__(self, other):
+        global events
+        events = events * 10 + 3
+        return 42
+class Child(float):
+    def __radd__(self, other): return 97
+value = Left()
+value /= Right()
+number = 8
+number /= 4
+)",
+         globals, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    eval("value, events, number, 1.0 + Child(2.0)", out, globals);
+    EXPECT_EQ(result(out), "(42, 123, 2.0, 97)");
+    for (auto source : {"1.0 / 0", "1.0 // 0.0", "float('nan') % 0.0"}) {
+        SCOPED_TRACE(source);
+        eval(source, out);
+        raised(out, CoreObject::ZeroDivisionErrorType);
+    }
+    eval("1.0 + '2'", out);
+    raised(out, CoreObject::TypeErrorType);
+}
+
 TEST_F(CoreSource, ForLoopsTupleTargetsAndSubscriptsComposeThroughOrdinaryProtocols)
 {
     const auto globals = dictionary();
@@ -1012,7 +1076,7 @@ TEST(SourceDiagnostics, InvalidProgramsDoNotSilentlyCompileThroughAnotherLanguag
         SCOPED_TRACE(source);
         EXPECT_THROW(SourceUnit{SourceBuffer(source)}, SourceError);
     }
-    for (auto source : {"import x", "class X[T]: pass", "f'{x}'", "x = 1.5", "x = [1]",
+    for (auto source : {"import x", "class X[T]: pass", "f'{x}'", "x = 1.5j", "x = [1]",
                         "try:\n    pass\nexcept* Exception:\n    pass"}) {
         SCOPED_TRACE(source);
         try {
@@ -1082,7 +1146,7 @@ TEST_F(CoreSource, RecursiveClosureCyclesReturnToTheOriginalLiveSet)
 
 TEST(SourceParallel, ImmutableNativeGraphsFreezeConcurrentlyWithoutSharedPythonState)
 {
-    const SourceUnit unit(SourceBuffer("def f(n=40):\n    try:\n        return n + 2\n    "
+    const SourceUnit unit(SourceBuffer("def f(n=40.5):\n    try:\n        return int(n + 1.5)\n    "
                                        "finally:\n        pass\nresult = f()\n"));
     Interpreter interpreter;
     Attachment owner(interpreter);
@@ -1125,11 +1189,17 @@ TEST(SourceParallel, ImmutableNativeGraphsFreezeConcurrentlyWithoutSharedPythonS
 
 TEST(SourceParallel, OneFrozenSourceAndFunctionRunInOneSharedInterpreter)
 {
-    for (unsigned variant : {0U, 1U, 2U, 3U, 4U}) {
+    for (unsigned variant : {0U, 1U, 2U, 3U, 4U, 5U}) {
         const bool closure = variant == 1;
         SCOPED_TRACE(variant);
         const SourceUnit unit(SourceBuffer(
-            variant == 4   ? R"(def total(n):
+            variant == 5   ? R"(def total(n):
+    result = 0.0
+    for item in range(n, 0, -1):
+        result += item / 2.0
+    return int(result * 2.0)
+)"
+            : variant == 4 ? R"(def total(n):
     for unused in range(8):
         class Operation:
             @staticmethod

@@ -185,7 +185,7 @@ std::size_t verify(const CodeSpec &spec, std::span<const Instruction> instructio
                 invalid(CodeErrorKind::JumpBounds, "jump target out of bounds", pc);
             break;
         case OperandDomain::Binary:
-            if (operand > static_cast<std::uint32_t>(BinaryOp::Modulo))
+            if (operand > static_cast<std::uint32_t>(BinaryOp::TrueDivide))
                 invalid(CodeErrorKind::Operand, "invalid binary operator", pc);
             break;
         case OperandDomain::Compare:

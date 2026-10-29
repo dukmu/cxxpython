@@ -62,7 +62,8 @@ compiler, VM, and extension platform implemented in a C/C++ mix.
 - Use the checked-in `.clang-format` for all C++ sources. Run
   `cmake --build build --target format` after edits and `format-check` before
   committing. CTest also checks formatting. Do not hand-format generated Unicode
-  tables or third-party code. Python test drivers belong in `Lib/test/`, native
+  tables or third-party code. `Lib/` is reserved for the interpreter's standard
+  library. Host-side Python test drivers belong in `Tests/python/`, native
   contract tests in `Tests/cpp/`, benchmarks in `Tools/benchmarks/`.
 - Small vertical slices are preferred: parser/compiler bytecode, runtime
   behavior, and tests should land together.

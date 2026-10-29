@@ -44,9 +44,12 @@ type construction. It is not a separate class VM or lifetime authority.
 lookup, argument binding and the shared call boundary. `Objects/abstract.cpp`
 dispatches typed object protocols. `Objects/longobject.cpp` provides int/bool
 construction and arithmetic; `Objects/floatobject.cpp` owns the immutable native
-float payload, conversions, representation, equality and hash. Numeric text
+float payload, conversions, representation, arithmetic, comparison and hash. Numeric text
 conversion shares Unicode decimal/whitespace helpers in `Include/internal/long.hpp`.
-Float arithmetic/literals and the complete numeric API remain unfinished.
+Float literals share the native conversion helper; the compiler freezes native
+binary64 constants into normal managed objects. Integer true division rounds
+exact ratios in longobject rather than narrowing both operands first.
+Complex/power and the complete numeric API remain unfinished.
 `Objects/representation.cpp` provides other value representation/hash
 operations. `Objects/rangeobject.cpp` owns immutable arbitrary-integer ranges and
 their iterators; `Objects/iterobject.cpp` owns iteration and immutable sequence
@@ -82,9 +85,10 @@ There is no whole-interpreter ordinary execution lock.
 
 ## Tests And Tooling
 
-`Tests/cpp/` tests production runtime interfaces. `Lib/test/` contains host Python
+`Tests/cpp/` tests production runtime interfaces. `Tests/python/` contains host Python
 drivers for actual executable differential and measurement-report tests, not a
-ported standard library. `Tools/benchmarks/runtime.cpp` runs the current runtime;
+ported standard library. `Lib/` is reserved for the interpreter's Python standard
+library. `Tools/benchmarks/runtime.cpp` runs the current runtime;
 `Tools/benchmarks/record.py` retains raw runs and generates comparison tables.
 
 The old implementation and its tests are absent, not disabled behind a build

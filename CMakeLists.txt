@@ -108,15 +108,15 @@ if(BUILD_TESTING)
     set(CXXPYTHON_REFERENCE_PYTHON "${Python3_EXECUTABLE}" CACHE FILEPATH
         "CPython executable used for source differential tests")
     add_test(NAME Source.Differential COMMAND ${Python3_EXECUTABLE}
-        ${CMAKE_CURRENT_SOURCE_DIR}/Lib/test/test_source.py
+        ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_source.py
         --binary $<TARGET_FILE:cxxpython> --reference ${CXXPYTHON_REFERENCE_PYTHON})
     set_tests_properties(Source.Differential PROPERTIES TIMEOUT 60)
     add_test(NAME Constructors.Differential COMMAND ${Python3_EXECUTABLE}
-        ${CMAKE_CURRENT_SOURCE_DIR}/Lib/test/test_constructors.py
+        ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_constructors.py
         --binary $<TARGET_FILE:cxxpython> --reference ${CXXPYTHON_REFERENCE_PYTHON})
     set_tests_properties(Constructors.Differential PROPERTIES TIMEOUT 60)
     add_test(NAME Benchmarks.Report COMMAND ${Python3_EXECUTABLE} -m unittest discover
-        -s ${CMAKE_CURRENT_SOURCE_DIR}/Lib/test -p test_benchmarks.py)
+        -s ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python -p test_benchmarks.py)
     set_tests_properties(Benchmarks.Report PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
     add_test(NAME CodingStyle.ClangFormat
         COMMAND ${CLANG_FORMAT_EXECUTABLE} --dry-run --Werror --style=file ${FORMAT_SOURCES})

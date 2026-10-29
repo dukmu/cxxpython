@@ -48,7 +48,7 @@ data. Python drivers follow ordinary Python formatting.
 
 ## Evidence And Commits
 
-Use `Lib/test/test_source.py --binary build/cxxpython --reference ... --report ...`
+Use `Tests/python/test_source.py --binary build/cxxpython --reference ... --report ...`
 for retained fixed-reference evidence. Generate benchmark tables with
 `Tools/benchmarks/record.py`; retain slow samples and actual build provenance.
 Existing `foundation-*` artifact names identify the historical series and are

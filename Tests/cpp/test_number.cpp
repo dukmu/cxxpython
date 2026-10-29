@@ -1,5 +1,7 @@
+#include "cxxpython/floatobject.hpp"
 #include "cxxpython/protocol.hpp"
 
+#include <cmath>
 #include <gtest/gtest.h>
 
 namespace {
@@ -112,6 +114,75 @@ TEST_F(CoreNumbers, DivisionByZeroAndInvalidOperandsProduceManagedExceptions)
     EXPECT_EQ(context.type_of(out.result().exception()),
               context.builtin(CoreObject::TypeErrorType));
     EXPECT_THROW(make_int_decimal(context, "1_0", out), std::invalid_argument);
+}
+
+TEST_F(CoreNumbers, TrueDivisionRoundsExactIntegerRatios)
+{
+    ReturnSlot out(context);
+    auto power = [](int exponent) {
+        std::string value = "1";
+        while (exponent-- > 0) {
+            int carry = 0;
+            for (auto it = value.rbegin(); it != value.rend(); ++it) {
+                int digit = (*it - '0') * 2 + carry;
+                *it = static_cast<char>('0' + digit % 10);
+                carry = digit / 10;
+            }
+            if (carry)
+                value.insert(value.begin(), '1');
+        }
+        return value;
+    };
+    auto combine = [&](std::string a, std::string b, BinaryOp op) {
+        auto left = integer(a);
+        auto right = integer(b);
+        binary(context, left, right, op, out);
+        return int_decimal(context, out.value());
+    };
+    auto divide = [&](std::string a, std::string b, bool reflected = false) {
+        auto left = integer(a);
+        auto right = integer(b);
+        make_str(context, reflected ? U"__rtruediv__" : U"__truediv__", out);
+        auto name = roots.root(out.value());
+        get_attribute(context, reflected ? right : left, name, out);
+        auto method = roots.root(out.value());
+        std::array args{(reflected ? left : right).get(context)};
+        call(context, method, {args, {}}, out);
+    };
+    auto expect = [&](std::string a, std::string b, double expected, bool reflected = false) {
+        divide(a, b, reflected);
+        ASSERT_EQ(out.tag(), ResultTag::Ok);
+        ASSERT_TRUE(is_float(context, out.value()));
+        context.collect();
+        double actual = context.payload<FloatObject>(out.value()).value;
+        EXPECT_EQ(actual, expected);
+        EXPECT_EQ(std::signbit(actual), std::signbit(expected));
+    };
+    auto huge = power(4000);
+    expect(combine(huge, "1", BinaryOp::Add), huge, 1.0);
+    expect("9007199254740993", power(53), 1.0);
+    expect("9007199254740995", power(53), 1.0 + 0x1p-51);
+    expect("1", power(1074), 0x1p-1074);
+    expect("1", power(1075), 0.0);
+    expect("-1", power(1075), -0.0);
+    expect("3", power(1075), 0x1p-1073);
+    expect("0", "-1", -0.0, true);
+    expect(combine(power(1024), power(971), BinaryOp::Subtract), "1", 0x1.fffffffffffffp+1023);
+    divide(combine(power(1024), power(970), BinaryOp::Subtract), "1");
+    ASSERT_EQ(out.tag(), ResultTag::Raised);
+    EXPECT_EQ(context.type_of(out.exception()), context.builtin(CoreObject::OverflowErrorType));
+    divide("1", "0");
+    ASSERT_EQ(out.tag(), ResultTag::Raised);
+    EXPECT_EQ(context.type_of(out.exception()), context.builtin(CoreObject::ZeroDivisionErrorType));
+    auto one = integer("1");
+    make_str(context, U"__truediv__", out);
+    auto name = roots.root(out.value());
+    get_attribute(context, one, name, out);
+    auto method = roots.root(out.value());
+    std::array args{context.builtin(CoreObject::None)};
+    call(context, method, {args, {}}, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(out.value(), context.builtin(CoreObject::NotImplemented));
 }
 
 TEST_F(CoreNumbers, NumericWrappersAndImplicitOperationsShareImplementations)

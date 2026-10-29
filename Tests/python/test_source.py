@@ -1,4 +1,4 @@
-"""Run supported source workflows through both actual executables."""
+"""Host-side differential tests of source workflows in both actual executables."""
 
 import argparse
 from datetime import datetime, timezone

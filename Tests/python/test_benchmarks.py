@@ -1,3 +1,5 @@
+"""Host-side tests of benchmark evidence and generated reports."""
+
 import unittest
 
 from Tools.benchmarks.record import parse_output, render_report
@@ -34,9 +36,12 @@ class BenchmarkReportTests(unittest.TestCase):
         rows += parse_output("parallel_exception_workers=2 wall_ns=4000000\n", "source-cpython", 1)
         rows += parse_output("parallel_class_workers=2 wall_ns=20000000\n", "source", 1)
         rows += parse_output("parallel_class_workers=2 wall_ns=4000000\n", "source-cpython", 1)
+        rows += parse_output("parallel_float_workers=2 wall_ns=24000000\n", "source", 1)
+        rows += parse_output("parallel_float_workers=2 wall_ns=4000000\n", "source-cpython", 1)
         report = render_report(rows, 0)
         self.assertIn("| source | parallel_source_workers | 2 | 4.000 | 1.000 | 4.000 |", report)
         self.assertIn("| source | parallel_closure_workers | 2 | 9.000 | 3.000 | 3.000 |", report)
         self.assertIn("| source | parallel_for_workers | 2 | 10.000 | 2.000 | 5.000 |", report)
         self.assertIn("| source | parallel_exception_workers | 2 | 12.000 | 4.000 | 3.000 |", report)
         self.assertIn("| source | parallel_class_workers | 2 | 20.000 | 4.000 | 5.000 |", report)
+        self.assertIn("| source | parallel_float_workers | 2 | 24.000 | 4.000 | 6.000 |", report)

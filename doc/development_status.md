@@ -1,5 +1,59 @@
 # Development Status
 
+## 2026-10-30 Float Source And Operators; Host Tests Outside Lib
+
+Prepended without rewriting history. The previous stable node is 1a0255c.
+The full Plan 2 N0-N6/M0-M9 goal remains active. This advances basic numeric
+language behavior and the requested repository layout, not complete acceptance.
+
+- At the user's direction, moved all three host-side Python test drivers from
+  Lib/test to Tests/python beside Tests/cpp. Lib is reserved for the actual
+  interpreter standard library. CMake, README, AGENTS, Plan 2 and current docs
+  now use that contract. Removed only the obsolete generated test cache; no
+  parallel old test tree or compatibility path remains. Historical entries and
+  previous evidence keep their original paths and contents.
+- Added decimal/dotted/exponent/underscore float literals to the existing
+  lexer/parser. They share float construction's pure native parser, retain
+  binary64 values in native AST/CFG and freeze to ordinary managed constants.
+  Signs use normal unary operations, including negative zero. Malformed numeric
+  forms remain syntax errors; complex/power are still explicit capability gaps.
+- Added float unary signs, arithmetic + - * / // %, and all six rich comparisons
+  with native int/float payloads. Mixed comparisons preserve exact integer
+  values, fractions, NaN unordered behavior and infinity bounds. Floor/modulo
+  preserve divisor sign, integral quotient rounding and signed zero; division
+  by zero raises the ordinary Python exception. Arbitrary __float__ methods
+  are not silently invoked by arithmetic. Existing descriptor validation,
+  subtype/reflected priority, inplace fallback and rooted returns remain shared.
+- A single terra agent implemented int/int true division in longobject and its
+  focused native test while the main agent owned frontend/float/integration.
+  The algorithm rounds an exact integer ratio to nearest-even binary64 rather
+  than overflowing each operand independently, including subnormals, signed-zero
+  underflow and overflow boundaries. The agent is closed; no sol/astra was used.
+- Source / and /= use the existing BINARY/INPLACE stack effect and verifier,
+  extended with a typed TrueDivide operand and ordinary true-division slots.
+  No separate VM, numeric object, RC or execution lock was added. Shared-Code
+  tests now run floating CPU loops, and concurrent native-graph freeze exercises
+  float constants/defaults in the same Interpreter with existing GC coordination.
+- Final normal CTest passes 354/354, including all 350 native cases, both actual
+  executable differentials, the recorder and clang-format. ASan/UBSan/LSan passes
+  350/350; TSan passes 348/348, excluding only the two established exhaustive
+  allocation enumerations covered by normal/ASan. All six numeric/construction
+  and eleven source differential groups pass against fixed CPython 3.12.14,
+  including the ASan CLI. Retained numeric evidence includes 53 exact-ratio
+  cases (explicit boundaries and a fixed-seed matrix); new pre-implementation
+  source/operator cases were observed failing before they were implemented.
+- Extended the existing benchmark/recorder with the captured floating source
+  kernel, identical CPython work and 1/2/4 workers. Three idle Release samples
+  after all builds/sanitizers generated the 2026-10-30 JSONL/CSV/Markdown from
+  raw data. Four-worker float scaling is real, but the absolute CPython gap
+  remains very large. No parity, complete performance optimization or Python
+  thread/I/O workflow acceptance is claimed. Previous daily evidence is intact.
+- Continue with general containers and their source forms, remaining numeric
+  APIs/complex/power/bit operations, slices, super/reflection, f-strings/imports,
+  suspension, actual libraries/thread/I/O, finalization/platform/install and
+  performance gates. The user's temporary_plan.md deletion and untracked
+  test2.py remain untouched and excluded from this node.
+
 ## 2026-10-29 Ordinary Numeric And Tuple Constructors
 
 Prepended without rewriting history. The previous stable node is d30bda8.

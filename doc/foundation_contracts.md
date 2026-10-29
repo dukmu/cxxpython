@@ -17,7 +17,7 @@ N0-N5 and M0-M6 contain experimental slices; complete language, object/protocol,
 library, thread/resource, platform/install and performance acceptance remain.
 M7-M9/N6 are not complete. No CPython ABI, .pyc or extension ABI is promised.
 
-The accepted source subset includes arbitrary integer/string literals,
+The accepted source subset includes arbitrary integer/float/string literals,
 implemented unary/arithmetic/boolean/comparison protocols, name/attribute
 operations, if/while/for control flow, calls, function definitions/defaults/variadic
 binding, globals/nonlocal, closures, docstrings, tuple expressions, recursive
@@ -30,8 +30,8 @@ with separate class namespaces, lexical forwarding and real __class__ Cells.
 Experimental int/float/tuple constructors use the same ordinary class call and
 descriptor boundary, including Python conversion callbacks and native subclasses.
 Mutable containers, slices, full iteration APIs, super(),
-exception groups, imports, suspension, f-strings, float literals/arithmetic/ordering,
-power protocols, full Unicode source handling and the remaining Python 3.12 matrix are
+exception groups, imports, suspension, f-strings, complex/power protocols,
+full Unicode source handling and the remaining Python 3.12 matrix are
 unfinished. These are remaining delivery requirements, not a reduction of the
 basic-language objective. Existing native VM/type/cleanup interfaces do not imply
 source or library support.
@@ -230,7 +230,7 @@ supports empty/object conversion, object/encoding/errors argument validation
 and native-layout-preserving subclasses. Byte buffers/codecs and the complete
 Unicode API remain requirements; no existing non-buffer type is silently decoded.
 
-## Numeric Constructors
+## Numeric Operations
 
 int() accepts decimal Unicode strings and base-0/2-36 text parsing, with ordinary
 __index__ conversion of the base, underscore/prefix/sign validation and arbitrary
@@ -253,9 +253,31 @@ doubles; hashes agree for equal integers/floats, and NaN is not equal to itself.
 int(float) truncates finite values and reports NaN/infinity as Python errors.
 Descriptors validate native receivers; no mutable shared numeric cache is added.
 
-These are experimental construction slices, not complete numeric support.
-Float arithmetic/ordering/source literals, bytes/buffer numeric construction,
-decimal conversion length limits and conversion deprecation warnings remain.
+Float literals share the pure native text parser with float construction. The
+native AST/CFG stores their binary64 value; each attached freeze materializes
+ordinary managed constants in immutable Code. Decimal/exponent/underscore forms
+and malformed literals are checked without allocating Python objects in parsing.
+Signs remain ordinary unary operators, preserving negative zero.
+
+Float +, -, *, /, // and % accept native float/int payloads, including subclasses,
+not arbitrary objects with __float__. Comparison handles all six rich relations
+against native floats/integers; integers are not narrowed to doubles. NaN is
+unordered, infinity compares outside every finite integer, and fractional floats
+are ordered against exact integers. Reflected/subclass/inplace dispatch uses the
+existing protocol engine; builtins return NotImplemented for incompatible types.
+Division/modulo by zero raises ZeroDivisionError. Floor division and remainder
+keep divisor-sign/rounding/signed-zero behavior distinct from C++ truncation.
+
+Integer true division rounds the exact integer ratio to nearest-even binary64,
+including subnormals, signed-zero underflow and overflow. It does not separately
+convert huge operands to double, so finite ratios of enormous integers work.
+The / and /= source forms use the existing BINARY/INPLACE instructions and their
+2-input/1-result stack effect, with the verified TrueDivide operand and ordinary
+__truediv__/__rtruediv__/__itruediv__ slots. No new VM execution path is introduced.
+
+These are experimental numeric slices, not complete numeric support.
+Complex/power and remaining integer/float method matrices, bytes/buffer numeric
+construction, decimal conversion length limits and conversion warnings remain.
 The internal name dictionary is still not the general Python dict API; general
 dict/list/set construction, storage, protocols and source syntax remain gates.
 
@@ -304,7 +326,8 @@ runtime faults use Raised and real tracebacks. Globals/builtins are actual name
 dictionaries; arbitrary namespace mappings and Python compile/exec/eval are absent.
 
 Native contracts live in Tests/cpp; actual executable differential drivers live
-in Lib/test and use fixed CPython 3.12.14 when configured. Benchmark source kernels
+in Tests/python and use fixed CPython 3.12.14 when configured. Lib is reserved for
+the interpreter's Python standard library. Benchmark source kernels
 are captured verbatim for the paired reference; raw runs retain version/build/hash
 provenance and generate tables. Same-Function source, closure, for-loop, exception and method probes
 exercise CPU parallelism, but absolute single-thread CPython parity remains a
