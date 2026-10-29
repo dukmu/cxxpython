@@ -45,6 +45,8 @@ namespace cxxpython::core
         template <class T> inline constexpr char native_layout_id = 0;
     }
 
+    // Internal identities must denote live managed allocations. A raw/dangling
+    // ObjectHeader address is not an embedding handle or a checked pointer API.
     class Value final
     {
     public:
@@ -142,6 +144,7 @@ namespace cxxpython::core
             ::new (static_cast<void *>(field_cells(object))) std::optional<Value>[count]();
         }
         void trace_storage(const ObjectHeader &object, Tracer &tracer) const noexcept;
+        // End payload/tail lifetimes; only the owning span frees raw storage.
         void destroy_storage(ObjectHeader *object) const noexcept;
 
         template <class T> static LayoutDescriptor of()
@@ -181,6 +184,7 @@ namespace cxxpython::core
         std::uint64_t last_pause_ns;
         std::size_t registered_threads;
         std::uint64_t last_rendezvous_ns, max_rendezvous_ns;
+        std::size_t spans = 0, reserved_bytes = 0;
     };
     enum class MutatorState { PendingAttach, Active, Parked, NativeWait, Collector, Exiting };
     enum class GcPhase { Running, Requesting, Collecting };
@@ -373,14 +377,16 @@ namespace cxxpython::core
         Handle acquire(const void *scope);
         void release(Handle handle) noexcept;
         void prepare_allocation(ReturnSlot &out, std::size_t bytes);
-        void adopt(ObjectHeader *object, LayoutDescriptor layout, ReturnSlot &out, std::size_t external);
+        void *reserve_storage(LayoutDescriptor layout);
+        void abandon_storage(ObjectHeader *object) noexcept;
+        void adopt(ObjectHeader *object, ReturnSlot &out, std::size_t external);
 
         template <class T, class... Args>
         void allocate_layout(LayoutDescriptor layout, std::optional<Handle> type, ReturnSlot &out, Args &&...args)
         {
             const auto bytes = layout.storage_size();
             prepare_allocation(out, bytes);
-            void *storage = layout.allocate_storage(bytes);
+            void *storage = reserve_storage(layout);
             T *object = nullptr;
             try
             {
@@ -389,12 +395,12 @@ namespace cxxpython::core
                 if (type) object->header.type.object_ = type->get(*this).object();
                 std::size_t external = 0;
                 if constexpr (requires { object->external_bytes(); }) external = object->external_bytes();
-                adopt(&object->header, layout, out, external);
+                adopt(&object->header, out, external);
             }
             catch (...)
             {
                 if (object) layout.destroy_storage(&object->header);
-                else layout.deallocate_storage(storage);
+                abandon_storage(reinterpret_cast<ObjectHeader *>(storage));
                 throw;
             }
         }

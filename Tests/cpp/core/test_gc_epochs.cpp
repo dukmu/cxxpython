@@ -168,4 +168,66 @@ namespace
         });
         worker.get(); EXPECT_EQ(owner.stats().objects, 0U); owner.bootstrap(); EXPECT_EQ(owner.stats().objects, 2U);
     }
+
+    TEST(FoundationEpochs, RetiredSpansKeepTransferredSurvivorsUntilFinalCollection)
+    {
+        std::atomic<int> destroyed{0}; Interpreter interpreter; Attachment owner(interpreter);
+        RootScope roots(owner); std::promise<Value> published; std::promise<void> release; auto released = release.get_future();
+        auto worker = std::async(std::launch::async, [&] {
+            Attachment thread(interpreter); ReturnSlot out(thread); thread.allocate<EpochLeaf>(out, &destroyed);
+            const auto value = out.result().value(); NativeWait frozen(thread); published.set_value(value); released.get();
+        });
+        // The sender keeps its root continuously until the receiver has a root.
+        auto input = published.get_future(); std::optional<Value> value;
+        { NativeWait wait(owner); value = input.get(); }
+        const auto keep = roots.root(*value); release.set_value();
+        { NativeWait wait(owner); worker.get(); }
+        EXPECT_EQ(owner.stats().registered_threads, 1U); EXPECT_EQ(owner.stats().spans, 1U);
+        EXPECT_EQ(owner.collect(), 0U); EXPECT_EQ(owner.payload<EpochLeaf>(keep).value, 42);
+        roots.release(keep); EXPECT_EQ(owner.collect(), 1U); EXPECT_EQ(destroyed.load(), 1);
+        EXPECT_EQ(owner.stats().spans, 0U); EXPECT_EQ(owner.stats().reserved_bytes, 0U);
+    }
+
+    TEST(FoundationEpochs, ParallelQuotaCommitsOnlyTheAvailableAllocations)
+    {
+        std::atomic<int> succeeded{0}, destroyed{0}; Interpreter interpreter; Attachment owner(interpreter);
+        owner.set_gc_enabled(false); owner.set_allocation_limit(37); std::barrier start(4);
+        {
+            NativeWait wait(owner); std::vector<std::future<void>> workers;
+            for (int i = 0; i < 4; ++i) workers.push_back(std::async(std::launch::async, [&] {
+                Attachment thread(interpreter); ReturnSlot out(thread); start.arrive_and_wait();
+                for (int n = 0; n < 100; ++n)
+                    try { thread.allocate<EpochLeaf>(out, &destroyed); ++succeeded; }
+                    catch (const std::bad_alloc &) {}
+            }));
+            for (auto &worker : workers) worker.get();
+        }
+        EXPECT_EQ(succeeded.load(), 37); EXPECT_EQ(owner.stats().objects, 37U);
+        // A prepared object may lose the finite-quota commit race and must be
+        // destroyed immediately; those rollbacks are not GC reclamations.
+        const auto rolled_back = destroyed.load();
+        owner.set_allocation_limit(std::numeric_limits<std::size_t>::max());
+        EXPECT_EQ(owner.collect(), 37U); EXPECT_EQ(destroyed.load(), rolled_back + 37); EXPECT_EQ(owner.stats().reserved_bytes, 0U);
+    }
+
+    TEST(FoundationEpochs, ConcurrentExternalAccountingSurvivesRendezvousAndRetirement)
+    {
+        Interpreter interpreter; Attachment owner(interpreter); ReturnSlot out(owner); owner.allocate<EpochLeaf>(out);
+        const auto shared = out.result().value();
+        {
+            NativeWait wait(owner); std::vector<std::future<void>> workers;
+            for (int i = 0; i < 4; ++i) workers.push_back(std::async(std::launch::async, [&, i] {
+                Attachment thread(interpreter); RootScope roots(thread); const auto keep = roots.root(shared);
+                for (int n = 0; n < 200; ++n)
+                {
+                    thread.account_external(keep, 1024 * (1 + (i + n) % 4));
+                    if (n % 31 == 0) thread.collect(); else thread.poll();
+                }
+            }));
+            for (auto &worker : workers) worker.get();
+        }
+        const auto bytes = owner.stats().live_bytes; EXPECT_GE(bytes, sizeof(EpochLeaf) + 1024); EXPECT_LE(bytes, sizeof(EpochLeaf) + 4096);
+        EXPECT_THROW(owner.account_external(shared, std::numeric_limits<std::size_t>::max()), std::bad_alloc);
+        EXPECT_EQ(owner.stats().live_bytes, bytes); out.reset(); EXPECT_EQ(owner.collect(), 1U); EXPECT_EQ(owner.stats().reserved_bytes, 0U);
+    }
 }

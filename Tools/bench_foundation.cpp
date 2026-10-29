@@ -59,7 +59,7 @@ int main()
     value.reset();
     context.collect();
     auto stats = context.stats();
-    if (stats.objects != 0 || stats.roots != 1 || stats.root_cells > 2)
+    if (stats.objects != 0 || stats.spans || stats.reserved_bytes || stats.roots != 1 || stats.root_cells > 2)
         return 1;
     std::cout << "iterations=" << iterations
               << " header_bytes=" << sizeof(ObjectHeader)
@@ -104,9 +104,12 @@ int main()
     });
     if (value.result().tag() != ResultTag::Ok || value.result().value() != receiver.get(context)) return 1;
     context.collect();
+    const auto core_stats = context.stats();
     std::cout << "native_call_iterations=" << iterations << " native_call_ns=" << native_call_ns
               << " method_iterations=" << method_iterations << " lookup_bind_call_ns=" << method_ns
-              << " live_objects=" << context.stats().objects << '\n';
+              << " live_objects=" << core_stats.objects << " core_spans=" << core_stats.spans
+              << " core_reserved_bytes=" << core_stats.reserved_bytes << " core_metadata_bytes=" << core_stats.metadata_bytes
+              << " core_live_bytes=" << core_stats.live_bytes << '\n';
 
     TypeSpec slots{"Slotted"}; slots.slots = std::vector<std::u32string>{U"x", U"y"};
     create_type(context, slots, value);
@@ -279,13 +282,17 @@ int main()
         const auto cpu_start = std::clock();
         const auto elapsed = measure([&] { start.arrive_and_wait(); finish.arrive_and_wait(); });
         const auto cpu_ns = static_cast<std::int64_t>((std::clock() - cpu_start) * (1000000000.0 / CLOCKS_PER_SEC));
+        Attachment observer(storage); const auto finished = observer.stats();
         finish.arrive_and_wait(); for (auto &task : tasks) task.get();
-        Attachment observer(storage); observer.collect(); const auto final = observer.stats();
-        if (final.objects || final.live_bytes || final.roots || final.registered_threads != 1) return 1;
+        observer.collect(); const auto final = observer.stats();
+        if (final.objects || final.live_bytes || final.roots || final.spans || final.reserved_bytes || final.registered_threads != 1) return 1;
         std::cout << "parallel_storage_workers=" << workers << " total_allocations=" << total << " wall_ns=" << elapsed
                   << " process_cpu_ns=" << cpu_ns << " collections=" << final.collections
                   << " request_epoch=" << storage.gc_state().request_epoch << " completed_epoch=" << storage.gc_state().completed_epoch
                   << " max_rendezvous_ns=" << final.max_rendezvous_ns << " last_mark_sweep_ns=" << final.last_pause_ns
+                  << " finish_spans=" << finished.spans << " finish_reserved_bytes=" << finished.reserved_bytes
+                  << " finish_metadata_bytes=" << finished.metadata_bytes << " finish_live_bytes=" << finished.live_bytes
+                  << " finish_objects=" << finished.objects
                   << " parallel_storage_live_set_check=ok\n";
     }
 }

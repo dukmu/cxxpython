@@ -10,8 +10,8 @@
 #include <condition_variable>
 #include <deque>
 #include <limits>
+#include <list>
 #include <random>
-#include <unordered_map>
 
 namespace cxxpython::core
 {
@@ -33,7 +33,6 @@ namespace cxxpython::core
             for (std::size_t i = 0; i < count; ++i) std::destroy_at(cells + i);
         }
         destroy(object);
-        deallocate_storage(object);
     }
     namespace detail
     {
@@ -81,6 +80,71 @@ namespace cxxpython::core
             RootCell *free = nullptr;
             std::size_t count = 0;
         };
+        struct AllocationSpan;
+        // Adjacent metadata has a fixed offset from every object, including
+        // over-aligned payloads. Span domain/layout never change after creation.
+        struct Allocation
+        {
+            explicit Allocation(AllocationSpan *span) : span(span) {}
+            Allocation *next = nullptr; // Free list or STW mark worklist.
+            std::atomic<std::size_t> external_bytes{0};
+            AllocationSpan *const span;
+            bool live = false, marked = false;
+
+            ObjectHeader *object() noexcept
+            { return reinterpret_cast<ObjectHeader *>(reinterpret_cast<std::byte *>(this) + sizeof(Allocation)); }
+            static Allocation &from(ObjectHeader *object) noexcept
+            { return *reinterpret_cast<Allocation *>(reinterpret_cast<std::byte *>(object) - sizeof(Allocation)); }
+        };
+        struct AllocationSpan
+        {
+            AllocationSpan(State *owner, LayoutDescriptor layout, std::size_t target_bytes) : owner(owner), layout(layout)
+            {
+                const auto alignment = layout.storage_alignment();
+                const auto limit = std::numeric_limits<std::size_t>::max();
+                if (alignment - 1 > limit - sizeof(Allocation)) throw std::bad_alloc();
+                object_offset = (sizeof(Allocation) + alignment - 1) & ~(alignment - 1);
+                const auto bytes = layout.storage_size();
+                if (bytes > limit - object_offset || alignment - 1 > limit - object_offset - bytes) throw std::bad_alloc();
+                stride = (object_offset + bytes + alignment - 1) & ~(alignment - 1);
+                capacity = std::max(std::size_t{1}, target_bytes / stride);
+                reserved_bytes = capacity * stride;
+                storage = static_cast<std::byte *>(layout.allocate_storage(reserved_bytes));
+            }
+            ~AllocationSpan()
+            {
+                for (std::size_t i = 0; i < extent; ++i)
+                {
+                    auto &allocation = at(i);
+                    if (allocation.live) layout.destroy_storage(allocation.object());
+                    std::destroy_at(&allocation);
+                }
+                layout.deallocate_storage(storage);
+            }
+            AllocationSpan(const AllocationSpan &) = delete;
+            AllocationSpan &operator=(const AllocationSpan &) = delete;
+            Allocation &at(std::size_t index) const noexcept
+            { return *reinterpret_cast<Allocation *>(storage + index * stride + object_offset - sizeof(Allocation)); }
+            bool available() const noexcept { return free || extent != capacity; }
+            Allocation &take() noexcept
+            {
+                if (!free) return *std::construct_at(&at(extent++), this);
+                auto *allocation = free; free = free->next; allocation->next = nullptr; return *allocation;
+            }
+            void discard(Allocation &allocation) noexcept
+            {
+                if (allocation.live) --live_count;
+                allocation.live = false; allocation.marked = false; allocation.external_bytes.store(0, std::memory_order_relaxed);
+                allocation.next = free; free = &allocation;
+            }
+
+            State *const owner;
+            const LayoutDescriptor layout;
+            std::byte *storage;
+            std::size_t object_offset, stride, capacity, reserved_bytes;
+            std::size_t extent = 0, live_count = 0;
+            Allocation *free = nullptr;
+        };
         struct ThreadRecord
         {
             explicit ThreadRecord(std::uint64_t identity) : owner(std::this_thread::get_id()), roots(identity) {}
@@ -89,26 +153,17 @@ namespace cxxpython::core
             std::atomic<MutatorState> state{MutatorState::PendingAttach};
             std::uint64_t observed_epoch = 0, ack_epoch = 0, wait_epoch = 0;
             std::size_t collection_result = 0;
+            std::list<AllocationSpan> spans;
+            AllocationSpan *current_span = nullptr;
+            std::size_t pending_bytes = 0;
         };
 
-        struct Allocation
-        {
-            const LayoutDescriptor layout;
-            ObjectHeader *object;
-            Allocation *next_mark = nullptr;
-            std::size_t external_bytes = 0;
-            bool marked = false;
-        };
+        std::size_t saturated_add(std::size_t a, std::size_t b) noexcept
+        { return a + std::min(b, std::numeric_limits<std::size_t>::max() - a); }
 
         struct State
         {
             explicit State(HeapConfig config_in) : config(config_in), budget(config.minimum_gc_budget) {}
-            ~State()
-            {
-                // Physical destruction never follows GC edges or invokes Python.
-                for (auto &[object, allocation] : heap)
-                    allocation.layout.destroy_storage(object);
-            }
 
             bool other_active(const ThreadRecord *self = nullptr) const
             {
@@ -126,8 +181,33 @@ namespace cxxpython::core
             {
                 std::size_t roots = 0, cells = 0;
                 for (const auto &thread : threads) { roots += thread->roots.count; cells += thread->roots.cells.size(); }
-                return {heap.size(), live_bytes, heap.size() * sizeof(Allocation) + cells * sizeof(RootCell) + threads.size() * sizeof(ThreadRecord),
-                        roots, cells, collections, reclaimed_bytes, last_pause_ns, threads.size(), last_rendezvous_ns, max_rendezvous_ns};
+                HeapStats result{0, 0, cells * sizeof(RootCell) + threads.size() * sizeof(ThreadRecord),
+                    roots, cells, collections, reclaimed_bytes, last_pause_ns, threads.size(), last_rendezvous_ns, max_rendezvous_ns};
+                auto count = [&](const auto &spans) {
+                    for (const auto &span : spans)
+                    {
+                        ++result.spans; result.objects += span.live_count;
+                        result.reserved_bytes = saturated_add(result.reserved_bytes, span.reserved_bytes + sizeof(AllocationSpan));
+                        result.metadata_bytes += sizeof(AllocationSpan) + span.capacity * sizeof(Allocation);
+                        for (std::size_t i = 0; i < span.extent; ++i)
+                            if (const auto &allocation = span.at(i); allocation.live)
+                                result.live_bytes = saturated_add(result.live_bytes, saturated_add(span.layout.storage_size(), allocation.external_bytes.load(std::memory_order_relaxed)));
+                    }
+                };
+                count(retired_spans); for (const auto &thread : threads) count(thread->spans); return result;
+            }
+            void charge(ThreadRecord &thread, std::size_t bytes) noexcept
+            {
+                thread.pending_bytes = saturated_add(thread.pending_bytes, bytes);
+                if (thread.pending_bytes < std::min(std::size_t{4096}, budget)) return;
+                flush_charge(thread);
+            }
+            void flush_charge(ThreadRecord &thread) noexcept
+            {
+                if (!thread.pending_bytes) return;
+                auto charged = allocated_since_gc.load(std::memory_order_relaxed);
+                while (!allocated_since_gc.compare_exchange_weak(charged, saturated_add(charged, thread.pending_bytes), std::memory_order_relaxed)) {}
+                thread.pending_bytes = 0;
             }
             std::size_t rendezvous(ThreadRecord &caller, HeapStats *snapshot = nullptr)
             {
@@ -172,13 +252,12 @@ namespace cxxpython::core
             {
                 if (!object)
                     return;
-                auto found = heap.find(object);
-                assert(found != heap.end());
-                auto &allocation = found->second;
+                auto &allocation = Allocation::from(object);
+                assert(allocation.span->owner == this && allocation.live);
                 if (allocation.marked)
                     return;
                 allocation.marked = true;
-                allocation.next_mark = worklist;
+                allocation.next = worklist;
                 worklist = &allocation;
             }
 
@@ -199,27 +278,35 @@ namespace cxxpython::core
                 while (worklist)
                 {
                     Allocation *allocation = worklist;
-                    worklist = allocation->next_mark;
-                    tracer.visit(allocation->object->type);
-                    allocation->layout.trace_storage(*allocation->object, tracer);
+                    worklist = allocation->next;
+                    tracer.visit(allocation->object()->type);
+                    allocation->span->layout.trace_storage(*allocation->object(), tracer);
                 }
                 std::size_t collected = 0;
                 reclaimed_bytes = 0;
-                for (auto it = heap.begin(); it != heap.end();)
-                {
-                    auto &allocation = it->second;
-                    if (allocation.marked)
+                std::size_t live_bytes = 0;
+                auto sweep_spans = [&](auto &spans) {
+                    for (auto it = spans.begin(); it != spans.end();)
                     {
-                        allocation.marked = false;
-                        ++it;
-                        continue;
+                        auto &span = *it;
+                        for (std::size_t i = 0; i < span.extent; ++i)
+                        {
+                            auto &allocation = span.at(i); if (!allocation.live) continue;
+                            const auto bytes = saturated_add(span.layout.storage_size(), allocation.external_bytes.load(std::memory_order_relaxed));
+                            if (allocation.marked)
+                            {
+                                allocation.marked = false; allocation.next = nullptr; live_bytes = saturated_add(live_bytes, bytes); continue;
+                            }
+                            reclaimed_bytes = saturated_add(reclaimed_bytes, bytes);
+                            span.layout.destroy_storage(allocation.object()); span.discard(allocation); ++collected;
+                        }
+                        if (!span.live_count) it = spans.erase(it); else ++it;
                     }
-                    const auto bytes = allocation.layout.storage_size() + allocation.external_bytes;
-                    live_bytes -= bytes;
-                    reclaimed_bytes += bytes;
-                    allocation.layout.destroy_storage(it->first);
-                    it = heap.erase(it);
-                    ++collected;
+                };
+                sweep_spans(retired_spans);
+                for (const auto &thread : threads)
+                {
+                    thread->current_span = nullptr; sweep_spans(thread->spans); thread->pending_bytes = 0;
                 }
                 // Budget all allocations, including leaf objects and external buffers.
                 budget = std::max(config.minimum_gc_budget, live_bytes);
@@ -244,22 +331,19 @@ namespace cxxpython::core
             std::atomic<std::uint64_t> request_epoch{0};
             std::uint64_t completed_epoch = 0;
             bool core_quarantine = false;
-            // Transitional central registration only, not an execution mutex.
-            std::mutex heap_mutex;
             std::atomic<bool> accepting{true};
-            std::unordered_map<ObjectHeader *, Allocation> heap;
+            std::list<AllocationSpan> retired_spans;
             std::vector<std::shared_ptr<ThreadRecord>> threads;
             std::uint64_t next_arena_id = 1;
             Allocation *worklist = nullptr;
-            std::size_t live_bytes = 0;
-            std::size_t allocated_since_gc = 0;
+            std::atomic<std::size_t> allocated_since_gc{0};
             std::size_t budget;
             std::size_t collections = 0;
             std::size_t reclaimed_bytes = 0;
             std::uint64_t last_pause_ns = 0;
             std::uint64_t last_rendezvous_ns = 0, max_rendezvous_ns = 0;
             std::atomic<bool> gc_enabled{true};
-            std::size_t allocations_remaining = std::numeric_limits<std::size_t>::max();
+            std::atomic<std::size_t> allocations_remaining{std::numeric_limits<std::size_t>::max()};
             ObjectHeader *object_type = nullptr;
             ObjectHeader *type_type = nullptr;
             std::array<ObjectHeader *, detail::core_count> core{};
@@ -313,9 +397,11 @@ namespace cxxpython::core
         if (thread_record_->roots.count != 0 || !repr_stack_.empty() || current_frame_)
             std::terminate();
         std::unique_lock gate(state_->coordinator);
+        state_->flush_charge(*thread_record_);
         thread_record_->ack_epoch = state_->request_epoch.load(std::memory_order_relaxed);
         thread_record_->state.store(MutatorState::Exiting, std::memory_order_release); state_->changed.notify_all();
         state_->changed.wait(gate, [&] { return state_->phase == GcPhase::Running; });
+        state_->retired_spans.splice(state_->retired_spans.end(), thread_record_->spans);
         std::erase(state_->threads, thread_record_);
         state_->changed.notify_all();
     }
@@ -356,9 +442,10 @@ namespace cxxpython::core
     void Attachment::require_owns(Value value) const
     {
         require_attached();
-        std::lock_guard metadata(state_->heap_mutex);
-        if (!state_->heap.contains(value.object()))
+        const auto &allocation = detail::Allocation::from(value.object());
+        if (allocation.span->owner != state_.get())
             throw std::logic_error("value does not belong to this interpreter");
+        if (!allocation.live) throw std::logic_error("value is not a published allocation");
     }
 
     void Attachment::require_layout(Value value, const void *family) const
@@ -372,10 +459,7 @@ namespace cxxpython::core
     }
     const LayoutDescriptor &Attachment::allocation_layout(Value value) const
     {
-        require_attached(); std::lock_guard metadata(state_->heap_mutex);
-        const auto found = state_->heap.find(value.object());
-        if (found == state_->heap.end()) throw std::logic_error("value does not belong to this interpreter");
-        return found->second.layout;
+        require_owns(value); return detail::Allocation::from(value.object()).span->layout;
     }
     std::optional<Value> *Attachment::instance_dictionary(Value object)
     {
@@ -550,33 +634,53 @@ namespace cxxpython::core
     {
         require_attached();
         out.reset(*this);
-        poll(); bool pressure;
-        {
-            std::lock_guard metadata(state_->heap_mutex);
-            if (state_->allocations_remaining == 0) throw std::bad_alloc();
-            pressure = state_->gc_enabled && (state_->config.collect_every_allocation || bytes >= state_->budget || state_->allocated_since_gc >= state_->budget - bytes);
-        }
-        if (pressure) collect();
+        poll();
+        if (state_->allocations_remaining.load(std::memory_order_relaxed) == 0) throw std::bad_alloc();
+        const auto charged = detail::saturated_add(state_->allocated_since_gc.load(std::memory_order_relaxed), thread_record_->pending_bytes);
+        if (state_->gc_enabled && (state_->config.collect_every_allocation || bytes >= state_->budget || charged >= state_->budget - bytes)) collect();
     }
 
-    void Attachment::adopt(ObjectHeader *object, LayoutDescriptor layout, ReturnSlot &out, std::size_t external)
+    void *Attachment::reserve_storage(LayoutDescriptor layout)
     {
-        std::lock_guard metadata(state_->heap_mutex);
-        if (state_->allocations_remaining == 0) throw std::bad_alloc();
-        const auto storage_bytes = layout.storage_size();
+        auto &thread = *thread_record_;
+        if (!thread.current_span || thread.current_span->layout != layout || !thread.current_span->available())
+        {
+            thread.current_span = nullptr;
+            std::size_t target_bytes = 4096;
+            for (auto &span : thread.spans)
+                if (span.layout == layout)
+                {
+                    if (span.available()) { thread.current_span = &span; break; }
+                    target_bytes = 64 * 1024;
+                }
+            if (!thread.current_span)
+            {
+                thread.spans.emplace_back(state_.get(), layout, target_bytes); thread.current_span = &thread.spans.back();
+            }
+        }
+        return thread.current_span->take().object();
+    }
+    void Attachment::abandon_storage(ObjectHeader *object) noexcept
+    {
+        auto &allocation = detail::Allocation::from(object); allocation.span->discard(allocation);
+    }
+    void Attachment::adopt(ObjectHeader *object, ReturnSlot &out, std::size_t external)
+    {
+        auto &allocation = detail::Allocation::from(object);
+        const auto storage_bytes = allocation.span->layout.storage_size();
         if (external > std::numeric_limits<std::size_t>::max() - storage_bytes)
             throw std::bad_alloc();
         const auto bytes = storage_bytes + external;
-        if (bytes > std::numeric_limits<std::size_t>::max() - state_->live_bytes)
-            throw std::bad_alloc();
-        state_->heap.emplace(object, detail::Allocation{layout, object, nullptr, external});
-        state_->live_bytes += bytes;
-        state_->allocated_since_gc += std::min(bytes,
-            std::numeric_limits<std::size_t>::max() - state_->allocated_since_gc);
-        if (state_->allocations_remaining != std::numeric_limits<std::size_t>::max())
-            --state_->allocations_remaining;
-        // prepare_allocation validated this caller-owned cell; heap insertion
-        // established the domain. Publication does not query heap or allocate.
+        auto remaining = state_->allocations_remaining.load(std::memory_order_relaxed);
+        while (remaining != std::numeric_limits<std::size_t>::max())
+        {
+            if (!remaining) throw std::bad_alloc();
+            if (state_->allocations_remaining.compare_exchange_weak(remaining, remaining - 1, std::memory_order_relaxed)) break;
+        }
+        allocation.external_bytes.store(external, std::memory_order_relaxed); allocation.live = true;
+        ++allocation.span->live_count; state_->charge(*thread_record_, bytes);
+        // No safepoint separates completed slot registration and caller-root
+        // publication. The immutable span establishes domain and layout.
         out.store_root_noexcept(ResultTag::Ok, object);
     }
 
@@ -607,20 +711,10 @@ namespace cxxpython::core
     }
     void Attachment::account_external(Value owner, std::size_t bytes)
     {
-        require_attached(); std::lock_guard metadata(state_->heap_mutex);
-        if (!state_->heap.contains(owner.object())) throw std::logic_error("value does not belong to this interpreter");
-        auto &allocation = state_->heap.at(owner.object());
-        auto without_previous = state_->live_bytes - allocation.external_bytes;
-        if (bytes > std::numeric_limits<std::size_t>::max() - without_previous)
-            throw std::bad_alloc();
-        if (bytes > allocation.external_bytes)
-        {
-            auto increase = bytes - allocation.external_bytes;
-            state_->allocated_since_gc += std::min(increase,
-                std::numeric_limits<std::size_t>::max() - state_->allocated_since_gc);
-        }
-        allocation.external_bytes = bytes;
-        state_->live_bytes = without_previous + bytes;
+        require_owns(owner); auto &allocation = detail::Allocation::from(owner.object());
+        if (bytes > std::numeric_limits<std::size_t>::max() - allocation.span->layout.storage_size()) throw std::bad_alloc();
+        const auto previous = allocation.external_bytes.exchange(bytes, std::memory_order_relaxed);
+        if (bytes > previous) state_->charge(*thread_record_, bytes - previous);
     }
 
     std::size_t Attachment::collect() { require_attached(); return state_->rendezvous(*thread_record_); }
@@ -637,7 +731,7 @@ namespace cxxpython::core
         state_->resume(*thread_record_, gate);
     }
     void Attachment::set_allocation_limit(std::size_t remaining)
-    { require_attached(); std::lock_guard metadata(state_->heap_mutex); state_->allocations_remaining = remaining; }
+    { require_attached(); state_->allocations_remaining.store(remaining, std::memory_order_relaxed); }
 
     void Attachment::bootstrap()
     {
@@ -739,14 +833,20 @@ namespace cxxpython::core
         };
         RootScope roots(*this);
         std::vector<TypeSnapshot> previous_types;
-        for (const auto &[object, allocation] : state_->heap)
-        {
-            if (allocation.layout.native_family != &detail::native_layout_id<TypeObject> || !object->type.object_) continue;
-            auto value = Value(*object);
-            auto &type = payload<TypeObject>(value);
-            if (type.state != TypeState::Structural || !is_subtype(*this, type_of(value), type_type())) continue;
-            previous_types.push_back({roots.root(value), type.name, type.qualname, type.bootstrap_module, type.dictionary, type.state});
-        }
+        auto save_types = [&](auto &spans) {
+            for (auto &span : spans)
+            {
+                if (span.layout.native_family != &detail::native_layout_id<TypeObject>) continue;
+                for (std::size_t i = 0; i < span.extent; ++i)
+                {
+                    auto &allocation = span.at(i); if (!allocation.live || !allocation.object()->type.object_) continue;
+                    auto value = Value(*allocation.object()); auto &type = payload<TypeObject>(value);
+                    if (type.state != TypeState::Structural || !is_subtype(*this, type_of(value), type_type())) continue;
+                    previous_types.push_back({roots.root(value), type.name, type.qualname, type.bootstrap_module, type.dictionary, type.state});
+                }
+            }
+        };
+        save_types(state_->retired_spans); for (const auto &thread : state_->threads) save_types(thread->spans);
         const bool previous_gc = state_->gc_enabled;
         state_->gc_enabled = false;
         try

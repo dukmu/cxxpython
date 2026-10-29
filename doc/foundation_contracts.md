@@ -19,7 +19,7 @@ is retained; the concurrency gates do not narrow language/library/release scope.
 | Concurrency Gate | Current Status | Remaining Evidence |
 | --- | --- | --- |
 | N0 access/publication contracts | Experimental | Plan 2 adopted; per-field migration contracts and implementation audits still required |
-| N1 roots/heap/GC | Experimental | Thread-owned roots, multi-Active storage, request/ack/completed gate and frozen registry scanning exist; transfer records, bounded rooted shared reads and scalable heap metadata remain |
+| N1 roots/heap/GC | Experimental | Thread-owned roots/spans, adjacent stable metadata, batched pressure and request/ack/completed gate exist; TransferRecord, bounded rooted shared reads and native slow-path/timeout audits remain |
 | N2 shared objects/methods | Planned | TypeSnapshot/FunctionCallState, atomic/shared fields and callback-safe critical sections |
 | N3 parallel VM | Planned | Dispatch polling exists; shared same Function/Code CPU progress, allocation-free VM loop acknowledgement and 1/2/4-worker Python costs remain |
 | N4-N6 completion/release | Planned | Remaining runtime, frontend/library, platform, performance and replacement gates |
@@ -29,8 +29,11 @@ Unbootstrapped storage permits multiple Active mutators. Core bootstrap requires
 one registered thread and quarantines unconverted ObjectOps: a second Active
 admission is explicitly rejected; NativeWait return waits for exclusive admission.
 This temporary boundary is NOT N2 completion or Python CPU-parallel support.
-The heap/layout map still has a short central metadata mutex; task 04 must
-replace its hot-path lookups and accounting before N3 performance acceptance.
+The central heap/layout map and its mutex have been removed. Normal allocation
+uses thread-owned layout-homogeneous spans; payload validation uses immutable
+domain/layout metadata adjacent to the object. Shared pressure is updated in
+batches, not for every object. This is still an initial allocator, not a claim
+of final memory budgets, bounded native preparation or N3 performance acceptance.
 
 Baseline: Python 3.12 language semantics, with CPython 3.12.14 as the intended
 fixed differential reference. No CPython ABI, `.pyc` or private bytecode promise.
@@ -1210,7 +1213,8 @@ it does not inspect an Active arena. Rendezvous duration is recorded separately
 from mark/sweep duration, with last/max wait values, not pause percentiles.
 Per-thread last-safepoint/resource and timeout diagnostics remain to be built.
 
-Current field migration map (not a declaration of parallel ObjectOps safety):
+Initial epoch-prototype field map (not parallel ObjectOps safety; the next
+section supersedes its central heap row):
 
 | Storage | Current Protector | Remaining Boundary |
 | --- | --- | --- |
@@ -1221,12 +1225,11 @@ Current field migration map (not a declaration of parallel ObjectOps safety):
 | Header/Cell/tail/Dict/Type/Function/exception mutable data | Explicit core quarantine | N2 rooted atomic reads, short locks and immutable snapshots |
 | Immutable native buffers | Owner construction and externally synchronized publication | Const access API and audited cache writes |
 
-The temporary heap map returns references to immutable layout elements: rehash
+That prototype's temporary heap map returned references to immutable layout elements: rehash
 does not invalidate element references, and erase waits for this reader's stop
-acknowledgement. Map lookup/registration, shared pressure and external accounting
-are locked; no GC rendezvous or Python callback runs while holding that lock.
-It can still allocate/wait and serialize common paths, so it is a prototype
-bottleneck, not the plan's final scalable allocation protocol.
+acknowledgement. Lookup/registration, pressure and external accounting were
+locked; no GC rendezvous or Python callback held that lock. The local-span
+implementation below removes this measured prototype bottleneck.
 
 Bootstrap requires a single registered attachment before enabling quarantine.
 The prior concurrently-started bootstrap fixture relied on the old execution
@@ -1240,6 +1243,81 @@ input, pressure/explicit GC, simultaneous collectors, admission and NativeWait
 return during a request, allocation-free polls, diagnostic joins, closing and
 exit acknowledgement. Native storage cost probes retain fixed total work for
 1/2/4 workers and verify post-GC live sets. Neither proves Python CPU speedup.
-TransferRecord, NoSafepoint/shared reads, local allocation, N2 snapshots and
+TransferRecord, NoSafepoint/shared reads, N2 snapshots and
 same PythonFunction/Code execution remain the immediate dependencies. The full
 N0-N6/M0-M9 goal is active and no whole concurrency milestone is complete.
+
+## N1 Local Spans And Stable Allocation Metadata
+
+AllocationSpan is a native storage owner, not a Python object or a second
+lifetime system. Each thread owns its span list and current-span cache. A span
+holds one immutable LayoutDescriptor/domain and fixed-stride storage. A new
+layout starts near 4 KiB; after a full matching span, refills grow to 64 KiB.
+A larger or highly aligned object has an independent single-slot
+span. Layout-homogeneous pools keep different native families and instance-tail
+plans distinct without duplicating the full layout for every object.
+
+Each object has fixed-offset adjacent Allocation metadata: span pointer, external
+byte counter, free/mark link and live/mark flags. ObjectHeader/Value stay one word.
+Payload/layout/ownership access performs no hash lookup, allocation or mutex
+operation. Live objects keep their span metadata stable across GC and thread
+retirement. Internal Value inputs must denote live, continuously rooted managed
+allocations; forged or dangling ObjectHeader addresses are not checked embedding
+handles. Valid foreign-interpreter values and foreign/retired Handles are still
+rejected. The public opaque extension/embedding API remains a later milestone.
+
+The allocation path polls and checks pressure before reserving storage. A local
+free slot or bump slot has no central registration. Native payload and tail
+construction finish before the live flag and caller-owned root are committed,
+without an intervening safepoint. Failure destroys any constructed payload and
+returns the private slot to its free list; it does not consume a successful
+allocation quota or charge live bytes. Finite quotas use a CAS at commit; the
+normal unlimited case only reads that policy. A loser of the finite-quota race
+can have constructed an object and must destroy it before reporting bad_alloc.
+
+ThreadRecord keeps pending allocation/external-growth bytes and flushes once at
+least min(4096, current GC budget) bytes accrue. Per-allocation pressure checks
+read the shared total plus the caller's pending count, without a shared write.
+Other Active owners can each hold less than one batch of unreported pressure;
+the threshold is consequently approximate, not a hard heap/RSS limit. Retirement
+flushes remaining pressure under the coordinator before its record disappears.
+Only completed GC clears pending counts and resets the shared budget.
+
+External-byte accounting is an atomic per-allocation exchange; positive growth
+charges the updating thread, not an expired originating ThreadRecord. Resizing
+the actual buffer still needs its object's synchronization; atomic accounting
+does not make a mutable vector/string safe. Single-object byte overflow is
+rejected before exchange; aggregate diagnostic/pressure byte sums saturate
+instead of wrapping. Shrinking a buffer reduces live bytes, not historical
+allocation pressure. Automatic GC disable leaves explicit GC and polling intact.
+
+During STW, collector marks through adjacent metadata and enumerates completed
+allocation extents in registered and retired span lists. It destroys unreachable
+payloads, returns dead slots to local free lists, frees completely empty spans,
+and invalidates owner caches before resumption. A retiring attachment splices
+its span list into the Interpreter's native retired list without allocating;
+survivors owned by another thread's roots remain valid. No span reclamation or
+cell reuse can race an Active reader. Final State teardown destroys the remaining
+payloads through the same immutable native layouts, never through dead Types.
+
+HeapStats live bytes/counts are computed from frozen extents. spans/reserved_bytes
+make empty storage and fragmentation visible. Reserved bytes include raw slot
+storage plus span headers, not external buffers, allocator/list/deque/control-
+block overhead or RSS. Metadata counts span headers and capacity-sized adjacent
+metadata, plus existing roots/records, not only live allocations. A mostly empty
+span therefore has a real reported cost. ASan sees raw span allocation boundaries;
+there is not yet per-slot poisoning or an independently measured RSS budget.
+
+Focused tests cover slot reuse, empty span release, constructor rollback, large
+4096-aligned payloads, retirement with a receiver-rooted survivor, exact parallel
+quota commits, concurrent external accounting and all existing forced-GC/type/
+tail-layout regressions. Native probes report core and frozen-worker reserved
+storage alongside time; neither is Python VM parallelism evidence.
+
+Remaining work includes bounded NoSafepoint rooted reads, TransferRecord, native
+allocator/constructor blocking preparation, fragmentation tuning under real
+workloads, complete timeout diagnostics and N2 shared-field migration. The first
+refill still uses host allocation while Active, and non-hot layout selection
+scans a thread-local span list. These are disclosed slow-path limits, not another
+global heap lock. Same PythonFunction/Code CPU acceptance and the full release
+matrix remain mandatory; N1/N2/N3 are not declared complete by this slice.

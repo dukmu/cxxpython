@@ -1,5 +1,98 @@
 # Development Status
 
+## 2026-10-29 N1 Local Spans And Lock-Free Layout Lookup Stable Point
+
+This entry is prepended without changing any earlier record. The previous goal
+turn committed c6c735a and measured the central-map bottleneck. This turn
+advances Plan 2 task 04 on the same production collector, retaining the full
+active N0-N6/M0-M9 goal and the explicit N2 ObjectOps quarantine.
+
+- Removed the central allocation unordered_map and heap_mutex rather than
+  sharding a lock around every payload access. Each ThreadRecord now owns
+  layout-homogeneous AllocationSpans and a current-span cache. Native metadata
+  immediately before each object identifies its immutable span/domain/layout;
+  ObjectHeader and Value remain one word. Valid foreign-interpreter values and
+  foreign/retired Handles still fail ownership checks. Internal Value is not a
+  checked API for forged or dangling ObjectHeader addresses.
+- Common allocation takes a local free/bump slot, constructs payload/tail, then
+  commits live metadata and the existing caller root without a safepoint.
+  Construction or quota-commit failure destroys completed payloads and returns
+  unpublished storage locally. The full layout is held once per span, independent
+  of Type lifetime. Larger/overaligned storage uses one-slot spans.
+- Allocation and external-growth pressure accumulate per thread and flush in
+  min(4096, GC budget)-byte batches. The unlimited-quota fast path does not write
+  shared quota state; finite quota uses a CAS at successful commit. A pressure
+  threshold can lag other owners' unflushed batches and is not a hard RSS limit.
+  External-byte accounting is per-allocation atomic; actual buffer mutation
+  still needs object synchronization. Per-object overflow fails before mutation;
+  aggregate diagnostic/pressure byte arithmetic saturates rather than wraps.
+- GC uses adjacent metadata for marking and scans only stopped allocation
+  extents. Sweep frees empty spans, reuses holes in surviving spans and clears
+  cached span pointers before resume. Exiting threads flush pending pressure
+  and splice spans into the interpreter's retired list without allocation;
+  receiver-rooted survivors remain valid after the source ThreadRecord retires.
+- Added six focused tests for reuse/release, constructor rollback, large
+  4096-aligned storage, retirement with a transferred survivor, parallel finite
+  quota and concurrent external accounting. Four new span assertions first
+  failed on the old map implementation. Repeated quota tests exposed a test
+  assumption: a successfully constructed object can lose the quota CAS and be
+  physically destroyed before publication. The test now separately counts
+  those rollbacks and still requires exactly 37 commits and 37 GC reclamations.
+- Added spans/reserved_bytes to HeapStats and native core/frozen-worker space
+  metrics to the existing benchmark. Post-GC probes require zero objects, live
+  bytes, spans and reserved storage. No benchmark workload category was removed.
+
+Verification and measurements:
+
+- Release foundation 266/266; full CTest exit 0, discovery 514 (248 legacy +
+  266 foundation). Fourteen concurrency/storage tests passed 30 repeats on the
+  final source. ASan/UBSan/LeakSanitizer 266/266 outside the ptrace sandbox;
+  TSan 266/266 on the final adaptive-span source.
+- Independent foundation-only Release built without legacy/tests. Three final
+  probes ran after all builds/sanitizers completed, with exact-result and final
+  live-set checks passing. GCC 11.4 / Release / x86-64 WSL2; lscpu exposes four
+  logical CPUs, two cores/two threads per core, i5-12500H. No pinning/frequency
+  control; these short probes are noisy, not release-level scaling statistics.
+- Fixed 60000 allocations: final 1/2/4-worker wall medians are
+  1.886/2.148/2.657 ms versus c6c735a's 6.348/12.203/20.999 ms (about
+  3.37/5.68/7.90 times faster). Process-CPU medians are 1.781/2.257/3.419 ms.
+  Collections remain enabled: 15/15/14 including final cleanup; all epochs
+  complete. Four-worker negative scaling remains, not a Python CPU-speedup
+  claim. Largest observed final rendezvous wait is 0.213 ms, not a bound/p95.
+- Serial 100000 allocations: 4.50/4.10/4.13 ms versus prior 9.13/9.80/10.32 ms.
+  Root register/release: 4.23/2.98/2.91 ms, including the slow first sample.
+  Final 10000 direct/scheduled/with-call medians: 21.39/32.45/43.72 ms.
+  Value/header/Handle/Frame remain 8/8/32/240 bytes. Empty-heap recorded metadata
+  with one record and two root cells is now 288 bytes versus 248 previously.
+- Uniform 64-KiB spans initially reserved 787664 bytes for the 404-object core
+  snapshot with 84896 live bytes. Based on that measurement, new layouts now
+  start near 4 KiB and refill at 64 KiB only after a matching full span exists.
+  Reserved storage falls to 312512 bytes (16 spans); capacity metadata falls
+  from 368448 to 91104 bytes. The first uniform-span implementation's lower
+  four-worker wall median (2.136 ms) is retained to expose this footprint tradeoff.
+- GNU time whole-workflow peak RSS is 5452/7072/5552 KiB on the final probes.
+  This includes all serial and storage categories; it is not per-worker or
+  per-stage peak RSS, nor a CPython comparison. Frozen-worker space snapshots
+  are not peaks. Native allocator/list/deque/control-block overhead is still
+  excluded from recorded metadata/reserved bytes; external buffers are included
+  in live bytes, not span reserved storage. ASan has raw-span, not per-slot,
+  allocation boundaries.
+- Every initial uniform-span and final adaptive sample is retained as
+  n1_spans_64k/adaptive in layout/numeric/execution/roots/storage CSVs. The new
+  span-memory CSV separates core/frozen-worker snapshots from whole-workflow
+  RSS. Earlier negative-scaling epoch and invalid early CPU samples remain.
+
+Remaining dependencies are bounded rooted shared reads/NoSafepoint,
+TransferRecord, native allocator/constructor blocking preparation, full timeout
+diagnostics and N2 shared-field/snapshot migration. Refills still allocate host
+storage while Active, non-hot layout selection scans a local list, and sparse
+span fragmentation remains measurable; no final allocator/RSS gate is closed.
+N3 must still execute the same PythonFunction/Code concurrently, not substitute
+this native allocation probe. N4-N6/M0-M9, source-level test2.py, CPython parity
+and release acceptance remain open. No new Python RC, subagent, benchmark
+special-case or legacy fallback was added. User test2.py and temporary_plan.md
+deletion remain excluded. The full goal stays active.
+
 ## 2026-10-29 N1 Multi-Active Storage And GC Epoch Stable Point
 
 This entry is prepended; all earlier development history is unchanged. The

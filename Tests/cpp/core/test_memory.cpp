@@ -42,6 +42,14 @@ namespace
         void trace(Tracer &) const noexcept {}
     };
 
+    struct alignas(4096) LargeLeaf
+    {
+        ObjectHeader header;
+        std::byte payload[128 * 1024]{};
+        explicit LargeLeaf(ObjectHeader head) : header(head) {}
+        void trace(Tracer &) const noexcept {}
+    };
+
     Handle make_node(Attachment &context, RootScope &scope, int *destroyed = nullptr)
     {
         ReturnSlot out(context);
@@ -231,6 +239,41 @@ namespace
         EXPECT_EQ(out.result().tag(), ResultTag::Empty);
         EXPECT_EQ(context.stats().objects, 0U);
         EXPECT_EQ(context.stats().live_bytes, 0U);
+    }
+
+    TEST(FoundationMemory, LocalSpansReuseSweptSlotsAndReleaseEmptyStorage)
+    {
+        int destroyed = 0; Interpreter interpreter; Attachment context(interpreter);
+        context.set_gc_enabled(false); RootScope roots(context); ReturnSlot out(context);
+        context.allocate<Node>(out, &destroyed); EXPECT_LT(context.stats().reserved_bytes, 16 * 1024U);
+        for (int i = 1; i < 500; ++i) context.allocate<Node>(out, &destroyed);
+        const auto survivor = make_node(context, roots, &destroyed);
+        out.reset(); EXPECT_EQ(context.collect(), 500U);
+        const auto first = context.stats(); EXPECT_EQ(first.spans, 1U); EXPECT_GT(first.reserved_bytes, sizeof(Node));
+        for (int i = 0; i < 500; ++i) context.allocate<Node>(out, &destroyed);
+        EXPECT_EQ(context.stats().spans, first.spans); EXPECT_EQ(context.stats().reserved_bytes, first.reserved_bytes);
+        out.reset(); roots.release(survivor); EXPECT_EQ(context.collect(), 501U);
+        EXPECT_EQ(destroyed, 1001); EXPECT_EQ(context.stats().spans, 0U); EXPECT_EQ(context.stats().reserved_bytes, 0U);
+    }
+
+    TEST(FoundationMemory, ConstructorFailureReusesPrivateSlotsWithoutPublishing)
+    {
+        Interpreter interpreter; Attachment context(interpreter); ReturnSlot out(context); context.set_gc_enabled(false);
+        for (int i = 0; i < 100; ++i) EXPECT_THROW(context.allocate<FailingNode>(out), std::bad_alloc);
+        EXPECT_EQ(out.result().tag(), ResultTag::Empty); EXPECT_EQ(context.stats().objects, 0U);
+        EXPECT_EQ(context.stats().spans, 1U); EXPECT_EQ(context.stats().live_bytes, 0U);
+        context.collect(); EXPECT_EQ(context.stats().reserved_bytes, 0U);
+    }
+
+    TEST(FoundationMemory, LargeOveralignedStorageUsesIndependentSpans)
+    {
+        Interpreter interpreter; Attachment context(interpreter); ReturnSlot out(context); RootScope roots(context);
+        context.allocate<LargeLeaf>(out); const auto keep = roots.root(out.result().value());
+        context.allocate<LargeLeaf>(out); out.reset();
+        EXPECT_EQ(reinterpret_cast<std::uintptr_t>(&context.payload<LargeLeaf>(keep)) % alignof(LargeLeaf), 0U);
+        EXPECT_EQ(context.stats().spans, 2U); EXPECT_GE(context.stats().reserved_bytes, 2 * sizeof(LargeLeaf));
+        EXPECT_EQ(context.collect(), 1U); EXPECT_EQ(context.stats().spans, 1U);
+        roots.release(keep); context.collect(); EXPECT_EQ(context.stats().reserved_bytes, 0U);
     }
 
     TEST(FoundationMemory, ForcedGcAtAllocationPreservesCallerRoots)
