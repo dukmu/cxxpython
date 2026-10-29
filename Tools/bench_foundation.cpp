@@ -230,4 +230,31 @@ int main()
               << " cleanup_max_stack=" << context.payload<CodeObject>(cleanup_code).program.max_stack()
               << " active_region_bytes=" << sizeof(ActiveRegion) << " cleanup_continuation_bytes=" << sizeof(CleanupContinuation)
               << " cleanup_live_set_check=ok\n";
+
+    create_type(context, {"BenchManager"}, value); auto manager_type = scope.root(value.result().value());
+    make_str(context, U"__enter__", value); auto enter_name = scope.root(value.result().value());
+    set_attribute(context, manager_type, enter_name, function, value);
+    SignatureLayout exit_signature; exit_signature.parameters = {{U"self"}, {U"kind"}, {U"error"}, {U"traceback"}};
+    make_native_function(context, "bench exit", exit_signature,
+        [](Attachment &c, Handle, std::span<const Value>, ReturnSlot &out) { out.ok(c.builtin(CoreObject::None)); }, {}, value);
+    auto exit_function = scope.root(value.result().value()); make_str(context, U"__exit__", value); auto exit_name = scope.root(value.result().value());
+    set_attribute(context, manager_type, exit_name, exit_function, value);
+    context.allocate_instance<InstanceObject>(manager_type, value); auto manager = scope.root(value.result().value());
+    CodeBuilder managed(context, code_spec); auto with = managed.region(RegionKind::With);
+    managed.emit(Opcode::LoadConst, managed.constant(manager)); managed.enter(with); managed.emit(Opcode::PopTop);
+    managed.emit(Opcode::LoadFast); managed.emit(Opcode::LoadFast, 1); managed.emit(Opcode::Binary, static_cast<std::uint32_t>(BinaryOp::Add)); managed.emit(Opcode::Return);
+    managed.leave(with); managed.emit(Opcode::LoadConst, managed.constant(none)); managed.emit(Opcode::Return);
+    managed.freeze(value); auto with_code = scope.root(value.result().value()); make_function(context, {with_code, globals}, value);
+    auto with_function = scope.root(value.result().value()); value.reset(); context.collect(); const auto before_with = context.stats().objects;
+    const auto with_ns = measure([&] {
+        for (int i = 0; i < method_iterations; ++i)
+            if (call(context, with_function, {tuple_items, {}}, value).tag() != ResultTag::Ok) { valid = false; return; }
+    });
+    if (!valid || int_decimal(context, value.result().value()) != "42") return 1;
+    value.reset(); context.collect();
+    if (context.stats().objects != before_with) return 1;
+    std::cout << "with_iterations=" << method_iterations << " with_function_ns=" << with_ns
+              << " with_instructions=" << context.payload<CodeObject>(with_code).program.instructions().size()
+              << " with_max_stack=" << context.payload<CodeObject>(with_code).program.max_stack()
+              << " with_live_set_check=ok\n";
 }

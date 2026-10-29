@@ -8,7 +8,7 @@ namespace cxxpython::core
     {
         Bool, Len, Int, Index, Repr, Str, Hash, Eq, Ne, Lt, Le, Gt, Ge,
         Add, RAdd, IAdd, Sub, RSub, ISub, Mul, RMul, IMul,
-        FloorDiv, RFloorDiv, IFloorDiv, Mod, RMod, IMod, Count,
+        FloorDiv, RFloorDiv, IFloorDiv, Mod, RMod, IMod, Enter, Exit, Count,
     };
     enum class ProtocolResult { Any, Boolean, Length, Integer, String, Hash };
     struct ProtocolDefinition

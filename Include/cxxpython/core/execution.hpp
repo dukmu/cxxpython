@@ -11,11 +11,12 @@ namespace cxxpython::core
     {
         LoadConst, LoadFast, StoreFast, DeleteFast, PopTop, DupTop,
         Binary, Compare, Jump, JumpIfFalse, Return, RaiseInstance, Call,
-        EnterRegion, LeaveRegion, EndHandler, BreakLoop, ContinueLoop, Reraise, LoadException, ExceptionMatch, Count,
+        EnterRegion, LeaveRegion, EndHandler, BreakLoop, ContinueLoop, Reraise, LoadException, ExceptionMatch,
+        PrepareWith, EnterWith, WithExit, WithResult, Count,
     };
     enum class OperandDomain { None, Constant, Local, Binary, Compare, Target, CallSite, Region };
     enum class FlowKind { Next, Jump, Branch, Stop, Leave, EndHandler, LoopControl };
-    enum class RegionKind { Loop, Except, Finally };
+    enum class RegionKind { Loop, Except, Finally, With };
     enum class RegionPhase { Protected, Handler, Cleanup };
     struct RegionToken
     {
@@ -159,8 +160,8 @@ namespace cxxpython::core
         void call(std::uint32_t positional, std::span<const std::u32string> keywords = {}, SourcePosition source = {});
         Region region(RegionKind kind);
         Region loop(Label continue_target, Label break_target);
-        void enter(Region region);
-        void leave(Region region);
+        void enter(Region region, SourcePosition source = {});
+        void leave(Region region, SourcePosition source = {});
         void handler(Region region);
         void end_handler(Region region);
         void control(Opcode opcode, Region loop);

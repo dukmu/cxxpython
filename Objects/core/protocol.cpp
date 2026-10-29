@@ -33,6 +33,8 @@ namespace cxxpython::core
             ProtocolDefinition{U"__mod__", 1, ProtocolResult::Any},
             ProtocolDefinition{U"__rmod__", 1, ProtocolResult::Any},
             ProtocolDefinition{U"__imod__", 1, ProtocolResult::Any},
+            ProtocolDefinition{U"__enter__", 0, ProtocolResult::Any},
+            ProtocolDefinition{U"__exit__", 3, ProtocolResult::Any},
         };
         static_assert(definitions.size() == static_cast<std::size_t>(Protocol::Count));
         constexpr std::array comparisons{Protocol::Eq, Protocol::Ne, Protocol::Lt, Protocol::Le, Protocol::Gt, Protocol::Ge};

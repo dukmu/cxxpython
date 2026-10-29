@@ -1,5 +1,71 @@
 # Development Status
 
+## 2026-10-29 M4 With Stable Point And Concurrency Review Hold
+
+This entry is prepended; earlier records are unchanged. The user paused the
+long-term goal and requested a stable commit/push for route review. This
+checkpoint finishes and verifies the already-written synchronous with slice;
+no no-GIL synchronization implementation was started after the pause.
+
+- Added Enter/Exit to the common protocol definitions and builder-generated
+  with entry/cleanup using PREPARE_WITH, ENTER_WITH, WITH_EXIT, WITH_RESULT and
+  ordinary CALL. Python enter/exit methods are scheduled as Frames, not hidden
+  recursive C++ execute calls. Native calls reuse the existing binder.
+- Lookup binds enter first, then freshly resolves/binds exit before calling
+  enter. Instance attributes/hooks are bypassed; descriptor type mutation and
+  enter-time replacement of exit preserve the correct cached callable.
+- Enter success registers the region before target binding. The cached exit
+  lives in the protected operand prefix, not a new ownership object or Frame
+  field. Every exit path releases that prefix. Verifier heights and fixed
+  cleanup-template checks include possible exception suppression successors.
+- Exit receives three None values for normal/return/break/continue, whose
+  result is ignored without truth conversion. Exceptional exit receives the
+  original type/value/traceback; truthy result suppresses only Raise. Exit or
+  truth errors replace the pending reason with the original exception context.
+  Previous handled state is restored before outer cleanup resumes.
+- Added 16 tests covering binding, ordering, suppression, failures, nested and
+  loop control, descriptor/hooks/type mutations, GC of cached callables, real
+  ObjectOps target-binding failure, truth callbacks and low-memory exit.
+  A 601-context test with Python enter/exit methods and native depth capped at
+  16 returns to its original post-GC live set. A pre-bound allocation-free exit
+  suppresses a body allocation failure after enter sets the allocation quota
+  to zero. Current Frame/region/continuation representations are unchanged.
+
+Verification:
+
+- Release foundation 249/249. Full CTest exit 0, discovery count 497
+  (248 legacy + 249 foundation).
+- ASan/UBSan/LeakSanitizer 249/249 outside the ptrace sandbox; TSan 249/249.
+- Independent foundation-only Release, testing/legacy disabled, built and ran
+  three probes after all builds/sanitizers completed. Every exact-value and
+  post-GC live-set check passed. Raw rows, including slow samples, remain in
+  benchmarks/foundation-*.csv as m4_with_*.
+- GCC 11.4 / Release / x86-64 WSL2, no CPU pinning/frequency control: 10000
+  direct calls took 27.01/23.09/25.01 ms, scheduled calls 41.86/37.00/41.57 ms,
+  finally calls 36.80/29.98/33.93 ms. A new 16-instruction with-return probe,
+  including native enter/exit and max_stack 5, took 67.03/53.46/52.67 ms.
+  Frame prefix remains 240 bytes; active region/continuation remain 32/48.
+  These are serial foundation costs, not a speedup or CPython/no-GIL acceptance.
+- No subagent, old-VM fallback or new GC/ownership layer was used. perf.data*,
+  test2.py and the unrelated temporary_plan.md deletion are excluded.
+
+Concurrency route review, not an implementation claim:
+
+- The user's latest requirement is CPU-parallel Python threads sharing one
+  interpreter/heap. NativeWait/I/O concurrency or multiple interpreters do not
+  satisfy it. Current State::execution serializes attached execution, so the
+  new foundation has not met that requirement.
+- The old plan and AGENTS still describe that serial first foundation. They
+  have not been silently rewritten while the user reviews the change. The
+  conflicting final concurrency target must be revised before goal work
+  resumes. Review topics and acceptance boundaries are recorded at the end of
+  foundation_contracts.md; no removal of the execution lock or replacement
+  synchronization scheme is included in this commit.
+- The goal remains paused pending user review. Full M4 exception normalization,
+  except-as cleanup, suspension, closures/namespaces, M2/M3 remaining matrices,
+  source differential execution, M5-M9 and replacement/performance gates remain
+  unfinished. No milestone or overall objective is marked complete.
+
 ## 2026-10-29 M4 Structured Region Unwind Stable Point
 
 The preceding goal turn made verified progress in commit 408ade3. The full

@@ -41,7 +41,7 @@ namespace cxxpython::core
             trim_stack(context, active.stack_base);
             if (top->phase == RegionPhase::Protected)
             {
-                if (layout.kind == RegionKind::Finally)
+                if (layout.kind == RegionKind::Finally || layout.kind == RegionKind::With)
                 {
                     cleanups.push_back({top->region, *reason, handled_exception});
                     regions.back().token.phase = RegionPhase::Cleanup;
@@ -65,6 +65,7 @@ namespace cxxpython::core
             if (top->phase == RegionPhase::Handler) handled_exception = active.previous_exception;
             else if (top->phase == RegionPhase::Cleanup)
             { handled_exception = cleanups.back().previous_exception; cleanups.pop_back(); }
+            if (layout.kind == RegionKind::With) trim_stack(context, active.stack_base - 1);
             regions.pop_back();
         }
     }
@@ -77,6 +78,7 @@ namespace cxxpython::core
         else
         {
             reason = cleanups.back().saved_reason; handled_exception = cleanups.back().previous_exception; cleanups.pop_back();
+            if (layout.kind == RegionKind::With) trim_stack(context, active.stack_base - 1);
         }
     }
     namespace detail

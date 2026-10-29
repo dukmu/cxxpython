@@ -23,3 +23,15 @@ m4_unwind_scheduled,10000,41055997,5,3,240,ok,4
 m4_unwind_finally,10000,34919313,11,2,240,ok,0
 m4_unwind_finally,10000,33351172,11,2,240,ok,0
 m4_unwind_finally,10000,36320421,11,2,240,ok,0
+m4_with_direct,10000,27007382,4,2,240,ok,0
+m4_with_direct,10000,23093983,4,2,240,ok,0
+m4_with_direct,10000,25013330,4,2,240,ok,0
+m4_with_scheduled,10000,41863966,5,3,240,ok,4
+m4_with_scheduled,10000,37004984,5,3,240,ok,4
+m4_with_scheduled,10000,41566220,5,3,240,ok,4
+m4_with_finally,10000,36803744,11,2,240,ok,0
+m4_with_finally,10000,29978379,11,2,240,ok,0
+m4_with_finally,10000,33931253,11,2,240,ok,0
+m4_with_context,10000,67030206,16,5,240,ok,0
+m4_with_context,10000,53460792,16,5,240,ok,0
+m4_with_context,10000,52665492,16,5,240,ok,0

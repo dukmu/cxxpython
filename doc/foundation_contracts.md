@@ -20,7 +20,7 @@ All new C++ interfaces are internal and unstable until the M1-M4 gates pass.
 | M1 storage/environment | Experimental | B0-B2 storage and seed gates now pass; interfaces remain internal/unstable |
 | M2 types/methods/call | Experimental | Calls/construction, field tails, cells, B2 promotion and common hash/repr/str/truth/comparison/arithmetic dispatch exist; full protocols/reflection/mutation and weakrefs remain |
 | M3 builtins | Experimental | Int/bool seed, initial Unicode value/representation/hash, tuple and cell value semantics; complete numeric, container, iterator, codec/buffer and finalization matrices remain |
-| M4 execution | Experimental | Verified Code/Function/Frame, non-recursive calls, tracebacks and structured handler/finally/loop unwind exist; full exception normalization, with, closure/namespace execution and suspension remain |
+| M4 execution | Experimental | Verified Code/Function/Frame, non-recursive calls, tracebacks, handler/finally/loop unwind and synchronous with exist; full exception normalization, closure/namespace execution and suspension remain |
 | M5 frontend | Planned | ScopeInfo/CFG, source positions, validated Code, L0-L2 differential cases |
 | M6 boot/platform | Planned | RunRequest, loader/import, CLI/embedding, I/O, thread API and shutdown |
 | M7 libraries | Planned | Real workflows and dependency closures, including unittest |
@@ -165,7 +165,7 @@ overlap does not close either milestone.
 M4 now has verified Code/CodeBuilder, stable rooted Frame storage and
 constant/local/arithmetic/comparison/branch/call/return execution through ObjectOps.
 Ordinary Python calls now use a Frame loop. The next execution slice is
-with/exception-normalization completion, typed suspension outcomes and
+exception-normalization completion, typed suspension outcomes and
 closure/namespace execution. Structured region unwind and per-Frame handled
 exception restoration now run through the same scheduler as ordinary calls.
 The plan explicitly permits M3 expansion and M4 execution in parallel after a
@@ -992,3 +992,73 @@ suite. With enter/exit lookup, suppression and binding cleanup; except-as target
 cleanup lowering; class/cause normalization and full exception reflection;
 yield/send/throw/close; closures and namespace frames remain M4-M5 gates. This
 is an Experimental execution slice, not complete M4 or Python-language support.
+
+## M4 With Cleanup Through Ordinary CALL
+
+ProtocolDefinition now includes Enter/Exit with arities zero/three and Any
+results. PREPARE_WITH resolves the actual type's __enter__ descriptor, binds it,
+then freshly resolves/binds __exit__. Instance attributes and __getattribute__
+are bypassed. Enter descriptor side effects may change the manager's type;
+exit lookup uses that new type. Both bound callables are rooted before enter is
+called, and exit is not re-resolved if enter subsequently changes the class.
+
+CodeBuilder.enter(With) emits PREPARE_WITH, ordinary CALL 0 and ENTER_WITH.
+Only the last instruction registers the region, after enter has returned.
+The operand prefix holds the cached exit below the enter result. stack_base
+protects that exit but allows consuming the result for target binding. Failures
+in target binding therefore unwind the registered region. No extra owner,
+per-Frame field or context-manager wrapper object was added.
+
+CodeBuilder.leave(With) emits its fixed cleanup template: WITH_EXIT, ordinary
+CALL 3, WITH_RESULT, END_HANDLER. The verifier checks template positions and
+arity, protects the cached exit and adjusts parent heights when releasing it.
+An abstract Raise continuation has both propagation and possible-suppression
+successors; this remains within the finite continuation verifier.
+
+| Opcode | Inputs / Pops / Pushes | Behavior |
+| --- | --- | --- |
+| PREPARE_WITH | 1 / 1 / 2 | Manager to cached exit and bound enter; lookup/binding may raise |
+| ENTER_WITH id | 2 / 0 / 0 | Registers with enter result still above protected exit |
+| WITH_EXIT id | 0 / 0 / 4 | Pushes cached exit and type/value/traceback, or three None arguments |
+| WITH_RESULT id | 1 / 1 / 0 | Truth-converts only for a pending Raise; truthy means Normal after the region |
+
+Both enter and exit calls use the existing non-recursive Python Frame scheduler
+and shared native binder. Normal/return/break/continue exits ignore the exit
+result without truth conversion. Exceptional exit uses the original exception
+and its actual traceback. Exit or truth-conversion errors override the pending
+reason and retain implicit context. Suppression restores the previous handled
+exception; outer managers then observe a normal exit. The cached exit is
+released on both successful completion and an overriding error.
+
+Sixteen new tests cover normal binding, real exception arguments, suppression,
+enter/missing-exit/exit failures, nonexceptional truth avoidance, target binding
+failure through real ObjectOps, nesting, implicit descriptors and hooks, type
+mutation during descriptor binding and enter, loop transfers, inherited handled
+state, allocation-free exit after OOM and cached-prefix verifier rejection.
+With Python enter/exit methods and native depth capped at 16, 601 nested contexts
+complete and return to their original post-GC live set. Frame prefix and region/
+continuation representations are unchanged by this slice.
+
+The lookup/call ordering and exception arguments were checked against the fixed
+[CPython v3.12.14 with instructions](https://github.com/python/cpython/blob/v3.12.14/Python/bytecodes.c)
+and the [Python 3.12 with contract](https://docs.python.org/3.12/reference/compound_stmts.html#the-with-statement).
+This is native CodeBuilder verification, not source-language support or the
+pinned executable differential gate. Async with, target unpacking/lowering,
+exception groups and the remaining M4-M9 gates are not inferred from it.
+
+## Concurrency Route Review Hold
+
+The user's latest requirement is real CPU-parallel Python execution in one
+interpreter with a shared heap. NativeWait/I/O progress or separate interpreters
+are not substitutes. The implemented foundation still holds State::execution
+for an Attachment's attached lifetime; this is serial execution, not no-GIL.
+The original plan/AGENTS concurrency choice has not been silently rewritten.
+
+The goal is paused for the user's route review. No new synchronization design
+is implemented in this checkpoint. The conflicting per-interpreter-lock final
+target needs revision before work resumes. Review topics include mutator
+registration and safe points, root publication and GC stop coordination,
+heap/root bookkeeping, shared mutable-object synchronization without locks
+across Python callbacks, and thread exit/shutdown. Acceptance must demonstrate
+overlapping CPU execution in the same interpreter, shared-object correctness,
+GC stress and race/deadlock checks, not merely passing the current serial suite.

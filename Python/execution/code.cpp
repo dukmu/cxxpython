@@ -29,6 +29,10 @@ namespace cxxpython::core
             OpcodeDefinition{"RERAISE", 0, 0, 0, OperandDomain::None, FlowKind::Stop, true, true},
             OpcodeDefinition{"LOAD_EXCEPTION", 0, 0, 1, OperandDomain::None, FlowKind::Next, false, false},
             OpcodeDefinition{"EXCEPTION_MATCH", 2, 2, 1, OperandDomain::None, FlowKind::Next, true, true},
+            OpcodeDefinition{"PREPARE_WITH", 1, 1, 2, OperandDomain::None, FlowKind::Next, true, true},
+            OpcodeDefinition{"ENTER_WITH", 2, 0, 0, OperandDomain::Region, FlowKind::Next, false, false},
+            OpcodeDefinition{"WITH_EXIT", 0, 0, 4, OperandDomain::Region, FlowKind::Next, false, false},
+            OpcodeDefinition{"WITH_RESULT", 1, 1, 0, OperandDomain::Region, FlowKind::Next, true, true},
         };
         static_assert(definitions.size() == static_cast<std::size_t>(Opcode::Count));
         [[noreturn]] void invalid(CodeErrorKind kind, const char *message, std::optional<std::size_t> pc = {})
@@ -101,11 +105,16 @@ namespace cxxpython::core
                     {
                         if (operand >= regions.size()) invalid(CodeErrorKind::RegionBounds, "region index out of bounds", pc);
                         const auto &region = regions[operand];
-                        if ((opcode == Opcode::EnterRegion && (region.enter_pc != pc || scopes[pc] != region.parent)) ||
+                        if (((opcode == Opcode::EnterRegion || opcode == Opcode::EnterWith) &&
+                                (region.enter_pc != pc || scopes[pc] != region.parent || (opcode == Opcode::EnterWith) != (region.kind == RegionKind::With))) ||
                             (opcode == Opcode::LeaveRegion && (region.leave_pc != pc || scopes[pc] != RegionToken{operand, RegionPhase::Protected})) ||
                             (opcode == Opcode::EndHandler && (region.kind == RegionKind::Loop || region.end_handler_pc != pc ||
                                 scopes[pc] != RegionToken{operand, region.kind == RegionKind::Except ? RegionPhase::Handler : RegionPhase::Cleanup})))
                             invalid(CodeErrorKind::RegionStructure, "region opcode is outside its structured boundary", pc);
+                        if ((opcode == Opcode::WithExit || opcode == Opcode::WithResult) &&
+                            (region.kind != RegionKind::With || scopes[pc] != RegionToken{operand, RegionPhase::Cleanup} ||
+                                (opcode == Opcode::WithExit ? region.handler_pc != pc : region.end_handler_pc != pc + 1)))
+                            invalid(CodeErrorKind::RegionStructure, "with opcode is outside its cleanup template", pc);
                         if (opcode == Opcode::BreakLoop || opcode == Opcode::ContinueLoop)
                         {
                             auto cursor = scopes[pc];
@@ -129,10 +138,21 @@ namespace cxxpython::core
                 if (region.kind == RegionKind::Loop && (region.continue_pc >= instructions.size() || region.break_pc >= instructions.size() ||
                     scopes[region.continue_pc] != RegionToken{id, RegionPhase::Protected} || scopes[region.break_pc] != region.parent))
                     invalid(CodeErrorKind::LoopTarget, "invalid loop continuation or break destination", region.enter_pc);
+                if (region.kind == RegionKind::With)
+                {
+                    const auto start = static_cast<std::size_t>(region.handler_pc);
+                    if (start + 3 >= instructions.size() || region.end_handler_pc != start + 3 ||
+                        instructions[start].opcode != Opcode::WithExit || instructions[start].operand != id ||
+                        instructions[start + 1].opcode != Opcode::Call || instructions[start + 2].opcode != Opcode::WithResult ||
+                        instructions[start + 2].operand != id || instructions[start + 3].opcode != Opcode::EndHandler ||
+                        calls[instructions[start + 1].operand].positional != 3 || calls[instructions[start + 1].operand].keywords)
+                        invalid(CodeErrorKind::RegionStructure, "invalid with cleanup template", region.enter_pc);
+                }
             }
             std::vector<std::optional<std::size_t>> heights(instructions.size());
             std::vector<std::vector<VerifyReason>> continuations(regions.size());
             std::vector<std::size_t> pending; std::size_t maximum = 0;
+            auto stack_base = [&](std::uint32_t id) { return *heights[regions[id].enter_pc] - (regions[id].kind == RegionKind::With ? 1 : 0); };
             auto join = [&](std::size_t target, std::size_t height, std::optional<RegionToken> scope) {
                 if (target == instructions.size()) invalid(CodeErrorKind::Fallthrough, "reachable code falls off its end", target - 1);
                 if (scopes[target] != scope) invalid(CodeErrorKind::RegionJump, "control flow crosses a region boundary", target);
@@ -146,10 +166,10 @@ namespace cxxpython::core
                     if (reason.kind == ReasonKind::Normal && scope == reason.stop)
                     { join(reason.target, height, scope); return; }
                     if (!scope) return;
-                    const auto id = scope->region; const auto &region = regions[id]; const auto base = *heights[region.enter_pc];
+                    const auto id = scope->region; const auto &region = regions[id]; const auto base = stack_base(id);
                     if (scope->phase == RegionPhase::Protected)
                     {
-                        if (region.kind == RegionKind::Finally)
+                        if (region.kind == RegionKind::Finally || region.kind == RegionKind::With)
                         {
                             auto &saved = continuations[id];
                             if (std::find(saved.begin(), saved.end(), reason) == saved.end())
@@ -167,7 +187,7 @@ namespace cxxpython::core
                             if (reason.kind == ReasonKind::Continue) { join(region.continue_pc, base, scope); return; }
                         }
                     }
-                    height = base; scope = region.parent;
+                    height = base - (region.kind == RegionKind::With ? 1 : 0); scope = region.parent;
                 }
             };
             join(0, 0, {});
@@ -179,7 +199,7 @@ namespace cxxpython::core
                 const auto &definition = opcode_definition(instruction.opcode); const auto height = *heights[pc];
                 const auto effect = instruction_effect(instruction, calls);
                 if (height < effect.inputs) invalid(CodeErrorKind::StackUnderflow, "instruction requires more stack inputs", pc);
-                if (scopes[pc] && height - effect.pops < *heights[regions[scopes[pc]->region].enter_pc])
+                if (scopes[pc] && height - effect.pops < stack_base(scopes[pc]->region))
                     invalid(CodeErrorKind::StackBase, "instruction consumes a protected stack prefix", pc);
                 const auto after = height - effect.pops + effect.pushes; maximum = std::max(maximum, after);
                 if (definition.may_raise) route({ReasonKind::Raise}, scopes[pc], height);
@@ -187,16 +207,23 @@ namespace cxxpython::core
                 if (definition.flow == FlowKind::Jump || definition.flow == FlowKind::Branch) join(instruction.operand, after, scopes[pc]);
                 if (definition.flow == FlowKind::Next || definition.flow == FlowKind::Branch)
                 {
-                    auto scope = instruction.opcode == Opcode::EnterRegion ? std::optional<RegionToken>{{instruction.operand, RegionPhase::Protected}} : scopes[pc];
+                    auto scope = instruction.opcode == Opcode::EnterRegion || instruction.opcode == Opcode::EnterWith ?
+                        std::optional<RegionToken>{{instruction.operand, RegionPhase::Protected}} : scopes[pc];
                     join(pc + 1, after, scope);
                 }
                 if (definition.flow == FlowKind::Leave || definition.flow == FlowKind::EndHandler)
                 {
                     const auto &region = regions[instruction.operand];
-                    if (height != *heights[region.enter_pc]) invalid(CodeErrorKind::StackBase, "region exit must restore its stack base", pc);
+                    if (height != stack_base(instruction.operand)) invalid(CodeErrorKind::StackBase, "region exit must restore its stack base", pc);
                     if (definition.flow == FlowKind::Leave) route({ReasonKind::Normal, region.after_pc, region.parent}, scopes[pc], height);
                     else if (region.kind == RegionKind::Except) join(region.after_pc, height, region.parent);
-                    else for (const auto &reason : continuations[instruction.operand]) route(reason, region.parent, height);
+                    else for (const auto &reason : continuations[instruction.operand])
+                    {
+                        const auto restored = height - (region.kind == RegionKind::With ? 1 : 0);
+                        route(reason, region.parent, restored);
+                        if (region.kind == RegionKind::With && reason.kind == ReasonKind::Raise)
+                            route({ReasonKind::Normal, region.after_pc, region.parent}, region.parent, restored);
+                    }
                 }
                 if (definition.flow == FlowKind::LoopControl)
                     route({instruction.opcode == Opcode::BreakLoop ? ReasonKind::Break : ReasonKind::Continue, instruction.operand}, scopes[pc], height);
@@ -336,7 +363,7 @@ namespace cxxpython::core
     }
     CodeBuilder::Region CodeBuilder::region(RegionKind kind)
     {
-        if (kind < RegionKind::Loop || kind > RegionKind::Finally) invalid(CodeErrorKind::RegionStructure, "unknown region kind");
+        if (kind < RegionKind::Loop || kind > RegionKind::With) invalid(CodeErrorKind::RegionStructure, "unknown region kind");
         if (regions_.size() >= std::numeric_limits<std::uint32_t>::max()) invalid(CodeErrorKind::SizeLimit, "too many regions");
         RegionSpec spec; spec.layout.kind = kind; regions_.push_back(spec); return {this, static_cast<std::uint32_t>(regions_.size() - 1)};
     }
@@ -346,21 +373,37 @@ namespace cxxpython::core
             if (label.owner != this || label.index >= labels_.size()) invalid(CodeErrorKind::ForeignLabel, "foreign loop label");
         auto result = region(RegionKind::Loop); regions_.back().continue_target = continued; regions_.back().break_target = broken; return result;
     }
-    void CodeBuilder::enter(Region id)
+    void CodeBuilder::enter(Region id, SourcePosition source)
     {
         auto &region = require_region(id);
         if (region.entered) invalid(CodeErrorKind::RegionStructure, "region already entered");
         region.layout.parent = scope_; region.layout.depth = scope_ ? regions_[scope_->region].layout.depth + 1 : 1;
-        region.layout.enter_pc = static_cast<std::uint32_t>(instructions_.size()); emit(Opcode::EnterRegion, id.index);
+        const auto count = instructions_.size(), sites = calls_.size();
+        try
+        {
+            if (region.layout.kind == RegionKind::With) { emit(Opcode::PrepareWith, 0, source); call(0, {}, source); }
+            region.layout.enter_pc = static_cast<std::uint32_t>(instructions_.size());
+            emit(region.layout.kind == RegionKind::With ? Opcode::EnterWith : Opcode::EnterRegion, id.index, source);
+        }
+        catch (...) { instructions_.resize(count); positions_.resize(count); scopes_.resize(count); calls_.resize(sites); throw; }
         region.entered = true; scope_ = RegionToken{id.index, RegionPhase::Protected};
     }
-    void CodeBuilder::leave(Region id)
+    void CodeBuilder::leave(Region id, SourcePosition source)
     {
         auto &region = require_region(id);
         if (scope_ != RegionToken{id.index, RegionPhase::Protected}) invalid(CodeErrorKind::RegionStructure, "not in the protected region");
-        region.layout.leave_pc = static_cast<std::uint32_t>(instructions_.size()); emit(Opcode::LeaveRegion, id.index);
-        region.closed = true; scope_ = region.layout.parent;
-        if (region.layout.kind == RegionKind::Loop) { region.complete = true; region.layout.after_pc = static_cast<std::uint32_t>(instructions_.size()); }
+        const auto saved = region; const auto scope = scope_; const auto count = instructions_.size(), sites = calls_.size();
+        try
+        {
+            region.layout.leave_pc = static_cast<std::uint32_t>(instructions_.size()); emit(Opcode::LeaveRegion, id.index, source);
+            region.closed = true; scope_ = region.layout.parent;
+            if (region.layout.kind == RegionKind::Loop) { region.complete = true; region.layout.after_pc = static_cast<std::uint32_t>(instructions_.size()); }
+            if (region.layout.kind == RegionKind::With)
+            {
+                handler(id); emit(Opcode::WithExit, id.index, source); call(3, {}, source); emit(Opcode::WithResult, id.index, source); end_handler(id);
+            }
+        }
+        catch (...) { region = saved; scope_ = scope; instructions_.resize(count); positions_.resize(count); scopes_.resize(count); calls_.resize(sites); throw; }
     }
     void CodeBuilder::handler(Region id)
     {

@@ -97,6 +97,14 @@ namespace cxxpython::core
             raise_error(context, CoreObject::UnboundLocalErrorType,
                         U"local variable '" + code.program.local_names()[local] + U"' is not bound", out);
         }
+        void with_method(Attachment &context, Handle manager, Protocol protocol, ReturnSlot &out)
+        {
+            RootScope roots(context);
+            auto slot = resolve_protocol(context, roots.root(context.type_of(manager)), protocol, roots);
+            if (slot.state == SlotState::Missing)
+            { type_error(context, U"context manager is missing " + std::u32string(protocol_definition(protocol).name), out); return; }
+            detail::bind_descriptor(context, slot.descriptor.get(context), manager.get(context), slot.type.get(context), out);
+        }
         void make_frame(Attachment &context, Handle function, CallArgsView args, std::optional<Value> receiver, ReturnSlot &out)
         {
             RootScope roots(context); const auto &callable = context.payload<FunctionObject>(function);
@@ -210,6 +218,37 @@ namespace cxxpython::core
                         }
                         case Opcode::EnterRegion:
                             data.regions.push_back({{operand, RegionPhase::Protected}, data.sp, {}}); break;
+                        case Opcode::PrepareWith:
+                        {
+                            RootScope roots(context); auto manager = roots.root(data.operands[data.sp - 1]); ReturnSlot enter(context);
+                            with_method(context, manager, Protocol::Enter, enter);
+                            if (raised(enter)) { activation.raising(enter.result().exception()); break; }
+                            with_method(context, manager, Protocol::Exit, result);
+                            if (raised(result)) { activation.raising(result.result().exception()); break; }
+                            data.operands[data.sp - 1] = result.result().value(); data.operands[data.sp++] = enter.result().value(); break;
+                        }
+                        case Opcode::EnterWith:
+                            data.regions.push_back({{operand, RegionPhase::Protected}, data.sp - 1, {}}); break;
+                        case Opcode::WithExit:
+                        {
+                            const auto *error = std::get_if<ExceptionRaise>(&data.cleanups.back().saved_reason);
+                            data.operands[data.sp++] = data.operands[data.regions.back().stack_base - 1];
+                            data.operands[data.sp++] = error ? context.type_of(error->exception) : context.builtin(CoreObject::None);
+                            data.operands[data.sp++] = error ? error->exception : context.builtin(CoreObject::None);
+                            data.operands[data.sp++] = error ? context.payload<ExceptionObject>(error->exception).traceback.value_or(context.builtin(CoreObject::None)) : context.builtin(CoreObject::None);
+                            break;
+                        }
+                        case Opcode::WithResult:
+                        {
+                            if (std::holds_alternative<ExceptionRaise>(data.cleanups.back().saved_reason))
+                            {
+                                RootScope roots(context); truth(context, roots.root(data.operands[data.sp - 1]), result);
+                                if (raised(result)) { activation.raising(result.result().exception()); break; }
+                                if (result.result().value() == context.builtin(CoreObject::True))
+                                    data.cleanups.back().saved_reason = NormalExit{code.program.regions()[operand].after_pc, code.program.regions()[operand].parent};
+                            }
+                            data.operands[--data.sp] = context.builtin(CoreObject::None); break;
+                        }
                         case Opcode::LeaveRegion:
                             data.reason = NormalExit{code.program.regions()[operand].after_pc, code.program.regions()[operand].parent}; break;
                         case Opcode::EndHandler:
