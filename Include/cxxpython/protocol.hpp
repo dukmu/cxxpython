@@ -37,6 +37,11 @@ enum class Protocol : std::size_t {
     Pos,
     Neg,
     Invert,
+    Iter,
+    Next,
+    GetItem,
+    SetItem,
+    DelItem,
     Count,
 };
 enum class ProtocolResult { Any, Boolean, Length, Integer, String, Hash };
@@ -58,6 +63,7 @@ struct ResolvedSlot {
 enum class CompareOp { Eq, Ne, Lt, Le, Gt, Ge, Is, IsNot };
 enum class BinaryOp { Add, Subtract, Multiply, FloorDivide, Modulo };
 enum class UnaryOp { Positive, Negative, Invert, Not };
+enum class NextStatus { Item, Done, Raised };
 
 const ProtocolDefinition &protocol_definition(Protocol id);
 ResolvedSlot resolve_protocol(Attachment &context, Handle type, Protocol id, RootScope &roots);
@@ -75,4 +81,9 @@ ResultView rich_compare(Attachment &context, Handle left, Handle right, CompareO
 ResultView container_equal(Attachment &context, Handle left, Handle right, ReturnSlot &out);
 ResultView binary(Attachment &context, Handle left, Handle right, BinaryOp op, ReturnSlot &out);
 ResultView inplace(Attachment &context, Handle left, Handle right, BinaryOp op, ReturnSlot &out);
+ResultView get_iter(Attachment &context, Handle value, ReturnSlot &out);
+NextStatus iter_next(Attachment &context, Handle iterator, ReturnSlot &out);
+ResultView get_item(Attachment &context, Handle value, Handle key, ReturnSlot &out);
+ResultView set_item(Attachment &context, Handle value, Handle key, Handle item, ReturnSlot &out);
+ResultView del_item(Attachment &context, Handle value, Handle key, ReturnSlot &out);
 } // namespace cxxpython::core

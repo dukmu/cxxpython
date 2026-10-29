@@ -469,6 +469,9 @@ int main()
         SourceBuffer("def factory(step):\n    def total(n):\n        value = 0\n        while n:\n "
                      "           value += n\n            n -= step\n        return value\n    "
                      "return total\ntotal = factory(1)\n"));
+    const SourceUnit for_program(
+        SourceBuffer("def total(n):\n    value = 0\n    for item in range(n, 0, -1):\n"
+                     "        value += item\n    return value\n"));
     auto hex_source = [](const SourceUnit &source) {
         std::string result;
         constexpr char hex[] = "0123456789abcdef";
@@ -481,9 +484,10 @@ int main()
     std::cout << "source_parse_scope_cfg_ns=" << parse_ns
               << " source_bytes=" << source_program->source().text().size()
               << " source_kernel_hex=" << hex_source(*source_program)
-              << " closure_kernel_hex=" << hex_source(closure_program) << '\n';
-    for (const auto *source :
-         std::array<const SourceUnit *, 3>{nullptr, &*source_program, &closure_program})
+              << " closure_kernel_hex=" << hex_source(closure_program)
+              << " for_kernel_hex=" << hex_source(for_program) << '\n';
+    for (const auto *source : std::array<const SourceUnit *, 4>{nullptr, &*source_program,
+                                                                &closure_program, &for_program})
         for (int workers : {1, 2, 4}) {
             Interpreter vm;
             Attachment controller(vm);
@@ -590,9 +594,10 @@ int main()
             const auto final = controller.stats();
             if (final.objects != baseline.objects || final.transfer_roots)
                 return 1;
-            std::cout << (source == &closure_program ? "parallel_closure_workers="
-                          : source                   ? "parallel_source_workers="
-                                                     : "parallel_vm_workers=")
+            std::cout << (source == &for_program       ? "parallel_for_workers="
+                          : source == &closure_program ? "parallel_closure_workers="
+                          : source                     ? "parallel_source_workers="
+                                                       : "parallel_vm_workers=")
                       << workers << " total_iterations=" << vm_total << " wall_ns=" << wall_ns
                       << " process_cpu_ns=" << cpu_ns
                       << " collections=" << final.collections - baseline.collections

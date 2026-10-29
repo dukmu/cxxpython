@@ -1,4 +1,5 @@
 #include "cxxpython/protocol.hpp"
+#include "internal/long.hpp"
 
 #include <boost/multiprecision/cpp_int.hpp>
 #include <boost/version.hpp>
@@ -8,11 +9,6 @@
 #endif
 
 namespace cxxpython::core {
-namespace detail {
-struct BigInt {
-    boost::multiprecision::cpp_int value;
-};
-} // namespace detail
 namespace {
 using Integer = boost::multiprecision::cpp_int;
 void type_error(Attachment &context, ReturnSlot &out)
@@ -285,6 +281,10 @@ void bool_new(Attachment &context, Handle, std::span<const Value> args, ReturnSl
     }
 }
 } // namespace
+void detail::publish_integer(Attachment &context, Integer value, ReturnSlot &out)
+{
+    publish(context, std::move(value), out);
+}
 IntObject::IntObject(InitialType head, std::int64_t value) : header(head), small(value) {}
 IntObject::IntObject(InitialType head, std::unique_ptr<detail::BigInt> value)
     : header(head), small(0), large(std::move(value))

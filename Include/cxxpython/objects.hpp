@@ -47,6 +47,43 @@ struct TupleObject {
     }
 };
 
+struct RangeObject {
+    ObjectHeader header;
+    const Value start, stop, step, length;
+    RangeObject(InitialType head, Value start, Value stop, Value step, Value length)
+        : header(head), start(start), stop(stop), step(step), length(length)
+    {}
+    void trace(Tracer &tracer) const noexcept
+    {
+        for (auto value : {start, stop, step, length})
+            tracer.visit(value);
+    }
+};
+struct RangeIteratorObject {
+    ObjectHeader header;
+    const Value stop, step;
+    AtomicGcEdge current;
+    RangeIteratorObject(InitialType head, Value stop, Value step, std::optional<Value> current)
+        : header(head), stop(stop), step(step), current(current)
+    {}
+    void trace(Tracer &tracer) const noexcept
+    {
+        tracer.visit(stop);
+        tracer.visit(step);
+        tracer.visit(current);
+    }
+};
+struct SequenceIteratorObject {
+    ObjectHeader header;
+    AtomicGcEdge owner;
+    std::atomic<std::size_t> index{0};
+    SequenceIteratorObject(InitialType head, Value owner) : header(head), owner(owner) {}
+    void trace(Tracer &tracer) const noexcept
+    {
+        tracer.visit(owner);
+    }
+};
+
 // B3 name dictionaries: managed keys/values, no public general mapping API.
 struct DictObject {
     struct Entry {
@@ -278,6 +315,12 @@ void invoke_special(Attachment &context, Handle receiver, Handle descriptor, Cal
 void install_native_attribute(Attachment &context, std::span<const Handle> core, Handle owner,
                               std::u32string name, SignatureLayout signature, NativeEntry entry,
                               std::vector<Value> captures = {});
+void install_native_field(Attachment &context, std::span<const Handle> core, Handle owner,
+                          std::u32string name, NativeGetter getter, NativeSetter setter = nullptr);
+void install_iteration(Attachment &context, std::span<const Handle> core);
+void install_ranges(Attachment &context, std::span<const Handle> core);
+void install_iterator_builtins(Attachment &context, std::span<const Handle> core, Value mapping);
+void stop_iteration(Attachment &context, ReturnSlot &out);
 void install_call_descriptors(Attachment &context, std::span<const Handle> core);
 void install_attribute_descriptors(Attachment &context, std::span<const Handle> core);
 void install_construction(Attachment &context, std::span<const Handle> core);

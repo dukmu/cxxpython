@@ -16,6 +16,7 @@ endif()
 add_library(cxxpython_core
     Python/gc.cpp
     Python/compile.cpp
+    Python/symtable.cpp
     Python/flowgraph.cpp
     Python/ceval.cpp
     Python/traceback.cpp
@@ -27,6 +28,8 @@ add_library(cxxpython_core
     Objects/descrobject.cpp
     Objects/typeconstruction.cpp
     Objects/longobject.cpp
+    Objects/rangeobject.cpp
+    Objects/iterobject.cpp
     Objects/abstract.cpp
     Objects/representation.cpp
 )
@@ -91,7 +94,8 @@ if(BUILD_TESTING)
         Tests/cpp/test_traceback.cpp
         Tests/cpp/test_unwind.cpp
         Tests/cpp/test_with.cpp
-        Tests/cpp/test_source.cpp)
+        Tests/cpp/test_source.cpp
+        Tests/cpp/test_iteration.cpp)
     target_link_libraries(test_runtime PRIVATE cxxpython_core GTest::gtest_main)
     target_compile_options(test_runtime PRIVATE -Wall -Wextra -Wpedantic -Werror)
     gtest_discover_tests(test_runtime PROPERTIES TIMEOUT 15)

@@ -49,6 +49,13 @@ enum class Opcode : std::uint8_t {
     StoreDeref,
     DeleteDeref,
     LoadClosure,
+    GetIter,
+    ForIter,
+    LoadItem,
+    StoreItem,
+    DeleteItem,
+    Copy,
+    UnpackSequence,
     Count,
 };
 enum class OperandDomain {
@@ -73,7 +80,7 @@ enum class FunctionFlags : std::uint32_t {
     KeywordDefaults = 2,
     Closure = 4
 };
-enum class FlowKind { Next, Jump, Branch, Stop, Leave, EndHandler, LoopControl };
+enum class FlowKind { Next, Jump, Branch, Stop, Leave, EndHandler, LoopControl, IterBranch };
 enum class RegionKind { Loop, Except, Finally, With };
 enum class RegionPhase { Protected, Handler, Cleanup };
 struct RegionToken {
@@ -426,7 +433,8 @@ struct FrameObject {
     }
 };
 const OpcodeDefinition &opcode_definition(Opcode opcode);
-StackEffect instruction_effect(Instruction instruction, std::span<const CallLayout> calls = {});
+StackEffect instruction_effect(Instruction instruction, std::span<const CallLayout> calls = {},
+                               bool jump_taken = false);
 std::string disassemble(Attachment &context, Handle code);
 void make_function(Attachment &context, const FunctionSpec &spec, ReturnSlot &out);
 namespace detail {

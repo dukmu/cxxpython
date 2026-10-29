@@ -36,6 +36,11 @@ constexpr std::array definitions{
     ProtocolDefinition{U"__pos__", 0, ProtocolResult::Any},
     ProtocolDefinition{U"__neg__", 0, ProtocolResult::Any},
     ProtocolDefinition{U"__invert__", 0, ProtocolResult::Any},
+    ProtocolDefinition{U"__iter__", 0, ProtocolResult::Any, true},
+    ProtocolDefinition{U"__next__", 0, ProtocolResult::Any, true},
+    ProtocolDefinition{U"__getitem__", 1, ProtocolResult::Any},
+    ProtocolDefinition{U"__setitem__", 2, ProtocolResult::Any},
+    ProtocolDefinition{U"__delitem__", 1, ProtocolResult::Any},
 };
 static_assert(definitions.size() == static_cast<std::size_t>(Protocol::Count));
 constexpr std::array comparisons{Protocol::Eq, Protocol::Ne, Protocol::Lt,
@@ -519,6 +524,40 @@ ResultView inplace(Attachment &context, Handle left, Handle right, BinaryOp op, 
         if (attempt(context, a, b, operations.at(static_cast<std::size_t>(op))[2], out))
             return;
         binary(context, a, b, op, out);
+    });
+}
+ResultView get_item(Attachment &context, Handle value, Handle key, ReturnSlot &out)
+{
+    return guarded(context, out, [&] {
+        RootScope roots(context);
+        const auto self = roots.root(value.get(context));
+        const auto item = roots.root(key.get(context));
+        auto slot = resolve(context, self, Protocol::GetItem, roots);
+        std::array args{item.get(context)};
+        invoke_protocol(context, self, slot, args, out);
+    });
+}
+ResultView set_item(Attachment &context, Handle value, Handle key, Handle item, ReturnSlot &out)
+{
+    return guarded(context, out, [&] {
+        RootScope roots(context);
+        const auto self = roots.root(value.get(context));
+        const auto index = roots.root(key.get(context));
+        const auto stored = roots.root(item.get(context));
+        auto slot = resolve(context, self, Protocol::SetItem, roots);
+        std::array args{index.get(context), stored.get(context)};
+        invoke_protocol(context, self, slot, args, out);
+    });
+}
+ResultView del_item(Attachment &context, Handle value, Handle key, ReturnSlot &out)
+{
+    return guarded(context, out, [&] {
+        RootScope roots(context);
+        const auto self = roots.root(value.get(context));
+        const auto index = roots.root(key.get(context));
+        auto slot = resolve(context, self, Protocol::DelItem, roots);
+        std::array args{index.get(context)};
+        invoke_protocol(context, self, slot, args, out);
     });
 }
 namespace detail {

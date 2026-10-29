@@ -256,6 +256,13 @@ void install_field(Attachment &context, Handle descriptor_type, Handle string_ty
 }
 } // namespace
 namespace detail {
+void install_native_field(Attachment &context, std::span<const Handle> core, Handle owner,
+                          std::u32string name, NativeGetter getter, NativeSetter setter)
+{
+    install_field(context, core[static_cast<std::size_t>(CoreObject::GetSetDescriptorType)],
+                  core[static_cast<std::size_t>(CoreObject::StrType)], owner, std::move(name),
+                  getter, setter);
+}
 void get_native_member(Attachment &context, Value value, std::optional<Value> receiver,
                        ReturnSlot &out)
 {

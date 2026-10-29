@@ -14,10 +14,14 @@ or VM. There is one executable, `cxxpython`, linked to `cxxpython_core`.
 and parser. `Include/internal/compiler.hpp` is the private contract between that
 parser and compiler; it contains no hidden managed Python references.
 
-`Python/compile.cpp` performs lexical scope analysis, constructs native CFGs and
-freezes managed constants/Code through CodeBuilder. `Python/flowgraph.cpp` owns
+`Python/symtable.cpp` performs lexical scope analysis. `Python/compile.cpp`
+constructs native CFGs and freezes managed constants/Code through CodeBuilder.
+`Python/flowgraph.cpp` owns
 bytecode construction, stack/control-region verification and disassembly.
 Scope analysis is complete before lowering; the emitter does not guess bindings.
+AST visitors fail at compile time if a new expression/statement has no explicit
+scope or lowering rule. Syntax additions extend these passes rather than adding
+another parser, execution path or managed compiler-state layer.
 
 `Python/ceval.cpp` prepares and schedules invocation-owned Frames, executes the
 verified bytecode and calls normal object protocols. Python-to-Python calls do
@@ -32,7 +36,11 @@ cleanup continuations. `Python/traceback.cpp` owns traceback operations.
 lookup, argument binding and the shared call boundary. `Objects/abstract.cpp`
 dispatches typed object protocols. `Objects/longobject.cpp` provides int/bool
 arithmetic; `Objects/representation.cpp` provides value representation/hash
-operations. `Objects/object.cpp` contains the initial values, name dictionaries,
+operations. `Objects/rangeobject.cpp` owns immutable arbitrary-integer ranges and
+their iterators; `Objects/iterobject.cpp` owns iteration and immutable sequence
+indexing. `Include/internal/long.hpp` shares the existing integer representation
+and publication helper, without a second numeric implementation.
+`Objects/object.cpp` contains the initial values, name dictionaries,
 core image and common object construction. Generated Unicode tables are private
 to Objects and retain their generator/source provenance.
 

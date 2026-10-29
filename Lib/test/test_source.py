@@ -21,7 +21,7 @@ class SourceDifferential(unittest.TestCase):
 
     def check_program(self, source, expression):
         actual = self.execute([self.binary, "-c", source, "--eval", expression])
-        expected = self.execute([self.reference, "-c", source + "\nprint(repr(" + expression + "))"])
+        expected = self.execute([self.reference, "-c", source + "\nprint(repr((" + expression + ")))"])
         self.assertEqual(expected.returncode, 0, expected.stderr)
         self.assertEqual(actual.returncode, 0, actual.stderr)
         self.assertEqual(actual.stdout, expected.stdout)
@@ -79,6 +79,64 @@ class SourceDifferential(unittest.TestCase):
             self.assertNotEqual(expected.returncode, 0)
             self.assertIn(error, actual.stderr)
             self.assertIn(error, expected.stderr)
+
+    def test_iteration_unpacking_and_exception_workflows(self):
+        cases = [
+            ("", "(), (1,), (1, 2), ((1, 2), 3)"),
+            ("a, (b, c) = (1, (2, 3))", "a, b, c"),
+            ("a, b = range(2)", "a, b"),
+            ("a, b = 'a\\U0001f600'", "a, b"),
+            ("", "(10, 20, 30)[-2], 'a\\U0001f600'[-1]"),
+            ("", "range(9, -2, -3), range(9, -2, -3)[-1]"),
+            ("", "range(1000000000000000000000000000000, 1000000000000000000000000000020, 3)[-1]"),
+            ("", "range(0, 3, 2) == range(0, 4, 2), range(0) == range(2, 2)"),
+            ("", "hash(range(0, 3, 2)) == hash(range(0, 4, 2))"),
+            ("", "bool(range(1000000000000000000000000000000)), bool(range(5, 5))"),
+            ("it = iter((1, 2))\na = next(it)\nb = next(it)", "a, b, next(it, None), next(it, 7)"),
+            ("it = iter(range(3))", "iter(it) is it"),
+            ("total = 0\nfor a, b in ((1, 2), (3, 4)):\n    total += a * b", "total"),
+            ("total = 0\nfor i in range(8):\n    if i == 2:\n        continue\n"
+             "    if i == 6:\n        break\n    total += i\nelse:\n    total = 999", "total"),
+            ("total = 0\nfor i in range(0):\n    total = 1\nelse:\n    total = 42", "total"),
+            ("def outer():\n    for x in range(3):\n        def read():\n            return x\n"
+             "    return read\nf = outer()", "f(), f.__code__.co_freevars"),
+            ("def total(n):\n    for i in range(n):\n        return i\n    return None", "total(0), total(4)"),
+            ("error = StopIteration(1, 2)\nerror.args = (3, 4)", "error.args, error.value"),
+            ("error = StopIteration(1)\ndel error.value\nerror.args = range(3)", "error.args, error.value"),
+            ("error = StopIteration(1)\nBaseException.__init__(error, 2)", "error.args, error.value"),
+            ("", "ValueError('message').args, StopIteration.__new__(StopIteration, 9).value"),
+        ]
+        for source, expression in cases:
+            with self.subTest(source=source, expression=expression):
+                self.check_program(source, expression)
+
+    def test_iteration_errors_preserve_python_exception_types(self):
+        for source, error in [
+            ("next(iter(()))", "StopIteration"),
+            ("next(iter(range(0)))", "StopIteration"),
+            ("iter(None)", "TypeError"),
+            ("next((1, 2))", "TypeError"),
+            ("range(0, 3, 0)", "ValueError"),
+            ("range(stop=3)", "TypeError"),
+            ("len(range(1000000000000000000000000000000))", "OverflowError"),
+            ("range(3)[3]", "IndexError"),
+            ("(1, 2)[1000000000000000000000000000000]", "IndexError"),
+            ("'abc'[-4]", "IndexError"),
+            ("(1, 2)[None]", "TypeError"),
+            ("a, b = (1,)", "ValueError"),
+            ("a, b = range(3)", "ValueError"),
+            ("a, b = None", "TypeError"),
+            ("value = (1, 2)\nvalue[0] = 3", "TypeError"),
+            ("value = (1, 2)\ndel value[0]", "TypeError"),
+            ("error = ValueError()\ndel error.args", "TypeError"),
+        ]:
+            with self.subTest(source=source):
+                actual = self.execute([self.binary, "-c", source])
+                expected = self.execute([self.reference, "-c", source])
+                self.assertEqual(actual.returncode, 1, actual.stderr)
+                self.assertNotEqual(expected.returncode, 0)
+                self.assertIn(error, actual.stderr)
+                self.assertIn(error, expected.stderr)
 
     def test_file_entry_and_unicode_diagnostics(self):
         with tempfile.TemporaryDirectory() as directory:

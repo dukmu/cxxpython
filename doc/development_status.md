@@ -1,5 +1,64 @@
 # Development Status
 
+## 2026-10-29 Source Iteration, Unpacking And Ordinary Item Protocols
+
+Prepended without rewriting history. The previous stable node is d474073.
+The full Plan 2 N0-N6/M0-M9 goal remains active. The user's basic-language
+requirement is a delivery requirement, not permission to stop at this subset.
+
+- Added tuple expressions, recursive non-starred assignment/unpacking, integer
+  subscripts and ordinary item assignment/deletion/augmented assignment through
+  the existing AST, CFG, CodeBuilder and object protocol boundary. Subscript
+  augmented assignment evaluates its receiver/key once; normal assignment
+  evaluates the RHS first. No script-specific optimization or alternate VM.
+- Added source for/else, break/continue and a real FOR_ITER branch with separate
+  taken/fallthrough stack effects in verification/disassembly. GET_ITER, item,
+  COPY and UNPACK_SEQUENCE operations have explicit operand/stack/error rules.
+  Unpacking roots all items and checks the count before target stores; iterator
+  exhaustion is distinct from a yielded None or an arbitrary Python exception.
+- Implemented immutable arbitrary-integer range values, independent range
+  iterators, tuple/Unicode codepoint iterators, iter(obj), next(it[, default]),
+  integer indexing, range repr/bool/len/content equality/hash and public fields.
+  Range and immutable-sequence iterators prepare allocating results before an
+  atomic claim, preserving the current item on allocation failure. Shared
+  iterators yield each item exactly once during concurrent next and collection.
+  These are normal managed Python object layouts, not another cursor framework.
+- Added LookupError/IndexError/StopIteration and repaired the missing general
+  BaseException constructor/init path discovered by iteration tests. Exception
+  args is a managed tuple, atomically replaced after iterable conversion.
+  StopIteration.value has its own traced atomic tail field, independent of args;
+  direct allocation, reinitialization, replacement and deletion are tested.
+- Extracted lexical scope analysis into Python/symtable.cpp, leaving CFG/freeze
+  in compile.cpp. Scope and graph visitors require explicit compile-time handling
+  of AST variants; new syntax cannot silently skip binding/traversal/lowering.
+  Shared the existing BigInt representation/publication interface in a private
+  header. Existing GC, roots, call paths and synchronization remain authoritative.
+- Added eight focused native cases and expanded same-Function source parallel
+  coverage with for/range. Normal CTest 325/325 passes, including all 322 native
+  cases, executable source differential, recorder tests and clang-format check.
+  Fresh ASan/UBSan/LSan passes 322/322; TSan passes 320/320, excluding only the
+  same two exhaustive bootstrap/promotion allocation enumerations covered by
+  normal/ASan tests. No timeout or sanitizer failure was suppressed.
+- Fixed executable differential expression wrapping for comma expressions and
+  added 21 positive plus 17 negative iteration/unpacking/exception workflows.
+  All five driver groups pass against the actual fixed CPython 3.12.14 binary;
+  its outputs and binary hashes are retained in the existing JSON evidence.
+- Extended the existing benchmark and recorder with the captured source for
+  kernel, paired with exactly that source on CPython at 1/2/4 workers. Three
+  idle Release runs after builds/sanitizers generated n4-iteration raw records,
+  CSV and Markdown tables automatically. Existing records remain untouched.
+  Plain/closure single-thread costs remain near the previous node; for-loop CPU
+  parallelism is real but the large absolute CPython gap remains a failed gate.
+- Remaining basic-language work includes full numeric/container/iteration APIs,
+  slicing and starred targets, class, try/raise/with source lowering, import,
+  f-strings and the rest of the 3.12 matrix. __getitem__-only iterator fallback,
+  iter(callable, sentinel) and full range methods are not claimed complete.
+  Continue L1 class/exception source lowering through existing Type/unwind
+  contracts and the required object capabilities, not another ownership or
+  compiler framework. Actual library/thread/I/O workflows, platform/install
+  and performance acceptance still remain. No subagents were used; the user's
+  temporary_plan.md deletion and untracked test2.py remain excluded.
+
 ## 2026-10-29 One Current Runtime And CPython-Shaped Source Layout
 
 Prepended without rewriting history. The previous stable node is e3c4beb.

@@ -306,6 +306,49 @@ TEST_F(CoreExecution, SourceLoweringOpcodesHaveVerifiedOperandsAndStackInputs)
     invalid(dictionary, CodeErrorKind::StackUnderflow);
 }
 
+TEST_F(CoreExecution, IterationAndUnpackOpcodesVerifyBothBranchStackEffects)
+{
+    CodeBuilder empty(context);
+    empty.emit(Opcode::ForIter);
+    invalid(empty, CodeErrorKind::StackUnderflow);
+    CodeBuilder copy(context);
+    copy.emit(Opcode::Copy, 0);
+    invalid(copy, CodeErrorKind::Operand);
+    CodeBuilder unpack(context);
+    unpack.emit(Opcode::UnpackSequence, 2);
+    invalid(unpack, CodeErrorKind::StackUnderflow);
+    const auto item = instruction_effect({Opcode::ForIter, 0});
+    const auto done = instruction_effect({Opcode::ForIter, 0}, {}, true);
+    EXPECT_EQ(item.inputs, 1U);
+    EXPECT_EQ(item.pops, 0U);
+    EXPECT_EQ(item.pushes, 1U);
+    EXPECT_EQ(done.inputs, 1U);
+    EXPECT_EQ(done.pops, 1U);
+    EXPECT_EQ(done.pushes, 0U);
+    const auto effect = instruction_effect({Opcode::UnpackSequence, 3});
+    EXPECT_EQ(effect.inputs, 1U);
+    EXPECT_EQ(effect.pops, 1U);
+    EXPECT_EQ(effect.pushes, 3U);
+    CodeBuilder loop(context);
+    const auto again = loop.label(), exhausted = loop.label();
+    loop.emit(Opcode::LoadConst, loop.constant(builtin(CoreObject::EmptyTuple)));
+    loop.emit(Opcode::GetIter);
+    loop.bind(again);
+    loop.jump(Opcode::ForIter, exhausted);
+    loop.emit(Opcode::PopTop);
+    loop.jump(Opcode::Jump, again);
+    loop.bind(exhausted);
+    loop.emit(Opcode::LoadConst, loop.constant(builtin(CoreObject::None)));
+    loop.emit(Opcode::Return);
+    const auto program = code(loop);
+    EXPECT_EQ(context.payload<CodeObject>(program).program.max_stack(), 2U);
+    EXPECT_NE(disassemble(context, program).find("FOR_ITER"), std::string::npos);
+    ReturnSlot out(context);
+    call(context, function(program), {}, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(out.value(), context.builtin(CoreObject::None));
+}
+
 TEST_F(CoreExecution, GlobalLookupUsesLiveGlobalsThenTheFunctionsBuiltinsMapping)
 {
     auto globals = dictionary(), builtins = dictionary();

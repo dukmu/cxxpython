@@ -37,11 +37,17 @@ struct AttributeExpr {
     ExprPtr object;
     std::u32string name;
 };
+struct TupleExpr {
+    std::vector<ExprPtr> items;
+};
+struct SubscriptExpr {
+    ExprPtr object, key;
+};
 struct Expr {
     Span span;
     std::size_t depth;
     std::variant<Literal, NameExpr, UnaryExpr, BinaryExpr, BoolExpr, CompareExpr, CallExpr,
-                 AttributeExpr>
+                 AttributeExpr, TupleExpr, SubscriptExpr>
         node;
 };
 struct Stmt;
@@ -69,6 +75,10 @@ struct WhileStmt {
     ExprPtr test;
     Suite body, alternative;
 };
+struct ForStmt {
+    ExprPtr target, iterable;
+    Suite body, alternative;
+};
 struct ParameterSpec {
     std::u32string name;
     ParameterKind kind;
@@ -92,8 +102,8 @@ struct DeclareStmt {
 enum class ControlStmt { Pass, Break, Continue };
 struct Stmt {
     Span span;
-    std::variant<ExprStmt, AssignStmt, AugAssignStmt, DeleteStmt, IfStmt, WhileStmt, FunctionStmt,
-                 ReturnStmt, DeclareStmt, ControlStmt>
+    std::variant<ExprStmt, AssignStmt, AugAssignStmt, DeleteStmt, IfStmt, WhileStmt, ForStmt,
+                 FunctionStmt, ReturnStmt, DeclareStmt, ControlStmt>
         node;
 };
 // CFG instructions use native literals/names until one attached freeze task
@@ -108,7 +118,7 @@ struct FlowInstruction {
     std::optional<std::size_t> function;
 };
 struct FlowBlock {
-    enum class Exit { Open, Jump, Branch, Return } exit = Exit::Open;
+    enum class Exit { Open, Jump, Branch, Return, IterNext } exit = Exit::Open;
     std::vector<FlowInstruction> instructions;
     std::size_t target = 0, alternative = 0;
     Span span;
@@ -125,6 +135,7 @@ struct SourceProgram {
     std::vector<FunctionGraph> graphs;
 };
 Suite parse_source(const SourceBuffer &source, InputMode mode);
+void analyze_scopes(SourceProgram &program, Suite &body);
 std::u32string decode_source(const SourceBuffer &source, Span span);
 std::u32string decode_filename(const SourceBuffer &source);
 } // namespace cxxpython::core::detail

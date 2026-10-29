@@ -1,10 +1,10 @@
 {
-  "captured_at": "2026-10-29T12:59:03.818514+00:00",
+  "captured_at": "2026-10-29T14:00:32.218279+00:00",
   "reference_version": "Python 3.12.14",
   "provenance": {
     "binary": {
       "path": "/home/shefrin/repo/cxxpython/build/cxxpython",
-      "sha256": "e332c23e1077f7ec17e1ff70acd48abf81c6dacb7e10aece4943768546fa0789"
+      "sha256": "519c15be1ff15d975825a59eadd1fdf8e1524ac6b2645ac6c14b33cdfc9cee47"
     },
     "reference": {
       "path": "/tmp/cxxpython-cpython31214-build/python",
@@ -226,7 +226,7 @@
     {
       "command": [
         "build/cxxpython",
-        "/tmp/tmpvi8fa_hn/source.py",
+        "/tmp/tmp6hjis0ew/source.py",
         "--eval",
         "f(41)"
       ],
@@ -248,6 +248,808 @@
       "command": [
         "build/cxxpython",
         "-c",
+        "next(iter(()))"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nStopIteration()\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "next(iter(()))"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nStopIteration\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "next(iter(range(0)))"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nStopIteration()\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "next(iter(range(0)))"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nStopIteration\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "iter(None)"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError('operation is missing or explicitly disabled')\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "iter(None)"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError: 'NoneType' object is not iterable\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "next((1, 2))"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError('operation is missing or explicitly disabled')\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "next((1, 2))"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError: 'tuple' object is not an iterator\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "range(0, 3, 0)"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nValueError('range() arg 3 must not be zero')\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "range(0, 3, 0)"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nValueError: range() arg 3 must not be zero\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "range(stop=3)"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError('unexpected or positional-only keyword: stop')\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "range(stop=3)"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError: range() takes no keyword arguments\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "len(range(1000000000000000000000000000000))"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nOverflowError('range length does not fit Py_ssize_t')\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "len(range(1000000000000000000000000000000))"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nOverflowError: Python int too large to convert to C ssize_t\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "range(3)[3]"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nIndexError('range object index out of range')\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "range(3)[3]"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nIndexError: range object index out of range\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "(1, 2)[1000000000000000000000000000000]"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nIndexError('sequence index is out of range')\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "(1, 2)[1000000000000000000000000000000]"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nIndexError: cannot fit 'int' into an index-sized integer\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "'abc'[-4]"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nIndexError('sequence index is out of range')\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "'abc'[-4]"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nIndexError: string index out of range\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "(1, 2)[None]"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError('operation is missing or explicitly disabled')\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "(1, 2)[None]"
+      ],
+      "stdout": "",
+      "stderr": "<string>:1: SyntaxWarning: tuple indices must be integers or slices, not NoneType; perhaps you missed a comma?\nTraceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError: tuple indices must be integers or slices, not NoneType\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "a, b = (1,)"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nValueError('not enough values to unpack')\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "a, b = (1,)"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nValueError: not enough values to unpack (expected 2, got 1)\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "a, b = range(3)"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nValueError('too many values to unpack')\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "a, b = range(3)"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nValueError: too many values to unpack (expected 2)\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "a, b = None"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError('operation is missing or explicitly disabled')\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "a, b = None"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError: cannot unpack non-iterable NoneType object\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "value = (1, 2)\nvalue[0] = 3"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 2, in <module>\nTypeError('operation is missing or explicitly disabled')\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "value = (1, 2)\nvalue[0] = 3"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 2, in <module>\nTypeError: 'tuple' object does not support item assignment\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "value = (1, 2)\ndel value[0]"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 2, in <module>\nTypeError('operation is missing or explicitly disabled')\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "value = (1, 2)\ndel value[0]"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 2, in <module>\nTypeError: 'tuple' object doesn't support item deletion\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "error = ValueError()\ndel error.args"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 2, in <module>\nTypeError('cannot delete exception args')\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "error = ValueError()\ndel error.args"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 2, in <module>\nTypeError: args may not be deleted\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "",
+        "--eval",
+        "(), (1,), (1, 2), ((1, 2), 3)"
+      ],
+      "stdout": "((), (1,), (1, 2), ((1, 2), 3))\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nprint(repr(((), (1,), (1, 2), ((1, 2), 3))))"
+      ],
+      "stdout": "((), (1,), (1, 2), ((1, 2), 3))\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "a, (b, c) = (1, (2, 3))",
+        "--eval",
+        "a, b, c"
+      ],
+      "stdout": "(1, 2, 3)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "a, (b, c) = (1, (2, 3))\nprint(repr((a, b, c)))"
+      ],
+      "stdout": "(1, 2, 3)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "a, b = range(2)",
+        "--eval",
+        "a, b"
+      ],
+      "stdout": "(0, 1)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "a, b = range(2)\nprint(repr((a, b)))"
+      ],
+      "stdout": "(0, 1)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "a, b = 'a\\U0001f600'",
+        "--eval",
+        "a, b"
+      ],
+      "stdout": "('a', '\ud83d\ude00')\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "a, b = 'a\\U0001f600'\nprint(repr((a, b)))"
+      ],
+      "stdout": "('a', '\ud83d\ude00')\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "",
+        "--eval",
+        "(10, 20, 30)[-2], 'a\\U0001f600'[-1]"
+      ],
+      "stdout": "(20, '\ud83d\ude00')\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nprint(repr(((10, 20, 30)[-2], 'a\\U0001f600'[-1])))"
+      ],
+      "stdout": "(20, '\ud83d\ude00')\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "",
+        "--eval",
+        "range(9, -2, -3), range(9, -2, -3)[-1]"
+      ],
+      "stdout": "(range(9, -2, -3), 0)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nprint(repr((range(9, -2, -3), range(9, -2, -3)[-1])))"
+      ],
+      "stdout": "(range(9, -2, -3), 0)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "",
+        "--eval",
+        "range(1000000000000000000000000000000, 1000000000000000000000000000020, 3)[-1]"
+      ],
+      "stdout": "1000000000000000000000000000018\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nprint(repr((range(1000000000000000000000000000000, 1000000000000000000000000000020, 3)[-1])))"
+      ],
+      "stdout": "1000000000000000000000000000018\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "",
+        "--eval",
+        "range(0, 3, 2) == range(0, 4, 2), range(0) == range(2, 2)"
+      ],
+      "stdout": "(True, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nprint(repr((range(0, 3, 2) == range(0, 4, 2), range(0) == range(2, 2))))"
+      ],
+      "stdout": "(True, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "",
+        "--eval",
+        "hash(range(0, 3, 2)) == hash(range(0, 4, 2))"
+      ],
+      "stdout": "True\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nprint(repr((hash(range(0, 3, 2)) == hash(range(0, 4, 2)))))"
+      ],
+      "stdout": "True\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "",
+        "--eval",
+        "bool(range(1000000000000000000000000000000)), bool(range(5, 5))"
+      ],
+      "stdout": "(True, False)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nprint(repr((bool(range(1000000000000000000000000000000)), bool(range(5, 5)))))"
+      ],
+      "stdout": "(True, False)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "it = iter((1, 2))\na = next(it)\nb = next(it)",
+        "--eval",
+        "a, b, next(it, None), next(it, 7)"
+      ],
+      "stdout": "(1, 2, None, 7)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "it = iter((1, 2))\na = next(it)\nb = next(it)\nprint(repr((a, b, next(it, None), next(it, 7))))"
+      ],
+      "stdout": "(1, 2, None, 7)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "it = iter(range(3))",
+        "--eval",
+        "iter(it) is it"
+      ],
+      "stdout": "True\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "it = iter(range(3))\nprint(repr((iter(it) is it)))"
+      ],
+      "stdout": "True\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "total = 0\nfor a, b in ((1, 2), (3, 4)):\n    total += a * b",
+        "--eval",
+        "total"
+      ],
+      "stdout": "14\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "total = 0\nfor a, b in ((1, 2), (3, 4)):\n    total += a * b\nprint(repr((total)))"
+      ],
+      "stdout": "14\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "total = 0\nfor i in range(8):\n    if i == 2:\n        continue\n    if i == 6:\n        break\n    total += i\nelse:\n    total = 999",
+        "--eval",
+        "total"
+      ],
+      "stdout": "13\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "total = 0\nfor i in range(8):\n    if i == 2:\n        continue\n    if i == 6:\n        break\n    total += i\nelse:\n    total = 999\nprint(repr((total)))"
+      ],
+      "stdout": "13\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "total = 0\nfor i in range(0):\n    total = 1\nelse:\n    total = 42",
+        "--eval",
+        "total"
+      ],
+      "stdout": "42\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "total = 0\nfor i in range(0):\n    total = 1\nelse:\n    total = 42\nprint(repr((total)))"
+      ],
+      "stdout": "42\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "def outer():\n    for x in range(3):\n        def read():\n            return x\n    return read\nf = outer()",
+        "--eval",
+        "f(), f.__code__.co_freevars"
+      ],
+      "stdout": "(2, ('x',))\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "def outer():\n    for x in range(3):\n        def read():\n            return x\n    return read\nf = outer()\nprint(repr((f(), f.__code__.co_freevars)))"
+      ],
+      "stdout": "(2, ('x',))\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "def total(n):\n    for i in range(n):\n        return i\n    return None",
+        "--eval",
+        "total(0), total(4)"
+      ],
+      "stdout": "(None, 0)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "def total(n):\n    for i in range(n):\n        return i\n    return None\nprint(repr((total(0), total(4))))"
+      ],
+      "stdout": "(None, 0)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "error = StopIteration(1, 2)\nerror.args = (3, 4)",
+        "--eval",
+        "error.args, error.value"
+      ],
+      "stdout": "((3, 4), 1)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "error = StopIteration(1, 2)\nerror.args = (3, 4)\nprint(repr((error.args, error.value)))"
+      ],
+      "stdout": "((3, 4), 1)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "error = StopIteration(1)\ndel error.value\nerror.args = range(3)",
+        "--eval",
+        "error.args, error.value"
+      ],
+      "stdout": "((0, 1, 2), None)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "error = StopIteration(1)\ndel error.value\nerror.args = range(3)\nprint(repr((error.args, error.value)))"
+      ],
+      "stdout": "((0, 1, 2), None)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "error = StopIteration(1)\nBaseException.__init__(error, 2)",
+        "--eval",
+        "error.args, error.value"
+      ],
+      "stdout": "((2,), 1)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "error = StopIteration(1)\nBaseException.__init__(error, 2)\nprint(repr((error.args, error.value)))"
+      ],
+      "stdout": "((2,), 1)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "",
+        "--eval",
+        "ValueError('message').args, StopIteration.__new__(StopIteration, 9).value"
+      ],
+      "stdout": "(('message',), None)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nprint(repr((ValueError('message').args, StopIteration.__new__(StopIteration, 9).value)))"
+      ],
+      "stdout": "(('message',), None)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
         "",
         "--eval",
         "0x_FF + 0b101 + 0o7 + 1_000"
@@ -260,7 +1062,7 @@
       "command": [
         "/tmp/cxxpython-cpython31214-build/python",
         "-c",
-        "\nprint(repr(0x_FF + 0b101 + 0o7 + 1_000))"
+        "\nprint(repr((0x_FF + 0b101 + 0o7 + 1_000)))"
       ],
       "stdout": "1267\n",
       "stderr": "",
@@ -282,7 +1084,7 @@
       "command": [
         "/tmp/cxxpython-cpython31214-build/python",
         "-c",
-        "\nprint(repr(-(18446744073709551616) // 3))"
+        "\nprint(repr((-(18446744073709551616) // 3)))"
       ],
       "stdout": "-6148914691236517206\n",
       "stderr": "",
@@ -304,7 +1106,7 @@
       "command": [
         "/tmp/cxxpython-cpython31214-build/python",
         "-c",
-        "\nprint(repr(not 0 and 1 < 2 < 3 or missing))"
+        "\nprint(repr((not 0 and 1 < 2 < 3 or missing)))"
       ],
       "stdout": "True\n",
       "stderr": "",
@@ -326,7 +1128,7 @@
       "command": [
         "/tmp/cxxpython-cpython31214-build/python",
         "-c",
-        "\nprint(repr('\\u4f60\\u597d' ' ' r'\\n'))"
+        "\nprint(repr(('\\u4f60\\u597d' ' ' r'\\n')))"
       ],
       "stdout": "'\u4f60\u597d \\\\n'\n",
       "stderr": "",
@@ -348,7 +1150,7 @@
       "command": [
         "/tmp/cxxpython-cpython31214-build/python",
         "-c",
-        "def f(n):\n    total = 0\n    while n:\n        total += n\n        n -= 1\n    return total\nprint(repr(f(2000)))"
+        "def f(n):\n    total = 0\n    while n:\n        total += n\n        n -= 1\n    return total\nprint(repr((f(2000))))"
       ],
       "stdout": "2001000\n",
       "stderr": "",
@@ -370,7 +1172,7 @@
       "command": [
         "/tmp/cxxpython-cpython31214-build/python",
         "-c",
-        "def fact(n):\n    if n <= 1:\n        return 1\n    return n * fact(n - 1)\nprint(repr(fact(20)))"
+        "def fact(n):\n    if n <= 1:\n        return 1\n    return n * fact(n - 1)\nprint(repr((fact(20))))"
       ],
       "stdout": "2432902008176640000\n",
       "stderr": "",
@@ -392,7 +1194,7 @@
       "command": [
         "/tmp/cxxpython-cpython31214-build/python",
         "-c",
-        "count = 0\ndef bump():\n    global count\n    count += 1\n    return count\ndef f(a=bump(), *, b=bump()):\n    return a * 10 + b\nx = f()\ny = f()\nprint(repr(count * 100 + x + y))"
+        "count = 0\ndef bump():\n    global count\n    count += 1\n    return count\ndef f(a=bump(), *, b=bump()):\n    return a * 10 + b\nx = f()\ny = f()\nprint(repr((count * 100 + x + y)))"
       ],
       "stdout": "224\n",
       "stderr": "",
@@ -414,7 +1216,7 @@
       "command": [
         "/tmp/cxxpython-cpython31214-build/python",
         "-c",
-        "def f(a, /, b=2, *, c=3):\n    return a + b + c\nprint(repr(f(1, c=4)))"
+        "def f(a, /, b=2, *, c=3):\n    return a + b + c\nprint(repr((f(1, c=4))))"
       ],
       "stdout": "7\n",
       "stderr": "",
@@ -436,7 +1238,7 @@
       "command": [
         "/tmp/cxxpython-cpython31214-build/python",
         "-c",
-        "def f(*args, **kwargs):\n    return len(args) * 10 + len(kwargs)\nprint(repr(f(1, 2, x=3)))"
+        "def f(*args, **kwargs):\n    return len(args) * 10 + len(kwargs)\nprint(repr((f(1, 2, x=3))))"
       ],
       "stdout": "21\n",
       "stderr": "",
@@ -458,7 +1260,7 @@
       "command": [
         "/tmp/cxxpython-cpython31214-build/python",
         "-c",
-        "i = 0\nx = 0\nwhile i < 10:\n    i += 1\n    if i == 3:\n        continue\n    elif i == 7:\n        break\n    x += i\nelse:\n    x = 999\nprint(repr(x))"
+        "i = 0\nx = 0\nwhile i < 10:\n    i += 1\n    if i == 3:\n        continue\n    elif i == 7:\n        break\n    x += i\nelse:\n    x = 999\nprint(repr((x)))"
       ],
       "stdout": "18\n",
       "stderr": "",
@@ -480,7 +1282,7 @@
       "command": [
         "/tmp/cxxpython-cpython31214-build/python",
         "-c",
-        "def factory():\n    def child():\n        return 42\n    return child\na = factory()\nb = factory()\nprint(repr(a is not b and a.__code__ is b.__code__))"
+        "def factory():\n    def child():\n        return 42\n    return child\na = factory()\nb = factory()\nprint(repr((a is not b and a.__code__ is b.__code__)))"
       ],
       "stdout": "True\n",
       "stderr": "",
@@ -502,7 +1304,7 @@
       "command": [
         "/tmp/cxxpython-cpython31214-build/python",
         "-c",
-        "'module doc'\ndef f():\n    'function doc'\n    return __debug__\nprint(repr(__doc__ + ' ' + f.__doc__))"
+        "'module doc'\ndef f():\n    'function doc'\n    return __debug__\nprint(repr((__doc__ + ' ' + f.__doc__)))"
       ],
       "stdout": "'module doc function doc'\n",
       "stderr": "",
@@ -524,7 +1326,7 @@
       "command": [
         "/tmp/cxxpython-cpython31214-build/python",
         "-c",
-        "'module doc'\nglobal __doc__\nprint(repr(__doc__))"
+        "'module doc'\nglobal __doc__\nprint(repr((__doc__)))"
       ],
       "stdout": "'module doc'\n",
       "stderr": "",
@@ -546,7 +1348,7 @@
       "command": [
         "/tmp/cxxpython-cpython31214-build/python",
         "-c",
-        "def outer(x):\n    def middle():\n        def inner():\n            return x\n        return inner\n    return middle\nprint(repr(outer(42)()()))"
+        "def outer(x):\n    def middle():\n        def inner():\n            return x\n        return inner\n    return middle\nprint(repr((outer(42)()())))"
       ],
       "stdout": "42\n",
       "stderr": "",
@@ -568,7 +1370,7 @@
       "command": [
         "/tmp/cxxpython-cpython31214-build/python",
         "-c",
-        "def outer(x):\n    def read():\n        return x\n    def bump():\n        nonlocal x\n        x += 1\n    bump()\n    return read\na = outer(40)\nb = outer(10)\nprint(repr(a() * 100 + b()))"
+        "def outer(x):\n    def read():\n        return x\n    def bump():\n        nonlocal x\n        x += 1\n    bump()\n    return read\na = outer(40)\nb = outer(10)\nprint(repr((a() * 100 + b())))"
       ],
       "stdout": "4111\n",
       "stderr": "",
@@ -590,7 +1392,7 @@
       "command": [
         "/tmp/cxxpython-cpython31214-build/python",
         "-c",
-        "def outer(x, /, *args, flag=2, **kw):\n    def inner(step=x, *, extra=flag):\n        return x + flag + len(args) + len(kw) + step + extra\n    x += 1\n    return inner\na = outer(10, 1, 2, flag=3, key=1)\nprint(repr(a()))"
+        "def outer(x, /, *args, flag=2, **kw):\n    def inner(step=x, *, extra=flag):\n        return x + flag + len(args) + len(kw) + step + extra\n    x += 1\n    return inner\na = outer(10, 1, 2, flag=3, key=1)\nprint(repr((a())))"
       ],
       "stdout": "30\n",
       "stderr": "",
@@ -612,7 +1414,7 @@
       "command": [
         "/tmp/cxxpython-cpython31214-build/python",
         "-c",
-        "def outer(z, a):\n    x = 1\n    y = 2\n    def inner():\n        return z + a + x + y\n    return inner\nprint(repr(outer.__code__.co_cellvars))"
+        "def outer(z, a):\n    x = 1\n    y = 2\n    def inner():\n        return z + a + x + y\n    return inner\nprint(repr((outer.__code__.co_cellvars)))"
       ],
       "stdout": "('z', 'a', 'x', 'y')\n",
       "stderr": "",
@@ -634,7 +1436,7 @@
       "command": [
         "/tmp/cxxpython-cpython31214-build/python",
         "-c",
-        "def outer(z, a):\n    x = 1\n    y = 2\n    def inner():\n        return z + a + x + y\n    return inner\nprint(repr(outer.__code__.co_varnames))"
+        "def outer(z, a):\n    x = 1\n    y = 2\n    def inner():\n        return z + a + x + y\n    return inner\nprint(repr((outer.__code__.co_varnames)))"
       ],
       "stdout": "('z', 'a', 'inner')\n",
       "stderr": "",
@@ -656,7 +1458,7 @@
       "command": [
         "/tmp/cxxpython-cpython31214-build/python",
         "-c",
-        "def outer(z, a):\n    x = 1\n    y = 2\n    def inner():\n        return z + a + x + y\n    return inner\nprint(repr(outer(1, 2).__code__.co_freevars))"
+        "def outer(z, a):\n    x = 1\n    y = 2\n    def inner():\n        return z + a + x + y\n    return inner\nprint(repr((outer(1, 2).__code__.co_freevars)))"
       ],
       "stdout": "('a', 'x', 'y', 'z')\n",
       "stderr": "",
@@ -678,7 +1480,7 @@
       "command": [
         "/tmp/cxxpython-cpython31214-build/python",
         "-c",
-        "def outer():\n    def fact(n):\n        if n <= 1:\n            return 1\n        return n * fact(n - 1)\n    return fact\nprint(repr(outer()(15)))"
+        "def outer():\n    def fact(n):\n        if n <= 1:\n            return 1\n        return n * fact(n - 1)\n    return fact\nprint(repr((outer()(15))))"
       ],
       "stdout": "1307674368000\n",
       "stderr": "",
@@ -700,7 +1502,7 @@
       "command": [
         "/tmp/cxxpython-cpython31214-build/python",
         "-c",
-        "x = 42\ndef outer():\n    x = 1\n    def middle():\n        global x\n        def inner():\n            return x\n        return inner\n    return middle\nprint(repr(outer()()()))"
+        "x = 42\ndef outer():\n    x = 1\n    def middle():\n        global x\n        def inner():\n            return x\n        return inner\n    return middle\nprint(repr((outer()()())))"
       ],
       "stdout": "42\n",
       "stderr": "",
@@ -722,7 +1524,7 @@
       "command": [
         "/tmp/cxxpython-cpython31214-build/python",
         "-c",
-        "def outer(x):\n    def read():\n        return x\n    return read\na = outer(1)\nb = outer(2)\nprint(repr(a is not b and a.__closure__ is not b.__closure__ and a.__code__ is b.__code__))"
+        "def outer(x):\n    def read():\n        return x\n    return read\na = outer(1)\nb = outer(2)\nprint(repr((a is not b and a.__closure__ is not b.__closure__ and a.__code__ is b.__code__)))"
       ],
       "stdout": "True\n",
       "stderr": "",

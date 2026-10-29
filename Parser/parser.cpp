@@ -143,6 +143,8 @@ enum class TokenKind {
     String,
     Left,
     Right,
+    LeftBracket,
+    RightBracket,
     Colon,
     Comma,
     Dot,
@@ -171,6 +173,8 @@ enum class TokenKind {
     Elif,
     Else,
     While,
+    For,
+    In,
     Def,
     Return,
     Pass,
@@ -300,8 +304,8 @@ class Lexer final {
                     {"None", TokenKind::None},
                     {"True", TokenKind::True},
                     {"False", TokenKind::False},
-                    {"for", TokenKind::Unsupported},
-                    {"in", TokenKind::Unsupported},
+                    {"for", TokenKind::For},
+                    {"in", TokenKind::In},
                     {"lambda", TokenKind::Unsupported},
                     {"class", TokenKind::Unsupported},
                     {"try", TokenKind::Unsupported},
@@ -366,6 +370,16 @@ class Lexer final {
                 groups_.pop_back();
                 push(TokenKind::Right, start);
                 break;
+            case '[':
+                groups_.push_back(start);
+                push(TokenKind::LeftBracket, start);
+                break;
+            case ']':
+                if (groups_.empty())
+                    fail({start, index_}, "unmatched ']'");
+                groups_.pop_back();
+                push(TokenKind::RightBracket, start);
+                break;
             case ':':
                 push(TokenKind::Colon, start);
                 break;
@@ -418,8 +432,6 @@ class Lexer final {
             case '>':
                 push(equals() ? TokenKind::Ge : TokenKind::Gt, start);
                 break;
-            case '[':
-            case ']':
             case '{':
             case '}':
             case '@':
@@ -593,7 +605,7 @@ class Parser final {
         Suite result;
         newlines();
         if (mode == InputMode::Eval) {
-            auto value = expression();
+            auto value = expression_list();
             const auto span = value->span;
             result.push_back(statement(ReturnStmt{std::move(value)}, span));
             newlines();
@@ -710,6 +722,22 @@ class Parser final {
     Suite compound()
     {
         Recursion recursion(*this);
+        if (accept(K::For)) {
+            const auto start = tokens_[index_ - 1].span.begin;
+            auto assigned = expression_list();
+            target(*assigned);
+            expect(K::In);
+            auto iterable = expression_list();
+            auto body = suite();
+            Suite alternative;
+            if (accept(K::Else))
+                alternative = suite();
+            Suite result;
+            result.push_back(statement(ForStmt{std::move(assigned), std::move(iterable),
+                                               std::move(body), std::move(alternative)},
+                                       {start, tokens_[index_ - 1].span.end}));
+            return result;
+        }
         if (is(K::If) || is(K::While)) {
             const auto first = take();
             auto test = expression();
@@ -804,8 +832,14 @@ class Parser final {
     }
     void target(const Expr &value)
     {
+        if (const auto *tuple = std::get_if<TupleExpr>(&value.node)) {
+            for (const auto &item : tuple->items)
+                target(*item);
+            return;
+        }
         if (!std::holds_alternative<NameExpr>(value.node) &&
-            !std::holds_alternative<AttributeExpr>(value.node))
+            !std::holds_alternative<AttributeExpr>(value.node) &&
+            !std::holds_alternative<SubscriptExpr>(value.node))
             throw SourceError(source_, value.span, "cannot assign/delete this expression");
     }
     Suite simple_line()
@@ -820,7 +854,7 @@ class Parser final {
                                                                     : ControlStmt::Continue,
                                            token.span));
             } else if (accept(K::Return)) {
-                auto value = line_end() ? ExprPtr{} : expression();
+                auto value = line_end() ? ExprPtr{} : expression_list();
                 result.push_back(
                     statement(ReturnStmt{std::move(value)}, {start, tokens_[index_ - 1].span.end}));
             } else if (is(K::Global) || is(K::Nonlocal)) {
@@ -841,13 +875,13 @@ class Parser final {
                 result.push_back(
                     statement(std::move(deletion), {start, tokens_[index_ - 1].span.end}));
             } else {
-                auto value = expression();
+                auto value = expression_list();
                 if (accept(K::Assign)) {
                     AssignStmt assign;
                     do {
                         target(*value);
                         assign.targets.push_back(std::move(value));
-                        value = expression();
+                        value = expression_list();
                     } while (accept(K::Assign));
                     assign.value = std::move(value);
                     result.push_back(
@@ -855,6 +889,8 @@ class Parser final {
                 } else if (is(K::AddAssign) || is(K::SubAssign) || is(K::MulAssign) ||
                            is(K::FloorAssign) || is(K::ModAssign)) {
                     target(*value);
+                    if (std::holds_alternative<TupleExpr>(value->node))
+                        fail(peek(), "illegal augmented assignment target");
                     const auto kind = take().kind;
                     const auto op = kind == K::AddAssign     ? BinaryOp::Add
                                     : kind == K::SubAssign   ? BinaryOp::Subtract
@@ -877,6 +913,27 @@ class Parser final {
     ExprPtr expression()
     {
         return boolean(false);
+    }
+    ExprPtr expression_list()
+    {
+        auto value = expression();
+        if (!accept(K::Comma))
+            return value;
+        const auto start = value->span.begin;
+        auto end = value->span.end;
+        auto depth = value->depth;
+        TupleExpr tuple;
+        tuple.items.push_back(std::move(value));
+        while (!line_end() && !is(K::Right) && !is(K::RightBracket) && !is(K::Colon) &&
+               !is(K::In) && !is(K::Assign)) {
+            auto item = expression();
+            end = item->span.end;
+            depth = std::max(depth, item->depth);
+            tuple.items.push_back(std::move(item));
+            if (!accept(K::Comma))
+                break;
+        }
+        return node(std::move(tuple), {start, end}, depth + 1);
     }
     ExprPtr boolean(bool conjunction)
     {
@@ -960,8 +1017,15 @@ class Parser final {
                         {token.span.begin, end}, depth);
         }
         auto value = atom();
-        while (is(K::Left) || is(K::Dot)) {
+        while (is(K::Left) || is(K::Dot) || is(K::LeftBracket)) {
             const auto start = value->span.begin;
+            if (accept(K::LeftBracket)) {
+                auto key = expression_list();
+                const auto end = expect(K::RightBracket).span.end;
+                const auto depth = std::max(value->depth, key->depth) + 1;
+                value = node(SubscriptExpr{std::move(value), std::move(key)}, {start, end}, depth);
+                continue;
+            }
             if (accept(K::Dot)) {
                 const auto name = expect(K::Name);
                 const auto depth = value->depth + 1;
@@ -1063,11 +1127,18 @@ class Parser final {
         case K::Left: {
             if (++expression_depth_ > 128)
                 fail(token, "too many nested parentheses");
-            auto value = expression();
+            if (accept(K::Right)) {
+                --expression_depth_;
+                return node(TupleExpr{}, {token.span.begin, tokens_[index_ - 1].span.end});
+            }
+            auto value = expression_list();
             expect(K::Right);
             --expression_depth_;
             return value;
         }
+        case K::LeftBracket:
+            fail(token, "list literals require the remaining mutable-container capability",
+                 SourceErrorKind::Capability);
         default:
             fail(token, "expected an expression");
         }

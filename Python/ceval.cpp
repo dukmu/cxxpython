@@ -368,6 +368,87 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
             case Opcode::Swap:
                 std::swap(data.operands[data.sp - 1], data.operands[data.sp - operand]);
                 break;
+            case Opcode::Copy:
+                data.operands[data.sp] = data.operands[data.sp - operand];
+                ++data.sp;
+                break;
+            case Opcode::GetIter: {
+                RootScope roots(context);
+                get_iter(context, roots.root(data.operands[data.sp - 1]), result);
+                if (raised(result))
+                    activation.raising(result.exception());
+                else
+                    data.operands[data.sp - 1] = result.value();
+                break;
+            }
+            case Opcode::ForIter: {
+                RootScope roots(context);
+                const auto status =
+                    iter_next(context, roots.root(data.operands[data.sp - 1]), result);
+                if (status == NextStatus::Raised)
+                    activation.raising(result.exception());
+                else if (status == NextStatus::Done) {
+                    data.operands[--data.sp] = context.builtin(CoreObject::None);
+                    data.pc = operand;
+                } else
+                    data.operands[data.sp++] = result.value();
+                break;
+            }
+            case Opcode::UnpackSequence: {
+                RootScope roots(context);
+                ReturnSlot iterator(context);
+                get_iter(context, roots.root(data.operands[data.sp - 1]), iterator);
+                if (raised(iterator)) {
+                    activation.raising(iterator.exception());
+                    break;
+                }
+                const auto source = roots.root(iterator.value());
+                std::vector<Value> values;
+                values.reserve(operand);
+                bool failed = false;
+                for (std::size_t i = 0; i < operand; ++i) {
+                    const auto status = iter_next(context, source, result);
+                    if (status != NextStatus::Item) {
+                        if (status == NextStatus::Done)
+                            raise_error(context, CoreObject::ValueErrorType,
+                                        U"not enough values to unpack", result);
+                        activation.raising(result.exception());
+                        failed = true;
+                        break;
+                    }
+                    values.push_back(roots.root(result.value()).get(context));
+                }
+                if (failed)
+                    break;
+                const auto status = iter_next(context, source, result);
+                if (status != NextStatus::Done) {
+                    if (status == NextStatus::Item)
+                        raise_error(context, CoreObject::ValueErrorType,
+                                    U"too many values to unpack", result);
+                    activation.raising(result.exception());
+                    break;
+                }
+                data.operands[--data.sp] = context.builtin(CoreObject::None);
+                for (auto i = values.size(); i-- > 0;)
+                    data.operands[data.sp++] = values[i];
+                break;
+            }
+            case Opcode::StoreItem:
+            case Opcode::DeleteItem: {
+                const auto base = data.sp - (opcode == Opcode::StoreItem ? 3 : 2);
+                RootScope roots(context);
+                const auto owner = roots.root(data.operands[base]),
+                           key = roots.root(data.operands[base + 1]);
+                if (opcode == Opcode::StoreItem)
+                    set_item(context, owner, key, roots.root(data.operands[base + 2]), result);
+                else
+                    del_item(context, owner, key, result);
+                if (raised(result))
+                    activation.raising(result.exception());
+                else
+                    data.trim_stack(context, base);
+                break;
+            }
             case Opcode::BuildTuple:
             case Opcode::BuildNameDict: {
                 const auto count =
@@ -427,6 +508,7 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
             }
             case Opcode::Binary:
             case Opcode::Inplace:
+            case Opcode::LoadItem:
             case Opcode::Compare: {
                 RootScope roots(context);
                 auto left = roots.root(data.operands[data.sp - 2]);
@@ -435,6 +517,8 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                     binary(context, left, right, static_cast<BinaryOp>(operand), result);
                 else if (opcode == Opcode::Inplace)
                     inplace(context, left, right, static_cast<BinaryOp>(operand), result);
+                else if (opcode == Opcode::LoadItem)
+                    get_item(context, left, right, result);
                 else
                     rich_compare(context, left, right, static_cast<CompareOp>(operand), result);
                 if (raised(result)) {

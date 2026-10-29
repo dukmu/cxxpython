@@ -9,6 +9,47 @@ void type_error(Attachment &context, std::u32string message, ReturnSlot &out)
 {
     raise_error(context, CoreObject::TypeErrorType, std::move(message), out);
 }
+void exception_args(Attachment &context, Value value, ReturnSlot &out)
+{
+    context.load(value, context.payload<ExceptionObject>(value).args, out);
+}
+void set_exception_args(Attachment &context, Value self, std::optional<Value> value,
+                        ReturnSlot &out)
+{
+    if (!value) {
+        type_error(context, U"cannot delete exception args", out);
+        return;
+    }
+    RootScope roots(context);
+    const auto owner = roots.root(self), source = roots.root(*value);
+    ReturnSlot iterator(context), item(context), tuple(context);
+    if (context.type_of(source) == context.builtin(CoreObject::TupleType)) {
+        context.store(owner.get(context), context.payload<ExceptionObject>(owner).args,
+                      source.get(context));
+        out.ok(context.builtin(CoreObject::None));
+        return;
+    }
+    get_iter(context, source, iterator);
+    if (iterator.tag() == ResultTag::Raised) {
+        out.raised(iterator.exception());
+        return;
+    }
+    const auto input = roots.root(iterator.value());
+    std::vector<Value> values;
+    for (;;) {
+        const auto status = iter_next(context, input, item);
+        if (status == NextStatus::Done)
+            break;
+        if (status == NextStatus::Raised) {
+            out.raised(item.exception());
+            return;
+        }
+        values.push_back(roots.root(item.value()).get(context));
+    }
+    cxxpython::core::make_tuple(context, values, tuple);
+    context.store(owner.get(context), context.payload<ExceptionObject>(owner).args, tuple.value());
+    out.ok(context.builtin(CoreObject::None));
+}
 bool traceback_or_none(Attachment &context, Value value, ReturnSlot &out)
 {
     if (value == context.builtin(CoreObject::None) ||
@@ -234,6 +275,7 @@ void install_exception_runtime(Attachment &context, std::span<const Handle> core
     };
     field(CoreObject::BaseExceptionType, U"__traceback__", exception_traceback,
           set_exception_traceback);
+    field(CoreObject::BaseExceptionType, U"args", exception_args, set_exception_args);
     field(CoreObject::TracebackType, U"tb_next", traceback_next, set_traceback_next);
     field(CoreObject::TracebackType, U"tb_frame", traceback_frame);
     field(CoreObject::TracebackType, U"tb_lasti", traceback_lasti);

@@ -89,6 +89,39 @@ void object_init(Attachment &context, Handle, std::span<const Value> args, Retur
     }
     out.ok(context.builtin(CoreObject::None));
 }
+void exception_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!is_type(context, args[0]) ||
+        !is_subtype(context, args[0], context.builtin(CoreObject::BaseExceptionType))) {
+        type_error(context, U"BaseException.__new__ requires an exception type", out);
+        return;
+    }
+    RootScope roots(context);
+    context.allocate_instance<ExceptionObject>(roots.root(args[0]), out, args[1]);
+}
+void exception_init(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!is_instance(context, args[0], CoreObject::BaseExceptionType) ||
+        !context.has_layout<ExceptionObject>(args[0])) {
+        type_error(context, U"BaseException.__init__ requires an exception", out);
+        return;
+    }
+    context.store(args[0], context.payload<ExceptionObject>(args[0]).args, args[1]);
+    out.ok(context.builtin(CoreObject::None));
+}
+void stop_init(Attachment &context, Handle fn, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!is_instance(context, args[0], CoreObject::StopIterationType)) {
+        type_error(context, U"StopIteration.__init__ requires StopIteration", out);
+        return;
+    }
+    exception_init(context, fn, args, out);
+    if (raised(out))
+        return;
+    const auto &items = context.payload<TupleObject>(args[1]).items;
+    context.store(args[0], context.instance_slot(args[0], 0),
+                  items.empty() ? context.builtin(CoreObject::None) : items[0]);
+}
 void type_call(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_type(context, args[0])) {
@@ -480,6 +513,13 @@ void install_construction(Attachment &context, std::span<const Handle> core)
     variadic.varkwargs = U"kwargs";
     install(object, U"__new__", variadic, object_new, Binding::Static);
     install(object, U"__init__", variadic, object_init);
+    SignatureLayout exception;
+    exception.parameters = {{U"self", ParameterKind::PositionalOnly}};
+    exception.varargs = U"args";
+    install(at(CoreObject::BaseExceptionType), U"__new__", exception, exception_new,
+            Binding::Static);
+    install(at(CoreObject::BaseExceptionType), U"__init__", exception, exception_init);
+    install(at(CoreObject::StopIterationType), U"__init__", exception, stop_init);
     install(type, U"__call__", variadic, type_call);
     install(type, U"__init__", variadic, type_init);
     SignatureLayout definition;

@@ -78,6 +78,162 @@ TEST_F(CoreSource, LiteralArithmeticBooleanAndComparisonProgramsUseOrdinaryProto
     }
 }
 
+TEST_F(CoreSource, ForLoopsTupleTargetsAndSubscriptsComposeThroughOrdinaryProtocols)
+{
+    const auto globals = dictionary();
+    ReturnSlot out(context);
+    exec("def total(n):\n    value = 0\n    for i in range(n):\n        if i == 2:\n            "
+         "continue\n        value += i\n    else:\n        value += 100\n    return value\n"
+         "def nested():\n    value = 0\n    for a, b in ((1, 2), (3, 4)):\n        for n in "
+         "range(a, b + 1):\n            value += n\n    return value\n"
+         "left, (middle, right) = 1, (2, 3)\n",
+         globals, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    eval("total(5)", out, globals);
+    EXPECT_EQ(result(out), "108");
+    eval("nested()", out, globals);
+    EXPECT_EQ(result(out), "10");
+    eval("left * 100 + middle * 10 + right", out, globals);
+    EXPECT_EQ(result(out), "123");
+    eval("(10, 20, 30)[-1]", out);
+    EXPECT_EQ(result(out), "30");
+    eval("'a\\U0001f600b'[1]", out);
+    EXPECT_EQ(result(out), "'\xf0\x9f\x98\x80'");
+    eval("(1,)[2]", out);
+    raised(out, CoreObject::IndexErrorType);
+    exec("a, b = (1,)", globals, out);
+    raised(out, CoreObject::ValueErrorType);
+    exec("a, b = (1, 2, 3)", globals, out);
+    raised(out, CoreObject::ValueErrorType);
+}
+
+TEST_F(CoreSource, RangeIterationHandlesBigBoundsBreakElseAndIteratorDefaults)
+{
+    const auto globals = dictionary();
+    ReturnSlot out(context);
+    exec("value = 0\nfor i in range(10, 0, -2):\n    if i == 4:\n        break\n    value += "
+         "i\nelse:\n    value = -1\n"
+         "iterator = iter(range(18446744073709551616, 18446744073709551619))\n"
+         "first = next(iterator)\nsecond = next(iterator)\nthird = next(iterator)\nlast = "
+         "next(iterator, None)\n",
+         globals, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    eval("value", out, globals);
+    EXPECT_EQ(result(out), "24");
+    eval("third - first", out, globals);
+    EXPECT_EQ(result(out), "2");
+    eval("last is None", out, globals);
+    EXPECT_EQ(result(out), "True");
+    eval("iter(iterator) is iterator", out, globals);
+    EXPECT_EQ(result(out), "True");
+    eval("range(10)[-2]", out);
+    EXPECT_EQ(result(out), "8");
+    eval("range(0, 18446744073709551616, 2)[3]", out);
+    EXPECT_EQ(result(out), "6");
+    eval("range(0, 3, 0)", out);
+    raised(out, CoreObject::ValueErrorType);
+    eval("len(range(18446744073709551616))", out);
+    raised(out, CoreObject::OverflowErrorType);
+    eval("not range(0)", out);
+    EXPECT_EQ(result(out), "True");
+    eval("range(0, 3, 2) == range(0, 4, 2)", out);
+    EXPECT_EQ(result(out), "True");
+    eval("hash(range(0, 3, 2)) == hash(range(0, 4, 2))", out);
+    EXPECT_EQ(result(out), "True");
+}
+
+TEST_F(CoreSource, ItemMutationAndUserIterationUseOneEvaluatedReceiverAndNormalPythonCalls)
+{
+    const auto globals = dictionary();
+    ReturnSlot out(context);
+    exec("calls = 0\nstored = 10\n"
+         "def owner():\n    global calls\n    calls = calls * 10 + 1\n    return instance\n"
+         "def key():\n    global calls\n    calls = calls * 10 + 3\n    return 0\n"
+         "def rhs():\n    global calls\n    calls = calls * 10 + 4\n    return 5\n"
+         "def get(self, key):\n    global calls\n    calls = calls * 10 + 2\n    return stored\n"
+         "def set(self, key, value):\n    global calls, stored\n    calls = calls * 10 + 5\n    "
+         "stored = value\n"
+         "def erase(self, key):\n    global calls\n    calls = calls * 10 + 6\n"
+         "def iterator(self):\n    return self\n"
+         "def step(self):\n    return next(self.cursor)\n",
+         globals, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    TypeSpec spec{U"Indexed"};
+    spec.slots = std::vector<std::u32string>{U"cursor"};
+    create_type(context, spec, out);
+    const auto type = roots.root(out.value());
+    context.allocate_instance<InstanceObject>(type, out);
+    const auto instance = roots.root(out.value());
+    make_str(context, U"instance", out);
+    detail::name_store(context, globals.get(context), out.value(), instance.get(context));
+    for (auto [name, function] : {std::pair{U"__getitem__", U"get"},
+                                  {U"__setitem__", U"set"},
+                                  {U"__delitem__", U"erase"},
+                                  {U"__iter__", U"iterator"},
+                                  {U"__next__", U"step"}}) {
+        const auto target =
+            roots.root(*detail::name_lookup(context, globals.get(context), function));
+        make_str(context, name, out);
+        set_attribute(context, type, roots.root(out.value()), target, out);
+        ASSERT_EQ(out.tag(), ResultTag::Ok);
+    }
+    exec("owner()[key()] += rhs()", globals, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    eval("calls", out, globals);
+    EXPECT_EQ(result(out), "13245");
+    eval("stored", out, globals);
+    EXPECT_EQ(result(out), "15");
+    exec("calls = 0\nowner()[key()] = rhs()", globals, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    eval("calls", out, globals);
+    EXPECT_EQ(result(out), "4135");
+    exec("calls = 0\ndel owner()[key()]", globals, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    eval("calls", out, globals);
+    EXPECT_EQ(result(out), "136");
+    exec("instance.cursor = iter(range(3))\nvalue = 0\nfor item in instance:\n    value += item\n",
+         globals, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    eval("value", out, globals);
+    EXPECT_EQ(result(out), "3");
+    exec("(1, 2)[0] = 5", globals, out);
+    raised(out, CoreObject::TypeErrorType);
+}
+
+TEST_F(CoreSource, ExceptionConstructionAndStopIterationValueUseIndependentManagedFields)
+{
+    const auto globals = dictionary();
+    ReturnSlot out(context);
+    exec("error = StopIteration(73)\nargs = (1, 2)\nerror.args = args\n", globals, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    eval("error.args is args", out, globals);
+    EXPECT_EQ(result(out), "True");
+    eval("error.value", out, globals);
+    EXPECT_EQ(result(out), "73");
+    exec("error.value = 'changed'", globals, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    eval("error.value", out, globals);
+    EXPECT_EQ(result(out), "'changed'");
+    exec("BaseException.__init__(error, 5)", globals, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    eval("error.value", out, globals);
+    EXPECT_EQ(result(out), "'changed'");
+    exec("error.__init__(9)\nerror.args = range(3)", globals, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    eval("error.value", out, globals);
+    EXPECT_EQ(result(out), "9");
+    eval("error.args", out, globals);
+    EXPECT_EQ(result(out), "(0, 1, 2)");
+    exec("del error.value", globals, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    eval("error.value is None", out, globals);
+    EXPECT_EQ(result(out), "True");
+    eval("ValueError(1, 'message').args", out);
+    EXPECT_EQ(result(out), "(1, 'message')");
+    eval("StopIteration.__new__(StopIteration, 1).value", out);
+    EXPECT_EQ(result(out), "None");
+}
+
 TEST_F(CoreSource, FunctionsLoopsDefaultsKeywordsAndRuntimeCodeIdentityCompose)
 {
     auto globals = dictionary();
@@ -370,8 +526,7 @@ TEST(SourceDiagnostics, InvalidProgramsDoNotSilentlyCompileThroughAnotherLanguag
         SCOPED_TRACE(source);
         EXPECT_THROW(SourceUnit{SourceBuffer(source)}, SourceError);
     }
-    for (auto source :
-         {"import x", "class X: pass", "for x in y: pass", "f'{x}'", "x = 1.5", "x = [1]"}) {
+    for (auto source : {"import x", "class X: pass", "f'{x}'", "x = 1.5", "x = [1]"}) {
         SCOPED_TRACE(source);
         try {
             SourceUnit unit{SourceBuffer(source)};
@@ -482,16 +637,19 @@ TEST(SourceParallel, ImmutableNativeGraphsFreezeConcurrentlyWithoutSharedPythonS
 
 TEST(SourceParallel, OneFrozenSourceAndFunctionRunInOneSharedInterpreter)
 {
-    for (bool closure : {false, true}) {
+    for (unsigned variant : {0U, 1U, 2U}) {
+        const bool closure = variant == 1;
         SCOPED_TRACE(closure ? "shared closure" : "plain function");
-        const SourceUnit unit(
-            SourceBuffer(closure ? "def outer(step):\n    shared = 0\n    def total(n):\n        "
-                                   "nonlocal shared\n        result = 0\n"
-                                   "        while n:\n            shared = n\n            result "
-                                   "+= n * step\n            n -= 1\n"
-                                   "        return result\n    return total\ntotal = outer(1)\n"
-                                 : "def total(n):\n    result = 0\n    while n:\n        result += "
-                                   "n\n        n -= 1\n    return result\n"));
+        const SourceUnit unit(SourceBuffer(
+            variant == 2 ? "def total(n):\n    result = 0\n    for item in range(n, 0, -1):\n      "
+                           "  result += item\n    return result\n"
+            : closure    ? "def outer(step):\n    shared = 0\n    def total(n):\n        "
+                           "nonlocal shared\n        result = 0\n"
+                           "        while n:\n            shared = n\n            result "
+                           "+= n * step\n            n -= 1\n"
+                           "        return result\n    return total\ntotal = outer(1)\n"
+                         : "def total(n):\n    result = 0\n    while n:\n        result += "
+                           "n\n        n -= 1\n    return result\n"));
         Interpreter interpreter;
         Attachment source(interpreter);
         source.bootstrap_core();

@@ -53,6 +53,13 @@ constexpr std::array definitions{
     OpcodeDefinition{"STORE_DEREF", 1, 1, 0, OperandDomain::Cell, FlowKind::Next, false, false},
     OpcodeDefinition{"DELETE_DEREF", 0, 0, 0, OperandDomain::Cell, FlowKind::Next, true, true},
     OpcodeDefinition{"LOAD_CLOSURE", 0, 0, 1, OperandDomain::Cell, FlowKind::Next, false, false},
+    OpcodeDefinition{"GET_ITER", 1, 1, 1, OperandDomain::None, FlowKind::Next, true, true},
+    OpcodeDefinition{"FOR_ITER", 1, 0, 1, OperandDomain::Target, FlowKind::IterBranch, true, true},
+    OpcodeDefinition{"LOAD_ITEM", 2, 2, 1, OperandDomain::None, FlowKind::Next, true, true},
+    OpcodeDefinition{"STORE_ITEM", 3, 3, 0, OperandDomain::None, FlowKind::Next, true, true},
+    OpcodeDefinition{"DELETE_ITEM", 2, 2, 0, OperandDomain::None, FlowKind::Next, true, true},
+    OpcodeDefinition{"COPY", 0, 0, 1, OperandDomain::StackDepth, FlowKind::Next, false, false},
+    OpcodeDefinition{"UNPACK_SEQUENCE", 1, 1, 0, OperandDomain::Count, FlowKind::Next, true, true},
 };
 static_assert(definitions.size() == static_cast<std::size_t>(Opcode::Count));
 [[noreturn]] void invalid(CodeErrorKind kind, const char *message,
@@ -169,7 +176,7 @@ std::size_t verify(const CodeSpec &spec, std::span<const Instruction> instructio
                 invalid(CodeErrorKind::Operand, "invalid unary operator", pc);
             break;
         case OperandDomain::StackDepth:
-            if (operand < 2)
+            if (operand < (opcode == Opcode::Copy ? 1U : 2U))
                 invalid(CodeErrorKind::Operand, "swap depth must be at least two", pc);
             break;
         case OperandDomain::Count:
@@ -327,7 +334,16 @@ std::size_t verify(const CodeSpec &spec, std::span<const Instruction> instructio
             route({ReasonKind::Return}, scopes[pc], after);
         if (definition.flow == FlowKind::Jump || definition.flow == FlowKind::Branch)
             join(instruction.operand, after, scopes[pc]);
-        if (definition.flow == FlowKind::Next || definition.flow == FlowKind::Branch) {
+        if (definition.flow == FlowKind::IterBranch) {
+            const auto taken = instruction_effect(instruction, calls, true);
+            const auto target_height = height - taken.pops + taken.pushes;
+            if (scopes[pc] && target_height < stack_base(scopes[pc]->region))
+                invalid(CodeErrorKind::StackBase, "iterator exit consumes a protected stack prefix",
+                        pc);
+            join(instruction.operand, target_height, scopes[pc]);
+        }
+        if (definition.flow == FlowKind::Next || definition.flow == FlowKind::Branch ||
+            definition.flow == FlowKind::IterBranch) {
             auto scope =
                 instruction.opcode == Opcode::EnterRegion || instruction.opcode == Opcode::EnterWith
                     ? std::optional<RegionToken>{{instruction.operand, RegionPhase::Protected}}
@@ -364,9 +380,14 @@ const OpcodeDefinition &opcode_definition(Opcode opcode)
 {
     return definitions.at(static_cast<std::size_t>(opcode));
 }
-StackEffect instruction_effect(Instruction instruction, std::span<const CallLayout> calls)
+StackEffect instruction_effect(Instruction instruction, std::span<const CallLayout> calls,
+                               bool jump_taken)
 {
     const auto &definition = opcode_definition(instruction.opcode);
+    if (instruction.opcode == Opcode::ForIter && jump_taken)
+        return {1, 1, 0};
+    if (instruction.opcode == Opcode::UnpackSequence)
+        return {1, 1, instruction.operand};
     if (definition.operand == OperandDomain::CallSite && instruction.operand >= calls.size())
         invalid(CodeErrorKind::CallBounds, "call-site index out of bounds");
     const auto arguments = definition.operand == OperandDomain::CallSite
@@ -471,7 +492,7 @@ void CodeBuilder::jump(Opcode opcode, Label target, SourcePosition source)
 {
     if (target.owner != this || target.index >= labels_.size())
         invalid(CodeErrorKind::ForeignLabel, "label belongs to a different builder");
-    if (opcode != Opcode::Jump && opcode != Opcode::JumpIfFalse)
+    if (opcode != Opcode::Jump && opcode != Opcode::JumpIfFalse && opcode != Opcode::ForIter)
         invalid(CodeErrorKind::Operand, "not a branch opcode");
     fixups_.push_back({instructions_.size(), target});
     try {

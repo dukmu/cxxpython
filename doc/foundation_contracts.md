@@ -19,11 +19,16 @@ M7-M9/N6 are not complete. No CPython ABI, .pyc or extension ABI is promised.
 
 The accepted source subset includes arbitrary integer/string literals,
 implemented unary/arithmetic/boolean/comparison protocols, name/attribute
-operations, if/while control flow, calls, function definitions/defaults/variadic
-binding, globals/nonlocal, closures and docstrings. Iteration/containers, class
-and exception source lowering, imports, suspension, f-strings, full Unicode
-source handling and the remaining Python 3.12 matrix are unfinished. Existing
-native VM/type/cleanup interfaces do not imply source or library support.
+operations, if/while/for control flow, calls, function definitions/defaults/variadic
+binding, globals/nonlocal, closures, docstrings, tuple expressions, recursive
+non-starred unpacking and integer/protocol subscripts. Experimental range,
+tuple/string iteration, iter(obj), next(it[, default]) and exception construction
+use ordinary object protocols. Mutable containers, slices, full iteration APIs,
+class and exception source lowering, imports, suspension, f-strings, float/power
+protocols, full Unicode source handling and the remaining Python 3.12 matrix are
+unfinished. These are remaining delivery requirements, not a reduction of the
+basic-language objective. Existing native VM/type/cleanup interfaces do not imply
+source or library support.
 
 ## Identity And Lifetime
 
@@ -114,6 +119,42 @@ actual managed metadata; runtime closure creation reuses the scope's Code.
 Several threads may call the same Function/Code/closure. Individual shared Cell
 edges are synchronized; compound nonlocal += is not implicitly atomic.
 
+## Iteration And Items
+
+get_iter resolves __iter__ on the type and checks the result's __next__ slot.
+iter_next distinguishes Item, Done and Raised; Done retains the original
+StopIteration (including subclasses) in the caller's exception slot. Other
+exceptions are not exhaustion. None is a valid yielded/default value, not a
+termination sentinel. The __getitem__-only sequence fallback and two-argument
+iter(callable, sentinel) remain unimplemented.
+
+Range stores immutable normalized start/stop/step and arbitrary-integer length.
+It rejects zero step, reports len overflow separately, indexes without narrowing
+big integers and compares/hashes sequence content. A range iterator atomically
+claims its rooted current value only after preparing the successor. Tuple and
+Unicode string iterators share an atomic owner/index layout and claim an index
+only after preparing its result. Concurrent next calls return each item once;
+no interpreter lock or Python callback is held in the claim. Exhaustion is sticky.
+Allocating a result/successor unsuccessfully does not consume the current item.
+Integer indexing follows __index__; negative indices are normalized, and invalid
+indices raise IndexError. Range slicing, reverse/membership helpers and the full
+container method matrices remain gates.
+
+FOR_ITER has distinct taken/fallthrough stack effects, both checked by the Code
+verifier. Loop exhaustion removes the iterator before else; break removes it
+without executing else; continue preserves it. UNPACK_SEQUENCE collects and roots
+the required values, probes for surplus and only then exposes target stores.
+Subscript augmented assignment evaluates owner/key once, using the same typed
+getitem/setitem dispatch as the public runtime API. List/dict syntax and starred
+targets are not approximated by tuple behavior.
+
+BaseException construction uses the native exception layout and a managed args
+tuple; args replacement consumes an iterable before atomically publishing its
+tuple. StopIteration.value is an independent traced atomic tail field: assigning
+args or calling BaseException.__init__ does not overwrite it, while calling
+StopIteration.__init__ resets it. This is not a claim of complete exception
+subtype-specific constructors or source try/raise support.
+
 ## Frontend And Measurement
 
 SourceUnit owns immutable native Source/ScopeInfo/CFG, contains no hidden Python
@@ -126,6 +167,7 @@ dictionaries; arbitrary namespace mappings and Python compile/exec/eval are abse
 Native contracts live in Tests/cpp; actual executable differential drivers live
 in Lib/test and use fixed CPython 3.12.14 when configured. Benchmark source kernels
 are captured verbatim for the paired reference; raw runs retain version/build/hash
-provenance and generate tables. Same-Function source and closure CPU parallelism
-is demonstrated, but absolute single-thread CPython parity remains a failed gate.
+provenance and generate tables. Same-Function source, closure and for-loop probes
+exercise CPU parallelism, but absolute single-thread CPython parity remains a
+failed gate.
 Do not replace that requirement with multicore scaling or a native-only probe.

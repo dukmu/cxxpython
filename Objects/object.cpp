@@ -365,6 +365,8 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
         spec.module = U"builtins";
         if (id == CoreObject::FunctionType)
             spec.slots = std::vector<std::u32string>{U"__dict__"};
+        if (id == CoreObject::StopIterationType)
+            spec.slots = std::vector<std::u32string>{U"value"};
         create_native_type(context, NativeTypeSpec{spec, layout},
                            *outputs[static_cast<std::size_t>(id)]);
         core.push_back(roots.root(outputs[static_cast<std::size_t>(id)]->result().value()));
@@ -399,6 +401,12 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
            LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::ArithmeticErrorType));
     define(CoreObject::OverflowErrorType, "OverflowError", LayoutDescriptor::of<ExceptionObject>(),
            at(CoreObject::ArithmeticErrorType));
+    define(CoreObject::LookupErrorType, "LookupError", LayoutDescriptor::of<ExceptionObject>(),
+           at(CoreObject::ExceptionType));
+    define(CoreObject::IndexErrorType, "IndexError", LayoutDescriptor::of<ExceptionObject>(),
+           at(CoreObject::LookupErrorType));
+    define(CoreObject::StopIterationType, "StopIteration", LayoutDescriptor::of<ExceptionObject>(),
+           at(CoreObject::ExceptionType));
     define(CoreObject::NameErrorType, "NameError", LayoutDescriptor::of<ExceptionObject>(),
            at(CoreObject::ExceptionType));
     define(CoreObject::UnboundLocalErrorType, "UnboundLocalError",
@@ -422,6 +430,13 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     define(CoreObject::FunctionType, "function", execution_layout(CoreObject::FunctionType));
     define(CoreObject::FrameType, "frame", execution_layout(CoreObject::FrameType));
     define(CoreObject::TracebackType, "traceback", execution_layout(CoreObject::TracebackType));
+    define(CoreObject::RangeType, "range", LayoutDescriptor::of<RangeObject>());
+    define(CoreObject::RangeIteratorType, "range_iterator",
+           LayoutDescriptor::of<RangeIteratorObject>());
+    define(CoreObject::TupleIteratorType, "tuple_iterator",
+           LayoutDescriptor::of<SequenceIteratorObject>());
+    define(CoreObject::StrIteratorType, "str_iterator",
+           LayoutDescriptor::of<SequenceIteratorObject>());
     context.payload<TypeObject>(at(CoreObject::TupleType)).allow_slots = false;
     context.payload<TypeObject>(at(CoreObject::IntType)).allow_slots = false;
     for (auto type : core) {
@@ -488,18 +503,22 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     install_value_protocols(context, core);
     install_execution(context, core);
     install_exception_runtime(context, core);
+    install_ranges(context, core);
+    install_iteration(context, core);
     for (std::size_t i = 0; i < static_cast<std::size_t>(CoreObject::None); ++i) {
         context.payload<TypeObject>(core[i]).immutable = true;
         context.payload<TypeObject>(core[i]).state = TypeState::Ready;
     }
     for (auto type : {context.object_type(), context.type_type()})
         context.payload<TypeObject>(type).state = TypeState::Ready;
-    for (auto id : {CoreObject::NoneType, CoreObject::BoolType, CoreObject::NotImplementedType,
-                    CoreObject::NativeFunctionType, CoreObject::MethodDescriptorType,
-                    CoreObject::BoundMethodType, CoreObject::GetSetDescriptorType,
-                    CoreObject::MappingProxyType, CoreObject::MemberDescriptorType,
-                    CoreObject::CellType, CoreObject::CodeType, CoreObject::FunctionType,
-                    CoreObject::FrameType, CoreObject::TracebackType})
+    for (auto id :
+         {CoreObject::NoneType, CoreObject::BoolType, CoreObject::NotImplementedType,
+          CoreObject::NativeFunctionType, CoreObject::MethodDescriptorType,
+          CoreObject::BoundMethodType, CoreObject::GetSetDescriptorType,
+          CoreObject::MappingProxyType, CoreObject::MemberDescriptorType, CoreObject::CellType,
+          CoreObject::CodeType, CoreObject::FunctionType, CoreObject::FrameType,
+          CoreObject::TracebackType, CoreObject::RangeType, CoreObject::RangeIteratorType,
+          CoreObject::TupleIteratorType, CoreObject::StrIteratorType})
         context.payload<TypeObject>(at(id)).subclassable = false;
 
     auto &builtins = *outputs[static_cast<std::size_t>(CoreObject::Builtins)];
@@ -523,6 +542,10 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                     CoreObject::ArithmeticErrorType,
                     CoreObject::ZeroDivisionErrorType,
                     CoreObject::OverflowErrorType,
+                    CoreObject::LookupErrorType,
+                    CoreObject::IndexErrorType,
+                    CoreObject::StopIterationType,
+                    CoreObject::RangeType,
                     CoreObject::NameErrorType,
                     CoreObject::UnboundLocalErrorType,
                     CoreObject::StaticMethodType,
@@ -550,6 +573,7 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     operation("len", U"len", builtin_protocol<Protocol::Len>);
     operation("repr", U"repr", builtin_protocol<Protocol::Repr>);
     operation("hash", U"hash", builtin_protocol<Protocol::Hash>);
+    install_iterator_builtins(context, core, mapping);
 }
 } // namespace detail
 } // namespace cxxpython::core
