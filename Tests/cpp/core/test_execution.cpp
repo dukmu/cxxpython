@@ -198,7 +198,7 @@ namespace
         call(context, function(program), {args, {}}, out); ASSERT_EQ(out.result().tag(), ResultTag::Ok);
         auto frame = roots.root(*context.payload<CellObject>(observed).contents); auto &data = context.payload<FrameObject>(frame);
         EXPECT_EQ(data.state, FrameState::Completed); EXPECT_EQ(data.sp, 0U); EXPECT_EQ(data.locals[0], self.get(context));
-        for (const auto &value : data.operands) EXPECT_FALSE(value);
+        for (auto value : data.operands) EXPECT_EQ(value, context.builtin(CoreObject::None));
         get_attribute(context, frame, text(U"f_code"), out); EXPECT_EQ(out.result().value(), program.get(context));
         EXPECT_FALSE(context.current_frame());
     }

@@ -1,4 +1,10 @@
-series,function_iterations,verified_function_ns,verified_instructions,max_stack,frame_prefix_bytes,execution_live_set_check
-m4_returning_final,10000,24558445,4,2,128,ok
-m4_returning_final,10000,24957825,4,2,128,ok
-m4_returning_final,10000,24994034,4,2,128,ok
+series,function_iterations,verified_function_ns,verified_instructions,max_stack,frame_prefix_bytes,execution_live_set_check,scheduled_callee_instructions
+m4_returning_final,10000,24558445,4,2,128,ok,0
+m4_returning_final,10000,24957825,4,2,128,ok,0
+m4_returning_final,10000,24994034,4,2,128,ok,0
+m4_call_direct,10000,25419998,4,2,144,ok,0
+m4_call_direct,10000,23887548,4,2,144,ok,0
+m4_call_direct,10000,29065940,4,2,144,ok,0
+m4_call_scheduled,10000,40093338,5,3,144,ok,4
+m4_call_scheduled,10000,36833261,5,3,144,ok,4
+m4_call_scheduled,10000,37461133,5,3,144,ok,4

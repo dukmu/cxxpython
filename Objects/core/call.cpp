@@ -7,11 +7,18 @@ namespace cxxpython::core
 {
     namespace
     {
-        void invoke(Attachment &, Handle, CallArgsView, std::optional<Value>, ReturnSlot &);
+        struct CallPreparation
+        {
+            RootScope &roots;
+            std::optional<detail::PreparedPythonCall> target;
+        };
+        void invoke(Attachment &, Handle, CallArgsView, std::optional<Value>, ReturnSlot &, CallPreparation * = nullptr);
+        void invoke_special_impl(Attachment &, Handle, Handle, CallArgsView, ReturnSlot &, CallPreparation * = nullptr);
         void bind_native_callable(Attachment &, Value, std::optional<Value>, ReturnSlot &);
         using detail::type_attribute;
         using detail::bind_descriptor;
         using detail::special;
+        using detail::validate_return;
         void type_error(Attachment &context, std::u32string message, ReturnSlot &out)
         { raise_error(context, CoreObject::TypeErrorType, std::move(message), out); }
         bool raised(ReturnSlot &out) { return out.result().tag() == ResultTag::Raised; }
@@ -53,23 +60,7 @@ namespace cxxpython::core
             invoke_special(context, self, target, args, out);
         }
         void invoke_special(Attachment &context, Handle self, Handle target, CallArgsView args, ReturnSlot &out)
-        {
-            auto receiver = self.get(context);
-            auto descriptor = target.get(context);
-            // Exact immutable native-function types obey normal function binding;
-            // arbitrary user descriptors still take the generic binding path.
-            if (context.type_of(descriptor) == context.builtin(CoreObject::NativeFunctionType) ||
-                context.type_of(descriptor) == context.builtin(CoreObject::FunctionType))
-                invoke(context, target, args, receiver, out);
-            else
-            {
-                ReturnSlot bound(context);
-                bind_descriptor(context, descriptor, receiver, context.type_of(receiver), bound);
-                if (raised(bound)) { out.raised(bound.result().exception()); return; }
-                RootScope roots(context);
-                invoke(context, roots.root(bound.result().value()), args, {}, out);
-            }
-        }
+        { invoke_special_impl(context, self, target, args, out); }
         void bind_descriptor(Attachment &context, Value descriptor, std::optional<Value> receiver,
                              Value owner, ReturnSlot &out)
         {
@@ -162,8 +153,23 @@ namespace cxxpython::core
             if (signature.varkwargs) bound.push_back(roots.root(extra_keywords.result().value()).get(context));
             return true;
         }
+        std::optional<PreparedPythonCall> prepare_call(Attachment &context, Handle callable, CallArgsView args,
+                                                      RootScope &roots, ReturnSlot &out)
+        {
+            out.check_caller(context);
+            try
+            {
+                auto target = roots.root(callable.get(context));
+                for (auto value : args.positional) roots.root(value);
+                for (const auto &keyword : args.keywords) { roots.root(keyword.name); roots.root(keyword.value); }
+                CallPreparation preparation{roots, {}};
+                invoke(context, target, args, {}, out, &preparation);
+                return std::move(preparation.target);
+            }
+            catch (const std::bad_alloc &) { out.raised(context.builtin(CoreObject::MemoryError)); return {}; }
+        }
     }
-    namespace
+    namespace detail
     {
         void validate_return(Attachment &context, ReturnSlot &out)
         {
@@ -183,6 +189,9 @@ namespace cxxpython::core
                 }
             }
         }
+    }
+    namespace
+    {
         void invoke_native(Attachment &context, Handle function, CallArgsView args,
                            std::optional<Value> receiver, ReturnSlot &out)
         {
@@ -196,11 +205,28 @@ namespace cxxpython::core
         {
             Attachment &context;
             bool entered;
-            explicit CallDepth(Attachment &c) : context(c), entered(c.enter_call()) {}
-            ~CallDepth() { if (entered) context.leave_call(); }
+            explicit CallDepth(Attachment &c) : context(c), entered(c.enter_call())
+            {
+                if (entered && !context.enter_native_call()) { context.leave_call(); entered = false; }
+            }
+            ~CallDepth() { if (entered) { context.leave_native_call(); context.leave_call(); } }
         };
+        void invoke_special_impl(Attachment &context, Handle self, Handle target, CallArgsView args,
+                                  ReturnSlot &out, CallPreparation *preparation)
+        {
+            const auto receiver = self.get(context); const auto descriptor = target.get(context);
+            const auto type = context.type_of(descriptor);
+            if (type == context.builtin(CoreObject::NativeFunctionType) || type == context.builtin(CoreObject::FunctionType))
+                invoke(context, target, args, receiver, out, preparation);
+            else
+            {
+                ReturnSlot bound(context); bind_descriptor(context, descriptor, receiver, context.type_of(receiver), bound);
+                if (raised(bound)) { out.raised(bound.result().exception()); return; }
+                RootScope roots(context); invoke(context, roots.root(bound.result().value()), args, {}, out, preparation);
+            }
+        }
         void invoke(Attachment &context, Handle target, CallArgsView args,
-                     std::optional<Value> receiver, ReturnSlot &out)
+                     std::optional<Value> receiver, ReturnSlot &out, CallPreparation *preparation)
         {
             out.reset(context);
             CallDepth depth(context);
@@ -210,19 +236,31 @@ namespace cxxpython::core
             if (context.type_of(callable) == context.builtin(CoreObject::NativeFunctionType))
             { invoke_native(context, target, args, receiver, out); return; }
             if (context.type_of(callable) == context.builtin(CoreObject::FunctionType))
-            { context.call_executor()(context, target, args, receiver, out); validate_return(context, out); return; }
+            {
+                if (preparation)
+                {
+                    auto &roots = preparation->roots;
+                    detail::PreparedPythonCall prepared{roots.root(callable), {},
+                        {args.positional.begin(), args.positional.end()}, {args.keywords.begin(), args.keywords.end()}};
+                    if (receiver) prepared.receiver = roots.root(*receiver);
+                    for (auto value : prepared.positional) roots.root(value);
+                    for (const auto &keyword : prepared.keywords) { roots.root(keyword.name); roots.root(keyword.value); }
+                    preparation->target = std::move(prepared); return;
+                }
+                context.call_executor()(context, target, args, receiver, out); validate_return(context, out); return;
+            }
             RootScope roots(context);
             if (receiver && context.type_of(callable) != context.builtin(CoreObject::MethodDescriptorType))
             {
                 std::vector<Value> prefixed{*receiver};
                 prefixed.insert(prefixed.end(), args.positional.begin(), args.positional.end());
-                invoke(context, target, {prefixed, args.keywords}, {}, out);
+                invoke(context, target, {prefixed, args.keywords}, {}, out, preparation);
                 return;
             }
             if (context.type_of(callable) == context.builtin(CoreObject::BoundMethodType))
             {
                 auto &method = context.payload<BoundMethodObject>(callable);
-                invoke(context, roots.root(method.function), args, method.self, out);
+                invoke(context, roots.root(method.function), args, method.self, out, preparation);
                 return;
             }
             if (context.type_of(callable) == context.builtin(CoreObject::MethodDescriptorType))
@@ -231,12 +269,13 @@ namespace cxxpython::core
                 auto self = receiver ? receiver : (args.positional.empty() ? std::optional<Value>{} : args.positional[0]);
                 if (!self || !is_subtype(context, context.type_of(*self), descriptor.owner))
                 { type_error(context, U"descriptor requires a compatible receiver", out); return; }
-                invoke(context, roots.root(descriptor.function), args, receiver, out);
+                invoke(context, roots.root(descriptor.function), args, receiver, out, preparation);
                 return;
             }
-            if (!type_attribute(context, context.type_of(callable), U"__call__"))
+            auto attribute = type_attribute(context, context.type_of(callable), U"__call__");
+            if (!attribute)
             { type_error(context, U"object is not callable", out); return; }
-            special(context, callable, U"__call__", args, out);
+            invoke_special_impl(context, target, roots.root(*attribute), args, out, preparation);
         }
 
         bool data_descriptor(Attachment &context, Value attribute)

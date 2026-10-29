@@ -165,6 +165,7 @@ namespace cxxpython::core
         std::size_t minimum_gc_budget = 64 * 1024;
         bool collect_every_allocation = false;
         std::size_t max_call_depth = 128;
+        std::size_t max_native_depth = 128;
     };
 
     struct HeapStats
@@ -319,6 +320,8 @@ namespace cxxpython::core
         void invalidate_types();
         bool enter_call();
         void leave_call() noexcept;
+        bool enter_native_call();
+        void leave_native_call() noexcept;
         CallExecutor call_executor() const;
         std::optional<Value> current_frame() const;
         std::uint64_t keyed_hash(std::span<const std::byte> data) const;
@@ -383,6 +386,7 @@ namespace cxxpython::core
         std::unique_lock<std::mutex> permission_;
         std::size_t owned_roots_ = 0;
         std::size_t call_depth_ = 0;
+        std::size_t native_depth_ = 0;
         std::vector<Value> repr_stack_;
         std::optional<Value> current_frame_;
     };

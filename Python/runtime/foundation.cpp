@@ -562,6 +562,13 @@ namespace cxxpython::core
         return true;
     }
     void Attachment::leave_call() noexcept { assert(call_depth_ != 0); --call_depth_; }
+    bool Attachment::enter_native_call()
+    {
+        require_attached();
+        if (native_depth_ >= state_->config.max_native_depth) return false;
+        ++native_depth_; return true;
+    }
+    void Attachment::leave_native_call() noexcept { assert(native_depth_ != 0); --native_depth_; }
 
     void Attachment::bootstrap_core()
     {

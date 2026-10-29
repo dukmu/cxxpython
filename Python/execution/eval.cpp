@@ -14,7 +14,59 @@ namespace cxxpython::core
     {
         tracer.visit(function); tracer.visit(code); if (back) tracer.visit(*back);
         for (const auto &value : locals) if (value) tracer.visit(*value);
-        for (const auto &value : operands) if (value) tracer.visit(*value);
+        for (std::size_t i = 0; i < sp; ++i) tracer.visit(operands[i]);
+    }
+    namespace detail
+    {
+        class FrameActivation final
+        {
+        public:
+            FrameActivation(Attachment &context, ReturnSlot &active)
+                : context_(context), active_(active), root_(active.result().value()), previous_(context.current_frame_)
+            {
+                auto &data = context.payload<FrameObject>(root_);
+                data.back = previous_; data.state = FrameState::Running; context.current_frame_ = root_;
+            }
+            ~FrameActivation()
+            {
+                while (current() != root_)
+                {
+                    auto &data = context_.payload<FrameObject>(current()); const auto parent = *data.back;
+                    complete(data); active_.ok(parent); --depth_; context_.leave_call();
+                }
+                complete(context_.payload<FrameObject>(root_)); context_.current_frame_ = previous_;
+            }
+            Value current() const { return active_.result().value(); }
+            bool descend(Handle frame)
+            {
+                if (!context_.enter_call()) return false;
+                auto &child = context_.payload<FrameObject>(frame);
+                child.back = current(); child.state = FrameState::Running;
+                active_.ok(frame.get(context_)); context_.current_frame_ = current(); ++depth_; return true;
+            }
+            bool returned(Value value, ReturnSlot &out)
+            {
+                if (current() == root_) { out.ok(value); return true; }
+                auto &child = context_.payload<FrameObject>(current()); const auto parent_value = *child.back;
+                auto &parent = context_.payload<FrameObject>(parent_value); const auto base = *parent.pending_call;
+                // Publish into the parent's traced stack before dropping the child root.
+                parent.operands[base] = value;
+                for (std::size_t i = base + 1; i < parent.sp; ++i) parent.operands[i] = context_.builtin(CoreObject::None);
+                parent.sp = base + 1; parent.pending_call.reset(); complete(child);
+                active_.ok(parent_value); context_.current_frame_ = parent_value; --depth_; context_.leave_call(); return false;
+            }
+        private:
+            void complete(FrameObject &frame) noexcept
+            {
+                for (std::size_t i = 0; i < frame.sp; ++i) frame.operands[i] = context_.builtin(CoreObject::None);
+                frame.sp = 0; frame.pending_call.reset(); frame.state = FrameState::Completed;
+            }
+            Attachment &context_;
+            ReturnSlot &active_;
+            Value root_;
+            std::optional<Value> previous_;
+            std::size_t depth_ = 0;
+        };
     }
     namespace
     {
@@ -28,14 +80,28 @@ namespace cxxpython::core
             raise_error(context, CoreObject::UnboundLocalErrorType,
                         U"local variable '" + code.program.local_names()[local] + U"' is not bound", out);
         }
-        void run(Attachment &context, Handle frame, ReturnSlot &out)
+        void make_frame(Attachment &context, Handle function, CallArgsView args, std::optional<Value> receiver, ReturnSlot &out)
         {
-            auto &data = context.payload<FrameObject>(frame); const auto &code = context.payload<CodeObject>(data.code);
-            const auto instructions = code.program.instructions(); ReturnSlot result(context);
+            RootScope roots(context); const auto &callable = context.payload<FunctionObject>(function);
+            auto code = roots.root(callable.code); auto defaults = roots.root(callable.defaults.value_or(context.builtin(CoreObject::EmptyTuple)));
+            std::optional<Value> keywords;
+            if (callable.kwdefaults) keywords = roots.root(*callable.kwdefaults).get(context);
+            const auto &program = context.payload<CodeObject>(code).program; std::vector<Value> bound;
+            detail::FunctionDefaults values{context.payload<TupleObject>(defaults).items, keywords};
+            if (!detail::bind_arguments(context, program.signature(), args, receiver, roots, bound, out, values)) return;
+            context.allocate_instance<FrameObject>(roots.root(context.builtin(CoreObject::FrameType)), out,
+                function.get(context), code.get(context), program.local_names().size(), program.max_stack(), context.builtin(CoreObject::None));
+            auto &data = context.payload<FrameObject>(out.result().value());
+            for (std::size_t i = 0; i < bound.size(); ++i) data.locals[i] = bound[i];
+        }
+        void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &out)
+        {
+            ReturnSlot result(context);
             for (;;)
             {
+                auto &data = context.payload<FrameObject>(activation.current()); const auto &code = context.payload<CodeObject>(data.code);
                 data.last_instruction = data.pc;
-                const auto [opcode, operand] = instructions[data.pc++];
+                const auto [opcode, operand] = code.program.instructions()[data.pc++];
                 switch (opcode)
                 {
                     case Opcode::LoadConst:
@@ -43,45 +109,75 @@ namespace cxxpython::core
                         break;
                     case Opcode::LoadFast:
                         if (!data.locals[operand]) { unbound(context, code, operand, out); return; }
-                        data.operands[data.sp++] = data.locals[operand]; break;
+                        data.operands[data.sp++] = *data.locals[operand]; break;
                     case Opcode::StoreFast:
-                        data.locals[operand] = data.operands[--data.sp]; data.operands[data.sp].reset(); break;
+                        data.locals[operand] = data.operands[--data.sp]; data.operands[data.sp] = context.builtin(CoreObject::None); break;
                     case Opcode::DeleteFast:
                         if (!data.locals[operand]) { unbound(context, code, operand, out); return; }
                         data.locals[operand].reset(); break;
                     case Opcode::PopTop:
-                        data.operands[--data.sp].reset(); break;
+                        data.operands[--data.sp] = context.builtin(CoreObject::None); break;
                     case Opcode::DupTop:
                         data.operands[data.sp] = data.operands[data.sp - 1]; ++data.sp; break;
                     case Opcode::Binary:
                     case Opcode::Compare:
                     {
                         RootScope roots(context);
-                        auto left = roots.root(*data.operands[data.sp - 2]); auto right = roots.root(*data.operands[data.sp - 1]);
+                        auto left = roots.root(data.operands[data.sp - 2]); auto right = roots.root(data.operands[data.sp - 1]);
                         if (opcode == Opcode::Binary) binary(context, left, right, static_cast<BinaryOp>(operand), result);
                         else rich_compare(context, left, right, static_cast<CompareOp>(operand), result);
                         if (raised(result)) { out.raised(result.result().exception()); return; }
-                        data.operands[data.sp - 2] = result.result().value(); data.operands[--data.sp].reset(); break;
+                        data.operands[data.sp - 2] = result.result().value(); data.operands[--data.sp] = context.builtin(CoreObject::None); break;
                     }
                     case Opcode::Jump:
                         data.pc = operand; break;
                     case Opcode::JumpIfFalse:
                     {
-                        RootScope roots(context); truth(context, roots.root(*data.operands[data.sp - 1]), result);
+                        RootScope roots(context); truth(context, roots.root(data.operands[data.sp - 1]), result);
                         if (raised(result)) { out.raised(result.result().exception()); return; }
-                        data.operands[--data.sp].reset();
+                        data.operands[--data.sp] = context.builtin(CoreObject::None);
                         if (result.result().value() == context.builtin(CoreObject::False)) data.pc = operand;
                         break;
                     }
                     case Opcode::Return:
-                        out.ok(*data.operands[data.sp - 1]); return;
+                        result.ok(data.operands[data.sp - 1]); detail::validate_return(context, result);
+                        if (activation.returned(result.result().value(), out)) return;
+                        break;
                     case Opcode::RaiseInstance:
                     {
-                        auto exception = *data.operands[data.sp - 1];
+                        auto exception = data.operands[data.sp - 1];
                         if (!kind<ExceptionObject, CoreObject::BaseExceptionType>(context, exception))
                             type_error(context, U"RAISE_INSTANCE requires a BaseException instance", out);
                         else out.raised(exception);
                         return;
+                    }
+                    case Opcode::Call:
+                    {
+                        const auto &layout = code.program.calls()[operand]; const auto base = data.sp - layout.argument_count() - 1;
+                        const auto &keywords = context.payload<TupleObject>(context.payload<TupleObject>(code.call_keywords).items[operand]).items;
+                        std::vector<KeywordArg> named;
+                        for (std::size_t i = 0; i < keywords.size(); ++i)
+                            named.push_back({keywords[i], data.operands[base + 1 + layout.positional + i]});
+                        CallArgsView args{{data.operands.data() + base + 1, layout.positional}, named};
+                        data.pending_call = base; RootScope roots(context);
+                        auto prepared = detail::prepare_call(context, roots.root(data.operands[base]), args, roots, result);
+                        if (prepared)
+                        {
+                            ReturnSlot child(context);
+                            make_frame(context, prepared->function, {prepared->positional, prepared->keywords},
+                                       prepared->receiver ? std::optional<Value>{prepared->receiver->get(context)} : std::optional<Value>{}, child);
+                            if (raised(child)) { out.raised(child.result().exception()); return; }
+                            if (!activation.descend(roots.root(child.result().value())))
+                            { raise_error(context, CoreObject::RecursionErrorType, U"maximum call depth exceeded", out); return; }
+                        }
+                        else
+                        {
+                            if (raised(result)) { out.raised(result.result().exception()); return; }
+                            data.operands[base] = result.result().value();
+                            for (std::size_t i = base + 1; i < data.sp; ++i) data.operands[i] = context.builtin(CoreObject::None);
+                            data.sp = base + 1; data.pending_call.reset();
+                        }
+                        break;
                     }
                     case Opcode::Count:
                         throw std::logic_error("unverified opcode reached execution");
@@ -155,42 +251,12 @@ namespace cxxpython::core
     }
     namespace detail
     {
-        class FrameActivation final
-        {
-        public:
-            FrameActivation(Attachment &context, Handle frame) : context_(context), frame_(frame), previous_(context.current_frame_)
-            {
-                auto &data = context.payload<FrameObject>(frame);
-                data.back = previous_; data.state = FrameState::Running; context.current_frame_ = frame.get(context);
-            }
-            ~FrameActivation()
-            {
-                auto &data = context_.payload<FrameObject>(frame_);
-                for (auto &value : data.operands) value.reset();
-                data.sp = 0; data.state = FrameState::Completed; context_.current_frame_ = previous_;
-            }
-        private:
-            Attachment &context_;
-            Handle frame_;
-            std::optional<Value> previous_;
-        };
         void execute_function(Attachment &context, Handle function, CallArgsView args,
                               std::optional<Value> receiver, ReturnSlot &out)
         {
-            RootScope roots(context); const auto &callable = context.payload<FunctionObject>(function);
-            auto code = roots.root(callable.code);
-            auto defaults = roots.root(callable.defaults.value_or(context.builtin(CoreObject::EmptyTuple)));
-            std::optional<Value> keywords;
-            if (callable.kwdefaults) keywords = roots.root(*callable.kwdefaults).get(context);
-            const auto &program = context.payload<CodeObject>(code).program; std::vector<Value> bound;
-            FunctionDefaults values{context.payload<TupleObject>(defaults).items, keywords};
-            if (!bind_arguments(context, program.signature(), args, receiver, roots, bound, out, values)) return;
-            ReturnSlot created(context);
-            context.allocate_instance<FrameObject>(roots.root(context.builtin(CoreObject::FrameType)), created,
-                function.get(context), code.get(context), program.local_names().size(), program.max_stack());
-            auto frame = roots.root(created.result().value()); auto &data = context.payload<FrameObject>(frame);
-            for (std::size_t i = 0; i < bound.size(); ++i) data.locals[i] = bound[i];
-            FrameActivation activation(context, frame); run(context, frame, out);
+            ReturnSlot active(context); make_frame(context, function, args, receiver, active);
+            if (raised(active)) { out.raised(active.result().exception()); return; }
+            FrameActivation activation(context, active); run(context, activation, out);
         }
         LayoutDescriptor execution_layout(CoreObject type)
         {

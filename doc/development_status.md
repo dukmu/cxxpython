@@ -1,5 +1,60 @@
 # Development Status
 
+## 2026-10-29 M4 Non-Recursive CALL Scheduling Stable Point
+
+The full M0-M9 goal remains active. This entry is prepended without altering any
+earlier record, and the verified vertical slice is committed promptly per the
+user's instruction. No old VM/frontend fallback, subagent or new ownership/GC
+layer was introduced.
+
+- Added CALL with positional/keyword layouts, managed keyword-name tuples,
+  variable stack effects, operand/arity/input validation and disassembly through
+  the existing opcode metadata. CodeBuilder owns the construction boundary.
+- Reused ordinary call dispatch for preparation: native calls return normally;
+  Python targets carry snapshots/handles in caller roots. Bound methods,
+  arbitrary __call__, descriptor binding, receiver insertion and failures share
+  the same resolver/binder, rather than a VM-only callable shortcut.
+- Extended the execution loop to create/park/resume child Frames without C++
+  execute recursion. One active root and owned back edges keep the whole chain
+  alive. pending_call saves the parent stack destination; results are published
+  into parent roots before child cleanup. Raised and host-fault exits complete
+  and clear the entire active chain.
+- Changed operand storage to a fixed contiguous Value array with sp as its
+  active-prefix authority. Unbound locals remain optional; cleared operands
+  use rooted None padding, not a missing-value sentinel. Native argument spans
+  remain address-stable, and traced buffers are accounted by actual element size.
+- Separated logical call permits from active native/C++ dispatch depth. A test
+  completes 6000 Python calls with native depth capped at 16, then verifies the
+  original post-GC live set. Native reentry still has its own bounded guard.
+- Added 11 scheduling tests. A new regression failed when an unready child
+  return was silently discarded by an outer function; sharing the ordinary
+  return validator fixed that bypass. Other tests exercise kwargs, bound/call
+  methods, snapshots after original receiver roots disappear, callback GC,
+  OOM, Raised/C++ faults and both recursion limits with recovery.
+
+Verification:
+
+- Release foundation 208/208. Full CTest exit 0, discovery count 456
+  (248 legacy + 208 foundation).
+- ASan/UBSan/LeakSanitizer 208/208 outside the ptrace sandbox; TSan 208/208.
+- Foundation-only Release with testing/legacy disabled built successfully.
+  After all sanitizer/build handles finished, three extended benchmark runs
+  passed exact-value and post-collection live-set checks.
+- GCC 11.4 / Release / x86-64 WSL2, no CPU binding/frequency control: 10000
+  direct four-instruction calls took 25.42/23.89/29.07 ms. 10000 five-instruction
+  callers scheduling a four-instruction child took 40.09/36.83/37.46 ms. Frame
+  prefix is 144 bytes, operand cells eight bytes and optional locals 16 bytes;
+  allocator buffers/heap/root metadata remain additional costs.
+- Raw rows are retained in the execution/layout/numeric CSVs, including slower
+  samples. These are cost baselines, not a speedup or CPython parity claim.
+  User perf.data*, test2.py and the temporary_plan.md deletion remain excluded.
+
+Next execution dependency is structured regions/unwind and traceback, then
+typed suspension/resume and closure/namespace execution. Their complete negative
+and combination matrices remain gates. Full M2/M3, source-language differential
+testing, the original single/multi/I/O performance target and M5-M9 are still
+unfinished; no whole milestone or overall goal is declared complete.
+
 ## 2026-10-29 M4 Verified Returning Code/Function/Frame Stable Point
 
 The complete M0-M9 goal remains active. This is the first independent execution

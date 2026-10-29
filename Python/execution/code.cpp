@@ -20,6 +20,7 @@ namespace cxxpython::core
             OpcodeDefinition{"JUMP_IF_FALSE", 1, 1, 0, OperandDomain::Target, FlowKind::Branch, true, true},
             OpcodeDefinition{"RETURN", 1, 1, 0, OperandDomain::None, FlowKind::Stop, false, false},
             OpcodeDefinition{"RAISE_INSTANCE", 1, 1, 0, OperandDomain::None, FlowKind::Stop, true, true},
+            OpcodeDefinition{"CALL", 1, 1, 1, OperandDomain::CallSite, FlowKind::Next, true, true},
         };
         static_assert(definitions.size() == static_cast<std::size_t>(Opcode::Count));
         [[noreturn]] void invalid(CodeErrorKind kind, const char *message, std::optional<std::size_t> pc = {})
@@ -31,7 +32,7 @@ namespace cxxpython::core
             return data >= start && data - start < sizeof(text) ? 0 : (text.capacity() + 1) * sizeof(char32_t);
         }
         std::size_t verify(const CodeSpec &spec, std::span<const Instruction> instructions,
-                           std::span<const SourcePosition> positions, std::size_t constants)
+                           std::span<const SourcePosition> positions, std::span<const CallLayout> calls, std::size_t constants)
         {
             if (instructions.empty()) invalid(CodeErrorKind::EmptyCode, "empty instruction sequence");
             if (!spec.first_line) invalid(CodeErrorKind::SourcePosition, "first line must be positive");
@@ -75,6 +76,9 @@ namespace cxxpython::core
                     case OperandDomain::Compare:
                         if (operand > static_cast<std::uint32_t>(CompareOp::Ge)) invalid(CodeErrorKind::Operand, "invalid comparison operator", pc);
                         break;
+                    case OperandDomain::CallSite:
+                        if (operand >= calls.size()) invalid(CodeErrorKind::CallBounds, "call-site index out of bounds", pc);
+                        break;
                 }
                 const auto &position = positions[pc];
                 if ((!position.line && (position.column || position.end_line || position.end_column)) ||
@@ -95,8 +99,9 @@ namespace cxxpython::core
             {
                 const auto pc = pending[next]; const auto &instruction = instructions[pc];
                 const auto &definition = opcode_definition(instruction.opcode); const auto height = *heights[pc];
-                if (height < definition.inputs) invalid(CodeErrorKind::StackUnderflow, "instruction requires more stack inputs", pc);
-                const auto after = height - definition.pops + definition.pushes; maximum = std::max(maximum, after);
+                const auto effect = instruction_effect(instruction, calls);
+                if (height < effect.inputs) invalid(CodeErrorKind::StackUnderflow, "instruction requires more stack inputs", pc);
+                const auto after = height - effect.pops + effect.pushes; maximum = std::max(maximum, after);
                 if (definition.flow == FlowKind::Jump || definition.flow == FlowKind::Branch) join(instruction.operand, after);
                 if (definition.flow == FlowKind::Next || definition.flow == FlowKind::Branch) join(pc + 1, after);
             }
@@ -105,15 +110,23 @@ namespace cxxpython::core
     }
     const OpcodeDefinition &opcode_definition(Opcode opcode)
     { return definitions.at(static_cast<std::size_t>(opcode)); }
+    StackEffect instruction_effect(Instruction instruction, std::span<const CallLayout> calls)
+    {
+        const auto &definition = opcode_definition(instruction.opcode);
+        if (definition.operand == OperandDomain::CallSite && instruction.operand >= calls.size())
+            invalid(CodeErrorKind::CallBounds, "call-site index out of bounds");
+        const auto arguments = definition.operand == OperandDomain::CallSite ? calls[instruction.operand].argument_count() : 0;
+        return {definition.inputs + arguments, definition.pops + arguments, definition.pushes};
+    }
     std::size_t VerifiedCode::external_bytes() const noexcept
     {
         auto bytes = instructions_.capacity() * sizeof(Instruction) + positions_.capacity() * sizeof(SourcePosition) +
-                     locals_.capacity() * sizeof(std::u32string) + signature_.external_bytes();
+                     calls_.capacity() * sizeof(CallLayout) + locals_.capacity() * sizeof(std::u32string) + signature_.external_bytes();
         for (const auto &local : locals_) bytes += string_bytes(local);
         return bytes;
     }
     void CodeObject::trace(Tracer &tracer) const noexcept
-    { for (auto value : {constants, varnames, name, qualname, filename}) tracer.visit(value); }
+    { for (auto value : {constants, varnames, name, qualname, filename, call_keywords}) tracer.visit(value); }
     CodeBuilder::CodeBuilder(Attachment &context, CodeSpec spec) : context_(context), roots_(context), spec_(std::move(spec))
     {
         if (!context.core_ready()) throw std::logic_error("CodeBuilder requires the B3 image");
@@ -158,8 +171,19 @@ namespace cxxpython::core
             if (!labels_[label.index]) invalid(CodeErrorKind::UnboundLabel, "unbound branch label", pc);
             instructions[pc].operand = static_cast<std::uint32_t>(*labels_[label.index]);
         }
-        const auto maximum = verify(spec_, instructions, positions_, constants_.size());
-        VerifiedCode verified(std::move(instructions), positions_, spec_.signature, spec_.locals, maximum, spec_.first_line);
+        std::vector<CallLayout> calls;
+        for (const auto &site : calls_)
+        {
+            if (site.keywords.size() >= std::numeric_limits<std::uint32_t>::max() ||
+                site.positional >= std::numeric_limits<std::uint32_t>::max() - site.keywords.size())
+                invalid(CodeErrorKind::SizeLimit, "too many call arguments");
+            for (const auto &name : site.keywords)
+                for (auto point : name)
+                    if (point > 0x10ffff) invalid(CodeErrorKind::Operand, "invalid keyword codepoint");
+            calls.push_back({site.positional, static_cast<std::uint32_t>(site.keywords.size())});
+        }
+        const auto maximum = verify(spec_, instructions, positions_, calls, constants_.size());
+        VerifiedCode verified(std::move(instructions), positions_, std::move(calls), spec_.signature, spec_.locals, maximum, spec_.first_line);
         RootScope roots(context_); ReturnSlot temporary(context_);
         cxxpython::core::make_tuple(context_, constants_, temporary); auto constants = roots.root(temporary.result().value());
         std::vector<Value> names;
@@ -169,9 +193,29 @@ namespace cxxpython::core
         make_str(context_, spec_.name, temporary); auto name = roots.root(temporary.result().value());
         make_str(context_, spec_.qualname.value_or(spec_.name), temporary); auto qualname = roots.root(temporary.result().value());
         make_str(context_, spec_.filename, temporary); auto filename = roots.root(temporary.result().value());
+        std::vector<Value> keyword_tables;
+        for (const auto &site : calls_)
+        {
+            std::vector<Value> keys;
+            for (const auto &key : site.keywords)
+            { make_str(context_, key, temporary); keys.push_back(roots.root(temporary.result().value()).get(context_)); }
+            cxxpython::core::make_tuple(context_, keys, temporary);
+            keyword_tables.push_back(roots.root(temporary.result().value()).get(context_));
+        }
+        auto call_keywords = roots.root(context_.builtin(CoreObject::EmptyTuple));
+        if (!keyword_tables.empty())
+        { cxxpython::core::make_tuple(context_, keyword_tables, temporary); call_keywords = roots.root(temporary.result().value()); }
         auto type = roots.root(context_.builtin(CoreObject::CodeType));
         context_.allocate_instance<CodeObject>(type, out, std::move(verified), constants.get(context_), varnames.get(context_),
-                                             name.get(context_), qualname.get(context_), filename.get(context_));
+                                             name.get(context_), qualname.get(context_), filename.get(context_), call_keywords.get(context_));
+    }
+    void CodeBuilder::call(std::uint32_t positional, std::span<const std::u32string> keywords, SourcePosition source)
+    {
+        context_.require_attached();
+        if (calls_.size() >= std::numeric_limits<std::uint32_t>::max()) invalid(CodeErrorKind::SizeLimit, "too many call sites");
+        calls_.push_back({positional, {keywords.begin(), keywords.end()}});
+        try { emit(Opcode::Call, static_cast<std::uint32_t>(calls_.size() - 1), source); }
+        catch (...) { calls_.pop_back(); throw; }
     }
     std::string disassemble(Attachment &context, Handle code)
     {

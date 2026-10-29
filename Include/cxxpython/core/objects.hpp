@@ -225,6 +225,18 @@ namespace cxxpython::core
             std::span<const Value> positional;
             std::optional<Value> keywords;
         };
+        struct PreparedPythonCall
+        {
+            Handle function;
+            std::optional<Handle> receiver;
+            std::vector<Value> positional;
+            std::vector<KeywordArg> keywords;
+        };
+        // A prepared target borrows the caller's RootScope; otherwise out owns
+        // the completed value/exception. No prepared target is a Python value.
+        std::optional<PreparedPythonCall> prepare_call(Attachment &context, Handle callable,
+            CallArgsView args, RootScope &roots, ReturnSlot &out);
+        void validate_return(Attachment &context, ReturnSlot &out);
         bool bind_arguments(Attachment &context, const SignatureLayout &signature, CallArgsView args,
                             std::optional<Value> receiver, RootScope &roots, std::vector<Value> &bound,
                             ReturnSlot &out, std::optional<FunctionDefaults> defaults = {});

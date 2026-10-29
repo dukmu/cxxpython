@@ -20,7 +20,7 @@ All new C++ interfaces are internal and unstable until the M1-M4 gates pass.
 | M1 storage/environment | Experimental | B0-B2 storage and seed gates now pass; interfaces remain internal/unstable |
 | M2 types/methods/call | Experimental | Calls/construction, field tails, cells, B2 promotion and common hash/repr/str/truth/comparison/arithmetic dispatch exist; full protocols/reflection/mutation and weakrefs remain |
 | M3 builtins | Experimental | Int/bool seed, initial Unicode value/representation/hash, tuple and cell value semantics; complete numeric, container, iterator, codec/buffer and finalization matrices remain |
-| M4 execution | Experimental | Verified returning Code/Function/Frame and ObjectOps switch execution exist; Python call scheduling, regions/unwind, traceback and suspension remain |
+| M4 execution | Experimental | Verified Code/Function/Frame, ObjectOps switch execution and non-recursive calls exist; regions/unwind, traceback, closure/namespace execution and suspension remain |
 | M5 frontend | Planned | ScopeInfo/CFG, source positions, validated Code, L0-L2 differential cases |
 | M6 boot/platform | Planned | RunRequest, loader/import, CLI/embedding, I/O, thread API and shutdown |
 | M7 libraries | Planned | Real workflows and dependency closures, including unittest |
@@ -163,9 +163,9 @@ promotion and common hash/repr/str/truth/comparison/arithmetic dispatch. The M3
 seed supplies actual values required to exercise those protocols; this dependency
 overlap does not close either milestone.
 M4 now has verified Code/CodeBuilder, stable rooted Frame storage and
-constant/local/arithmetic/comparison/branch/return execution through ObjectOps.
-The next execution slice is non-recursive Python call scheduling, followed by
-structured regions/unwind and typed suspension outcomes.
+constant/local/arithmetic/comparison/branch/call/return execution through ObjectOps.
+Ordinary Python calls now use a Frame loop. The next execution slice is
+structured regions/unwind and traceback, followed by typed suspension outcomes.
 The plan explicitly permits M3 expansion and M4 execution in parallel after a
 minimal builtin set exists. Full M3 is not an added prerequisite for this first
 executor. Remaining type/reflection/mutation, callable value semantics,
@@ -780,3 +780,68 @@ and variadic transfer, loops/locals, GC and source-position observation during
 callbacks, native reentry/back edges, host-fault cleanup, allocation failure at
 every freeze allocation and collection of function/globals/code cycles. This
 is a native CodeBuilder vertical slice, not a new source frontend or full M4.
+
+## M4 Non-Recursive Calls And Rooted Continuations
+
+CALL uses a private call-site index as its operand. Immutable CallLayout entries
+hold positional/keyword counts; the actual keyword names are managed str tuples
+owned and traced by Code. CodeBuilder.call creates those entries. The central
+instruction_effect derives CALL's required inputs/pops from that layout: callee,
+positional values, then keyword values are consumed and one result is produced.
+Validation rejects bad call-site indices, oversized arity and reachable input
+underflow; disassembly uses the same opcode metadata. The instruction encoding
+remains the existing private in-memory Opcode/uint32 pair.
+
+The call engine gained an explicit prepare_call mode, not a second resolver.
+Native callables complete normally into the caller ReturnSlot. A final Python
+target is instead returned as PreparedPythonCall with owned argument snapshots
+and handles rooted in the caller's supplied RootScope. An actual None receiver
+is distinct from no receiver. The target is not a Python Value or an artificial
+Frame return. Bound methods, generic callable __call__, descriptor binding,
+receiver prepending and binder errors keep the ordinary call path. Descriptor
+callbacks may use bounded native-to-Python reentry during preparation.
+
+The VM creates a child Frame with the existing binder/factory, parks the caller
+with its argument stack intact, and changes the active rooted Frame. One active
+ReturnSlot roots the top; owned back edges keep parked parents alive. pending_call
+records the caller's stack destination while pc already names the continuation.
+Child return validates readiness through the same validator as ordinary calls,
+publishes into the parent's traced operand slot, then releases the child root.
+No Python-to-Python call recursively invokes C++ execute. Native reentry opens
+its own explicit execution boundary and restores its previous active Frame.
+
+Frame locals remain optional cells for unbound-versus-None semantics. Operands
+are now a preallocated contiguous Value array: sp alone defines its active
+prefix, only that prefix is traced, and released slots are overwritten with the
+interpreter's rooted None padding. None is not an unbound or call-state marker.
+Positional CallArgsView can borrow this stable array across native reentry;
+Python targets snapshot before temporary normalization scopes disappear.
+
+HeapConfig separates max_call_depth (logical frames/dispatch budget) from
+max_native_depth (active C++ call-dispatch budget). Both default to 128 to retain
+the prior internal bound. Scheduled children retain logical permits only;
+ordinary/native dispatch guards retain both. Completion, Raised and C++ host
+faults iteratively clear every active child and pending call, balance permits
+and restore the boundary's predecessor. This is an internal runtime budget, not
+an implemented Python sys recursion-limit API or platform stack-size detector.
+
+The new scheduling suite adds 11 cases: call metadata/effects; Python/native
+keyword binding; bound and __call__ methods; failed/missing calls; prepared
+snapshots surviving loss of the original bound-method roots; parked Frame GC;
+allocation failure/retry; exception and host-fault cleanup; return-readiness
+equivalence; and independent logical/native recursion limits. With native depth
+16, 6000 ordinary Python calls succeed and return to the original live set.
+A regression initially demonstrated that a scheduled unready return could be
+hidden by the caller; sharing validate_return removed that semantic difference.
+
+Verification: 208/208 foundation, 456/456 full CTest, 208/208 ASan/UBSan/LSan and
+208/208 TSan. Direct returning and scheduled-call cost probes both validate the
+result and post-GC live set, with all raw samples retained. Frame prefix is now
+144 bytes including continuation metadata; each operand cell is eight bytes,
+while each optional local remains 16. These exclude buffers/heap/root metadata
+and are not CPython performance or memory acceptance results.
+
+The scope remains M0-M9. Region/handler/cleanup validation, traceback, full
+exception normalization/context, finally/with, closure and namespace execution,
+typed Yield/resume, source compilation and release/performance gates remain
+unfinished. CALL scheduling does not approximate or close those requirements.

@@ -191,4 +191,22 @@ int main()
               << " verified_instructions=" << context.payload<CodeObject>(verified).program.instructions().size()
               << " max_stack=" << context.payload<CodeObject>(verified).program.max_stack()
               << " frame_prefix_bytes=" << sizeof(FrameObject) << " execution_live_set_check=ok\n";
+
+    CodeSpec caller_spec = code_spec; caller_spec.name = U"call_add"; CodeBuilder caller(context, caller_spec);
+    caller.emit(Opcode::LoadConst, caller.constant(python_function)); caller.emit(Opcode::LoadFast, 0); caller.emit(Opcode::LoadFast, 1);
+    caller.call(2); caller.emit(Opcode::Return); caller.freeze(value); auto caller_code = scope.root(value.result().value());
+    make_function(context, {caller_code, globals}, value); auto scheduled = scope.root(value.result().value());
+    value.reset(); context.collect(); const auto before_scheduled = context.stats().objects;
+    const auto scheduled_ns = measure([&] {
+        for (int i = 0; i < method_iterations; ++i)
+            if (call(context, scheduled, {tuple_items, {}}, value).tag() != ResultTag::Ok) { valid = false; return; }
+    });
+    if (!valid || int_decimal(context, value.result().value()) != "42") return 1;
+    value.reset(); context.collect();
+    if (context.stats().objects != before_scheduled) return 1;
+    std::cout << "scheduled_iterations=" << method_iterations << " scheduled_function_ns=" << scheduled_ns
+              << " caller_instructions=" << context.payload<CodeObject>(caller_code).program.instructions().size()
+              << " caller_max_stack=" << context.payload<CodeObject>(caller_code).program.max_stack()
+              << " callee_instructions=" << context.payload<CodeObject>(verified).program.instructions().size()
+              << " scheduled_live_set_check=ok\n";
 }

@@ -163,6 +163,7 @@ add_executable(test_foundation
     Tests/cpp/core/test_number.cpp
     Tests/cpp/core/test_representation.cpp
     Tests/cpp/core/test_execution.cpp
+    Tests/cpp/core/test_scheduling.cpp
 )
 target_link_libraries(test_foundation PRIVATE cxxpython_foundation GTest::gtest_main)
 target_compile_options(test_foundation PRIVATE -Wall -Wextra -Wpedantic -Werror)
