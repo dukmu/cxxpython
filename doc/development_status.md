@@ -1,5 +1,59 @@
 # Development Status
 
+## 2026-10-29 Ordinary Numeric And Tuple Constructors
+
+Prepended without rewriting history. The previous stable node is d30bda8.
+The full Plan 2 goal remains active; construction slices do not establish
+complete basic-language, library or performance acceptance.
+
+- At the user's request, one terra agent audited and implemented int/float
+  construction. No sol/astra agent was started. The main agent implemented
+  tuple construction, reviewed/integrated the numeric changes and repaired
+  executable differential failures. The terra assignment is now closed.
+- int now parses arbitrary-precision Unicode decimal text, base-0/2-36 text,
+  signs, prefixes and underscores, with ordinary base __index__ conversion and
+  argument validation. Conversions preserve __int__/__index__/Python-3.12
+  __trunc__ precedence and validate results; subclasses retain native payloads
+  and instance fields. bool retains its existing truth construction.
+- Added an immutable FloatObject double payload and normal bootstrap/builtin
+  registration, not an alternate number representation or lifetime mechanism.
+  Float construction handles integer/text/__float__/__index__, exact identity,
+  native subclasses, nearest-even BigInt conversion, overflow/underflow,
+  infinity/NaN and signed zero. Ordinary descriptors provide repr/str, truth,
+  integer conversion, exact int/float equality and compatible hashes. Type and
+  subclass fields use the existing traced allocation layout; slots are allowed.
+- tuple construction uses ordinary iteration and rooted yielded values. Exact
+  tuples retain identity, exact empty results share EmptyTuple and subclasses
+  preserve their native layout. Length/hint ordering, signed-size validation,
+  NotImplemented and iterator failures have source/native coverage. Length
+  callbacks can replace __class__, so hint lookup refreshes the source type.
+  Descriptor binding errors remain distinct from a call declining a hint.
+- Fixed-reference testing exposed and fixed malformed float '+-' signs being
+  accepted, the incorrect int-like slot prohibition on float subclasses, and
+  tuple hint TypeError/binding/retyping differences. Tests were observed failing
+  before repair. No script-specific path, global execution lock, RC, cache
+  framework or new synchronization mechanism was introduced.
+- Final normal CTest passes 351/351, including all 347 native cases, both actual
+  executable differential drivers, recorder tests and clang-format. Final
+  ASan/UBSan/LSan passes 347/347; TSan passes 345/345, excluding only the two
+  established exhaustive allocation enumerations covered by normal/ASan.
+  All four constructor differential groups and eleven source groups pass
+  against fixed CPython 3.12.14, also with the ASan CLI. Constructor/source
+  output and binary/reference hashes are retained in doc/benchmarks/.
+- Three idle Release samples after all builds/sanitizers generated the
+  l1-constructors raw JSONL, CSV and Markdown through the existing recorder.
+  Existing source loops still execute in parallel, but some timings/variance
+  are higher than the preceding node; no numeric performance gain is claimed.
+  The large absolute CPython gap remains a failed gate. Raw earlier samples
+  and generated comparisons remain intact, not replaced with hand-filled tables.
+- Remaining work includes float source literals/arithmetic/ordering, numeric
+  bytes/buffer inputs, decimal conversion limits and deprecation warnings;
+  actual general dict/list/set objects and constructors, not wrappers around
+  the internal name dictionary; the rest of basic syntax/protocols including
+  f-strings, reflection/imports/libraries, Python thread/I/O workflows and the
+  finalization/platform/install/performance gates. The user's temporary_plan.md
+  deletion and untracked test2.py are untouched and excluded from the commit.
+
 ## 2026-10-29 Class Bodies, Namespaces And Decorators In The Shared VM
 
 Prepended without rewriting history. The previous stable node is 6de249d.

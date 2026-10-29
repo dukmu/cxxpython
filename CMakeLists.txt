@@ -29,6 +29,7 @@ add_library(cxxpython_core
     Objects/descrobject.cpp
     Objects/typeconstruction.cpp
     Objects/longobject.cpp
+    Objects/floatobject.cpp
     Objects/rangeobject.cpp
     Objects/iterobject.cpp
     Objects/abstract.cpp
@@ -84,6 +85,8 @@ if(BUILD_TESTING)
         Tests/cpp/test_call.cpp
         Tests/cpp/test_attributes.cpp
         Tests/cpp/test_construction.cpp
+        Tests/cpp/test_constructors.cpp
+        Tests/cpp/test_tuple_constructor.cpp
         Tests/cpp/test_layout.cpp
         Tests/cpp/test_cell.cpp
         Tests/cpp/test_readiness.cpp
@@ -108,6 +111,10 @@ if(BUILD_TESTING)
         ${CMAKE_CURRENT_SOURCE_DIR}/Lib/test/test_source.py
         --binary $<TARGET_FILE:cxxpython> --reference ${CXXPYTHON_REFERENCE_PYTHON})
     set_tests_properties(Source.Differential PROPERTIES TIMEOUT 60)
+    add_test(NAME Constructors.Differential COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/Lib/test/test_constructors.py
+        --binary $<TARGET_FILE:cxxpython> --reference ${CXXPYTHON_REFERENCE_PYTHON})
+    set_tests_properties(Constructors.Differential PROPERTIES TIMEOUT 60)
     add_test(NAME Benchmarks.Report COMMAND ${Python3_EXECUTABLE} -m unittest discover
         -s ${CMAKE_CURRENT_SOURCE_DIR}/Lib/test -p test_benchmarks.py)
     set_tests_properties(Benchmarks.Report PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})

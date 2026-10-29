@@ -198,6 +198,65 @@ void bool_repr(Attachment &context, Handle, std::span<const Value> args, ReturnS
     }
     make_str(context, args[0] == context.builtin(CoreObject::True) ? U"True" : U"False", out);
 }
+bool parse_integer(std::u32string_view text, int base, Integer &result)
+{
+    while (!text.empty() && detail::numeric_whitespace(text.front()))
+        text.remove_prefix(1);
+    while (!text.empty() && detail::numeric_whitespace(text.back()))
+        text.remove_suffix(1);
+    bool negative = false;
+    if (!text.empty() && (text.front() == U'+' || text.front() == U'-')) {
+        negative = text.front() == U'-';
+        text.remove_prefix(1);
+    }
+    if (text.empty())
+        return false;
+    const bool automatic = base == 0;
+    bool prefixed = false;
+    if (text.size() >= 2 && detail::decimal_digit(text[0]) == 0) {
+        const auto marker = text[1];
+        const int prefix = marker == U'x' || marker == U'X'   ? 16
+                           : marker == U'o' || marker == U'O' ? 8
+                           : marker == U'b' || marker == U'B' ? 2
+                                                              : 0;
+        if (prefix && (automatic || base == prefix)) {
+            base = prefix;
+            text.remove_prefix(2);
+            prefixed = true;
+            if (!text.empty() && text.front() == U'_')
+                text.remove_prefix(1);
+        }
+    }
+    if (automatic && !prefixed)
+        base = 10;
+    bool digit_seen = false, previous_digit = false;
+    result = 0;
+    for (auto c : text) {
+        if (c == U'_') {
+            if (!previous_digit)
+                return false;
+            previous_digit = false;
+            continue;
+        }
+        int digit = detail::decimal_digit(c);
+        if (digit < 0 && c >= U'a' && c <= U'z')
+            digit = static_cast<int>(c - U'a') + 10;
+        if (digit < 0 && c >= U'A' && c <= U'Z')
+            digit = static_cast<int>(c - U'A') + 10;
+        if (digit < 0 || digit >= base)
+            return false;
+        digit_seen = previous_digit = true;
+        result *= base;
+        result += digit;
+    }
+    if (!digit_seen || !previous_digit)
+        return false;
+    if (automatic && !prefixed && detail::decimal_digit(text.front()) == 0 && result != 0)
+        return false;
+    if (negative)
+        result = -result;
+    return true;
+}
 void int_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     if (!context.has_layout<TypeObject>(args[0]) ||
@@ -207,25 +266,92 @@ void int_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlo
         return;
     }
     const auto &values = context.payload<TupleObject>(args[1]).items;
-    if (values.size() > 1) {
+    DictView keywords(context, args[2]);
+    const auto base_keyword = keywords.find(U"base");
+    if (values.size() > 2 || keywords.entries().size() != (base_keyword ? 1 : 0) ||
+        (values.size() == 2 && base_keyword)) {
         type_error(context, out);
         return;
     }
     RootScope roots(context);
     auto cls = roots.root(args[0]);
     ReturnSlot converted(context);
-    if (values.empty())
+    const auto base_arg = values.size() == 2 ? std::optional<Value>{values[1]} : base_keyword;
+    if (base_arg) {
+        if (values.empty()) {
+            type_error(context, out);
+            return;
+        }
+        index(context, roots.root(*base_arg), converted);
+        if (raised(converted)) {
+            out.raised(converted.exception());
+            return;
+        }
+        std::int64_t base;
+        if (!int_fits_signed(context, converted.value(), base) ||
+            (base != 0 && (base < 2 || base > 36))) {
+            raise_error(context, CoreObject::ValueErrorType,
+                        U"int() base must be >= 2 and <= 36, or 0", out);
+            return;
+        }
+        if (!context.has_layout<StrObject>(values[0]) ||
+            !is_subtype(context, context.type_of(values[0]),
+                        context.builtin(CoreObject::StrType))) {
+            type_error(context, out);
+            return;
+        }
+        Integer parsed;
+        if (!parse_integer(context.payload<StrObject>(values[0]).value, static_cast<int>(base),
+                           parsed)) {
+            raise_error(context, CoreObject::ValueErrorType, U"invalid literal for int()", out);
+            return;
+        }
+        publish(context, std::move(parsed), converted);
+    } else if (values.empty())
         make_int(context, 0, converted);
-    else if (context.type_of(values[0]) == context.builtin(CoreObject::IntType))
+    else if (context.type_of(values[0]) == context.builtin(CoreObject::StrType)) {
+        Integer parsed;
+        if (!parse_integer(context.payload<StrObject>(values[0]).value, 10, parsed)) {
+            raise_error(context, CoreObject::ValueErrorType, U"invalid literal for int()", out);
+            return;
+        }
+        publish(context, std::move(parsed), converted);
+    } else if (context.type_of(values[0]) == context.builtin(CoreObject::IntType))
         copy_int(context, values[0], converted);
     else {
         auto value = roots.root(values[0]);
         auto slot =
             resolve_protocol(context, roots.root(context.type_of(value)), Protocol::Int, roots);
-        if (slot.state == SlotState::Missing)
-            index(context, value, converted);
-        else
+        if (slot.state != SlotState::Missing)
             invoke_protocol(context, value, slot, {}, converted);
+        else {
+            auto index_slot = resolve_protocol(context, roots.root(context.type_of(value)),
+                                               Protocol::Index, roots);
+            auto trunc = index_slot.state == SlotState::Missing
+                             ? detail::type_attribute(context, context.type_of(value), U"__trunc__")
+                             : std::optional<Value>{};
+            if (trunc) {
+                ReturnSlot truncated(context);
+                detail::invoke_special(context, value, roots.root(*trunc), {{}, {}}, truncated);
+                if (raised(truncated)) {
+                    out.raised(truncated.exception());
+                    return;
+                }
+                index(context, roots.root(truncated.value()), converted);
+            } else if (index_slot.state == SlotState::Missing &&
+                       context.has_layout<StrObject>(value.get(context)) &&
+                       is_subtype(context, context.type_of(value),
+                                  context.builtin(CoreObject::StrType))) {
+                Integer parsed;
+                if (!parse_integer(context.payload<StrObject>(value).value, 10, parsed)) {
+                    raise_error(context, CoreObject::ValueErrorType, U"invalid literal for int()",
+                                out);
+                    return;
+                }
+                publish(context, std::move(parsed), converted);
+            } else
+                index(context, value, converted);
+        }
         if (raised(converted)) {
             out.raised(converted.exception());
             return;
@@ -437,6 +563,8 @@ void install_numbers(Attachment &context, std::span<const Handle> core)
         SignatureLayout constructor;
         constructor.parameters = {{U"cls", ParameterKind::PositionalOnly}};
         constructor.varargs = U"args";
+        if (id == CoreObject::IntType)
+            constructor.varkwargs = U"kwargs";
         install_native_attribute(context, core, at(id), U"__new__", constructor,
                                  id == CoreObject::IntType ? int_new : bool_new);
         RootScope roots(context);

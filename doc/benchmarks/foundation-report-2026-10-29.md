@@ -240,6 +240,237 @@ Storage/native delivery probes do not establish Python VM parallelism. RSS is th
 | l1-class-namespaces-cpython | parallel_source_workers | 2 | wall_ns | ms | 3 | 6.203 | 6.143 | 6.546 |
 | l1-class-namespaces-cpython | parallel_source_workers | 4 | process_cpu_ns | ms | 3 | 6.175 | 5.934 | 6.493 |
 | l1-class-namespaces-cpython | parallel_source_workers | 4 | wall_ns | ms | 3 | 6.009 | 5.832 | 6.395 |
+| l1-constructors | cleanup_iterations | - | active_region_bytes | bytes | 3 | 32.000 | 32.000 | 32.000 |
+| l1-constructors | cleanup_iterations | - | cleanup_continuation_bytes | bytes | 3 | 48.000 | 48.000 | 48.000 |
+| l1-constructors | cleanup_iterations | - | cleanup_function_ns | ms | 3 | 18.913 | 17.580 | 19.893 |
+| l1-constructors | function_iterations | - | frame_prefix_bytes | bytes | 3 | 272.000 | 272.000 | 272.000 |
+| l1-constructors | function_iterations | - | verified_function_ns | ms | 3 | 15.185 | 13.666 | 15.961 |
+| l1-constructors | hash_iterations | - | string_hash_ns | ms | 3 | 64.633 | 63.677 | 71.307 |
+| l1-constructors | hash_iterations | - | tuple_repr_ns | ms | 3 | 18.277 | 17.477 | 21.724 |
+| l1-constructors | int_iterations | - | big_int_mul_ns | ms | 3 | 7.789 | 6.922 | 8.369 |
+| l1-constructors | int_iterations | - | int_add_ns | ms | 3 | 66.628 | 64.994 | 66.690 |
+| l1-constructors | int_iterations | - | int_object_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| l1-constructors | iterations | - | allocation_and_auto_gc_ns | ms | 3 | 4.976 | 4.705 | 5.415 |
+| l1-constructors | iterations | - | handle_bytes | bytes | 3 | 32.000 | 32.000 | 32.000 |
+| l1-constructors | iterations | - | header_bytes | bytes | 3 | 8.000 | 8.000 | 8.000 |
+| l1-constructors | iterations | - | last_gc_pause_ns | ms | 3 | 0.001 | 0.001 | 0.002 |
+| l1-constructors | iterations | - | live_bytes | bytes | 3 | 0.000 | 0.000 | 0.000 |
+| l1-constructors | iterations | - | node_bytes | bytes | 3 | 16.000 | 16.000 | 16.000 |
+| l1-constructors | iterations | - | recorded_metadata_bytes | bytes | 3 | 3360.000 | 3360.000 | 3360.000 |
+| l1-constructors | iterations | - | root_register_release_ns | ms | 3 | 3.058 | 2.892 | 3.268 |
+| l1-constructors | native_call_iterations | - | core_live_bytes | bytes | 3 | 130392.000 | 130392.000 | 130392.000 |
+| l1-constructors | native_call_iterations | - | core_metadata_bytes | bytes | 3 | 155136.000 | 155136.000 | 155136.000 |
+| l1-constructors | native_call_iterations | - | core_reserved_bytes | bytes | 3 | 452368.000 | 452368.000 | 452368.000 |
+| l1-constructors | native_call_iterations | - | lookup_bind_call_ns | ms | 3 | 20.063 | 18.691 | 20.423 |
+| l1-constructors | native_call_iterations | - | native_call_ns | ms | 3 | 14.272 | 13.615 | 14.287 |
+| l1-constructors | parallel_class_workers | 1 | finish_live_bytes | bytes | 3 | 194632.000 | 194632.000 | 194632.000 |
+| l1-constructors | parallel_class_workers | 1 | finish_metadata_bytes | bytes | 3 | 253072.000 | 253072.000 | 253072.000 |
+| l1-constructors | parallel_class_workers | 1 | finish_reserved_bytes | bytes | 3 | 678432.000 | 678432.000 | 678432.000 |
+| l1-constructors | parallel_class_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.055 | 0.051 | 0.059 |
+| l1-constructors | parallel_class_workers | 1 | max_rendezvous_ns | ms | 3 | 0.002 | 0.001 | 0.002 |
+| l1-constructors | parallel_class_workers | 1 | process_cpu_ns | ms | 3 | 496.484 | 491.128 | 541.016 |
+| l1-constructors | parallel_class_workers | 1 | source_freeze_run_ns | ms | 3 | 0.161 | 0.142 | 0.193 |
+| l1-constructors | parallel_class_workers | 1 | wall_ns | ms | 3 | 488.557 | 483.227 | 533.664 |
+| l1-constructors | parallel_class_workers | 2 | finish_live_bytes | bytes | 3 | 142000.000 | 135856.000 | 238768.000 |
+| l1-constructors | parallel_class_workers | 2 | finish_metadata_bytes | bytes | 3 | 293264.000 | 286256.000 | 300272.000 |
+| l1-constructors | parallel_class_workers | 2 | finish_reserved_bytes | bytes | 3 | 739864.000 | 674376.000 | 805352.000 |
+| l1-constructors | parallel_class_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.070 | 0.062 | 0.078 |
+| l1-constructors | parallel_class_workers | 2 | max_rendezvous_ns | ms | 3 | 0.239 | 0.137 | 0.269 |
+| l1-constructors | parallel_class_workers | 2 | process_cpu_ns | ms | 3 | 527.599 | 519.993 | 547.478 |
+| l1-constructors | parallel_class_workers | 2 | source_freeze_run_ns | ms | 3 | 0.144 | 0.140 | 0.233 |
+| l1-constructors | parallel_class_workers | 2 | wall_ns | ms | 3 | 274.309 | 274.258 | 291.873 |
+| l1-constructors | parallel_class_workers | 4 | finish_live_bytes | bytes | 3 | 172384.000 | 160864.000 | 177376.000 |
+| l1-constructors | parallel_class_workers | 4 | finish_metadata_bytes | bytes | 3 | 343472.000 | 308368.000 | 378576.000 |
+| l1-constructors | parallel_class_workers | 4 | finish_reserved_bytes | bytes | 3 | 809728.000 | 748296.000 | 871160.000 |
+| l1-constructors | parallel_class_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.056 | 0.033 | 0.068 |
+| l1-constructors | parallel_class_workers | 4 | max_rendezvous_ns | ms | 3 | 2.839 | 1.917 | 8.048 |
+| l1-constructors | parallel_class_workers | 4 | process_cpu_ns | ms | 3 | 698.530 | 666.969 | 753.696 |
+| l1-constructors | parallel_class_workers | 4 | source_freeze_run_ns | ms | 3 | 0.150 | 0.144 | 0.213 |
+| l1-constructors | parallel_class_workers | 4 | wall_ns | ms | 3 | 258.498 | 237.806 | 280.871 |
+| l1-constructors | parallel_closure_workers | 1 | finish_live_bytes | bytes | 3 | 160392.000 | 160392.000 | 160392.000 |
+| l1-constructors | parallel_closure_workers | 1 | finish_metadata_bytes | bytes | 3 | 199072.000 | 199072.000 | 199072.000 |
+| l1-constructors | parallel_closure_workers | 1 | finish_reserved_bytes | bytes | 3 | 530464.000 | 530464.000 | 530464.000 |
+| l1-constructors | parallel_closure_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.033 | 0.031 | 0.053 |
+| l1-constructors | parallel_closure_workers | 1 | max_rendezvous_ns | ms | 3 | 0.002 | 0.002 | 0.002 |
+| l1-constructors | parallel_closure_workers | 1 | process_cpu_ns | ms | 3 | 268.896 | 264.440 | 318.446 |
+| l1-constructors | parallel_closure_workers | 1 | source_freeze_run_ns | ms | 3 | 0.101 | 0.099 | 0.157 |
+| l1-constructors | parallel_closure_workers | 1 | wall_ns | ms | 3 | 268.914 | 260.182 | 313.866 |
+| l1-constructors | parallel_closure_workers | 2 | finish_live_bytes | bytes | 3 | 215688.000 | 215040.000 | 233616.000 |
+| l1-constructors | parallel_closure_workers | 2 | finish_metadata_bytes | bytes | 3 | 316688.000 | 316144.000 | 354256.000 |
+| l1-constructors | parallel_closure_workers | 2 | finish_reserved_bytes | bytes | 3 | 731488.000 | 727408.000 | 797136.000 |
+| l1-constructors | parallel_closure_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.078 | 0.054 | 0.079 |
+| l1-constructors | parallel_closure_workers | 2 | max_rendezvous_ns | ms | 3 | 0.120 | 0.115 | 0.174 |
+| l1-constructors | parallel_closure_workers | 2 | process_cpu_ns | ms | 3 | 283.425 | 269.788 | 313.218 |
+| l1-constructors | parallel_closure_workers | 2 | source_freeze_run_ns | ms | 3 | 0.111 | 0.099 | 0.130 |
+| l1-constructors | parallel_closure_workers | 2 | wall_ns | ms | 3 | 153.186 | 136.256 | 158.422 |
+| l1-constructors | parallel_closure_workers | 4 | finish_live_bytes | bytes | 3 | 188832.000 | 170400.000 | 192672.000 |
+| l1-constructors | parallel_closure_workers | 4 | finish_metadata_bytes | bytes | 3 | 362992.000 | 362448.000 | 362992.000 |
+| l1-constructors | parallel_closure_workers | 4 | finish_reserved_bytes | bytes | 3 | 797136.000 | 793056.000 | 797136.000 |
+| l1-constructors | parallel_closure_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.085 | 0.076 | 0.092 |
+| l1-constructors | parallel_closure_workers | 4 | max_rendezvous_ns | ms | 3 | 1.054 | 0.243 | 1.485 |
+| l1-constructors | parallel_closure_workers | 4 | process_cpu_ns | ms | 3 | 326.693 | 323.070 | 345.246 |
+| l1-constructors | parallel_closure_workers | 4 | source_freeze_run_ns | ms | 3 | 0.106 | 0.104 | 0.113 |
+| l1-constructors | parallel_closure_workers | 4 | wall_ns | ms | 3 | 99.065 | 97.393 | 99.536 |
+| l1-constructors | parallel_exception_workers | 1 | finish_live_bytes | bytes | 3 | 152316.000 | 152316.000 | 152316.000 |
+| l1-constructors | parallel_exception_workers | 1 | finish_metadata_bytes | bytes | 3 | 213424.000 | 213424.000 | 213424.000 |
+| l1-constructors | parallel_exception_workers | 1 | finish_reserved_bytes | bytes | 3 | 559840.000 | 559840.000 | 559840.000 |
+| l1-constructors | parallel_exception_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.069 | 0.038 | 0.072 |
+| l1-constructors | parallel_exception_workers | 1 | max_rendezvous_ns | ms | 3 | 0.002 | 0.002 | 0.002 |
+| l1-constructors | parallel_exception_workers | 1 | process_cpu_ns | ms | 3 | 473.832 | 426.050 | 488.841 |
+| l1-constructors | parallel_exception_workers | 1 | source_freeze_run_ns | ms | 3 | 0.103 | 0.099 | 0.109 |
+| l1-constructors | parallel_exception_workers | 1 | wall_ns | ms | 3 | 467.005 | 419.240 | 480.965 |
+| l1-constructors | parallel_exception_workers | 2 | finish_live_bytes | bytes | 3 | 254676.000 | 233996.000 | 259180.000 |
+| l1-constructors | parallel_exception_workers | 2 | finish_metadata_bytes | bytes | 3 | 401680.000 | 368784.000 | 439248.000 |
+| l1-constructors | parallel_exception_workers | 2 | finish_reserved_bytes | bytes | 3 | 888096.000 | 822432.000 | 953744.000 |
+| l1-constructors | parallel_exception_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.239 | 0.138 | 0.241 |
+| l1-constructors | parallel_exception_workers | 2 | max_rendezvous_ns | ms | 3 | 0.196 | 0.122 | 0.207 |
+| l1-constructors | parallel_exception_workers | 2 | process_cpu_ns | ms | 3 | 466.751 | 459.892 | 485.854 |
+| l1-constructors | parallel_exception_workers | 2 | source_freeze_run_ns | ms | 3 | 0.101 | 0.100 | 0.138 |
+| l1-constructors | parallel_exception_workers | 2 | wall_ns | ms | 3 | 244.188 | 234.228 | 248.008 |
+| l1-constructors | parallel_exception_workers | 4 | finish_live_bytes | bytes | 3 | 225476.000 | 218084.000 | 230076.000 |
+| l1-constructors | parallel_exception_workers | 4 | finish_metadata_bytes | bytes | 3 | 433552.000 | 381424.000 | 471120.000 |
+| l1-constructors | parallel_exception_workers | 4 | finish_reserved_bytes | bytes | 3 | 925744.000 | 826648.000 | 991392.000 |
+| l1-constructors | parallel_exception_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.103 | 0.082 | 0.183 |
+| l1-constructors | parallel_exception_workers | 4 | max_rendezvous_ns | ms | 3 | 3.216 | 0.619 | 5.871 |
+| l1-constructors | parallel_exception_workers | 4 | process_cpu_ns | ms | 3 | 562.439 | 512.309 | 582.823 |
+| l1-constructors | parallel_exception_workers | 4 | source_freeze_run_ns | ms | 3 | 0.107 | 0.100 | 0.142 |
+| l1-constructors | parallel_exception_workers | 4 | wall_ns | ms | 3 | 171.378 | 159.420 | 184.288 |
+| l1-constructors | parallel_for_workers | 1 | finish_live_bytes | bytes | 3 | 219444.000 | 219444.000 | 219444.000 |
+| l1-constructors | parallel_for_workers | 1 | finish_metadata_bytes | bytes | 3 | 315888.000 | 315888.000 | 315888.000 |
+| l1-constructors | parallel_for_workers | 1 | finish_reserved_bytes | bytes | 3 | 735816.000 | 735816.000 | 735816.000 |
+| l1-constructors | parallel_for_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.083 | 0.056 | 0.124 |
+| l1-constructors | parallel_for_workers | 1 | max_rendezvous_ns | ms | 3 | 0.002 | 0.002 | 0.011 |
+| l1-constructors | parallel_for_workers | 1 | process_cpu_ns | ms | 3 | 174.390 | 172.149 | 200.626 |
+| l1-constructors | parallel_for_workers | 1 | source_freeze_run_ns | ms | 3 | 0.100 | 0.089 | 0.102 |
+| l1-constructors | parallel_for_workers | 1 | wall_ns | ms | 3 | 171.668 | 169.628 | 198.760 |
+| l1-constructors | parallel_for_workers | 2 | finish_live_bytes | bytes | 3 | 151620.000 | 140100.000 | 153228.000 |
+| l1-constructors | parallel_for_workers | 2 | finish_metadata_bytes | bytes | 3 | 245840.000 | 245840.000 | 245840.000 |
+| l1-constructors | parallel_for_workers | 2 | finish_reserved_bytes | bytes | 3 | 604520.000 | 604520.000 | 604520.000 |
+| l1-constructors | parallel_for_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.073 | 0.041 | 0.077 |
+| l1-constructors | parallel_for_workers | 2 | max_rendezvous_ns | ms | 3 | 0.078 | 0.076 | 0.135 |
+| l1-constructors | parallel_for_workers | 2 | process_cpu_ns | ms | 3 | 191.883 | 180.164 | 204.248 |
+| l1-constructors | parallel_for_workers | 2 | source_freeze_run_ns | ms | 3 | 0.112 | 0.087 | 0.145 |
+| l1-constructors | parallel_for_workers | 2 | wall_ns | ms | 3 | 97.599 | 91.534 | 105.991 |
+| l1-constructors | parallel_for_workers | 4 | finish_live_bytes | bytes | 3 | 235700.000 | 223348.000 | 249940.000 |
+| l1-constructors | parallel_for_workers | 4 | finish_metadata_bytes | bytes | 3 | 450640.000 | 419856.000 | 450640.000 |
+| l1-constructors | parallel_for_workers | 4 | finish_reserved_bytes | bytes | 3 | 949456.000 | 900504.000 | 949456.000 |
+| l1-constructors | parallel_for_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.099 | 0.087 | 0.137 |
+| l1-constructors | parallel_for_workers | 4 | max_rendezvous_ns | ms | 3 | 1.096 | 0.270 | 3.719 |
+| l1-constructors | parallel_for_workers | 4 | process_cpu_ns | ms | 3 | 203.026 | 195.132 | 263.181 |
+| l1-constructors | parallel_for_workers | 4 | source_freeze_run_ns | ms | 3 | 0.093 | 0.088 | 0.096 |
+| l1-constructors | parallel_for_workers | 4 | wall_ns | ms | 3 | 60.235 | 58.511 | 88.347 |
+| l1-constructors | parallel_source_workers | 1 | finish_live_bytes | bytes | 3 | 242012.000 | 242012.000 | 242012.000 |
+| l1-constructors | parallel_source_workers | 1 | finish_metadata_bytes | bytes | 3 | 308928.000 | 308928.000 | 308928.000 |
+| l1-constructors | parallel_source_workers | 1 | finish_reserved_bytes | bytes | 3 | 723200.000 | 723200.000 | 723200.000 |
+| l1-constructors | parallel_source_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.095 | 0.065 | 0.130 |
+| l1-constructors | parallel_source_workers | 1 | max_rendezvous_ns | ms | 3 | 0.002 | 0.002 | 0.002 |
+| l1-constructors | parallel_source_workers | 1 | process_cpu_ns | ms | 3 | 274.517 | 266.452 | 316.045 |
+| l1-constructors | parallel_source_workers | 1 | source_freeze_run_ns | ms | 3 | 0.099 | 0.091 | 0.112 |
+| l1-constructors | parallel_source_workers | 1 | wall_ns | ms | 3 | 283.874 | 262.172 | 319.054 |
+| l1-constructors | parallel_source_workers | 2 | finish_live_bytes | bytes | 3 | 156020.000 | 150852.000 | 167276.000 |
+| l1-constructors | parallel_source_workers | 2 | finish_metadata_bytes | bytes | 3 | 238704.000 | 238160.000 | 275728.000 |
+| l1-constructors | parallel_source_workers | 2 | finish_reserved_bytes | bytes | 3 | 595984.000 | 591904.000 | 657552.000 |
+| l1-constructors | parallel_source_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.060 | 0.051 | 0.061 |
+| l1-constructors | parallel_source_workers | 2 | max_rendezvous_ns | ms | 3 | 0.171 | 0.110 | 0.699 |
+| l1-constructors | parallel_source_workers | 2 | process_cpu_ns | ms | 3 | 290.433 | 269.109 | 315.146 |
+| l1-constructors | parallel_source_workers | 2 | source_freeze_run_ns | ms | 3 | 0.138 | 0.088 | 0.139 |
+| l1-constructors | parallel_source_workers | 2 | wall_ns | ms | 3 | 157.210 | 136.565 | 158.235 |
+| l1-constructors | parallel_source_workers | 4 | finish_live_bytes | bytes | 3 | 163988.000 | 135596.000 | 264412.000 |
+| l1-constructors | parallel_source_workers | 4 | finish_metadata_bytes | bytes | 3 | 359600.000 | 322032.000 | 473392.000 |
+| l1-constructors | parallel_source_workers | 4 | finish_reserved_bytes | bytes | 3 | 788848.000 | 723200.000 | 993952.000 |
+| l1-constructors | parallel_source_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.100 | 0.089 | 0.139 |
+| l1-constructors | parallel_source_workers | 4 | max_rendezvous_ns | ms | 3 | 4.025 | 0.228 | 6.555 |
+| l1-constructors | parallel_source_workers | 4 | process_cpu_ns | ms | 3 | 305.013 | 297.701 | 368.947 |
+| l1-constructors | parallel_source_workers | 4 | source_freeze_run_ns | ms | 3 | 0.093 | 0.087 | 0.108 |
+| l1-constructors | parallel_source_workers | 4 | wall_ns | ms | 3 | 117.821 | 84.969 | 118.537 |
+| l1-constructors | parallel_storage_workers | 1 | finish_live_bytes | bytes | 3 | 42720.000 | 42720.000 | 42720.000 |
+| l1-constructors | parallel_storage_workers | 1 | finish_metadata_bytes | bytes | 3 | 97040.000 | 97040.000 | 97040.000 |
+| l1-constructors | parallel_storage_workers | 1 | finish_reserved_bytes | bytes | 3 | 135504.000 | 135504.000 | 135504.000 |
+| l1-constructors | parallel_storage_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.031 | 0.026 | 0.031 |
+| l1-constructors | parallel_storage_workers | 1 | max_rendezvous_ns | ms | 3 | 0.000 | 0.000 | 0.001 |
+| l1-constructors | parallel_storage_workers | 1 | process_cpu_ns | ms | 3 | 2.775 | 2.739 | 3.010 |
+| l1-constructors | parallel_storage_workers | 1 | wall_ns | ms | 3 | 2.748 | 2.710 | 2.888 |
+| l1-constructors | parallel_storage_workers | 2 | finish_live_bytes | bytes | 3 | 12560.000 | 3024.000 | 21664.000 |
+| l1-constructors | parallel_storage_workers | 2 | finish_metadata_bytes | bytes | 3 | 100352.000 | 100352.000 | 100352.000 |
+| l1-constructors | parallel_storage_workers | 2 | finish_reserved_bytes | bytes | 3 | 135504.000 | 135504.000 | 135504.000 |
+| l1-constructors | parallel_storage_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.024 | 0.010 | 0.048 |
+| l1-constructors | parallel_storage_workers | 2 | max_rendezvous_ns | ms | 3 | 0.050 | 0.049 | 0.114 |
+| l1-constructors | parallel_storage_workers | 2 | process_cpu_ns | ms | 3 | 3.117 | 2.954 | 3.145 |
+| l1-constructors | parallel_storage_workers | 2 | wall_ns | ms | 3 | 2.091 | 1.809 | 2.530 |
+| l1-constructors | parallel_storage_workers | 4 | finish_live_bytes | bytes | 3 | 31776.000 | 1472.000 | 44832.000 |
+| l1-constructors | parallel_storage_workers | 4 | finish_metadata_bytes | bytes | 3 | 197440.000 | 194592.000 | 241248.000 |
+| l1-constructors | parallel_storage_workers | 4 | finish_reserved_bytes | bytes | 3 | 271008.000 | 266800.000 | 336656.000 |
+| l1-constructors | parallel_storage_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.064 | 0.012 | 0.082 |
+| l1-constructors | parallel_storage_workers | 4 | max_rendezvous_ns | ms | 3 | 0.161 | 0.097 | 0.289 |
+| l1-constructors | parallel_storage_workers | 4 | process_cpu_ns | ms | 3 | 5.261 | 3.940 | 5.351 |
+| l1-constructors | parallel_storage_workers | 4 | wall_ns | ms | 3 | 3.186 | 2.180 | 3.208 |
+| l1-constructors | parallel_vm_workers | 1 | finish_live_bytes | bytes | 3 | 146564.000 | 146564.000 | 146564.000 |
+| l1-constructors | parallel_vm_workers | 1 | finish_metadata_bytes | bytes | 3 | 196128.000 | 196128.000 | 196128.000 |
+| l1-constructors | parallel_vm_workers | 1 | finish_reserved_bytes | bytes | 3 | 526256.000 | 526256.000 | 526256.000 |
+| l1-constructors | parallel_vm_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.111 | 0.074 | 0.124 |
+| l1-constructors | parallel_vm_workers | 1 | max_rendezvous_ns | ms | 3 | 0.002 | 0.002 | 0.002 |
+| l1-constructors | parallel_vm_workers | 1 | process_cpu_ns | ms | 3 | 229.623 | 226.660 | 264.037 |
+| l1-constructors | parallel_vm_workers | 1 | source_freeze_run_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| l1-constructors | parallel_vm_workers | 1 | wall_ns | ms | 3 | 226.684 | 222.996 | 277.733 |
+| l1-constructors | parallel_vm_workers | 2 | finish_live_bytes | bytes | 3 | 194588.000 | 183164.000 | 194804.000 |
+| l1-constructors | parallel_vm_workers | 2 | finish_metadata_bytes | bytes | 3 | 313104.000 | 275536.000 | 313104.000 |
+| l1-constructors | parallel_vm_workers | 2 | finish_reserved_bytes | bytes | 3 | 723200.000 | 657552.000 | 723200.000 |
+| l1-constructors | parallel_vm_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.065 | 0.063 | 0.074 |
+| l1-constructors | parallel_vm_workers | 2 | max_rendezvous_ns | ms | 3 | 0.080 | 0.066 | 0.092 |
+| l1-constructors | parallel_vm_workers | 2 | process_cpu_ns | ms | 3 | 244.626 | 240.765 | 257.656 |
+| l1-constructors | parallel_vm_workers | 2 | source_freeze_run_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| l1-constructors | parallel_vm_workers | 2 | wall_ns | ms | 3 | 126.021 | 125.371 | 133.401 |
+| l1-constructors | parallel_vm_workers | 4 | finish_live_bytes | bytes | 3 | 141500.000 | 134924.000 | 193956.000 |
+| l1-constructors | parallel_vm_workers | 4 | finish_metadata_bytes | bytes | 3 | 321648.000 | 321648.000 | 360304.000 |
+| l1-constructors | parallel_vm_workers | 4 | finish_reserved_bytes | bytes | 3 | 723200.000 | 723200.000 | 797008.000 |
+| l1-constructors | parallel_vm_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.078 | 0.057 | 0.080 |
+| l1-constructors | parallel_vm_workers | 4 | max_rendezvous_ns | ms | 3 | 2.051 | 0.232 | 13.624 |
+| l1-constructors | parallel_vm_workers | 4 | process_cpu_ns | ms | 3 | 272.448 | 264.850 | 283.955 |
+| l1-constructors | parallel_vm_workers | 4 | source_freeze_run_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| l1-constructors | parallel_vm_workers | 4 | wall_ns | ms | 3 | 91.550 | 82.259 | 184.431 |
+| l1-constructors | process_peak_rss_kib | - | process_peak_rss_kib | KiB | 3 | 7220.000 | 7140.000 | 7500.000 |
+| l1-constructors | scheduled_iterations | - | scheduled_function_ns | ms | 3 | 21.735 | 20.473 | 23.796 |
+| l1-constructors | shared_edge_iterations | - | cell_object_bytes | bytes | 3 | 16.000 | 16.000 | 16.000 |
+| l1-constructors | shared_edge_iterations | - | rooted_cell_read_ns | ms | 3 | 2.456 | 2.387 | 2.483 |
+| l1-constructors | shared_edge_iterations | - | rooted_cell_store_read_ns | ms | 3 | 4.894 | 4.584 | 5.462 |
+| l1-constructors | slot_iterations | - | generic_prefix_bytes | bytes | 3 | 8.000 | 8.000 | 8.000 |
+| l1-constructors | slot_iterations | - | slot_instance_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| l1-constructors | slot_iterations | - | slot_set_get_ns | ms | 3 | 30.875 | 30.006 | 33.119 |
+| l1-constructors | source_parse_scope_cfg_ns | - | source_bytes | bytes | 3 | 92.000 | 92.000 | 92.000 |
+| l1-constructors | source_parse_scope_cfg_ns | - | source_parse_scope_cfg_ns | ms | 3 | 0.037 | 0.035 | 0.039 |
+| l1-constructors | transfer_iterations | - | transfer_roundtrip_ns | ms | 3 | 0.884 | 0.878 | 1.003 |
+| l1-constructors | transfer_iterations | - | transfer_token_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| l1-constructors | with_iterations | - | with_function_ns | ms | 3 | 29.179 | 28.137 | 31.963 |
+| l1-constructors-cpython | parallel_class_workers | 1 | process_cpu_ns | ms | 3 | 9.570 | 8.889 | 11.252 |
+| l1-constructors-cpython | parallel_class_workers | 1 | wall_ns | ms | 3 | 9.405 | 8.753 | 11.106 |
+| l1-constructors-cpython | parallel_class_workers | 2 | process_cpu_ns | ms | 3 | 9.639 | 9.214 | 10.824 |
+| l1-constructors-cpython | parallel_class_workers | 2 | wall_ns | ms | 3 | 9.453 | 9.025 | 10.564 |
+| l1-constructors-cpython | parallel_class_workers | 4 | process_cpu_ns | ms | 3 | 9.672 | 9.185 | 10.168 |
+| l1-constructors-cpython | parallel_class_workers | 4 | wall_ns | ms | 3 | 9.480 | 9.007 | 9.994 |
+| l1-constructors-cpython | parallel_closure_workers | 1 | process_cpu_ns | ms | 3 | 6.865 | 6.389 | 7.994 |
+| l1-constructors-cpython | parallel_closure_workers | 1 | wall_ns | ms | 3 | 6.749 | 6.275 | 8.189 |
+| l1-constructors-cpython | parallel_closure_workers | 2 | process_cpu_ns | ms | 3 | 6.957 | 6.608 | 7.242 |
+| l1-constructors-cpython | parallel_closure_workers | 2 | wall_ns | ms | 3 | 6.832 | 6.498 | 7.123 |
+| l1-constructors-cpython | parallel_closure_workers | 4 | process_cpu_ns | ms | 3 | 6.881 | 6.587 | 7.284 |
+| l1-constructors-cpython | parallel_closure_workers | 4 | wall_ns | ms | 3 | 6.792 | 6.668 | 7.170 |
+| l1-constructors-cpython | parallel_exception_workers | 1 | process_cpu_ns | ms | 3 | 9.630 | 8.093 | 9.874 |
+| l1-constructors-cpython | parallel_exception_workers | 1 | wall_ns | ms | 3 | 9.566 | 7.965 | 9.723 |
+| l1-constructors-cpython | parallel_exception_workers | 2 | process_cpu_ns | ms | 3 | 7.994 | 7.719 | 8.626 |
+| l1-constructors-cpython | parallel_exception_workers | 2 | wall_ns | ms | 3 | 7.838 | 7.579 | 8.487 |
+| l1-constructors-cpython | parallel_exception_workers | 4 | process_cpu_ns | ms | 3 | 8.375 | 8.077 | 8.860 |
+| l1-constructors-cpython | parallel_exception_workers | 4 | wall_ns | ms | 3 | 8.141 | 7.891 | 8.693 |
+| l1-constructors-cpython | parallel_for_workers | 1 | process_cpu_ns | ms | 3 | 5.169 | 5.099 | 6.442 |
+| l1-constructors-cpython | parallel_for_workers | 1 | wall_ns | ms | 3 | 5.737 | 5.119 | 6.345 |
+| l1-constructors-cpython | parallel_for_workers | 2 | process_cpu_ns | ms | 3 | 5.173 | 5.118 | 5.591 |
+| l1-constructors-cpython | parallel_for_workers | 2 | wall_ns | ms | 3 | 5.051 | 5.001 | 5.489 |
+| l1-constructors-cpython | parallel_for_workers | 4 | process_cpu_ns | ms | 3 | 5.208 | 4.603 | 6.117 |
+| l1-constructors-cpython | parallel_for_workers | 4 | wall_ns | ms | 3 | 5.175 | 4.559 | 5.975 |
+| l1-constructors-cpython | parallel_source_workers | 1 | process_cpu_ns | ms | 3 | 6.927 | 6.801 | 7.570 |
+| l1-constructors-cpython | parallel_source_workers | 1 | wall_ns | ms | 3 | 6.817 | 6.727 | 7.467 |
+| l1-constructors-cpython | parallel_source_workers | 2 | process_cpu_ns | ms | 3 | 6.751 | 6.545 | 7.183 |
+| l1-constructors-cpython | parallel_source_workers | 2 | wall_ns | ms | 3 | 6.635 | 6.450 | 7.046 |
+| l1-constructors-cpython | parallel_source_workers | 4 | process_cpu_ns | ms | 3 | 6.584 | 6.226 | 8.163 |
+| l1-constructors-cpython | parallel_source_workers | 4 | wall_ns | ms | 3 | 6.471 | 6.122 | 8.033 |
 | l1-source-exceptions | cleanup_iterations | - | active_region_bytes | bytes | 3 | 32.000 | 32.000 | 32.000 |
 | l1-source-exceptions | cleanup_iterations | - | cleanup_continuation_bytes | bytes | 3 | 48.000 | 48.000 | 48.000 |
 | l1-source-exceptions | cleanup_iterations | - | cleanup_function_ns | ms | 3 | 15.273 | 15.053 | 17.760 |
@@ -1733,6 +1964,42 @@ Derived from median wall/process CPU times. CPU/wall is not a speedup; 1-worker 
 | l1-class-namespaces-cpython | parallel_source_workers | 1 | 6.537 | 0.997 | 1.000 | 1.000 |
 | l1-class-namespaces-cpython | parallel_source_workers | 2 | 6.203 | 1.012 | 1.054 | 0.527 |
 | l1-class-namespaces-cpython | parallel_source_workers | 4 | 6.009 | 1.027 | 1.088 | 0.272 |
+| l1-constructors | parallel_class_workers | 1 | 488.557 | 1.016 | 1.000 | 1.000 |
+| l1-constructors | parallel_class_workers | 2 | 274.309 | 1.923 | 1.781 | 0.891 |
+| l1-constructors | parallel_class_workers | 4 | 258.498 | 2.702 | 1.890 | 0.472 |
+| l1-constructors | parallel_closure_workers | 1 | 268.914 | 1.000 | 1.000 | 1.000 |
+| l1-constructors | parallel_closure_workers | 2 | 153.186 | 1.850 | 1.755 | 0.878 |
+| l1-constructors | parallel_closure_workers | 4 | 99.065 | 3.298 | 2.715 | 0.679 |
+| l1-constructors | parallel_exception_workers | 1 | 467.005 | 1.015 | 1.000 | 1.000 |
+| l1-constructors | parallel_exception_workers | 2 | 244.188 | 1.911 | 1.912 | 0.956 |
+| l1-constructors | parallel_exception_workers | 4 | 171.378 | 3.282 | 2.725 | 0.681 |
+| l1-constructors | parallel_for_workers | 1 | 171.668 | 1.016 | 1.000 | 1.000 |
+| l1-constructors | parallel_for_workers | 2 | 97.599 | 1.966 | 1.759 | 0.879 |
+| l1-constructors | parallel_for_workers | 4 | 60.235 | 3.371 | 2.850 | 0.712 |
+| l1-constructors | parallel_source_workers | 1 | 283.874 | 0.967 | 1.000 | 1.000 |
+| l1-constructors | parallel_source_workers | 2 | 157.210 | 1.847 | 1.806 | 0.903 |
+| l1-constructors | parallel_source_workers | 4 | 117.821 | 2.589 | 2.409 | 0.602 |
+| l1-constructors | parallel_storage_workers | 1 | 2.748 | 1.010 | 1.000 | 1.000 |
+| l1-constructors | parallel_storage_workers | 2 | 2.091 | 1.491 | 1.315 | 0.657 |
+| l1-constructors | parallel_storage_workers | 4 | 3.186 | 1.651 | 0.863 | 0.216 |
+| l1-constructors | parallel_vm_workers | 1 | 226.684 | 1.013 | 1.000 | 1.000 |
+| l1-constructors | parallel_vm_workers | 2 | 126.021 | 1.941 | 1.799 | 0.899 |
+| l1-constructors | parallel_vm_workers | 4 | 91.550 | 2.976 | 2.476 | 0.619 |
+| l1-constructors-cpython | parallel_class_workers | 1 | 9.405 | 1.017 | 1.000 | 1.000 |
+| l1-constructors-cpython | parallel_class_workers | 2 | 9.453 | 1.020 | 0.995 | 0.497 |
+| l1-constructors-cpython | parallel_class_workers | 4 | 9.480 | 1.020 | 0.992 | 0.248 |
+| l1-constructors-cpython | parallel_closure_workers | 1 | 6.749 | 1.017 | 1.000 | 1.000 |
+| l1-constructors-cpython | parallel_closure_workers | 2 | 6.832 | 1.018 | 0.988 | 0.494 |
+| l1-constructors-cpython | parallel_closure_workers | 4 | 6.792 | 1.013 | 0.994 | 0.248 |
+| l1-constructors-cpython | parallel_exception_workers | 1 | 9.566 | 1.007 | 1.000 | 1.000 |
+| l1-constructors-cpython | parallel_exception_workers | 2 | 7.838 | 1.020 | 1.220 | 0.610 |
+| l1-constructors-cpython | parallel_exception_workers | 4 | 8.141 | 1.029 | 1.175 | 0.294 |
+| l1-constructors-cpython | parallel_for_workers | 1 | 5.737 | 0.901 | 1.000 | 1.000 |
+| l1-constructors-cpython | parallel_for_workers | 2 | 5.051 | 1.024 | 1.136 | 0.568 |
+| l1-constructors-cpython | parallel_for_workers | 4 | 5.175 | 1.006 | 1.109 | 0.277 |
+| l1-constructors-cpython | parallel_source_workers | 1 | 6.817 | 1.016 | 1.000 | 1.000 |
+| l1-constructors-cpython | parallel_source_workers | 2 | 6.635 | 1.017 | 1.027 | 0.514 |
+| l1-constructors-cpython | parallel_source_workers | 4 | 6.471 | 1.018 | 1.054 | 0.263 |
 | l1-source-exceptions | parallel_closure_workers | 1 | 243.912 | 1.036 | 1.000 | 1.000 |
 | l1-source-exceptions | parallel_closure_workers | 2 | 126.691 | 2.028 | 1.925 | 0.963 |
 | l1-source-exceptions | parallel_closure_workers | 4 | 77.233 | 3.469 | 3.158 | 0.790 |
@@ -1911,6 +2178,21 @@ The CPython probe executes the source kernel captured from the C++ benchmark, wi
 | l1-class-namespaces | parallel_source_workers | 1 | 264.697 | 6.537 | 40.490 |
 | l1-class-namespaces | parallel_source_workers | 2 | 140.995 | 6.203 | 22.731 |
 | l1-class-namespaces | parallel_source_workers | 4 | 90.087 | 6.009 | 14.991 |
+| l1-constructors | parallel_class_workers | 1 | 488.557 | 9.405 | 51.946 |
+| l1-constructors | parallel_class_workers | 2 | 274.309 | 9.453 | 29.019 |
+| l1-constructors | parallel_class_workers | 4 | 258.498 | 9.480 | 27.267 |
+| l1-constructors | parallel_closure_workers | 1 | 268.914 | 6.749 | 39.845 |
+| l1-constructors | parallel_closure_workers | 2 | 153.186 | 6.832 | 22.423 |
+| l1-constructors | parallel_closure_workers | 4 | 99.065 | 6.792 | 14.586 |
+| l1-constructors | parallel_exception_workers | 1 | 467.005 | 9.566 | 48.821 |
+| l1-constructors | parallel_exception_workers | 2 | 244.188 | 7.838 | 31.155 |
+| l1-constructors | parallel_exception_workers | 4 | 171.378 | 8.141 | 21.052 |
+| l1-constructors | parallel_for_workers | 1 | 171.668 | 5.737 | 29.925 |
+| l1-constructors | parallel_for_workers | 2 | 97.599 | 5.051 | 19.322 |
+| l1-constructors | parallel_for_workers | 4 | 60.235 | 5.175 | 11.640 |
+| l1-constructors | parallel_source_workers | 1 | 283.874 | 6.817 | 41.643 |
+| l1-constructors | parallel_source_workers | 2 | 157.210 | 6.635 | 23.694 |
+| l1-constructors | parallel_source_workers | 4 | 117.821 | 6.471 | 18.209 |
 | l1-source-exceptions | parallel_closure_workers | 1 | 243.912 | 5.900 | 41.340 |
 | l1-source-exceptions | parallel_closure_workers | 2 | 126.691 | 5.896 | 21.486 |
 | l1-source-exceptions | parallel_closure_workers | 4 | 77.233 | 5.681 | 13.595 |

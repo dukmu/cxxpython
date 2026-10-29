@@ -1,0 +1,2327 @@
+{
+  "captured_at": "2026-10-29T15:56:28.271827+00:00",
+  "reference_version": "Python 3.12.14",
+  "provenance": {
+    "binary": {
+      "path": "/home/shefrin/repo/cxxpython/build/cxxpython",
+      "sha256": "0be96709c9d13720832900ad02ef649ee0b1b71c4b211571813727dd5170263c"
+    },
+    "reference": {
+      "path": "/tmp/cxxpython-cpython31214-build/python",
+      "sha256": "0048a751931754717ef43384585009919fd2a5d952c253f107113787dcfe7a8b"
+    }
+  },
+  "passed": true,
+  "observations": [
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float()\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "0.0\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float()\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "0.0\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float(42)\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "42.0\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float(42)\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "42.0\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('  -1.25e2  ')\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "-125.0\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('  -1.25e2  ')\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "-125.0\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('inf')\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "inf\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('inf')\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "inf\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('-Infinity')\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "-inf\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('-Infinity')\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "-inf\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('nan')\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "nan\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('nan')\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "nan\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('nan(foo)')\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "'ValueError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('nan(foo)')\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "'ValueError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('+-1')\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "'ValueError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('+-1')\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "'ValueError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('+-inf')\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "'ValueError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('+-inf')\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "'ValueError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('++1')\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "'ValueError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('++1')\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "'ValueError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('--1')\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "'ValueError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('--1')\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "'ValueError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('+1')\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "1.0\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('+1')\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "1.0\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('+Infinity')\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "inf\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('+Infinity')\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "inf\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('+nan')\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "nan\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('+nan')\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "nan\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('-0')\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "-0.0\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('-0')\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "-0.0\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('1_2.5')\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "12.5\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('1_2.5')\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "12.5\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('1__2')\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "'ValueError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('1__2')\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "'ValueError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float(ViaFloat())\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "2.5\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float(ViaFloat())\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "2.5\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float(Text('2.5'))\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "3.5\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float(Text('2.5'))\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "3.5\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('\u0661\u0662.\u0665')\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "12.5\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('\u0661\u0662.\u0665')\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "12.5\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('1e16')\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "1e+16\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('1e16')\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "1e+16\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('1e-5')\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "1e-05\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('1e-5')\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "1e-05\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = int(float('-123.75'))\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "-123\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = int(float('-123.75'))\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "-123\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('1e9999')\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "inf\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('1e9999')\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "inf\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('-1e9999')\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "-inf\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('-1e9999')\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "-inf\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('1e-9999')\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "0.0\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('1e-9999')\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "0.0\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('-1e-9999')\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "-0.0\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('-1e-9999')\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "-0.0\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('5e-324')\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "5e-324\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('5e-324')\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "5e-324\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('1.7976931348623157e308')\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "1.7976931348623157e+308\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('1.7976931348623157e308')\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "1.7976931348623157e+308\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('9007199254740992') == 9007199254740993\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "False\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('9007199254740992') == 9007199254740993\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "False\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('9007199254740992') == 9007199254740992\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "True\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('9007199254740992') == 9007199254740992\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "True\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float(9007199254740993)\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "9007199254740992.0\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float(9007199254740993)\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "9007199254740992.0\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float(9007199254740995)\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "9007199254740996.0\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float(9007199254740995)\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "9007199254740996.0\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float(9686040848368617267738905405359029371380096248252945222673)\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "9.686040848368618e+57\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float(9686040848368617267738905405359029371380096248252945222673)\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "9.686040848368618e+57\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float(ViaIndex())\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "7.0\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float(ViaIndex())\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "7.0\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float(BadFloat())\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float(BadFloat())\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float(x=1)\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float(x=1)\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = type(Child(1)).__name__\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "'Child'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = type(Child(1)).__name__\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "'Child'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = hash(float(42)) == hash(42)\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "True\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = hash(float(42)) == hash(42)\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "True\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float(42) == 42\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "True\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float(42) == 42\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "True\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('nan') == float('nan')\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "False\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = float('nan') == float('nan')\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "False\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = slotted, slotted.item, type(slotted).__name__\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "(1.5, (7, 8), 'Slotted')\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaFloat:\n    def __float__(self):\n        return float('2.5')\nclass ViaIndex:\n    def __index__(self):\n        return 7\nclass BadFloat:\n    def __float__(self):\n        return 1\nclass Child(float):\n    pass\nclass Text(str):\n    def __float__(self):\n        return float('3.5')\nclass Slotted(float):\n    __slots__ = ('item',)\nslotted = Slotted('1.5')\nslotted.item = (7, 8)\n\ntry:\n    result = slotted, slotted.item, type(slotted).__name__\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "(1.5, (7, 8), 'Slotted')\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaInt:\n    def __int__(self):\n        return 17\n    def __index__(self):\n        return 19\nclass ViaIndex:\n    def __index__(self):\n        return 23\nclass BadInt:\n    def __int__(self):\n        return 'bad'\nclass ViaTrunc:\n    def __trunc__(self):\n        return ViaIndex()\nclass BadTrunc:\n    def __trunc__(self):\n        return 'bad'\nclass Radix:\n    def __index__(self):\n        return 16\nclass Child(int):\n    pass\nclass Text(str):\n    def __int__(self):\n        return 31\n    def __index__(self):\n        return 16\n\ntry:\n    result = int(ViaInt())\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "17\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaInt:\n    def __int__(self):\n        return 17\n    def __index__(self):\n        return 19\nclass ViaIndex:\n    def __index__(self):\n        return 23\nclass BadInt:\n    def __int__(self):\n        return 'bad'\nclass ViaTrunc:\n    def __trunc__(self):\n        return ViaIndex()\nclass BadTrunc:\n    def __trunc__(self):\n        return 'bad'\nclass Radix:\n    def __index__(self):\n        return 16\nclass Child(int):\n    pass\nclass Text(str):\n    def __int__(self):\n        return 31\n    def __index__(self):\n        return 16\n\ntry:\n    result = int(ViaInt())\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "17\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaInt:\n    def __int__(self):\n        return 17\n    def __index__(self):\n        return 19\nclass ViaIndex:\n    def __index__(self):\n        return 23\nclass BadInt:\n    def __int__(self):\n        return 'bad'\nclass ViaTrunc:\n    def __trunc__(self):\n        return ViaIndex()\nclass BadTrunc:\n    def __trunc__(self):\n        return 'bad'\nclass Radix:\n    def __index__(self):\n        return 16\nclass Child(int):\n    pass\nclass Text(str):\n    def __int__(self):\n        return 31\n    def __index__(self):\n        return 16\n\ntry:\n    result = int(ViaIndex())\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "23\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaInt:\n    def __int__(self):\n        return 17\n    def __index__(self):\n        return 19\nclass ViaIndex:\n    def __index__(self):\n        return 23\nclass BadInt:\n    def __int__(self):\n        return 'bad'\nclass ViaTrunc:\n    def __trunc__(self):\n        return ViaIndex()\nclass BadTrunc:\n    def __trunc__(self):\n        return 'bad'\nclass Radix:\n    def __index__(self):\n        return 16\nclass Child(int):\n    pass\nclass Text(str):\n    def __int__(self):\n        return 31\n    def __index__(self):\n        return 16\n\ntry:\n    result = int(ViaIndex())\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "23\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaInt:\n    def __int__(self):\n        return 17\n    def __index__(self):\n        return 19\nclass ViaIndex:\n    def __index__(self):\n        return 23\nclass BadInt:\n    def __int__(self):\n        return 'bad'\nclass ViaTrunc:\n    def __trunc__(self):\n        return ViaIndex()\nclass BadTrunc:\n    def __trunc__(self):\n        return 'bad'\nclass Radix:\n    def __index__(self):\n        return 16\nclass Child(int):\n    pass\nclass Text(str):\n    def __int__(self):\n        return 31\n    def __index__(self):\n        return 16\n\ntry:\n    result = int(BadInt())\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaInt:\n    def __int__(self):\n        return 17\n    def __index__(self):\n        return 19\nclass ViaIndex:\n    def __index__(self):\n        return 23\nclass BadInt:\n    def __int__(self):\n        return 'bad'\nclass ViaTrunc:\n    def __trunc__(self):\n        return ViaIndex()\nclass BadTrunc:\n    def __trunc__(self):\n        return 'bad'\nclass Radix:\n    def __index__(self):\n        return 16\nclass Child(int):\n    pass\nclass Text(str):\n    def __int__(self):\n        return 31\n    def __index__(self):\n        return 16\n\ntry:\n    result = int(BadInt())\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaInt:\n    def __int__(self):\n        return 17\n    def __index__(self):\n        return 19\nclass ViaIndex:\n    def __index__(self):\n        return 23\nclass BadInt:\n    def __int__(self):\n        return 'bad'\nclass ViaTrunc:\n    def __trunc__(self):\n        return ViaIndex()\nclass BadTrunc:\n    def __trunc__(self):\n        return 'bad'\nclass Radix:\n    def __index__(self):\n        return 16\nclass Child(int):\n    pass\nclass Text(str):\n    def __int__(self):\n        return 31\n    def __index__(self):\n        return 16\n\ntry:\n    result = int(ViaTrunc())\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "23\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaInt:\n    def __int__(self):\n        return 17\n    def __index__(self):\n        return 19\nclass ViaIndex:\n    def __index__(self):\n        return 23\nclass BadInt:\n    def __int__(self):\n        return 'bad'\nclass ViaTrunc:\n    def __trunc__(self):\n        return ViaIndex()\nclass BadTrunc:\n    def __trunc__(self):\n        return 'bad'\nclass Radix:\n    def __index__(self):\n        return 16\nclass Child(int):\n    pass\nclass Text(str):\n    def __int__(self):\n        return 31\n    def __index__(self):\n        return 16\n\ntry:\n    result = int(ViaTrunc())\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "23\n",
+      "stderr": "<string>:31: DeprecationWarning: The delegation of int() to __trunc__ is deprecated.\n",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaInt:\n    def __int__(self):\n        return 17\n    def __index__(self):\n        return 19\nclass ViaIndex:\n    def __index__(self):\n        return 23\nclass BadInt:\n    def __int__(self):\n        return 'bad'\nclass ViaTrunc:\n    def __trunc__(self):\n        return ViaIndex()\nclass BadTrunc:\n    def __trunc__(self):\n        return 'bad'\nclass Radix:\n    def __index__(self):\n        return 16\nclass Child(int):\n    pass\nclass Text(str):\n    def __int__(self):\n        return 31\n    def __index__(self):\n        return 16\n\ntry:\n    result = int(BadTrunc())\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaInt:\n    def __int__(self):\n        return 17\n    def __index__(self):\n        return 19\nclass ViaIndex:\n    def __index__(self):\n        return 23\nclass BadInt:\n    def __int__(self):\n        return 'bad'\nclass ViaTrunc:\n    def __trunc__(self):\n        return ViaIndex()\nclass BadTrunc:\n    def __trunc__(self):\n        return 'bad'\nclass Radix:\n    def __index__(self):\n        return 16\nclass Child(int):\n    pass\nclass Text(str):\n    def __int__(self):\n        return 31\n    def __index__(self):\n        return 16\n\ntry:\n    result = int(BadTrunc())\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "<string>:31: DeprecationWarning: The delegation of int() to __trunc__ is deprecated.\n",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaInt:\n    def __int__(self):\n        return 17\n    def __index__(self):\n        return 19\nclass ViaIndex:\n    def __index__(self):\n        return 23\nclass BadInt:\n    def __int__(self):\n        return 'bad'\nclass ViaTrunc:\n    def __trunc__(self):\n        return ViaIndex()\nclass BadTrunc:\n    def __trunc__(self):\n        return 'bad'\nclass Radix:\n    def __index__(self):\n        return 16\nclass Child(int):\n    pass\nclass Text(str):\n    def __int__(self):\n        return 31\n    def __index__(self):\n        return 16\n\ntry:\n    result = int('ff', Radix())\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "255\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaInt:\n    def __int__(self):\n        return 17\n    def __index__(self):\n        return 19\nclass ViaIndex:\n    def __index__(self):\n        return 23\nclass BadInt:\n    def __int__(self):\n        return 'bad'\nclass ViaTrunc:\n    def __trunc__(self):\n        return ViaIndex()\nclass BadTrunc:\n    def __trunc__(self):\n        return 'bad'\nclass Radix:\n    def __index__(self):\n        return 16\nclass Child(int):\n    pass\nclass Text(str):\n    def __int__(self):\n        return 31\n    def __index__(self):\n        return 16\n\ntry:\n    result = int('ff', Radix())\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "255\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaInt:\n    def __int__(self):\n        return 17\n    def __index__(self):\n        return 19\nclass ViaIndex:\n    def __index__(self):\n        return 23\nclass BadInt:\n    def __int__(self):\n        return 'bad'\nclass ViaTrunc:\n    def __trunc__(self):\n        return ViaIndex()\nclass BadTrunc:\n    def __trunc__(self):\n        return 'bad'\nclass Radix:\n    def __index__(self):\n        return 16\nclass Child(int):\n    pass\nclass Text(str):\n    def __int__(self):\n        return 31\n    def __index__(self):\n        return 16\n\ntry:\n    result = Child('123')\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "123\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaInt:\n    def __int__(self):\n        return 17\n    def __index__(self):\n        return 19\nclass ViaIndex:\n    def __index__(self):\n        return 23\nclass BadInt:\n    def __int__(self):\n        return 'bad'\nclass ViaTrunc:\n    def __trunc__(self):\n        return ViaIndex()\nclass BadTrunc:\n    def __trunc__(self):\n        return 'bad'\nclass Radix:\n    def __index__(self):\n        return 16\nclass Child(int):\n    pass\nclass Text(str):\n    def __int__(self):\n        return 31\n    def __index__(self):\n        return 16\n\ntry:\n    result = Child('123')\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "123\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaInt:\n    def __int__(self):\n        return 17\n    def __index__(self):\n        return 19\nclass ViaIndex:\n    def __index__(self):\n        return 23\nclass BadInt:\n    def __int__(self):\n        return 'bad'\nclass ViaTrunc:\n    def __trunc__(self):\n        return ViaIndex()\nclass BadTrunc:\n    def __trunc__(self):\n        return 'bad'\nclass Radix:\n    def __index__(self):\n        return 16\nclass Child(int):\n    pass\nclass Text(str):\n    def __int__(self):\n        return 31\n    def __index__(self):\n        return 16\n\ntry:\n    result = type(Child(1)).__name__\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "'Child'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaInt:\n    def __int__(self):\n        return 17\n    def __index__(self):\n        return 19\nclass ViaIndex:\n    def __index__(self):\n        return 23\nclass BadInt:\n    def __int__(self):\n        return 'bad'\nclass ViaTrunc:\n    def __trunc__(self):\n        return ViaIndex()\nclass BadTrunc:\n    def __trunc__(self):\n        return 'bad'\nclass Radix:\n    def __index__(self):\n        return 16\nclass Child(int):\n    pass\nclass Text(str):\n    def __int__(self):\n        return 31\n    def __index__(self):\n        return 16\n\ntry:\n    result = type(Child(1)).__name__\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "'Child'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaInt:\n    def __int__(self):\n        return 17\n    def __index__(self):\n        return 19\nclass ViaIndex:\n    def __index__(self):\n        return 23\nclass BadInt:\n    def __int__(self):\n        return 'bad'\nclass ViaTrunc:\n    def __trunc__(self):\n        return ViaIndex()\nclass BadTrunc:\n    def __trunc__(self):\n        return 'bad'\nclass Radix:\n    def __index__(self):\n        return 16\nclass Child(int):\n    pass\nclass Text(str):\n    def __int__(self):\n        return 31\n    def __index__(self):\n        return 16\n\ntry:\n    result = int(Text('12'))\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "31\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaInt:\n    def __int__(self):\n        return 17\n    def __index__(self):\n        return 19\nclass ViaIndex:\n    def __index__(self):\n        return 23\nclass BadInt:\n    def __int__(self):\n        return 'bad'\nclass ViaTrunc:\n    def __trunc__(self):\n        return ViaIndex()\nclass BadTrunc:\n    def __trunc__(self):\n        return 'bad'\nclass Radix:\n    def __index__(self):\n        return 16\nclass Child(int):\n    pass\nclass Text(str):\n    def __int__(self):\n        return 31\n    def __index__(self):\n        return 16\n\ntry:\n    result = int(Text('12'))\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "31\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaInt:\n    def __int__(self):\n        return 17\n    def __index__(self):\n        return 19\nclass ViaIndex:\n    def __index__(self):\n        return 23\nclass BadInt:\n    def __int__(self):\n        return 'bad'\nclass ViaTrunc:\n    def __trunc__(self):\n        return ViaIndex()\nclass BadTrunc:\n    def __trunc__(self):\n        return 'bad'\nclass Radix:\n    def __index__(self):\n        return 16\nclass Child(int):\n    pass\nclass Text(str):\n    def __int__(self):\n        return 31\n    def __index__(self):\n        return 16\n\ntry:\n    result = int(Text('12'), 10)\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "12\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaInt:\n    def __int__(self):\n        return 17\n    def __index__(self):\n        return 19\nclass ViaIndex:\n    def __index__(self):\n        return 23\nclass BadInt:\n    def __int__(self):\n        return 'bad'\nclass ViaTrunc:\n    def __trunc__(self):\n        return ViaIndex()\nclass BadTrunc:\n    def __trunc__(self):\n        return 'bad'\nclass Radix:\n    def __index__(self):\n        return 16\nclass Child(int):\n    pass\nclass Text(str):\n    def __int__(self):\n        return 31\n    def __index__(self):\n        return 16\n\ntry:\n    result = int(Text('12'), 10)\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "12\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaInt:\n    def __int__(self):\n        return 17\n    def __index__(self):\n        return 19\nclass ViaIndex:\n    def __index__(self):\n        return 23\nclass BadInt:\n    def __int__(self):\n        return 'bad'\nclass ViaTrunc:\n    def __trunc__(self):\n        return ViaIndex()\nclass BadTrunc:\n    def __trunc__(self):\n        return 'bad'\nclass Radix:\n    def __index__(self):\n        return 16\nclass Child(int):\n    pass\nclass Text(str):\n    def __int__(self):\n        return 31\n    def __index__(self):\n        return 16\n\ntry:\n    result = type(int(Child(1))).__name__\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "'int'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaInt:\n    def __int__(self):\n        return 17\n    def __index__(self):\n        return 19\nclass ViaIndex:\n    def __index__(self):\n        return 23\nclass BadInt:\n    def __int__(self):\n        return 'bad'\nclass ViaTrunc:\n    def __trunc__(self):\n        return ViaIndex()\nclass BadTrunc:\n    def __trunc__(self):\n        return 'bad'\nclass Radix:\n    def __index__(self):\n        return 16\nclass Child(int):\n    pass\nclass Text(str):\n    def __int__(self):\n        return 31\n    def __index__(self):\n        return 16\n\ntry:\n    result = type(int(Child(1))).__name__\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "'int'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaInt:\n    def __int__(self):\n        return 17\n    def __index__(self):\n        return 19\nclass ViaIndex:\n    def __index__(self):\n        return 23\nclass BadInt:\n    def __int__(self):\n        return 'bad'\nclass ViaTrunc:\n    def __trunc__(self):\n        return ViaIndex()\nclass BadTrunc:\n    def __trunc__(self):\n        return 'bad'\nclass Radix:\n    def __index__(self):\n        return 16\nclass Child(int):\n    pass\nclass Text(str):\n    def __int__(self):\n        return 31\n    def __index__(self):\n        return 16\n\ntry:\n    result = bool()\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "False\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaInt:\n    def __int__(self):\n        return 17\n    def __index__(self):\n        return 19\nclass ViaIndex:\n    def __index__(self):\n        return 23\nclass BadInt:\n    def __int__(self):\n        return 'bad'\nclass ViaTrunc:\n    def __trunc__(self):\n        return ViaIndex()\nclass BadTrunc:\n    def __trunc__(self):\n        return 'bad'\nclass Radix:\n    def __index__(self):\n        return 16\nclass Child(int):\n    pass\nclass Text(str):\n    def __int__(self):\n        return 31\n    def __index__(self):\n        return 16\n\ntry:\n    result = bool()\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "False\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaInt:\n    def __int__(self):\n        return 17\n    def __index__(self):\n        return 19\nclass ViaIndex:\n    def __index__(self):\n        return 23\nclass BadInt:\n    def __int__(self):\n        return 'bad'\nclass ViaTrunc:\n    def __trunc__(self):\n        return ViaIndex()\nclass BadTrunc:\n    def __trunc__(self):\n        return 'bad'\nclass Radix:\n    def __index__(self):\n        return 16\nclass Child(int):\n    pass\nclass Text(str):\n    def __int__(self):\n        return 31\n    def __index__(self):\n        return 16\n\ntry:\n    result = bool(0)\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "False\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaInt:\n    def __int__(self):\n        return 17\n    def __index__(self):\n        return 19\nclass ViaIndex:\n    def __index__(self):\n        return 23\nclass BadInt:\n    def __int__(self):\n        return 'bad'\nclass ViaTrunc:\n    def __trunc__(self):\n        return ViaIndex()\nclass BadTrunc:\n    def __trunc__(self):\n        return 'bad'\nclass Radix:\n    def __index__(self):\n        return 16\nclass Child(int):\n    pass\nclass Text(str):\n    def __int__(self):\n        return 31\n    def __index__(self):\n        return 16\n\ntry:\n    result = bool(0)\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "False\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaInt:\n    def __int__(self):\n        return 17\n    def __index__(self):\n        return 19\nclass ViaIndex:\n    def __index__(self):\n        return 23\nclass BadInt:\n    def __int__(self):\n        return 'bad'\nclass ViaTrunc:\n    def __trunc__(self):\n        return ViaIndex()\nclass BadTrunc:\n    def __trunc__(self):\n        return 'bad'\nclass Radix:\n    def __index__(self):\n        return 16\nclass Child(int):\n    pass\nclass Text(str):\n    def __int__(self):\n        return 31\n    def __index__(self):\n        return 16\n\ntry:\n    result = bool(Child(2))\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "True\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaInt:\n    def __int__(self):\n        return 17\n    def __index__(self):\n        return 19\nclass ViaIndex:\n    def __index__(self):\n        return 23\nclass BadInt:\n    def __int__(self):\n        return 'bad'\nclass ViaTrunc:\n    def __trunc__(self):\n        return ViaIndex()\nclass BadTrunc:\n    def __trunc__(self):\n        return 'bad'\nclass Radix:\n    def __index__(self):\n        return 16\nclass Child(int):\n    pass\nclass Text(str):\n    def __int__(self):\n        return 31\n    def __index__(self):\n        return 16\n\ntry:\n    result = bool(Child(2))\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "True\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaInt:\n    def __int__(self):\n        return 17\n    def __index__(self):\n        return 19\nclass ViaIndex:\n    def __index__(self):\n        return 23\nclass BadInt:\n    def __int__(self):\n        return 'bad'\nclass ViaTrunc:\n    def __trunc__(self):\n        return ViaIndex()\nclass BadTrunc:\n    def __trunc__(self):\n        return 'bad'\nclass Radix:\n    def __index__(self):\n        return 16\nclass Child(int):\n    pass\nclass Text(str):\n    def __int__(self):\n        return 31\n    def __index__(self):\n        return 16\n\ntry:\n    result = bool(1, 2)\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaInt:\n    def __int__(self):\n        return 17\n    def __index__(self):\n        return 19\nclass ViaIndex:\n    def __index__(self):\n        return 23\nclass BadInt:\n    def __int__(self):\n        return 'bad'\nclass ViaTrunc:\n    def __trunc__(self):\n        return ViaIndex()\nclass BadTrunc:\n    def __trunc__(self):\n        return 'bad'\nclass Radix:\n    def __index__(self):\n        return 16\nclass Child(int):\n    pass\nclass Text(str):\n    def __int__(self):\n        return 31\n    def __index__(self):\n        return 16\n\ntry:\n    result = bool(1, 2)\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\nclass ViaInt:\n    def __int__(self):\n        return 17\n    def __index__(self):\n        return 19\nclass ViaIndex:\n    def __index__(self):\n        return 23\nclass BadInt:\n    def __int__(self):\n        return 'bad'\nclass ViaTrunc:\n    def __trunc__(self):\n        return ViaIndex()\nclass BadTrunc:\n    def __trunc__(self):\n        return 'bad'\nclass Radix:\n    def __index__(self):\n        return 16\nclass Child(int):\n    pass\nclass Text(str):\n    def __int__(self):\n        return 31\n    def __index__(self):\n        return 16\n\ntry:\n    result = bool(x=1)\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\nclass ViaInt:\n    def __int__(self):\n        return 17\n    def __index__(self):\n        return 19\nclass ViaIndex:\n    def __index__(self):\n        return 23\nclass BadInt:\n    def __int__(self):\n        return 'bad'\nclass ViaTrunc:\n    def __trunc__(self):\n        return ViaIndex()\nclass BadTrunc:\n    def __trunc__(self):\n        return 'bad'\nclass Radix:\n    def __index__(self):\n        return 16\nclass Child(int):\n    pass\nclass Text(str):\n    def __int__(self):\n        return 31\n    def __index__(self):\n        return 16\n\ntry:\n    result = bool(x=1)\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\ntry:\n    result = int()\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "0\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\ntry:\n    result = int()\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "0\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\ntry:\n    result = int(42)\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "42\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\ntry:\n    result = int(42)\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "42\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\ntry:\n    result = int(True)\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "1\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\ntry:\n    result = int(True)\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "1\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\ntry:\n    result = int('  -123  ')\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "-123\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\ntry:\n    result = int('  -123  ')\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "-123\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\ntry:\n    result = int('1_000')\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "1000\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\ntry:\n    result = int('1_000')\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "1000\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\ntry:\n    result = int('0xff', 0)\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "255\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\ntry:\n    result = int('0xff', 0)\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "255\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\ntry:\n    result = int('-0B_101', base=0)\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "-5\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\ntry:\n    result = int('-0B_101', base=0)\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "-5\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\ntry:\n    result = int('0o77', 8)\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "63\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\ntry:\n    result = int('0o77', 8)\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "63\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\ntry:\n    result = int('z', 36)\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "35\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\ntry:\n    result = int('z', 36)\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "35\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\ntry:\n    result = int('000', 0)\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "0\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\ntry:\n    result = int('000', 0)\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "0\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\ntry:\n    result = int('01', 0)\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "'ValueError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\ntry:\n    result = int('01', 0)\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "'ValueError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\ntry:\n    result = int('0x', 0)\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "'ValueError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\ntry:\n    result = int('0x', 0)\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "'ValueError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\ntry:\n    result = int('1__2')\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "'ValueError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\ntry:\n    result = int('1__2')\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "'ValueError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\ntry:\n    result = int('_1')\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "'ValueError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\ntry:\n    result = int('_1')\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "'ValueError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\ntry:\n    result = int('1_', 10)\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "'ValueError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\ntry:\n    result = int('1_', 10)\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "'ValueError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\ntry:\n    result = int('123', 1)\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "'ValueError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\ntry:\n    result = int('123', 1)\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "'ValueError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\ntry:\n    result = int('123', 37)\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "'ValueError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\ntry:\n    result = int('123', 37)\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "'ValueError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\ntry:\n    result = int('12', -1)\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "'ValueError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\ntry:\n    result = int('12', -1)\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "'ValueError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\ntry:\n    result = int(12, 10)\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\ntry:\n    result = int(12, 10)\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\ntry:\n    result = int(base=10)\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\ntry:\n    result = int(base=10)\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\ntry:\n    result = int('12', 10, base=10)\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\ntry:\n    result = int('12', 10, base=10)\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\ntry:\n    result = int(x='12')\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\ntry:\n    result = int(x='12')\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\ntry:\n    result = int('\u0661\u0662\u0663')\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "123\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\ntry:\n    result = int('\u0661\u0662\u0663')\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "123\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\ntry:\n    result = int('\\u2003 42 \\u2003')\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "42\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\ntry:\n    result = int('\\u2003 42 \\u2003')\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "42\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\ntry:\n    result = int('123456789012345678901234567890')\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "123456789012345678901234567890\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\ntry:\n    result = int('123456789012345678901234567890')\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "123456789012345678901234567890\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple()\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "()\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple()\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "()\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple((1, 2))\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "(1, 2)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple((1, 2))\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "(1, 2)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple(range(3))\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "(0, 1, 2)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple(range(3))\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "(0, 1, 2)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple(1)\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple(1)\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple(iterable=(1, 2))\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple(iterable=(1, 2))\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple(None)\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple(None)\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple(1, 2)\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple(1, 2)\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple(original) is original\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "True\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple(original) is original\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "True\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple(child), type(child).__name__\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "((1, 2), 'Child')\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple(child), type(child).__name__\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "((1, 2), 'Child')\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple(changed)\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "(9, 8)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple(changed)\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "(9, 8)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple('a\\U0001f600')\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "('a', '\ud83d\ude00')\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple('a\\U0001f600')\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "('a', '\ud83d\ude00')\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = value, events\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "((4, 5), 123)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = value, events\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "((4, 5), 123)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple(Hint())\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "(1, 2)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple(Hint())\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "(1, 2)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple(Negative())\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "'ValueError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple(Negative())\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "'ValueError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple(Invalid())\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple(Invalid())\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple(Huge())\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "'OverflowError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple(Huge())\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "'OverflowError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple(Declined())\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "(1, 2)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple(Declined())\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "(1, 2)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple(Failed())\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "'ValueError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple(Failed())\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "'ValueError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple(Disabled())\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "(1, 2)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple(Disabled())\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "(1, 2)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple(BadDescriptor())\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple(BadDescriptor())\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "'TypeError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple(Retyped())\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "'ValueError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple(Retyped())\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "'ValueError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple(Broken())\nexcept BaseException as error:\n    result = type(error).__name__\n",
+        "--eval",
+        "result"
+      ],
+      "stdout": "'ValueError'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/tmp/cxxpython-cpython31214-build/python",
+        "-c",
+        "\noriginal = (1, 2)\nclass Child(tuple):\n    pass\nclass Changed(tuple):\n    def __iter__(self):\n        return iter((9, 8))\nchild = Child(original)\nchanged = Changed(original)\nevents = 0\nclass Count:\n    def __index__(self):\n        global events\n        events = events * 10 + 3\n        return 2\nclass Source:\n    def __iter__(self):\n        global events\n        events = events * 10 + 1\n        return iter((4, 5))\n    def __len__(self):\n        global events\n        events = events * 10 + 2\n        return Count()\nvalue = tuple(Source())\nclass Hint:\n    def __iter__(self):\n        return iter((1, 2))\n    def __len__(self):\n        raise TypeError('no length')\n    def __length_hint__(self):\n        return NotImplemented\nclass Negative(Hint):\n    def __length_hint__(self): return -1\nclass Invalid(Hint):\n    def __length_hint__(self): return Count()\nclass Huge(Hint):\n    def __length_hint__(self): return 18446744073709551616\nclass Declined(Hint):\n    def __length_hint__(self): raise TypeError('no hint')\nclass Failed(Hint):\n    def __length_hint__(self): raise ValueError('bad hint')\nclass Disabled(Hint):\n    __length_hint__ = None\nclass Descriptor:\n    def __get__(self, obj, owner): raise TypeError('descriptor failed')\nclass BadDescriptor(Hint):\n    __length_hint__ = Descriptor()\nclass After:\n    def __length_hint__(self): raise ValueError('new type')\nclass Retyped:\n    def __iter__(self): return iter((1, 2))\n    def __len__(self):\n        self.__class__ = After\n        raise TypeError('no length')\nclass Broken:\n    def __iter__(self): return self\n    def __next__(self): raise ValueError('not exhaustion')\n\ntry:\n    result = tuple(Broken())\nexcept BaseException as error:\n    result = type(error).__name__\n\nprint(repr(result))"
+      ],
+      "stdout": "'ValueError'\n",
+      "stderr": "",
+      "exit_code": 0
+    }
+  ]
+}

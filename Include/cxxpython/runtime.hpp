@@ -33,6 +33,7 @@ enum class CoreObject : std::size_t {
     DictType,
     IntType,
     BoolType,
+    FloatType,
     NotImplementedType,
     BaseExceptionType,
     ExceptionType,

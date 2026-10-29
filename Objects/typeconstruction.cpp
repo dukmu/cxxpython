@@ -477,6 +477,122 @@ void type_prepare(Attachment &context, Handle, std::span<const Value>, ReturnSlo
     RootScope roots(context);
     context.allocate_instance<DictObject>(roots.root(context.builtin(CoreObject::DictType)), out);
 }
+std::optional<std::size_t> tuple_length_hint(Attachment &context, Handle source, ReturnSlot &out)
+{
+    RootScope roots(context);
+    const auto type = roots.root(context.type_of(source));
+    const auto length_slot = resolve_protocol(context, type, Protocol::Len, roots);
+    if (length_slot.state != SlotState::Missing) {
+        length(context, source, out);
+        if (out.tag() == ResultTag::Ok) {
+            std::int64_t value;
+            if (int_fits_signed(context, out.value(), value))
+                return static_cast<std::size_t>(value);
+            raise_error(context, CoreObject::OverflowErrorType, U"length does not fit Py_ssize_t",
+                        out);
+        }
+        if (out.tag() != ResultTag::Raised ||
+            !is_subtype(context, context.type_of(out.exception()),
+                        context.builtin(CoreObject::TypeErrorType)))
+            return {};
+    }
+    out.reset();
+    const auto hint_type = roots.root(context.type_of(source));
+    const auto hint = detail::type_attribute(context, hint_type.get(context), U"__length_hint__");
+    if (!hint)
+        return 0;
+    ReturnSlot method(context);
+    detail::bind_descriptor(context, *hint, source.get(context), hint_type.get(context), method);
+    if (raised(method)) {
+        out.raised(method.exception());
+        return {};
+    }
+    // A TypeError declines the call's hint, not a failing descriptor lookup.
+    call(context, roots.root(method.value()), {}, out);
+    if (raised(out)) {
+        if (is_subtype(context, context.type_of(out.exception()),
+                       context.builtin(CoreObject::TypeErrorType))) {
+            out.reset();
+            return 0;
+        }
+        return {};
+    }
+    if (out.value() == context.builtin(CoreObject::NotImplemented))
+        return 0;
+    if (!is_int(context, out.value())) {
+        type_error(context, U"__length_hint__ must return an integer", out);
+        return {};
+    }
+    std::int64_t value;
+    if (!int_fits_signed(context, out.value(), value) ||
+        value > std::numeric_limits<std::intptr_t>::max()) {
+        raise_error(context, CoreObject::OverflowErrorType, U"length hint does not fit Py_ssize_t",
+                    out);
+        return {};
+    }
+    if (value < 0) {
+        raise_error(context, CoreObject::ValueErrorType, U"__length_hint__ must be nonnegative",
+                    out);
+        return {};
+    }
+    return static_cast<std::size_t>(value);
+}
+void tuple_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!is_type(context, args[0]) ||
+        !is_subtype(context, args[0], context.builtin(CoreObject::TupleType))) {
+        type_error(context, U"tuple.__new__ requires a tuple type", out);
+        return;
+    }
+    const auto &values = context.payload<TupleObject>(args[1]).items;
+    if (values.size() > 1) {
+        type_error(context, U"tuple expects at most one iterable", out);
+        return;
+    }
+    RootScope roots(context);
+    const auto cls = roots.root(args[0]);
+    const bool exact = args[0] == context.builtin(CoreObject::TupleType);
+    if (exact && values.size() == 1 &&
+        context.type_of(values[0]) == context.builtin(CoreObject::TupleType)) {
+        out.ok(values[0]);
+        return;
+    }
+    std::vector<Value> items;
+    if (!values.empty()) {
+        const auto source = roots.root(values[0]);
+        ReturnSlot iterator(context), item(context);
+        get_iter(context, source, iterator);
+        if (raised(iterator)) {
+            out.raised(iterator.exception());
+            return;
+        }
+        const auto input = roots.root(iterator.value());
+        const auto hint = tuple_length_hint(context, source, item);
+        if (!hint) {
+            out.raised(item.exception());
+            return;
+        }
+        if (*hint > items.max_size()) {
+            out.raised(context.builtin(CoreObject::MemoryError));
+            return;
+        }
+        items.reserve(*hint);
+        for (;;) {
+            const auto status = iter_next(context, input, item);
+            if (status == NextStatus::Done)
+                break;
+            if (status == NextStatus::Raised) {
+                out.raised(item.exception());
+                return;
+            }
+            items.push_back(roots.root(item.value()).get(context));
+        }
+    }
+    if (exact && items.empty())
+        out.ok(context.builtin(CoreObject::EmptyTuple));
+    else
+        context.allocate_instance<TupleObject>(cls, out, std::move(items));
+}
 void string_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_type(context, args[0]) ||
@@ -578,6 +694,10 @@ void install_construction(Attachment &context, std::span<const Handle> core)
     install(type, U"__init__", variadic, type_init);
     install(type, U"__prepare__", variadic, type_prepare, Binding::Class);
     install(at(CoreObject::StrType), U"__new__", variadic, string_new, Binding::Static);
+    SignatureLayout sequence;
+    sequence.parameters = {{U"cls", ParameterKind::PositionalOnly}};
+    sequence.varargs = U"args";
+    install(at(CoreObject::TupleType), U"__new__", sequence, tuple_new, Binding::Static);
     SignatureLayout definition;
     definition.parameters = {{U"cls", ParameterKind::PositionalOnly},
                              {U"name", ParameterKind::PositionalOnly},

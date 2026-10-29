@@ -43,7 +43,11 @@ type construction. It is not a separate class VM or lifetime authority.
 `Objects/descrobject.cpp` and `Objects/call.cpp` implement descriptors, attribute
 lookup, argument binding and the shared call boundary. `Objects/abstract.cpp`
 dispatches typed object protocols. `Objects/longobject.cpp` provides int/bool
-arithmetic; `Objects/representation.cpp` provides value representation/hash
+construction and arithmetic; `Objects/floatobject.cpp` owns the immutable native
+float payload, conversions, representation, equality and hash. Numeric text
+conversion shares Unicode decimal/whitespace helpers in `Include/internal/long.hpp`.
+Float arithmetic/literals and the complete numeric API remain unfinished.
+`Objects/representation.cpp` provides other value representation/hash
 operations. `Objects/rangeobject.cpp` owns immutable arbitrary-integer ranges and
 their iterators; `Objects/iterobject.cpp` owns iteration and immutable sequence
 indexing. `Include/internal/long.hpp` shares the existing integer representation

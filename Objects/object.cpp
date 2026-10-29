@@ -1,3 +1,4 @@
+#include "cxxpython/floatobject.hpp"
 #include "cxxpython/objects.hpp"
 #include "cxxpython/protocol.hpp"
 
@@ -378,6 +379,7 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     define(CoreObject::IntType, "int", LayoutDescriptor::of<IntObject>());
     define(CoreObject::BoolType, "bool", LayoutDescriptor::of<IntObject>(),
            at(CoreObject::IntType));
+    define(CoreObject::FloatType, "float", LayoutDescriptor::of<FloatObject>());
     define(CoreObject::NotImplementedType, "NotImplementedType",
            LayoutDescriptor::of<NoneObject>());
     define(CoreObject::BaseExceptionType, "BaseException", LayoutDescriptor::of<ExceptionObject>());
@@ -501,6 +503,7 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     install_attribute_descriptors(context, core);
     install_construction(context, core);
     install_numbers(context, core);
+    install_floats(context, core);
     install_protocols(context, core);
     install_value_protocols(context, core);
     install_execution(context, core);
@@ -537,6 +540,7 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                     CoreObject::DictType,
                     CoreObject::IntType,
                     CoreObject::BoolType,
+                    CoreObject::FloatType,
                     CoreObject::BaseExceptionType,
                     CoreObject::ExceptionType,
                     CoreObject::TypeErrorType,
