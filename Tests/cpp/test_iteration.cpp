@@ -118,7 +118,7 @@ TEST_F(CoreIteration, UserProtocolsPreserveStopIterationValuesAndOtherExceptions
 TEST(ParallelIteration, SharedBuiltinIteratorClaimsEachItemOnceDuringGc)
 {
     constexpr std::size_t count = 700;
-    for (int kind : {0, 1, 2, 3, 4}) {
+    for (int kind : {0, 1, 2, 3, 4, 5, 6}) {
         const auto expected = kind == 4 ? std::size_t{256} : count;
         Interpreter interpreter;
         Attachment owner(interpreter);
@@ -127,6 +127,11 @@ TEST(ParallelIteration, SharedBuiltinIteratorClaimsEachItemOnceDuringGc)
         ReturnSlot out(owner);
         if (kind == 0) {
             SourceUnit unit(SourceBuffer("iter(range(700))"), InputMode::Eval);
+            run(owner, {&unit}, out);
+        } else if (kind == 5 || kind == 6) {
+            SourceUnit unit(
+                SourceBuffer(kind == 5 ? "iter(set(range(700)))" : "iter(frozenset(range(700)))"),
+                InputMode::Eval);
             run(owner, {&unit}, out);
         } else if (kind == 4) {
             std::string values;

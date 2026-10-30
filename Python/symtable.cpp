@@ -233,7 +233,8 @@ class ScopePass final {
                 } else if constexpr (std::is_same_v<T, AttributeExpr>) {
                     expression(*node.object, scope);
                     node.name = mangle(std::move(node.name), scope);
-                } else if constexpr (std::is_same_v<T, TupleExpr> || std::is_same_v<T, ListExpr>) {
+                } else if constexpr (std::is_same_v<T, TupleExpr> || std::is_same_v<T, ListExpr> ||
+                                     std::is_same_v<T, SetExpr>) {
                     for (const auto &item : node.items)
                         expression(*item, scope);
                 } else if constexpr (std::is_same_v<T, DictExpr>) {

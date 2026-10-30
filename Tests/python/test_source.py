@@ -206,6 +206,66 @@ class SourceDifferential(unittest.TestCase):
             with self.subTest(expression=expression):
                 self.check_program(source, expression)
 
+    def test_sets_and_comprehensions(self):
+        cases = [
+            ("class Items:\n"
+             "    def __init__(self): self.consumed = 0\n"
+             "    def __iter__(self): return self\n"
+             "    def __next__(self):\n        self.consumed += 1\n"
+             "        if self.consumed == 1: return 1\n"
+             "        raise ValueError('must not consume')\n"
+             "a = Items()\nb = Items()\ns = {1}\ni = s.intersection(a)\nsubset = s.issubset(b)",
+             "i == s, subset, a.consumed, b.consumed"),
+            ("rejected = []\nfor method, receiver in [(set.union, frozenset()), "
+             "(frozenset.union, set()), (set.issubset, frozenset()), "
+             "(frozenset.__or__, set())]:\n"
+             "    try:\n        method(receiver, set())\n"
+             "    except TypeError:\n        rejected.append(True)\n"
+             "    else:\n        rejected.append(False)", "rejected"),
+            ("events = []\nclass K:\n"
+             "    def __init__(self, n):\n        events.append(('value', n))\n        self.n = n\n"
+             "    def __hash__(self):\n        events.append(('hash', self.n))\n        return self.n\n"
+             "s = {K(1), *[], K(2), K(3)}", "events"),
+            ("s = {1, 2, 2, *range(3, 6)}\nt = {2, 4, 6}",
+             "s == set(range(1, 6)), s & t == {2, 4}, s | t == set(range(1, 7)), "
+             "s - t == {1, 3, 5}, s ^ t == {1, 3, 5, 6}, "
+             "{1, 2} < s, s > {1}, {1, 2} <= s, s >= {1}, s != t"),
+            ("events = []\ndef item(n):\n    events.append(n)\n    return n\n"
+             "s = {item(1), *[item(2), item(3)], item(1)}\n"
+             "set = None", "events, s == {1, 2, 3}, len({4, 4})"),
+            ("x = 99\ns = {x % 3 for x in range(10) if x > 1}\n"
+             "nested = {(x, y) for x in range(3) for y in range(x) if y < 2}",
+             "s == {0, 1, 2}, x, nested == {(1, 0), (2, 0), (2, 1)}"),
+            ("def outer(n):\n"
+             "    return {x + n for x in range(3)}\n"
+             "s = {(last := x) for x in range(4)}",
+             "outer(10) == {10, 11, 12}, s == {0, 1, 2, 3}, last"),
+            ("s = {1, 2}\na = s\ns |= {3}\ns &= {2, 3}\n"
+             "s ^= {1, 2}\ns -= {3}", "s is a, s == {1}"),
+            ("class S(set): pass\nclass F(frozenset): pass\n"
+             "s = S([1, 2])\ns.extra = 42\nf = F([2, 1])\nf.extra = 43\n"
+             "base = frozenset([1, 2])",
+             "s == f, s.extra, f.extra, type(s | {3}) is set, "
+             "type(f | {3}) is frozenset, frozenset(base) is base, "
+             "base.copy() is base, hash(base) == hash(frozenset([2, 1])), "
+             "{frozenset([1, 2]): 42}[f]"),
+            ("s = {frozenset([1, 2]), 3}\n"
+             "present = {1, 2} in s\ns.remove({1, 2})\ns.discard({1, 2})",
+             "present, s == {3}, s.isdisjoint([1, 2]), s.issubset([3, 4]), "
+             "s.issuperset([3]), s.union([4]) == {3, 4}, "
+             "s.intersection([3, 4]) == {3}, s.difference([3]) == set(), "
+             "s.symmetric_difference([3, 4]) == {4}"),
+            ("events = []\nclass K:\n"
+             "    def __hash__(self):\n        events.append('hash')\n        raise ValueError('hash')\n"
+             "s = {1}\ntry:\n    s.add(K())\nexcept ValueError as e:\n    error = str(e)",
+             "events, error, s == {1}"),
+            ("s = {1}\nit = iter(s)\ns.add(2)\n"
+             "try:\n    next(it)\nexcept RuntimeError as e:\n    error = str(e)", "error"),
+        ]
+        for source, expression in cases:
+            with self.subTest(expression=expression):
+                self.check_program(source, expression)
+
     def test_print_closed_pipe_is_a_python_error(self):
         if not Path('/proc/self/fd/0').exists():
             self.skipTest('Linux descriptor fixture')

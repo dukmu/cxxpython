@@ -333,6 +333,25 @@ TEST_F(CoreExecution, SourceLoweringOpcodesHaveVerifiedOperandsAndStackInputs)
     EXPECT_EQ(list_effect.pops, 3U);
     EXPECT_EQ(list_effect.pushes, 1U);
     EXPECT_EQ(opcode_definition(Opcode::BuildList).name, "BUILD_LIST");
+    CodeBuilder set(context);
+    set.emit(Opcode::BuildSet, 1);
+    invalid(set, CodeErrorKind::StackUnderflow);
+    const auto set_effect = instruction_effect({Opcode::BuildSet, 3});
+    EXPECT_EQ(set_effect.inputs, 3U);
+    EXPECT_EQ(set_effect.pops, 3U);
+    EXPECT_EQ(set_effect.pushes, 1U);
+    EXPECT_EQ(opcode_definition(Opcode::BuildSet).name, "BUILD_SET");
+    for (auto opcode : {Opcode::SetAdd, Opcode::SetUpdate}) {
+        CodeBuilder set_update(context);
+        set_update.emit(opcode);
+        invalid(set_update, CodeErrorKind::StackUnderflow);
+        const auto effect = instruction_effect({opcode, 0});
+        EXPECT_EQ(effect.inputs, 2U);
+        EXPECT_EQ(effect.pops, 1U);
+        EXPECT_EQ(effect.pushes, 0U);
+        EXPECT_TRUE(opcode_definition(opcode).may_raise);
+        EXPECT_TRUE(opcode_definition(opcode).safepoint);
+    }
     for (auto opcode : {Opcode::LoadAttr, Opcode::StoreAttr, Opcode::DeleteAttr}) {
         CodeBuilder attribute(context);
         attribute.emit(opcode);

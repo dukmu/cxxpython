@@ -257,6 +257,27 @@ class GraphPass final {
                     emit(Opcode::LoadAttr, value.span, 0, node.name);
                 } else if constexpr (std::is_same_v<T, TupleExpr> || std::is_same_v<T, ListExpr>) {
                     sequence(node.items, value.span, std::is_same_v<T, TupleExpr>);
+                } else if constexpr (std::is_same_v<T, SetExpr>) {
+                    std::uint32_t pending = 0;
+                    bool built = false;
+                    for (const auto &item : node.items) {
+                        if (const auto *star = std::get_if<StarredExpr>(&item->node)) {
+                            if (!built) {
+                                emit(Opcode::BuildSet, value.span, pending);
+                                built = true;
+                            }
+                            expression(*star->value);
+                            emit(Opcode::SetUpdate, item->span);
+                        } else {
+                            expression(*item);
+                            if (built)
+                                emit(Opcode::SetAdd, item->span);
+                            else
+                                ++pending;
+                        }
+                    }
+                    if (!built)
+                        emit(Opcode::BuildSet, value.span, pending);
                 } else if constexpr (std::is_same_v<T, DictExpr>) {
                     std::uint32_t pending = 0;
                     bool built = false;
@@ -741,7 +762,10 @@ class GraphPass final {
                         if (node.key)
                             expression(*node.key);
                         expression(*node.value);
-                        emit(node.key ? Opcode::StoreItem : Opcode::ListAppend, span);
+                        emit(node.kind == CollectionKind::Dict  ? Opcode::StoreItem
+                             : node.kind == CollectionKind::Set ? Opcode::SetAdd
+                                                                : Opcode::ListAppend,
+                             span);
                         if (!node.key)
                             emit(Opcode::PopTop, span);
                     } else if constexpr (std::is_same_v<T, ImportStmt>) {

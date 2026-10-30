@@ -463,11 +463,15 @@ void list_item(Attachment &, Handle, std::size_t, ReturnSlot &);
 void list_snapshot(Attachment &, Handle, RootScope &, std::vector<Value> &);
 std::optional<std::size_t> length_hint(Attachment &, Handle, ReturnSlot &);
 void copy_dictionary_entries(Attachment &, Value destination, std::span<const DictObject::Entry>);
-void make_dict_iterator(Attachment &, Handle dictionary, DictViewKind, ReturnSlot &);
+void make_dict_iterator(Attachment &, Handle dictionary, DictViewKind, ReturnSlot &,
+                        std::optional<Handle> iterator_type = {});
 void next_dict_item(Attachment &, Handle iterator, ReturnSlot &);
+// Root both fields before removing the entry; Empty means the table was empty.
+void dict_popitem(Attachment &, Handle dictionary, ReturnSlot &key, ReturnSlot &value);
 std::size_t dictionary_size(Attachment &, Value dictionary);
 ResultView dict_lookup_hash(Attachment &, Handle, Handle, std::int64_t, ReturnSlot &);
 ResultView dict_store_hash(Attachment &, Handle, Handle, Handle, std::int64_t, ReturnSlot &);
+ResultView dict_erase_hash(Attachment &, Handle, Handle, std::int64_t, ReturnSlot &);
 bool name_erase(Attachment &context, Value dictionary, const std::u32string &name);
 bool copy_name_storage(Attachment &context, std::optional<Value> source, const std::u32string &name,
                        std::optional<Value> key, std::optional<Value> value, ReturnSlot &out);

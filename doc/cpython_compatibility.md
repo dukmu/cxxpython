@@ -46,9 +46,9 @@ acceptance evidence; this list is not a generated support matrix.
 ## Builtins And Product
 
 The canonical builtins module/dictionary, namespace lookup and core bootstrap are
-present. Base slices now include print, immutable bytes, super, namespace/reflection,
+present. Base slices now include print, immutable bytes, set/frozenset, super, namespace/reflection,
 exec/eval compilation/execution and common aggregate builtins. Complete Python
-3.12 builtins are not: open/input, set/frozenset, bytearray/memoryview, remaining
+3.12 builtins are not: open/input, bytearray/memoryview, remaining
 iterators, compiler flags/modes and constructors/protocol matrices are still work.
 Complete their native dependencies and fixed-reference tests before copying
 dependent libraries wholesale. `__builtin__` is not the Python 3 module name;
@@ -58,6 +58,14 @@ the target is `builtins` and the `__builtins__` execution namespace.
   bytesobject.c, bltinmodule.c, longobject.c, floatobject.c and typeobject.c flows
   to typed roots and immutable snapshots. Complete bytes methods, mutable buffer
   exports and the Unicode codec registry still need their actual dependencies.
+- Set/frozenset adapt pinned setobject.c's construction, hashing, relation and
+  algebra behavior. Private dictionary storage replaces the RC/GIL-dependent set
+  table without bypassing hash/equality callbacks or adding another lifetime
+  authority. Operation-specific set/dict fast paths, iterable early termination,
+  native subclasses, reflected operators and mutation failures have focused and
+  fixed-reference tests. Weakrefs, pickle and generic aliases remain dependencies;
+  this is not completion of all common type/library integration or performance
+  acceptance. Iteration order is not the reference's private table layout.
 - Builtin compile/eval/exec reuse the existing compiler and VM. Ordinary module
   names now emit namespace instructions, matching separate globals/locals
   behavior; explicit global still emits global instructions. Current valid slices

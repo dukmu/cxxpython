@@ -78,6 +78,9 @@ enum class Opcode : std::uint8_t {
     BuildSlice,
     BuildString,
     FormatValue,
+    BuildSet,
+    SetAdd,
+    SetUpdate,
     Count,
 };
 enum class OperandDomain {

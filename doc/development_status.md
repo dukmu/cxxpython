@@ -1,5 +1,58 @@
 # Development Status
 
+## 2026-10-30 Set/Frozenset And Responsibility-Based Source Split
+
+Prepended without rewriting earlier entries. Previous stable node: 24892b2.
+The full frontend/import/library/N4-N6/M0-M9 objective remains active. The user's
+latest request adds immediate REPL/product-entry work, not a declaration that
+all I/O, library, installation or language dependencies are finished.
+
+- Split the former mixed Objects/object.cpp by responsibility: common values and
+  construction remain there (190 lines); Python/pylifecycle.cpp owns core-image
+  bootstrap; Objects/dictstorage.cpp owns namespace/hash storage, precise rooted
+  views, prepared-node commits and iterator cursors. Objects/dictobject.cpp remains
+  the public dictionary protocol layer. Existing APIs and lock/GC contracts are
+  unchanged by this move. No parallel fallback, new lifetime authority or generic
+  module framework was introduced. The architecture document records the owners.
+- Added real set/frozenset native layouts, constructors/subclasses, repr/hash,
+  comparisons, element mutation, copy, iteration, algebra and update methods.
+  Objects/setobject.cpp owns element/object behavior; Objects/setoperations.cpp
+  owns algebra and method/operator registration. A private traced DictObject
+  reuses the existing safe hash/equality and per-object storage machinery instead
+  of duplicating it. Frozenset tables are populated before visible allocation;
+  their cached hash is atomic. Mutable lookup keys follow upstream conversion.
+- Source set displays, starred displays and synchronous set comprehensions lower
+  through the generated grammar adapter and existing scope/CFG/VM. BUILD_SET,
+  SET_ADD and SET_UPDATE have verifier stack effects, encoding/disassembly metadata
+  and exception tests. They do not invoke a shadowed builtins.set. Hash/evaluation
+  order, lexical/walrus binding, subtype results, reflected operators and iterator
+  early termination match the retained CPython cases.
+- Retained operation-specific upstream hash fast paths and smaller-set intersection
+  traversal. New internal dictionary helpers reuse cached hashes for deletion and
+  atomically root/remove a popped entry, avoiding snapshot-scanning on every pop.
+  No internal mutex spans Python callbacks or blocking work. Tests exercise shared
+  set insertion/pop and shared mutable/frozen iterators on two Active OS threads
+  during GC, with every key accounted for once. Bulk updates retain snapshot/
+  per-key-commit semantics, not an undocumented whole-operation atomicity promise.
+- Final normal CTest passes 497/497. Full ASan/UBSan/LSan and TSan sweeps ran 489
+  and 487 native cases respectively; their only failure was a newly added test
+  fixture using unsupported yield, not a sanitizer diagnostic. Replaced it with
+  an equivalent ordinary iterator, preserving the error and exact consumption
+  assertions instead of skipping it. Final ASan and TSan affected suites each pass
+  26/26. The established two TSan allocation enumerations remain its only exclusions.
+  Final normal/strict-ASan product differentials pass all 12 fixed-CPython set
+  cases. Format-check and all 244 generated grammar-rule checks pass.
+- Retained evidence: .cache/set-{final,asan,tsan}-ctest.*, copied complete native
+  sanitizer outputs, .cache/set-{asan,tsan}-final-affected.*, and differential JSON/
+  logs with executable hashes. .cache/set-before.* preserves all nine original
+  unsupported-set failures. No sanitizer warning, extra exclusion, full CPU
+  benchmark rerun or hand-written measurement table was introduced.
+- Set weakrefs/pickle/generic aliases, full buffers/I/O/encoding, remaining
+  constructors/iterators, suspension and the standard-library/product release
+  gates remain. The requested REPL/entrypoint and Python runpy work is being
+  prepared separately and is not claimed by this node. User changes to
+  temporary_plan.md and test2.py remain outside the commit.
+
 ## 2026-10-30 Base Builtins, Bytes, Codecs, Super And Real Print
 
 Prepended without rewriting earlier entries. Previous stable node: 30dd0ed.

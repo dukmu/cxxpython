@@ -1,5 +1,7 @@
 #include "cxxpython/execution.hpp"
 #include "cxxpython/import.hpp"
+#include "cxxpython/setobject.hpp"
+#include "internal/setobject.hpp"
 
 #include <algorithm>
 #include <charconv>
@@ -816,7 +818,9 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
             case Opcode::DictUpdate:
             case Opcode::DictMerge:
             case Opcode::ListAppend:
-            case Opcode::ListExtend: {
+            case Opcode::ListExtend:
+            case Opcode::SetAdd:
+            case Opcode::SetUpdate: {
                 RootScope roots(context);
                 const auto owner = roots.root(data.operands[data.sp - 2]),
                            item = roots.root(data.operands[data.sp - 1]);
@@ -826,6 +830,13 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                     else
                         detail::dict_merge(context, owner, item, opcode == Opcode::DictMerge,
                                            result);
+                } else if (opcode == Opcode::SetAdd || opcode == Opcode::SetUpdate) {
+                    if (context.type_of(owner) != context.builtin(CoreObject::SetType))
+                        type_error(context, U"set builder requires an exact set", result);
+                    else if (opcode == Opcode::SetAdd)
+                        set_add(context, owner, item, result);
+                    else
+                        detail::set_update(context, owner, item, result);
                 } else if (context.type_of(owner) != context.builtin(CoreObject::ListType))
                     type_error(context, U"list builder requires an exact list", result);
                 else if (opcode == Opcode::ListAppend)
@@ -943,6 +954,7 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
             }
             case Opcode::BuildTuple:
             case Opcode::BuildList:
+            case Opcode::BuildSet:
             case Opcode::BuildNameDict: {
                 const auto count = opcode == Opcode::BuildNameDict
                                        ? code.program.calls()[operand].keywords
@@ -956,6 +968,9 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                     cxxpython::core::make_list(
                         context, std::span<const Value>{data.operands.data() + base, count},
                         result);
+                else if (opcode == Opcode::BuildSet)
+                    make_set(context, std::span<const Value>{data.operands.data() + base, count},
+                             result);
                 else {
                     RootScope roots(context);
                     context.allocate_instance<DictObject>(

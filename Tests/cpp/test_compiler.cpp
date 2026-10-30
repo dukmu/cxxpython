@@ -98,6 +98,35 @@ TEST_F(CoreSource, ListDisplaysAndTargetsUseNormalExpressionAndBindingPaths)
     }
 }
 
+TEST_F(CoreSource, SetDisplaysAndComprehensionsKeepTheirOrdinaryScopeAndRoots)
+{
+    const auto globals = dictionary();
+    ReturnSlot out(context);
+    exec(R"(
+outer = 99
+set = None
+literal = {1, *range(2, 6), 2}
+result = {outer % 3 for outer in range(100) if outer > 4}
+nested = {(x, y) for x in range(3) for y in range(x)}
+def f(n):
+    return {x + n for x in range(3)}
+named = {(last := x) for x in range(3)}
+failed = False
+try:
+    {[]}
+except TypeError:
+    failed = True
+)",
+         globals, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    eval("literal == {1, 2, 3, 4, 5}, result == {0, 1, 2}, outer, "
+         "nested == {(1, 0), (2, 0), (2, 1)}, f(10) == {10, 11, 12}, "
+         "named == {0, 1, 2}, last, failed",
+         out, globals);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(result(out), "(True, True, 99, True, True, True, 2, True)");
+}
+
 TEST_F(CoreSource, FloatLiteralsAndArithmeticUseOrdinaryNumericProtocolsDuringGc)
 {
     ReturnSlot out(context);

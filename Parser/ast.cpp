@@ -275,8 +275,6 @@ class Adapter {
         auto c = children(n);
         auto r = rules(n);
         switch (n.rule) {
-        case Rule::set:
-        case Rule::setcomp:
         case Rule::genexp:
         case Rule::yield_expr:
         case Rule::await_primary:
@@ -299,6 +297,7 @@ class Adapter {
         }
         case Rule::listcomp:
         case Rule::dictcomp:
+        case Rule::setcomp:
             return comprehension(n);
         case Rule::fstring:
             return fstring(n);
@@ -533,6 +532,7 @@ class Adapter {
             break;
         case Rule::list:
         case Rule::tuple:
+        case Rule::set:
         case Rule::star_atom: {
             if (n.rule == Rule::star_atom && r.empty())
                 for (auto p : c)
@@ -541,7 +541,7 @@ class Adapter {
             if (n.rule == Rule::star_atom && n.alternative == 1 && r.size() == 1)
                 return expression(*r[0]);
             bool list = has(n, U"[");
-            if (!list && !has(n, U"("))
+            if (!list && !has(n, U"(") && n.rule != Rule::set)
                 break;
             std::vector<ExprPtr> items;
             for (auto p : r) {
@@ -555,6 +555,8 @@ class Adapter {
             }
             if (list)
                 return make(n, ListExpr{std::move(items)}, 2);
+            if (n.rule == Rule::set)
+                return make(n, SetExpr{std::move(items)}, 2);
             return make(n, TupleExpr{std::move(items)}, 2);
         }
         case Rule::slices:
@@ -611,7 +613,9 @@ class Adapter {
             unsupported(*loops[0]);
         auto iterable = expression(*first_iter);
         auto fn = std::make_unique<FunctionStmt>();
-        fn->name = n.rule == Rule::listcomp ? U"<listcomp>" : U"<dictcomp>";
+        fn->name = n.rule == Rule::listcomp  ? U"<listcomp>"
+                   : n.rule == Rule::setcomp ? U"<setcomp>"
+                                             : U"<dictcomp>";
         fn->comprehension = true;
         fn->parameters.push_back(
             ParameterSpec{U".0", ParameterKind::PositionalOnly, nullptr, span(n)});
@@ -620,11 +624,16 @@ class Adapter {
         init.targets.push_back(name());
         if (n.rule == Rule::listcomp)
             init.value = make(n, ListExpr{});
+        else if (n.rule == Rule::setcomp)
+            init.value = make(n, SetExpr{});
         else
             init.value = make(n, DictExpr{});
         fn->body.push_back(stmt(n, std::move(init)));
         CollectionAddStmt add;
         add.collection = name();
+        add.kind = n.rule == Rule::listcomp  ? CollectionKind::List
+                   : n.rule == Rule::setcomp ? CollectionKind::Set
+                                             : CollectionKind::Dict;
         if (n.rule == Rule::dictcomp) {
             auto pair = find(n, Rule::kvpair);
             if (!pair)

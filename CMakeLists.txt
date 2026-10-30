@@ -20,6 +20,7 @@ endif()
 
 add_library(cxxpython_core
     Python/gc.cpp
+    Python/pylifecycle.cpp
     Python/compile.cpp
     Python/bltinmodule.cpp
     Python/builtinexec.cpp
@@ -37,12 +38,15 @@ add_library(cxxpython_core
     Objects/typeobject.cpp
     Objects/object.cpp
     Objects/dictobject.cpp
+    Objects/dictstorage.cpp
     Objects/listobject.cpp
     Objects/sliceobject.cpp
     Objects/formatobject.cpp
     Objects/bytesobject.cpp
     Objects/unicodecodecs.cpp
     Objects/superobject.cpp
+    Objects/setobject.cpp
+    Objects/setoperations.cpp
     Objects/moduleobject.cpp
     Objects/call.cpp
     Objects/descrobject.cpp
@@ -137,6 +141,9 @@ if(BUILD_TESTING)
         Tests/cpp/test_bytes.cpp
         Tests/cpp/test_codecs.cpp
         Tests/cpp/test_super.cpp
+        Tests/cpp/test_set.cpp
+        Tests/cpp/test_set_operations.cpp
+        Tests/cpp/test_set_concurrency.cpp
         Tests/cpp/test_builtin_functions.cpp
         Tests/cpp/test_builtin_exec.cpp
         Tests/cpp/test_stdio.cpp

@@ -88,10 +88,17 @@ operations. `Objects/rangeobject.cpp` owns immutable arbitrary-integer ranges an
 their iterators; `Objects/iterobject.cpp` owns iteration and immutable sequence
 indexing. `Include/internal/long.hpp` shares the existing integer representation
 and publication helper, without a second numeric implementation.
-`Objects/object.cpp` contains the initial values, shared dictionary/namespace
-storage, core image and common object construction. `Objects/dictobject.cpp` owns
-public dict/mappingproxy methods, views and iterators; callbacks use ordinary
-protocols outside storage locks. `Objects/listobject.cpp` owns mutable list storage,
+`Python/pylifecycle.cpp` builds the initial core image and installs its native
+types/builtins. `Objects/object.cpp` contains common value construction and layout
+tracing, not the core initializer or a second hash table implementation.
+`Objects/dictstorage.cpp` owns shared dictionary/namespace storage, prepared-node
+commits, rooted snapshots and iterator cursor operations. `Objects/dictobject.cpp`
+owns public dict/mappingproxy methods and protocol registration; callbacks use
+ordinary protocols outside storage locks. `Objects/setobject.cpp` owns set and
+frozenset construction, representation/hash, lookup and element mutation;
+`Objects/setoperations.cpp` owns their bulk algebra and method/operator bindings.
+Sets reuse a private dictionary table and its existing synchronization, rather
+than a second storage or lifetime authority. `Objects/listobject.cpp` owns mutable list storage,
 constructors and protocols, with prepared capacity growth and local commits.
 List displays lower through the same AST/CFG into BUILD_LIST; sys.path, regular
 package paths and CLI argv use that real container, not host-only arrays.

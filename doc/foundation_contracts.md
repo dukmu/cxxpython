@@ -38,7 +38,7 @@ Dictionary/list displays and comprehensions, conditional/lambda/named expression
 assert, expanded calls, power/shift/bitwise protocols, property/attribute builtins,
 Unicode identifiers and f-strings use the existing compiler/VM/protocol path.
 Import/from/package syntax remains an experimental implemented slice.
-Set/complex execution, full iteration APIs, exception groups,
+Complex execution, full iteration APIs, exception groups,
 suspension, annotations/type parameters, patterns, locale formatting and the
 remaining Python 3.12 matrix are
 unfinished. These are remaining delivery requirements, not a reduction of the
@@ -56,6 +56,33 @@ and collection. The immutable payload may be borrowed across NativeWait only
 while its precise owner Handle remains live. bytearray/memoryview and the full
 buffer export/PEP 688 matrix are still requirements, not emulated by iterable
 conversion or an unrooted pointer.
+
+Set/frozenset construction, displays and synchronous set comprehensions use the
+same compiler, call and object protocol paths. A SetObject owns a private traced
+dictionary table; individual membership/insertion/deletion/pop use its existing
+rooted reads and prepared-node commits. No separate hash store or execution lock
+is introduced. Frozenset fills its unpublished table before allocating the visible
+object and caches its order-independent hash atomically. Subclasses retain their
+ordinary native layout and traced tails. Bulk algebra uses rooted snapshots and
+short per-key commits, not a promise that an entire multi-operand update is one
+atomic transaction. Native weakrefs, pickle/generic-alias integration and the
+remaining common type APIs are still gates.
+
+Method forms accept iterables, binary operators require set/frozenset, and in-place
+operations preserve mutable set identity. Cached hashes are reused only on the
+corresponding upstream set/dict paths; ordinary iterable conversion keeps its
+observable hash calls and exceptions. Set intersection walks the smaller set
+snapshot rather than copying the larger input first. Iterators share the dictionary
+cursor implementation under the private table's short lock, returning each key
+once to concurrent next calls and detecting size changes.
+
+BUILD_SET's count operand consumes N values and produces one exact set; SET_ADD
+and SET_UPDATE require two stack values, consume the item/iterable and retain the
+set. All three use normal one-byte opcodes with existing operand encoding, can
+allocate/call Python/raise, and are verified and disassembled through the common
+opcode definitions. Starred displays and comprehensions do not consult a shadowed
+builtins.set. After a starred element, subsequent expressions are inserted before
+evaluating the next expression, preserving observable evaluation/hash order.
 
 The native UTF-8/ASCII/Latin-1 kernels back str.encode and bytes.decode, with
 traced UnicodeEncodeError/UnicodeDecodeError fields and error-handler behavior.
@@ -576,8 +603,9 @@ __truediv__/__rtruediv__/__itruediv__ slots. No new VM execution path is introdu
 These are experimental numeric slices, not complete numeric support.
 Complex values, modular power and remaining integer/float method matrices, bytes/buffer numeric
 construction, decimal conversion length limits and conversion warnings remain.
-The experimental dictionary slice is specified above. Its remaining API matrix,
-set construction/protocols and remaining source container features remain gates.
+The experimental dictionary slice is specified above. Its remaining APIs and
+source container features remain gates. Set slices
+and their remaining common-type integration are specified above.
 
 ## Source Exceptions And Cleanup
 

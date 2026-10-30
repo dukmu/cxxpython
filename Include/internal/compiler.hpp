@@ -61,6 +61,9 @@ struct TupleExpr {
 struct ListExpr {
     std::vector<ExprPtr> items;
 };
+struct SetExpr {
+    std::vector<ExprPtr> items;
+};
 struct DictExpr {
     // A missing key denotes **mapping, not a key with the value None.
     std::vector<std::pair<ExprPtr, ExprPtr>> items;
@@ -82,9 +85,9 @@ struct Expr {
     Span span;
     std::size_t depth;
     std::variant<Literal, NameExpr, UnaryExpr, BinaryExpr, BoolExpr, CompareExpr, CallExpr,
-                 AttributeExpr, TupleExpr, ListExpr, DictExpr, SubscriptExpr, ConditionalExpr,
-                 NamedExpr, StarredExpr, LambdaExpr, ComprehensionExpr, SliceExpr, JoinedStrExpr,
-                 FormattedExpr>
+                 AttributeExpr, TupleExpr, ListExpr, SetExpr, DictExpr, SubscriptExpr,
+                 ConditionalExpr, NamedExpr, StarredExpr, LambdaExpr, ComprehensionExpr, SliceExpr,
+                 JoinedStrExpr, FormattedExpr>
         node;
 };
 struct Stmt;
@@ -149,8 +152,10 @@ struct RaiseStmt {
 struct AssertStmt {
     ExprPtr test, message;
 };
+enum class CollectionKind { List, Dict, Set };
 struct CollectionAddStmt {
     ExprPtr collection, key, value;
+    CollectionKind kind = CollectionKind::List;
 };
 struct ExceptHandler {
     ExprPtr type;
