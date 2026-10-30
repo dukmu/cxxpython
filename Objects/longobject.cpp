@@ -548,6 +548,39 @@ void int_unary(Attachment &context, Handle, std::span<const Value> args, ReturnS
         value = ~value;
     publish(context, std::move(value), out);
 }
+void int_absolute(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!is_int(context, args[0])) {
+        type_error(context, out);
+        return;
+    }
+    auto value = expanded(integer(context, args[0]));
+    if (value < 0)
+        value = -value;
+    publish(context, std::move(value), out);
+}
+template <bool Reflected>
+void int_divmod(Attachment &context, Handle function, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(context);
+    ReturnSlot quotient(context), remainder(context);
+    arithmetic<BinaryOp::FloorDivide, Reflected>(context, function, args, quotient);
+    if (raised(quotient)) {
+        out.raised(quotient.exception());
+        return;
+    }
+    if (quotient.value() == context.builtin(CoreObject::NotImplemented)) {
+        out.ok(quotient.value());
+        return;
+    }
+    arithmetic<BinaryOp::Modulo, Reflected>(context, function, args, remainder);
+    if (raised(remainder)) {
+        out.raised(remainder.exception());
+        return;
+    }
+    const std::array values{quotient.value(), remainder.value()};
+    cxxpython::core::make_tuple(context, values, out);
+}
 void bool_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     if (args[0] != context.builtin(CoreObject::BoolType)) {
@@ -703,6 +736,8 @@ void install_numbers(Attachment &context, std::span<const Handle> core)
     install(U"__rfloordiv__", arithmetic<BinaryOp::FloorDivide, true>, true);
     install(U"__mod__", arithmetic<BinaryOp::Modulo, false>, true);
     install(U"__rmod__", arithmetic<BinaryOp::Modulo, true>, true);
+    install(U"__divmod__", int_divmod<false>, true);
+    install(U"__rdivmod__", int_divmod<true>, true);
     install(U"__pow__", integer_extended<BinaryOp::Power, false>, true);
     install(U"__rpow__", integer_extended<BinaryOp::Power, true>, true);
     install(U"__lshift__", integer_extended<BinaryOp::LeftShift, false>, true);
@@ -733,6 +768,7 @@ void install_numbers(Attachment &context, std::span<const Handle> core)
     install(U"__index__", int_identity);
     install(U"__pos__", int_unary<UnaryOp::Positive>);
     install(U"__neg__", int_unary<UnaryOp::Negative>);
+    install(U"__abs__", int_absolute);
     install(U"__invert__", int_unary<UnaryOp::Invert>);
     install(U"__hash__", int_hash);
     install(U"__repr__", int_repr);

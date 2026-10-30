@@ -144,6 +144,84 @@ class SourceDifferential(unittest.TestCase):
             with self.subTest(expression=expression):
                 self.check_program(source, expression)
 
+    def test_base_builtins(self):
+        cases = [
+            ("errors = []\ntry:\n    bytes(9223372036854775807)\n"
+             "except OverflowError as e:\n    errors.append((type(e).__name__, str(e)))\n"
+             "for text in ['0g', 'g0', '0', '0 ', '00 0', 'z\\xff']:\n"
+             "    try:\n        bytes.fromhex(text)\n"
+             "    except ValueError as e:\n        errors.append(str(e))", "errors"),
+            ("events = []\nclass Flag:\n"
+             "    def __bool__(self):\n        events.append('bool')\n        return True\n"
+             "class Stream:\n"
+             "    def write(self, text): events.append(text)\n"
+             "    def flush(self): events.append('flush')\n"
+             "print('x', file=Stream(), flush=Flag())", "events"),
+            ("events = []\nclass Text(str):\n"
+             "    def __str__(self):\n        events.append('str')\n        return 'converted'\n"
+             "class Stream:\n"
+             "    def __getattribute__(self, name):\n"
+             "        events.append(name)\n        return object.__getattribute__(self, name)\n"
+             "    def write(self, text): events.append(text)\n"
+             "print(Text('x'), Text('y'), sep=Text(':'), end=Text('!'), file=Stream())", "events"),
+            ("import sys\nsaved = sys.stdout\nsys.stdout = None\n"
+             "print(1, sep=42)\nsys.stdout = saved", "True"),
+            ("e = UnicodeEncodeError('ascii', 'x', 0, -9223372036854775808, 'bad')",
+             "str(e)"),
+            ("x = bytes([0, 127, 128, 255])\nclass B(bytes): pass\nb = B(x)",
+             "x, tuple(x), x[::-1], type(b).__name__, bytes(b), "
+             "b':'.join([b'a', b'b']), x.hex(':', -2), bytes.fromhex('00 7f 80 ff')"),
+            ("class A:\n    def value(self): return 40\n"
+             "class B(A):\n    def value(self): return super().value() + 2\n"
+             "b = B()\ns = super(B, b)",
+             "b.value(), s.value(), s.__self__ is b, s.__self_class__ is B"),
+            ("class K:\n    def __abs__(self): return 'custom'\n"
+             "class R:\n    def __rdivmod__(self, other): return ('reflected', other)",
+             "abs(-2**100), abs(-0.0), abs(K()), all([1, 2]), any([0, 2]), "
+             "ord(b'\\xff'), ord(chr(0x10ffff)), callable(K), divmod(-7, 3), divmod(7, R()), "
+             "min([3, 1, 2]), max([], default=42), min(1, -2, key=abs), "
+             "sum([1e100, 1.0, -1e100]), sum([1, 2], 40)"),
+            ("value = 30\ndef f(x):\n"
+             "    return locals()['x'], eval('x + value'), globals()['value']\n"
+             "g = {'x': 1}\nl = {'x': 40}\n"
+             "exec(compile('result = x + 2', 'base.py', 'exec'), g, l)",
+             "f(12), l['result'], 'result' in g, eval(compile('x + 2', 'base.py', 'eval'), g, l)"),
+            ("class D:\n    def __dir__(self): return ['z', 'a', 'b']\n"
+             "d = D()\nd.item = 42", "dir(d), vars(d), vars()['d'] is d"),
+            ("print('native', 42, b'\\xff', sep=':', end='!\\n')", "True"),
+            ("import sys\nsaved = sys.stdout\nevents = []\n"
+             "class Stream:\n    def write(self, text): events.append(text)\n"
+             "    def flush(self): events.append('flush')\n"
+             "sys.stdout = Stream()\nprint('a', 2, sep=':', end='!', flush=True)\n"
+             "sys.stdout = saved", "events"),
+            ("text = '\\u4f60\\U0001f600'\nb = text.encode('utf-8')",
+             "b, b.decode(), '\\xff'.encode('latin-1'), b'\\xff'.decode('ascii', 'replace')"),
+            ("errors = []\nfor data in [b'\\x80', b'\\xe2\\x82', b'\\xed\\xa0\\x80', b'\\xf4\\x90\\x80\\x80']:\n"
+             "    try:\n        data.decode()\n"
+             "    except UnicodeDecodeError as e:\n"
+             "        errors.append((e.encoding, e.object, e.start, e.end, e.reason, str(e)))",
+             "errors"),
+        ]
+        for source, expression in cases:
+            with self.subTest(expression=expression):
+                self.check_program(source, expression)
+
+    def test_print_closed_pipe_is_a_python_error(self):
+        if not Path('/proc/self/fd/0').exists():
+            self.skipTest('Linux descriptor fixture')
+        source = ("import _imp\nimport sys\n_imp._get_source('/proc/self/fd/0')\n"
+                  "try:\n    print('closed pipe')\n"
+                  "except OSError:\n    sys.stdout = None\n    sys.stderr.write('caught\\n')\n")
+        process = subprocess.Popen([self.binary, '-c', source], stdin=subprocess.PIPE,
+                                   stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        process.stdout.close()
+        process.stdin.close()
+        process.wait(timeout=15)
+        error = process.stderr.read()
+        process.stderr.close()
+        self.assertEqual(process.returncode, 0, error)
+        self.assertEqual(error, 'caught\n')
+
     def test_iteration_unpacking_and_exception_workflows(self):
         cases = [
             ("", "(), (1,), (1, 2), ((1, 2), 3)"),

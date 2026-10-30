@@ -125,10 +125,12 @@ class Adapter {
         std::size_t quote = text.find_first_of(U"'\"");
         if (quote == std::u32string::npos)
             unsupported(n);
-        bool raw = false;
+        bool raw = false, bytes = false;
         for (std::size_t i = 0; i < quote; ++i) {
-            if (text[i] == U'b' || text[i] == U'B' || text[i] == U'f' || text[i] == U'F')
+            if (text[i] == U'f' || text[i] == U'F')
                 unsupported(n);
+            if (text[i] == U'b' || text[i] == U'B')
+                bytes = true;
             if (text[i] == U'r' || text[i] == U'R')
                 raw = true;
         }
@@ -144,6 +146,11 @@ class Adapter {
                 continue;
             }
             ch = text[++i];
+            if (bytes && (ch == U'u' || ch == U'U' || ch == U'N')) {
+                out.push_back(U'\\');
+                out.push_back(ch);
+                continue;
+            }
             switch (ch) {
             case U'\n':
                 break;
@@ -215,7 +222,7 @@ class Adapter {
                                     text[i + 1] <= U'7';
                          ++j)
                         value = value * 8 + text[++i] - U'0';
-                    out.push_back(value);
+                    out.push_back(bytes ? value & 255 : value);
                 } else {
                     out.push_back(U'\\');
                     out.push_back(ch);
@@ -238,8 +245,13 @@ class Adapter {
         }
         if (t.kind == TokenKind::ELLIPSIS)
             return make(n, Literal{Literal::Kind::Ellipsis, {}});
-        if (t.kind == TokenKind::STRING)
-            return make(n, Literal{Literal::Kind::String, string_value(n, t.text)});
+        if (t.kind == TokenKind::STRING) {
+            const auto prefix = t.text.substr(0, t.text.find_first_of(U"'\""));
+            const auto kind = prefix.find_first_of(U"bB") == std::u32string::npos
+                                  ? Literal::Kind::String
+                                  : Literal::Kind::Bytes;
+            return make(n, Literal{kind, string_value(n, t.text)});
+        }
         if (t.kind == TokenKind::NUMBER) {
             auto text = t.text;
             if (!text.empty() && (text.back() == U'j' || text.back() == U'J'))
@@ -301,7 +313,8 @@ class Adapter {
                         joined.items.push_back(std::move(item));
                 } else {
                     auto lit = std::get_if<Literal>(&e->node);
-                    if (!lit || lit->kind != Literal::Kind::String)
+                    if (!lit ||
+                        (lit->kind != Literal::Kind::String && lit->kind != Literal::Kind::Bytes))
                         unsupported(*p);
                     joined.items.push_back(std::move(e));
                 }
@@ -311,7 +324,9 @@ class Adapter {
             std::u32string value;
             for (auto &item : joined.items)
                 value += std::get<Literal>(item->node).text;
-            return make(n, Literal{Literal::Kind::String, std::move(value)});
+            const auto kind = joined.items.empty() ? Literal::Kind::String
+                                                   : std::get<Literal>(joined.items[0]->node).kind;
+            return make(n, Literal{kind, std::move(value)});
         }
         case Rule::string:
             for (auto p : c)

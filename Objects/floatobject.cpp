@@ -231,6 +231,12 @@ void float_negative(Attachment &context, Handle, std::span<const Value> args, Re
     if (value)
         make_float(context, -value->value, out);
 }
+void float_absolute(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    const auto *value = require_float(context, args[0], out);
+    if (value)
+        make_float(context, std::fabs(value->value), out);
+}
 
 bool operand_double(Attachment &context, Value value, double &number, ReturnSlot &out)
 {
@@ -326,6 +332,29 @@ void float_arithmetic(Attachment &context, Handle, std::span<const Value> args, 
         }
     }
     make_float(context, result, out);
+}
+
+template <bool Reflected>
+void float_divmod(Attachment &context, Handle function, std::span<const Value> args,
+                  ReturnSlot &out)
+{
+    ReturnSlot quotient(context), remainder(context);
+    float_arithmetic<BinaryOp::FloorDivide, Reflected>(context, function, args, quotient);
+    if (quotient.tag() == ResultTag::Raised) {
+        out.raised(quotient.exception());
+        return;
+    }
+    if (quotient.value() == context.builtin(CoreObject::NotImplemented)) {
+        out.ok(quotient.value());
+        return;
+    }
+    float_arithmetic<BinaryOp::Modulo, Reflected>(context, function, args, remainder);
+    if (remainder.tag() == ResultTag::Raised) {
+        out.raised(remainder.exception());
+        return;
+    }
+    const std::array values{quotient.value(), remainder.value()};
+    cxxpython::core::make_tuple(context, values, out);
 }
 
 void float_int(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
@@ -504,6 +533,7 @@ void detail::install_floats(Attachment &context, std::span<const Handle> core)
     install(U"__float__", float_identity);
     install(U"__pos__", float_identity);
     install(U"__neg__", float_negative);
+    install(U"__abs__", float_absolute);
     install(U"__int__", float_int);
     install(U"__repr__", float_repr);
     install(U"__str__", float_repr);
@@ -528,6 +558,8 @@ void detail::install_floats(Attachment &context, std::span<const Handle> core)
     install(U"__rfloordiv__", float_arithmetic<BinaryOp::FloorDivide, true>, true);
     install(U"__mod__", float_arithmetic<BinaryOp::Modulo, false>, true);
     install(U"__rmod__", float_arithmetic<BinaryOp::Modulo, true>, true);
+    install(U"__divmod__", float_divmod<false>, true);
+    install(U"__rdivmod__", float_divmod<true>, true);
     SignatureLayout constructor;
     constructor.parameters = {{U"cls", ParameterKind::PositionalOnly}};
     constructor.varargs = U"args";

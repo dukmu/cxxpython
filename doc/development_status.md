@@ -1,5 +1,73 @@
 # Development Status
 
+## 2026-10-30 Base Builtins, Bytes, Codecs, Super And Real Print
+
+Prepended without rewriting earlier entries. Previous stable node: 30dd0ed.
+The generated-frontend/import/library/N4-N6/M0-M9 goal remains active; this Base
+slice is not completion of all builtins, I/O, codecs or release acceptance.
+
+- Builtins now contain real print, locals/globals/vars/dir, compile/eval/exec and
+  abs/all/any/callable/chr/ord/divmod/min/max/sum. They use ordinary current frames,
+  namespaces, native layouts, numeric dispatch and iterator protocols. Float sum
+  retains the pinned 3.12 compensated accumulation flow. No separate execution
+  engine, Python reference counting or execution-wide mutex was introduced.
+- Module implicit names now use namespace bytecode, including module docstrings;
+  explicit global declarations still use globals. RunRequest accepts distinct
+  locals, so exec/eval execute against real separate mappings instead of rejecting
+  them or silently writing globals. Syntax errors retain source location fields.
+  Current compile slices are exec/eval, zero flags and optimize -1/0; single/AST/
+  future flags, closure execution and the full option/diagnostic matrix remain.
+- Added immutable BytesObject with bytes literals, constructor/subclass behavior,
+  indexing/slicing, comparisons/hash, iteration, concatenation/repeat, membership,
+  join and hex/fromhex. Immutable payload borrows keep their precise owner root
+  live; this is not a complete buffer-export protocol. Shared bytes iteration uses
+  the existing atomic sequence cursor, claiming an item only after allocating its
+  result. The existing concurrent-next/GC test now covers bytes too.
+- Added UTF-8/ASCII/Latin-1 codec kernels, str.encode, bytes.decode and real
+  UnicodeEncodeError/UnicodeDecodeError fields with strict and selected standard
+  handlers. Unknown encodings do not silently become UTF-8; unknown handlers are
+  checked lazily at actual errors. Source encoding cookies, the codec registry,
+  additional encodings and complete mutable error semantics remain dependencies.
+- super supports current-frame __class__/first-argument binding and explicit
+  forms, C3 lookup and ordinary descriptors. One immutable tuple publishes its
+  mutable binding atomically; no GIL-dependent multi-field state was copied.
+  CPython source provenance and temporary adaptations are recorded in the ledger.
+- print resolves current sys.stdout or an explicit file and invokes real write/
+  flush callbacks. Pinned bltinmodule/clinic/fileobject behavior determines flush
+  truth conversion, write lookup before str conversion, separator/end conversion,
+  disabled-stdout handling and exception order. Bootstrap sys._StandardTextIO
+  supplies unbuffered UTF-8 writes through borrowed standard descriptors. Blocking
+  writes release object locks and use NativeWait; close waits for active writes.
+  Thread-local SIGPIPE masking consumes only a newly generated closed-pipe signal;
+  it does not replace the embedding host's process-wide signal disposition.
+- Fixed concrete integration defects: an expired temporary DictView span in bytes
+  keyword parsing; unpublished bootstrap defaults; accidental std::make_tuple ADL;
+  Unicode error end-index signed overflow; bytes length_error escaping as a C++
+  failure; fromhex error positions; and standard-stream encoding exceptions not
+  reaching the caller's result slot. Focused every-allocation-GC tests and retained
+  failing observations cover the affected paths rather than introducing guards
+  for hypothetical future behavior.
+- Final normal CTest passes 473/473. Full ASan/UBSan/LSan native passes 464/464 and
+  full TSan native passes 462/462 before the final localized boundary/call-order
+  corrections. Final affected suites pass ASan 17/17 and TSan 6/6, including the
+  new standard-stream exception test and shared iteration/GC. TSan excludes only
+  the established two allocation enumerations covered elsewhere, with no new
+  exclusion. Final normal and strict-ASan product differentials match all 14 Base
+  cases against fixed CPython 3.12.14; both also pass the real closed-pipe process
+  regression. Format-check and all 244 generated grammar-rule checks pass.
+- Evidence remains under .cache/base-builtins-*: full and affected CTest logs,
+  copied sanitizer output, differential JSON/logs and executable hashes. The
+  Unicode boundary failure and bytes keyword crash observations remain in
+  .cache/base-codec-boundary-before.log and .cache/base-bytes-crash.log. All build/
+  test handles were confirmed terminal before replacing binaries or declaring
+  success. No unrelated CPU benchmark rerun or handwritten table was added.
+- Next Base dependencies remain set/frozenset, bytearray/memoryview and full buffer
+  ownership, remaining iterators/constructors, raw file resources and real _io/
+  Lib io/codecs/encodings, followed by the specified standard-library closures,
+  runpy and product entrypoints. Bootstrap standard streams are not TextIOWrapper;
+  open/input/read/configuration remain unimplemented. The user's temporary_plan.md
+  deletion and untracked test2.py remain outside this stable-point commit.
+
 ## 2026-10-30 Unified Finder Protocol And CPython Compatibility Direction
 
 Prepended without rewriting earlier entries. Previous stable node: 5dce200.

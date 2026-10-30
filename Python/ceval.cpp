@@ -1461,6 +1461,12 @@ void make_function(Attachment &context, const FunctionSpec &spec, ReturnSlot &ou
                                               builtins.get(context), closure);
 }
 namespace detail {
+void frame_locals(Attachment &context, Handle frame, ReturnSlot &out)
+{
+    auto &data = context.payload<FrameObject>(frame);
+    import_locals(context, data, context.payload<CodeObject>(data.code), out);
+}
+
 void execute_class_body(Attachment &context, Handle function, Handle mapping, ReturnSlot &out)
 {
     if (!context.enter_call()) {

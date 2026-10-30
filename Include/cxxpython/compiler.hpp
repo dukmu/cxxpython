@@ -75,6 +75,7 @@ class SourceUnit final {
 struct RunRequest {
     std::variant<const SourceUnit *, Handle> program;
     std::optional<Handle> globals = {}, builtins = {};
+    std::optional<Handle> locals = {};
 };
 ResultView run(Attachment &context, const RunRequest &request, ReturnSlot &out);
 // Native UTF-8 conversion for source and host diagnostics, not a Python codec API.

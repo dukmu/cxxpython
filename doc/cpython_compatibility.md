@@ -46,11 +46,31 @@ acceptance evidence; this list is not a generated support matrix.
 ## Builtins And Product
 
 The canonical builtins module/dictionary, namespace lookup and core bootstrap are
-present. Complete Python 3.12 builtins are not: print/open/input, bytes/set/super,
-compile/eval/exec and remaining constructors/protocol matrices are still work.
+present. Base slices now include print, immutable bytes, super, namespace/reflection,
+exec/eval compilation/execution and common aggregate builtins. Complete Python
+3.12 builtins are not: open/input, set/frozenset, bytearray/memoryview, remaining
+iterators, compiler flags/modes and constructors/protocol matrices are still work.
 Complete their native dependencies and fixed-reference tests before copying
 dependent libraries wholesale. `__builtin__` is not the Python 3 module name;
 the target is `builtins` and the `__builtins__` execution namespace.
+
+- Bytes construction and numeric/aggregate/super implementations adapt the pinned
+  bytesobject.c, bltinmodule.c, longobject.c, floatobject.c and typeobject.c flows
+  to typed roots and immutable snapshots. Complete bytes methods, mutable buffer
+  exports and the Unicode codec registry still need their actual dependencies.
+- Builtin compile/eval/exec reuse the existing compiler and VM. Ordinary module
+  names now emit namespace instructions, matching separate globals/locals
+  behavior; explicit global still emits global instructions. Current valid slices
+  are exec/eval, zero flags and non-positive optimization. Single/AST/future flags,
+  closure execution, path-like filenames and complete diagnostics are not done.
+  Complete them in the compiler rather than making Lib permanently avoid them.
+- Bootstrap sys._StandardTextIO is an explicit temporary native stream type,
+  using borrowed descriptors and UTF-8 unbuffered writes. Replace this bootstrap
+  layer with the real _io/Lib io closure after mutable buffers, raw file resources,
+  incremental codecs and configuration exist. Do not claim it is TextIOWrapper or
+  copy a fake Python io facade around it. print itself follows current sys.stdout
+  and ordinary file.write/flush callbacks; closed-pipe handling does not install a
+  process-global signal handler. Input/open and full stream configuration remain.
 
 The configured source-tree stdlib path is development configuration, not final
 installation, isolation, environment or embedding acceptance. Full stdio, runpy,

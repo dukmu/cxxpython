@@ -2,6 +2,10 @@
 #include "cxxpython/moduleobject.hpp"
 #include "cxxpython/objects.hpp"
 #include "cxxpython/protocol.hpp"
+#include "cxxpython/superobject.hpp"
+#include "internal/builtinexec.hpp"
+#include "internal/codecs.hpp"
+#include "internal/stdio.hpp"
 
 #include <algorithm>
 #include <bit>
@@ -581,6 +585,9 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
             spec.slots = std::vector<std::u32string>{U"name", U"path", U"msg", U"name_from"};
         if (id == CoreObject::StopIterationType)
             spec.slots = std::vector<std::u32string>{U"value"};
+        if (id == CoreObject::UnicodeEncodeErrorType || id == CoreObject::UnicodeDecodeErrorType)
+            spec.slots =
+                std::vector<std::u32string>{U"encoding", U"object", U"start", U"end", U"reason"};
         create_native_type(context, NativeTypeSpec{spec, layout},
                            *outputs[static_cast<std::size_t>(id)]);
         core.push_back(roots.root(outputs[static_cast<std::size_t>(id)]->result().value()));
@@ -608,6 +615,12 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
            LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::ExceptionType));
     define(CoreObject::ValueErrorType, "ValueError", LayoutDescriptor::of<ExceptionObject>(),
            at(CoreObject::ExceptionType));
+    define(CoreObject::UnicodeErrorType, "UnicodeError", LayoutDescriptor::of<ExceptionObject>(),
+           at(CoreObject::ValueErrorType));
+    define(CoreObject::UnicodeEncodeErrorType, "UnicodeEncodeError",
+           LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::UnicodeErrorType));
+    define(CoreObject::UnicodeDecodeErrorType, "UnicodeDecodeError",
+           LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::UnicodeErrorType));
     define(CoreObject::RuntimeErrorType, "RuntimeError", LayoutDescriptor::of<ExceptionObject>(),
            at(CoreObject::ExceptionType));
     define(CoreObject::MemoryErrorType, "MemoryError", LayoutDescriptor::of<ExceptionObject>(),
@@ -688,6 +701,11 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     define(CoreObject::SequenceIteratorType, "iterator",
            LayoutDescriptor::of<SequenceIteratorObject>());
     define(CoreObject::SliceType, "slice", LayoutDescriptor::of<SliceObject>());
+    define(CoreObject::BytesType, "bytes", LayoutDescriptor::of<BytesObject>());
+    define(CoreObject::SuperType, "super", LayoutDescriptor::of<SuperObject>());
+    define(CoreObject::BytesIteratorType, "bytes_iterator",
+           LayoutDescriptor::of<SequenceIteratorObject>());
+    context.payload<TypeObject>(at(CoreObject::BytesType)).allow_slots = false;
     context.payload<TypeObject>(at(CoreObject::TupleType)).allow_slots = false;
     context.payload<TypeObject>(at(CoreObject::IntType)).allow_slots = false;
     for (auto type : core) {
@@ -757,6 +775,9 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     install_protocols(context, core);
     install_dictionaries(context, core);
     install_lists(context, core);
+    install_bytes(context, core);
+    install_codecs(context, core);
+    install_super(context, core);
     install_value_protocols(context, core);
     install_format(context, core);
     install_execution(context, core);
@@ -798,7 +819,8 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                     CoreObject::DictItemIteratorType,
                     CoreObject::ListIteratorType,
                     CoreObject::SequenceIteratorType,
-                    CoreObject::SliceType})
+                    CoreObject::SliceType,
+                    CoreObject::BytesIteratorType})
         context.payload<TypeObject>(at(id)).subclassable = false;
 
     auto &builtins = *outputs[static_cast<std::size_t>(CoreObject::Builtins)];
@@ -823,6 +845,9 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                     CoreObject::TypeErrorType,
                     CoreObject::AttributeErrorType,
                     CoreObject::ValueErrorType,
+                    CoreObject::UnicodeErrorType,
+                    CoreObject::UnicodeEncodeErrorType,
+                    CoreObject::UnicodeDecodeErrorType,
                     CoreObject::RuntimeErrorType,
                     CoreObject::MemoryErrorType,
                     CoreObject::RecursionErrorType,
@@ -835,6 +860,8 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                     CoreObject::StopIterationType,
                     CoreObject::RangeType,
                     CoreObject::SliceType,
+                    CoreObject::BytesType,
+                    CoreObject::SuperType,
                     CoreObject::NameErrorType,
                     CoreObject::UnboundLocalErrorType,
                     CoreObject::ImportErrorType,
@@ -873,6 +900,22 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     operation("hash", U"hash", builtin_protocol<Protocol::Hash>);
     install_iterator_builtins(context, core, mapping);
     install_class_builtins(context, core, mapping);
+    install_exec_builtins(context, core, mapping);
+    {
+        SignatureLayout signature;
+        signature.parameters = {
+            {U"sep", ParameterKind::KeywordOnly, at(CoreObject::None).get(context)},
+            {U"end", ParameterKind::KeywordOnly, at(CoreObject::None).get(context)},
+            {U"file", ParameterKind::KeywordOnly, at(CoreObject::None).get(context)},
+            {U"flush", ParameterKind::KeywordOnly, at(CoreObject::False).get(context)}};
+        signature.varargs = U"objects";
+        ReturnSlot function(context);
+        context.allocate_instance<NativeFunctionObject>(at(CoreObject::NativeFunctionType),
+                                                        function, "print", signature, print_builtin,
+                                                        std::vector<Value>{});
+        context.allocate_instance<StrObject>(at(CoreObject::StrType), text, U"print");
+        publish(text.value(), function.value());
+    }
     install_import_builtins(context, core, mapping);
     auto &modules = *outputs[static_cast<std::size_t>(CoreObject::Modules)];
     context.allocate_instance<DictObject>(at(CoreObject::DictType), modules);

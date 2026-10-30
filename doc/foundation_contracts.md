@@ -38,12 +38,53 @@ Dictionary/list displays and comprehensions, conditional/lambda/named expression
 assert, expanded calls, power/shift/bitwise protocols, property/attribute builtins,
 Unicode identifiers and f-strings use the existing compiler/VM/protocol path.
 Import/from/package syntax remains an experimental implemented slice.
-Set/bytes/complex execution, full iteration APIs, super(), exception groups,
+Set/complex execution, full iteration APIs, exception groups,
 suspension, annotations/type parameters, patterns, locale formatting and the
 remaining Python 3.12 matrix are
 unfinished. These are remaining delivery requirements, not a reduction of the
 basic-language objective. Existing native VM/type/cleanup interfaces do not imply
 source or library support.
+
+## Base Builtins, Bytes And Streams
+
+Experimental bytes literals and immutable native BytesObject use ordinary
+construction, comparison/hash, repr/str, integer/slice access, iteration,
+concatenation/repetition, membership, join and hex/fromhex protocols. __bytes__
+precedes index/iterable construction; bytes subclasses retain traced dictionary
+tails. Byte iterator claims are atomic and tested with two shared-heap workers
+and collection. The immutable payload may be borrowed across NativeWait only
+while its precise owner Handle remains live. bytearray/memoryview and the full
+buffer export/PEP 688 matrix are still requirements, not emulated by iterable
+conversion or an unrooted pointer.
+
+The native UTF-8/ASCII/Latin-1 kernels back str.encode and bytes.decode, with
+traced UnicodeEncodeError/UnicodeDecodeError fields and error-handler behavior.
+Unknown encodings and handlers are not silently mapped to UTF-8. This is not a
+complete codec registry or the encodings/codecs library; source-cookie decoding,
+additional codecs, custom handlers and complete error mutation matrices remain.
+
+abs/all/any/callable/chr/ord/divmod/min/max/sum use normal type, iterator and
+numeric protocols. super uses the current frame's __class__ Cell/first argument
+or explicit bindings, C3 lookup and normal descriptors. Its mutable binding is
+published as one immutable rooted tuple rather than three independent fields.
+locals/globals/vars/dir use real namespaces and current-thread frame snapshots;
+fast locals and Cells remain execution authority, not the reflection dictionary.
+
+compile/eval/exec support the exec/eval source and Code path through SourceUnit,
+VerifiedCode and RunRequest. Separate locals mappings execute namespace bytecode;
+explicit global declarations still access globals. Single/AST/future flags,
+positive optimize, closure execution and the remaining compiler API matrix are
+not complete and are explicitly rejected, not silently ignored.
+
+print uses the dynamically selected sys.stdout or explicit file, str/write in
+observable order, sep/end validation and optional flush. The bootstrap standard
+streams are native sys._StandardTextIO objects, not modules or a claim of full
+_io.TextIOWrapper compatibility. They borrow standard descriptors, use operation
+leases for close/write coordination, and park only around host operations without
+holding internal mutexes during blocking writes. SIGPIPE is scoped to the writing
+thread rather than changing the embedding host's process-wide disposition.
+These are unbuffered UTF-8 bootstrap streams; input/read, open, full _io layering,
+buffering, stream configuration and errno/platform error matrices remain gates.
 
 The independent parser recognizes the fixed complete Python 3.12.14 PEG grammar,
 including those not-yet-executable families. `Grammar/` is the source of truth;
@@ -426,10 +467,10 @@ is frozen once and reused by subsequent class/factory invocations, while their
 types, Functions and Cells are distinct. Decorators evaluate top-to-bottom
 before definition expressions and apply bottom-to-top before name binding.
 
-Zero-/two-argument super and its descriptor object, full locals/globals/vars
-reflection, general containers, call/base unpacking, annotation scopes/type
-parameters and the rest of the type protocol/method matrix remain delivery
-requirements. Class source support here is experimental, not complete M2/M5.
+Base super and namespace reflection are specified above. Full reflection,
+general containers, call/base unpacking, annotation scopes/type parameters and
+the rest of the type protocol/method matrix remain delivery requirements.
+Class source support here is experimental, not complete M2/M5.
 
 ## Iteration And Items
 
@@ -483,8 +524,9 @@ matrices remain a gate.
 KeyError's one-argument str uses repr of its key; explicitly calling
 BaseException.__str__ retains the base behavior. The ordinary str constructor
 supports empty/object conversion, object/encoding/errors argument validation
-and native-layout-preserving subclasses. Byte buffers/codecs and the complete
-Unicode API remain requirements; no existing non-buffer type is silently decoded.
+and native-layout-preserving subclasses. Complete buffer/codec and Unicode APIs
+remain requirements beyond the bytes and codec kernels specified above; no
+existing non-buffer type is silently decoded.
 
 ## Numeric Operations
 
@@ -580,7 +622,8 @@ all managed materialization. RunRequest and the single CLI use this same service
 not a second language path. Native SourceError preserves source spans and category;
 runtime faults use Raised and real tracebacks. Globals use actual name dictionaries;
 builtins accept a module or dictionary and normalize to its canonical dictionary.
-Arbitrary RunRequest namespace mappings and Python compile/exec/eval remain absent.
+RunRequest accepts distinct globals/locals, with Python compile/exec/eval and
+their remaining option/mode gates specified above.
 
 Native contracts live in Tests/cpp; actual executable differential drivers live
 in Tests/python and use fixed CPython 3.12.14 when configured. Lib is reserved for

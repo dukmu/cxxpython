@@ -35,6 +35,20 @@ struct StrObject {
     void trace(Tracer &) const noexcept {}
     std::size_t external_bytes() const noexcept;
 };
+struct BytesObject {
+    ObjectHeader header;
+    const std::string value;
+    BytesObject(InitialType head, std::string data) : header(head), value(std::move(data)) {}
+    void trace(Tracer &) const noexcept {}
+    std::size_t external_bytes() const noexcept
+    {
+        return value.capacity() + 1;
+    }
+};
+// The immutable payload may be borrowed across a safepoint/NativeWait only
+// while a precise owner Handle remains live. Mutable buffer exports are separate.
+void make_bytes(Attachment &, std::string, ReturnSlot &);
+bool is_bytes(Attachment &, Value);
 struct IntObject {
     ObjectHeader header;
     const std::int64_t small;
@@ -431,6 +445,7 @@ void discard_name_table(Attachment &context, Value dictionary);
 std::int64_t name_hash(Attachment &, const std::u32string &);
 void install_dictionaries(Attachment &, std::span<const Handle>);
 void install_lists(Attachment &, std::span<const Handle>);
+void install_bytes(Attachment &, std::span<const Handle>);
 void install_slices(Attachment &, std::span<const Handle>);
 struct SliceIndices {
     std::int64_t start, stop, step, length;

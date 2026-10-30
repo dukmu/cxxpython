@@ -118,7 +118,8 @@ TEST_F(CoreIteration, UserProtocolsPreserveStopIterationValuesAndOtherExceptions
 TEST(ParallelIteration, SharedBuiltinIteratorClaimsEachItemOnceDuringGc)
 {
     constexpr std::size_t count = 700;
-    for (int kind : {0, 1, 2, 3}) {
+    for (int kind : {0, 1, 2, 3, 4}) {
+        const auto expected = kind == 4 ? std::size_t{256} : count;
         Interpreter interpreter;
         Attachment owner(interpreter);
         owner.bootstrap_core();
@@ -127,6 +128,12 @@ TEST(ParallelIteration, SharedBuiltinIteratorClaimsEachItemOnceDuringGc)
         if (kind == 0) {
             SourceUnit unit(SourceBuffer("iter(range(700))"), InputMode::Eval);
             run(owner, {&unit}, out);
+        } else if (kind == 4) {
+            std::string values;
+            for (std::size_t i = 0; i < expected; ++i)
+                values += static_cast<char>(i);
+            make_bytes(owner, std::move(values), out);
+            get_iter(owner, roots.root(out.value()), out);
         } else {
             if (kind == 1 || kind == 3) {
                 std::vector<Value> values;
@@ -179,7 +186,7 @@ TEST(ParallelIteration, SharedBuiltinIteratorClaimsEachItemOnceDuringGc)
                                             0x1000;
                                 else if (!int_fits_signed(context, result.value(), index))
                                     throw std::runtime_error("invalid item");
-                                if (index < 0 || index >= static_cast<std::int64_t>(count))
+                                if (index < 0 || index >= static_cast<std::int64_t>(expected))
                                     throw std::runtime_error("item bounds");
                                 ++seen[index];
                                 if (index % 37 == 0)
@@ -197,8 +204,8 @@ TEST(ParallelIteration, SharedBuiltinIteratorClaimsEachItemOnceDuringGc)
             for (auto &worker : workers)
                 EXPECT_NO_THROW(worker.get());
         }
-        for (const auto &visits : seen)
-            EXPECT_EQ(visits.load(), 1U);
+        for (std::size_t i = 0; i < seen.size(); ++i)
+            EXPECT_EQ(seen[i].load(), i < expected ? 1U : 0U);
         owner.collect();
     }
 }

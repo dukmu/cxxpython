@@ -22,9 +22,11 @@ add_library(cxxpython_core
     Python/gc.cpp
     Python/compile.cpp
     Python/bltinmodule.cpp
+    Python/builtinexec.cpp
     Python/import.cpp
     Python/extension.cpp
     Modules/_impmodule.cpp
+    Modules/_iomodule.cpp
     Python/symtable.cpp
     Python/flowgraph.cpp
     Python/ceval.cpp
@@ -38,6 +40,9 @@ add_library(cxxpython_core
     Objects/listobject.cpp
     Objects/sliceobject.cpp
     Objects/formatobject.cpp
+    Objects/bytesobject.cpp
+    Objects/unicodecodecs.cpp
+    Objects/superobject.cpp
     Objects/moduleobject.cpp
     Objects/call.cpp
     Objects/descrobject.cpp
@@ -129,6 +134,12 @@ if(BUILD_TESTING)
         Tests/cpp/test_attributes.cpp
         Tests/cpp/test_construction.cpp
         Tests/cpp/test_constructors.cpp
+        Tests/cpp/test_bytes.cpp
+        Tests/cpp/test_codecs.cpp
+        Tests/cpp/test_super.cpp
+        Tests/cpp/test_builtin_functions.cpp
+        Tests/cpp/test_builtin_exec.cpp
+        Tests/cpp/test_stdio.cpp
         Tests/cpp/test_modules.cpp
         Tests/cpp/test_import.cpp
         Tests/cpp/test_import_protocol.cpp

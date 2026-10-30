@@ -87,7 +87,7 @@ class GraphPass final {
     {
         const auto &binding = symbol(text);
         if (binding.classification == NameClass::Namespace ||
-            (program_.scopes[scope_].kind == ScopeKind::Class &&
+            (program_.scopes[scope_].kind != ScopeKind::Function &&
              binding.classification == NameClass::GlobalImplicit))
             emit(local == Opcode::LoadFast    ? Opcode::LoadName
                  : local == Opcode::StoreFast ? Opcode::StoreName
@@ -548,7 +548,14 @@ class GraphPass final {
                 if (scope_ == 0) {
                     literal({Literal::Kind::String, *program_.graphs[scope_].docstring},
                             statement->span);
-                    emit(Opcode::StoreGlobal, statement->span, 0, U"__doc__");
+                    const auto &symbols = program_.scopes[scope_].symbols;
+                    const auto explicit_global =
+                        std::any_of(symbols.begin(), symbols.end(), [](const auto &item) {
+                            return item.name == U"__doc__" &&
+                                   item.classification == NameClass::GlobalExplicit;
+                        });
+                    emit(explicit_global ? Opcode::StoreGlobal : Opcode::StoreName, statement->span,
+                         0, U"__doc__");
                 }
                 continue;
             }
@@ -897,6 +904,14 @@ class GraphPass final {
 
 void literal(Attachment &context, const Literal &value, ReturnSlot &out)
 {
+    if (value.kind == Literal::Kind::Bytes) {
+        std::string data;
+        data.reserve(value.text.size());
+        for (auto ch : value.text)
+            data.push_back(static_cast<char>(ch));
+        make_bytes(context, std::move(data), out);
+        return;
+    }
     if (value.kind == Literal::Kind::Float) {
         make_float(context, value.number, out);
         return;
@@ -1055,13 +1070,15 @@ ResultView run(Attachment &context, const RunRequest &request, ReturnSlot &out)
     out.check_caller(context);
     RootScope roots(context);
     ReturnSlot compiled(context), environment(context), temporary(context);
-    std::optional<Handle> input_code, input_globals, input_builtins;
+    std::optional<Handle> input_code, input_globals, input_builtins, input_locals;
     if (const auto *code = std::get_if<Handle>(&request.program))
         input_code = roots.root(code->get(context));
     if (request.globals)
         input_globals = roots.root(request.globals->get(context));
     if (request.builtins)
         input_builtins = roots.root(request.builtins->get(context));
+    if (request.locals)
+        input_locals = roots.root(request.locals->get(context));
     out.reset(context);
     try {
         if (const auto *source = std::get_if<const SourceUnit *>(&request.program)) {
@@ -1124,6 +1141,8 @@ ResultView run(Attachment &context, const RunRequest &request, ReturnSlot &out)
                       temporary);
         if (temporary.tag() == ResultTag::Raised)
             out.raised(temporary.exception());
+        else if (input_locals)
+            detail::execute_class_body(context, roots.root(temporary.value()), *input_locals, out);
         else
             call(context, roots.root(temporary.value()), {}, out);
     } catch (const std::bad_alloc &) {
