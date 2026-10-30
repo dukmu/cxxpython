@@ -1,0 +1,21 @@
+int values ok
+float values ok
+complex values ok
+str values ok
+bytes values ok
+int conversion bypass and state ok
+float conversion bypass and state ok
+complex conversion bypass and state ok
+str conversion bypass and state ok
+bytes conversion bypass and state ok
+int collecting state hooks ok
+float collecting state hooks ok
+complex collecting state hooks ok
+str collecting state hooks ok
+bytes collecting state hooks ok
+int reconstruction overrides ok
+float reconstruction overrides ok
+complex reconstruction overrides ok
+str reconstruction overrides ok
+bytes reconstruction overrides ok
+invalid receivers and arguments ok

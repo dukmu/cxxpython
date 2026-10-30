@@ -721,6 +721,23 @@ std::optional<std::size_t> detail::length_hint(Attachment &context, Handle sourc
     return static_cast<std::size_t>(value);
 }
 namespace {
+void tuple_getnewargs(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!context.has_layout<TupleObject>(args[0]) ||
+        !is_subtype(context, context.type_of(args[0]), context.builtin(CoreObject::TupleType))) {
+        type_error(context, U"tuple descriptor requires a tuple", out);
+        return;
+    }
+    RootScope roots(context);
+    const auto self = roots.root(args[0]);
+    ReturnSlot value(context);
+    if (context.type_of(self) == context.builtin(CoreObject::TupleType))
+        value.ok(self.get(context));
+    else
+        cxxpython::core::make_tuple(context, context.payload<TupleObject>(self).items, value);
+    const std::array result{value.value()};
+    cxxpython::core::make_tuple(context, result, out);
+}
 void tuple_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_type(context, args[0]) ||
@@ -920,6 +937,9 @@ void install_construction(Attachment &context, std::span<const Handle> core)
     sequence.parameters = {{U"cls", ParameterKind::PositionalOnly}};
     sequence.varargs = U"args";
     install(at(CoreObject::TupleType), U"__new__", sequence, tuple_new, Binding::Static);
+    SignatureLayout tuple_state;
+    tuple_state.parameters = {{U"self", ParameterKind::PositionalOnly}};
+    install(at(CoreObject::TupleType), U"__getnewargs__", tuple_state, tuple_getnewargs);
     SignatureLayout generic;
     generic.parameters = {{U"cls", ParameterKind::PositionalOnly},
                           {U"item", ParameterKind::PositionalOnly}};

@@ -29,6 +29,19 @@ bool is_string(Attachment &context, Value value)
     return context.has_layout<StrObject>(value) &&
            is_subtype(context, context.type_of(value), context.builtin(CoreObject::StrType));
 }
+void unicode_getnewargs(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!is_string(context, args[0])) {
+        raise_error(context, CoreObject::TypeErrorType, U"str descriptor requires a str", out);
+        return;
+    }
+    RootScope roots(context);
+    const auto self = roots.root(args[0]);
+    ReturnSlot value(context);
+    make_str(context, context.payload<StrObject>(self).value, value);
+    const std::array arguments{value.value()};
+    cxxpython::core::make_tuple(context, arguments, out);
+}
 // CPython 3.12.14 unicode_repeat: convert the count before testing for empty output.
 void repeat(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
@@ -808,6 +821,8 @@ void detail::install_unicode_methods(Attachment &context, std::span<const Handle
                              split<true>);
     SignatureLayout unary;
     unary.parameters = {{U"self", ParameterKind::PositionalOnly}};
+    install_native_attribute(context, core, at(CoreObject::StrType), U"__getnewargs__", unary,
+                             unicode_getnewargs);
     install_native_attribute(context, core, at(CoreObject::StrType), U"isascii", unary,
                              predicate<Predicate::Ascii>);
     install_native_attribute(context, core, at(CoreObject::StrType), U"isalnum", unary,

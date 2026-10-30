@@ -407,6 +407,20 @@ module object's reachability, keeps registered callbacks alive. This does not
 complete the runtime's full shutdown protocol. The listed targeted fixtures do
 not substitute for full upstream suites or final sanitizer acceptance.
 
+## Copy And Native Reconstruction
+
+`Lib/copy.py` is another complete, unchanged pinned CPython 3.12.14 file. Shallow
+and deep-copy policy, memo/alias/cycle handling, registered reducers and custom
+copy/state hooks remain in Python. Native types supply their actual reconstruction
+protocols: set/frozenset and bytearray reducers, tuple/int/float/complex/str/bytes
+constructor arguments, and range/slice reducers. Payload snapshots produce exact
+builtin argument values without invoking subtype conversion hooks; ordinary
+constructors and copied state retain subtype identity and aliases. Mutable
+bytearray state callbacks precede its data snapshot, matching the reference.
+This is not a pickle engine or full upstream copy/pickle acceptance. Remaining
+native resource/iterator reducers, weakref compound-policy concurrency and full
+serialization/diagnostic matrices stay separate gates.
+
 ## Requested Library Delivery
 
 The requested Base-to-Full scope includes dis, collections, typing, types, ctypes,

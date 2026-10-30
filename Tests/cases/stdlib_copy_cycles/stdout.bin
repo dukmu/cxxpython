@@ -1,0 +1,9 @@
+aliases ok
+recursive containers ok
+memo ok
+recursive instance ok
+custom memo ok
+bound method ok
+weak keys ok
+weak values ok
+dead weakref ok

@@ -225,6 +225,19 @@ void float_identity(Attachment &context, Handle, std::span<const Value> args, Re
     else
         make_float(context, value->value, out);
 }
+void float_getnewargs(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    const auto *value = require_float(context, args[0], out);
+    if (!value)
+        return;
+    const double number = value->value;
+    RootScope roots(context);
+    roots.root(args[0]);
+    ReturnSlot copied(context);
+    make_float(context, number, copied);
+    const std::array arguments{copied.value()};
+    cxxpython::core::make_tuple(context, arguments, out);
+}
 
 void float_negative(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
@@ -537,6 +550,7 @@ void detail::install_floats(Attachment &context, std::span<const Handle> core)
     };
     install(U"__bool__", float_bool);
     install(U"__float__", float_identity);
+    install(U"__getnewargs__", float_getnewargs);
     install(U"__pos__", float_identity);
     install(U"__neg__", float_negative);
     install(U"__abs__", float_absolute);

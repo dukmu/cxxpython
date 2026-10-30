@@ -64,6 +64,19 @@ void range_repr(Attachment &context, Handle, std::span<const Value> args, Return
     const auto text = "range(" + a + ", " + b + (step == "1" ? "" : ", " + step) + ")";
     make_str(context, {text.begin(), text.end()}, out);
 }
+void range_reduce(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(context);
+    const auto self = roots.root(args[0]);
+    const auto *value = range(context, self.get(context), out);
+    if (!value)
+        return;
+    const std::array fields{value->start, value->stop, value->step};
+    ReturnSlot arguments(context);
+    cxxpython::core::make_tuple(context, fields, arguments);
+    const std::array result{context.type_of(self), arguments.value()};
+    cxxpython::core::make_tuple(context, result, out);
+}
 void range_bool(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     const auto *value = range(context, args[0], out);
@@ -257,6 +270,10 @@ void install_ranges(Attachment &context, std::span<const Handle> core)
     install_native_attribute(context, core, owner, U"__getitem__", pair, range_item);
     install_native_attribute(context, core, owner, U"__eq__", pair, range_equal<false>);
     install_native_attribute(context, core, owner, U"__ne__", pair, range_equal<true>);
+    // CPython's range_reduce accepts and ignores positional arguments.
+    auto reduction = unary;
+    reduction.varargs = U"ignored";
+    install_native_attribute(context, core, owner, U"__reduce__", reduction, range_reduce);
     install_native_field(context, core, owner, U"start", range_start);
     install_native_field(context, core, owner, U"stop", range_stop);
     install_native_field(context, core, owner, U"step", range_step);

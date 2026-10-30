@@ -1,0 +1,10 @@
+custom copy ok
+reduce precedence ok
+registry ok
+state hooks ok
+default state ok
+slots ok
+getnewargs ok
+getnewargs_ex ok
+iterator reducers ok
+errors ok

@@ -1,0 +1,9 @@
+set reducers ok
+set subclasses ok
+set callbacks ok
+bytearray protocols ok
+bytearray subclasses ok
+bytearray callbacks ok
+tuple arguments ok
+tuple copy ok
+overrides and receivers ok

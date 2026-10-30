@@ -420,6 +420,19 @@ void int_identity(Attachment &context, Handle, std::span<const Value> args, Retu
     }
     copy_int(context, args[0], out);
 }
+void int_getnewargs(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!is_int(context, args[0])) {
+        type_error(context, out);
+        return;
+    }
+    RootScope roots(context);
+    const auto self = roots.root(args[0]);
+    ReturnSlot value(context);
+    publish(context, expanded(integer(context, self.get(context))), value);
+    const std::array arguments{value.value()};
+    cxxpython::core::make_tuple(context, arguments, out);
+}
 void int_hash(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_int(context, args[0])) {
@@ -860,6 +873,7 @@ void install_numbers(Attachment &context, std::span<const Handle> core)
     install(U"bit_count", int_bits<true>);
     install(U"__int__", int_identity);
     install(U"__index__", int_identity);
+    install(U"__getnewargs__", int_getnewargs);
     install(U"__pos__", int_unary<UnaryOp::Positive>);
     install(U"__neg__", int_unary<UnaryOp::Negative>);
     install(U"__abs__", int_absolute);

@@ -220,6 +220,19 @@ void complex_field_imag(Attachment &ctx, Value value, ReturnSlot &out)
     if (require_complex(ctx, value, p, out))
         make_float(ctx, p.imag, out);
 }
+void complex_getnewargs(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    Parts parts;
+    if (!require_complex(ctx, args[0], parts, out))
+        return;
+    RootScope roots(ctx);
+    roots.root(args[0]);
+    ReturnSlot real(ctx), imag(ctx);
+    make_float(ctx, parts.real, real);
+    make_float(ctx, parts.imag, imag);
+    const std::array arguments{real.value(), imag.value()};
+    cxxpython::core::make_tuple(ctx, arguments, out);
+}
 
 enum class Unary { Bool, Pos, Neg, Abs, Conjugate, Identity };
 template <Unary Op>
@@ -462,6 +475,7 @@ void detail::install_complex(Attachment &context, std::span<const Handle> core)
     install(U"__neg__", complex_unary<Unary::Neg>);
     install(U"__abs__", complex_unary<Unary::Abs>);
     install(U"__complex__", complex_unary<Unary::Identity>);
+    install(U"__getnewargs__", complex_getnewargs);
     install(U"conjugate", complex_unary<Unary::Conjugate>);
     install(U"__repr__", complex_repr);
     install(U"__str__", complex_repr);

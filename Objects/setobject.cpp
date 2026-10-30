@@ -162,6 +162,35 @@ void repr_set(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &
     text += exact ? U"}" : U"})";
     make_str(ctx, std::move(text), out);
 }
+void set_reduce(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!receiver(ctx, args[0], out))
+        return;
+    RootScope roots(ctx);
+    const auto self = roots.root(args[0]);
+    ReturnSlot keys(ctx), arguments(ctx), name(ctx), method(ctx), state(ctx);
+    const std::array iterable{self.get(ctx)};
+    call(ctx, roots.root(ctx.builtin(CoreObject::ListType)), {iterable}, keys);
+    if (keys.tag() == ResultTag::Raised) {
+        out.raised(keys.exception());
+        return;
+    }
+    const std::array values{keys.value()};
+    cxxpython::core::make_tuple(ctx, values, arguments);
+    make_str(ctx, U"__getstate__", name);
+    get_attribute(ctx, self, roots.root(name.value()), method);
+    if (method.tag() == ResultTag::Raised) {
+        out.raised(method.exception());
+        return;
+    }
+    call(ctx, roots.root(method.value()), {}, state);
+    if (state.tag() == ResultTag::Raised) {
+        out.raised(state.exception());
+        return;
+    }
+    const std::array result{ctx.type_of(self), arguments.value(), state.value()};
+    cxxpython::core::make_tuple(ctx, result, out);
+}
 void frozen_hash(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(ctx, args[0], out) ||
@@ -504,6 +533,9 @@ void detail::install_sets(Attachment &ctx, std::span<const Handle> core)
         install(type, U"copy", unary,
                 frozen ? typed_entry<CoreObject::FrozenSetType, copy>
                        : typed_entry<CoreObject::SetType, copy>);
+        install(type, U"__reduce__", unary,
+                frozen ? typed_entry<CoreObject::FrozenSetType, set_reduce>
+                       : typed_entry<CoreObject::SetType, set_reduce>);
         install(type, U"__eq__", pair,
                 frozen ? typed_entry<CoreObject::FrozenSetType, compare_set<Comparison::Eq>>
                        : typed_entry<CoreObject::SetType, compare_set<Comparison::Eq>>);

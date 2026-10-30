@@ -196,6 +196,11 @@ publication for ordinary attributes while preserving custom attribute protocols.
 attributes, dictionaries, slots and iterators, using the unchanged Lib/copyreg.py
 helpers. Native layouts retain explicit reconstruction restrictions; neither the
 copyreg source nor these hooks provide a complete pickle implementation.
+Lib/copy.py retains upstream shallow/deep-copy policy. Concrete container,
+numeric, text, bytes, range and slice files provide their own reducers or exact
+native constructor arguments rather than adding layout-specific cases to
+Objects/reduction.cpp. Subtype state and memo graphs travel through the ordinary
+Python reconstruction path; callbacks do not run under storage locks.
 BoundMethod construction, equality/hash and NativeFunction __self__ metadata live
 at the existing call/descriptor/representation boundaries, not in weakref or enum.
 `Modules/posixmodule.cpp` supplies real descriptor, directory,

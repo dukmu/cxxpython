@@ -170,6 +170,16 @@ possibly absent hash protocol. Object reduction snapshots ordinary dictionaries
 and slots through rooted reads, preserving user constructor/state callbacks.
 This is reduction support, not completion of pickle/deepcopy.
 
+The unchanged pinned copy.py now supplies actual shallow/deep-copy policy.
+Concrete native types own reconstruction: set/frozenset and bytearray reducers,
+tuple/numeric/text/bytes constructor arguments, and range/slice reducers. Exact
+payload snapshots bypass subtype conversion hooks, while ordinary constructors,
+state hooks and Python memo dictionaries preserve subtype state and graph aliases.
+Bytearray snapshots follow the collecting getstate callback. Source graphs may
+be read concurrently; compound copying is not an atomic snapshot of concurrent
+mutation, and no global graph lock is introduced. Resource/iterator reconstruction
+and the complete upstream copy/pickle matrix remain acceptance gates.
+
 BaseException owns an ordinary instance-dictionary tail; __notes__ has no second
 storage authority. Concurrent first-use add_note publishes one list through the
 existing dictionary commit and appends through normal list synchronization.

@@ -1,5 +1,44 @@
 # Development Status
 
+## 2026-10-31 Copy Policy And Native Reconstruction
+
+Prepended after committing and pushing aa1905c, without rewriting its evidence.
+A reused terra worker copied complete, unchanged CPython 3.12.14 copy.py and
+implemented native container/immutable reconstruction in their existing object
+files. Parent work added range/slice reducers, shared-graph tests and integration.
+The broad active goal and remaining Plan 2 gates are not marked complete.
+
+- Upstream-derived tests initially exposed missing set/frozenset and bytearray
+  reducers and tuple constructor arguments. These are fixed at the native type
+  boundary, not in Lib/copy.py or generic layout-specific reduction branches.
+  Further acceptance covers int/float/complex/str/bytes subtype constructor
+  arguments and range/slice reconstruction, including large integers, signed
+  zeros, infinities/NaNs, embedded NULs and surrogates. Constructor payloads bypass
+  user conversion/iteration hooks, while ordinary state/copy/reduction overrides
+  and failure precedence remain observable.
+- Mutable-container state and snapshot order follows the pinned implementations.
+  The Python policy preserves memo aliases, cycles, slots/dictionaries, bound
+  methods and weak mappings. A two-OS-thread test deep-copies the same immutable
+  source graph with shared aliases, subtype state and cycles while callbacks and
+  workers collect. It verifies both workers' results without a graph-wide lock
+  or assuming atomic snapshots of concurrently mutated input.
+- Final normal product, fixed reference and strict ASan/UBSan/LSan each pass all
+  nine targeted reconstruction/copy scripts. These contain seven new fixtures
+  and two existing object-reduction fixtures; unrelated library baselines were
+  not rerun. Four collecting/shared-heap scenarios pass TSan. Final native
+  construction/call and exhaustive normal bootstrap/promotion OOM checks pass
+  63/63; strict ASan/UBSan/LSan construction/call checks pass 47/47. Formatting
+  and source byte-comparison checks pass. Initial failures, intermediate and
+  final runs plus binary/source hashes remain under .cache/copy-protocol-* and
+  .cache/verification/stdlib-copy-closure. No sanitizer was disabled, timeout
+  raised, assertion removed or performance campaign repeated.
+- This delivers actual copy policy and common native reconstruction, not full
+  upstream copy/pickle coverage, resource/iterator serialization or a pickle
+  engine. Next dependencies are real standard streams/input and product flushing,
+  async-with/contextlib, typing and regex closures. The explicit readline/curses,
+  actual-bytecode dis and tracing-GC REPL requirements remain unfinished. The
+  user's temporary_plan.md deletion and untracked test2.py remain excluded.
+
 ## 2026-10-31 Native Buffered/Text I/O And Python OS, Enum, Weakref Closures
 
 Prepended without rewriting earlier entries. Previous stable node: b2e7642.

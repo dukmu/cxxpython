@@ -1,0 +1,10 @@
+atomic ok
+lists and dicts ok
+sets ok
+frozensets ok
+bytearrays ok
+instances ok
+list subclass ok
+dict subclass ok
+tuple subclass ok
+weak references ok

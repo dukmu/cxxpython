@@ -266,6 +266,17 @@ void bytes_value(Attachment &c, Handle, std::span<const Value> args, ReturnSlot 
     else
         make_bytes(c, c.payload<BytesObject>(args[0]).value, out);
 }
+void bytes_getnewargs(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!receiver(c, args[0], out))
+        return;
+    RootScope roots(c);
+    const auto self = roots.root(args[0]);
+    ReturnSlot value(c);
+    make_bytes(c, c.payload<BytesObject>(self).value, value);
+    const std::array arguments{value.value()};
+    cxxpython::core::make_tuple(c, arguments, out);
+}
 void representation(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
@@ -629,6 +640,77 @@ void hex(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
     }
     make_str(c, std::move(result), out);
 }
+// CPython 3.12.14 bytearrayobject.c: obtain state before observing mutable data.
+void bytearray_reduce_common(Attachment &c, Handle self, int protocol, ReturnSlot &out)
+{
+    RootScope roots(c);
+    self = roots.root(self.get(c));
+    ReturnSlot name(c), method(c), state(c), value(c), arguments(c);
+    make_str(c, U"__getstate__", name);
+    get_attribute(c, self, roots.root(name.value()), method);
+    if (failed(method)) {
+        out.raised(method.exception());
+        return;
+    }
+    call(c, roots.root(method.value()), {}, state);
+    if (failed(state)) {
+        out.raised(state.exception());
+        return;
+    }
+    auto data = detail::bytearray_snapshot(c, self);
+    std::vector<Value> values;
+    if (!data.empty()) {
+        if (protocol < 3) {
+            std::u32string text;
+            text.reserve(data.size());
+            for (unsigned char byte : data)
+                text.push_back(byte);
+            make_str(c, std::move(text), value);
+            values.push_back(roots.root(value.value()).get(c));
+            make_str(c, U"latin-1", value);
+        } else
+            make_bytes(c, std::move(data), value);
+        values.push_back(roots.root(value.value()).get(c));
+    }
+    cxxpython::core::make_tuple(c, values, arguments);
+    const std::array result{c.type_of(self), arguments.value(), state.value()};
+    cxxpython::core::make_tuple(c, result, out);
+}
+bool bytearray_reduce_receiver(Attachment &c, Value self, ReturnSlot &out)
+{
+    if (is_bytearray(c, self))
+        return true;
+    raise_error(c, CoreObject::TypeErrorType, U"bytearray descriptor requires bytearray", out);
+    return false;
+}
+void bytearray_reduce(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!bytearray_reduce_receiver(c, args[0], out))
+        return;
+    RootScope roots(c);
+    bytearray_reduce_common(c, roots.root(args[0]), 2, out);
+}
+void bytearray_reduce_ex(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!bytearray_reduce_receiver(c, args[0], out))
+        return;
+    RootScope roots(c);
+    const auto self = roots.root(args[0]);
+    ReturnSlot converted(c);
+    index(c, roots.root(args[1]), converted);
+    if (failed(converted)) {
+        out.raised(converted.exception());
+        return;
+    }
+    std::int64_t protocol;
+    if (!int_fits_signed(c, converted.value(), protocol) ||
+        protocol < std::numeric_limits<int>::min() || protocol > std::numeric_limits<int>::max()) {
+        raise_error(c, CoreObject::OverflowErrorType, U"Python int too large to convert to C int",
+                    out);
+        return;
+    }
+    bytearray_reduce_common(c, self, static_cast<int>(protocol), out);
+}
 } // namespace
 void detail::install_bytes(Attachment &c, std::span<const Handle> core)
 {
@@ -653,6 +735,13 @@ void detail::install_bytes(Attachment &c, std::span<const Handle> core)
     unary.parameters = {{U"self", ParameterKind::PositionalOnly}};
     auto pair = unary;
     pair.parameters.push_back({U"value", ParameterKind::PositionalOnly});
+    install_native_attribute(c, core, at(CoreObject::ByteArrayType), U"__reduce__", unary,
+                             bytearray_reduce);
+    auto reduction = unary;
+    reduction.parameters.push_back(
+        {U"proto", ParameterKind::PositionalOnly, at(CoreObject::IntZero).get(c)});
+    install_native_attribute(c, core, at(CoreObject::ByteArrayType), U"__reduce_ex__", reduction,
+                             bytearray_reduce_ex);
     auto variadic = unary;
     variadic.varargs = U"args";
     variadic.varkwargs = U"kwargs";
@@ -671,6 +760,7 @@ void detail::install_bytes(Attachment &c, std::span<const Handle> core)
     name_store(c, *TypeView(c, at(CoreObject::BytesType)).dictionary(), key.value(),
                wrapper.value());
     for (auto [name, entry] : {std::pair{U"__bytes__", bytes_value},
+                               {U"__getnewargs__", bytes_getnewargs},
                                {U"__repr__", representation},
                                {U"__str__", representation},
                                {U"__len__", size},

@@ -58,6 +58,19 @@ void slice_repr(Attachment &context, Handle, std::span<const Value> args, Return
     }
     make_str(context, text + U")", out);
 }
+void slice_reduce(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!slice_receiver(context, args[0], out))
+        return;
+    RootScope roots(context);
+    const auto self = roots.root(args[0]);
+    const auto &value = context.payload<SliceObject>(self);
+    const std::array fields{value.start, value.stop, value.step};
+    ReturnSlot arguments(context);
+    cxxpython::core::make_tuple(context, fields, arguments);
+    const std::array result{context.type_of(self), arguments.value()};
+    cxxpython::core::make_tuple(context, result, out);
+}
 template <CompareOp Op>
 void slice_compare(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
@@ -263,6 +276,7 @@ void install_slices(Attachment &context, std::span<const Handle> core)
     unary.parameters = {{U"self", ParameterKind::PositionalOnly}};
     install_native_attribute(context, core, owner, U"__repr__", unary, slice_repr);
     install_native_attribute(context, core, owner, U"__hash__", unary, slice_hash);
+    install_native_attribute(context, core, owner, U"__reduce__", unary, slice_reduce);
     SignatureLayout pair = unary;
     pair.parameters.push_back({U"other", ParameterKind::PositionalOnly});
     install_native_attribute(context, core, owner, U"indices", pair, slice_indices_method);
