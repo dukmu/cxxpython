@@ -54,10 +54,10 @@ Failure removes an entry only if it still names that initialization's module;
 user replacements must survive. C/C++ extension ABI and Python import policy
 remain distinct from CPython binary compatibility, per Plan 2 section 11.2.
 
-Current inputs are registered immutable SourceUnits and statically linked C++
-initializers. __import__ handles their absolute/relative names, fromlist and
+Current inputs are registered immutable SourceUnits, filesystem source/packages
+and statically linked C++ initializers. __import__ handles absolute/relative names, fromlist and
 __all__, and binds loaded children onto the parent. The low-level C++
-import_module entry loads a registered full-name transaction; it is not the
+import_module entry loads one full-name transaction; it is not the
 unimplemented Python importlib API. Native callbacks must publish None or a
 Python exception; their code must outlive registration and every entry they
 create. This internal C++ function-pointer interface is not a dynamic C ABI.
@@ -70,10 +70,31 @@ callback, which receives only the name. ImportError name/path fields are traced
 tail slots with None defaults. The CLI's __main__ and imported __main__ are the
 same object/namespace; builtins module/dictionary identities are canonical.
 
-File finders, import/from syntax, complete sys/module/reflection methods,
-ModuleSpec/loader objects and Python importlib, general dictionary operations,
+File lookup snapshots the current iterable sys.path or parent's __path__,
+skipping non-string entries. Package __init__.py takes precedence over .py;
+namespace directory portions are combined unless a concrete module/package wins.
+Filesystem reads and native source compilation park through NativeWait with only
+native data. Source errors become SyntaxError/IndentationError/TabError; source
+read failures become OSError, not C++ errors. Full exception constructor fields,
+errno subclasses and formatted source diagnostics remain incomplete.
+Source imports/aliases/from/relative/star lower through the same scope/CFG/VM.
+IMPORT_NAME consumes level/fromlist and pushes the hook result (2 -> 1);
+IMPORT_FROM retains the module and pushes its attribute (1 -> 2);
+IMPORT_STAR consumes one object and writes the module namespace (1 -> 0).
+The first two have a name-index operand; star has none and is module-code only.
+All can raise/call Python, keep inputs traced until success, and use ordinary
+unwinding. ImportName reads __import__ from actual builtins, never globals.
+Hooks receive the actual module/class mapping or a lazy Frame-owned function
+locals snapshot refreshed from fast locals/Cells; this snapshot is not execution
+state. Star honors __all__ with indexed sequence access or snapshots public
+namespace keys. Compiler private-name rules preserve raw fromlist spellings.
+CLI script entry uses its resolved directory for imports and publishes __file__.
+
+Complete sys/module/reflection methods, ModuleSpec/loader objects and Python importlib, general dictionary operations,
 mutable list-based path/argv, and dynamic C/extension loading are still gates.
-The bootstrap path/argv tuples are experimental, not full sys compatibility.
+The bootstrap path/argv tuples and static namespace-package path snapshots are
+experimental, not full sys/PEP 420 compatibility. Auto-refresh after a namespace
+parent search path changes, path hooks and bytecode caches remain pending.
 This node therefore does not complete the active module-stage goal.
 
 ## Identity And Lifetime

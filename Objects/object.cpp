@@ -531,6 +531,12 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
            LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::ImportErrorType));
     define(CoreObject::SyntaxErrorType, "SyntaxError", LayoutDescriptor::of<ExceptionObject>(),
            at(CoreObject::ExceptionType));
+    define(CoreObject::IndentationErrorType, "IndentationError",
+           LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::SyntaxErrorType));
+    define(CoreObject::TabErrorType, "TabError", LayoutDescriptor::of<ExceptionObject>(),
+           at(CoreObject::IndentationErrorType));
+    define(CoreObject::OSErrorType, "OSError", LayoutDescriptor::of<ExceptionObject>(),
+           at(CoreObject::ExceptionType));
     define(CoreObject::NativeFunctionType, "builtin_function_or_method",
            LayoutDescriptor::of<NativeFunctionObject>());
     define(CoreObject::MethodDescriptorType, "method_descriptor",
@@ -680,6 +686,9 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                     CoreObject::ImportErrorType,
                     CoreObject::ModuleNotFoundErrorType,
                     CoreObject::SyntaxErrorType,
+                    CoreObject::IndentationErrorType,
+                    CoreObject::TabErrorType,
+                    CoreObject::OSErrorType,
                     CoreObject::StaticMethodType,
                     CoreObject::ClassMethodType})
         publish(std::get<Value>(context.payload<TypeObject>(at(id)).name), at(id).get(context));

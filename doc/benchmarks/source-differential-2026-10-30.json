@@ -1,14 +1,14 @@
 {
-  "captured_at": "2026-10-29T17:27:22.672761+00:00",
+  "captured_at": "2026-10-30T03:27:08.692967+00:00",
   "reference_version": "Python 3.12.14",
   "provenance": {
     "binary": {
       "path": "/home/shefrin/repo/cxxpython/build/cxxpython",
-      "sha256": "ac421eccd0e2fb9d8eef2f7bef975f19ca2673a94f0130cb953afca6d00075f2"
+      "sha256": "1400563898154ae8cd844de7214b54cded1049737d41baff286b2fc05098cdd5"
     },
     "reference": {
-      "path": "/tmp/cxxpython-cpython31214-build/python",
-      "sha256": "0048a751931754717ef43384585009919fd2a5d952c253f107113787dcfe7a8b"
+      "path": "/home/shefrin/repo/cxxpython/.cache/cpython31214-build/python",
+      "sha256": "06ee6bc43fafd0ddbc5842fc73163dc261b403c08eaacaac1f68a8f840d4277a"
     }
   },
   "passed": true,
@@ -27,7 +27,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nvalue = 90\nclass Base:\n    'documentation'\n    value = 3\n    def __init__(self, n=4):\n        self.n = n\n    def total(self):\n        return self.n + self.value\nclass Child(Base):\n    @staticmethod\n    def scale(n):\n        return n * 2\n    @classmethod\n    def identify(cls):\n        return cls\ninstance = Child(7)\n\nprint(repr((instance.total(), Child.scale(5), instance.identify() is Child, value, Base.__doc__, Child.__module__)))"
       ],
@@ -49,7 +49,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\ndef factory(x):\n    class C:\n        x = 99\n        def read(self):\n            return x, __class__\n        class Inner:\n            value = x\n    return C\nA = factory(7)\nB = factory(8)\n\nprint(repr((A.x, A.Inner.value, A().read()[0], B().read()[0], A().read()[1] is A, A.read.__code__ is B.read.__code__)))"
       ],
@@ -71,7 +71,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\ndef factory(x):\n    class C:\n        nonlocal x\n        x += 1\n        value = x\n        def read(self):\n            return x\n    return C\nC = factory(7)\n\nprint(repr((C.value, C().read())))"
       ],
@@ -93,7 +93,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nx = 90\ndef factory(x):\n    class C:\n        global x\n        value = x\n        def read(self):\n            return x\n    return C\nC = factory(7)\n\nprint(repr((C.value, C().read())))"
       ],
@@ -115,7 +115,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nclass A:\n    def make(self):\n        class B:\n            owner = __class__\n            def who(self):\n                return __class__\n        return B\nB = A().make()\n\nprint(repr((B.owner is A, B().who() is B, B.who.__qualname__)))"
       ],
@@ -137,7 +137,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nclass __C:\n    __slots__ = ('__value',)\n    def __init__(self, __value=7):\n        self.__value = __value\n    def __hidden(self):\n        return self.__value\nc = __C()\n\nprint(repr((c._C__hidden(), __C._C__hidden.__name__, __C._C__hidden.__qualname__, __C.__init__.__code__.co_varnames)))"
       ],
@@ -159,7 +159,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nevents = 0\ndef decorator(n):\n    global events\n    events = events * 10 + n\n    def apply(value):\n        global events\n        events = events * 10 + n + 2\n        return value\n    return apply\ndef default():\n    global events\n    events = events * 10 + 3\n    return 42\n@decorator(1)\n@decorator(2)\ndef f(value=default()):\n    return value\n\nprint(repr((events, f(), f.__code__.co_firstlineno)))"
       ],
@@ -181,7 +181,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nclass A: pass\nclass B(A): pass\nbases = B.__bases__\nmro = B.__mro__\nB.value = 42\nB.__name__ = 'Renamed'\n\nprint(repr((B.__bases__ is bases, B.__mro__ is mro, B.__base__ is A, B.__mro__[1] is A, object.__base__)))"
       ],
@@ -203,7 +203,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nevents = 0\nclass Descriptor:\n    def __set_name__(self, owner, name):\n        global events\n        events = events * 10 + 1\n        self.owner = owner\n    def __get__(self, instance, owner):\n        return self.owner\nclass Base:\n    def __init_subclass__(cls, *, flag=2):\n        global events\n        events = events * 10 + flag\nclass Alias:\n    def __mro_entries__(self, bases):\n        return (Base,)\nalias = Alias()\nclass Child(alias, flag=3):\n    owner = Descriptor()\n\nprint(repr((Child.owner is Child, Child.__bases__[0] is Base, Child.__orig_bases__[0] is alias, events)))"
       ],
@@ -225,7 +225,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nclass C:\n    def __new__(cls):\n        return 17\n\nprint(repr((C())))"
       ],
@@ -247,7 +247,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nclass Meta(type):\n    @classmethod\n    def __prepare__(cls, name, bases, *, flag):\n        return type.__prepare__(name, bases)\n    def __new__(cls, name, bases, namespace, *, flag):\n        result = type.__new__(cls, name, bases, namespace)\n        result.flag = flag\n        return result\nclass C(metaclass=Meta, flag=7):\n    value = 42\n\nprint(repr((C.flag, C.value, type(C) is Meta)))"
       ],
@@ -269,7 +269,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nclass Namespace:\n    def __getitem__(self, key):\n        if key == 'injected':\n            return 17\n        raise KeyError(key)\n    def __setitem__(self, key, value):\n        if key == 'value':\n            self.saved = value\nclass Meta(type):\n    @classmethod\n    def __prepare__(cls, name, bases):\n        return Namespace()\n    def __new__(cls, name, bases, namespace):\n        return namespace\nclass C(metaclass=Meta):\n    value = injected\n\nprint(repr((C.saved)))"
       ],
@@ -291,7 +291,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\ndef meta(name, bases, namespace):\n    return 7\nclass C(metaclass=meta):\n    def who(self):\n        return __class__\n\nprint(repr((C)))"
       ],
@@ -313,7 +313,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "__build_class__ = None\nclass C: pass\nprint(repr((C.__name__)))"
       ],
@@ -335,7 +335,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nclass Descriptor:\n    def __get__(self, instance, owner):\n        if instance is None:\n            return self\n        return instance.value\n    def __set__(self, instance, value):\n        instance.value = value\nclass C:\n    item = Descriptor()\nc = C()\nc.item = 42\n\nprint(repr((c.item)))"
       ],
@@ -357,7 +357,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\ndef factory():\n    class C:\n        def who(self):\n            return __class__\n    return C\nA = factory()\nB = factory()\n\nprint(repr((A is not B, A.who.__code__ is B.who.__code__, A.who.__closure__ is not B.who.__closure__)))"
       ],
@@ -379,7 +379,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nclass C:\n    def f(self, **kwargs):\n        return len(kwargs)\n    def g(self):\n        return self.f(__x=1, _C__x=2)\n\nprint(repr((C().g())))"
       ],
@@ -401,7 +401,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nprint(repr((str(KeyError('x')), str(KeyError(1, 2)), str(KeyError()), BaseException.__str__(KeyError('x')))))"
       ],
@@ -423,7 +423,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nprint(repr((str(), str(None), str(object=42), str(encoding='utf8'), str(errors='strict'))))"
       ],
@@ -445,7 +445,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nclass Text(str):\n    pass\nvalue = Text(42)\n\nprint(repr((value == '42', type(value) is Text, type(str(value)) is str)))"
       ],
@@ -465,7 +465,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "class C: return 1"
       ],
@@ -485,7 +485,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "for i in range(1):\n    class C: break"
       ],
@@ -505,7 +505,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "class C:\n    def f(self, __x, _C__x): pass"
       ],
@@ -525,7 +525,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "@staticmethod\nvalue = 1"
       ],
@@ -545,7 +545,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "class A: pass\nclass B(A, A): pass"
       ],
@@ -565,7 +565,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "class C(flag=1): pass"
       ],
@@ -585,7 +585,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "str(1, object=2)"
       ],
@@ -605,7 +605,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "str(1, encoding='utf8')"
       ],
@@ -625,7 +625,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "str(encoding=None)"
       ],
@@ -645,7 +645,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "class C:\n    def f(self, __x): return __x\nC().f(__x=1)"
       ],
@@ -665,7 +665,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "class A: x = 1\nclass B:\n    y = x"
       ],
@@ -685,7 +685,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "__build_class__(None, 'C')"
       ],
@@ -705,7 +705,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "def f(): pass\n__build_class__(f, None)"
       ],
@@ -725,7 +725,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "class Meta(type):\n    def __prepare__(name, bases): return 1\nclass C(metaclass=Meta): pass"
       ],
@@ -745,7 +745,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "class Alias:\n    def __mro_entries__(self, bases): return None\nclass C(Alias()): pass"
       ],
@@ -765,7 +765,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "class M1(type): pass\nclass M2(type): pass\nclass A(metaclass=M1): pass\nclass B(metaclass=M2): pass\nclass C(A, B): pass"
       ],
@@ -785,7 +785,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "class Drop(type):\n    def __new__(cls, name, bases, namespace):\n        return type.__new__(cls, name, bases, type.__prepare__(name, bases))\nclass C(metaclass=Drop):\n    def who(self): return __class__"
       ],
@@ -805,7 +805,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "return 1"
       ],
@@ -825,7 +825,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "break"
       ],
@@ -845,7 +845,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "if 1:\nx = 2"
       ],
@@ -865,7 +865,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "def f(a, a): pass"
       ],
@@ -885,7 +885,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "x = 1\nglobal x"
       ],
@@ -905,7 +905,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "def f():\n    nonlocal missing"
       ],
@@ -925,7 +925,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "def f(x):\n    nonlocal x"
       ],
@@ -945,7 +945,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "def f():\n    global x\n    nonlocal x"
       ],
@@ -975,7 +975,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "def f():\n    def inner():\n        return x\n    return x\n    x = 1\nf()"
       ],
@@ -995,7 +995,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "def f():\n    x = 1\n    def inner():\n        return x\n    del x\n    return inner\nf()()"
       ],
@@ -1017,7 +1017,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nevents = 0\ntry:\n    raise ValueError(7)\nexcept (TypeError, ValueError) as error:\n    value = error.args[0]\nelse:\n    value = 99\nfinally:\n    events += 1\ntry:\n    error\nexcept NameError:\n    cleared = True\n\nprint(repr((value, events, cleared)))"
       ],
@@ -1039,7 +1039,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\ndef f():\n    error = 1\n    def read():\n        return error\n    try:\n        raise ValueError\n    except ValueError as error:\n        pass\n    try:\n        read()\n    except NameError:\n        return True\n\nprint(repr((f())))"
       ],
@@ -1061,7 +1061,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\noriginal = ValueError('inner')\ndef reraiser():\n    raise\ntry:\n    raise original\nexcept ValueError:\n    try:\n        reraiser()\n    except ValueError as error:\n        same = error is original\n    try:\n        raise TypeError('outer') from None\n    except TypeError as error:\n        saved = error\n\nprint(repr((same, saved.__context__ is original, saved.__cause__, saved.__suppress_context__)))"
       ],
@@ -1083,7 +1083,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\ncause = TypeError('cause')\ntry:\n    raise ValueError(1) from cause\nexcept ValueError as error:\n    saved = error\n\nprint(repr((saved.__cause__ is cause, saved.__context__, saved.__suppress_context__)))"
       ],
@@ -1105,7 +1105,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\ntry:\n    raise ValueError from TypeError\nexcept ValueError as error:\n    saved = error\n\nprint(repr((type(saved) is ValueError, type(saved.__cause__) is TypeError)))"
       ],
@@ -1127,7 +1127,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nvalue = 0\ntry:\n    try:\n        value = 1\n    except TypeError:\n        value = 99\n    else:\n        raise TypeError(3)\nexcept TypeError as error:\n    value += error.args[0]\nfinally:\n    value += 10\n\nprint(repr((value)))"
       ],
@@ -1149,7 +1149,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\noriginal = ValueError(1)\ntry:\n    try:\n        raise original\n    except None:\n        pass\nexcept TypeError as error:\n    saved = error\n\nprint(repr((saved.__context__ is original)))"
       ],
@@ -1171,7 +1171,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\ndef f():\n    try:\n        raise ValueError\n    finally:\n        return 42\n\nprint(repr((f())))"
       ],
@@ -1193,7 +1193,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nerror = ValueError()\nother = TypeError()\nerror.__context__ = other\nerror.__cause__ = other\nerror.__suppress_context__ = False\n\nprint(repr((error.__context__ is other, error.__cause__ is other, error.__suppress_context__)))"
       ],
@@ -1215,7 +1215,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nerror = ValueError()\nerror.__cause__ = None\n\nprint(repr((error.__cause__, error.__suppress_context__)))"
       ],
@@ -1237,7 +1237,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nvalue = 0\ntry:\n    raise ValueError\nexcept ():\n    value = 99\nexcept:\n    value = 42\n\nprint(repr((value)))"
       ],
@@ -1259,7 +1259,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nevents = 0\ndef __new__(cls):\n    global events\n    events = events * 10 + 3\n    return BaseException.__new__(cls)\nCustom = type('Custom', (ValueError,), __new__.__globals__)\ndef first():\n    global events\n    events = events * 10 + 1\n    return Custom\ndef second():\n    global events\n    events = events * 10 + 2\n    return TypeError\ntry:\n    raise first() from second()\nexcept ValueError as error:\n    saved = error\n\nprint(repr((events, type(saved) is Custom, type(saved.__cause__) is TypeError)))"
       ],
@@ -1281,7 +1281,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\ndef __new__(cls):\n    return 1\nInvalid = type('Invalid', (ValueError,), __new__.__globals__)\ntry:\n    raise Invalid\nexcept TypeError:\n    caught = True\n\nprint(repr((caught)))"
       ],
@@ -1303,7 +1303,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "def f():\n    events = 0\n    item = -1\n    try:\n        for item in range(5):\n            try:\n                if item == 2:\n                    break\n                events = events * 10 + 1\n            finally:\n                events = events * 10 + 2\n        else:\n            events = events * 10 + 5\n    except TypeError:\n        events = events * 10 + 3\n    finally:\n        events = events * 10 + 4\n    return events\n\nprint(repr((f())))"
       ],
@@ -1325,7 +1325,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "def f():\n    events = 0\n    item = -1\n    try:\n        for item in range(5):\n            try:\n                if item == 2:\n                    continue\n                events = events * 10 + 1\n            finally:\n                events = events * 10 + 2\n        else:\n            events = events * 10 + 5\n    except TypeError:\n        events = events * 10 + 3\n    finally:\n        events = events * 10 + 4\n    return events\n\nprint(repr((f())))"
       ],
@@ -1347,7 +1347,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "def f():\n    events = 0\n    item = -1\n    try:\n        for item in range(5):\n            try:\n                if item == 2:\n                    return events\n                events = events * 10 + 1\n            finally:\n                events = events * 10 + 2\n        else:\n            events = events * 10 + 5\n    except TypeError:\n        events = events * 10 + 3\n    finally:\n        events = events * 10 + 4\n    return events\n\nprint(repr((f())))"
       ],
@@ -1369,7 +1369,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "def f():\n    events = 0\n    item = -1\n    try:\n        for item in range(5):\n            try:\n                if item == 2:\n                    raise TypeError\n                events = events * 10 + 1\n            finally:\n                events = events * 10 + 2\n        else:\n            events = events * 10 + 5\n    except TypeError:\n        events = events * 10 + 3\n    finally:\n        events = events * 10 + 4\n    return events\n\nprint(repr((f())))"
       ],
@@ -1391,7 +1391,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "def f():\n    events = 0\n    item = -1\n    try:\n        while item < 4:\n            item += 1\n            try:\n                if item == 2:\n                    break\n                events = events * 10 + 1\n            finally:\n                events = events * 10 + 2\n        else:\n            events = events * 10 + 5\n    except TypeError:\n        events = events * 10 + 3\n    finally:\n        events = events * 10 + 4\n    return events\n\nprint(repr((f())))"
       ],
@@ -1413,7 +1413,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "def f():\n    events = 0\n    item = -1\n    try:\n        while item < 4:\n            item += 1\n            try:\n                if item == 2:\n                    continue\n                events = events * 10 + 1\n            finally:\n                events = events * 10 + 2\n        else:\n            events = events * 10 + 5\n    except TypeError:\n        events = events * 10 + 3\n    finally:\n        events = events * 10 + 4\n    return events\n\nprint(repr((f())))"
       ],
@@ -1435,7 +1435,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "def f():\n    events = 0\n    item = -1\n    try:\n        while item < 4:\n            item += 1\n            try:\n                if item == 2:\n                    return events\n                events = events * 10 + 1\n            finally:\n                events = events * 10 + 2\n        else:\n            events = events * 10 + 5\n    except TypeError:\n        events = events * 10 + 3\n    finally:\n        events = events * 10 + 4\n    return events\n\nprint(repr((f())))"
       ],
@@ -1457,7 +1457,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "def f():\n    events = 0\n    item = -1\n    try:\n        while item < 4:\n            item += 1\n            try:\n                if item == 2:\n                    raise TypeError\n                events = events * 10 + 1\n            finally:\n                events = events * 10 + 2\n        else:\n            events = events * 10 + 5\n    except TypeError:\n        events = events * 10 + 3\n    finally:\n        events = events * 10 + 4\n    return events\n\nprint(repr((f())))"
       ],
@@ -1477,7 +1477,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "try: pass"
       ],
@@ -1497,7 +1497,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "try: pass\nelse: pass\nfinally: pass"
       ],
@@ -1517,7 +1517,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "try: pass\nexcept: pass\nexcept ValueError: pass"
       ],
@@ -1537,7 +1537,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "try: pass\nexcept ValueError as x.y: pass"
       ],
@@ -1557,7 +1557,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "try: pass\nexcept ValueError as __debug__: pass"
       ],
@@ -1577,7 +1577,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "try: pass\nfinally: break"
       ],
@@ -1597,7 +1597,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "raise"
       ],
@@ -1617,7 +1617,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "raise 1"
       ],
@@ -1637,7 +1637,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "raise ValueError from 1"
       ],
@@ -1657,7 +1657,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "try:\n    raise ValueError\nexcept None:\n    pass"
       ],
@@ -1677,7 +1677,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "with None: pass"
       ],
@@ -1697,7 +1697,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "with (): pass"
       ],
@@ -1717,7 +1717,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "error = ValueError()\nerror.__cause__ = ValueError"
       ],
@@ -1737,7 +1737,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "error = ValueError()\nerror.__context__ = 1"
       ],
@@ -1757,7 +1757,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "error = ValueError()\nerror.__suppress_context__ = 1"
       ],
@@ -1768,11 +1768,31 @@
     {
       "command": [
         "build/cxxpython",
-        "/tmp/tmp4k6jbz4z/source.py",
+        "/tmp/tmpt5yktpq4/source.py",
         "--eval",
         "f(41)"
       ],
       "stdout": "42\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "/tmp/tmpt5yktpq4/source.py",
+        "--eval",
+        "value, __file__"
+      ],
+      "stdout": "(42, '/tmp/tmpt5yktpq4/source.py')\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "/tmp/tmpt5yktpq4/source.py"
+      ],
+      "stdout": "(42, '/tmp/tmpt5yktpq4/source.py')\n",
       "stderr": "",
       "exit_code": 0
     },
@@ -1790,6 +1810,326 @@
       "command": [
         "build/cxxpython",
         "-c",
+        "import sys\nsys.path = ('/tmp/tmpde6pgkgy', '/tmp/tmpde6pgkgy/one', '/tmp/tmpde6pgkgy/two')\nimport pkg.child as alias\nfrom pkg.child import *\nimport pkg.child",
+        "--eval",
+        "answer, alias is pkg.child, pkg.value, alias.__package__, alias.__file__"
+      ],
+      "stdout": "(42, True, 10, 'pkg', '/tmp/tmpde6pgkgy/pkg/child.py')\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "import sys\nsys.path = ('/tmp/tmpde6pgkgy', '/tmp/tmpde6pgkgy/one', '/tmp/tmpde6pgkgy/two')\nimport pkg.child as alias\nfrom pkg.child import *\nimport pkg.child\nprint(repr((answer, alias is pkg.child, pkg.value, alias.__package__, alias.__file__)))"
+      ],
+      "stdout": "(42, True, 10, 'pkg', '/tmp/tmpde6pgkgy/pkg/child.py')\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "import sys\nsys.path = ('/tmp/tmpde6pgkgy', '/tmp/tmpde6pgkgy/one', '/tmp/tmpde6pgkgy/two')\nimport left, right",
+        "--eval",
+        "left.answer, right.first"
+      ],
+      "stdout": "(42, 1)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "import sys\nsys.path = ('/tmp/tmpde6pgkgy', '/tmp/tmpde6pgkgy/one', '/tmp/tmpde6pgkgy/two')\nimport left, right\nprint(repr((left.answer, right.first)))"
+      ],
+      "stdout": "(42, 1)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "import sys\nsys.path = ('/tmp/tmpde6pgkgy', '/tmp/tmpde6pgkgy/one', '/tmp/tmpde6pgkgy/two')\nimport ns.a, ns.b\nns.__path__ = ('/tmp/tmpde6pgkgy/other',)\nfrom ns import extra",
+        "--eval",
+        "ns.a.value, ns.b.value, extra.value"
+      ],
+      "stdout": "(1, 2, 8)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "import sys\nsys.path = ('/tmp/tmpde6pgkgy', '/tmp/tmpde6pgkgy/one', '/tmp/tmpde6pgkgy/two')\nimport ns.a, ns.b\nns.__path__ = ('/tmp/tmpde6pgkgy/other',)\nfrom ns import extra\nprint(repr((ns.a.value, ns.b.value, extra.value)))"
+      ],
+      "stdout": "(1, 2, 8)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "import sys\nsys.path = ('/tmp/tmpde6pgkgy', '/tmp/tmpde6pgkgy/one', '/tmp/tmpde6pgkgy/two')\ntry:\n    import bad\nexcept SyntaxError:\n    syntax = True\ntry:\n    from fails import value\nexcept ModuleNotFoundError as error:\n    dependency = error.name",
+        "--eval",
+        "syntax, dependency"
+      ],
+      "stdout": "(True, 'missing_dependency_for_test')\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "import sys\nsys.path = ('/tmp/tmpde6pgkgy', '/tmp/tmpde6pgkgy/one', '/tmp/tmpde6pgkgy/two')\ntry:\n    import bad\nexcept SyntaxError:\n    syntax = True\ntry:\n    from fails import value\nexcept ModuleNotFoundError as error:\n    dependency = error.name\nprint(repr((syntax, dependency)))"
+      ],
+      "stdout": "(True, 'missing_dependency_for_test')\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "import sys, builtins as b\nfrom sys import (modules as table,)",
+        "--eval",
+        "sys.__name__, b.int is int, table is sys.modules"
+      ],
+      "stdout": "('sys', True, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "import sys, builtins as b\nfrom sys import (modules as table,)\nprint(repr((sys.__name__, b.int is int, table is sys.modules)))"
+      ],
+      "stdout": "('sys', True, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "__import__ = None\nimport sys\ndef f():\n    import builtins as b\n    return b.int",
+        "--eval",
+        "sys.__name__, f() is int"
+      ],
+      "stdout": "('sys', True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "__import__ = None\nimport sys\ndef f():\n    import builtins as b\n    return b.int\nprint(repr((sys.__name__, f() is int)))"
+      ],
+      "stdout": "('sys', True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "import builtins\nimport __main__ as main\nold = builtins.__import__\ndef hook(name, globals, locals, fromlist, level):\n    global captured\n    captured = name, fromlist, level, globals is locals\n    return main\nbuiltins.__import__ = hook\ntry:\n    import chosen as alias\nfinally:\n    builtins.__import__ = old",
+        "--eval",
+        "alias is main, captured"
+      ],
+      "stdout": "(True, ('chosen', None, 0, True))\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "import builtins\nimport __main__ as main\nold = builtins.__import__\ndef hook(name, globals, locals, fromlist, level):\n    global captured\n    captured = name, fromlist, level, globals is locals\n    return main\nbuiltins.__import__ = hook\ntry:\n    import chosen as alias\nfinally:\n    builtins.__import__ = old\nprint(repr((alias is main, captured)))"
+      ],
+      "stdout": "(True, ('chosen', None, 0, True))\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "import builtins\nold = builtins.__import__\nclass Returned:\n    value = 42\n    __all__ = ('value',)\ndef hook(name, globals, locals, fromlist, level):\n    return Returned()\nbuiltins.__import__ = hook\ntry:\n    from chosen import *\nfinally:\n    builtins.__import__ = old",
+        "--eval",
+        "value"
+      ],
+      "stdout": "42\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "import builtins\nold = builtins.__import__\nclass Returned:\n    value = 42\n    __all__ = ('value',)\ndef hook(name, globals, locals, fromlist, level):\n    return Returned()\nbuiltins.__import__ = hook\ntry:\n    from chosen import *\nfinally:\n    builtins.__import__ = old\nprint(repr((value)))"
+      ],
+      "stdout": "42\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "import builtins\nold = builtins.__import__\nseen = None\nsame = False\ndef hook(name, globals, locals, fromlist, level):\n    global seen, same\n    same = seen is locals\n    seen = locals\n    return None\nbuiltins.__import__ = hook\ntry:\n    def f():\n        import first\n        import second\n    f()\nfinally:\n    builtins.__import__ = old",
+        "--eval",
+        "same"
+      ],
+      "stdout": "True\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "import builtins\nold = builtins.__import__\nseen = None\nsame = False\ndef hook(name, globals, locals, fromlist, level):\n    global seen, same\n    same = seen is locals\n    seen = locals\n    return None\nbuiltins.__import__ = hook\ntry:\n    def f():\n        import first\n        import second\n    f()\nfinally:\n    builtins.__import__ = old\nprint(repr((same)))"
+      ],
+      "stdout": "True\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "import builtins\nold = builtins.__import__\nclass Names:\n    def keys(self):\n        return iter(('value',))\nclass Returned:\n    __dict__ = Names()\n    value = 42\ndef hook(name, globals, locals, fromlist, level):\n    return Returned()\nbuiltins.__import__ = hook\ntry:\n    from chosen import *\nfinally:\n    builtins.__import__ = old",
+        "--eval",
+        "value"
+      ],
+      "stdout": "42\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "import builtins\nold = builtins.__import__\nclass Names:\n    def keys(self):\n        return iter(('value',))\nclass Returned:\n    __dict__ = Names()\n    value = 42\ndef hook(name, globals, locals, fromlist, level):\n    return Returned()\nbuiltins.__import__ = hook\ntry:\n    from chosen import *\nfinally:\n    builtins.__import__ = old\nprint(repr((value)))"
+      ],
+      "stdout": "42\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "import sys,"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 1\nimport sys,\n           ^\nSyntaxError: expected an identifier\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "import sys,"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 1\n    import sys,\n               ^\nSyntaxError: invalid syntax\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "from sys import modules,"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 1\nfrom sys import modules,\n                        ^\nSyntaxError: expected an identifier\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "from sys import modules,"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 1\n    from sys import modules,\n                            ^\nSyntaxError: trailing comma not allowed without surrounding parentheses\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "from sys import (*)"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 1\nfrom sys import (*)\n                 ^\nSyntaxError: expected an identifier\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "from sys import (*)"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 1\n    from sys import (*)\n                     ^\nSyntaxError: invalid syntax\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "def f():\n    from sys import *"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 2\n    from sys import *\n                    ^\nSyntaxError: import * only allowed at module level\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "def f():\n    from sys import *"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 2\nSyntaxError: import * only allowed at module level\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "class C:\n    from sys import *"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 2\n    from sys import *\n                    ^\nSyntaxError: import * only allowed at module level\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "class C:\n    from sys import *"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 2\nSyntaxError: import * only allowed at module level\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
         "next(iter(()))"
       ],
       "stdout": "",
@@ -1798,7 +2138,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "next(iter(()))"
       ],
@@ -1818,7 +2158,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "next(iter(range(0)))"
       ],
@@ -1838,7 +2178,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "iter(None)"
       ],
@@ -1858,7 +2198,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "next((1, 2))"
       ],
@@ -1878,7 +2218,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "range(0, 3, 0)"
       ],
@@ -1898,7 +2238,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "range(stop=3)"
       ],
@@ -1918,7 +2258,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "len(range(1000000000000000000000000000000))"
       ],
@@ -1938,7 +2278,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "range(3)[3]"
       ],
@@ -1958,7 +2298,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "(1, 2)[1000000000000000000000000000000]"
       ],
@@ -1978,7 +2318,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "'abc'[-4]"
       ],
@@ -1998,7 +2338,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "(1, 2)[None]"
       ],
@@ -2018,7 +2358,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "a, b = (1,)"
       ],
@@ -2038,7 +2378,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "a, b = range(3)"
       ],
@@ -2058,7 +2398,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "a, b = None"
       ],
@@ -2078,7 +2418,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "value = (1, 2)\nvalue[0] = 3"
       ],
@@ -2098,7 +2438,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "value = (1, 2)\ndel value[0]"
       ],
@@ -2118,7 +2458,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "error = ValueError()\ndel error.args"
       ],
@@ -2140,7 +2480,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nprint(repr(((), (1,), (1, 2), ((1, 2), 3))))"
       ],
@@ -2162,7 +2502,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "a, (b, c) = (1, (2, 3))\nprint(repr((a, b, c)))"
       ],
@@ -2184,7 +2524,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "a, b = range(2)\nprint(repr((a, b)))"
       ],
@@ -2206,7 +2546,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "a, b = 'a\\U0001f600'\nprint(repr((a, b)))"
       ],
@@ -2228,7 +2568,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nprint(repr(((10, 20, 30)[-2], 'a\\U0001f600'[-1])))"
       ],
@@ -2250,7 +2590,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nprint(repr((range(9, -2, -3), range(9, -2, -3)[-1])))"
       ],
@@ -2272,7 +2612,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nprint(repr((range(1000000000000000000000000000000, 1000000000000000000000000000020, 3)[-1])))"
       ],
@@ -2294,7 +2634,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nprint(repr((range(0, 3, 2) == range(0, 4, 2), range(0) == range(2, 2))))"
       ],
@@ -2316,7 +2656,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nprint(repr((hash(range(0, 3, 2)) == hash(range(0, 4, 2)))))"
       ],
@@ -2338,7 +2678,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nprint(repr((bool(range(1000000000000000000000000000000)), bool(range(5, 5)))))"
       ],
@@ -2360,7 +2700,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "it = iter((1, 2))\na = next(it)\nb = next(it)\nprint(repr((a, b, next(it, None), next(it, 7))))"
       ],
@@ -2382,7 +2722,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "it = iter(range(3))\nprint(repr((iter(it) is it)))"
       ],
@@ -2404,7 +2744,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "total = 0\nfor a, b in ((1, 2), (3, 4)):\n    total += a * b\nprint(repr((total)))"
       ],
@@ -2426,7 +2766,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "total = 0\nfor i in range(8):\n    if i == 2:\n        continue\n    if i == 6:\n        break\n    total += i\nelse:\n    total = 999\nprint(repr((total)))"
       ],
@@ -2448,7 +2788,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "total = 0\nfor i in range(0):\n    total = 1\nelse:\n    total = 42\nprint(repr((total)))"
       ],
@@ -2470,7 +2810,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "def outer():\n    for x in range(3):\n        def read():\n            return x\n    return read\nf = outer()\nprint(repr((f(), f.__code__.co_freevars)))"
       ],
@@ -2492,7 +2832,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "def total(n):\n    for i in range(n):\n        return i\n    return None\nprint(repr((total(0), total(4))))"
       ],
@@ -2514,7 +2854,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "error = StopIteration(1, 2)\nerror.args = (3, 4)\nprint(repr((error.args, error.value)))"
       ],
@@ -2536,7 +2876,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "error = StopIteration(1)\ndel error.value\nerror.args = range(3)\nprint(repr((error.args, error.value)))"
       ],
@@ -2558,7 +2898,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "error = StopIteration(1)\nBaseException.__init__(error, 2)\nprint(repr((error.args, error.value)))"
       ],
@@ -2580,7 +2920,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nprint(repr((ValueError('message').args, StopIteration.__new__(StopIteration, 9).value)))"
       ],
@@ -2602,7 +2942,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "marker = object()\nprint(repr((__import__('__main__').marker is marker)))"
       ],
@@ -2624,7 +2964,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nprint(repr((__import__('__main__').__package__, __import__('__main__').__spec__)))"
       ],
@@ -2646,7 +2986,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "sys = __import__('sys')\nprint(repr((type(sys).__name__, __import__('sys') is sys)))"
       ],
@@ -2668,7 +3008,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "b = __import__('builtins')\nprint(repr((b.int is int, b.__dict__ is __builtins__)))"
       ],
@@ -2690,7 +3030,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "Module = type(__import__('sys'))\nm = Module(name='example', doc='document')\nm.answer = 42\nprint(repr((m.__name__, m.__doc__, m.answer, repr(m), m.__dict__ is m.__dict__)))"
       ],
@@ -2712,7 +3052,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "Module = type(__import__('sys'))\nclass Child(Module): pass\nm = Child('example')\nprint(repr((type(m).__name__, m.__name__)))"
       ],
@@ -2734,7 +3074,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "Module = type(__import__('sys'))\nm = Module('example')\ndef fallback(name): return name\nm.__getattr__ = fallback\nprint(repr((m.missing)))"
       ],
@@ -2756,7 +3096,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "try:\n    __import__('absent_cxxpython_module')\nexcept ModuleNotFoundError as error:\n    value = error.name, error.path\nprint(repr((value)))"
       ],
@@ -2778,7 +3118,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "Module = type(__import__('sys'))\nm = Module('example')\ntry:\n    Module.__new__(1)\nexcept BaseException as error:\n    failure = type(error).__name__\nprint(repr((failure)))"
       ],
@@ -2800,7 +3140,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "Module = type(__import__('sys'))\nm = Module('example')\ntry:\n    Module.__repr__(1)\nexcept BaseException as error:\n    failure = type(error).__name__\nprint(repr((failure)))"
       ],
@@ -2822,7 +3162,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "Module = type(__import__('sys'))\nm = Module('example')\ntry:\n    Module.__init__(1, 'x')\nexcept BaseException as error:\n    failure = type(error).__name__\nprint(repr((failure)))"
       ],
@@ -2844,7 +3184,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "Module = type(__import__('sys'))\nm = Module('example')\ntry:\n    __import__(1)\nexcept BaseException as error:\n    failure = type(error).__name__\nprint(repr((failure)))"
       ],
@@ -2866,7 +3206,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "Module = type(__import__('sys'))\nm = Module('example')\ntry:\n    __import__('sys', level=-1)\nexcept BaseException as error:\n    failure = type(error).__name__\nprint(repr((failure)))"
       ],
@@ -2888,7 +3228,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "Module = type(__import__('sys'))\nm = Module('example')\ntry:\n    m.__dict__ = ()\nexcept BaseException as error:\n    failure = type(error).__name__\nprint(repr((failure)))"
       ],
@@ -2910,7 +3250,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nevents = 0\ncount = 0\nerrors = 0\nsuppress = False\nfail_enter = 0\nfail_exit = 0\ndef __enter__(self):\n    global events, count\n    count += 1\n    self.tag = count\n    events = events * 10 + self.tag\n    if self.tag == fail_enter:\n        raise ValueError('enter')\n    return 4, 5\ndef __exit__(self, kind, error, traceback):\n    global events, errors\n    events = events * 10 + self.tag\n    if error is not None:\n        errors += 1\n    if self.tag == fail_exit:\n        raise TypeError('exit')\n    return suppress\nManager = type('Manager', (), __enter__.__globals__)\nwith (Manager(), Manager() as (a, b),):\n    value = a + b\nprint(repr((value, events, errors)))"
       ],
@@ -2932,7 +3272,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nevents = 0\ncount = 0\nerrors = 0\nsuppress = False\nfail_enter = 0\nfail_exit = 0\ndef __enter__(self):\n    global events, count\n    count += 1\n    self.tag = count\n    events = events * 10 + self.tag\n    if self.tag == fail_enter:\n        raise ValueError('enter')\n    return 4, 5\ndef __exit__(self, kind, error, traceback):\n    global events, errors\n    events = events * 10 + self.tag\n    if error is not None:\n        errors += 1\n    if self.tag == fail_exit:\n        raise TypeError('exit')\n    return suppress\nManager = type('Manager', (), __enter__.__globals__)\nwith (Manager()) as value:\n    pass\nprint(repr((value, events, errors)))"
       ],
@@ -2954,7 +3294,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nevents = 0\ncount = 0\nerrors = 0\nsuppress = False\nfail_enter = 0\nfail_exit = 0\ndef __enter__(self):\n    global events, count\n    count += 1\n    self.tag = count\n    events = events * 10 + self.tag\n    if self.tag == fail_enter:\n        raise ValueError('enter')\n    return 4, 5\ndef __exit__(self, kind, error, traceback):\n    global events, errors\n    events = events * 10 + self.tag\n    if error is not None:\n        errors += 1\n    if self.tag == fail_exit:\n        raise TypeError('exit')\n    return suppress\nManager = type('Manager', (), __enter__.__globals__)\nsuppress = True\nwith Manager(), Manager():\n    raise ValueError\nprint(repr((events, errors)))"
       ],
@@ -2976,7 +3316,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nevents = 0\ncount = 0\nerrors = 0\nsuppress = False\nfail_enter = 0\nfail_exit = 0\ndef __enter__(self):\n    global events, count\n    count += 1\n    self.tag = count\n    events = events * 10 + self.tag\n    if self.tag == fail_enter:\n        raise ValueError('enter')\n    return 4, 5\ndef __exit__(self, kind, error, traceback):\n    global events, errors\n    events = events * 10 + self.tag\n    if error is not None:\n        errors += 1\n    if self.tag == fail_exit:\n        raise TypeError('exit')\n    return suppress\nManager = type('Manager', (), __enter__.__globals__)\nsuppress = True\nvalue = 0\nwith Manager() as (a, b, c):\n    value = 99\nprint(repr((value, events, errors)))"
       ],
@@ -2998,7 +3338,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nevents = 0\ncount = 0\nerrors = 0\nsuppress = False\nfail_enter = 0\nfail_exit = 0\ndef __enter__(self):\n    global events, count\n    count += 1\n    self.tag = count\n    events = events * 10 + self.tag\n    if self.tag == fail_enter:\n        raise ValueError('enter')\n    return 4, 5\ndef __exit__(self, kind, error, traceback):\n    global events, errors\n    events = events * 10 + self.tag\n    if error is not None:\n        errors += 1\n    if self.tag == fail_exit:\n        raise TypeError('exit')\n    return suppress\nManager = type('Manager', (), __enter__.__globals__)\nsuppress = True\nfail_enter = 2\nwith Manager(), Manager():\n    pass\nprint(repr((events, errors)))"
       ],
@@ -3020,7 +3360,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nevents = 0\ncount = 0\nerrors = 0\nsuppress = False\nfail_enter = 0\nfail_exit = 0\ndef __enter__(self):\n    global events, count\n    count += 1\n    self.tag = count\n    events = events * 10 + self.tag\n    if self.tag == fail_enter:\n        raise ValueError('enter')\n    return 4, 5\ndef __exit__(self, kind, error, traceback):\n    global events, errors\n    events = events * 10 + self.tag\n    if error is not None:\n        errors += 1\n    if self.tag == fail_exit:\n        raise TypeError('exit')\n    return suppress\nManager = type('Manager', (), __enter__.__globals__)\ndef f():\n    with Manager() as value:\n        return value\nsaved = f()\nprint(repr((saved, events, errors)))"
       ],
@@ -3042,7 +3382,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nevents = 0\ncount = 0\nerrors = 0\nsuppress = False\nfail_enter = 0\nfail_exit = 0\ndef __enter__(self):\n    global events, count\n    count += 1\n    self.tag = count\n    events = events * 10 + self.tag\n    if self.tag == fail_enter:\n        raise ValueError('enter')\n    return 4, 5\ndef __exit__(self, kind, error, traceback):\n    global events, errors\n    events = events * 10 + self.tag\n    if error is not None:\n        errors += 1\n    if self.tag == fail_exit:\n        raise TypeError('exit')\n    return suppress\nManager = type('Manager', (), __enter__.__globals__)\nfail_exit = 2\ntry:\n    with Manager(), Manager():\n        raise ValueError\nexcept TypeError as error:\n    saved = error\nprint(repr((events, errors, type(saved.__context__) is ValueError)))"
       ],
@@ -3064,7 +3404,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nevents = 0\ncount = 0\nerrors = 0\nsuppress = False\nfail_enter = 0\nfail_exit = 0\ndef __enter__(self):\n    global events, count\n    count += 1\n    self.tag = count\n    events = events * 10 + self.tag\n    if self.tag == fail_enter:\n        raise ValueError('enter')\n    return 4, 5\ndef __exit__(self, kind, error, traceback):\n    global events, errors\n    events = events * 10 + self.tag\n    if error is not None:\n        errors += 1\n    if self.tag == fail_exit:\n        raise TypeError('exit')\n    return suppress\nManager = type('Manager', (), __enter__.__globals__)\nfor i in range(3):\n    with Manager():\n        continue\nprint(repr((events, errors)))"
       ],
@@ -3086,7 +3426,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nprint(repr((0x_FF + 0b101 + 0o7 + 1_000)))"
       ],
@@ -3108,7 +3448,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nprint(repr((-(18446744073709551616) // 3)))"
       ],
@@ -3130,7 +3470,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nprint(repr((not 0 and 1 < 2 < 3 or missing)))"
       ],
@@ -3152,7 +3492,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "\nprint(repr(('\\u4f60\\u597d' ' ' r'\\n')))"
       ],
@@ -3174,7 +3514,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "def f(n):\n    total = 0\n    while n:\n        total += n\n        n -= 1\n    return total\nprint(repr((f(2000))))"
       ],
@@ -3196,7 +3536,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "def fact(n):\n    if n <= 1:\n        return 1\n    return n * fact(n - 1)\nprint(repr((fact(20))))"
       ],
@@ -3218,7 +3558,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "count = 0\ndef bump():\n    global count\n    count += 1\n    return count\ndef f(a=bump(), *, b=bump()):\n    return a * 10 + b\nx = f()\ny = f()\nprint(repr((count * 100 + x + y)))"
       ],
@@ -3240,7 +3580,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "def f(a, /, b=2, *, c=3):\n    return a + b + c\nprint(repr((f(1, c=4))))"
       ],
@@ -3262,7 +3602,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "def f(*args, **kwargs):\n    return len(args) * 10 + len(kwargs)\nprint(repr((f(1, 2, x=3))))"
       ],
@@ -3284,7 +3624,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "i = 0\nx = 0\nwhile i < 10:\n    i += 1\n    if i == 3:\n        continue\n    elif i == 7:\n        break\n    x += i\nelse:\n    x = 999\nprint(repr((x)))"
       ],
@@ -3306,7 +3646,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "def factory():\n    def child():\n        return 42\n    return child\na = factory()\nb = factory()\nprint(repr((a is not b and a.__code__ is b.__code__)))"
       ],
@@ -3328,7 +3668,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "'module doc'\ndef f():\n    'function doc'\n    return __debug__\nprint(repr((__doc__ + ' ' + f.__doc__)))"
       ],
@@ -3350,7 +3690,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "'module doc'\nglobal __doc__\nprint(repr((__doc__)))"
       ],
@@ -3372,7 +3712,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "def outer(x):\n    def middle():\n        def inner():\n            return x\n        return inner\n    return middle\nprint(repr((outer(42)()())))"
       ],
@@ -3394,7 +3734,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "def outer(x):\n    def read():\n        return x\n    def bump():\n        nonlocal x\n        x += 1\n    bump()\n    return read\na = outer(40)\nb = outer(10)\nprint(repr((a() * 100 + b())))"
       ],
@@ -3416,7 +3756,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "def outer(x, /, *args, flag=2, **kw):\n    def inner(step=x, *, extra=flag):\n        return x + flag + len(args) + len(kw) + step + extra\n    x += 1\n    return inner\na = outer(10, 1, 2, flag=3, key=1)\nprint(repr((a())))"
       ],
@@ -3438,7 +3778,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "def outer(z, a):\n    x = 1\n    y = 2\n    def inner():\n        return z + a + x + y\n    return inner\nprint(repr((outer.__code__.co_cellvars)))"
       ],
@@ -3460,7 +3800,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "def outer(z, a):\n    x = 1\n    y = 2\n    def inner():\n        return z + a + x + y\n    return inner\nprint(repr((outer.__code__.co_varnames)))"
       ],
@@ -3482,7 +3822,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "def outer(z, a):\n    x = 1\n    y = 2\n    def inner():\n        return z + a + x + y\n    return inner\nprint(repr((outer(1, 2).__code__.co_freevars)))"
       ],
@@ -3504,7 +3844,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "def outer():\n    def fact(n):\n        if n <= 1:\n            return 1\n        return n * fact(n - 1)\n    return fact\nprint(repr((outer()(15))))"
       ],
@@ -3526,7 +3866,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "x = 42\ndef outer():\n    x = 1\n    def middle():\n        global x\n        def inner():\n            return x\n        return inner\n    return middle\nprint(repr((outer()()())))"
       ],
@@ -3548,7 +3888,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "def outer(x):\n    def read():\n        return x\n    return read\na = outer(1)\nb = outer(2)\nprint(repr((a is not b and a.__closure__ is not b.__closure__ and a.__code__ is b.__code__)))"
       ],
@@ -3568,7 +3908,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "raise ValueError('outer') from TypeError('cause')"
       ],
@@ -3588,7 +3928,7 @@
     },
     {
       "command": [
-        "/tmp/cxxpython-cpython31214-build/python",
+        ".cache/cpython31214-build/python",
         "-c",
         "try:\n    raise TypeError('inner')\nexcept:\n    raise ValueError('outer')"
       ],

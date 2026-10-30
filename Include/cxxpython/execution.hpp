@@ -62,6 +62,9 @@ enum class Opcode : std::uint8_t {
     DeleteName,
     LoadClassDeref,
     LoadBuildClass,
+    ImportName,
+    ImportFrom,
+    ImportStar,
     Count,
 };
 enum class OperandDomain {
@@ -423,6 +426,8 @@ struct FrameObject {
     std::vector<Value> operands;
     const std::vector<Value> cells;
     const std::optional<Value> namespace_mapping;
+    // Lazily refreshed reflection snapshot, never the fast-local/Cell authority.
+    std::optional<Value> locals_snapshot;
     std::size_t pc = 0, sp = 0;
     std::atomic<std::size_t> last_instruction{std::numeric_limits<std::size_t>::max()};
     std::optional<std::size_t> pending_call;

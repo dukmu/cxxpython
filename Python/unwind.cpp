@@ -20,6 +20,8 @@ void FrameObject::trace(Tracer &tracer) const noexcept
         tracer.visit(*back);
     if (namespace_mapping)
         tracer.visit(*namespace_mapping);
+    if (locals_snapshot)
+        tracer.visit(*locals_snapshot);
     for (const auto &value : locals)
         if (value)
             tracer.visit(*value);

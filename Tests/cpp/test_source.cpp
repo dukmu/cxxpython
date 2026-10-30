@@ -1076,7 +1076,7 @@ TEST(SourceDiagnostics, InvalidProgramsDoNotSilentlyCompileThroughAnotherLanguag
         SCOPED_TRACE(source);
         EXPECT_THROW(SourceUnit{SourceBuffer(source)}, SourceError);
     }
-    for (auto source : {"import x", "class X[T]: pass", "f'{x}'", "x = 1.5j", "x = [1]",
+    for (auto source : {"class X[T]: pass", "f'{x}'", "x = 1.5j", "x = [1]",
                         "try:\n    pass\nexcept* Exception:\n    pass"}) {
         SCOPED_TRACE(source);
         try {

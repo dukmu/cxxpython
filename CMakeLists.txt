@@ -90,6 +90,8 @@ if(BUILD_TESTING)
         Tests/cpp/test_constructors.cpp
         Tests/cpp/test_modules.cpp
         Tests/cpp/test_import.cpp
+        Tests/cpp/test_import_files.cpp
+        Tests/cpp/test_source_import.cpp
         Tests/cpp/test_tuple_constructor.cpp
         Tests/cpp/test_layout.cpp
         Tests/cpp/test_cell.cpp

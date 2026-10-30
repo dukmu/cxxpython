@@ -9,6 +9,492 @@ Storage/native delivery probes do not establish Python VM parallelism. RSS is th
 
 | Series | Probe | Workers | Metric | Unit | Samples | Median | Min | Max |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| file-import-syntax | cleanup_iterations | - | active_region_bytes | bytes | 1 | 32.000 | 32.000 | 32.000 |
+| file-import-syntax | cleanup_iterations | - | cleanup_continuation_bytes | bytes | 1 | 48.000 | 48.000 | 48.000 |
+| file-import-syntax | cleanup_iterations | - | cleanup_function_ns | ms | 1 | 22.662 | 22.662 | 22.662 |
+| file-import-syntax | function_iterations | - | frame_prefix_bytes | bytes | 1 | 288.000 | 288.000 | 288.000 |
+| file-import-syntax | function_iterations | - | verified_function_ns | ms | 1 | 15.957 | 15.957 | 15.957 |
+| file-import-syntax | hash_iterations | - | string_hash_ns | ms | 1 | 77.985 | 77.985 | 77.985 |
+| file-import-syntax | hash_iterations | - | tuple_repr_ns | ms | 1 | 21.984 | 21.984 | 21.984 |
+| file-import-syntax | int_iterations | - | big_int_mul_ns | ms | 1 | 9.325 | 9.325 | 9.325 |
+| file-import-syntax | int_iterations | - | int_add_ns | ms | 1 | 73.871 | 73.871 | 73.871 |
+| file-import-syntax | int_iterations | - | int_object_bytes | bytes | 1 | 24.000 | 24.000 | 24.000 |
+| file-import-syntax | iterations | - | allocation_and_auto_gc_ns | ms | 1 | 5.598 | 5.598 | 5.598 |
+| file-import-syntax | iterations | - | handle_bytes | bytes | 1 | 32.000 | 32.000 | 32.000 |
+| file-import-syntax | iterations | - | header_bytes | bytes | 1 | 8.000 | 8.000 | 8.000 |
+| file-import-syntax | iterations | - | last_gc_pause_ns | ms | 1 | 0.002 | 0.002 | 0.002 |
+| file-import-syntax | iterations | - | live_bytes | bytes | 1 | 0.000 | 0.000 | 0.000 |
+| file-import-syntax | iterations | - | node_bytes | bytes | 1 | 16.000 | 16.000 | 16.000 |
+| file-import-syntax | iterations | - | recorded_metadata_bytes | bytes | 1 | 3360.000 | 3360.000 | 3360.000 |
+| file-import-syntax | iterations | - | root_register_release_ns | ms | 1 | 3.452 | 3.452 | 3.452 |
+| file-import-syntax | native_call_iterations | - | core_live_bytes | bytes | 1 | 156857.000 | 156857.000 | 156857.000 |
+| file-import-syntax | native_call_iterations | - | core_metadata_bytes | bytes | 1 | 157536.000 | 157536.000 | 157536.000 |
+| file-import-syntax | native_call_iterations | - | core_reserved_bytes | bytes | 1 | 452368.000 | 452368.000 | 452368.000 |
+| file-import-syntax | native_call_iterations | - | lookup_bind_call_ns | ms | 1 | 22.913 | 22.913 | 22.913 |
+| file-import-syntax | native_call_iterations | - | native_call_ns | ms | 1 | 15.037 | 15.037 | 15.037 |
+| file-import-syntax | parallel_class_workers | 1 | finish_live_bytes | bytes | 1 | 212377.000 | 212377.000 | 212377.000 |
+| file-import-syntax | parallel_class_workers | 1 | finish_metadata_bytes | bytes | 1 | 252624.000 | 252624.000 | 252624.000 |
+| file-import-syntax | parallel_class_workers | 1 | finish_reserved_bytes | bytes | 1 | 674024.000 | 674024.000 | 674024.000 |
+| file-import-syntax | parallel_class_workers | 1 | last_mark_sweep_ns | ms | 1 | 0.060 | 0.060 | 0.060 |
+| file-import-syntax | parallel_class_workers | 1 | max_rendezvous_ns | ms | 1 | 0.002 | 0.002 | 0.002 |
+| file-import-syntax | parallel_class_workers | 1 | process_cpu_ns | ms | 1 | 569.023 | 569.023 | 569.023 |
+| file-import-syntax | parallel_class_workers | 1 | source_freeze_run_ns | ms | 1 | 0.124 | 0.124 | 0.124 |
+| file-import-syntax | parallel_class_workers | 1 | wall_ns | ms | 1 | 616.409 | 616.409 | 616.409 |
+| file-import-syntax | parallel_class_workers | 2 | finish_live_bytes | bytes | 1 | 226849.000 | 226849.000 | 226849.000 |
+| file-import-syntax | parallel_class_workers | 2 | finish_metadata_bytes | bytes | 1 | 297744.000 | 297744.000 | 297744.000 |
+| file-import-syntax | parallel_class_workers | 2 | finish_reserved_bytes | bytes | 1 | 743888.000 | 743888.000 | 743888.000 |
+| file-import-syntax | parallel_class_workers | 2 | last_mark_sweep_ns | ms | 1 | 0.073 | 0.073 | 0.073 |
+| file-import-syntax | parallel_class_workers | 2 | max_rendezvous_ns | ms | 1 | 1.166 | 1.166 | 1.166 |
+| file-import-syntax | parallel_class_workers | 2 | process_cpu_ns | ms | 1 | 655.854 | 655.854 | 655.854 |
+| file-import-syntax | parallel_class_workers | 2 | source_freeze_run_ns | ms | 1 | 0.117 | 0.117 | 0.117 |
+| file-import-syntax | parallel_class_workers | 2 | wall_ns | ms | 1 | 378.717 | 378.717 | 378.717 |
+| file-import-syntax | parallel_class_workers | 4 | finish_live_bytes | bytes | 1 | 247249.000 | 247249.000 | 247249.000 |
+| file-import-syntax | parallel_class_workers | 4 | finish_metadata_bytes | bytes | 1 | 380592.000 | 380592.000 | 380592.000 |
+| file-import-syntax | parallel_class_workers | 4 | finish_reserved_bytes | bytes | 1 | 870968.000 | 870968.000 | 870968.000 |
+| file-import-syntax | parallel_class_workers | 4 | last_mark_sweep_ns | ms | 1 | 0.090 | 0.090 | 0.090 |
+| file-import-syntax | parallel_class_workers | 4 | max_rendezvous_ns | ms | 1 | 4.198 | 4.198 | 4.198 |
+| file-import-syntax | parallel_class_workers | 4 | process_cpu_ns | ms | 1 | 716.396 | 716.396 | 716.396 |
+| file-import-syntax | parallel_class_workers | 4 | source_freeze_run_ns | ms | 1 | 0.126 | 0.126 | 0.126 |
+| file-import-syntax | parallel_class_workers | 4 | wall_ns | ms | 1 | 315.753 | 315.753 | 315.753 |
+| file-import-syntax | parallel_closure_workers | 1 | finish_live_bytes | bytes | 1 | 168969.000 | 168969.000 | 168969.000 |
+| file-import-syntax | parallel_closure_workers | 1 | finish_metadata_bytes | bytes | 1 | 201440.000 | 201440.000 | 201440.000 |
+| file-import-syntax | parallel_closure_workers | 1 | finish_reserved_bytes | bytes | 1 | 530352.000 | 530352.000 | 530352.000 |
+| file-import-syntax | parallel_closure_workers | 1 | last_mark_sweep_ns | ms | 1 | 0.058 | 0.058 | 0.058 |
+| file-import-syntax | parallel_closure_workers | 1 | max_rendezvous_ns | ms | 1 | 0.002 | 0.002 | 0.002 |
+| file-import-syntax | parallel_closure_workers | 1 | process_cpu_ns | ms | 1 | 276.596 | 276.596 | 276.596 |
+| file-import-syntax | parallel_closure_workers | 1 | source_freeze_run_ns | ms | 1 | 0.086 | 0.086 | 0.086 |
+| file-import-syntax | parallel_closure_workers | 1 | wall_ns | ms | 1 | 299.628 | 299.628 | 299.628 |
+| file-import-syntax | parallel_closure_workers | 2 | finish_live_bytes | bytes | 1 | 237049.000 | 237049.000 | 237049.000 |
+| file-import-syntax | parallel_closure_workers | 2 | finish_metadata_bytes | bytes | 1 | 281456.000 | 281456.000 | 281456.000 |
+| file-import-syntax | parallel_closure_workers | 2 | finish_reserved_bytes | bytes | 1 | 665616.000 | 665616.000 | 665616.000 |
+| file-import-syntax | parallel_closure_workers | 2 | last_mark_sweep_ns | ms | 1 | 0.120 | 0.120 | 0.120 |
+| file-import-syntax | parallel_closure_workers | 2 | max_rendezvous_ns | ms | 1 | 0.104 | 0.104 | 0.104 |
+| file-import-syntax | parallel_closure_workers | 2 | process_cpu_ns | ms | 1 | 313.531 | 313.531 | 313.531 |
+| file-import-syntax | parallel_closure_workers | 2 | source_freeze_run_ns | ms | 1 | 0.062 | 0.062 | 0.062 |
+| file-import-syntax | parallel_closure_workers | 2 | wall_ns | ms | 1 | 174.696 | 174.696 | 174.696 |
+| file-import-syntax | parallel_closure_workers | 4 | finish_live_bytes | bytes | 1 | 174609.000 | 174609.000 | 174609.000 |
+| file-import-syntax | parallel_closure_workers | 4 | finish_metadata_bytes | bytes | 1 | 327248.000 | 327248.000 | 327248.000 |
+| file-import-syntax | parallel_closure_workers | 4 | finish_reserved_bytes | bytes | 1 | 727296.000 | 727296.000 | 727296.000 |
+| file-import-syntax | parallel_closure_workers | 4 | last_mark_sweep_ns | ms | 1 | 0.086 | 0.086 | 0.086 |
+| file-import-syntax | parallel_closure_workers | 4 | max_rendezvous_ns | ms | 1 | 0.300 | 0.300 | 0.300 |
+| file-import-syntax | parallel_closure_workers | 4 | process_cpu_ns | ms | 1 | 341.894 | 341.894 | 341.894 |
+| file-import-syntax | parallel_closure_workers | 4 | source_freeze_run_ns | ms | 1 | 0.076 | 0.076 | 0.076 |
+| file-import-syntax | parallel_closure_workers | 4 | wall_ns | ms | 1 | 137.521 | 137.521 | 137.521 |
+| file-import-syntax | parallel_exception_workers | 1 | finish_live_bytes | bytes | 1 | 212525.000 | 212525.000 | 212525.000 |
+| file-import-syntax | parallel_exception_workers | 1 | finish_metadata_bytes | bytes | 1 | 253360.000 | 253360.000 | 253360.000 |
+| file-import-syntax | parallel_exception_workers | 1 | finish_reserved_bytes | bytes | 1 | 625376.000 | 625376.000 | 625376.000 |
+| file-import-syntax | parallel_exception_workers | 1 | last_mark_sweep_ns | ms | 1 | 0.049 | 0.049 | 0.049 |
+| file-import-syntax | parallel_exception_workers | 1 | max_rendezvous_ns | ms | 1 | 0.002 | 0.002 | 0.002 |
+| file-import-syntax | parallel_exception_workers | 1 | process_cpu_ns | ms | 1 | 489.780 | 489.780 | 489.780 |
+| file-import-syntax | parallel_exception_workers | 1 | source_freeze_run_ns | ms | 1 | 0.072 | 0.072 | 0.072 |
+| file-import-syntax | parallel_exception_workers | 1 | wall_ns | ms | 1 | 530.686 | 530.686 | 530.686 |
+| file-import-syntax | parallel_exception_workers | 2 | finish_live_bytes | bytes | 1 | 247965.000 | 247965.000 | 247965.000 |
+| file-import-syntax | parallel_exception_workers | 2 | finish_metadata_bytes | bytes | 1 | 350576.000 | 350576.000 | 350576.000 |
+| file-import-syntax | parallel_exception_workers | 2 | finish_reserved_bytes | bytes | 1 | 794224.000 | 794224.000 | 794224.000 |
+| file-import-syntax | parallel_exception_workers | 2 | last_mark_sweep_ns | ms | 1 | 0.063 | 0.063 | 0.063 |
+| file-import-syntax | parallel_exception_workers | 2 | max_rendezvous_ns | ms | 1 | 0.187 | 0.187 | 0.187 |
+| file-import-syntax | parallel_exception_workers | 2 | process_cpu_ns | ms | 1 | 504.277 | 504.277 | 504.277 |
+| file-import-syntax | parallel_exception_workers | 2 | source_freeze_run_ns | ms | 1 | 0.067 | 0.067 | 0.067 |
+| file-import-syntax | parallel_exception_workers | 2 | wall_ns | ms | 1 | 281.217 | 281.217 | 281.217 |
+| file-import-syntax | parallel_exception_workers | 4 | finish_live_bytes | bytes | 1 | 222829.000 | 222829.000 | 222829.000 |
+| file-import-syntax | parallel_exception_workers | 4 | finish_metadata_bytes | bytes | 1 | 381328.000 | 381328.000 | 381328.000 |
+| file-import-syntax | parallel_exception_workers | 4 | finish_reserved_bytes | bytes | 1 | 822320.000 | 822320.000 | 822320.000 |
+| file-import-syntax | parallel_exception_workers | 4 | last_mark_sweep_ns | ms | 1 | 0.120 | 0.120 | 0.120 |
+| file-import-syntax | parallel_exception_workers | 4 | max_rendezvous_ns | ms | 1 | 0.609 | 0.609 | 0.609 |
+| file-import-syntax | parallel_exception_workers | 4 | process_cpu_ns | ms | 1 | 634.584 | 634.584 | 634.584 |
+| file-import-syntax | parallel_exception_workers | 4 | source_freeze_run_ns | ms | 1 | 0.070 | 0.070 | 0.070 |
+| file-import-syntax | parallel_exception_workers | 4 | wall_ns | ms | 1 | 253.617 | 253.617 | 253.617 |
+| file-import-syntax | parallel_float_workers | 1 | finish_live_bytes | bytes | 1 | 218917.000 | 218917.000 | 218917.000 |
+| file-import-syntax | parallel_float_workers | 1 | finish_metadata_bytes | bytes | 1 | 302720.000 | 302720.000 | 302720.000 |
+| file-import-syntax | parallel_float_workers | 1 | finish_reserved_bytes | bytes | 1 | 686864.000 | 686864.000 | 686864.000 |
+| file-import-syntax | parallel_float_workers | 1 | last_mark_sweep_ns | ms | 1 | 0.092 | 0.092 | 0.092 |
+| file-import-syntax | parallel_float_workers | 1 | max_rendezvous_ns | ms | 1 | 0.002 | 0.002 | 0.002 |
+| file-import-syntax | parallel_float_workers | 1 | process_cpu_ns | ms | 1 | 331.941 | 331.941 | 331.941 |
+| file-import-syntax | parallel_float_workers | 1 | source_freeze_run_ns | ms | 1 | 0.054 | 0.054 | 0.054 |
+| file-import-syntax | parallel_float_workers | 1 | wall_ns | ms | 1 | 359.630 | 359.630 | 359.630 |
+| file-import-syntax | parallel_float_workers | 2 | finish_live_bytes | bytes | 1 | 293221.000 | 293221.000 | 293221.000 |
+| file-import-syntax | parallel_float_workers | 2 | finish_metadata_bytes | bytes | 1 | 470704.000 | 470704.000 | 470704.000 |
+| file-import-syntax | parallel_float_workers | 2 | finish_reserved_bytes | bytes | 1 | 949456.000 | 949456.000 | 949456.000 |
+| file-import-syntax | parallel_float_workers | 2 | last_mark_sweep_ns | ms | 1 | 0.174 | 0.174 | 0.174 |
+| file-import-syntax | parallel_float_workers | 2 | max_rendezvous_ns | ms | 1 | 0.122 | 0.122 | 0.122 |
+| file-import-syntax | parallel_float_workers | 2 | process_cpu_ns | ms | 1 | 365.256 | 365.256 | 365.256 |
+| file-import-syntax | parallel_float_workers | 2 | source_freeze_run_ns | ms | 1 | 0.048 | 0.048 | 0.048 |
+| file-import-syntax | parallel_float_workers | 2 | wall_ns | ms | 1 | 206.510 | 206.510 | 206.510 |
+| file-import-syntax | parallel_float_workers | 4 | finish_live_bytes | bytes | 1 | 307765.000 | 307765.000 | 307765.000 |
+| file-import-syntax | parallel_float_workers | 4 | finish_metadata_bytes | bytes | 1 | 650992.000 | 650992.000 | 650992.000 |
+| file-import-syntax | parallel_float_workers | 4 | finish_reserved_bytes | bytes | 1 | 1241232.000 | 1241232.000 | 1241232.000 |
+| file-import-syntax | parallel_float_workers | 4 | last_mark_sweep_ns | ms | 1 | 0.265 | 0.265 | 0.265 |
+| file-import-syntax | parallel_float_workers | 4 | max_rendezvous_ns | ms | 1 | 0.327 | 0.327 | 0.327 |
+| file-import-syntax | parallel_float_workers | 4 | process_cpu_ns | ms | 1 | 408.728 | 408.728 | 408.728 |
+| file-import-syntax | parallel_float_workers | 4 | source_freeze_run_ns | ms | 1 | 0.055 | 0.055 | 0.055 |
+| file-import-syntax | parallel_float_workers | 4 | wall_ns | ms | 1 | 161.375 | 161.375 | 161.375 |
+| file-import-syntax | parallel_for_workers | 1 | finish_live_bytes | bytes | 1 | 220213.000 | 220213.000 | 220213.000 |
+| file-import-syntax | parallel_for_workers | 1 | finish_metadata_bytes | bytes | 1 | 280688.000 | 280688.000 | 280688.000 |
+| file-import-syntax | parallel_for_workers | 1 | finish_reserved_bytes | bytes | 1 | 670056.000 | 670056.000 | 670056.000 |
+| file-import-syntax | parallel_for_workers | 1 | last_mark_sweep_ns | ms | 1 | 0.083 | 0.083 | 0.083 |
+| file-import-syntax | parallel_for_workers | 1 | max_rendezvous_ns | ms | 1 | 0.002 | 0.002 | 0.002 |
+| file-import-syntax | parallel_for_workers | 1 | process_cpu_ns | ms | 1 | 185.105 | 185.105 | 185.105 |
+| file-import-syntax | parallel_for_workers | 1 | source_freeze_run_ns | ms | 1 | 0.052 | 0.052 | 0.052 |
+| file-import-syntax | parallel_for_workers | 1 | wall_ns | ms | 1 | 200.586 | 200.586 | 200.586 |
+| file-import-syntax | parallel_for_workers | 2 | finish_live_bytes | bytes | 1 | 312429.000 | 312429.000 | 312429.000 |
+| file-import-syntax | parallel_for_workers | 2 | finish_metadata_bytes | bytes | 1 | 405232.000 | 405232.000 | 405232.000 |
+| file-import-syntax | parallel_for_workers | 2 | finish_reserved_bytes | bytes | 1 | 883584.000 | 883584.000 | 883584.000 |
+| file-import-syntax | parallel_for_workers | 2 | last_mark_sweep_ns | ms | 1 | 0.138 | 0.138 | 0.138 |
+| file-import-syntax | parallel_for_workers | 2 | max_rendezvous_ns | ms | 1 | 0.313 | 0.313 | 0.313 |
+| file-import-syntax | parallel_for_workers | 2 | process_cpu_ns | ms | 1 | 218.904 | 218.904 | 218.904 |
+| file-import-syntax | parallel_for_workers | 2 | source_freeze_run_ns | ms | 1 | 0.050 | 0.050 | 0.050 |
+| file-import-syntax | parallel_for_workers | 2 | wall_ns | ms | 1 | 123.142 | 123.142 | 123.142 |
+| file-import-syntax | parallel_for_workers | 4 | finish_live_bytes | bytes | 1 | 176877.000 | 176877.000 | 176877.000 |
+| file-import-syntax | parallel_for_workers | 4 | finish_metadata_bytes | bytes | 1 | 305168.000 | 305168.000 | 305168.000 |
+| file-import-syntax | parallel_for_workers | 4 | finish_reserved_bytes | bytes | 1 | 690856.000 | 690856.000 | 690856.000 |
+| file-import-syntax | parallel_for_workers | 4 | last_mark_sweep_ns | ms | 1 | 0.077 | 0.077 | 0.077 |
+| file-import-syntax | parallel_for_workers | 4 | max_rendezvous_ns | ms | 1 | 0.386 | 0.386 | 0.386 |
+| file-import-syntax | parallel_for_workers | 4 | process_cpu_ns | ms | 1 | 231.241 | 231.241 | 231.241 |
+| file-import-syntax | parallel_for_workers | 4 | source_freeze_run_ns | ms | 1 | 0.054 | 0.054 | 0.054 |
+| file-import-syntax | parallel_for_workers | 4 | wall_ns | ms | 1 | 93.714 | 93.714 | 93.714 |
+| file-import-syntax | parallel_source_workers | 1 | finish_live_bytes | bytes | 1 | 238677.000 | 238677.000 | 238677.000 |
+| file-import-syntax | parallel_source_workers | 1 | finish_metadata_bytes | bytes | 1 | 273728.000 | 273728.000 | 273728.000 |
+| file-import-syntax | parallel_source_workers | 1 | finish_reserved_bytes | bytes | 1 | 657440.000 | 657440.000 | 657440.000 |
+| file-import-syntax | parallel_source_workers | 1 | last_mark_sweep_ns | ms | 1 | 0.076 | 0.076 | 0.076 |
+| file-import-syntax | parallel_source_workers | 1 | max_rendezvous_ns | ms | 1 | 0.002 | 0.002 | 0.002 |
+| file-import-syntax | parallel_source_workers | 1 | process_cpu_ns | ms | 1 | 293.214 | 293.214 | 293.214 |
+| file-import-syntax | parallel_source_workers | 1 | source_freeze_run_ns | ms | 1 | 0.053 | 0.053 | 0.053 |
+| file-import-syntax | parallel_source_workers | 1 | wall_ns | ms | 1 | 317.641 | 317.641 | 317.641 |
+| file-import-syntax | parallel_source_workers | 2 | finish_live_bytes | bytes | 1 | 182349.000 | 182349.000 | 182349.000 |
+| file-import-syntax | parallel_source_workers | 2 | finish_metadata_bytes | bytes | 1 | 240528.000 | 240528.000 | 240528.000 |
+| file-import-syntax | parallel_source_workers | 2 | finish_reserved_bytes | bytes | 1 | 591792.000 | 591792.000 | 591792.000 |
+| file-import-syntax | parallel_source_workers | 2 | last_mark_sweep_ns | ms | 1 | 0.077 | 0.077 | 0.077 |
+| file-import-syntax | parallel_source_workers | 2 | max_rendezvous_ns | ms | 1 | 0.154 | 0.154 | 0.154 |
+| file-import-syntax | parallel_source_workers | 2 | process_cpu_ns | ms | 1 | 315.598 | 315.598 | 315.598 |
+| file-import-syntax | parallel_source_workers | 2 | source_freeze_run_ns | ms | 1 | 0.074 | 0.074 | 0.074 |
+| file-import-syntax | parallel_source_workers | 2 | wall_ns | ms | 1 | 175.393 | 175.393 | 175.393 |
+| file-import-syntax | parallel_source_workers | 4 | finish_live_bytes | bytes | 1 | 244709.000 | 244709.000 | 244709.000 |
+| file-import-syntax | parallel_source_workers | 4 | finish_metadata_bytes | bytes | 1 | 400048.000 | 400048.000 | 400048.000 |
+| file-import-syntax | parallel_source_workers | 4 | finish_reserved_bytes | bytes | 1 | 858352.000 | 858352.000 | 858352.000 |
+| file-import-syntax | parallel_source_workers | 4 | last_mark_sweep_ns | ms | 1 | 0.120 | 0.120 | 0.120 |
+| file-import-syntax | parallel_source_workers | 4 | max_rendezvous_ns | ms | 1 | 6.913 | 6.913 | 6.913 |
+| file-import-syntax | parallel_source_workers | 4 | process_cpu_ns | ms | 1 | 335.194 | 335.194 | 335.194 |
+| file-import-syntax | parallel_source_workers | 4 | source_freeze_run_ns | ms | 1 | 0.049 | 0.049 | 0.049 |
+| file-import-syntax | parallel_source_workers | 4 | wall_ns | ms | 1 | 137.570 | 137.570 | 137.570 |
+| file-import-syntax | parallel_storage_workers | 1 | finish_live_bytes | bytes | 1 | 42720.000 | 42720.000 | 42720.000 |
+| file-import-syntax | parallel_storage_workers | 1 | finish_metadata_bytes | bytes | 1 | 97040.000 | 97040.000 | 97040.000 |
+| file-import-syntax | parallel_storage_workers | 1 | finish_reserved_bytes | bytes | 1 | 135504.000 | 135504.000 | 135504.000 |
+| file-import-syntax | parallel_storage_workers | 1 | last_mark_sweep_ns | ms | 1 | 0.015 | 0.015 | 0.015 |
+| file-import-syntax | parallel_storage_workers | 1 | max_rendezvous_ns | ms | 1 | 0.000 | 0.000 | 0.000 |
+| file-import-syntax | parallel_storage_workers | 1 | process_cpu_ns | ms | 1 | 3.068 | 3.068 | 3.068 |
+| file-import-syntax | parallel_storage_workers | 1 | wall_ns | ms | 1 | 3.361 | 3.361 | 3.361 |
+| file-import-syntax | parallel_storage_workers | 2 | finish_live_bytes | bytes | 1 | 5920.000 | 5920.000 | 5920.000 |
+| file-import-syntax | parallel_storage_workers | 2 | finish_metadata_bytes | bytes | 1 | 100352.000 | 100352.000 | 100352.000 |
+| file-import-syntax | parallel_storage_workers | 2 | finish_reserved_bytes | bytes | 1 | 135504.000 | 135504.000 | 135504.000 |
+| file-import-syntax | parallel_storage_workers | 2 | last_mark_sweep_ns | ms | 1 | 0.004 | 0.004 | 0.004 |
+| file-import-syntax | parallel_storage_workers | 2 | max_rendezvous_ns | ms | 1 | 0.057 | 0.057 | 0.057 |
+| file-import-syntax | parallel_storage_workers | 2 | process_cpu_ns | ms | 1 | 3.213 | 3.213 | 3.213 |
+| file-import-syntax | parallel_storage_workers | 2 | wall_ns | ms | 1 | 2.228 | 2.228 | 2.228 |
+| file-import-syntax | parallel_storage_workers | 4 | finish_live_bytes | bytes | 1 | 2944.000 | 2944.000 | 2944.000 |
+| file-import-syntax | parallel_storage_workers | 4 | finish_metadata_bytes | bytes | 1 | 194592.000 | 194592.000 | 194592.000 |
+| file-import-syntax | parallel_storage_workers | 4 | finish_reserved_bytes | bytes | 1 | 266800.000 | 266800.000 | 266800.000 |
+| file-import-syntax | parallel_storage_workers | 4 | last_mark_sweep_ns | ms | 1 | 0.013 | 0.013 | 0.013 |
+| file-import-syntax | parallel_storage_workers | 4 | max_rendezvous_ns | ms | 1 | 0.247 | 0.247 | 0.247 |
+| file-import-syntax | parallel_storage_workers | 4 | process_cpu_ns | ms | 1 | 4.605 | 4.605 | 4.605 |
+| file-import-syntax | parallel_storage_workers | 4 | wall_ns | ms | 1 | 3.314 | 3.314 | 3.314 |
+| file-import-syntax | parallel_vm_workers | 1 | finish_live_bytes | bytes | 1 | 263717.000 | 263717.000 | 263717.000 |
+| file-import-syntax | parallel_vm_workers | 1 | finish_metadata_bytes | bytes | 1 | 311200.000 | 311200.000 | 311200.000 |
+| file-import-syntax | parallel_vm_workers | 1 | finish_reserved_bytes | bytes | 1 | 723088.000 | 723088.000 | 723088.000 |
+| file-import-syntax | parallel_vm_workers | 1 | last_mark_sweep_ns | ms | 1 | 0.095 | 0.095 | 0.095 |
+| file-import-syntax | parallel_vm_workers | 1 | max_rendezvous_ns | ms | 1 | 0.001 | 0.001 | 0.001 |
+| file-import-syntax | parallel_vm_workers | 1 | process_cpu_ns | ms | 1 | 255.894 | 255.894 | 255.894 |
+| file-import-syntax | parallel_vm_workers | 1 | source_freeze_run_ns | ms | 1 | 0.000 | 0.000 | 0.000 |
+| file-import-syntax | parallel_vm_workers | 1 | wall_ns | ms | 1 | 277.214 | 277.214 | 277.214 |
+| file-import-syntax | parallel_vm_workers | 2 | finish_live_bytes | bytes | 1 | 206501.000 | 206501.000 | 206501.000 |
+| file-import-syntax | parallel_vm_workers | 2 | finish_metadata_bytes | bytes | 1 | 277904.000 | 277904.000 | 277904.000 |
+| file-import-syntax | parallel_vm_workers | 2 | finish_reserved_bytes | bytes | 1 | 657440.000 | 657440.000 | 657440.000 |
+| file-import-syntax | parallel_vm_workers | 2 | last_mark_sweep_ns | ms | 1 | 0.085 | 0.085 | 0.085 |
+| file-import-syntax | parallel_vm_workers | 2 | max_rendezvous_ns | ms | 1 | 0.684 | 0.684 | 0.684 |
+| file-import-syntax | parallel_vm_workers | 2 | process_cpu_ns | ms | 1 | 286.602 | 286.602 | 286.602 |
+| file-import-syntax | parallel_vm_workers | 2 | source_freeze_run_ns | ms | 1 | 0.000 | 0.000 | 0.000 |
+| file-import-syntax | parallel_vm_workers | 2 | wall_ns | ms | 1 | 162.091 | 162.091 | 162.091 |
+| file-import-syntax | parallel_vm_workers | 4 | finish_live_bytes | bytes | 1 | 291965.000 | 291965.000 | 291965.000 |
+| file-import-syntax | parallel_vm_workers | 4 | finish_metadata_bytes | bytes | 1 | 474800.000 | 474800.000 | 474800.000 |
+| file-import-syntax | parallel_vm_workers | 4 | finish_reserved_bytes | bytes | 1 | 989648.000 | 989648.000 | 989648.000 |
+| file-import-syntax | parallel_vm_workers | 4 | last_mark_sweep_ns | ms | 1 | 0.156 | 0.156 | 0.156 |
+| file-import-syntax | parallel_vm_workers | 4 | max_rendezvous_ns | ms | 1 | 3.543 | 3.543 | 3.543 |
+| file-import-syntax | parallel_vm_workers | 4 | process_cpu_ns | ms | 1 | 318.887 | 318.887 | 318.887 |
+| file-import-syntax | parallel_vm_workers | 4 | source_freeze_run_ns | ms | 1 | 0.000 | 0.000 | 0.000 |
+| file-import-syntax | parallel_vm_workers | 4 | wall_ns | ms | 1 | 134.638 | 134.638 | 134.638 |
+| file-import-syntax | process_peak_rss_kib | - | process_peak_rss_kib | KiB | 1 | 7268.000 | 7268.000 | 7268.000 |
+| file-import-syntax | scheduled_iterations | - | scheduled_function_ns | ms | 1 | 26.959 | 26.959 | 26.959 |
+| file-import-syntax | shared_edge_iterations | - | cell_object_bytes | bytes | 1 | 16.000 | 16.000 | 16.000 |
+| file-import-syntax | shared_edge_iterations | - | rooted_cell_read_ns | ms | 1 | 2.659 | 2.659 | 2.659 |
+| file-import-syntax | shared_edge_iterations | - | rooted_cell_store_read_ns | ms | 1 | 5.432 | 5.432 | 5.432 |
+| file-import-syntax | slot_iterations | - | generic_prefix_bytes | bytes | 1 | 8.000 | 8.000 | 8.000 |
+| file-import-syntax | slot_iterations | - | slot_instance_bytes | bytes | 1 | 24.000 | 24.000 | 24.000 |
+| file-import-syntax | slot_iterations | - | slot_set_get_ns | ms | 1 | 36.927 | 36.927 | 36.927 |
+| file-import-syntax | source_parse_scope_cfg_ns | - | source_bytes | bytes | 1 | 92.000 | 92.000 | 92.000 |
+| file-import-syntax | source_parse_scope_cfg_ns | - | source_parse_scope_cfg_ns | ms | 1 | 0.045 | 0.045 | 0.045 |
+| file-import-syntax | transfer_iterations | - | transfer_roundtrip_ns | ms | 1 | 1.121 | 1.121 | 1.121 |
+| file-import-syntax | transfer_iterations | - | transfer_token_bytes | bytes | 1 | 24.000 | 24.000 | 24.000 |
+| file-import-syntax | with_iterations | - | with_function_ns | ms | 1 | 37.766 | 37.766 | 37.766 |
+| file-import-syntax-idle | cleanup_iterations | - | active_region_bytes | bytes | 3 | 32.000 | 32.000 | 32.000 |
+| file-import-syntax-idle | cleanup_iterations | - | cleanup_continuation_bytes | bytes | 3 | 48.000 | 48.000 | 48.000 |
+| file-import-syntax-idle | cleanup_iterations | - | cleanup_function_ns | ms | 3 | 17.991 | 17.915 | 18.352 |
+| file-import-syntax-idle | function_iterations | - | frame_prefix_bytes | bytes | 3 | 288.000 | 288.000 | 288.000 |
+| file-import-syntax-idle | function_iterations | - | verified_function_ns | ms | 3 | 14.382 | 13.772 | 16.021 |
+| file-import-syntax-idle | hash_iterations | - | string_hash_ns | ms | 3 | 70.551 | 69.262 | 70.864 |
+| file-import-syntax-idle | hash_iterations | - | tuple_repr_ns | ms | 3 | 19.400 | 18.446 | 20.339 |
+| file-import-syntax-idle | int_iterations | - | big_int_mul_ns | ms | 3 | 7.637 | 7.131 | 7.865 |
+| file-import-syntax-idle | int_iterations | - | int_add_ns | ms | 3 | 67.405 | 63.294 | 88.762 |
+| file-import-syntax-idle | int_iterations | - | int_object_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| file-import-syntax-idle | iterations | - | allocation_and_auto_gc_ns | ms | 3 | 4.796 | 4.625 | 4.943 |
+| file-import-syntax-idle | iterations | - | handle_bytes | bytes | 3 | 32.000 | 32.000 | 32.000 |
+| file-import-syntax-idle | iterations | - | header_bytes | bytes | 3 | 8.000 | 8.000 | 8.000 |
+| file-import-syntax-idle | iterations | - | last_gc_pause_ns | ms | 3 | 0.001 | 0.000 | 0.001 |
+| file-import-syntax-idle | iterations | - | live_bytes | bytes | 3 | 0.000 | 0.000 | 0.000 |
+| file-import-syntax-idle | iterations | - | node_bytes | bytes | 3 | 16.000 | 16.000 | 16.000 |
+| file-import-syntax-idle | iterations | - | recorded_metadata_bytes | bytes | 3 | 3360.000 | 3360.000 | 3360.000 |
+| file-import-syntax-idle | iterations | - | root_register_release_ns | ms | 3 | 3.017 | 2.998 | 3.203 |
+| file-import-syntax-idle | native_call_iterations | - | core_live_bytes | bytes | 3 | 156857.000 | 156857.000 | 156857.000 |
+| file-import-syntax-idle | native_call_iterations | - | core_metadata_bytes | bytes | 3 | 157536.000 | 157536.000 | 157536.000 |
+| file-import-syntax-idle | native_call_iterations | - | core_reserved_bytes | bytes | 3 | 452368.000 | 452368.000 | 452368.000 |
+| file-import-syntax-idle | native_call_iterations | - | lookup_bind_call_ns | ms | 3 | 21.385 | 20.840 | 21.666 |
+| file-import-syntax-idle | native_call_iterations | - | native_call_ns | ms | 3 | 13.712 | 13.516 | 14.502 |
+| file-import-syntax-idle | parallel_class_workers | 1 | finish_live_bytes | bytes | 3 | 212377.000 | 212377.000 | 212377.000 |
+| file-import-syntax-idle | parallel_class_workers | 1 | finish_metadata_bytes | bytes | 3 | 252624.000 | 252624.000 | 252624.000 |
+| file-import-syntax-idle | parallel_class_workers | 1 | finish_reserved_bytes | bytes | 3 | 674024.000 | 674024.000 | 674024.000 |
+| file-import-syntax-idle | parallel_class_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.058 | 0.048 | 0.081 |
+| file-import-syntax-idle | parallel_class_workers | 1 | max_rendezvous_ns | ms | 3 | 0.002 | 0.001 | 0.003 |
+| file-import-syntax-idle | parallel_class_workers | 1 | process_cpu_ns | ms | 3 | 495.261 | 468.635 | 518.331 |
+| file-import-syntax-idle | parallel_class_workers | 1 | source_freeze_run_ns | ms | 3 | 0.180 | 0.131 | 0.253 |
+| file-import-syntax-idle | parallel_class_workers | 1 | wall_ns | ms | 3 | 536.521 | 507.671 | 561.649 |
+| file-import-syntax-idle | parallel_class_workers | 2 | finish_live_bytes | bytes | 3 | 206193.000 | 164401.000 | 284401.000 |
+| file-import-syntax-idle | parallel_class_workers | 2 | finish_metadata_bytes | bytes | 3 | 301936.000 | 253520.000 | 314000.000 |
+| file-import-syntax-idle | parallel_class_workers | 2 | finish_reserved_bytes | bytes | 3 | 805080.000 | 612832.000 | 830088.000 |
+| file-import-syntax-idle | parallel_class_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.082 | 0.053 | 0.113 |
+| file-import-syntax-idle | parallel_class_workers | 2 | max_rendezvous_ns | ms | 3 | 0.287 | 0.192 | 0.288 |
+| file-import-syntax-idle | parallel_class_workers | 2 | process_cpu_ns | ms | 3 | 570.853 | 547.607 | 577.453 |
+| file-import-syntax-idle | parallel_class_workers | 2 | source_freeze_run_ns | ms | 3 | 0.105 | 0.101 | 0.112 |
+| file-import-syntax-idle | parallel_class_workers | 2 | wall_ns | ms | 3 | 327.798 | 319.426 | 332.812 |
+| file-import-syntax-idle | parallel_class_workers | 4 | finish_live_bytes | bytes | 3 | 254049.000 | 240049.000 | 285209.000 |
+| file-import-syntax-idle | parallel_class_workers | 4 | finish_metadata_bytes | bytes | 3 | 352144.000 | 345488.000 | 455600.000 |
+| file-import-syntax-idle | parallel_class_workers | 4 | finish_reserved_bytes | bytes | 3 | 874944.000 | 809536.000 | 1117448.000 |
+| file-import-syntax-idle | parallel_class_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.080 | 0.073 | 0.105 |
+| file-import-syntax-idle | parallel_class_workers | 4 | max_rendezvous_ns | ms | 3 | 0.685 | 0.656 | 1.291 |
+| file-import-syntax-idle | parallel_class_workers | 4 | process_cpu_ns | ms | 3 | 713.059 | 681.584 | 790.029 |
+| file-import-syntax-idle | parallel_class_workers | 4 | source_freeze_run_ns | ms | 3 | 0.117 | 0.117 | 0.140 |
+| file-import-syntax-idle | parallel_class_workers | 4 | wall_ns | ms | 3 | 251.190 | 236.194 | 275.102 |
+| file-import-syntax-idle | parallel_closure_workers | 1 | finish_live_bytes | bytes | 3 | 168969.000 | 168969.000 | 168969.000 |
+| file-import-syntax-idle | parallel_closure_workers | 1 | finish_metadata_bytes | bytes | 3 | 201440.000 | 201440.000 | 201440.000 |
+| file-import-syntax-idle | parallel_closure_workers | 1 | finish_reserved_bytes | bytes | 3 | 530352.000 | 530352.000 | 530352.000 |
+| file-import-syntax-idle | parallel_closure_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.062 | 0.057 | 0.068 |
+| file-import-syntax-idle | parallel_closure_workers | 1 | max_rendezvous_ns | ms | 3 | 0.002 | 0.002 | 0.002 |
+| file-import-syntax-idle | parallel_closure_workers | 1 | process_cpu_ns | ms | 3 | 261.840 | 247.509 | 278.558 |
+| file-import-syntax-idle | parallel_closure_workers | 1 | source_freeze_run_ns | ms | 3 | 0.073 | 0.071 | 0.077 |
+| file-import-syntax-idle | parallel_closure_workers | 1 | wall_ns | ms | 3 | 283.652 | 268.130 | 301.772 |
+| file-import-syntax-idle | parallel_closure_workers | 2 | finish_live_bytes | bytes | 3 | 241465.000 | 237049.000 | 252265.000 |
+| file-import-syntax-idle | parallel_closure_workers | 2 | finish_metadata_bytes | bytes | 3 | 319024.000 | 281456.000 | 319024.000 |
+| file-import-syntax-idle | parallel_closure_workers | 2 | finish_reserved_bytes | bytes | 3 | 731264.000 | 665616.000 | 731264.000 |
+| file-import-syntax-idle | parallel_closure_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.091 | 0.090 | 0.112 |
+| file-import-syntax-idle | parallel_closure_workers | 2 | max_rendezvous_ns | ms | 3 | 0.281 | 0.153 | 0.559 |
+| file-import-syntax-idle | parallel_closure_workers | 2 | process_cpu_ns | ms | 3 | 269.338 | 264.217 | 338.583 |
+| file-import-syntax-idle | parallel_closure_workers | 2 | source_freeze_run_ns | ms | 3 | 0.059 | 0.056 | 0.065 |
+| file-import-syntax-idle | parallel_closure_workers | 2 | wall_ns | ms | 3 | 150.370 | 147.705 | 188.506 |
+| file-import-syntax-idle | parallel_closure_workers | 4 | finish_live_bytes | bytes | 3 | 277225.000 | 270425.000 | 292193.000 |
+| file-import-syntax-idle | parallel_closure_workers | 4 | finish_metadata_bytes | bytes | 3 | 440464.000 | 403408.000 | 440976.000 |
+| file-import-syntax-idle | parallel_closure_workers | 4 | finish_reserved_bytes | bytes | 3 | 928208.000 | 866528.000 | 932176.000 |
+| file-import-syntax-idle | parallel_closure_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.119 | 0.062 | 0.123 |
+| file-import-syntax-idle | parallel_closure_workers | 4 | max_rendezvous_ns | ms | 3 | 0.573 | 0.503 | 0.658 |
+| file-import-syntax-idle | parallel_closure_workers | 4 | process_cpu_ns | ms | 3 | 336.851 | 329.975 | 423.559 |
+| file-import-syntax-idle | parallel_closure_workers | 4 | source_freeze_run_ns | ms | 3 | 0.064 | 0.063 | 0.072 |
+| file-import-syntax-idle | parallel_closure_workers | 4 | wall_ns | ms | 3 | 106.238 | 101.405 | 129.698 |
+| file-import-syntax-idle | parallel_exception_workers | 1 | finish_live_bytes | bytes | 3 | 212525.000 | 212525.000 | 212525.000 |
+| file-import-syntax-idle | parallel_exception_workers | 1 | finish_metadata_bytes | bytes | 3 | 253360.000 | 253360.000 | 253360.000 |
+| file-import-syntax-idle | parallel_exception_workers | 1 | finish_reserved_bytes | bytes | 3 | 625376.000 | 625376.000 | 625376.000 |
+| file-import-syntax-idle | parallel_exception_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.076 | 0.042 | 0.092 |
+| file-import-syntax-idle | parallel_exception_workers | 1 | max_rendezvous_ns | ms | 3 | 0.001 | 0.001 | 0.002 |
+| file-import-syntax-idle | parallel_exception_workers | 1 | process_cpu_ns | ms | 3 | 394.746 | 391.153 | 511.617 |
+| file-import-syntax-idle | parallel_exception_workers | 1 | source_freeze_run_ns | ms | 3 | 0.067 | 0.066 | 0.072 |
+| file-import-syntax-idle | parallel_exception_workers | 1 | wall_ns | ms | 3 | 427.639 | 423.743 | 554.294 |
+| file-import-syntax-idle | parallel_exception_workers | 2 | finish_live_bytes | bytes | 3 | 249093.000 | 248037.000 | 252541.000 |
+| file-import-syntax-idle | parallel_exception_workers | 2 | finish_metadata_bytes | bytes | 3 | 350576.000 | 350576.000 | 350576.000 |
+| file-import-syntax-idle | parallel_exception_workers | 2 | finish_reserved_bytes | bytes | 3 | 794224.000 | 794224.000 | 794224.000 |
+| file-import-syntax-idle | parallel_exception_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.101 | 0.072 | 0.150 |
+| file-import-syntax-idle | parallel_exception_workers | 2 | max_rendezvous_ns | ms | 3 | 0.208 | 0.136 | 0.273 |
+| file-import-syntax-idle | parallel_exception_workers | 2 | process_cpu_ns | ms | 3 | 461.232 | 431.237 | 523.278 |
+| file-import-syntax-idle | parallel_exception_workers | 2 | source_freeze_run_ns | ms | 3 | 0.060 | 0.057 | 0.061 |
+| file-import-syntax-idle | parallel_exception_workers | 2 | wall_ns | ms | 3 | 256.484 | 239.322 | 290.054 |
+| file-import-syntax-idle | parallel_exception_workers | 4 | finish_live_bytes | bytes | 3 | 179965.000 | 175341.000 | 326565.000 |
+| file-import-syntax-idle | parallel_exception_workers | 4 | finish_metadata_bytes | bytes | 3 | 360752.000 | 350512.000 | 528016.000 |
+| file-import-syntax-idle | parallel_exception_workers | 4 | finish_reserved_bytes | bytes | 3 | 794224.000 | 773256.000 | 1094368.000 |
+| file-import-syntax-idle | parallel_exception_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.100 | 0.080 | 0.168 |
+| file-import-syntax-idle | parallel_exception_workers | 4 | max_rendezvous_ns | ms | 3 | 0.701 | 0.339 | 0.772 |
+| file-import-syntax-idle | parallel_exception_workers | 4 | process_cpu_ns | ms | 3 | 587.587 | 528.312 | 631.027 |
+| file-import-syntax-idle | parallel_exception_workers | 4 | source_freeze_run_ns | ms | 3 | 0.059 | 0.059 | 0.075 |
+| file-import-syntax-idle | parallel_exception_workers | 4 | wall_ns | ms | 3 | 175.977 | 157.677 | 193.496 |
+| file-import-syntax-idle | parallel_float_workers | 1 | finish_live_bytes | bytes | 3 | 218917.000 | 218917.000 | 218917.000 |
+| file-import-syntax-idle | parallel_float_workers | 1 | finish_metadata_bytes | bytes | 3 | 302720.000 | 302720.000 | 302720.000 |
+| file-import-syntax-idle | parallel_float_workers | 1 | finish_reserved_bytes | bytes | 3 | 686864.000 | 686864.000 | 686864.000 |
+| file-import-syntax-idle | parallel_float_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.104 | 0.082 | 0.113 |
+| file-import-syntax-idle | parallel_float_workers | 1 | max_rendezvous_ns | ms | 3 | 0.002 | 0.001 | 0.002 |
+| file-import-syntax-idle | parallel_float_workers | 1 | process_cpu_ns | ms | 3 | 295.911 | 282.071 | 303.844 |
+| file-import-syntax-idle | parallel_float_workers | 1 | source_freeze_run_ns | ms | 3 | 0.068 | 0.051 | 0.070 |
+| file-import-syntax-idle | parallel_float_workers | 1 | wall_ns | ms | 3 | 320.829 | 305.573 | 329.157 |
+| file-import-syntax-idle | parallel_float_workers | 2 | finish_live_bytes | bytes | 3 | 301973.000 | 287893.000 | 305333.000 |
+| file-import-syntax-idle | parallel_float_workers | 2 | finish_metadata_bytes | bytes | 3 | 527824.000 | 484016.000 | 527824.000 |
+| file-import-syntax-idle | parallel_float_workers | 2 | finish_reserved_bytes | bytes | 3 | 1044288.000 | 978640.000 | 1044288.000 |
+| file-import-syntax-idle | parallel_float_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.147 | 0.126 | 0.185 |
+| file-import-syntax-idle | parallel_float_workers | 2 | max_rendezvous_ns | ms | 3 | 0.093 | 0.077 | 0.201 |
+| file-import-syntax-idle | parallel_float_workers | 2 | process_cpu_ns | ms | 3 | 325.086 | 304.800 | 393.155 |
+| file-import-syntax-idle | parallel_float_workers | 2 | source_freeze_run_ns | ms | 3 | 0.046 | 0.042 | 0.059 |
+| file-import-syntax-idle | parallel_float_workers | 2 | wall_ns | ms | 3 | 180.885 | 169.181 | 218.662 |
+| file-import-syntax-idle | parallel_float_workers | 4 | finish_live_bytes | bytes | 3 | 258125.000 | 253293.000 | 286389.000 |
+| file-import-syntax-idle | parallel_float_workers | 4 | finish_metadata_bytes | bytes | 3 | 589168.000 | 545360.000 | 640048.000 |
+| file-import-syntax-idle | parallel_float_workers | 4 | finish_reserved_bytes | bytes | 3 | 1139120.000 | 1073472.000 | 1233952.000 |
+| file-import-syntax-idle | parallel_float_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.166 | 0.133 | 0.172 |
+| file-import-syntax-idle | parallel_float_workers | 4 | max_rendezvous_ns | ms | 3 | 0.417 | 0.384 | 0.581 |
+| file-import-syntax-idle | parallel_float_workers | 4 | process_cpu_ns | ms | 3 | 384.520 | 373.443 | 449.249 |
+| file-import-syntax-idle | parallel_float_workers | 4 | source_freeze_run_ns | ms | 3 | 0.049 | 0.046 | 0.052 |
+| file-import-syntax-idle | parallel_float_workers | 4 | wall_ns | ms | 3 | 118.172 | 112.313 | 138.278 |
+| file-import-syntax-idle | parallel_for_workers | 1 | finish_live_bytes | bytes | 3 | 220213.000 | 220213.000 | 220213.000 |
+| file-import-syntax-idle | parallel_for_workers | 1 | finish_metadata_bytes | bytes | 3 | 280688.000 | 280688.000 | 280688.000 |
+| file-import-syntax-idle | parallel_for_workers | 1 | finish_reserved_bytes | bytes | 3 | 670056.000 | 670056.000 | 670056.000 |
+| file-import-syntax-idle | parallel_for_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.076 | 0.069 | 0.080 |
+| file-import-syntax-idle | parallel_for_workers | 1 | max_rendezvous_ns | ms | 3 | 0.002 | 0.002 | 0.002 |
+| file-import-syntax-idle | parallel_for_workers | 1 | process_cpu_ns | ms | 3 | 166.830 | 166.696 | 191.052 |
+| file-import-syntax-idle | parallel_for_workers | 1 | source_freeze_run_ns | ms | 3 | 0.053 | 0.052 | 0.054 |
+| file-import-syntax-idle | parallel_for_workers | 1 | wall_ns | ms | 3 | 180.733 | 180.589 | 206.974 |
+| file-import-syntax-idle | parallel_for_workers | 2 | finish_live_bytes | bytes | 3 | 169981.000 | 159829.000 | 306789.000 |
+| file-import-syntax-idle | parallel_for_workers | 2 | finish_metadata_bytes | bytes | 3 | 248208.000 | 248208.000 | 442800.000 |
+| file-import-syntax-idle | parallel_for_workers | 2 | finish_reserved_bytes | bytes | 3 | 604408.000 | 604408.000 | 949232.000 |
+| file-import-syntax-idle | parallel_for_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.055 | 0.048 | 0.122 |
+| file-import-syntax-idle | parallel_for_workers | 2 | max_rendezvous_ns | ms | 3 | 0.113 | 0.084 | 0.173 |
+| file-import-syntax-idle | parallel_for_workers | 2 | process_cpu_ns | ms | 3 | 176.555 | 170.895 | 196.622 |
+| file-import-syntax-idle | parallel_for_workers | 2 | source_freeze_run_ns | ms | 3 | 0.044 | 0.042 | 0.066 |
+| file-import-syntax-idle | parallel_for_workers | 2 | wall_ns | ms | 3 | 98.845 | 96.039 | 109.810 |
+| file-import-syntax-idle | parallel_for_workers | 4 | finish_live_bytes | bytes | 3 | 278893.000 | 274293.000 | 279149.000 |
+| file-import-syntax-idle | parallel_for_workers | 4 | finish_metadata_bytes | bytes | 3 | 459728.000 | 452976.000 | 483792.000 |
+| file-import-syntax-idle | parallel_for_workers | 4 | finish_reserved_bytes | bytes | 3 | 965816.000 | 949232.000 | 998296.000 |
+| file-import-syntax-idle | parallel_for_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.116 | 0.115 | 0.144 |
+| file-import-syntax-idle | parallel_for_workers | 4 | max_rendezvous_ns | ms | 3 | 0.424 | 0.249 | 0.776 |
+| file-import-syntax-idle | parallel_for_workers | 4 | process_cpu_ns | ms | 3 | 212.568 | 204.555 | 267.291 |
+| file-import-syntax-idle | parallel_for_workers | 4 | source_freeze_run_ns | ms | 3 | 0.046 | 0.044 | 0.052 |
+| file-import-syntax-idle | parallel_for_workers | 4 | wall_ns | ms | 3 | 75.989 | 66.359 | 88.176 |
+| file-import-syntax-idle | parallel_source_workers | 1 | finish_live_bytes | bytes | 3 | 238677.000 | 238677.000 | 238677.000 |
+| file-import-syntax-idle | parallel_source_workers | 1 | finish_metadata_bytes | bytes | 3 | 273728.000 | 273728.000 | 273728.000 |
+| file-import-syntax-idle | parallel_source_workers | 1 | finish_reserved_bytes | bytes | 3 | 657440.000 | 657440.000 | 657440.000 |
+| file-import-syntax-idle | parallel_source_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.075 | 0.067 | 0.083 |
+| file-import-syntax-idle | parallel_source_workers | 1 | max_rendezvous_ns | ms | 3 | 0.002 | 0.002 | 0.002 |
+| file-import-syntax-idle | parallel_source_workers | 1 | process_cpu_ns | ms | 3 | 246.812 | 241.439 | 273.426 |
+| file-import-syntax-idle | parallel_source_workers | 1 | source_freeze_run_ns | ms | 3 | 0.052 | 0.050 | 0.054 |
+| file-import-syntax-idle | parallel_source_workers | 1 | wall_ns | ms | 3 | 267.382 | 261.584 | 296.238 |
+| file-import-syntax-idle | parallel_source_workers | 2 | finish_live_bytes | bytes | 3 | 182037.000 | 180021.000 | 186989.000 |
+| file-import-syntax-idle | parallel_source_workers | 2 | finish_metadata_bytes | bytes | 3 | 240528.000 | 240528.000 | 278608.000 |
+| file-import-syntax-idle | parallel_source_workers | 2 | finish_reserved_bytes | bytes | 3 | 591792.000 | 591792.000 | 661408.000 |
+| file-import-syntax-idle | parallel_source_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.048 | 0.028 | 0.072 |
+| file-import-syntax-idle | parallel_source_workers | 2 | max_rendezvous_ns | ms | 3 | 0.305 | 0.173 | 0.717 |
+| file-import-syntax-idle | parallel_source_workers | 2 | process_cpu_ns | ms | 3 | 268.781 | 264.108 | 297.398 |
+| file-import-syntax-idle | parallel_source_workers | 2 | source_freeze_run_ns | ms | 3 | 0.043 | 0.041 | 0.043 |
+| file-import-syntax-idle | parallel_source_workers | 2 | wall_ns | ms | 3 | 150.177 | 148.670 | 166.424 |
+| file-import-syntax-idle | parallel_source_workers | 4 | finish_live_bytes | bytes | 3 | 212765.000 | 193165.000 | 214413.000 |
+| file-import-syntax-idle | parallel_source_workers | 4 | finish_metadata_bytes | bytes | 3 | 362480.000 | 325424.000 | 399536.000 |
+| file-import-syntax-idle | parallel_source_workers | 4 | finish_reserved_bytes | bytes | 3 | 792704.000 | 731024.000 | 854384.000 |
+| file-import-syntax-idle | parallel_source_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.072 | 0.069 | 0.082 |
+| file-import-syntax-idle | parallel_source_workers | 4 | max_rendezvous_ns | ms | 3 | 0.356 | 0.288 | 0.925 |
+| file-import-syntax-idle | parallel_source_workers | 4 | process_cpu_ns | ms | 3 | 335.089 | 320.940 | 362.698 |
+| file-import-syntax-idle | parallel_source_workers | 4 | source_freeze_run_ns | ms | 3 | 0.045 | 0.045 | 0.046 |
+| file-import-syntax-idle | parallel_source_workers | 4 | wall_ns | ms | 3 | 102.686 | 101.372 | 107.633 |
+| file-import-syntax-idle | parallel_storage_workers | 1 | finish_live_bytes | bytes | 3 | 42720.000 | 42720.000 | 42720.000 |
+| file-import-syntax-idle | parallel_storage_workers | 1 | finish_metadata_bytes | bytes | 3 | 97040.000 | 97040.000 | 97040.000 |
+| file-import-syntax-idle | parallel_storage_workers | 1 | finish_reserved_bytes | bytes | 3 | 135504.000 | 135504.000 | 135504.000 |
+| file-import-syntax-idle | parallel_storage_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.017 | 0.015 | 0.029 |
+| file-import-syntax-idle | parallel_storage_workers | 1 | max_rendezvous_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| file-import-syntax-idle | parallel_storage_workers | 1 | process_cpu_ns | ms | 3 | 3.272 | 3.091 | 3.378 |
+| file-import-syntax-idle | parallel_storage_workers | 1 | wall_ns | ms | 3 | 3.466 | 3.366 | 3.688 |
+| file-import-syntax-idle | parallel_storage_workers | 2 | finish_live_bytes | bytes | 3 | 15008.000 | 12800.000 | 64592.000 |
+| file-import-syntax-idle | parallel_storage_workers | 2 | finish_metadata_bytes | bytes | 3 | 100352.000 | 59392.000 | 190816.000 |
+| file-import-syntax-idle | parallel_storage_workers | 2 | finish_reserved_bytes | bytes | 3 | 135504.000 | 74064.000 | 271008.000 |
+| file-import-syntax-idle | parallel_storage_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.011 | 0.009 | 0.033 |
+| file-import-syntax-idle | parallel_storage_workers | 2 | max_rendezvous_ns | ms | 3 | 0.029 | 0.026 | 0.096 |
+| file-import-syntax-idle | parallel_storage_workers | 2 | process_cpu_ns | ms | 3 | 3.325 | 3.033 | 3.360 |
+| file-import-syntax-idle | parallel_storage_workers | 2 | wall_ns | ms | 3 | 2.438 | 2.071 | 2.474 |
+| file-import-syntax-idle | parallel_storage_workers | 4 | finish_live_bytes | bytes | 3 | 54848.000 | 33008.000 | 64272.000 |
+| file-import-syntax-idle | parallel_storage_workers | 4 | finish_metadata_bytes | bytes | 3 | 241248.000 | 197440.000 | 241248.000 |
+| file-import-syntax-idle | parallel_storage_workers | 4 | finish_reserved_bytes | bytes | 3 | 336656.000 | 271008.000 | 336656.000 |
+| file-import-syntax-idle | parallel_storage_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.051 | 0.034 | 0.066 |
+| file-import-syntax-idle | parallel_storage_workers | 4 | max_rendezvous_ns | ms | 3 | 0.219 | 0.107 | 0.248 |
+| file-import-syntax-idle | parallel_storage_workers | 4 | process_cpu_ns | ms | 3 | 4.700 | 3.758 | 5.631 |
+| file-import-syntax-idle | parallel_storage_workers | 4 | wall_ns | ms | 3 | 2.860 | 2.856 | 3.993 |
+| file-import-syntax-idle | parallel_vm_workers | 1 | finish_live_bytes | bytes | 3 | 263717.000 | 263717.000 | 263717.000 |
+| file-import-syntax-idle | parallel_vm_workers | 1 | finish_metadata_bytes | bytes | 3 | 311200.000 | 311200.000 | 311200.000 |
+| file-import-syntax-idle | parallel_vm_workers | 1 | finish_reserved_bytes | bytes | 3 | 723088.000 | 723088.000 | 723088.000 |
+| file-import-syntax-idle | parallel_vm_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.104 | 0.095 | 0.138 |
+| file-import-syntax-idle | parallel_vm_workers | 1 | max_rendezvous_ns | ms | 3 | 0.002 | 0.001 | 0.002 |
+| file-import-syntax-idle | parallel_vm_workers | 1 | process_cpu_ns | ms | 3 | 213.825 | 211.148 | 223.616 |
+| file-import-syntax-idle | parallel_vm_workers | 1 | source_freeze_run_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| file-import-syntax-idle | parallel_vm_workers | 1 | wall_ns | ms | 3 | 238.539 | 231.620 | 242.241 |
+| file-import-syntax-idle | parallel_vm_workers | 2 | finish_live_bytes | bytes | 3 | 211661.000 | 202757.000 | 214517.000 |
+| file-import-syntax-idle | parallel_vm_workers | 2 | finish_metadata_bytes | bytes | 3 | 278416.000 | 278416.000 | 278416.000 |
+| file-import-syntax-idle | parallel_vm_workers | 2 | finish_reserved_bytes | bytes | 3 | 661408.000 | 661408.000 | 661408.000 |
+| file-import-syntax-idle | parallel_vm_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.062 | 0.042 | 0.063 |
+| file-import-syntax-idle | parallel_vm_workers | 2 | max_rendezvous_ns | ms | 3 | 0.211 | 0.210 | 0.215 |
+| file-import-syntax-idle | parallel_vm_workers | 2 | process_cpu_ns | ms | 3 | 245.780 | 239.714 | 248.778 |
+| file-import-syntax-idle | parallel_vm_workers | 2 | source_freeze_run_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| file-import-syntax-idle | parallel_vm_workers | 2 | wall_ns | ms | 3 | 138.422 | 134.436 | 139.373 |
+| file-import-syntax-idle | parallel_vm_workers | 4 | finish_live_bytes | bytes | 3 | 247133.000 | 226733.000 | 255797.000 |
+| file-import-syntax-idle | parallel_vm_workers | 4 | finish_metadata_bytes | bytes | 3 | 399664.000 | 362096.000 | 436720.000 |
+| file-import-syntax-idle | parallel_vm_workers | 4 | finish_reserved_bytes | bytes | 3 | 858352.000 | 792704.000 | 920032.000 |
+| file-import-syntax-idle | parallel_vm_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.094 | 0.073 | 0.102 |
+| file-import-syntax-idle | parallel_vm_workers | 4 | max_rendezvous_ns | ms | 3 | 0.299 | 0.249 | 0.789 |
+| file-import-syntax-idle | parallel_vm_workers | 4 | process_cpu_ns | ms | 3 | 293.975 | 279.542 | 301.694 |
+| file-import-syntax-idle | parallel_vm_workers | 4 | source_freeze_run_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| file-import-syntax-idle | parallel_vm_workers | 4 | wall_ns | ms | 3 | 94.561 | 86.305 | 95.701 |
+| file-import-syntax-idle | process_peak_rss_kib | - | process_peak_rss_kib | KiB | 3 | 8592.000 | 7080.000 | 8628.000 |
+| file-import-syntax-idle | scheduled_iterations | - | scheduled_function_ns | ms | 3 | 22.560 | 21.361 | 22.814 |
+| file-import-syntax-idle | shared_edge_iterations | - | cell_object_bytes | bytes | 3 | 16.000 | 16.000 | 16.000 |
+| file-import-syntax-idle | shared_edge_iterations | - | rooted_cell_read_ns | ms | 3 | 2.386 | 2.281 | 2.491 |
+| file-import-syntax-idle | shared_edge_iterations | - | rooted_cell_store_read_ns | ms | 3 | 4.798 | 4.792 | 4.831 |
+| file-import-syntax-idle | slot_iterations | - | generic_prefix_bytes | bytes | 3 | 8.000 | 8.000 | 8.000 |
+| file-import-syntax-idle | slot_iterations | - | slot_instance_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| file-import-syntax-idle | slot_iterations | - | slot_set_get_ns | ms | 3 | 32.619 | 31.808 | 39.721 |
+| file-import-syntax-idle | source_parse_scope_cfg_ns | - | source_bytes | bytes | 3 | 92.000 | 92.000 | 92.000 |
+| file-import-syntax-idle | source_parse_scope_cfg_ns | - | source_parse_scope_cfg_ns | ms | 3 | 0.041 | 0.040 | 0.055 |
+| file-import-syntax-idle | transfer_iterations | - | transfer_roundtrip_ns | ms | 3 | 0.955 | 0.926 | 0.977 |
+| file-import-syntax-idle | transfer_iterations | - | transfer_token_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| file-import-syntax-idle | with_iterations | - | with_function_ns | ms | 3 | 29.627 | 28.883 | 30.297 |
+| file-import-syntax-idle-cpython | parallel_class_workers | 1 | process_cpu_ns | ms | 3 | 8.775 | 8.721 | 8.931 |
+| file-import-syntax-idle-cpython | parallel_class_workers | 1 | wall_ns | ms | 3 | 9.512 | 9.477 | 9.722 |
+| file-import-syntax-idle-cpython | parallel_class_workers | 2 | process_cpu_ns | ms | 3 | 8.896 | 8.768 | 9.076 |
+| file-import-syntax-idle-cpython | parallel_class_workers | 2 | wall_ns | ms | 3 | 9.649 | 9.541 | 9.873 |
+| file-import-syntax-idle-cpython | parallel_class_workers | 4 | process_cpu_ns | ms | 3 | 8.662 | 8.052 | 8.741 |
+| file-import-syntax-idle-cpython | parallel_class_workers | 4 | wall_ns | ms | 3 | 9.459 | 9.033 | 9.490 |
+| file-import-syntax-idle-cpython | parallel_closure_workers | 1 | process_cpu_ns | ms | 3 | 6.359 | 6.254 | 6.505 |
+| file-import-syntax-idle-cpython | parallel_closure_workers | 1 | wall_ns | ms | 3 | 6.927 | 6.824 | 7.048 |
+| file-import-syntax-idle-cpython | parallel_closure_workers | 2 | process_cpu_ns | ms | 3 | 6.055 | 5.941 | 6.339 |
+| file-import-syntax-idle-cpython | parallel_closure_workers | 2 | wall_ns | ms | 3 | 6.587 | 6.456 | 6.840 |
+| file-import-syntax-idle-cpython | parallel_closure_workers | 4 | process_cpu_ns | ms | 3 | 5.806 | 5.711 | 6.225 |
+| file-import-syntax-idle-cpython | parallel_closure_workers | 4 | wall_ns | ms | 3 | 6.338 | 6.237 | 6.660 |
+| file-import-syntax-idle-cpython | parallel_exception_workers | 1 | process_cpu_ns | ms | 3 | 7.287 | 7.212 | 7.520 |
+| file-import-syntax-idle-cpython | parallel_exception_workers | 1 | wall_ns | ms | 3 | 7.938 | 7.815 | 8.161 |
+| file-import-syntax-idle-cpython | parallel_exception_workers | 2 | process_cpu_ns | ms | 3 | 7.510 | 6.997 | 8.083 |
+| file-import-syntax-idle-cpython | parallel_exception_workers | 2 | wall_ns | ms | 3 | 8.193 | 7.634 | 8.752 |
+| file-import-syntax-idle-cpython | parallel_exception_workers | 4 | process_cpu_ns | ms | 3 | 7.105 | 6.878 | 7.473 |
+| file-import-syntax-idle-cpython | parallel_exception_workers | 4 | wall_ns | ms | 3 | 7.743 | 7.456 | 8.152 |
+| file-import-syntax-idle-cpython | parallel_float_workers | 1 | process_cpu_ns | ms | 3 | 5.777 | 5.677 | 5.952 |
+| file-import-syntax-idle-cpython | parallel_float_workers | 1 | wall_ns | ms | 3 | 6.260 | 6.159 | 6.478 |
+| file-import-syntax-idle-cpython | parallel_float_workers | 2 | process_cpu_ns | ms | 3 | 5.831 | 5.673 | 6.604 |
+| file-import-syntax-idle-cpython | parallel_float_workers | 2 | wall_ns | ms | 3 | 6.344 | 6.171 | 7.220 |
+| file-import-syntax-idle-cpython | parallel_float_workers | 4 | process_cpu_ns | ms | 3 | 6.034 | 5.998 | 7.124 |
+| file-import-syntax-idle-cpython | parallel_float_workers | 4 | wall_ns | ms | 3 | 6.543 | 6.517 | 7.787 |
+| file-import-syntax-idle-cpython | parallel_for_workers | 1 | process_cpu_ns | ms | 3 | 4.699 | 4.692 | 4.895 |
+| file-import-syntax-idle-cpython | parallel_for_workers | 1 | wall_ns | ms | 3 | 5.127 | 5.081 | 5.326 |
+| file-import-syntax-idle-cpython | parallel_for_workers | 2 | process_cpu_ns | ms | 3 | 4.680 | 4.668 | 5.068 |
+| file-import-syntax-idle-cpython | parallel_for_workers | 2 | wall_ns | ms | 3 | 5.100 | 5.079 | 5.464 |
+| file-import-syntax-idle-cpython | parallel_for_workers | 4 | process_cpu_ns | ms | 3 | 4.646 | 4.558 | 5.100 |
+| file-import-syntax-idle-cpython | parallel_for_workers | 4 | wall_ns | ms | 3 | 5.080 | 4.997 | 5.508 |
+| file-import-syntax-idle-cpython | parallel_source_workers | 1 | process_cpu_ns | ms | 3 | 6.711 | 6.598 | 7.077 |
+| file-import-syntax-idle-cpython | parallel_source_workers | 1 | wall_ns | ms | 3 | 7.307 | 7.188 | 7.662 |
+| file-import-syntax-idle-cpython | parallel_source_workers | 2 | process_cpu_ns | ms | 3 | 6.362 | 6.272 | 6.963 |
+| file-import-syntax-idle-cpython | parallel_source_workers | 2 | wall_ns | ms | 3 | 6.913 | 6.822 | 7.564 |
+| file-import-syntax-idle-cpython | parallel_source_workers | 4 | process_cpu_ns | ms | 3 | 6.307 | 6.093 | 6.451 |
+| file-import-syntax-idle-cpython | parallel_source_workers | 4 | wall_ns | ms | 3 | 6.865 | 6.640 | 7.007 |
 | l1-float-operators | cleanup_iterations | - | active_region_bytes | bytes | 3 | 32.000 | 32.000 | 32.000 |
 | l1-float-operators | cleanup_iterations | - | cleanup_continuation_bytes | bytes | 3 | 48.000 | 48.000 | 48.000 |
 | l1-float-operators | cleanup_iterations | - | cleanup_function_ns | ms | 3 | 17.037 | 16.820 | 18.269 |
@@ -538,6 +1024,72 @@ Derived from median wall/process CPU times. CPU/wall is not a speedup; 1-worker 
 
 | Series | Probe | Workers | Wall ms | CPU/Wall | Speedup | Efficiency |
 | --- | --- | --- | --- | --- | --- | --- |
+| file-import-syntax | parallel_class_workers | 1 | 616.409 | 0.923 | 1.000 | 1.000 |
+| file-import-syntax | parallel_class_workers | 2 | 378.717 | 1.732 | 1.628 | 0.814 |
+| file-import-syntax | parallel_class_workers | 4 | 315.753 | 2.269 | 1.952 | 0.488 |
+| file-import-syntax | parallel_closure_workers | 1 | 299.628 | 0.923 | 1.000 | 1.000 |
+| file-import-syntax | parallel_closure_workers | 2 | 174.696 | 1.795 | 1.715 | 0.858 |
+| file-import-syntax | parallel_closure_workers | 4 | 137.521 | 2.486 | 2.179 | 0.545 |
+| file-import-syntax | parallel_exception_workers | 1 | 530.686 | 0.923 | 1.000 | 1.000 |
+| file-import-syntax | parallel_exception_workers | 2 | 281.217 | 1.793 | 1.887 | 0.944 |
+| file-import-syntax | parallel_exception_workers | 4 | 253.617 | 2.502 | 2.092 | 0.523 |
+| file-import-syntax | parallel_float_workers | 1 | 359.630 | 0.923 | 1.000 | 1.000 |
+| file-import-syntax | parallel_float_workers | 2 | 206.510 | 1.769 | 1.741 | 0.871 |
+| file-import-syntax | parallel_float_workers | 4 | 161.375 | 2.533 | 2.229 | 0.557 |
+| file-import-syntax | parallel_for_workers | 1 | 200.586 | 0.923 | 1.000 | 1.000 |
+| file-import-syntax | parallel_for_workers | 2 | 123.142 | 1.778 | 1.629 | 0.814 |
+| file-import-syntax | parallel_for_workers | 4 | 93.714 | 2.468 | 2.140 | 0.535 |
+| file-import-syntax | parallel_source_workers | 1 | 317.641 | 0.923 | 1.000 | 1.000 |
+| file-import-syntax | parallel_source_workers | 2 | 175.393 | 1.799 | 1.811 | 0.906 |
+| file-import-syntax | parallel_source_workers | 4 | 137.570 | 2.437 | 2.309 | 0.577 |
+| file-import-syntax | parallel_storage_workers | 1 | 3.361 | 0.913 | 1.000 | 1.000 |
+| file-import-syntax | parallel_storage_workers | 2 | 2.228 | 1.442 | 1.509 | 0.754 |
+| file-import-syntax | parallel_storage_workers | 4 | 3.314 | 1.389 | 1.014 | 0.254 |
+| file-import-syntax | parallel_vm_workers | 1 | 277.214 | 0.923 | 1.000 | 1.000 |
+| file-import-syntax | parallel_vm_workers | 2 | 162.091 | 1.768 | 1.710 | 0.855 |
+| file-import-syntax | parallel_vm_workers | 4 | 134.638 | 2.368 | 2.059 | 0.515 |
+| file-import-syntax-idle | parallel_class_workers | 1 | 536.521 | 0.923 | 1.000 | 1.000 |
+| file-import-syntax-idle | parallel_class_workers | 2 | 327.798 | 1.741 | 1.637 | 0.818 |
+| file-import-syntax-idle | parallel_class_workers | 4 | 251.190 | 2.839 | 2.136 | 0.534 |
+| file-import-syntax-idle | parallel_closure_workers | 1 | 283.652 | 0.923 | 1.000 | 1.000 |
+| file-import-syntax-idle | parallel_closure_workers | 2 | 150.370 | 1.791 | 1.886 | 0.943 |
+| file-import-syntax-idle | parallel_closure_workers | 4 | 106.238 | 3.171 | 2.670 | 0.667 |
+| file-import-syntax-idle | parallel_exception_workers | 1 | 427.639 | 0.923 | 1.000 | 1.000 |
+| file-import-syntax-idle | parallel_exception_workers | 2 | 256.484 | 1.798 | 1.667 | 0.834 |
+| file-import-syntax-idle | parallel_exception_workers | 4 | 175.977 | 3.339 | 2.430 | 0.608 |
+| file-import-syntax-idle | parallel_float_workers | 1 | 320.829 | 0.922 | 1.000 | 1.000 |
+| file-import-syntax-idle | parallel_float_workers | 2 | 180.885 | 1.797 | 1.774 | 0.887 |
+| file-import-syntax-idle | parallel_float_workers | 4 | 118.172 | 3.254 | 2.715 | 0.679 |
+| file-import-syntax-idle | parallel_for_workers | 1 | 180.733 | 0.923 | 1.000 | 1.000 |
+| file-import-syntax-idle | parallel_for_workers | 2 | 98.845 | 1.786 | 1.828 | 0.914 |
+| file-import-syntax-idle | parallel_for_workers | 4 | 75.989 | 2.797 | 2.378 | 0.595 |
+| file-import-syntax-idle | parallel_source_workers | 1 | 267.382 | 0.923 | 1.000 | 1.000 |
+| file-import-syntax-idle | parallel_source_workers | 2 | 150.177 | 1.790 | 1.780 | 0.890 |
+| file-import-syntax-idle | parallel_source_workers | 4 | 102.686 | 3.263 | 2.604 | 0.651 |
+| file-import-syntax-idle | parallel_storage_workers | 1 | 3.466 | 0.944 | 1.000 | 1.000 |
+| file-import-syntax-idle | parallel_storage_workers | 2 | 2.438 | 1.364 | 1.422 | 0.711 |
+| file-import-syntax-idle | parallel_storage_workers | 4 | 2.860 | 1.643 | 1.212 | 0.303 |
+| file-import-syntax-idle | parallel_vm_workers | 1 | 238.539 | 0.896 | 1.000 | 1.000 |
+| file-import-syntax-idle | parallel_vm_workers | 2 | 138.422 | 1.776 | 1.723 | 0.862 |
+| file-import-syntax-idle | parallel_vm_workers | 4 | 94.561 | 3.109 | 2.523 | 0.631 |
+| file-import-syntax-idle-cpython | parallel_class_workers | 1 | 9.512 | 0.922 | 1.000 | 1.000 |
+| file-import-syntax-idle-cpython | parallel_class_workers | 2 | 9.649 | 0.922 | 0.986 | 0.493 |
+| file-import-syntax-idle-cpython | parallel_class_workers | 4 | 9.459 | 0.916 | 1.006 | 0.251 |
+| file-import-syntax-idle-cpython | parallel_closure_workers | 1 | 6.927 | 0.918 | 1.000 | 1.000 |
+| file-import-syntax-idle-cpython | parallel_closure_workers | 2 | 6.587 | 0.919 | 1.052 | 0.526 |
+| file-import-syntax-idle-cpython | parallel_closure_workers | 4 | 6.338 | 0.916 | 1.093 | 0.273 |
+| file-import-syntax-idle-cpython | parallel_exception_workers | 1 | 7.938 | 0.918 | 1.000 | 1.000 |
+| file-import-syntax-idle-cpython | parallel_exception_workers | 2 | 8.193 | 0.917 | 0.969 | 0.484 |
+| file-import-syntax-idle-cpython | parallel_exception_workers | 4 | 7.743 | 0.918 | 1.025 | 0.256 |
+| file-import-syntax-idle-cpython | parallel_float_workers | 1 | 6.260 | 0.923 | 1.000 | 1.000 |
+| file-import-syntax-idle-cpython | parallel_float_workers | 2 | 6.344 | 0.919 | 0.987 | 0.493 |
+| file-import-syntax-idle-cpython | parallel_float_workers | 4 | 6.543 | 0.922 | 0.957 | 0.239 |
+| file-import-syntax-idle-cpython | parallel_for_workers | 1 | 5.127 | 0.916 | 1.000 | 1.000 |
+| file-import-syntax-idle-cpython | parallel_for_workers | 2 | 5.100 | 0.918 | 1.005 | 0.503 |
+| file-import-syntax-idle-cpython | parallel_for_workers | 4 | 5.080 | 0.915 | 1.009 | 0.252 |
+| file-import-syntax-idle-cpython | parallel_source_workers | 1 | 7.307 | 0.919 | 1.000 | 1.000 |
+| file-import-syntax-idle-cpython | parallel_source_workers | 2 | 6.913 | 0.920 | 1.057 | 0.528 |
+| file-import-syntax-idle-cpython | parallel_source_workers | 4 | 6.865 | 0.919 | 1.064 | 0.266 |
 | l1-float-operators | parallel_class_workers | 1 | 460.123 | 1.004 | 1.000 | 1.000 |
 | l1-float-operators | parallel_class_workers | 2 | 251.646 | 1.911 | 1.828 | 0.914 |
 | l1-float-operators | parallel_class_workers | 4 | 183.485 | 2.889 | 2.508 | 0.627 |
@@ -629,6 +1181,24 @@ The CPython probe executes the source kernel captured from the C++ benchmark, wi
 
 | Series | Probe | Workers | cxxpython ms | CPython ms | cxxpython/CPython |
 | --- | --- | --- | --- | --- | --- |
+| file-import-syntax-idle | parallel_class_workers | 1 | 536.521 | 9.512 | 56.402 |
+| file-import-syntax-idle | parallel_class_workers | 2 | 327.798 | 9.649 | 33.971 |
+| file-import-syntax-idle | parallel_class_workers | 4 | 251.190 | 9.459 | 26.557 |
+| file-import-syntax-idle | parallel_closure_workers | 1 | 283.652 | 6.927 | 40.949 |
+| file-import-syntax-idle | parallel_closure_workers | 2 | 150.370 | 6.587 | 22.829 |
+| file-import-syntax-idle | parallel_closure_workers | 4 | 106.238 | 6.338 | 16.763 |
+| file-import-syntax-idle | parallel_exception_workers | 1 | 427.639 | 7.938 | 53.870 |
+| file-import-syntax-idle | parallel_exception_workers | 2 | 256.484 | 8.193 | 31.307 |
+| file-import-syntax-idle | parallel_exception_workers | 4 | 175.977 | 7.743 | 22.727 |
+| file-import-syntax-idle | parallel_float_workers | 1 | 320.829 | 6.260 | 51.251 |
+| file-import-syntax-idle | parallel_float_workers | 2 | 180.885 | 6.344 | 28.513 |
+| file-import-syntax-idle | parallel_float_workers | 4 | 118.172 | 6.543 | 18.060 |
+| file-import-syntax-idle | parallel_for_workers | 1 | 180.733 | 5.127 | 35.250 |
+| file-import-syntax-idle | parallel_for_workers | 2 | 98.845 | 5.100 | 19.380 |
+| file-import-syntax-idle | parallel_for_workers | 4 | 75.989 | 5.080 | 14.959 |
+| file-import-syntax-idle | parallel_source_workers | 1 | 267.382 | 7.307 | 36.595 |
+| file-import-syntax-idle | parallel_source_workers | 2 | 150.177 | 6.913 | 21.723 |
+| file-import-syntax-idle | parallel_source_workers | 4 | 102.686 | 6.865 | 14.957 |
 | l1-float-operators | parallel_class_workers | 1 | 460.123 | 8.687 | 52.970 |
 | l1-float-operators | parallel_class_workers | 2 | 251.646 | 8.673 | 29.016 |
 | l1-float-operators | parallel_class_workers | 4 | 183.485 | 8.635 | 21.249 |

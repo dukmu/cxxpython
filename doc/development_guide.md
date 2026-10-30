@@ -19,6 +19,12 @@ is used when available; otherwise CMake fetches the pinned source archive.
 Set `BOOST_MULTIPRECISION_INCLUDE_DIR` when Boost headers are not on the compiler
 search path. Configure sanitizers with the compiler/linker flags in a separate
 build directory; never measure performance while compiling or running sanitizers.
+Keep reusable inputs and builds under the repository's ignored `.cache/`, for
+example `.cache/deps/`, `.cache/cpython31214-build/`, `.cache/build-asan/` and
+`.cache/build-tsan/`. `/tmp` is restart-disposable, not durable build state.
+Store verification logs under `.cache/` until their results are recorded; retain
+release evidence in the documented tracked artifacts. After resuming work, verify
+live process handles and actual files before continuing or restarting a build.
 
 ## Formatting
 

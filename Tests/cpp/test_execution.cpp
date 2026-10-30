@@ -87,6 +87,36 @@ TEST_F(CoreExecution, VerificationRejectsEmptyUnknownAndUnexpectedOperands)
     invalid(function, CodeErrorKind::StackUnderflow);
 }
 
+TEST_F(CoreExecution, ImportInstructionsVerifyNamesStackAndModuleOnlyStar)
+{
+    for (auto op : {Opcode::ImportName, Opcode::ImportFrom}) {
+        CodeBuilder bounds(context);
+        bounds.emit(op);
+        invalid(bounds, CodeErrorKind::NameBounds);
+        CodeBuilder underflow(context);
+        underflow.emit(op, underflow.name(U"sys"));
+        invalid(underflow, CodeErrorKind::StackUnderflow);
+    }
+    CodeBuilder nonmodule(context);
+    nonmodule.emit(Opcode::ImportStar);
+    invalid(nonmodule, CodeErrorKind::Operand);
+    CodeSpec spec;
+    spec.kind = CodeKind::Module;
+    CodeBuilder star(context, spec);
+    star.emit(Opcode::ImportStar);
+    invalid(star, CodeErrorKind::StackUnderflow);
+    CodeBuilder valid(context, spec);
+    valid.emit(Opcode::LoadConst, valid.constant(integer(0)));
+    valid.emit(Opcode::LoadConst, valid.constant(roots.root(context.builtin(CoreObject::None))));
+    valid.emit(Opcode::ImportName, valid.name(U"sys"));
+    valid.emit(Opcode::ImportFrom, valid.name(U"modules"));
+    valid.emit(Opcode::PopTop);
+    valid.emit(Opcode::Return);
+    auto program = code(valid);
+    EXPECT_NE(disassemble(context, program).find("IMPORT_NAME"), std::string::npos);
+    EXPECT_NE(disassemble(context, program).find("IMPORT_FROM"), std::string::npos);
+}
+
 TEST_F(CoreExecution, FunctionCreationRetainsCodeIdentityAndInheritsTheExecutionEnvironment)
 {
     CodeBuilder child(context);

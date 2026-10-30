@@ -3,6 +3,14 @@
 #include <algorithm>
 
 namespace cxxpython::core::detail {
+std::u32string mangle_name(std::u32string name, const std::u32string &owner)
+{
+    if (owner.empty() || !name.starts_with(U"__") || name.ends_with(U"__") ||
+        name.find(U'.') != name.npos)
+        return name;
+    const auto begin = owner.find_first_not_of(U'_');
+    return begin == owner.npos ? name : U"_" + owner.substr(begin) + name;
+}
 namespace {
 struct Binding {
     std::u32string name;
@@ -143,12 +151,7 @@ class ScopePass final {
     }
     std::u32string mangle(std::u32string name, std::size_t scope) const
     {
-        const auto &owner = private_names_[scope];
-        if (owner.empty() || !name.starts_with(U"__") || name.ends_with(U"__") ||
-            name.find(U'.') != name.npos)
-            return name;
-        const auto begin = owner.find_first_not_of(U'_');
-        return begin == owner.npos ? name : U"_" + owner.substr(begin) + name;
+        return mangle_name(std::move(name), private_names_[scope]);
     }
     std::u32string qualified(const std::u32string &name, std::size_t scope) const
     {
@@ -277,6 +280,23 @@ class ScopePass final {
                                 target(*item.target, scope);
                         }
                         collect(node.body, scope);
+                    } else if constexpr (std::is_same_v<T, ImportStmt>) {
+                        node.private_name = private_names_[scope];
+                        for (auto &alias : node.names) {
+                            if (alias.name == U"*") {
+                                if (program_.scopes[scope].kind != ScopeKind::Module)
+                                    error(alias.span, "import * only allowed at module level");
+                                continue;
+                            }
+                            auto binding = alias.asname ? *alias.asname
+                                           : node.module
+                                               ? alias.name
+                                               : alias.name.substr(0, alias.name.find(U'.'));
+                            if (binding == U"__debug__")
+                                error(alias.span, "cannot assign __debug__");
+                            alias.binding = mangle(std::move(binding), scope);
+                            bindings_[scope].get(alias.binding, alias.span).bound = true;
+                        }
                     } else if constexpr (std::is_same_v<T, DeclareStmt>) {
                         if (node.nonlocal && program_.scopes[scope].kind == ScopeKind::Module)
                             error(statement->span,

@@ -658,9 +658,90 @@ class SourceDifferential(unittest.TestCase):
             actual = self.execute([self.binary, str(path), "--eval", "f(41)"])
             self.assertEqual(actual.returncode, 0, actual.stderr)
             self.assertEqual(actual.stdout, "42\n")
+            (Path(directory) / "sibling.py").write_text("answer = 42\n", encoding="utf-8")
+            path.write_text("import sibling\nvalue = sibling.answer\n", encoding="utf-8")
+            actual = self.execute([self.binary, str(path), "--eval", "value, __file__"])
+            path.write_text("import sibling\nvalue = sibling.answer\nprint(repr((value, __file__)))\n", encoding="utf-8")
+            expected = self.execute([self.reference, str(path)])
+            self.assertEqual(actual.returncode, 0, actual.stderr)
+            self.assertEqual(expected.returncode, 0, expected.stderr)
+            self.assertEqual(actual.stdout, expected.stdout)
         actual = self.execute([self.binary, "--eval", "'\\u4f60' + )"])
         self.assertEqual(actual.returncode, 1)
         self.assertIn("SyntaxError", actual.stderr)
+
+    def test_import_statements_and_custom_hook(self):
+        cases = [
+            ("import sys, builtins as b\nfrom sys import (modules as table,)",
+             "sys.__name__, b.int is int, table is sys.modules"),
+            ("__import__ = None\nimport sys\ndef f():\n    import builtins as b\n    return b.int",
+             "sys.__name__, f() is int"),
+            ("import builtins\nimport __main__ as main\nold = builtins.__import__\n"
+             "def hook(name, globals, locals, fromlist, level):\n"
+             "    global captured\n    captured = name, fromlist, level, globals is locals\n"
+             "    return main\nbuiltins.__import__ = hook\ntry:\n    import chosen as alias\n"
+             "finally:\n    builtins.__import__ = old", "alias is main, captured"),
+            ("import builtins\nold = builtins.__import__\n"
+             "class Returned:\n    value = 42\n    __all__ = ('value',)\n"
+             "def hook(name, globals, locals, fromlist, level):\n    return Returned()\n"
+             "builtins.__import__ = hook\ntry:\n    from chosen import *\n"
+             "finally:\n    builtins.__import__ = old", "value"),
+            ("import builtins\nold = builtins.__import__\nseen = None\nsame = False\n"
+             "def hook(name, globals, locals, fromlist, level):\n"
+             "    global seen, same\n    same = seen is locals\n    seen = locals\n    return None\n"
+             "builtins.__import__ = hook\n"
+             "try:\n    def f():\n        import first\n        import second\n    f()\n"
+             "finally:\n    builtins.__import__ = old", "same"),
+            ("import builtins\nold = builtins.__import__\n"
+             "class Names:\n    def keys(self):\n        return iter(('value',))\n"
+             "class Returned:\n    __dict__ = Names()\n    value = 42\n"
+             "def hook(name, globals, locals, fromlist, level):\n    return Returned()\n"
+             "builtins.__import__ = hook\ntry:\n    from chosen import *\n"
+             "finally:\n    builtins.__import__ = old", "value"),
+        ]
+        for source, expression in cases:
+            with self.subTest(expression=expression):
+                self.check_program(source, expression)
+        for source in ("import sys,", "from sys import modules,", "from sys import (*)",
+                       "def f():\n    from sys import *", "class C:\n    from sys import *"):
+            for binary in (self.binary, self.reference):
+                result = self.execute([binary, "-c", source])
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertIn("SyntaxError", result.stderr)
+
+    def test_file_packages_relative_cycles_star_and_path_changes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            files = {
+                "pkg.py": "value = 999\n",
+                "pkg/__init__.py": "value = 10\n",
+                "pkg/child.py": "from . import value\nanswer = value + 32\n__all__ = ('answer',)\n",
+                "left.py": "value = 1\nimport right\nanswer = right.value + value\n",
+                "right.py": "from left import value as first\nvalue = first + 40\n",
+                "one/ns/a.py": "value = 1\n",
+                "two/ns/b.py": "value = 2\n",
+                "other/extra.py": "value = 8\n",
+                "bad.py": "value = )\n",
+                "fails.py": "import missing_dependency_for_test\n",
+            }
+            for name, text in files.items():
+                path = root / name
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(text, encoding="utf-8")
+            setup = "import sys\nsys.path = " + repr((directory, str(root / "one"), str(root / "two"))) + "\n"
+            cases = [
+                ("import pkg.child as alias\nfrom pkg.child import *\nimport pkg.child",
+                 "answer, alias is pkg.child, pkg.value, alias.__package__, alias.__file__"),
+                ("import left, right", "left.answer, right.first"),
+                ("import ns.a, ns.b\nns.__path__ = " + repr((str(root / "other"),)) + "\nfrom ns import extra",
+                 "ns.a.value, ns.b.value, extra.value"),
+                ("try:\n    import bad\nexcept SyntaxError:\n    syntax = True\n"
+                 "try:\n    from fails import value\nexcept ModuleNotFoundError as error:\n    dependency = error.name",
+                 "syntax, dependency"),
+            ]
+            for source, expression in cases:
+                with self.subTest(expression=expression):
+                    self.check_program(setup + source, expression)
 
 
 if __name__ == "__main__":

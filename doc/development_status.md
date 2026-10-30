@@ -1,5 +1,74 @@
 # Development Status
 
+## 2026-10-30 Source Imports And Filesystem Packages
+
+Prepended without rewriting history. Previous stable node: fca9166. The active
+module/unified-import goal remains incomplete; this closes its source-language
+and file-discovery path, not its public mapping/importlib/C ABI acceptance.
+
+- Added import/from/aliases, dotted names, relative levels, parenthesized names
+  and module-level star imports through the existing AST, scope pass, CFG,
+  CodeBuilder and VM. Import bindings obey global/nonlocal/closure/class-private
+  rules. Three import opcodes have explicit stack effects, typed name operands,
+  verifier checks, disassembly and ordinary exception unwinding. The old test
+  expecting every import statement to be UnsupportedSyntax now checks actual
+  missing-module errors instead; remaining unsupported syntax tests are kept.
+- ImportName calls the actual builtins.__import__ with all five positional
+  arguments, ignoring a shadowing global. Module/class locals use their real
+  mapping. Functions lazily own a traced locals snapshot, refreshed from fast
+  slots/Cells and retaining identity across imports; it is not a second execution
+  authority. Star imports preserve __all__ sequence semantics and public-name
+  fallback. A real differential caught mapping.keys() returning an iterator;
+  the fallback now materializes it normally instead of requiring indexing.
+- File discovery snapshots current iterable sys.path or package.__path__, skips
+  non-string entries, prefers package __init__.py to module.py, and combines
+  implicit namespace portions unless a concrete package/module wins. Reads and
+  native source compilation use NativeWait, then the existing initialization
+  lease, managed module table, VM, parent binding and conditional rollback.
+  There is no second module cache, loader VM or execution lock. A single terra
+  sidecar implemented discovery/tests; main integrated/reviewed it and implemented
+  the frontend/VM/CLI. That agent is closed; no sol/astra were used.
+- CLI scripts now publish __file__ and search their resolved directory, allowing
+  sibling imports outside the working directory. Syntax/indentation/tab errors
+  retain Python exception hierarchy; file-read errors use OSError rather than
+  ImportError/C++ failures. Full diagnostic fields, errno-specific exceptions,
+  constructors and formatting remain an explicit gate, not completed APIs.
+- Added forced-GC file/package/relative/cache/namespace/path-reassignment tests,
+  syntax and body failure retry, managed-allocation failure enumeration preserving
+  a successful dependency, star behavior, hook locals and private-name tests.
+  Existing cross-thread initialization-cycle tests now execute real import
+  statements while the owner collects, preserving the no-GIL waiting contract.
+- Final normal CTest passes 381/381 (377 native plus both executable drivers,
+  recorder and formatting). Final ASan/UBSan/LSan passes 377/377; TSan passes
+  375/375, excluding only the established two bootstrap allocation enumerations
+  covered by normal/ASan. Fixed CPython 3.12.14 source differential passes 14
+  groups and numeric/construction differential passes 6 groups, also with the
+  final ASan executable. Refreshed the retained source differential report.
+- Corrected the mistaken dependence on restart-disposable /tmp: dependencies,
+  pinned reference source/binary, sanitizer/Release builds and verification logs
+  now live under ignored repository .cache/. AGENTS and the development guide
+  record this rule. Old missing handles/artifacts were not counted as sanitizer
+  passes. Recovered the reference archive with its previously recorded SHA256;
+  its optional full build stopped on unavailable libtirpc, while the python target
+  and upstream sysconfig generator completed and the tested reference works.
+  Restart also left two zero-byte Release object files; identified and rebuilt
+  those generated objects. No source changes were used to hide either failure.
+- Three post-verification idle Release runs appended file-import-syntax-idle raw
+  evidence and regenerated CSV/Markdown with the existing recorder. An earlier
+  C++ sample overlapped the final constructor check and its recorder stopped at
+  missing reference sysconfig metadata; that sample remains under the distinct
+  file-import-syntax series. No samples or old rows were removed. Current wall
+  medians are higher than the preceding node for several kernels; single-worker
+  source CPU is close to the preceding capture, but parallel CPU costs are higher.
+  This is not a no-regression or CPython-parity claim; absolute costs remain far
+  outside performance acceptance. See the generated report, not hand-filled rows.
+- Next close the public namespace mapping/list interfaces needed by sys.modules,
+  path/argv, real ModuleSpec/loader objects and Python import policy, namespace
+  path refresh, reload, and versioned C/native extension state/code leases. The
+  static C++ callback is still not a C-callable or dynamically loaded ABI. Full
+  Base-to-Full library/product scope remains in Plan 2 sections 0.8/11.2. User
+  temporary_plan.md deletion and untracked test2.py remain untouched/unstaged.
+
 ## 2026-10-30 Real Modules And GC-Safe Registered Initialization
 
 Prepended without rewriting history. Previous stable node: e4b6090 (runtime

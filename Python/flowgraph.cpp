@@ -66,6 +66,9 @@ constexpr std::array definitions{
     OpcodeDefinition{"DELETE_NAME", 0, 0, 0, OperandDomain::Name, FlowKind::Next, true, true},
     OpcodeDefinition{"LOAD_CLASS_DEREF", 0, 0, 1, OperandDomain::Cell, FlowKind::Next, true, true},
     OpcodeDefinition{"LOAD_BUILD_CLASS", 0, 0, 1, OperandDomain::None, FlowKind::Next, true, true},
+    OpcodeDefinition{"IMPORT_NAME", 2, 2, 1, OperandDomain::Name, FlowKind::Next, true, true},
+    OpcodeDefinition{"IMPORT_FROM", 1, 0, 1, OperandDomain::Name, FlowKind::Next, true, true},
+    OpcodeDefinition{"IMPORT_STAR", 1, 1, 0, OperandDomain::None, FlowKind::Next, true, true},
 };
 static_assert(definitions.size() == static_cast<std::size_t>(Opcode::Count));
 [[noreturn]] void invalid(CodeErrorKind kind, const char *message,
@@ -145,6 +148,8 @@ std::size_t verify(const CodeSpec &spec, std::span<const Instruction> instructio
         if (static_cast<std::size_t>(opcode) >= definitions.size())
             invalid(CodeErrorKind::UnknownOpcode, "unknown opcode", pc);
         const auto &definition = opcode_definition(opcode);
+        if (opcode == Opcode::ImportStar && spec.kind != CodeKind::Module)
+            invalid(CodeErrorKind::Operand, "IMPORT_STAR requires module code", pc);
         if ((opcode == Opcode::LoadName || opcode == Opcode::StoreName ||
              opcode == Opcode::DeleteName || opcode == Opcode::LoadClassDeref) &&
             spec.kind == CodeKind::Function)

@@ -2,6 +2,10 @@
 #include "cxxpython/protocol.hpp"
 #include "internal/compiler.hpp"
 
+#include <filesystem>
+#include <fstream>
+#include <iterator>
+
 namespace cxxpython::core {
 namespace {
 using detail::ImportState;
@@ -133,6 +137,100 @@ std::shared_ptr<const ModuleDefinition> find_definition(Attachment &context,
     return found == state.definitions.end() ? nullptr : found->second;
 }
 
+std::shared_ptr<const ModuleDefinition> find_file(Attachment &context, const std::u32string &name,
+                                                  ReturnSlot &out)
+{
+    RootScope roots(context);
+    const auto dot = name.rfind(U'.');
+    const auto owner_name = dot == std::u32string::npos ? U"sys" : name.substr(0, dot);
+    auto owner = detail::name_lookup(context, context.builtin(CoreObject::Modules), owner_name);
+    if (!owner && dot == std::u32string::npos) {
+        import_module(context, U"sys", out);
+        if (out.tag() == ResultTag::Raised)
+            return nullptr;
+        owner = out.value();
+    }
+    if (!owner || !is_module(context, *owner))
+        return nullptr;
+    const auto module = roots.root(*owner);
+    auto path = detail::name_lookup(context, module_dict(context, module.get(context)),
+                                    dot == std::u32string::npos ? U"path" : U"__path__");
+    if (!path)
+        return nullptr;
+    const auto rooted_path = roots.root(*path);
+    ReturnSlot item(context);
+    get_iter(context, rooted_path, item);
+    if (item.tag() == ResultTag::Raised) {
+        out.raised(item.exception());
+        return nullptr;
+    }
+    const auto iterator = roots.root(item.value());
+    std::vector<std::string> paths;
+    for (;;) {
+        const auto status = iter_next(context, iterator, item);
+        if (status == NextStatus::Done)
+            break;
+        if (status == NextStatus::Raised) {
+            out.raised(item.exception());
+            return nullptr;
+        }
+        if (context.has_layout<StrObject>(item.value()) &&
+            is_subtype(context, context.type_of(item.value()),
+                       context.builtin(CoreObject::StrType)))
+            paths.push_back(source_utf8(context.payload<StrObject>(item.value()).value));
+    }
+    const auto leaf = source_utf8(dot == std::u32string::npos ? name : name.substr(dot + 1));
+    std::shared_ptr<const ModuleDefinition> result;
+    try {
+        NativeWait parked(context);
+        std::vector<std::string> portions;
+        for (const auto &entry : paths) {
+            const auto base = std::filesystem::absolute(entry.empty() ? "." : entry);
+            const auto package = base / leaf / "__init__.py";
+            const auto file = base / (leaf + ".py");
+            std::error_code error;
+            bool is_package = std::filesystem::is_regular_file(package, error);
+            auto selected = is_package ? package : file;
+            if (!is_package && !std::filesystem::is_regular_file(file, error)) {
+                const auto directory = base / leaf;
+                if (std::filesystem::is_directory(directory, error))
+                    portions.push_back(directory.string());
+                continue;
+            }
+            std::ifstream stream(selected, std::ios::binary);
+            if (!stream)
+                throw std::ios_base::failure("cannot open module source");
+            std::string text{std::istreambuf_iterator<char>(stream),
+                             std::istreambuf_iterator<char>()};
+            if (stream.bad())
+                throw std::ios_base::failure("cannot read module source");
+            const auto origin = selected.string();
+            auto source = std::make_shared<const SourceUnit>(SourceBuffer(std::move(text), origin));
+            result = std::make_shared<const ModuleDefinition>(ModuleDefinition{
+                std::move(source), is_package, origin,
+                is_package ? std::vector<std::string>{selected.parent_path().string()}
+                           : std::vector<std::string>{}});
+            break;
+        }
+        if (!result && !portions.empty()) {
+            auto source = std::make_shared<const SourceUnit>(SourceBuffer(""));
+            result = std::make_shared<const ModuleDefinition>(
+                ModuleDefinition{std::move(source), true, "", std::move(portions)});
+        }
+    } catch (const SourceError &error) {
+        const auto type = error.kind == SourceErrorKind::Indentation
+                              ? CoreObject::IndentationErrorType
+                          : error.kind == SourceErrorKind::Tab ? CoreObject::TabErrorType
+                                                               : CoreObject::SyntaxErrorType;
+        raise_error(context, type, detail::decode_filename(SourceBuffer("", error.what())), out);
+    } catch (const std::ios_base::failure &) {
+        raise_error(context, CoreObject::OSErrorType, U"cannot read module source", out);
+    } catch (const std::filesystem::filesystem_error &) {
+        raise_error(context, CoreObject::OSErrorType, U"cannot access module source", out);
+    }
+    return result;
+}
+
 void builtin_import(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
@@ -247,7 +345,12 @@ ResultView import_module(Attachment &context, const std::u32string &name, Return
                 out.ok(*cached);
             return out.result();
         }
-        const auto definition = find_definition(context, name);
+        auto definition = find_definition(context, name);
+        if (!definition) {
+            definition = find_file(context, name, out);
+            if (out.tag() == ResultTag::Raised)
+                return out.result();
+        }
         if (!definition) {
             missing(context, name, out);
             return out.result();
@@ -279,7 +382,7 @@ ResultView import_module(Attachment &context, const std::u32string &name, Return
             cxxpython::core::make_tuple(context, paths, temporary);
             store_name(context, dictionary.get(context), U"__path__", temporary.value());
         }
-        if (definition->origin != "built-in") {
+        if (!definition->origin.empty() && definition->origin != "built-in") {
             make_str(context, detail::decode_filename(SourceBuffer("", definition->origin)),
                      temporary);
             store_name(context, dictionary.get(context), U"__file__", temporary.value());

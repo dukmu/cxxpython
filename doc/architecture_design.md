@@ -35,11 +35,14 @@ cleanup continuations. `Python/traceback.cpp` owns traceback operations.
 `Python/bltinmodule.cpp` owns the ordinary __build_class__ builtin, coordinating
 base expansion, metaclass preparation, a normal class-body Frame and existing
 type construction. It is not a separate class VM or lifetime authority.
-`Python/import.cpp` owns the experimental registered-source/static-native
+`Python/import.cpp` owns the experimental registered/file-source/static-native
 initialization transaction and bootstrap __import__ policy. Host-only per-Interpreter
 records coordinate owners/waiters; the managed module table is the only completed
-module authority. File finders, source import statements, ModuleSpec/importlib
-policy and the dynamic C extension interface remain pending, not separate runtimes.
+module authority. File lookup snapshots Python-visible search paths, then reads
+and compiles while parked. Source import statements lower through the existing
+scope/CFG passes into verified import opcodes and normal calls/unwinding.
+ModuleSpec/importlib policy and the dynamic C extension interface remain pending,
+not separate runtimes.
 
 ## Objects And Lifetime
 

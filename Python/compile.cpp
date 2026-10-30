@@ -584,6 +584,59 @@ class GraphPass final {
                         for (std::size_t i = 0; i < node.decorators.size(); ++i)
                             emit(Opcode::Call, span, 1);
                         name(node.binding, span, Opcode::StoreFast, Opcode::StoreGlobal);
+                    } else if constexpr (std::is_same_v<T, ImportStmt>) {
+                        auto level = std::to_string(node.level);
+                        if (node.module) {
+                            literal({Literal::Kind::Integer,
+                                     std::u32string(level.begin(), level.end())},
+                                    span);
+                            for (const auto &alias : node.names)
+                                literal({Literal::Kind::String, alias.name}, alias.span);
+                            emit(Opcode::BuildTuple, span,
+                                 static_cast<std::uint32_t>(node.names.size()));
+                            emit(Opcode::ImportName, span, 0,
+                                 mangle_name(*node.module, node.private_name));
+                            for (const auto &alias : node.names) {
+                                if (alias.name == U"*") {
+                                    emit(Opcode::ImportStar, alias.span);
+                                    return;
+                                }
+                                emit(Opcode::ImportFrom, alias.span, 0,
+                                     mangle_name(alias.name, node.private_name));
+                                name(alias.binding, alias.span, Opcode::StoreFast,
+                                     Opcode::StoreGlobal);
+                            }
+                            emit(Opcode::PopTop, span);
+                        } else {
+                            for (const auto &alias : node.names) {
+                                literal({Literal::Kind::Integer, U"0"}, alias.span);
+                                none(alias.span);
+                                emit(Opcode::ImportName, alias.span, 0,
+                                     mangle_name(alias.name, node.private_name));
+                                auto dot = alias.name.find(U'.');
+                                const bool traversed = alias.asname && dot != alias.name.npos;
+                                if (traversed) {
+                                    do {
+                                        const auto begin = dot + 1;
+                                        dot = alias.name.find(U'.', begin);
+                                        emit(Opcode::ImportFrom, alias.span, 0,
+                                             mangle_name(
+                                                 alias.name.substr(begin, dot == alias.name.npos
+                                                                              ? dot
+                                                                              : dot - begin),
+                                                 node.private_name));
+                                        if (dot != alias.name.npos) {
+                                            emit(Opcode::Swap, alias.span, 2);
+                                            emit(Opcode::PopTop, alias.span);
+                                        }
+                                    } while (dot != alias.name.npos);
+                                }
+                                name(alias.binding, alias.span, Opcode::StoreFast,
+                                     Opcode::StoreGlobal);
+                                if (traversed)
+                                    emit(Opcode::PopTop, alias.span);
+                            }
+                        }
                     } else if constexpr (std::is_same_v<T, ClassStmt>) {
                         nested(node.scope, node.body);
                         for (const auto &decorator : node.decorators)
@@ -768,7 +821,7 @@ void SourceUnit::freeze(Attachment &context, ReturnSlot &out) const
                         operand = builder.constant(roots.root(temporary.value()));
                     } else if (instruction.function)
                         operand = builder.constant(codes[*instruction.function]);
-                    else if (!instruction.name.empty())
+                    else if (opcode_definition(instruction.opcode).operand == OperandDomain::Name)
                         operand = builder.name(instruction.name);
                     if (instruction.opcode == Opcode::EnterRegion)
                         builder.enter(regions[operand], position);

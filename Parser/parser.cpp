@@ -183,6 +183,7 @@ enum class TokenKind {
     Class,
     Return,
     Raise,
+    Import,
     From,
     Try,
     Except,
@@ -326,7 +327,7 @@ class Lexer final {
                     {"with", TokenKind::With},
                     {"raise", TokenKind::Raise},
                     {"yield", TokenKind::Unsupported},
-                    {"import", TokenKind::Unsupported},
+                    {"import", TokenKind::Import},
                     {"from", TokenKind::From},
                     {"async", TokenKind::Unsupported},
                     {"await", TokenKind::Unsupported},
@@ -1014,6 +1015,47 @@ class Parser final {
                 }
                 result.push_back(
                     statement(std::move(raised), {start, tokens_[index_ - 1].span.end}));
+            } else if (is(K::Import) || is(K::From)) {
+                ImportStmt imported;
+                const bool from = take().kind == K::From;
+                auto dotted_name = [&] {
+                    auto name = expect(K::Name).text;
+                    while (accept(K::Dot))
+                        name += U"." + expect(K::Name).text;
+                    return name;
+                };
+                if (from) {
+                    while (accept(K::Dot))
+                        ++imported.level;
+                    imported.module = is(K::Name) ? dotted_name() : std::u32string{};
+                    if (imported.module->empty() && !imported.level)
+                        fail(peek(), "expected a module name");
+                    expect(K::Import);
+                }
+                const bool parenthesized = from && accept(K::Left);
+                if (from && !parenthesized && accept(K::Star))
+                    imported.names.push_back({U"*", {}, {}, tokens_[index_ - 1].span});
+                else {
+                    do {
+                        const auto begin = peek().span.begin;
+                        auto name = from ? expect(K::Name).text : dotted_name();
+                        std::optional<std::u32string> alias;
+                        if (accept(K::As))
+                            alias = expect(K::Name).text;
+                        imported.names.push_back({std::move(name),
+                                                  std::move(alias),
+                                                  {},
+                                                  {begin, tokens_[index_ - 1].span.end}});
+                        if (!accept(K::Comma))
+                            break;
+                        if (parenthesized && is(K::Right))
+                            break;
+                    } while (true);
+                }
+                if (parenthesized)
+                    expect(K::Right);
+                result.push_back(
+                    statement(std::move(imported), {start, tokens_[index_ - 1].span.end}));
             } else if (is(K::Global) || is(K::Nonlocal)) {
                 DeclareStmt declaration{take().kind == K::Nonlocal, {}};
                 do {

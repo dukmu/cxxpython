@@ -1,5 +1,7 @@
 #include "cxxpython/execution.hpp"
+#include "cxxpython/import.hpp"
 
+#include <algorithm>
 #include <charconv>
 
 namespace cxxpython::core {
@@ -258,6 +260,149 @@ void namespace_lookup(Attachment &context, Value mapping, Value key, ReturnSlot 
                                   context.builtin(CoreObject::KeyErrorType)))
         out.reset();
 }
+void import_locals(Attachment &context, FrameObject &frame, const CodeObject &code, ReturnSlot &out)
+{
+    if (frame.namespace_mapping) {
+        out.ok(*frame.namespace_mapping);
+        return;
+    }
+    RootScope roots(context);
+    if (!frame.locals_snapshot) {
+        context.allocate_instance<DictObject>(roots.root(context.builtin(CoreObject::DictType)),
+                                              out);
+        frame.locals_snapshot = out.value();
+    }
+    const auto mapping = roots.root(*frame.locals_snapshot);
+    ReturnSlot key(context), value(context);
+    auto store = [&](const std::u32string &name, Value item) {
+        const auto rooted = roots.root(item);
+        make_str(context, name, key);
+        detail::name_store(context, mapping.get(context), key.value(), rooted.get(context));
+    };
+    const auto cell_locals = code.program.cell_locals();
+    for (std::size_t i = 0; i < frame.locals.size(); ++i) {
+        auto item = frame.locals[i];
+        const auto cell = std::find(cell_locals.begin(), cell_locals.end(), i);
+        if (cell != cell_locals.end()) {
+            read_cell(context, frame.cells[cell - cell_locals.begin()], value);
+            item = value.tag() == ResultTag::Empty ? std::optional<Value>{} : value.value();
+        }
+        const auto &name = code.program.local_names()[i];
+        if (item)
+            store(name, *item);
+        else
+            detail::name_erase(context, mapping.get(context), name);
+    }
+    for (std::size_t i = cell_locals.size(); i < frame.cells.size(); ++i) {
+        read_cell(context, frame.cells[i], value);
+        const auto &name = code.program.free_names()[i - cell_locals.size()];
+        if (value.tag() != ResultTag::Empty)
+            store(name, value.value());
+        else
+            detail::name_erase(context, mapping.get(context), name);
+    }
+    out.ok(mapping.get(context));
+}
+void import_star(Attachment &context, Handle from, Handle mapping, ReturnSlot &out)
+{
+    RootScope roots(context);
+    ReturnSlot key(context), names(context), value(context), index(context);
+    make_str(context, U"__all__", key);
+    get_attribute(context, from, roots.root(key.value()), names);
+    bool skip_private = false;
+    if (raised(names)) {
+        if (!is_subtype(context, context.type_of(names.exception()),
+                        context.builtin(CoreObject::AttributeErrorType))) {
+            out.raised(names.exception());
+            return;
+        }
+        skip_private = true;
+        make_str(context, U"__dict__", key);
+        get_attribute(context, from, roots.root(key.value()), names);
+        if (raised(names)) {
+            if (is_subtype(context, context.type_of(names.exception()),
+                           context.builtin(CoreObject::AttributeErrorType)))
+                raise_error(context, CoreObject::ImportErrorType,
+                            U"from-import-* object has no __dict__ and no __all__", out);
+            else
+                out.raised(names.exception());
+            return;
+        }
+        if (context.type_of(names.value()) == context.builtin(CoreObject::DictType)) {
+            DictView view(context, names.value());
+            std::vector<Value> keys;
+            for (const auto &entry : view.entries())
+                keys.push_back(entry.key);
+            cxxpython::core::make_tuple(context, keys, names);
+        } else {
+            const auto dictionary = roots.root(names.value());
+            make_str(context, U"keys", key);
+            get_attribute(context, dictionary, roots.root(key.value()), names);
+            if (!raised(names))
+                call(context, roots.root(names.value()), {}, names);
+            if (raised(names)) {
+                out.raised(names.exception());
+                return;
+            }
+            ReturnSlot iterator(context), item(context);
+            get_iter(context, roots.root(names.value()), iterator);
+            if (raised(iterator)) {
+                out.raised(iterator.exception());
+                return;
+            }
+            std::vector<Value> keys;
+            for (;;) {
+                const auto status = iter_next(context, roots.root(iterator.value()), item);
+                if (status == NextStatus::Done)
+                    break;
+                if (status == NextStatus::Raised) {
+                    out.raised(item.exception());
+                    return;
+                }
+                keys.push_back(roots.root(item.value()).get(context));
+            }
+            cxxpython::core::make_tuple(context, keys, names);
+        }
+    }
+    const auto all = roots.root(names.value());
+    for (std::int64_t i = 0;; ++i) {
+        RootScope iteration(context);
+        make_int(context, i, index);
+        get_item(context, all, iteration.root(index.value()), key);
+        if (raised(key)) {
+            if (is_subtype(context, context.type_of(key.exception()),
+                           context.builtin(CoreObject::IndexErrorType)))
+                out.ok(context.builtin(CoreObject::None));
+            else
+                out.raised(key.exception());
+            return;
+        }
+        const auto name = iteration.root(key.value());
+        if (!is_subtype(context, context.type_of(name), context.builtin(CoreObject::StrType))) {
+            type_error(context, U"import * names must be str", out);
+            return;
+        }
+        const auto &text = context.payload<StrObject>(name).value;
+        if (!skip_private || text.empty() || text[0] != U'_') {
+            get_attribute(context, from, name, value);
+            if (raised(value)) {
+                out.raised(value.exception());
+                return;
+            }
+            if (context.type_of(mapping) == context.builtin(CoreObject::DictType))
+                detail::name_store(context, mapping.get(context), name.get(context), value.value());
+            else {
+                set_item(context, mapping, name, iteration.root(value.value()), out);
+                if (raised(out))
+                    return;
+            }
+        }
+        if (i == std::numeric_limits<std::int64_t>::max()) {
+            raise_error(context, CoreObject::OverflowErrorType, U"too many import * names", out);
+            return;
+        }
+    }
+}
 void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &out)
 {
     ReturnSlot result(context);
@@ -342,6 +487,52 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 write_cell(context, data.cells[operand], data.operands[data.sp - 1]);
                 data.operands[--data.sp] = context.builtin(CoreObject::None);
                 break;
+            case Opcode::ImportName: {
+                RootScope roots(context);
+                const auto &function = context.payload<FunctionObject>(data.function);
+                const auto importer =
+                    detail::name_lookup(context, function.builtins, U"__import__");
+                if (!importer) {
+                    raise_error(context, CoreObject::ImportErrorType, U"__import__ not found",
+                                result);
+                    activation.raising(result.exception());
+                    break;
+                }
+                const auto callable = roots.root(*importer);
+                import_locals(context, data, code, result);
+                const std::array arguments{context.payload<TupleObject>(code.names).items[operand],
+                                           function.globals, result.value(),
+                                           data.operands[data.sp - 1], data.operands[data.sp - 2]};
+                call(context, callable, {arguments}, result);
+                if (raised(result))
+                    activation.raising(result.exception());
+                else {
+                    data.trim_stack(context, data.sp - 2);
+                    data.operands[data.sp++] = result.value();
+                }
+                break;
+            }
+            case Opcode::ImportFrom: {
+                RootScope roots(context);
+                import_from(context, roots.root(data.operands[data.sp - 1]),
+                            roots.root(context.payload<TupleObject>(code.names).items[operand]),
+                            result);
+                if (raised(result))
+                    activation.raising(result.exception());
+                else
+                    data.operands[data.sp++] = result.value();
+                break;
+            }
+            case Opcode::ImportStar: {
+                RootScope roots(context);
+                import_star(context, roots.root(data.operands[data.sp - 1]),
+                            roots.root(*data.namespace_mapping), result);
+                if (raised(result))
+                    activation.raising(result.exception());
+                else
+                    data.trim_stack(context, data.sp - 1);
+                break;
+            }
             case Opcode::LoadBuildClass: {
                 const auto &function = context.payload<FunctionObject>(data.function);
                 const auto value =

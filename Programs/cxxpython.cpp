@@ -1,6 +1,7 @@
 #include "cxxpython/compiler.hpp"
 #include "cxxpython/import.hpp"
 
+#include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <iterator>
@@ -100,6 +101,10 @@ int main(int argc, char **argv)
             executable.emplace(SourceBuffer(*command, "<string>"));
         if (expression)
             evaluated.emplace(SourceBuffer(*expression, "<eval>"), InputMode::Eval);
+        const auto script =
+            filename ? std::optional{std::filesystem::absolute(*filename)} : std::nullopt;
+        const auto search_path =
+            filename ? std::filesystem::canonical(*filename).parent_path().string() : std::string{};
         Interpreter interpreter;
         Attachment context(interpreter);
         context.bootstrap_core();
@@ -110,6 +115,19 @@ int main(int argc, char **argv)
             return report(context, out.exception());
         const auto main_module = roots.root(out.value());
         const auto globals = roots.root(module_dict(context, main_module.get(context)));
+        const std::array paths{search_path};
+        set_import_path(context, paths, out);
+        if (out.tag() == ResultTag::Raised)
+            return report(context, out.exception());
+        if (script) {
+            ReturnSlot key(context), value(context);
+            make_str(context, U"__file__", key);
+            make_str(context, script->u32string(), value);
+            set_attribute(context, main_module, roots.root(key.value()), roots.root(value.value()),
+                          out);
+            if (out.tag() == ResultTag::Raised)
+                return report(context, out.exception());
+        }
         if (executable) {
             run(context, {&*executable, globals}, out);
             if (out.result().tag() == ResultTag::Raised)

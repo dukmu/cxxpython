@@ -210,11 +210,11 @@ TEST(ParallelImports, PerModuleLeasesAndCrossThreadCyclesParkForGc)
                            callback.get(owner));
         register_source_module(owner, U"left",
                                std::make_shared<const SourceUnit>(SourceBuffer(
-                                   variant == 2 ? "gate()\npeer = __import__('right')\nvalue = 42\n"
+                                   variant == 2 ? "gate()\nimport right as peer\nvalue = 42\n"
                                                 : "gate()\nvalue = 42\n")));
         register_source_module(owner, U"right",
                                std::make_shared<const SourceUnit>(SourceBuffer(
-                                   variant == 2 ? "gate()\npeer = __import__('left')\nvalue = 42\n"
+                                   variant == 2 ? "gate()\nimport left as peer\nvalue = 42\n"
                                                 : "gate()\nvalue = 42\n")));
         std::array<std::future<Transfer>, 2> workers;
         {

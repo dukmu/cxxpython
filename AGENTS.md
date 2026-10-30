@@ -75,6 +75,11 @@ compiler, VM, and extension platform implemented in a C/C++ mix.
 ## Engineering Rules
 
 - Read existing design docs in `doc/` before implementing a subsystem.
+- Keep reusable dependencies, fixed reference interpreters, sanitizer builds and
+  verification logs under ignored repository `.cache/` (ordinary build: `build/`).
+  `/tmp` is disposable and may be cleared on restart; never use it as the only
+  copy of reusable build state or verification evidence. After a continuation,
+  check process handles and artifacts before assuming a build/test survived.
 - Use the checked-in `.clang-format` for all C++ sources. Run
   `cmake --build build --target format` after edits and `format-check` before
   committing. CTest also checks formatting. Do not hand-format generated Unicode

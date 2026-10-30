@@ -130,12 +130,25 @@ struct DeclareStmt {
     bool nonlocal;
     std::vector<std::pair<std::u32string, Span>> names;
 };
+struct ImportAlias {
+    std::u32string name;
+    std::optional<std::u32string> asname;
+    std::u32string binding;
+    Span span;
+};
+struct ImportStmt {
+    // nullopt is ordinary import; an empty module is a relative from-import.
+    std::optional<std::u32string> module;
+    std::uint32_t level = 0;
+    std::vector<ImportAlias> names;
+    std::u32string private_name;
+};
 enum class ControlStmt { Pass, Break, Continue };
 struct Stmt {
     Span span;
     std::variant<ExprStmt, AssignStmt, AugAssignStmt, DeleteStmt, IfStmt, WhileStmt, ForStmt,
                  FunctionStmt, ClassStmt, ReturnStmt, RaiseStmt, TryStmt, WithStmt, DeclareStmt,
-                 ControlStmt>
+                 ImportStmt, ControlStmt>
         node;
 };
 // CFG instructions use native literals/names until one attached freeze task
@@ -187,4 +200,5 @@ Suite parse_source(const SourceBuffer &source, InputMode mode);
 void analyze_scopes(SourceProgram &program, Suite &body);
 std::u32string decode_source(const SourceBuffer &source, Span span);
 std::u32string decode_filename(const SourceBuffer &source);
+std::u32string mangle_name(std::u32string name, const std::u32string &owner);
 } // namespace cxxpython::core::detail
