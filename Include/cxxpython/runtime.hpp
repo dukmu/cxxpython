@@ -135,6 +135,15 @@ enum class CoreObject : std::size_t {
     HashXofType,
     Blake2bType,
     Blake2sType,
+    IOBaseType,
+    RawIOBaseType,
+    BufferedIOBaseType,
+    TextIOBaseType,
+    FileIOType,
+    BytesIOType,
+    StringIOType,
+    UnsupportedOperationType,
+    NotImplementedErrorType,
     None,
     NotImplemented,
     Ellipsis,
@@ -493,6 +502,9 @@ class Transfer final {
 class Attachment final {
   public:
     explicit Attachment(Interpreter &interpreter);
+    // The launch transfer retains the heap until admission; close still rejects
+    // new attachments. Access to this transfer remains exclusively host-owned.
+    explicit Attachment(const Transfer &launch);
     ~Attachment();
     Attachment(const Attachment &) = delete;
     Attachment &operator=(const Attachment &) = delete;
@@ -601,6 +613,7 @@ class Attachment final {
     friend class ResultView;
     friend class Handle;
     friend class detail::FrameActivation;
+    explicit Attachment(std::shared_ptr<detail::State> state);
     void require_owns(Value value) const;
     void require_safepoint() const;
     void require_layout(Value value, const void *family) const;

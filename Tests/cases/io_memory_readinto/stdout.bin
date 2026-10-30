@@ -1,0 +1,6 @@
+3 b'abc' 3
+b'abcX'
+3 b'defX' 6
+b'defXY' 0
+3 3 b'ababcf'
+1 b'abaZcf'

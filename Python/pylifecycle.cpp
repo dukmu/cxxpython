@@ -13,7 +13,10 @@
 #include "internal/codecs.hpp"
 #include "internal/errors.hpp"
 #include "internal/exceptions.hpp"
+#include "internal/fileio.hpp"
 #include "internal/hashmodule.hpp"
+#include "internal/iomodule.hpp"
+#include "internal/memoryio.hpp"
 #include "internal/reversed.hpp"
 #include "internal/stdio.hpp"
 #include "internal/stringformat.hpp"
@@ -235,6 +238,35 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     define(CoreObject::HashXofType, "HASHXOF", LayoutDescriptor::of<HashObject>());
     define(CoreObject::Blake2bType, "blake2b", LayoutDescriptor::of<HashObject>());
     define(CoreObject::Blake2sType, "blake2s", LayoutDescriptor::of<HashObject>());
+    for (auto id : {CoreObject::StaticMethodType, CoreObject::ClassMethodType})
+        context.payload<TypeObject>(at(id)).instance_layout.fields.dictionary = true;
+    define(CoreObject::IOBaseType, "_IOBase", LayoutDescriptor::of<InstanceObject>());
+    context.payload<TypeObject>(at(CoreObject::IOBaseType)).instance_layout.fields.dictionary =
+        true;
+    context.payload<TypeObject>(at(CoreObject::IOBaseType)).instance_layout.fields.weakrefs = true;
+    define(CoreObject::RawIOBaseType, "_RawIOBase", LayoutDescriptor::of<InstanceObject>(),
+           at(CoreObject::IOBaseType));
+    define(CoreObject::BufferedIOBaseType, "_BufferedIOBase",
+           LayoutDescriptor::of<InstanceObject>(), at(CoreObject::IOBaseType));
+    define(CoreObject::TextIOBaseType, "_TextIOBase", LayoutDescriptor::of<InstanceObject>(),
+           at(CoreObject::IOBaseType));
+    define(CoreObject::FileIOType, "FileIO", LayoutDescriptor::of<FileIOObject>(),
+           at(CoreObject::RawIOBaseType));
+    define(CoreObject::BytesIOType, "BytesIO", LayoutDescriptor::of<BytesIOObject>(),
+           at(CoreObject::BufferedIOBaseType));
+    define(CoreObject::StringIOType, "StringIO", LayoutDescriptor::of<StringIOObject>(),
+           at(CoreObject::TextIOBaseType));
+    {
+        const Handle bases[] = {at(CoreObject::OSErrorType), at(CoreObject::ValueErrorType)};
+        TypeSpec spec{U"UnsupportedOperation", bases};
+        create_native_type(
+            context, {spec, LayoutDescriptor::of<ExceptionObject>()},
+            *outputs[static_cast<std::size_t>(CoreObject::UnsupportedOperationType)]);
+        core.push_back(roots.root(
+            outputs[static_cast<std::size_t>(CoreObject::UnsupportedOperationType)]->value()));
+    }
+    define(CoreObject::NotImplementedErrorType, "NotImplementedError",
+           LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::RuntimeErrorType));
     for (auto id : {CoreObject::FunctionType, CoreObject::ModuleType, CoreObject::CodeType,
                     CoreObject::GeneratorType, CoreObject::CoroutineType, CoreObject::SetType,
                     CoreObject::FrozenSetType})
@@ -318,6 +350,9 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     install_memoryviews(context, core);
     install_struct(context, core);
     install_hashes(context, core);
+    install_iobases(context, core);
+    install_fileio(context, core);
+    install_memoryio(context, core);
     install_codecs(context, core);
     install_super(context, core);
     install_sets(context, core);
@@ -401,6 +436,16 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
         name_store(context, *context.payload<TypeObject>(at(id)).dictionary,
                    module_key.get(context), text.value());
     }
+    for (auto id :
+         {CoreObject::IOBaseType, CoreObject::RawIOBaseType, CoreObject::BufferedIOBaseType,
+          CoreObject::TextIOBaseType, CoreObject::FileIOType, CoreObject::BytesIOType,
+          CoreObject::StringIOType, CoreObject::UnsupportedOperationType}) {
+        context.allocate_instance<StrObject>(at(CoreObject::StrType), text,
+                                             id == CoreObject::UnsupportedOperationType ? U"io"
+                                                                                        : U"_io");
+        name_store(context, *context.payload<TypeObject>(at(id)).dictionary,
+                   module_key.get(context), text.value());
+    }
 
     auto &builtins = *outputs[static_cast<std::size_t>(CoreObject::Builtins)];
     context.allocate_instance<DictObject>(at(CoreObject::DictType), builtins);
@@ -439,6 +484,7 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                     CoreObject::UnicodeEncodeErrorType,
                     CoreObject::UnicodeDecodeErrorType,
                     CoreObject::RuntimeErrorType,
+                    CoreObject::NotImplementedErrorType,
                     CoreObject::MemoryErrorType,
                     CoreObject::RecursionErrorType,
                     CoreObject::ArithmeticErrorType,

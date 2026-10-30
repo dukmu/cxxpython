@@ -1,0 +1,20 @@
+None 'a\nb\nc\nd' ["'a\\n'", "'b\\n'", "'c\\n'", "'d'"]
+('\r', '\n', '\r\n')
+2 'a\nb\nc\nd\nx'
+'' 'a\r\nb\rc\nd' ["'a\\r\\n'", "'b\\r'", "'c\\n'", "'d'"]
+('\r', '\n', '\r\n')
+2 'a\r\nb\rc\nd\nx'
+'\n' 'a\r\nb\rc\nd' ["'a\\r\\n'", "'b\\rc\\n'", "'d'"]
+None
+2 'a\r\nb\rc\nd\nx'
+'\r' 'a\r\rb\rc\rd' ["'a\\r'", "'\\r'", "'b\\r'", "'c\\r'", "'d'"]
+None
+2 'a\r\rb\rc\rd\rx'
+'\r\n' 'a\r\r\nb\rc\r\nd' ["'a\\r\\r\\n'", "'b\\rc\\r\\n'", "'d'"]
+None
+2 'a\r\r\nb\rc\r\nd\r\nx'
+7 0 one
+ ['two']
+2 2 'on'
+True False
+True

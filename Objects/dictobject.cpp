@@ -432,6 +432,48 @@ void equal(Attachment &context, Handle, std::span<const Value> args, ReturnSlot 
     }
     out.ok(context.builtin(CoreObject::True));
 }
+// CPython 3.12.14 dict_fromkeys: subclass construction and writes stay ordinary
+// calls, so overridden constructors/setitem and their failures remain visible.
+void fromkeys(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(context);
+    if (!context.has_layout<TypeObject>(args[0]) ||
+        !is_subtype(context, args[0], context.builtin(CoreObject::DictType))) {
+        raise_error(context, CoreObject::TypeErrorType, U"fromkeys requires a dict subtype", out);
+        return;
+    }
+    ReturnSlot created(context), iterator(context), item(context), stored(context);
+    call(context, roots.root(args[0]), {}, created);
+    if (failed(created)) {
+        out.raised(created.exception());
+        return;
+    }
+    auto target = roots.root(created.value());
+    get_iter(context, roots.root(args[1]), iterator);
+    if (failed(iterator)) {
+        out.raised(iterator.exception());
+        return;
+    }
+    auto sequence = roots.root(iterator.value());
+    auto value = roots.root(args[2]);
+    for (;;) {
+        auto status = iter_next(context, sequence, item);
+        if (status == NextStatus::Done)
+            break;
+        if (status == NextStatus::Raised) {
+            out.raised(item.exception());
+            return;
+        }
+        auto key = roots.root(item.value());
+        set_item(context, target, key, value, stored);
+        if (failed(stored)) {
+            out.raised(stored.exception());
+            return;
+        }
+        roots.release(key);
+    }
+    out.ok(target.get(context));
+}
 } // namespace
 void detail::dict_merge(Attachment &context, Handle self, Handle source, bool unique,
                         ReturnSlot &out)
@@ -469,6 +511,17 @@ void detail::install_dictionaries(Attachment &context, std::span<const Handle> c
     context.allocate_instance<StaticMethodObject>(at(CoreObject::StaticMethodType), wrapper,
                                                   new_function);
     context.allocate_instance<StrObject>(at(CoreObject::StrType), key, U"__new__");
+    name_store(context, *TypeView(context, at(CoreObject::DictType)).dictionary(), key.value(),
+               wrapper.value());
+    auto fromkeys_signature = optional;
+    fromkeys_signature.parameters[1].name = U"iterable";
+    fromkeys_signature.parameters[2].name = U"value";
+    install(CoreObject::DictType, U"fromkeys", fromkeys_signature, fromkeys);
+    auto factory = roots.root(*name_lookup(
+        context, *TypeView(context, at(CoreObject::DictType)).dictionary(), U"fromkeys"));
+    context.allocate_instance<ClassMethodObject>(at(CoreObject::ClassMethodType), wrapper,
+                                                 factory.get(context));
+    context.allocate_instance<StrObject>(at(CoreObject::StrType), key, U"fromkeys");
     name_store(context, *TypeView(context, at(CoreObject::DictType)).dictionary(), key.value(),
                wrapper.value());
     install(CoreObject::DictType, U"__init__", variadic, update);

@@ -368,8 +368,12 @@ struct MappingProxyObject {
 };
 struct StaticMethodObject {
     ObjectHeader header;
-    const Value callable;
-    StaticMethodObject(InitialType head, Value value) : header(head), callable(value) {}
+    AtomicGcEdge callable;
+    const bool native;
+    explicit StaticMethodObject(InitialType head) : header(head), native(false) {}
+    StaticMethodObject(InitialType head, Value value, bool native_in = true)
+        : header(head), callable(value), native(native_in)
+    {}
     void trace(Tracer &tracer) const noexcept
     {
         tracer.visit(callable);
@@ -377,8 +381,12 @@ struct StaticMethodObject {
 };
 struct ClassMethodObject {
     ObjectHeader header;
-    const Value callable;
-    ClassMethodObject(InitialType head, Value value) : header(head), callable(value) {}
+    AtomicGcEdge callable;
+    const bool native;
+    explicit ClassMethodObject(InitialType head) : header(head), native(false) {}
+    ClassMethodObject(InitialType head, Value value, bool native_in = true)
+        : header(head), callable(value), native(native_in)
+    {}
     void trace(Tracer &tracer) const noexcept
     {
         tracer.visit(callable);

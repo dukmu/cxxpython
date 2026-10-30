@@ -183,6 +183,51 @@ the target is `builtins` and the `__builtins__` execution namespace.
   make_native_function default remains descriptor-capable; builtin-function
   __get__ reflection is not yet identical to CPython's distinct native types.
 
+## Native I/O, ABC And Thread Foundations
+
+- `Lib/abc.py` is the unchanged pinned CPython 3.12.14 implementation. `_abc`
+  implements its eight native functions with traced weak sets and interpreter-
+  local invalidation state. Registered classes are not strongly retained;
+  metaclass hash/equality, hook failures, cycles and abstract descriptors follow
+  ordinary protocols. Complete collections-ABC type flags and the complete
+  upstream unittest/inspect closure remain requirements, not declared support.
+- Type `__abstractmethods__` changes publish their truth flag with the namespace;
+  `object.__new__` enforces that snapshot. `type.__subclasses__` returns actual
+  directly registered live types in definition order. Its weak registry reuses
+  ordinary dictionaries and conditional deletion; failed bootstrap restores the
+  prior graph. Class/static wrapper initialization, reinitialization, wrapped
+  metadata and atomic callable reads now support the actual abc implementation.
+  Bound methods forward missing attributes to the wrapped function. Full method
+  reflection, comparison and the distinct CPython native-callable type matrix
+  remain broader type-compatibility work.
+  Python wrapper instances are mutable; native image wrappers reject callable
+  reinitialization, preserving builtin immutability. They still use this runtime's
+  wrapper representation rather than CPython's separate native descriptor types.
+- `_io` exposes real FileIO, BytesIO, StringIO and base stream capabilities.
+  FileIO supports path-like/custom openers, borrowed descriptors, raw binary
+  read/write/readinto, positioning/truncation, iteration and explicit/GC close.
+  BytesIO exports actual mutable aliases and forbids writes/close while exported;
+  native readinto exports release immediately on return. StringIO implements
+  Unicode positions and the five newline modes. Prepared storage growth and
+  per-object synchronization preserve shared-heap GC/parallel access.
+- This is not completion of `io`: buffered reader/writer/random/pair, text
+  wrappers/decoder cookies, full pickling/reinitialization/diagnostic matrices,
+  warning policy and installed stream configuration remain. The existing
+  bootstrap sys streams still live in `_io/stdio.cpp`; no fake `Lib/io.py`, open
+  builtin or host-Python stream is installed to bypass those dependencies.
+- `_thread` implements allocate_lock/LockType, blocking/nonblocking/timed acquire,
+  cross-thread release, context management, identifiers, start_new_thread and
+  exit. Waiting uses NativeWait; launched Python executes in the same Interpreter
+  and shared heap. Startup uses Transfer admission, not a detached borrowed
+  Interpreter reference. Locks and interpreter leases retain only their actual
+  lifecycle. Python failures are reported, not silently discarded.
+  RLock/local, signals/interrupt_main, thread sentinels/count/stack configuration,
+  threading joins and product shutdown coordination remain delivery work.
+- `_abc` reload preserves its private data type and epoch state; `_thread` reload
+  preserves lock type identity. Existing classes/functions and instances continue
+  to use the same state, rather than constructing incompatible native types on
+  every execution of the initializer.
+
 The configured source-tree stdlib path is development configuration, not final
 installation, isolation, environment or embedding acceptance. Full stdio/runpy,
 REPL/product configuration and requested library dependency closures remain in Plan 2.

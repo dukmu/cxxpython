@@ -484,6 +484,11 @@ void get_default(Attachment &context, Handle object, Handle name, bool type_look
         bind_descriptor(context, *attribute, value, type, out);
         return;
     }
+    if (type == context.builtin(CoreObject::BoundMethodType)) {
+        get_attribute(context, roots.root(context.payload<BoundMethodObject>(value).function), name,
+                      out);
+        return;
+    }
     raise_error(context, CoreObject::AttributeErrorType, U"attribute not found: " + text, out);
 }
 

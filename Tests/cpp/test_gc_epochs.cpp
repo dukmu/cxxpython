@@ -685,6 +685,59 @@ TEST(FoundationEpochs, ExistingReceiverCanAcceptAfterInterpreterOwnerCloses)
     EXPECT_EQ(destroyed.load(), 1);
 }
 
+TEST(FoundationEpochs, TransferAdmissionRetainsHeapWithoutBorrowingInterpreterOwner)
+{
+    std::atomic<int> destroyed{0};
+    auto interpreter = std::make_unique<Interpreter>();
+    Transfer transfer;
+    {
+        Attachment source(*interpreter);
+        RootScope roots(source);
+        ReturnSlot out(source);
+        source.allocate<EpochLeaf>(out, &destroyed);
+        transfer = source.make_transfer(roots.root(out.value()));
+    }
+    std::promise<void> admitted, finish;
+    auto released = finish.get_future();
+    auto worker = std::async(std::launch::async,
+                             [token = std::move(transfer), &admitted, &released]() mutable {
+                                 Attachment receiver(token);
+                                 ReturnSlot out(receiver);
+                                 receiver.receive(token, out);
+                                 {
+                                     NativeWait wait(receiver);
+                                     admitted.set_value();
+                                     released.wait();
+                                 }
+                                 EXPECT_EQ(receiver.payload<EpochLeaf>(out.value()).value, 42);
+                                 receiver.collect();
+                             });
+    admitted.get_future().get();
+    interpreter.reset();
+    EXPECT_EQ(destroyed.load(), 0);
+    finish.set_value();
+    worker.get();
+    EXPECT_EQ(destroyed.load(), 1);
+}
+
+TEST(FoundationEpochs, TransferAdmissionRejectsClosedAndEmptyLeases)
+{
+    Interpreter interpreter;
+    Transfer transfer;
+    {
+        Attachment source(interpreter);
+        RootScope roots(source);
+        ReturnSlot out(source);
+        source.allocate<EpochLeaf>(out);
+        transfer = source.make_transfer(roots.root(out.value()));
+    }
+    interpreter.close();
+    EXPECT_THROW(Attachment receiver(transfer), std::logic_error);
+    EXPECT_TRUE(transfer);
+    Transfer empty;
+    EXPECT_THROW(Attachment receiver(empty), std::invalid_argument);
+}
+
 TEST(FoundationEpochs, SharedCellReplacementsUseTransferredInputsAndRootedSnapshotsDuringGc)
 {
     std::atomic<int> destroyed{0};

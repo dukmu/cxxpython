@@ -523,6 +523,48 @@ template <Field field> void attribute(Attachment &c, Value value, ReturnSlot &ou
 }
 } // namespace
 
+bool detail::writable_buffer(Attachment &c, Handle source, WritableBuffer &result, ReturnSlot &out)
+{
+    if (is_bytearray(c, source.get(c))) {
+        result.owner.ok(source.get(c));
+        auto storage = c.payload<ByteArrayObject>(source).contents;
+        auto token = std::make_shared<MemoryViewExport>(nullptr);
+        result.length = locked(c, *storage, [&] {
+            token->storage = storage;
+            ++storage->exports;
+            return storage->bytes.size();
+        });
+        result.offset = 0;
+        result.lease = std::move(token);
+        return true;
+    }
+    if (c.has_layout<MemoryViewObject>(source.get(c))) {
+        auto &v = c.payload<MemoryViewObject>(source);
+        auto token = live(c, v, out);
+        if (!token)
+            return false;
+        if (!v.readonly && token->storage && (v.length <= 1 || v.stride == 1)) {
+            if (!load_owner(c, source, v, result.owner, out))
+                return false;
+            result.offset = static_cast<std::size_t>(v.offset);
+            result.length = static_cast<std::size_t>(v.length);
+            result.lease = std::move(token);
+            return true;
+        }
+    }
+    raise_error(c, CoreObject::TypeErrorType, U"a contiguous writable buffer is required", out);
+    return false;
+}
+void detail::write_buffer(Attachment &c, const WritableBuffer &target, std::string_view data)
+{
+    if (!target.lease || data.size() > target.length)
+        throw std::logic_error("write exceeds the native buffer export");
+    auto &storage = *target.lease->storage;
+    locked(c, storage, [&] {
+        std::copy(data.begin(), data.end(), storage.bytes.begin() + target.offset);
+        ++storage.version;
+    });
+}
 bool detail::buffer_bytes(Attachment &c, Handle source, std::string &out, ReturnSlot &error,
                           bool contiguous)
 {

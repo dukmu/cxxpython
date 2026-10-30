@@ -1,0 +1,19 @@
+True rb+ False True
+True True True False
+8
+0 b'abc\n' 4
+[b'def\n']
+0 b'abc' b'\ndef\n'
+1
+4 bytearray(b'-bc\nd-')
+3 0 b'abc'
+b'abc!?'
+True
+<_io.FileIO [closed]>
+closed read
+True False b'ab'
+0 b'abc'
+False rb
+True b'abc!?'
+data.bin True
+b'abc!?'

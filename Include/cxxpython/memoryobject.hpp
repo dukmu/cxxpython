@@ -38,6 +38,16 @@ struct MemoryViewObject {
 };
 
 namespace detail {
+// Native consumers root the exporter and release the export at scope exit,
+// rather than waiting for an unreachable temporary memoryview to be collected.
+struct WritableBuffer {
+    ReturnSlot owner;
+    std::shared_ptr<MemoryViewExport> lease;
+    std::size_t offset = 0, length = 0;
+    explicit WritableBuffer(Attachment &context) : owner(context) {}
+};
+bool writable_buffer(Attachment &, Handle, WritableBuffer &, ReturnSlot &);
+void write_buffer(Attachment &, const WritableBuffer &, std::string_view);
 // Returns false for unsupported objects or a released view; errors are in out.
 bool buffer_bytes(Attachment &, Handle, std::string &, ReturnSlot &, bool contiguous = true);
 void install_memoryviews(Attachment &, std::span<const Handle>);

@@ -1,0 +1,7 @@
+{} {1: None, 2: None}
+True True
+True {'x': 5, 'y': 5}
+{'first': 7, 'second': 7}
+TypeError
+TypeError
+write failed

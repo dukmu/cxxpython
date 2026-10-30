@@ -31,6 +31,13 @@ add_library(cxxpython_core
     Python/extension.cpp
     Modules/_impmodule.cpp
     Modules/_iomodule.cpp
+    Modules/_io/stdio.cpp
+    Modules/_io/iobase.cpp
+    Modules/_io/fileio.cpp
+    Modules/_io/bytesio.cpp
+    Modules/_io/stringio.cpp
+    Modules/_threadmodule.cpp
+    Modules/_abc.cpp
     Modules/main.cpp
     Modules/sysmodule.cpp
     Modules/gcmodule.cpp
@@ -165,6 +172,9 @@ if(BUILD_TESTING)
         Tests/cpp/test_codecs.cpp
         Tests/cpp/test_codecs_parallel.cpp
         Tests/cpp/test_buffers_parallel.cpp
+        Tests/cpp/test_fileio_parallel.cpp
+        Tests/cpp/test_native_threads.cpp
+        Tests/cpp/test_abc_parallel.cpp
         Tests/cpp/test_super.cpp
         Tests/cpp/test_set.cpp
         Tests/cpp/test_set_operations.cpp

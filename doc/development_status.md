@@ -1,5 +1,62 @@
 # Development Status
 
+## 2026-10-31 Native I/O, ABC And Shared-Heap Thread Launch
+
+Prepended without rewriting earlier records. Previous stable node: baf3897,
+already committed and pushed. Three terra workers implemented independent ABC,
+memory-stream and low-level thread slices; parent integration supplied real raw
+files, stream protocols, scoped readinto exports and shared type dependencies.
+No sol/astra agents, host-Python execution or interpreter-wide execution lock.
+The complete service goal and remaining Plan 2 N4-N6/M0-M9 gates stay active.
+
+- Copied unchanged CPython 3.12.14 Lib/abc.py. Native _abc owns traced weak sets,
+  interpreter-local invalidation epochs and rooted callback snapshots. Virtual
+  registration, subclass hooks, negative-cache invalidation, metaclass hash/eq,
+  weak lifetime and reload identity are exercised through the real library.
+  Abstract-method truth flags publish with TypeSnapshot namespaces. Direct
+  subclasses use ordinary prepared dictionaries with allocation-free weak
+  deletion; failed core publication restores structural seeds and their roots.
+- Added mutable Python staticmethod/classmethod construction, metadata and
+  atomic callable access, while keeping native image descriptors immutable.
+  Bound methods forward missing function attributes. Added genuine dict.fromkeys
+  through normal subclass construction, iteration and item-setting protocols.
+- _io provides FileIO, BytesIO, StringIO and actual base-stream capabilities.
+  FileIO uses per-resource active-operation leases, NativeWait syscalls and close
+  coordination to prevent descriptor reuse. It supports filesystem/openers,
+  borrowed fds, raw read/write/readinto, positioning, iteration and finalization.
+  Memory streams use prepared amortized storage growth; exported BytesIO aliases
+  prohibit resizing/close. Scoped native readinto exports drop on return rather
+  than waiting for GC. Bootstrap sys streams moved intact to Modules/_io/stdio.cpp.
+- _thread provides actual locks, timed/native waits, cross-thread release,
+  identifiers, same-Interpreter start_new_thread and exit. Transfer-based
+  Attachment admission retains the heap without borrowing an Interpreter owner.
+  Child Python failures reach unraisable reporting; SystemExit is quiet. Tests
+  execute Python concurrently with shared roots, type changes, buffers and GC.
+- Frozen product and fixed CPython pass the same 100 byte-exact script fixtures.
+  Normal affected native tests pass 155/155; both exhaustive allocation-failure
+  rollback/retry tests pass unchanged, separately and serially. Strict
+  ASan/UBSan/LeakSanitizer affected tests pass 155/155, product cases 100/100 and
+  all eight existing upstream doctest examples. TSan affected tests pass 49/49;
+  eleven focused Python ABC/descriptor/thread/I/O/reload cases also pass.
+- The two exhaustive OOM enumerations exceeded the existing ASan CTest 120-second
+  deadline while using CPU; these timeout failures are retained, not counted as
+  passes or hidden by changing limits. A separate unchanged-binary run has
+  completed the first enumeration successfully in 246 seconds; the promotion
+  enumeration is still in flight at this record. Full sanitizer timing acceptance
+  is therefore not declared. No assertion, sanitizer or leak check was disabled.
+  Relevant logs, initial failures, frozen fixture snapshot and binary hashes are
+  retained under .cache/native-io-abc-thread-*. The stable source set passed
+  clang-format checks and all 244 generated-rule consistency checks. No unrelated
+  performance sweep or hand-written benchmark table was added.
+- Full io still needs buffering/text wrappers, open and product stream setup;
+  full threading still needs RLock/local, joins and shutdown coordination.
+  Complete native descriptor/reflection and upstream unittest matrices remain.
+  A new parallel terra batch is implementing real SimpleNamespace, GenericAlias,
+  binascii and async-generator dependencies for unchanged types/collections.abc.
+  Their unintegrated files and parent function-annotation work are not included
+  in this node or claimed usable libraries. User temporary_plan.md/test2.py changes
+  remain excluded. Architecture, ownership and compatibility notes were updated.
+
 ## 2026-10-30 Parallel Codec, Buffer, Struct And Hashlib Closures
 
 Prepended without rewriting earlier records. Previous stable node: 70feda3,

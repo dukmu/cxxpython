@@ -1,0 +1,16 @@
+True False
+uninitialized
+True True
+first first doc
+('first', 0) ('first', 0)
+True second second doc
+('second', 0) ('second', 0)
+True False
+uninitialized
+True True
+first first doc
+('first', 1) ('first', 1)
+True second second doc
+('second', 1) ('second', 1)
+42 42
+True True

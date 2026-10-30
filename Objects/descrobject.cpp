@@ -169,6 +169,30 @@ void property_abstract(Attachment &context, Value receiver, ReturnSlot &out)
     out.ok(context.builtin(CoreObject::False));
 }
 
+template <typename Wrapper>
+void wrapper_abstract(Attachment &context, Value receiver, ReturnSlot &out)
+{
+    RootScope roots(context);
+    ReturnSlot name(context), result(context), loaded(context);
+    context.load(receiver, context.payload<Wrapper>(receiver).callable, loaded);
+    if (loaded.tag() == ResultTag::Empty) {
+        out.ok(context.builtin(CoreObject::False));
+        return;
+    }
+    auto callable = roots.root(loaded.value());
+    make_str(context, U"__isabstractmethod__", name);
+    get_attribute(context, callable, roots.root(name.value()), result);
+    if (result.tag() == ResultTag::Raised) {
+        if (is_subtype(context, context.type_of(result.exception()),
+                       context.builtin(CoreObject::AttributeErrorType)))
+            out.ok(context.builtin(CoreObject::False));
+        else
+            out.raised(result.exception());
+        return;
+    }
+    truth(context, roots.root(result.value()), out);
+}
+
 GetSetDescriptorObject *descriptor(Attachment &context, Value value, ReturnSlot &out)
 {
     if (context.type_of(value) != context.builtin(CoreObject::GetSetDescriptorType)) {
@@ -353,6 +377,45 @@ void type_dict_get(Attachment &context, Value receiver, ReturnSlot &out)
     context.allocate_instance<MappingProxyObject>(
         roots.root(context.builtin(CoreObject::MappingProxyType)), out, *dictionary);
 }
+void type_abstract_get(Attachment &context, Value receiver, ReturnSlot &out)
+{
+    auto dictionary = TypeView(context, receiver).dictionary();
+    auto value = dictionary ? detail::name_lookup(context, *dictionary, U"__abstractmethods__")
+                            : std::optional<Value>{};
+    if (value)
+        out.ok(*value);
+    else
+        raise_error(context, CoreObject::AttributeErrorType, U"__abstractmethods__", out);
+}
+void type_abstract_set(Attachment &context, Value receiver, std::optional<Value> value,
+                       ReturnSlot &out)
+{
+    if (context.payload<TypeObject>(receiver).immutable) {
+        type_error(context, U"cannot set attributes of immutable type", out);
+        return;
+    }
+    RootScope roots(context);
+    auto owner = roots.root(receiver);
+    ReturnSlot result(context), key(context);
+    bool abstract = false;
+    if (value) {
+        auto rooted = roots.root(*value);
+        truth(context, rooted, result);
+        if (result.tag() == ResultTag::Raised) {
+            out.raised(result.exception());
+            return;
+        }
+        abstract = result.value() == context.builtin(CoreObject::True);
+    }
+    make_str(context, U"__abstractmethods__", key);
+    if (!detail::type_namespace_change(context, owner.get(context), U"__abstractmethods__",
+                                       value ? std::optional<Value>(key.value()) : std::nullopt,
+                                       value, abstract)) {
+        raise_error(context, CoreObject::AttributeErrorType, U"__abstractmethods__", out);
+        return;
+    }
+    out.ok(context.builtin(CoreObject::None));
+}
 void method_function(Attachment &context, Value receiver, ReturnSlot &out)
 {
     out.ok(context.payload<BoundMethodObject>(receiver).function);
@@ -363,11 +426,15 @@ void method_receiver(Attachment &context, Value receiver, ReturnSlot &out)
 }
 void static_function(Attachment &context, Value receiver, ReturnSlot &out)
 {
-    out.ok(context.payload<StaticMethodObject>(receiver).callable);
+    context.load(receiver, context.payload<StaticMethodObject>(receiver).callable, out);
+    if (out.tag() == ResultTag::Empty)
+        out.ok(context.builtin(CoreObject::None));
 }
 void class_function(Attachment &context, Value receiver, ReturnSlot &out)
 {
-    out.ok(context.payload<ClassMethodObject>(receiver).callable);
+    context.load(receiver, context.payload<ClassMethodObject>(receiver).callable, out);
+    if (out.tag() == ResultTag::Empty)
+        out.ok(context.builtin(CoreObject::None));
 }
 void cell_contents(Attachment &context, Value receiver, ReturnSlot &out)
 {
@@ -580,10 +647,16 @@ void install_attribute_descriptors(Attachment &context, std::span<const Handle> 
                   property_field<&PropertyObject::doc>, property_doc_set);
     install_field(context, descriptor_type, string_type, property_type, U"__isabstractmethod__",
                   property_abstract, nullptr);
+    install_field(context, descriptor_type, string_type, at(CoreObject::ClassMethodType),
+                  U"__isabstractmethod__", wrapper_abstract<ClassMethodObject>, nullptr);
+    install_field(context, descriptor_type, string_type, at(CoreObject::StaticMethodType),
+                  U"__isabstractmethod__", wrapper_abstract<StaticMethodObject>, nullptr);
     install_field(context, descriptor_type, string_type, roots.root(context.object_type()),
                   U"__class__", class_get, class_set);
     install_field(context, descriptor_type, string_type, roots.root(context.type_type()),
                   U"__dict__", type_dict_get, nullptr);
+    install_field(context, descriptor_type, string_type, roots.root(context.type_type()),
+                  U"__abstractmethods__", type_abstract_get, type_abstract_set);
     install_field(context, descriptor_type, string_type, roots.root(context.type_type()),
                   U"__bases__", type_bases, nullptr);
     install_field(context, descriptor_type, string_type, roots.root(context.type_type()),
@@ -600,8 +673,12 @@ void install_attribute_descriptors(Attachment &context, std::span<const Handle> 
                   U"__self__", method_receiver, nullptr);
     install_field(context, descriptor_type, string_type, at(CoreObject::StaticMethodType),
                   U"__func__", static_function, nullptr);
+    install_field(context, descriptor_type, string_type, at(CoreObject::StaticMethodType),
+                  U"__wrapped__", static_function, nullptr);
     install_field(context, descriptor_type, string_type, at(CoreObject::ClassMethodType),
                   U"__func__", class_function, nullptr);
+    install_field(context, descriptor_type, string_type, at(CoreObject::ClassMethodType),
+                  U"__wrapped__", class_function, nullptr);
     install_field(context, descriptor_type, string_type, at(CoreObject::CellType), U"cell_contents",
                   cell_contents, cell_contents_set);
     install_field(context, descriptor_type, string_type, at(CoreObject::FunctionType), U"__dict__",

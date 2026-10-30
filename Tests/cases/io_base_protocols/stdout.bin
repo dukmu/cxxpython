@@ -1,0 +1,14 @@
+False False False False False
+unsupported
+unsupported
+unsupported
+unsupported
+unsupported
+unsupported
+True
+b'a\n' b'b\nc' b'' True
+b'a\n' [b'b\n', b'c']
+[1, 2, 3]
+abstract raw method
+abstract raw method
+failed flush True

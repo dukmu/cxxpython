@@ -53,9 +53,10 @@ concatenation/repetition, membership, join and hex/fromhex protocols. __bytes__
 precedes index/iterable construction; bytes subclasses retain traced dictionary
 tails. Byte iterator claims are atomic and tested with two shared-heap workers
 and collection. The immutable payload may be borrowed across NativeWait only
-while its precise owner Handle remains live. bytearray/memoryview and the full
-buffer export/PEP 688 matrix are still requirements, not emulated by iterable
-conversion or an unrooted pointer.
+while its precise owner Handle remains live. Native bytearray and byte-oriented
+memoryview exports now use synchronized storage and scoped native export tokens.
+The complete buffer-format/exporter/PEP 688 matrix remains a requirement, not
+emulated by iterable conversion or an unrooted pointer.
 
 Set/frozenset construction, displays and synchronous set comprehensions use the
 same compiler, call and object protocol paths. A SetObject owns a private traced
@@ -84,11 +85,12 @@ opcode definitions. Starred displays and comprehensions do not consult a shadowe
 builtins.set. After a starred element, subsequent expressions are inserted before
 evaluating the next expression, preserving observable evaluation/hash order.
 
-The native UTF-8/ASCII/Latin-1 kernels back str.encode and bytes.decode, with
+The native UTF-8/16/32, ASCII, Latin-1 and charmap kernels back str.encode and bytes.decode, with
 traced UnicodeEncodeError/UnicodeDecodeError fields and error-handler behavior.
-Unknown encodings and handlers are not silently mapped to UTF-8. This is not a
-complete codec registry or the encodings/codecs library; source-cookie decoding,
-additional codecs, custom handlers and complete error mutation matrices remain.
+Unknown encodings and handlers are not silently mapped to UTF-8. The traced
+per-Interpreter registry backs real Lib/codecs.py and selected encodings modules,
+including custom handlers and incremental boundaries. Source-cookie decoding,
+other codec families, UnicodeTranslateError and full diagnostic matrices remain.
 
 abs/all/any/callable/chr/ord/divmod/min/max/sum use normal type, iterator and
 numeric protocols. super uses the current frame's __class__ Cell/first argument
@@ -133,6 +135,24 @@ holding internal mutexes during blocking writes. SIGPIPE is scoped to the writin
 thread rather than changing the embedding host's process-wide disposition.
 These are unbuffered UTF-8 bootstrap streams; input/read, open, full _io layering,
 buffering, stream configuration and errno/platform error matrices remain gates.
+The bridge now lives in Modules/_io/stdio.cpp. Separate native IOBase/FileIO and
+BytesIO/StringIO implementations provide actual descriptor/memory operations,
+not yet the complete buffered/text/io/open dependency closure. File operations
+use descriptor leases and NativeWait, not a lock held across blocking syscalls.
+
+The unchanged pinned abc.py uses real _abc weak registries and epoch-tagged
+negative caches. Type abstract flags publish with immutable namespace snapshots;
+direct subclasses use prepared dictionary nodes with weak targets and conditional
+deletion. Bootstrap failure restores these fields rather than retaining an image
+through callback/type edges. Mutable Python class/static wrappers use rooted
+atomic callable reads; native image descriptors remain read-only.
+
+Low-level _thread locks and start_new_thread execute through the same shared heap
+and OS-thread VM. A Transfer retains state for admission without borrowing an
+Interpreter C++ lifetime; close rejects new admissions. Admitted threads keep
+their state/precise roots alive, and lock waits park for GC. Python exceptions
+are reported through the unraisable hook, except quiet SystemExit. Threading
+joins, signals, RLock/local and complete product shutdown remain requirements.
 
 The independent parser recognizes the fixed complete Python 3.12.14 PEG grammar,
 including those not-yet-executable families. `Grammar/` is the source of truth;

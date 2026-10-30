@@ -180,6 +180,44 @@ underlying environment itself is process-wide. External embedding code must
 coordinate its own concurrent environment mutations. Full os/_io policy and
 resource-owning file objects remain separate library delivery work.
 
+`Modules/_io/` now separates stream responsibilities. `iobase.cpp` supplies
+ordinary context/iteration/line and raw-stream defaults; `fileio.cpp` owns POSIX
+descriptors, and `bytesio.cpp`/`stringio.cpp` own native memory streams. A FileIO
+operation borrows a descriptor under a short local commit, then parks for the
+syscall without that lock. Close waits for in-flight operations before releasing
+the old descriptor, preventing reuse while a read/write still uses it. Flush
+callbacks run outside locks, and their failure still closes owned resources.
+Native writable-buffer exports root their exporter and release the export at
+scope exit, including exceptional exits, instead of creating GC-delayed views.
+Memory-stream capacity is prepared outside locks; geometric growth avoids copying
+the entire stream on every append. `Modules/_iomodule.cpp` exposes these actual
+capabilities. The former bootstrap stdio bridge moved unchanged to
+`Modules/_io/stdio.cpp`; buffered/text streams and the complete `Lib/io.py` closure
+are not replaced by a fake Python facade.
+
+`Modules/_abc.cpp` backs the unmodified pinned `Lib/abc.py`. Per-module invalidation
+epochs and traced weak sets supply registry/positive/negative caches; Python
+hooks and metaclass hash/equality run without internal locks. Negative caches
+publish an epoch and set together so an in-flight old result cannot invalidate
+new registration. Direct type subclasses use ordinary prepared dictionary nodes,
+weak references and allocation-free conditional deletion, not an ever-growing
+tuple or strong references to user classes. Core promotion records this graph in
+its rollback transaction. Abstract flags publish with the class namespace in
+TypeSnapshot. Python class/static wrappers publish their callable with a rooted
+atomic edge; reinitialization and inherited abstract markers use ordinary
+protocols. Native image wrappers retain a read-only callable, so wrapper
+reinitialization cannot bypass the owning builtin type's immutability.
+
+`Modules/_threadmodule.cpp` supplies native locks and low-level OS thread entry.
+Transfer already owns a shared-heap lease and precise delivery root; a new
+Attachment may use that lease without borrowing an Interpreter C++ object. The
+same admission gate rejects launches after close. A successful start is returned
+only after child admission, and admitted children retain heap state independently
+of the embedding owner's lifetime. Lock waits park; ordinary Python runs on the
+existing parallel VM. Uncaught Python exceptions use unraisable reporting and
+SystemExit exits quietly. These low-level daemon threads are not the unfinished
+`threading` join/shutdown policy.
+
 Runtime contracts are in `Include/cxxpython/`. Compiler-private implementation
 structures belong in `Include/internal/`. All C++ interfaces remain unstable.
 `Include/cxxpython/extension.h` specifies the experimental C11 extension ABI;

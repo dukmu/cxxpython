@@ -1,13 +1,16 @@
 #include "internal/import.hpp"
 #include "cxxpython/protocol.hpp"
 #include "cxxpython/weakrefobject.hpp"
+#include "internal/abc.hpp"
 #include "internal/codecregistry.hpp"
 #include "internal/compiler.hpp"
 #include "internal/hashmodule.hpp"
+#include "internal/iomodule.hpp"
 #include "internal/posixmodule.hpp"
 #include "internal/stdio.hpp"
 #include "internal/structmodule.hpp"
 #include "internal/sysmodule.hpp"
+#include "internal/threadmodule.hpp"
 
 #include <filesystem>
 
@@ -219,6 +222,9 @@ detail::ImportState::ImportState()
                                      {U"_struct", detail::initialize_struct},
                                      {U"_hashlib", detail::initialize_hashlib},
                                      {U"_blake2", detail::initialize_blake2},
+                                     {U"_io", detail::initialize_io},
+                                     {U"_thread", detail::initialize_thread},
+                                     {U"_abc", detail::initialize_abc},
                                      {U"posix", detail::initialize_posix},
                                      {U"_weakref", detail::initialize_weakref},
                                      {U"__main__", main_init},

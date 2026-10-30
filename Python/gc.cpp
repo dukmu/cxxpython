@@ -647,8 +647,12 @@ GcSnapshot Interpreter::gc_state() const
     return result;
 }
 
-Attachment::Attachment(Interpreter &interpreter) : state_(interpreter.state_)
+Attachment::Attachment(Interpreter &interpreter) : Attachment(interpreter.state_) {}
+Attachment::Attachment(const Transfer &launch) : Attachment(launch.state_) {}
+Attachment::Attachment(std::shared_ptr<detail::State> state) : state_(std::move(state))
 {
+    if (!state_)
+        throw std::invalid_argument("attachment requires a live interpreter lease");
     std::unique_lock gate(state_->coordinator);
     state_->changed.wait(gate, [&] {
         return !state_->accepting.load(std::memory_order_acquire) ||
@@ -1550,7 +1554,9 @@ void Attachment::bootstrap_core()
         decltype(TypeObject::qualname) qualname;
         std::optional<std::u32string> module;
         std::optional<Value> dictionary;
+        std::optional<Value> subclasses;
         TypeState state;
+        bool immutable;
     };
     RootScope roots(*this);
     std::vector<TypeSnapshot> previous_types;
@@ -1568,8 +1574,15 @@ void Attachment::bootstrap_core()
                 if (type.state != TypeState::Structural ||
                     !is_subtype(*this, type_of(value), type_type()))
                     continue;
+                ReturnSlot registry(*this);
+                load(value, type.subclasses, registry);
+                auto subclasses =
+                    registry.tag() == ResultTag::Ok
+                        ? std::optional<Value>{roots.root(registry.value()).get(*this)}
+                        : std::optional<Value>{};
                 previous_types.push_back({roots.root(value), type.name, type.qualname,
-                                          type.bootstrap_module, type.dictionary, type.state});
+                                          type.bootstrap_module, type.dictionary, subclasses,
+                                          type.state, type.immutable});
             }
         }
     };
@@ -1614,15 +1627,26 @@ void Attachment::bootstrap_core()
             detail::publish_type(*this, type.get(*this));
         state_->call_executor = detail::execute_function;
         state_->core_published = true;
+        for (auto type : ready_types) {
+            ReturnSlot registry(*this);
+            allocate_instance<DictObject>(publication_roots.root(builtin(CoreObject::DictType)),
+                                          registry);
+            store(type.get(*this), payload<TypeObject>(type).subclasses, registry.value());
+        }
+        for (auto type : ready_types)
+            for (auto base : payload<TypeObject>(type).bases)
+                detail::register_subclass(*this, publication_roots.root(base), type);
     } catch (...) {
         for (auto &saved : previous_types) {
             auto &type = payload<TypeObject>(saved.type);
             store(saved.type.get(*this), type.metadata, {});
+            store(saved.type.get(*this), type.subclasses, saved.subclasses);
             type.name = std::move(saved.name);
             type.qualname = std::move(saved.qualname);
             type.bootstrap_module = std::move(saved.module);
             type.dictionary = saved.dictionary;
             type.state = saved.state;
+            type.immutable = saved.immutable;
             account_external(saved.type, type.external_bytes());
         }
         state_->core.fill(nullptr);

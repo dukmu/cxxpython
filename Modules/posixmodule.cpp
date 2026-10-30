@@ -606,6 +606,12 @@ void stat_entry(Attachment &c, Handle function, std::span<const Value> a, Return
 }
 } // namespace
 
+bool filesystem_path(Attachment &c, Value value, std::string &result, ReturnSlot &out,
+                     ReturnSlot &filename)
+{
+    return path(c, value, result, out, &filename);
+}
+
 void initialize_posix(Attachment &c, Handle module, ReturnSlot &out)
 {
     RootScope roots(c);

@@ -43,11 +43,15 @@ bool excess(Attachment &context, std::span<const Value> args)
     return !context.payload<TupleObject>(args[1]).items.empty() ||
            !DictView(context, args[2]).entries().empty();
 }
-Value unwrapped(Attachment &context, Value value)
+Value unwrapped(Attachment &context, Value value, RootScope &roots)
 {
-    return context.type_of(value) == context.builtin(CoreObject::StaticMethodType)
-               ? context.payload<StaticMethodObject>(value).callable
-               : value;
+    if (context.has_layout<StaticMethodObject>(value)) {
+        ReturnSlot function(context);
+        context.load(value, context.payload<StaticMethodObject>(value).callable, function);
+        if (function.tag() == ResultTag::Ok)
+            return roots.root(function.value()).get(context);
+    }
+    return value;
 }
 bool object_default(Attachment &context, Value type, const std::u32string &name)
 {
@@ -56,8 +60,9 @@ bool object_default(Attachment &context, Value type, const std::u32string &name)
     if (method)
         roots.root(*method);
     return method &&
-           unwrapped(context, *method) ==
-               unwrapped(context, *detail::type_attribute(context, context.object_type(), name));
+           unwrapped(context, *method, roots) ==
+               unwrapped(context, *detail::type_attribute(context, context.object_type(), name),
+                         roots);
 }
 void object_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
@@ -70,13 +75,56 @@ void object_new(Attachment &context, Handle, std::span<const Value> args, Return
         type_error(context, U"object.__new__ received excess arguments", out);
         return;
     }
+    RootScope roots(context);
+    TypeView metadata(context, args[0]);
+    if (metadata.snapshot() && context.payload<TypeSnapshot>(*metadata.snapshot()).abstract) {
+        auto methods = DictView(context, metadata.storage()).find(U"__abstractmethods__");
+        ReturnSlot result(context);
+        get_iter(context, roots.root(*methods), result);
+        if (raised(result)) {
+            out.raised(result.exception());
+            return;
+        }
+        auto iterator = roots.root(result.value());
+        std::vector<std::u32string> names;
+        for (;;) {
+            auto status = iter_next(context, iterator, result);
+            if (status == NextStatus::Done)
+                break;
+            if (status == NextStatus::Raised) {
+                out.raised(result.exception());
+                return;
+            }
+            if (!context.has_layout<StrObject>(result.value())) {
+                type_error(context, U"abstract method name must be a string", out);
+                return;
+            }
+            names.push_back(context.payload<StrObject>(result.value()).value);
+        }
+        std::sort(names.begin(), names.end());
+        auto name = metadata.name();
+        auto text = std::holds_alternative<Value>(name)
+                        ? context.payload<StrObject>(std::get<Value>(name)).value
+                        : std::get<std::u32string>(name);
+        std::u32string message = U"Can't instantiate abstract class " + text +
+                                 U" without an implementation for abstract method";
+        if (names.size() != 1)
+            message += U"s";
+        message += U" '";
+        for (std::size_t i = 0; i < names.size(); ++i) {
+            if (i)
+                message += U"', '";
+            message += names[i];
+        }
+        type_error(context, message + U"'", out);
+        return;
+    }
     auto prefix = context.payload<TypeObject>(args[0]).instance_layout;
     prefix.fields = {};
     if (prefix != LayoutDescriptor::of<InstanceObject>()) {
         type_error(context, U"object.__new__ cannot allocate this native layout", out);
         return;
     }
-    RootScope roots(context);
     context.allocate_instance<InstanceObject>(roots.root(args[0]), out);
 }
 void object_init(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
@@ -204,6 +252,15 @@ void type_call(Attachment &context, Handle, std::span<const Value> args, ReturnS
     }
     out.ok(self.get(context));
 }
+void type_subclasses(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!is_type(context, args[0])) {
+        type_error(context, U"type.__subclasses__ requires a type", out);
+        return;
+    }
+    RootScope roots(context);
+    detail::direct_subclasses(context, roots.root(args[0]), out);
+}
 void static_get(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_instance(context, args[0], CoreObject::StaticMethodType)) {
@@ -215,7 +272,10 @@ void static_get(Attachment &context, Handle, std::span<const Value> args, Return
         type_error(context, U"__get__(None, None) is invalid", out);
         return;
     }
-    out.ok(context.payload<StaticMethodObject>(args[0]).callable);
+    context.load(args[0], context.payload<StaticMethodObject>(args[0]).callable, out);
+    if (out.tag() == ResultTag::Empty)
+        raise_error(context, CoreObject::RuntimeErrorType, U"uninitialized staticmethod object",
+                    out);
 }
 void class_get(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
@@ -231,12 +291,19 @@ void class_get(Attachment &context, Handle, std::span<const Value> args, ReturnS
     auto owner = args[2];
     if (owner == context.builtin(CoreObject::None))
         owner = context.type_of(args[1]);
-    auto callable = context.payload<ClassMethodObject>(args[0]).callable;
+    RootScope roots(context);
+    ReturnSlot loaded(context);
+    context.load(args[0], context.payload<ClassMethodObject>(args[0]).callable, loaded);
+    if (loaded.tag() == ResultTag::Empty) {
+        raise_error(context, CoreObject::RuntimeErrorType, U"uninitialized classmethod object",
+                    out);
+        return;
+    }
+    auto callable = roots.root(loaded.value()).get(context);
     if (detail::type_attribute(context, context.type_of(callable), U"__get__")) {
         detail::bind_descriptor(context, callable, owner, owner, out);
         return;
     }
-    RootScope roots(context);
     context.allocate_instance<BoundMethodObject>(
         roots.root(context.builtin(CoreObject::BoundMethodType)), out, callable, owner);
 }
@@ -248,8 +315,15 @@ void static_call(Attachment &context, Handle, std::span<const Value> args, Retur
     }
     RootScope roots(context);
     auto named = keywords(context, args[2], roots);
-    call(context, roots.root(context.payload<StaticMethodObject>(args[0]).callable),
-         {context.payload<TupleObject>(args[1]).items, named}, out);
+    ReturnSlot loaded(context);
+    context.load(args[0], context.payload<StaticMethodObject>(args[0]).callable, loaded);
+    if (loaded.tag() == ResultTag::Empty) {
+        raise_error(context, CoreObject::RuntimeErrorType, U"uninitialized staticmethod object",
+                    out);
+        return;
+    }
+    call(context, roots.root(loaded.value()), {context.payload<TupleObject>(args[1]).items, named},
+         out);
 }
 void static_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
@@ -259,7 +333,7 @@ void static_new(Attachment &context, Handle, std::span<const Value> args, Return
         return;
     }
     RootScope roots(context);
-    context.allocate_instance<StaticMethodObject>(roots.root(args[0]), out, args[1]);
+    context.allocate_instance<StaticMethodObject>(roots.root(args[0]), out);
 }
 void class_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
@@ -269,7 +343,45 @@ void class_new(Attachment &context, Handle, std::span<const Value> args, ReturnS
         return;
     }
     RootScope roots(context);
-    context.allocate_instance<ClassMethodObject>(roots.root(args[0]), out, args[1]);
+    context.allocate_instance<ClassMethodObject>(roots.root(args[0]), out);
+}
+template <class Wrapper>
+void wrapper_init(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!context.has_layout<Wrapper>(args[0])) {
+        type_error(context, U"wrapper descriptor requires a matching instance", out);
+        return;
+    }
+    if (context.payload<Wrapper>(args[0]).native) {
+        type_error(context, U"cannot initialize a native method descriptor", out);
+        return;
+    }
+    RootScope roots(context);
+    auto self = roots.root(args[0]), function = roots.root(args[1]);
+    context.store(args[0], context.payload<Wrapper>(self).callable, args[1]);
+    ReturnSlot key(context), value(context), changed(context);
+    for (auto name :
+         {U"__module__", U"__name__", U"__qualname__", U"__doc__", U"__annotations__"}) {
+        make_str(context, name, key);
+        auto attribute = roots.root(key.value());
+        get_attribute(context, function, attribute, value);
+        if (raised(value)) {
+            if (is_subtype(context, context.type_of(value.exception()),
+                           context.builtin(CoreObject::AttributeErrorType))) {
+                roots.release(attribute);
+                continue;
+            }
+            out.raised(value.exception());
+            return;
+        }
+        set_attribute(context, self, attribute, roots.root(value.value()), changed);
+        if (raised(changed)) {
+            out.raised(changed.exception());
+            return;
+        }
+        roots.release(attribute);
+    }
+    out.ok(context.builtin(CoreObject::None));
 }
 void cell_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
@@ -290,17 +402,21 @@ void wrap_definition(Attachment &context, Handle cls, const std::u32string &name
 {
     auto dictionary = *TypeView(context, cls.get(context)).dictionary();
     auto function = detail::name_lookup(context, dictionary, name);
-    if (!function || context.type_of(*function) != context.builtin(CoreObject::NativeFunctionType))
+    if (!function ||
+        (context.type_of(*function) != context.builtin(CoreObject::NativeFunctionType) &&
+         context.type_of(*function) != context.builtin(CoreObject::FunctionType)))
         return;
     RootScope roots(context);
     auto callable = roots.root(*function);
     ReturnSlot out(context);
     if (class_method)
         context.allocate_instance<ClassMethodObject>(
-            roots.root(context.builtin(CoreObject::ClassMethodType)), out, callable.get(context));
+            roots.root(context.builtin(CoreObject::ClassMethodType)), out, callable.get(context),
+            false);
     else
         context.allocate_instance<StaticMethodObject>(
-            roots.root(context.builtin(CoreObject::StaticMethodType)), out, callable.get(context));
+            roots.root(context.builtin(CoreObject::StaticMethodType)), out, callable.get(context),
+            false);
     auto wrapper = roots.root(out.value());
     make_str(context, name, out);
     detail::name_store(context, dictionary, out.value(), wrapper.get(context));
@@ -676,6 +792,10 @@ void object_subclass(Attachment &context, Handle, std::span<const Value> args, R
     }
     out.ok(context.builtin(CoreObject::None));
 }
+void object_subclasshook(Attachment &context, Handle, std::span<const Value>, ReturnSlot &out)
+{
+    out.ok(context.builtin(CoreObject::NotImplemented));
+}
 } // namespace
 namespace detail {
 void install_construction(Attachment &context, std::span<const Handle> core)
@@ -741,7 +861,10 @@ void install_construction(Attachment &context, std::span<const Handle> core)
     install(type, U"__new__", definition, type_new, Binding::Static);
     SignatureLayout subclass;
     subclass.parameters = {{U"cls", ParameterKind::PositionalOnly}};
+    install(type, U"__subclasses__", subclass, type_subclasses);
     install(object, U"__init_subclass__", subclass, object_subclass, Binding::Class);
+    subclass.varargs = U"args";
+    install(object, U"__subclasshook__", subclass, object_subclasshook, Binding::Class);
     SignatureLayout get;
     get.parameters = {{U"self", ParameterKind::PositionalOnly},
                       {U"instance", ParameterKind::PositionalOnly},
@@ -752,8 +875,11 @@ void install_construction(Attachment &context, std::span<const Handle> core)
     SignatureLayout wrapped;
     wrapped.parameters = {{U"cls", ParameterKind::PositionalOnly},
                           {U"function", ParameterKind::PositionalOnly}};
-    install(at(CoreObject::StaticMethodType), U"__new__", wrapped, static_new, Binding::Static);
-    install(at(CoreObject::ClassMethodType), U"__new__", wrapped, class_new, Binding::Static);
+    install(at(CoreObject::StaticMethodType), U"__new__", variadic, static_new, Binding::Static);
+    install(at(CoreObject::ClassMethodType), U"__new__", variadic, class_new, Binding::Static);
+    install(at(CoreObject::StaticMethodType), U"__init__", wrapped,
+            wrapper_init<StaticMethodObject>);
+    install(at(CoreObject::ClassMethodType), U"__init__", wrapped, wrapper_init<ClassMethodObject>);
     SignatureLayout cell;
     cell.parameters = {{U"cls", ParameterKind::PositionalOnly}};
     cell.varargs = U"contents";

@@ -1,11 +1,12 @@
 #include "cxxpython/objects.hpp"
 #include "cxxpython/type.hpp"
+#include "cxxpython/weakrefobject.hpp"
 
 #include <algorithm>
 
 namespace cxxpython::core {
 TypeSnapshot::TypeSnapshot(InitialType head, Value name, Value qualname, Value dictionary,
-                           std::optional<Value> storage, Value bases, Value mro)
+                           std::optional<Value> storage, Value bases, Value mro, bool abstract_in)
     : header(head), name(name), qualname(qualname), dictionary(dictionary), bases(bases), mro(mro),
       storage(storage), finalizer([&]() -> std::optional<Value> {
           if (storage) {
@@ -15,7 +16,8 @@ TypeSnapshot::TypeSnapshot(InitialType head, Value name, Value qualname, Value d
                       return data.entries[index].value;
           }
           return {};
-      }())
+      }()),
+      abstract(abstract_in)
 {}
 TypeView::TypeView(Attachment &context, Value type)
     : context_(context), owner_(context), metadata_(context)
@@ -237,8 +239,16 @@ void create(Attachment &context, const TypeSpec &spec, const LayoutDescriptor *n
     payload.allow_weakrefs = allow_weakrefs;
     context.account_external(created, payload.external_bytes());
     payload.state = TypeState::Structural;
-    if (context.core_ready())
+    if (context.core_ready()) {
+        ReturnSlot registry(context);
+        context.allocate_instance<DictObject>(roots.root(context.builtin(CoreObject::DictType)),
+                                              registry);
+        context.store(created.get(context), payload.subclasses, registry.value());
         detail::type_ready(context, created, spec.dictionary);
+    }
+    if (context.core_ready())
+        for (auto base : bases)
+            detail::register_subclass(context, base, created);
     out.ok(created.get(context));
 }
 } // namespace
@@ -246,6 +256,7 @@ void create(Attachment &context, const TypeSpec &spec, const LayoutDescriptor *n
 void TypeObject::trace(Tracer &tracer) const noexcept
 {
     tracer.visit(metadata);
+    tracer.visit(subclasses);
     if (auto value = std::get_if<Value>(&name))
         tracer.visit(*value);
     if (auto value = std::get_if<Value>(&qualname))
@@ -363,6 +374,78 @@ LayoutDescriptor Attachment::require_instance_layout(Handle type, const LayoutDe
 
 namespace detail {
 namespace {
+struct SubclassBinding {
+    ObjectHeader header;
+    const Value dictionary;
+    DictBinding binding;
+    SubclassBinding(InitialType head, Value registry) : header(head), dictionary(registry) {}
+    void trace(Tracer &tracer) const noexcept
+    {
+        tracer.visit(dictionary);
+    }
+};
+void remove_subclass(Attachment &context, Handle function, std::span<const Value> args,
+                     ReturnSlot &out)
+{
+    RootScope roots(context);
+    const auto state = roots.root(context.payload<NativeFunctionObject>(function).captures[0]);
+    const auto &data = context.payload<SubclassBinding>(state);
+    dict_erase_binding(context, roots.root(data.dictionary), data.binding, roots.root(args[0]));
+    out.ok(context.builtin(CoreObject::None));
+}
+} // namespace
+void register_subclass(Attachment &context, Handle base, Handle child)
+{
+    RootScope roots(context);
+    ReturnSlot registry(context), state(context), callback(context), key(context),
+        reference(context), linked(context);
+    context.load(base.get(context), context.payload<TypeObject>(base).subclasses, registry);
+    if (registry.tag() != ResultTag::Ok)
+        throw std::logic_error("ready type has no subclass registry");
+    auto dictionary = roots.root(registry.value());
+    context.allocate<SubclassBinding>(state, dictionary.get(context));
+    auto binding = roots.root(state.value());
+    SignatureLayout signature;
+    signature.parameters = {{U"ref", ParameterKind::PositionalOnly}};
+    const Value captures[] = {binding.get(context)};
+    make_native_function(context, "remove_subclass", signature, remove_subclass, captures, callback,
+                         NativeFunctionBinding::Function);
+    context.allocate_instance<WeakRefObject>(roots.root(context.builtin(CoreObject::WeakRefType)),
+                                             reference, child.get(context),
+                                             context.builtin(CoreObject::None));
+    auto weak = roots.root(reference.value());
+    context.register_weakref(weak, child, false, linked);
+    make_int_decimal(context,
+                     std::to_string(reinterpret_cast<std::uintptr_t>(child.get(context).object())),
+                     key);
+    dict_store_binding(context, dictionary, roots.root(key.value()), weak,
+                       context.payload<SubclassBinding>(binding).binding, linked);
+    // Exact integer keys cannot call Python; only the managed quota may fail.
+    if (linked.tag() == ResultTag::Raised)
+        throw std::bad_alloc();
+    // The binding is immutable before another thread can obtain the callback.
+    context.store(weak.get(context), context.payload<WeakRefObject>(weak).callback,
+                  callback.value());
+}
+void direct_subclasses(Attachment &context, Handle type, ReturnSlot &out)
+{
+    RootScope roots(context);
+    ReturnSlot snapshot(context);
+    context.load(type.get(context), context.payload<TypeObject>(type).subclasses, snapshot);
+    std::vector<Value> live;
+    if (snapshot.tag() == ResultTag::Ok) {
+        DictView entries(context, snapshot.value());
+        for (const auto &entry : entries.entries()) {
+            auto ref = entry.value;
+            ReturnSlot child(context);
+            context.load(ref, context.payload<WeakRefObject>(ref).target, child);
+            if (child.tag() == ResultTag::Ok)
+                live.push_back(roots.root(child.value()).get(context));
+        }
+    }
+    make_list(context, live, out);
+}
+namespace {
 bool commit_type(Attachment &context, Value type, std::optional<Value> expected, Value desired)
 {
     const auto epoch = context.type_epoch();
@@ -421,7 +504,8 @@ void type_name_store(Attachment &context, Value type, Value name, bool qualified
                                            qualified ? name : std::get<Value>(old.qualname()),
                                            *old.dictionary(), old.storage(),
                                            context.payload<TypeSnapshot>(*old.snapshot()).bases,
-                                           context.payload<TypeSnapshot>(*old.snapshot()).mro);
+                                           context.payload<TypeSnapshot>(*old.snapshot()).mro,
+                                           context.payload<TypeSnapshot>(*old.snapshot()).abstract);
             if (commit_type(context, type, old.snapshot(), staged.value()))
                 return;
         }
@@ -430,7 +514,8 @@ void type_name_store(Attachment &context, Value type, Value name, bool qualified
     }
 }
 bool type_namespace_change(Attachment &context, Value type, const std::u32string &name,
-                           std::optional<Value> key, std::optional<Value> value)
+                           std::optional<Value> key, std::optional<Value> value,
+                           std::optional<bool> abstract)
 {
     RootScope roots(context);
     roots.root(type);
@@ -446,11 +531,12 @@ bool type_namespace_change(Attachment &context, Value type, const std::u32string
                 throw std::logic_error("type mutation requires published metadata");
             if (!copy_name_storage(context, old.storage(), name, key, value, storage))
                 return false;
-            context.allocate<TypeSnapshot>(staged, std::get<Value>(old.name()),
-                                           std::get<Value>(old.qualname()), *old.dictionary(),
-                                           storage.value(),
-                                           context.payload<TypeSnapshot>(*old.snapshot()).bases,
-                                           context.payload<TypeSnapshot>(*old.snapshot()).mro);
+            context.allocate<TypeSnapshot>(
+                staged, std::get<Value>(old.name()), std::get<Value>(old.qualname()),
+                *old.dictionary(), storage.value(),
+                context.payload<TypeSnapshot>(*old.snapshot()).bases,
+                context.payload<TypeSnapshot>(*old.snapshot()).mro,
+                abstract.value_or(context.payload<TypeSnapshot>(*old.snapshot()).abstract));
             if (commit_type(context, type, old.snapshot(), staged.value()))
                 return true;
         }
@@ -468,7 +554,7 @@ bool publish_type_dictionary(Attachment &context, Value type, Value expected, Va
     const auto &old = context.payload<TypeSnapshot>(expected);
     ReturnSlot staged(context);
     context.allocate<TypeSnapshot>(staged, old.name, old.qualname, old.dictionary, storage,
-                                   old.bases, old.mro);
+                                   old.bases, old.mro, old.abstract);
     return commit_type(context, type, expected, staged.value());
 }
 void type_ready(Attachment &context, Handle type, std::optional<Handle> source)

@@ -1,0 +1,10 @@
+b'one\n' 4 [b'two']
+1 2 b'oXY\ntwo'
+b'AXY\ntwo' b'AXY\ntwo'
+BufferError
+BufferError
+BufferError
+0 [b'AXY\n', b'two']
+True False
+True
+ValueError

@@ -22,8 +22,9 @@ struct TypeSnapshot {
     const Value name, qualname, dictionary, bases, mro;
     const std::optional<Value> storage;
     const std::optional<Value> finalizer;
+    const bool abstract;
     TypeSnapshot(InitialType head, Value name, Value qualname, Value dictionary,
-                 std::optional<Value> storage, Value bases, Value mro);
+                 std::optional<Value> storage, Value bases, Value mro, bool abstract = false);
     void trace(Tracer &tracer) const noexcept
     {
         tracer.visit(name);
@@ -42,6 +43,7 @@ struct TypeSnapshot {
 struct TypeObject {
     ObjectHeader header;
     AtomicGcEdge metadata;
+    AtomicGcEdge subclasses;
     // Before metadata publication, names may be native bootstrap text. Publication
     // moves their managed identities to TypeSnapshot and clears these builders.
     std::variant<std::u32string, Value> name;
@@ -131,9 +133,12 @@ void build_type_seeds(Attachment &context, ReturnSlot &object, ReturnSlot &type)
 void initialize_type_dictionary(Attachment &context, Handle type);
 void type_ready(Attachment &context, Handle type, std::optional<Handle> dictionary = {});
 void publish_type(Attachment &context, Value type);
+void register_subclass(Attachment &, Handle base, Handle child);
+void direct_subclasses(Attachment &, Handle type, ReturnSlot &out);
 void type_name_store(Attachment &context, Value type, Value name, bool qualified);
 bool type_namespace_change(Attachment &context, Value type, const std::u32string &name,
-                           std::optional<Value> key, std::optional<Value> value);
+                           std::optional<Value> key, std::optional<Value> value,
+                           std::optional<bool> abstract = {});
 bool publish_type_dictionary(Attachment &, Value type, Value expected, Value storage);
 Handle select_metaclass(Attachment &context, Handle metaclass, std::span<const Handle> bases,
                         RootScope &roots);
