@@ -55,6 +55,12 @@ compiler, VM, and extension platform implemented in a C/C++ mix.
   an entire Python library in C++ just to avoid completing its syntax/dependencies.
   Fixed CPython source may be adapted with provenance, notices and licenses;
   its RC/GIL/private ABI assumptions do not override this runtime's contracts.
+- Prefer copying fixed CPython implementations with provenance over independently
+  approximating their behavior. Keep temporary `Lib/` adaptations in the
+  compatibility ledger with their missing dependency and removal condition;
+  preserve error paths and test them against the fixed reference. Runtime GC,
+  parallelism and extension ABI differences do not justify Python-level semantic
+  changes. Bootstrap readiness is not completeness of builtins or the library.
 - The user allows limited, explained performance regressions, not very large or
   exponential degradation. Preserve raw complexity/performance measurements;
   real CPU parallelism alone does not meet absolute performance acceptance.

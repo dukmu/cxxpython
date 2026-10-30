@@ -83,6 +83,9 @@ class SourceDifferential(unittest.TestCase):
 
     def test_python_importlib_policy(self):
         cases = [
+            ("from importlib import util\nfrom importlib.machinery import FileFinder",
+             "FileFinder('.').path, FileFinder('').path, "
+             "util.spec_from_file_location('relative', './relative.py').origin"),
             ("from importlib.machinery import ModuleSpec\n"
              "a = ModuleSpec('pkg.child', None, origin='memory')\n"
              "b = ModuleSpec('pkg.child', None, origin='memory')",
@@ -102,6 +105,40 @@ class SourceDifferential(unittest.TestCase):
              "b = importlib.import_module('.util', 'importlib')",
              "a is b, a is sys.modules['importlib.util'], a.__package__, "
              "a.__loader__ is a.__spec__.loader"),
+            ("import importlib\nimport sys\nfrom importlib.machinery import ModuleSpec\n"
+             "events = []\nclass Module:\n    pass\n"
+             "class Loader:\n"
+             "    def create_module(self, spec):\n"
+             "        events.append('create')\n        return Module()\n"
+             "    def exec_module(self, module):\n"
+             "        events.append('exec')\n"
+             "        module.value = getattr(module, 'value', 40) + 1\n"
+             "class Finder:\n"
+             "    def find_spec(self, name, path, target=None):\n"
+             "        if name == 'differential_import':\n"
+             "            events.append(target is not None)\n"
+             "            return ModuleSpec(name, Loader())\n"
+             "        return None\n"
+             "sys.meta_path.insert(0, Finder())\n"
+             "m = importlib.import_module('differential_import')\n"
+             "same = importlib.reload(m) is m",
+             "events, same, m.value, m.__spec__._initializing if hasattr(m.__spec__, '_initializing') else False"),
+            ("e = ModuleNotFoundError('missing', name='child', path='source', name_from='parent')\n"
+             "e.args = ('changed',)",
+             "e.name, e.path, e.msg, e.name_from, str(e), e.args"),
+            ("import sys\nfrom importlib import util\n"
+             "sys.modules['plain_parent'] = type(sys)('plain_parent')\n"
+             "try:\n    util.find_spec('plain_parent.child')\n"
+             "except ModuleNotFoundError as e:\n"
+             "    result = (e.name, type(e.__cause__).__name__)\n",
+             "result"),
+            ("import sys\nfrom importlib import util\n"
+             "sys.meta_path = [object()]\n"
+             "missing = util.find_spec('not_discoverable')\n"
+             "sys.meta_path = None\n"
+             "try:\n    util.find_spec('not_discoverable')\n"
+             "except ImportError:\n    shutdown = True\n",
+             "missing, shutdown"),
         ]
         for source, expression in cases:
             with self.subTest(expression=expression):

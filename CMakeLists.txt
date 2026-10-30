@@ -131,6 +131,7 @@ if(BUILD_TESTING)
         Tests/cpp/test_constructors.cpp
         Tests/cpp/test_modules.cpp
         Tests/cpp/test_import.cpp
+        Tests/cpp/test_import_protocol.cpp
         Tests/cpp/test_extension.cpp
         Tests/cpp/test_dict.cpp
         Tests/cpp/test_list.cpp

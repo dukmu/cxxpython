@@ -1,6 +1,7 @@
 #include "internal/compiler.hpp"
 #include "internal/import.hpp"
 
+#include <filesystem>
 #include <fstream>
 #include <iterator>
 
@@ -127,6 +128,97 @@ void file_source(Attachment &context, Handle, std::span<const Value> args, Retur
     if (buffer)
         make_str(context, detail::decode_source(*buffer, {0, buffer->text().size()}), out);
 }
+void registered_data(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!string(context, args[0], out))
+        return;
+    const auto name = context.payload<StrObject>(args[0]).value;
+    const auto definition = detail::find_registered_definition(context, name);
+    if (definition)
+        detail::loader_arguments(context, name, definition, out);
+    else
+        out.ok(context.builtin(CoreObject::None));
+}
+void extension_data(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!string(context, args[0], out) || !string(context, args[1], out))
+        return;
+    const auto name = context.payload<StrObject>(args[0]).value;
+    const auto path = source_utf8(context.payload<StrObject>(args[1]).value);
+    out.reset(context);
+    const auto native = detail::load_extension(context, path, name, out);
+    if (failed(out))
+        return;
+    if (!native)
+        return;
+    const bool package = std::filesystem::path(path).filename() == "__init__.cxxpy.so";
+    auto definition = std::make_shared<const detail::ModuleDefinition>(detail::ModuleDefinition{
+        native, package, path,
+        package ? std::vector<std::string>{std::filesystem::path(path).parent_path().string()}
+                : std::vector<std::string>{}});
+    detail::loader_arguments(context, name, definition, out);
+}
+void path_absolute(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!string(context, args[0], out))
+        return;
+    auto path = source_utf8(context.payload<StrObject>(args[0]).value);
+    // CPython _path_abspath strips one leading './', not embedded '.' or '..'.
+    if (path.starts_with("./"))
+        path.erase(0, 2);
+    std::string absolute;
+    try {
+        NativeWait parked(context);
+        absolute =
+            (path.empty() ? std::filesystem::current_path() : std::filesystem::absolute(path))
+                .string();
+    } catch (const std::filesystem::filesystem_error &error) {
+        raise_error(context,
+                    error.code() == std::errc::no_such_file_or_directory
+                        ? CoreObject::FileNotFoundErrorType
+                        : CoreObject::OSErrorType,
+                    U"cannot resolve import path", out);
+        return;
+    }
+    make_str(context, detail::decode_filename(SourceBuffer("", absolute)), out);
+}
+void is_directory(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!string(context, args[0], out))
+        return;
+    const auto path = source_utf8(context.payload<StrObject>(args[0]).value);
+    bool found;
+    {
+        NativeWait parked(context);
+        std::error_code error;
+        found = std::filesystem::is_directory(path.empty() ? "." : path, error);
+    }
+    out.ok(context.builtin(found ? CoreObject::True : CoreObject::False));
+}
+void is_file(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!string(context, args[0], out))
+        return;
+    const auto path = source_utf8(context.payload<StrObject>(args[0]).value);
+    bool found;
+    {
+        NativeWait parked(context);
+        std::error_code error;
+        found = std::filesystem::is_regular_file(path, error);
+    }
+    out.ok(context.builtin(found ? CoreObject::True : CoreObject::False));
+}
+void create_builtin(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!string(context, args[0], out))
+        return;
+    if (context.payload<StrObject>(args[0]).value != U"builtins") {
+        out.ok(context.builtin(CoreObject::None));
+        return;
+    }
+    RootScope roots(context);
+    make_module(context, U"builtins", out, roots.root(context.builtin(CoreObject::Builtins)));
+}
 void gcd_import(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     if (!string(context, args[0], out))
@@ -203,10 +295,6 @@ void execute_definition(Attachment &context,
                         const std::shared_ptr<const ModuleDefinition> &definition, Handle module,
                         ReturnSlot &out)
 {
-    if (std::holds_alternative<std::monostate>(definition->loader)) {
-        out.ok(context.builtin(CoreObject::None));
-        return;
-    }
     const auto unit = definition_source(context, *definition, out);
     if (failed(out))
         return;
@@ -236,11 +324,7 @@ void loader_arguments(Attachment &context, const std::u32string &name,
     auto append = [&] { values.push_back(roots.root(temporary.value()).get(context)); };
     make_str(context, name, temporary);
     append();
-    const bool ns = std::holds_alternative<std::monostate>(definition->loader);
-    if (ns)
-        temporary.ok(context.builtin(CoreObject::None));
-    else
-        make_str(context, decode_filename(SourceBuffer("", definition->origin)), temporary);
+    make_str(context, decode_filename(SourceBuffer("", definition->origin)), temporary);
     append();
     if (definition->package) {
         std::vector<Value> paths;
@@ -255,27 +339,26 @@ void loader_arguments(Attachment &context, const std::u32string &name,
     const bool file = std::holds_alternative<ModuleDefinition::File>(definition->loader);
     const bool memory =
         std::holds_alternative<std::shared_ptr<const SourceUnit>>(definition->loader);
-    if (!ns && !file)
+    if (!file)
         context.allocate<LoaderBinding>(binding, name, definition);
-    const std::array captures{!ns && !file ? binding.value() : context.builtin(CoreObject::None)};
+    const std::array captures{!file ? binding.value() : context.builtin(CoreObject::None)};
     SignatureLayout signature;
     signature.parameters = {{U"value", ParameterKind::PositionalOnly}};
     for (auto entry :
          {loader_entry<LoaderOperation::Execute>, loader_entry<LoaderOperation::Source>,
           loader_entry<LoaderOperation::Code>}) {
-        if (ns || file || (!memory && entry != loader_entry<LoaderOperation::Execute>))
+        if (file || (!memory && entry != loader_entry<LoaderOperation::Execute>))
             temporary.ok(context.builtin(CoreObject::None));
         else
             make_native_function(context, "loader operation", signature, entry, captures,
                                  temporary);
         append();
     }
-    make_int(context, ns ? 3 : file ? 0 : memory ? 1 : 2, temporary);
+    make_int(context, file ? 0 : memory ? 1 : 2, temporary);
     append();
-    temporary.ok(
-        context.builtin(!ns && definition->origin != "built-in" && !definition->origin.empty()
-                            ? CoreObject::True
-                            : CoreObject::False));
+    temporary.ok(context.builtin(definition->origin != "built-in" && !definition->origin.empty()
+                                     ? CoreObject::True
+                                     : CoreObject::False));
     append();
     cxxpython::core::make_tuple(context, values, out);
 }
@@ -301,6 +384,12 @@ void initialize_imp(Attachment &context, Handle module, ReturnSlot &out)
     if (!install("exec_code", U"exec_code", pair, exec_code) ||
         !install("source_to_code", U"source_to_code", pair, source_to_code) ||
         !install("_get_source", U"_get_source", unary, file_source) ||
+        !install("_registered_data", U"_registered_data", unary, registered_data) ||
+        !install("_extension_data", U"_extension_data", pair, extension_data) ||
+        !install("_path_absolute", U"_path_absolute", unary, path_absolute) ||
+        !install("_is_directory", U"_is_directory", unary, is_directory) ||
+        !install("_is_file", U"_is_file", unary, is_file) ||
+        !install("_create_builtin", U"_create_builtin", unary, create_builtin) ||
         !install("_gcd_import", U"_gcd_import", triple, gcd_import) ||
         !install("_reload", U"_reload", pair, reload) ||
         !install("is_builtin", U"is_builtin", unary, is_builtin) ||

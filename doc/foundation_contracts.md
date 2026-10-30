@@ -93,11 +93,12 @@ Module identity/equality/hash inherit object behavior. The ordinary dictionary
 tail traces namespace values; __dict__ is read-only as an attribute, while its
 bindings remain mutable. Constructors preserve subtype layouts. __getattribute__
 uses generic descriptors/namespace lookup before the module-level __getattr__
-callback, which receives only the name. ImportError name/path fields are traced
-tail slots with None defaults. The CLI's __main__ and imported __main__ are the
+callback, which receives only the name. ImportError name/path/msg/name_from fields
+are traced tail slots; construction accepts the upstream keyword-only fields and
+str uses a string msg before falling back to BaseException args. The CLI's __main__ and imported __main__ are the
 same object/namespace; builtins module/dictionary identities are canonical.
 
-File lookup snapshots the current iterable sys.path or parent's __path__,
+Python FileFinder/PathFinder lookup snapshots the current iterable sys.path or parent's __path__,
 skipping non-string entries. Package __init__.py takes precedence over .py;
 namespace directory portions are combined unless a concrete module/package wins.
 Filesystem reads and native source compilation park through NativeWait with only
@@ -149,12 +150,30 @@ to None (explicit assignments remain mutable). module_from_spec does not registe
 the result in sys.modules. Importlib machinery/util export the implemented
 classes and helper, not a placeholder full CPython importlib API.
 
-Complete sys/module/reflection methods, general PEP 451 finders/path hooks,
-Python-defined loader discovery and the remaining container matrix are still
-gates. Namespace-package paths are
-currently mutable static list snapshots, not full PEP 420 paths. Auto-refresh after a namespace
-parent search path changes, path hooks and bytecode caches remain pending.
-This node therefore does not complete the active module-stage goal.
+Ordinary imports honor sys.meta_path, sys.path_hooks and sys.path_importer_cache.
+Registered modules go through RegistryFinder; clearing meta_path does not enable
+an implicit native fallback. The old C++ file-search policy has been deleted.
+Only configured seed definitions during cold bootstrap and the script __main__
+entry bypass discovery. Python create_module results may be module-like objects;
+package paths and child binding use attribute protocols, not native Module casts.
+Reload passes the existing object as target and does not call create_module again.
+Finder/creator/executor failures propagate through the same per-module transaction;
+finder-populated cache entries and user replacements remain authoritative.
+
+FileFinder supports actual custom loader factories/suffixes. Namespace paths
+refresh after parent-path changes and invalidate_caches while preserving path
+identity. One immutable (parent, epoch, path) snapshot is published per refresh,
+and exact-list tuple construction uses rooted synchronized list snapshots.
+Importlib util exposes find_spec, resolve_name, spec_from_loader and
+spec_from_file_location on those real objects. The fixed-reference tests include
+custom objects/reload, missing parent errors and shutdown discovery errors.
+
+Complete sys/module/reflection methods, directory/mtime/case caches, bytecode
+caches, deprecated loader compatibility, warning/metadata/resource integration,
+encoding and installation configuration remain gates, as does the remaining
+builtin/container matrix. Follow the dependency/removal conditions in
+[cpython_compatibility.md](cpython_compatibility.md); the active full-route goal
+is not complete.
 
 ## Dictionary And Namespace Storage
 

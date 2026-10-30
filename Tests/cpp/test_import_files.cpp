@@ -158,7 +158,14 @@ TEST_F(FileImports, NamespacePortionsAndIterablePathReassignment)
     ASSERT_EQ(out.tag(), ResultTag::Ok);
     const auto package = roots.root(out.value());
     auto package_path = roots.root(attribute(package, U"__path__"));
-    EXPECT_EQ(detail::list_size(context, package_path), 2u);
+    import_module(context, U"__main__", out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    const auto globals = roots.root(module_dict(context, out.value()));
+    make_str(context, U"package_path", out);
+    detail::name_store(context, globals.get(context), out.value(), package_path.get(context));
+    SourceUnit length_check(SourceBuffer("assert len(package_path) == 2\n"));
+    run(context, {&length_check, globals}, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
     EXPECT_EQ(attribute(package, U"__file__"), context.builtin(CoreObject::None));
     const auto spec = roots.root(attribute(package, U"__spec__"));
     EXPECT_EQ(attribute(spec, U"origin"), context.builtin(CoreObject::None));
@@ -180,6 +187,46 @@ TEST_F(FileImports, NamespacePortionsAndIterablePathReassignment)
     import_module(context, U"ns.third", out);
     ASSERT_EQ(out.tag(), ResultTag::Ok);
     EXPECT_EQ(int_decimal(context, attribute(roots.root(out.value()), U"value")), "3");
+}
+
+TEST_F(FileImports, NamespacePathTracksParentChangesAndInvalidation)
+{
+    write("one/dynamic_ns/first.py", "value = 1\n");
+    write("two/dynamic_ns/second.py", "value = 2\n");
+    write("three/dynamic_ns/third.py", "value = 3\n");
+    ReturnSlot out(context);
+    const std::array paths{(directory / "one").string()};
+    set_import_path(context, paths, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    import_module(context, U"__main__", out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    const auto globals = roots.root(module_dict(context, out.value()));
+    for (const auto &[name, path] : std::array{std::pair{U"second_path", directory / "two"},
+                                               std::pair{U"third_path", directory / "three"}}) {
+        ReturnSlot key(context), value(context);
+        make_str(context, name, key);
+        make_str(context, detail::decode_filename(SourceBuffer("", path.string())), value);
+        detail::name_store(context, globals.get(context), key.value(), value.value());
+    }
+    SourceUnit check(SourceBuffer(R"(import sys
+import importlib
+import dynamic_ns
+original_path = dynamic_ns.__path__
+assert len(original_path) == 1
+sys.path.append(second_path)
+import dynamic_ns.second
+assert dynamic_ns.second.value == 2
+assert dynamic_ns.__path__ is original_path
+assert len(original_path) == 2
+sys.path = [third_path]
+importlib.invalidate_caches()
+import dynamic_ns.third
+assert dynamic_ns.third.value == 3
+assert dynamic_ns.__path__ is original_path
+assert len(original_path) == 1
+)"));
+    run(context, {&check, globals}, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
 }
 
 TEST_F(FileImports, LoaderRereadsSourceAndReloadRetainsNamespaceOnSuccessAndFailure)

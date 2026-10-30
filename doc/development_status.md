@@ -1,5 +1,68 @@
 # Development Status
 
+## 2026-10-30 Unified Finder Protocol And CPython Compatibility Direction
+
+Prepended without rewriting earlier entries. Previous stable node: 5dce200.
+The full frontend/import/library/N4-N6/M0-M9 goal remains active. Modern import
+protocol evidence below is not completion of all builtins, importlib or release
+acceptance. The user's latest CPython-copy/compatibility requirements are recorded
+in Plan 2 section 0.11, AGENTS.md and doc/cpython_compatibility.md.
+
+- Ordinary imports now use actual Python sys.meta_path discovery followed by
+  module_from_spec/create_module and exec_module in the existing per-module
+  transaction. RegistryFinder handles registered source/native definitions;
+  PathFinder/FileFinder honor path_hooks, path_importer_cache and real custom
+  loader factories/suffixes. Empty meta_path has no implicit native fallback.
+  Deleted the old C++ filesystem search policy and its native namespace-definition
+  variant. Only configured bootstrap seeds and the script entry bypass discovery.
+- Copied/adapted the fixed CPython 3.12.14 _find_spec, module_from_spec, PathFinder,
+  namespace and util flows, retaining license/provenance and meaningful error
+  paths. No whole CPython execution/import lock or RC model was copied. Native
+  primitives provide file probes, cwd/path handling, extension loading and source
+  execution; public import policy stays in Lib. Remaining upstream dependencies
+  and adaptation removal conditions are listed in the compatibility ledger.
+- Custom create_module objects, package paths and child attributes use ordinary
+  object protocols rather than requiring native Module layouts. Reload receives
+  the original object as target, preserves identity/bindings and does not recreate
+  it. Finder errors, execution failures, OOM and user replacements retain the same
+  GC-safe rollback semantics. No registry/namespace mutex spans Python bodies.
+- Namespace paths now follow parent path mutation/replacement and invalidation
+  without changing their identity. One immutable (parent, epoch, path) state tuple
+  and fresh epoch identities replace GIL-dependent multi-field publication.
+  tuple(exact_list) uses the existing rooted synchronized list snapshot; subclasses
+  retain their own iteration protocol. Cache invalidation snapshots the dictionary
+  before callbacks, drops missing/relative entries and invalidates path finders.
+- Preserved copied util.find_spec exception fields/chains by implementing native
+  ImportError keyword fields name/path/msg/name_from and string-msg behavior,
+  following pinned Objects/exceptions.c. BaseException.__new__ now accepts keyword
+  forwarding while its initializer retains validation. FileNotFoundError is a real
+  OSError subtype; complete errno/platform exception matrices are still pending.
+- Fixed-reference tests exposed the FileFinder('.')/empty-path and leading './'
+  normalization difference. Retained the failing observations, then matched
+  CPython's cwd and _path_abspath behavior without normalizing embedded dot/dotdot
+  components. An old rollback test now instruments the actual creation/execution
+  boundary instead of assuming a fixed count of module-table equality reads.
+  Its zero-quota cleanup/no-extra-callback assertion is preserved.
+- Final normal CTest passes 457/457. ASan/UBSan/LSan native passes 449/449 before
+  the localized path correction; the final binary reruns all 47 affected import/
+  file/extension/concurrency cases successfully. Final TSan native passes 447/447,
+  excluding only the established two allocation enumerations covered elsewhere.
+  Final normal and ASan product-entry policy differentials pass all nine pinned
+  CPython cases, retaining raw observations and executable hashes. Formatting and
+  all 244 generated grammar-rule consistency checks pass. No new sanitizer
+  exclusion, CPU benchmark rerun or hand-built performance table was introduced.
+- Evidence remains under .cache/import-protocol-*: final normal CTest, native
+  sanitizer logs/copied outputs, affected ASan rerun, policy differential JSON/logs
+  and the failing path-before report. Sanitizer lifecycle handles were confirmed
+  terminal before declaring success or replacing their binaries.
+- Next main dependency is Base builtins/type/bytes/buffer and real I/O/encoding,
+  not additional small import hardening. Canonical builtins/bootstrap readiness
+  is not full compatibility: print/open/input, bytes/set/super, compile/eval/exec,
+  complete constructors/protocols and the specified library closures remain.
+  Directory caches, warning/metadata/resource/deprecated-loader integration and
+  installation/product entry acceptance follow their real dependencies. The
+  user's temporary_plan.md deletion and untracked test2.py remain untouched.
+
 ## 2026-10-30 Real Python Import Policy, Loaders And Reload
 
 Prepended without changing earlier records. Previous stable node: de4838c,

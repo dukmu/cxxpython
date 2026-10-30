@@ -61,6 +61,7 @@ enum class CoreObject : std::size_t {
     IndentationErrorType,
     TabErrorType,
     OSErrorType,
+    FileNotFoundErrorType,
     NativeFunctionType,
     MethodDescriptorType,
     BoundMethodType,

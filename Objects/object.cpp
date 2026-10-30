@@ -578,7 +578,7 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
         if (id == CoreObject::FunctionType || id == CoreObject::ModuleType)
             spec.slots = std::vector<std::u32string>{U"__dict__"};
         if (id == CoreObject::ImportErrorType)
-            spec.slots = std::vector<std::u32string>{U"name", U"path"};
+            spec.slots = std::vector<std::u32string>{U"name", U"path", U"msg", U"name_from"};
         if (id == CoreObject::StopIterationType)
             spec.slots = std::vector<std::u32string>{U"value"};
         create_native_type(context, NativeTypeSpec{spec, layout},
@@ -644,6 +644,8 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
            at(CoreObject::IndentationErrorType));
     define(CoreObject::OSErrorType, "OSError", LayoutDescriptor::of<ExceptionObject>(),
            at(CoreObject::ExceptionType));
+    define(CoreObject::FileNotFoundErrorType, "FileNotFoundError",
+           LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::OSErrorType));
     define(CoreObject::NativeFunctionType, "builtin_function_or_method",
            LayoutDescriptor::of<NativeFunctionObject>());
     define(CoreObject::MethodDescriptorType, "method_descriptor",
@@ -841,6 +843,7 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                     CoreObject::IndentationErrorType,
                     CoreObject::TabErrorType,
                     CoreObject::OSErrorType,
+                    CoreObject::FileNotFoundErrorType,
                     CoreObject::PropertyType,
                     CoreObject::StaticMethodType,
                     CoreObject::ClassMethodType})

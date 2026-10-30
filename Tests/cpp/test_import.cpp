@@ -333,13 +333,28 @@ TEST_F(Imports, EqualKeyPublicationRollsBackAtZeroQuotaWithoutAnotherCallback)
     SourceUnit setup(SourceBuffer(R"(import sys
 class CacheKey:
     calls = 0
+    match = False
     def __hash__(self):
         return hash('unstable_cache')
     def __eq__(self, other):
         self.calls = self.calls + 1
-        return self.calls > 1
+        return self.match
 key = CacheKey()
 sys.modules[key] = False
+from importlib._bootstrap import NativeLoader
+create = NativeLoader.create_module
+execute = NativeLoader.exec_module
+def created(self, spec):
+    module = create(self, spec)
+    if spec.name == 'unstable_cache':
+        key.match = True
+    return module
+def executed(self, module):
+    if module.__name__ == 'unstable_cache':
+        key.before_cleanup = key.calls
+    return execute(self, module)
+NativeLoader.create_module = created
+NativeLoader.exec_module = executed
 )"));
     run(context, {&setup, globals}, out);
     ASSERT_EQ(out.tag(), ResultTag::Ok);
@@ -354,7 +369,8 @@ sys.modules[key] = False
     ASSERT_EQ(out.tag(), ResultTag::Raised);
     EXPECT_EQ(out.exception(), context.builtin(CoreObject::MemoryError));
     context.collect();
-    EXPECT_EQ(int_decimal(context, attribute(key, U"calls")), "2");
+    EXPECT_EQ(int_decimal(context, attribute(key, U"calls")),
+              int_decimal(context, attribute(key, U"before_cleanup")));
     dict_lookup(context, roots.root(context.builtin(CoreObject::Modules)), key, out);
     EXPECT_EQ(out.tag(), ResultTag::Empty);
 }

@@ -1,7 +1,14 @@
 """Python import policy backed by the runtime's native import primitives."""
 
 import _imp
+import sys
 from . import _bootstrap
+
+
+def invalidate_caches():
+    for finder in tuple(sys.meta_path):
+        if hasattr(finder, 'invalidate_caches'):
+            finder.invalidate_caches()
 
 
 def import_module(name, package=None):

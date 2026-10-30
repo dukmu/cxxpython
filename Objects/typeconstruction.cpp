@@ -122,6 +122,22 @@ void stop_init(Attachment &context, Handle fn, std::span<const Value> args, Retu
     context.store(args[0], context.instance_slot(args[0], 0),
                   items.empty() ? context.builtin(CoreObject::None) : items[0]);
 }
+// CPython 3.12.14 Objects/exceptions.c ImportError_init, using traced tail slots.
+void import_error_init(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!is_instance(context, args[0], CoreObject::ImportErrorType)) {
+        type_error(context, U"ImportError.__init__ requires ImportError", out);
+        return;
+    }
+    context.store(args[0], context.payload<ExceptionObject>(args[0]).args, args[4]);
+    context.store(args[0], context.instance_slot(args[0], 0), args[1]);
+    context.store(args[0], context.instance_slot(args[0], 1), args[2]);
+    context.store(args[0], context.instance_slot(args[0], 3), args[3]);
+    const auto &items = context.payload<TupleObject>(args[4]).items;
+    context.store(args[0], context.instance_slot(args[0], 2),
+                  items.size() == 1 ? items[0] : context.builtin(CoreObject::None));
+    out.ok(context.builtin(CoreObject::None));
+}
 void type_call(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_type(context, args[0])) {
@@ -562,32 +578,36 @@ void tuple_new(Attachment &context, Handle, std::span<const Value> args, ReturnS
     std::vector<Value> items;
     if (!values.empty()) {
         const auto source = roots.root(values[0]);
-        ReturnSlot iterator(context), item(context);
-        get_iter(context, source, iterator);
-        if (raised(iterator)) {
-            out.raised(iterator.exception());
-            return;
-        }
-        const auto input = roots.root(iterator.value());
-        const auto hint = detail::length_hint(context, source, item);
-        if (!hint) {
-            out.raised(item.exception());
-            return;
-        }
-        if (*hint > items.max_size()) {
-            out.raised(context.builtin(CoreObject::MemoryError));
-            return;
-        }
-        items.reserve(*hint);
-        for (;;) {
-            const auto status = iter_next(context, input, item);
-            if (status == NextStatus::Done)
-                break;
-            if (status == NextStatus::Raised) {
+        if (context.type_of(source) == context.builtin(CoreObject::ListType))
+            detail::list_snapshot(context, source, roots, items);
+        else {
+            ReturnSlot iterator(context), item(context);
+            get_iter(context, source, iterator);
+            if (raised(iterator)) {
+                out.raised(iterator.exception());
+                return;
+            }
+            const auto input = roots.root(iterator.value());
+            const auto hint = detail::length_hint(context, source, item);
+            if (!hint) {
                 out.raised(item.exception());
                 return;
             }
-            items.push_back(roots.root(item.value()).get(context));
+            if (*hint > items.max_size()) {
+                out.raised(context.builtin(CoreObject::MemoryError));
+                return;
+            }
+            items.reserve(*hint);
+            for (;;) {
+                const auto status = iter_next(context, input, item);
+                if (status == NextStatus::Done)
+                    break;
+                if (status == NextStatus::Raised) {
+                    out.raised(item.exception());
+                    return;
+                }
+                items.push_back(roots.root(item.value()).get(context));
+            }
         }
     }
     if (exact && items.empty())
@@ -688,10 +708,18 @@ void install_construction(Attachment &context, std::span<const Handle> core)
     SignatureLayout exception;
     exception.parameters = {{U"self", ParameterKind::PositionalOnly}};
     exception.varargs = U"args";
-    install(at(CoreObject::BaseExceptionType), U"__new__", exception, exception_new,
+    install(at(CoreObject::BaseExceptionType), U"__new__", variadic, exception_new,
             Binding::Static);
     install(at(CoreObject::BaseExceptionType), U"__init__", exception, exception_init);
     install(at(CoreObject::StopIterationType), U"__init__", exception, stop_init);
+    auto import_error = exception;
+    import_error.parameters.push_back(
+        {U"name", ParameterKind::KeywordOnly, at(CoreObject::None).get(context)});
+    import_error.parameters.push_back(
+        {U"path", ParameterKind::KeywordOnly, at(CoreObject::None).get(context)});
+    import_error.parameters.push_back(
+        {U"name_from", ParameterKind::KeywordOnly, at(CoreObject::None).get(context)});
+    install(at(CoreObject::ImportErrorType), U"__init__", import_error, import_error_init);
     install(type, U"__call__", variadic, type_call);
     install(type, U"__init__", variadic, type_init);
     install(type, U"__prepare__", variadic, type_prepare, Binding::Class);
