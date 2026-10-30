@@ -16,7 +16,7 @@
 #include <utility>
 #include <vector>
 
-// Internal, unstable M1 storage API. No dependency on the legacy runtime.
+// Internal runtime storage, roots and attachment API. Not a public extension ABI.
 namespace cxxpython::core {
 struct ObjectHeader;
 class Attachment;
@@ -76,6 +76,12 @@ enum class CoreObject : std::size_t {
     TupleIteratorType,
     StrIteratorType,
     ModuleType,
+    DictKeysType,
+    DictValuesType,
+    DictItemsType,
+    DictKeyIteratorType,
+    DictValueIteratorType,
+    DictItemIteratorType,
     None,
     NotImplemented,
     False,

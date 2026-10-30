@@ -41,8 +41,9 @@ records coordinate owners/waiters; the managed module table is the only complete
 module authority. File lookup snapshots Python-visible search paths, then reads
 and compiles while parked. Source import statements lower through the existing
 scope/CFG passes into verified import opcodes and normal calls/unwinding.
-ModuleSpec/importlib policy and the dynamic C extension interface remain pending,
-not separate runtimes.
+`Python/extension.cpp` bridges the versioned C API and POSIX dynamic libraries into
+that same transaction. ModuleSpec/importlib policy remains pending, not a separate
+runtime.
 
 ## Objects And Lifetime
 
@@ -63,8 +64,10 @@ operations. `Objects/rangeobject.cpp` owns immutable arbitrary-integer ranges an
 their iterators; `Objects/iterobject.cpp` owns iteration and immutable sequence
 indexing. `Include/internal/long.hpp` shares the existing integer representation
 and publication helper, without a second numeric implementation.
-`Objects/object.cpp` contains the initial values, name dictionaries,
-core image and common object construction. Generated Unicode tables are private
+`Objects/object.cpp` contains the initial values, shared dictionary/namespace
+storage, core image and common object construction. `Objects/dictobject.cpp` owns
+public dict/mappingproxy methods, views and iterators; callbacks use ordinary
+protocols outside storage locks. Generated Unicode tables are private
 to Objects and retain their generator/source provenance.
 `Objects/moduleobject.cpp` uses the ordinary instance dictionary as the module
 namespace, including descriptor lookup and module-level __getattr__. Module
@@ -78,8 +81,9 @@ image lifecycle. These coupled lifetime operations remain in one translation
 unit; moving them does not introduce an extra lifetime authority or new locking.
 
 Runtime contracts are in `Include/cxxpython/`. Compiler-private implementation
-structures belong in `Include/internal/`. All C++ interfaces remain unstable;
-there is currently no extension ABI or CPython ABI compatibility promise.
+structures belong in `Include/internal/`. All C++ interfaces remain unstable.
+`Include/cxxpython/extension.h` specifies the experimental C11 extension ABI;
+there is no CPython ABI compatibility promise.
 
 ## Parallel Execution
 

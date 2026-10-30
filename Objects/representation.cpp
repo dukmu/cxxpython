@@ -106,10 +106,7 @@ void string_hash(Attachment &context, Handle, std::span<const Value> args, Retur
         return;
     }
     const auto &text = context.payload<StrObject>(args[0]).value;
-    auto word = text.empty() ? 0
-                             : static_cast<std::uintptr_t>(context.keyed_hash(
-                                   std::as_bytes(std::span(text.data(), text.size()))));
-    make_int(context, signed_hash(word), out);
+    make_int(context, detail::name_hash(context, text), out);
 }
 void string_str(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
@@ -275,6 +272,66 @@ void tuple_hash(Attachment &context, Handle, std::span<const Value> args, Return
                                                                        : signed_hash(accumulator),
              out);
 }
+void dictionary_repr(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(context);
+    const auto self = roots.root(args[0]);
+    const auto is_dict = context.has_layout<DictObject>(args[0]);
+    const auto is_proxy = context.has_layout<MappingProxyObject>(args[0]);
+    const auto is_view = context.has_layout<DictViewObject>(args[0]);
+    if (!is_dict && !is_proxy && !is_view) {
+        type_error(context, out);
+        return;
+    }
+    ReprGuard recursion(context, self);
+    if (!recursion.entered) {
+        make_str(context, U"{...}", out);
+        return;
+    }
+    auto dictionary = args[0];
+    if (is_proxy)
+        dictionary = context.payload<MappingProxyObject>(self).mapping;
+    if (is_view)
+        dictionary = context.payload<DictViewObject>(self).dictionary;
+    DictView entries(context, dictionary);
+    const auto kind = is_view ? context.payload<DictViewObject>(self).kind : DictViewKind::Items;
+    std::u32string result = is_proxy                       ? U"mappingproxy({"
+                            : !is_view                     ? U"{"
+                            : kind == DictViewKind::Keys   ? U"dict_keys(["
+                            : kind == DictViewKind::Values ? U"dict_values(["
+                                                           : U"dict_items([";
+    bool first = true;
+    ReturnSlot text(context);
+    for (const auto &entry : entries.entries()) {
+        if (!first)
+            result += U", ";
+        first = false;
+        if (is_view && kind == DictViewKind::Items)
+            result += U'(';
+        if (kind != DictViewKind::Values) {
+            repr(context, roots.root(entry.key), text);
+            if (raised(text)) {
+                out.raised(text.exception());
+                return;
+            }
+            result += context.payload<StrObject>(text.value()).value;
+        }
+        if (kind != DictViewKind::Keys) {
+            if (kind == DictViewKind::Items)
+                result += is_view ? U", " : U": ";
+            repr(context, roots.root(entry.value), text);
+            if (raised(text)) {
+                out.raised(text.exception());
+                return;
+            }
+            result += context.payload<StrObject>(text.value()).value;
+        }
+        if (is_view && kind == DictViewKind::Items)
+            result += U')';
+    }
+    result += is_proxy ? U"})" : is_view ? U"])" : U"}";
+    make_str(context, std::move(result), out);
+}
 template <CompareOp Op>
 void tuple_compare(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
@@ -439,6 +496,9 @@ void install_value_protocols(Attachment &context, std::span<const Handle> core)
     install_native_attribute(context, core, at(CoreObject::StrType), U"__add__", pair, string_add);
     install(at(CoreObject::TupleType), U"__hash__", tuple_hash);
     install(at(CoreObject::TupleType), U"__repr__", tuple_repr);
+    for (auto type : {CoreObject::DictType, CoreObject::MappingProxyType, CoreObject::DictKeysType,
+                      CoreObject::DictValuesType, CoreObject::DictItemsType})
+        install(at(type), U"__repr__", dictionary_repr);
     install(at(CoreObject::CellType), U"__repr__", cell_repr);
     install(at(CoreObject::NoneType), U"__hash__", none_hash);
     install(at(CoreObject::MappingProxyType), U"__hash__", proxy_hash);

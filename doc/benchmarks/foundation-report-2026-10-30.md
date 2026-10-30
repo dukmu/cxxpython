@@ -9,6 +9,267 @@ Storage/native delivery probes do not establish Python VM parallelism. RSS is th
 
 | Series | Probe | Workers | Metric | Unit | Samples | Median | Min | Max |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| dict-namespace-cabi-idle | cleanup_iterations | - | active_region_bytes | bytes | 3 | 32.000 | 32.000 | 32.000 |
+| dict-namespace-cabi-idle | cleanup_iterations | - | cleanup_continuation_bytes | bytes | 3 | 48.000 | 48.000 | 48.000 |
+| dict-namespace-cabi-idle | cleanup_iterations | - | cleanup_function_ns | ms | 3 | 12.250 | 11.900 | 12.386 |
+| dict-namespace-cabi-idle | function_iterations | - | frame_prefix_bytes | bytes | 3 | 288.000 | 288.000 | 288.000 |
+| dict-namespace-cabi-idle | function_iterations | - | verified_function_ns | ms | 3 | 9.835 | 9.761 | 10.431 |
+| dict-namespace-cabi-idle | hash_iterations | - | string_hash_ns | ms | 3 | 41.599 | 40.875 | 41.608 |
+| dict-namespace-cabi-idle | hash_iterations | - | tuple_repr_ns | ms | 3 | 11.468 | 11.438 | 11.728 |
+| dict-namespace-cabi-idle | int_iterations | - | big_int_mul_ns | ms | 3 | 4.810 | 4.636 | 5.136 |
+| dict-namespace-cabi-idle | int_iterations | - | int_add_ns | ms | 3 | 39.333 | 38.477 | 39.958 |
+| dict-namespace-cabi-idle | int_iterations | - | int_object_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| dict-namespace-cabi-idle | iterations | - | allocation_and_auto_gc_ns | ms | 3 | 3.920 | 3.887 | 3.941 |
+| dict-namespace-cabi-idle | iterations | - | handle_bytes | bytes | 3 | 32.000 | 32.000 | 32.000 |
+| dict-namespace-cabi-idle | iterations | - | header_bytes | bytes | 3 | 8.000 | 8.000 | 8.000 |
+| dict-namespace-cabi-idle | iterations | - | last_gc_pause_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| dict-namespace-cabi-idle | iterations | - | live_bytes | bytes | 3 | 0.000 | 0.000 | 0.000 |
+| dict-namespace-cabi-idle | iterations | - | node_bytes | bytes | 3 | 16.000 | 16.000 | 16.000 |
+| dict-namespace-cabi-idle | iterations | - | recorded_metadata_bytes | bytes | 3 | 3360.000 | 3360.000 | 3360.000 |
+| dict-namespace-cabi-idle | iterations | - | root_register_release_ns | ms | 3 | 2.119 | 2.108 | 2.222 |
+| dict-namespace-cabi-idle | native_call_iterations | - | core_live_bytes | bytes | 3 | 194737.000 | 194737.000 | 194737.000 |
+| dict-namespace-cabi-idle | native_call_iterations | - | core_metadata_bytes | bytes | 3 | 159792.000 | 159792.000 | 159792.000 |
+| dict-namespace-cabi-idle | native_call_iterations | - | core_reserved_bytes | bytes | 3 | 452232.000 | 452232.000 | 452232.000 |
+| dict-namespace-cabi-idle | native_call_iterations | - | lookup_bind_call_ns | ms | 3 | 15.685 | 15.662 | 15.727 |
+| dict-namespace-cabi-idle | native_call_iterations | - | native_call_ns | ms | 3 | 8.703 | 8.648 | 8.897 |
+| dict-namespace-cabi-idle | parallel_class_workers | 1 | finish_live_bytes | bytes | 3 | 202561.000 | 202561.000 | 202561.000 |
+| dict-namespace-cabi-idle | parallel_class_workers | 1 | finish_metadata_bytes | bytes | 3 | 248560.000 | 248560.000 | 248560.000 |
+| dict-namespace-cabi-idle | parallel_class_workers | 1 | finish_reserved_bytes | bytes | 3 | 608480.000 | 608480.000 | 608480.000 |
+| dict-namespace-cabi-idle | parallel_class_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.035 | 0.026 | 0.055 |
+| dict-namespace-cabi-idle | parallel_class_workers | 1 | max_rendezvous_ns | ms | 3 | 0.001 | 0.001 | 0.001 |
+| dict-namespace-cabi-idle | parallel_class_workers | 1 | process_cpu_ns | ms | 3 | 341.671 | 341.186 | 341.974 |
+| dict-namespace-cabi-idle | parallel_class_workers | 1 | source_freeze_run_ns | ms | 3 | 0.131 | 0.125 | 0.178 |
+| dict-namespace-cabi-idle | parallel_class_workers | 1 | wall_ns | ms | 3 | 370.151 | 369.611 | 370.456 |
+| dict-namespace-cabi-idle | parallel_class_workers | 2 | finish_live_bytes | bytes | 3 | 341953.000 | 314585.000 | 352209.000 |
+| dict-namespace-cabi-idle | parallel_class_workers | 2 | finish_metadata_bytes | bytes | 3 | 307328.000 | 304864.000 | 354496.000 |
+| dict-namespace-cabi-idle | parallel_class_workers | 2 | finish_reserved_bytes | bytes | 3 | 809160.000 | 804944.000 | 895600.000 |
+| dict-namespace-cabi-idle | parallel_class_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.090 | 0.074 | 0.121 |
+| dict-namespace-cabi-idle | parallel_class_workers | 2 | max_rendezvous_ns | ms | 3 | 0.187 | 0.095 | 0.467 |
+| dict-namespace-cabi-idle | parallel_class_workers | 2 | process_cpu_ns | ms | 3 | 377.336 | 365.796 | 393.367 |
+| dict-namespace-cabi-idle | parallel_class_workers | 2 | source_freeze_run_ns | ms | 3 | 0.102 | 0.101 | 0.102 |
+| dict-namespace-cabi-idle | parallel_class_workers | 2 | wall_ns | ms | 3 | 221.473 | 215.993 | 228.405 |
+| dict-namespace-cabi-idle | parallel_class_workers | 4 | finish_live_bytes | bytes | 3 | 349225.000 | 295881.000 | 383249.000 |
+| dict-namespace-cabi-idle | parallel_class_workers | 4 | finish_metadata_bytes | bytes | 3 | 447136.000 | 393312.000 | 447136.000 |
+| dict-namespace-cabi-idle | parallel_class_workers | 4 | finish_reserved_bytes | bytes | 3 | 1092304.000 | 940456.000 | 1092304.000 |
+| dict-namespace-cabi-idle | parallel_class_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.095 | 0.088 | 0.100 |
+| dict-namespace-cabi-idle | parallel_class_workers | 4 | max_rendezvous_ns | ms | 3 | 1.000 | 0.900 | 1.051 |
+| dict-namespace-cabi-idle | parallel_class_workers | 4 | process_cpu_ns | ms | 3 | 471.942 | 459.998 | 484.394 |
+| dict-namespace-cabi-idle | parallel_class_workers | 4 | source_freeze_run_ns | ms | 3 | 0.111 | 0.110 | 0.126 |
+| dict-namespace-cabi-idle | parallel_class_workers | 4 | wall_ns | ms | 3 | 167.027 | 161.161 | 171.085 |
+| dict-namespace-cabi-idle | parallel_closure_workers | 1 | finish_live_bytes | bytes | 3 | 220897.000 | 220897.000 | 220897.000 |
+| dict-namespace-cabi-idle | parallel_closure_workers | 1 | finish_metadata_bytes | bytes | 3 | 203696.000 | 203696.000 | 203696.000 |
+| dict-namespace-cabi-idle | parallel_closure_workers | 1 | finish_reserved_bytes | bytes | 3 | 530216.000 | 530216.000 | 530216.000 |
+| dict-namespace-cabi-idle | parallel_closure_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.033 | 0.026 | 0.103 |
+| dict-namespace-cabi-idle | parallel_closure_workers | 1 | max_rendezvous_ns | ms | 3 | 0.001 | 0.001 | 0.001 |
+| dict-namespace-cabi-idle | parallel_closure_workers | 1 | process_cpu_ns | ms | 3 | 162.576 | 160.898 | 163.542 |
+| dict-namespace-cabi-idle | parallel_closure_workers | 1 | source_freeze_run_ns | ms | 3 | 0.069 | 0.069 | 0.080 |
+| dict-namespace-cabi-idle | parallel_closure_workers | 1 | wall_ns | ms | 3 | 176.145 | 174.329 | 177.161 |
+| dict-namespace-cabi-idle | parallel_closure_workers | 2 | finish_live_bytes | bytes | 3 | 374177.000 | 373169.000 | 374201.000 |
+| dict-namespace-cabi-idle | parallel_closure_workers | 2 | finish_metadata_bytes | bytes | 3 | 471552.000 | 433984.000 | 471552.000 |
+| dict-namespace-cabi-idle | parallel_closure_workers | 2 | finish_reserved_bytes | bytes | 3 | 993720.000 | 928072.000 | 993720.000 |
+| dict-namespace-cabi-idle | parallel_closure_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.081 | 0.081 | 0.103 |
+| dict-namespace-cabi-idle | parallel_closure_workers | 2 | max_rendezvous_ns | ms | 3 | 0.161 | 0.035 | 0.181 |
+| dict-namespace-cabi-idle | parallel_closure_workers | 2 | process_cpu_ns | ms | 3 | 175.082 | 172.198 | 177.068 |
+| dict-namespace-cabi-idle | parallel_closure_workers | 2 | source_freeze_run_ns | ms | 3 | 0.060 | 0.058 | 0.069 |
+| dict-namespace-cabi-idle | parallel_closure_workers | 2 | wall_ns | ms | 3 | 99.932 | 96.810 | 101.101 |
+| dict-namespace-cabi-idle | parallel_closure_workers | 4 | finish_live_bytes | bytes | 3 | 274313.000 | 244457.000 | 295193.000 |
+| dict-namespace-cabi-idle | parallel_closure_workers | 4 | finish_metadata_bytes | bytes | 3 | 367584.000 | 367584.000 | 405152.000 |
+| dict-namespace-cabi-idle | parallel_closure_workers | 4 | finish_reserved_bytes | bytes | 3 | 796776.000 | 796776.000 | 862424.000 |
+| dict-namespace-cabi-idle | parallel_closure_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.098 | 0.073 | 0.110 |
+| dict-namespace-cabi-idle | parallel_closure_workers | 4 | max_rendezvous_ns | ms | 3 | 0.601 | 0.308 | 0.725 |
+| dict-namespace-cabi-idle | parallel_closure_workers | 4 | process_cpu_ns | ms | 3 | 204.460 | 200.976 | 216.979 |
+| dict-namespace-cabi-idle | parallel_closure_workers | 4 | source_freeze_run_ns | ms | 3 | 0.062 | 0.061 | 0.070 |
+| dict-namespace-cabi-idle | parallel_closure_workers | 4 | wall_ns | ms | 3 | 66.841 | 64.870 | 71.465 |
+| dict-namespace-cabi-idle | parallel_exception_workers | 1 | finish_live_bytes | bytes | 3 | 346309.000 | 346309.000 | 346309.000 |
+| dict-namespace-cabi-idle | parallel_exception_workers | 1 | finish_metadata_bytes | bytes | 3 | 401552.000 | 401552.000 | 401552.000 |
+| dict-namespace-cabi-idle | parallel_exception_workers | 1 | finish_reserved_bytes | bytes | 3 | 887848.000 | 887848.000 | 887848.000 |
+| dict-namespace-cabi-idle | parallel_exception_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.082 | 0.070 | 0.082 |
+| dict-namespace-cabi-idle | parallel_exception_workers | 1 | max_rendezvous_ns | ms | 3 | 0.001 | 0.001 | 0.001 |
+| dict-namespace-cabi-idle | parallel_exception_workers | 1 | process_cpu_ns | ms | 3 | 265.782 | 260.551 | 265.864 |
+| dict-namespace-cabi-idle | parallel_exception_workers | 1 | source_freeze_run_ns | ms | 3 | 0.071 | 0.068 | 0.074 |
+| dict-namespace-cabi-idle | parallel_exception_workers | 1 | wall_ns | ms | 3 | 287.931 | 282.250 | 288.030 |
+| dict-namespace-cabi-idle | parallel_exception_workers | 2 | finish_live_bytes | bytes | 3 | 250469.000 | 250277.000 | 258205.000 |
+| dict-namespace-cabi-idle | parallel_exception_workers | 2 | finish_metadata_bytes | bytes | 3 | 298944.000 | 298944.000 | 315936.000 |
+| dict-namespace-cabi-idle | parallel_exception_workers | 2 | finish_reserved_bytes | bytes | 3 | 690888.000 | 690888.000 | 728440.000 |
+| dict-namespace-cabi-idle | parallel_exception_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.067 | 0.061 | 0.081 |
+| dict-namespace-cabi-idle | parallel_exception_workers | 2 | max_rendezvous_ns | ms | 3 | 0.118 | 0.105 | 0.286 |
+| dict-namespace-cabi-idle | parallel_exception_workers | 2 | process_cpu_ns | ms | 3 | 281.249 | 275.881 | 293.151 |
+| dict-namespace-cabi-idle | parallel_exception_workers | 2 | source_freeze_run_ns | ms | 3 | 0.054 | 0.053 | 0.056 |
+| dict-namespace-cabi-idle | parallel_exception_workers | 2 | wall_ns | ms | 3 | 156.499 | 155.230 | 164.409 |
+| dict-namespace-cabi-idle | parallel_exception_workers | 4 | finish_live_bytes | bytes | 3 | 225685.000 | 209221.000 | 227749.000 |
+| dict-namespace-cabi-idle | parallel_exception_workers | 4 | finish_metadata_bytes | bytes | 3 | 347360.000 | 347360.000 | 364352.000 |
+| dict-namespace-cabi-idle | parallel_exception_workers | 4 | finish_reserved_bytes | bytes | 3 | 756536.000 | 756536.000 | 794088.000 |
+| dict-namespace-cabi-idle | parallel_exception_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.096 | 0.084 | 0.143 |
+| dict-namespace-cabi-idle | parallel_exception_workers | 4 | max_rendezvous_ns | ms | 3 | 0.769 | 0.233 | 0.944 |
+| dict-namespace-cabi-idle | parallel_exception_workers | 4 | process_cpu_ns | ms | 3 | 361.812 | 357.464 | 369.852 |
+| dict-namespace-cabi-idle | parallel_exception_workers | 4 | source_freeze_run_ns | ms | 3 | 0.061 | 0.060 | 0.546 |
+| dict-namespace-cabi-idle | parallel_exception_workers | 4 | wall_ns | ms | 3 | 114.843 | 112.224 | 117.982 |
+| dict-namespace-cabi-idle | parallel_float_workers | 1 | finish_live_bytes | bytes | 3 | 234341.000 | 234341.000 | 234341.000 |
+| dict-namespace-cabi-idle | parallel_float_workers | 1 | finish_metadata_bytes | bytes | 3 | 261360.000 | 261360.000 | 261360.000 |
+| dict-namespace-cabi-idle | parallel_float_workers | 1 | finish_reserved_bytes | bytes | 3 | 621080.000 | 621080.000 | 621080.000 |
+| dict-namespace-cabi-idle | parallel_float_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.035 | 0.029 | 0.035 |
+| dict-namespace-cabi-idle | parallel_float_workers | 1 | max_rendezvous_ns | ms | 3 | 0.001 | 0.001 | 0.001 |
+| dict-namespace-cabi-idle | parallel_float_workers | 1 | process_cpu_ns | ms | 3 | 180.780 | 180.242 | 184.467 |
+| dict-namespace-cabi-idle | parallel_float_workers | 1 | source_freeze_run_ns | ms | 3 | 0.054 | 0.054 | 0.058 |
+| dict-namespace-cabi-idle | parallel_float_workers | 1 | wall_ns | ms | 3 | 195.855 | 195.248 | 199.825 |
+| dict-namespace-cabi-idle | parallel_float_workers | 2 | finish_live_bytes | bytes | 3 | 339661.000 | 318325.000 | 357749.000 |
+| dict-namespace-cabi-idle | parallel_float_workers | 2 | finish_metadata_bytes | bytes | 3 | 530464.000 | 486656.000 | 568032.000 |
+| dict-namespace-cabi-idle | parallel_float_workers | 2 | finish_reserved_bytes | bytes | 3 | 1044152.000 | 978504.000 | 1109800.000 |
+| dict-namespace-cabi-idle | parallel_float_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.107 | 0.099 | 0.118 |
+| dict-namespace-cabi-idle | parallel_float_workers | 2 | max_rendezvous_ns | ms | 3 | 0.150 | 0.080 | 0.154 |
+| dict-namespace-cabi-idle | parallel_float_workers | 2 | process_cpu_ns | ms | 3 | 183.615 | 182.309 | 184.135 |
+| dict-namespace-cabi-idle | parallel_float_workers | 2 | source_freeze_run_ns | ms | 3 | 0.044 | 0.044 | 0.048 |
+| dict-namespace-cabi-idle | parallel_float_workers | 2 | wall_ns | ms | 3 | 102.301 | 102.101 | 103.563 |
+| dict-namespace-cabi-idle | parallel_float_workers | 4 | finish_live_bytes | bytes | 3 | 232005.000 | 228381.000 | 238629.000 |
+| dict-namespace-cabi-idle | parallel_float_workers | 4 | finish_metadata_bytes | bytes | 3 | 447456.000 | 390336.000 | 447456.000 |
+| dict-namespace-cabi-idle | parallel_float_workers | 4 | finish_reserved_bytes | bytes | 3 | 912856.000 | 818024.000 | 912856.000 |
+| dict-namespace-cabi-idle | parallel_float_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.089 | 0.061 | 0.114 |
+| dict-namespace-cabi-idle | parallel_float_workers | 4 | max_rendezvous_ns | ms | 3 | 0.348 | 0.289 | 0.555 |
+| dict-namespace-cabi-idle | parallel_float_workers | 4 | process_cpu_ns | ms | 3 | 222.007 | 216.575 | 222.945 |
+| dict-namespace-cabi-idle | parallel_float_workers | 4 | source_freeze_run_ns | ms | 3 | 0.048 | 0.046 | 0.051 |
+| dict-namespace-cabi-idle | parallel_float_workers | 4 | wall_ns | ms | 3 | 68.681 | 68.446 | 70.802 |
+| dict-namespace-cabi-idle | parallel_for_workers | 1 | finish_live_bytes | bytes | 3 | 264861.000 | 264861.000 | 264861.000 |
+| dict-namespace-cabi-idle | parallel_for_workers | 1 | finish_metadata_bytes | bytes | 3 | 283280.000 | 283280.000 | 283280.000 |
+| dict-namespace-cabi-idle | parallel_for_workers | 1 | finish_reserved_bytes | bytes | 3 | 669920.000 | 669920.000 | 669920.000 |
+| dict-namespace-cabi-idle | parallel_for_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.037 | 0.036 | 0.052 |
+| dict-namespace-cabi-idle | parallel_for_workers | 1 | max_rendezvous_ns | ms | 3 | 0.001 | 0.001 | 0.001 |
+| dict-namespace-cabi-idle | parallel_for_workers | 1 | process_cpu_ns | ms | 3 | 107.312 | 106.083 | 107.328 |
+| dict-namespace-cabi-idle | parallel_for_workers | 1 | source_freeze_run_ns | ms | 3 | 0.051 | 0.051 | 0.054 |
+| dict-namespace-cabi-idle | parallel_for_workers | 1 | wall_ns | ms | 3 | 116.251 | 114.941 | 116.255 |
+| dict-namespace-cabi-idle | parallel_for_workers | 2 | finish_live_bytes | bytes | 3 | 374813.000 | 368405.000 | 393221.000 |
+| dict-namespace-cabi-idle | parallel_for_workers | 2 | finish_metadata_bytes | bytes | 3 | 445728.000 | 445728.000 | 445728.000 |
+| dict-namespace-cabi-idle | parallel_for_workers | 2 | finish_reserved_bytes | bytes | 3 | 949096.000 | 949096.000 | 949096.000 |
+| dict-namespace-cabi-idle | parallel_for_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.094 | 0.090 | 0.097 |
+| dict-namespace-cabi-idle | parallel_for_workers | 2 | max_rendezvous_ns | ms | 3 | 0.210 | 0.151 | 0.225 |
+| dict-namespace-cabi-idle | parallel_for_workers | 2 | process_cpu_ns | ms | 3 | 110.599 | 105.264 | 110.818 |
+| dict-namespace-cabi-idle | parallel_for_workers | 2 | source_freeze_run_ns | ms | 3 | 0.044 | 0.042 | 0.046 |
+| dict-namespace-cabi-idle | parallel_for_workers | 2 | wall_ns | ms | 3 | 62.716 | 60.061 | 63.920 |
+| dict-namespace-cabi-idle | parallel_for_workers | 4 | finish_live_bytes | bytes | 3 | 283181.000 | 275685.000 | 283333.000 |
+| dict-namespace-cabi-idle | parallel_for_workers | 4 | finish_metadata_bytes | bytes | 3 | 419008.000 | 412256.000 | 425760.000 |
+| dict-namespace-cabi-idle | parallel_for_workers | 4 | finish_reserved_bytes | bytes | 3 | 883448.000 | 866864.000 | 900032.000 |
+| dict-namespace-cabi-idle | parallel_for_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.120 | 0.109 | 0.128 |
+| dict-namespace-cabi-idle | parallel_for_workers | 4 | max_rendezvous_ns | ms | 3 | 0.447 | 0.386 | 0.643 |
+| dict-namespace-cabi-idle | parallel_for_workers | 4 | process_cpu_ns | ms | 3 | 130.425 | 130.150 | 133.325 |
+| dict-namespace-cabi-idle | parallel_for_workers | 4 | source_freeze_run_ns | ms | 3 | 0.046 | 0.046 | 0.052 |
+| dict-namespace-cabi-idle | parallel_for_workers | 4 | wall_ns | ms | 3 | 44.610 | 44.364 | 46.690 |
+| dict-namespace-cabi-idle | parallel_source_workers | 1 | finish_live_bytes | bytes | 3 | 278669.000 | 278669.000 | 278669.000 |
+| dict-namespace-cabi-idle | parallel_source_workers | 1 | finish_metadata_bytes | bytes | 3 | 275984.000 | 275984.000 | 275984.000 |
+| dict-namespace-cabi-idle | parallel_source_workers | 1 | finish_reserved_bytes | bytes | 3 | 657304.000 | 657304.000 | 657304.000 |
+| dict-namespace-cabi-idle | parallel_source_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.086 | 0.041 | 0.093 |
+| dict-namespace-cabi-idle | parallel_source_workers | 1 | max_rendezvous_ns | ms | 3 | 0.001 | 0.001 | 0.001 |
+| dict-namespace-cabi-idle | parallel_source_workers | 1 | process_cpu_ns | ms | 3 | 159.019 | 157.266 | 163.867 |
+| dict-namespace-cabi-idle | parallel_source_workers | 1 | source_freeze_run_ns | ms | 3 | 0.049 | 0.048 | 0.052 |
+| dict-namespace-cabi-idle | parallel_source_workers | 1 | wall_ns | ms | 3 | 172.272 | 170.353 | 177.517 |
+| dict-namespace-cabi-idle | parallel_source_workers | 2 | finish_live_bytes | bytes | 3 | 223525.000 | 221885.000 | 226373.000 |
+| dict-namespace-cabi-idle | parallel_source_workers | 2 | finish_metadata_bytes | bytes | 3 | 243296.000 | 242784.000 | 280352.000 |
+| dict-namespace-cabi-idle | parallel_source_workers | 2 | finish_reserved_bytes | bytes | 3 | 595624.000 | 591656.000 | 657304.000 |
+| dict-namespace-cabi-idle | parallel_source_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.060 | 0.048 | 0.107 |
+| dict-namespace-cabi-idle | parallel_source_workers | 2 | max_rendezvous_ns | ms | 3 | 0.095 | 0.085 | 0.145 |
+| dict-namespace-cabi-idle | parallel_source_workers | 2 | process_cpu_ns | ms | 3 | 170.048 | 167.487 | 170.900 |
+| dict-namespace-cabi-idle | parallel_source_workers | 2 | source_freeze_run_ns | ms | 3 | 0.043 | 0.041 | 0.053 |
+| dict-namespace-cabi-idle | parallel_source_workers | 2 | wall_ns | ms | 3 | 95.088 | 94.119 | 98.786 |
+| dict-namespace-cabi-idle | parallel_source_workers | 4 | finish_live_bytes | bytes | 3 | 267293.000 | 262317.000 | 271093.000 |
+| dict-namespace-cabi-idle | parallel_source_workers | 4 | finish_metadata_bytes | bytes | 3 | 401792.000 | 365248.000 | 402304.000 |
+| dict-namespace-cabi-idle | parallel_source_workers | 4 | finish_reserved_bytes | bytes | 3 | 854248.000 | 796536.000 | 858216.000 |
+| dict-namespace-cabi-idle | parallel_source_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.097 | 0.093 | 0.114 |
+| dict-namespace-cabi-idle | parallel_source_workers | 4 | max_rendezvous_ns | ms | 3 | 0.482 | 0.407 | 1.082 |
+| dict-namespace-cabi-idle | parallel_source_workers | 4 | process_cpu_ns | ms | 3 | 206.300 | 194.392 | 207.926 |
+| dict-namespace-cabi-idle | parallel_source_workers | 4 | source_freeze_run_ns | ms | 3 | 0.046 | 0.043 | 0.049 |
+| dict-namespace-cabi-idle | parallel_source_workers | 4 | wall_ns | ms | 3 | 67.015 | 60.308 | 68.523 |
+| dict-namespace-cabi-idle | parallel_storage_workers | 1 | finish_live_bytes | bytes | 3 | 42720.000 | 42720.000 | 42720.000 |
+| dict-namespace-cabi-idle | parallel_storage_workers | 1 | finish_metadata_bytes | bytes | 3 | 97040.000 | 97040.000 | 97040.000 |
+| dict-namespace-cabi-idle | parallel_storage_workers | 1 | finish_reserved_bytes | bytes | 3 | 135504.000 | 135504.000 | 135504.000 |
+| dict-namespace-cabi-idle | parallel_storage_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.016 | 0.015 | 0.033 |
+| dict-namespace-cabi-idle | parallel_storage_workers | 1 | max_rendezvous_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| dict-namespace-cabi-idle | parallel_storage_workers | 1 | process_cpu_ns | ms | 3 | 2.230 | 2.225 | 2.534 |
+| dict-namespace-cabi-idle | parallel_storage_workers | 1 | wall_ns | ms | 3 | 2.450 | 2.434 | 2.820 |
+| dict-namespace-cabi-idle | parallel_storage_workers | 2 | finish_live_bytes | bytes | 3 | 11360.000 | 10240.000 | 12768.000 |
+| dict-namespace-cabi-idle | parallel_storage_workers | 2 | finish_metadata_bytes | bytes | 3 | 100352.000 | 100352.000 | 100352.000 |
+| dict-namespace-cabi-idle | parallel_storage_workers | 2 | finish_reserved_bytes | bytes | 3 | 135504.000 | 135504.000 | 135504.000 |
+| dict-namespace-cabi-idle | parallel_storage_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.007 | 0.005 | 0.008 |
+| dict-namespace-cabi-idle | parallel_storage_workers | 2 | max_rendezvous_ns | ms | 3 | 0.067 | 0.057 | 0.089 |
+| dict-namespace-cabi-idle | parallel_storage_workers | 2 | process_cpu_ns | ms | 3 | 2.723 | 2.614 | 2.764 |
+| dict-namespace-cabi-idle | parallel_storage_workers | 2 | wall_ns | ms | 3 | 2.273 | 2.216 | 2.277 |
+| dict-namespace-cabi-idle | parallel_storage_workers | 4 | finish_live_bytes | bytes | 3 | 39696.000 | 3632.000 | 52768.000 |
+| dict-namespace-cabi-idle | parallel_storage_workers | 4 | finish_metadata_bytes | bytes | 3 | 241248.000 | 194592.000 | 285056.000 |
+| dict-namespace-cabi-idle | parallel_storage_workers | 4 | finish_reserved_bytes | bytes | 3 | 336656.000 | 266800.000 | 402304.000 |
+| dict-namespace-cabi-idle | parallel_storage_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.019 | 0.016 | 0.029 |
+| dict-namespace-cabi-idle | parallel_storage_workers | 4 | max_rendezvous_ns | ms | 3 | 0.137 | 0.112 | 0.202 |
+| dict-namespace-cabi-idle | parallel_storage_workers | 4 | process_cpu_ns | ms | 3 | 3.732 | 3.467 | 4.091 |
+| dict-namespace-cabi-idle | parallel_storage_workers | 4 | wall_ns | ms | 3 | 2.553 | 2.211 | 3.248 |
+| dict-namespace-cabi-idle | parallel_vm_workers | 1 | finish_live_bytes | bytes | 3 | 304053.000 | 304053.000 | 304053.000 |
+| dict-namespace-cabi-idle | parallel_vm_workers | 1 | finish_metadata_bytes | bytes | 3 | 313456.000 | 313456.000 | 313456.000 |
+| dict-namespace-cabi-idle | parallel_vm_workers | 1 | finish_reserved_bytes | bytes | 3 | 722952.000 | 722952.000 | 722952.000 |
+| dict-namespace-cabi-idle | parallel_vm_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.045 | 0.042 | 0.063 |
+| dict-namespace-cabi-idle | parallel_vm_workers | 1 | max_rendezvous_ns | ms | 3 | 0.001 | 0.001 | 0.001 |
+| dict-namespace-cabi-idle | parallel_vm_workers | 1 | process_cpu_ns | ms | 3 | 134.382 | 133.862 | 135.418 |
+| dict-namespace-cabi-idle | parallel_vm_workers | 1 | source_freeze_run_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| dict-namespace-cabi-idle | parallel_vm_workers | 1 | wall_ns | ms | 3 | 146.755 | 144.933 | 156.560 |
+| dict-namespace-cabi-idle | parallel_vm_workers | 2 | finish_live_bytes | bytes | 3 | 260013.000 | 258789.000 | 260013.000 |
+| dict-namespace-cabi-idle | parallel_vm_workers | 2 | finish_metadata_bytes | bytes | 3 | 280672.000 | 280672.000 | 318240.000 |
+| dict-namespace-cabi-idle | parallel_vm_workers | 2 | finish_reserved_bytes | bytes | 3 | 661272.000 | 661272.000 | 726920.000 |
+| dict-namespace-cabi-idle | parallel_vm_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.062 | 0.034 | 0.073 |
+| dict-namespace-cabi-idle | parallel_vm_workers | 2 | max_rendezvous_ns | ms | 3 | 0.238 | 0.112 | 0.354 |
+| dict-namespace-cabi-idle | parallel_vm_workers | 2 | process_cpu_ns | ms | 3 | 147.855 | 147.329 | 149.250 |
+| dict-namespace-cabi-idle | parallel_vm_workers | 2 | source_freeze_run_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| dict-namespace-cabi-idle | parallel_vm_workers | 2 | wall_ns | ms | 3 | 83.187 | 82.538 | 83.413 |
+| dict-namespace-cabi-idle | parallel_vm_workers | 4 | finish_live_bytes | bytes | 3 | 343293.000 | 338301.000 | 346413.000 |
+| dict-namespace-cabi-idle | parallel_vm_workers | 4 | finish_metadata_bytes | bytes | 3 | 478080.000 | 477056.000 | 514624.000 |
+| dict-namespace-cabi-idle | parallel_vm_workers | 4 | finish_reserved_bytes | bytes | 3 | 997448.000 | 989512.000 | 1055160.000 |
+| dict-namespace-cabi-idle | parallel_vm_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.095 | 0.090 | 0.106 |
+| dict-namespace-cabi-idle | parallel_vm_workers | 4 | max_rendezvous_ns | ms | 3 | 0.813 | 0.310 | 1.181 |
+| dict-namespace-cabi-idle | parallel_vm_workers | 4 | process_cpu_ns | ms | 3 | 175.887 | 167.477 | 179.387 |
+| dict-namespace-cabi-idle | parallel_vm_workers | 4 | source_freeze_run_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| dict-namespace-cabi-idle | parallel_vm_workers | 4 | wall_ns | ms | 3 | 58.660 | 53.210 | 61.964 |
+| dict-namespace-cabi-idle | process_peak_rss_kib | - | process_peak_rss_kib | KiB | 3 | 8804.000 | 8116.000 | 9008.000 |
+| dict-namespace-cabi-idle | scheduled_iterations | - | scheduled_function_ns | ms | 3 | 14.814 | 14.358 | 15.008 |
+| dict-namespace-cabi-idle | shared_edge_iterations | - | cell_object_bytes | bytes | 3 | 16.000 | 16.000 | 16.000 |
+| dict-namespace-cabi-idle | shared_edge_iterations | - | rooted_cell_read_ns | ms | 3 | 1.081 | 1.026 | 1.212 |
+| dict-namespace-cabi-idle | shared_edge_iterations | - | rooted_cell_store_read_ns | ms | 3 | 2.888 | 2.864 | 3.367 |
+| dict-namespace-cabi-idle | slot_iterations | - | generic_prefix_bytes | bytes | 3 | 8.000 | 8.000 | 8.000 |
+| dict-namespace-cabi-idle | slot_iterations | - | slot_instance_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| dict-namespace-cabi-idle | slot_iterations | - | slot_set_get_ns | ms | 3 | 26.597 | 26.328 | 26.898 |
+| dict-namespace-cabi-idle | source_parse_scope_cfg_ns | - | source_bytes | bytes | 3 | 92.000 | 92.000 | 92.000 |
+| dict-namespace-cabi-idle | source_parse_scope_cfg_ns | - | source_parse_scope_cfg_ns | ms | 3 | 0.050 | 0.038 | 0.053 |
+| dict-namespace-cabi-idle | transfer_iterations | - | transfer_roundtrip_ns | ms | 3 | 0.600 | 0.593 | 0.845 |
+| dict-namespace-cabi-idle | transfer_iterations | - | transfer_token_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| dict-namespace-cabi-idle | with_iterations | - | with_function_ns | ms | 3 | 20.087 | 19.583 | 21.035 |
+| dict-namespace-cabi-idle-cpython | parallel_class_workers | 1 | process_cpu_ns | ms | 3 | 8.381 | 8.167 | 8.470 |
+| dict-namespace-cabi-idle-cpython | parallel_class_workers | 1 | wall_ns | ms | 3 | 9.093 | 8.869 | 9.185 |
+| dict-namespace-cabi-idle-cpython | parallel_class_workers | 2 | process_cpu_ns | ms | 3 | 8.670 | 8.361 | 8.965 |
+| dict-namespace-cabi-idle-cpython | parallel_class_workers | 2 | wall_ns | ms | 3 | 9.409 | 9.039 | 9.773 |
+| dict-namespace-cabi-idle-cpython | parallel_class_workers | 4 | process_cpu_ns | ms | 3 | 8.390 | 8.032 | 8.633 |
+| dict-namespace-cabi-idle-cpython | parallel_class_workers | 4 | wall_ns | ms | 3 | 9.216 | 8.873 | 9.448 |
+| dict-namespace-cabi-idle-cpython | parallel_closure_workers | 1 | process_cpu_ns | ms | 3 | 5.969 | 5.901 | 6.067 |
+| dict-namespace-cabi-idle-cpython | parallel_closure_workers | 1 | wall_ns | ms | 3 | 6.482 | 6.407 | 6.583 |
+| dict-namespace-cabi-idle-cpython | parallel_closure_workers | 2 | process_cpu_ns | ms | 3 | 5.910 | 5.596 | 5.915 |
+| dict-namespace-cabi-idle-cpython | parallel_closure_workers | 2 | wall_ns | ms | 3 | 6.409 | 6.082 | 6.497 |
+| dict-namespace-cabi-idle-cpython | parallel_closure_workers | 4 | process_cpu_ns | ms | 3 | 5.450 | 5.431 | 5.505 |
+| dict-namespace-cabi-idle-cpython | parallel_closure_workers | 4 | wall_ns | ms | 3 | 6.098 | 6.062 | 6.102 |
+| dict-namespace-cabi-idle-cpython | parallel_exception_workers | 1 | process_cpu_ns | ms | 3 | 7.089 | 6.715 | 7.757 |
+| dict-namespace-cabi-idle-cpython | parallel_exception_workers | 1 | wall_ns | ms | 3 | 7.686 | 7.299 | 8.412 |
+| dict-namespace-cabi-idle-cpython | parallel_exception_workers | 2 | process_cpu_ns | ms | 3 | 6.796 | 6.761 | 7.423 |
+| dict-namespace-cabi-idle-cpython | parallel_exception_workers | 2 | wall_ns | ms | 3 | 7.399 | 7.312 | 8.060 |
+| dict-namespace-cabi-idle-cpython | parallel_exception_workers | 4 | process_cpu_ns | ms | 3 | 7.051 | 6.908 | 7.515 |
+| dict-namespace-cabi-idle-cpython | parallel_exception_workers | 4 | wall_ns | ms | 3 | 7.649 | 7.418 | 8.250 |
+| dict-namespace-cabi-idle-cpython | parallel_float_workers | 1 | process_cpu_ns | ms | 3 | 5.502 | 5.436 | 5.776 |
+| dict-namespace-cabi-idle-cpython | parallel_float_workers | 1 | wall_ns | ms | 3 | 5.964 | 5.886 | 6.266 |
+| dict-namespace-cabi-idle-cpython | parallel_float_workers | 2 | process_cpu_ns | ms | 3 | 5.624 | 5.591 | 5.848 |
+| dict-namespace-cabi-idle-cpython | parallel_float_workers | 2 | wall_ns | ms | 3 | 6.113 | 6.103 | 6.387 |
+| dict-namespace-cabi-idle-cpython | parallel_float_workers | 4 | process_cpu_ns | ms | 3 | 5.919 | 5.721 | 6.025 |
+| dict-namespace-cabi-idle-cpython | parallel_float_workers | 4 | wall_ns | ms | 3 | 6.504 | 6.251 | 6.599 |
+| dict-namespace-cabi-idle-cpython | parallel_for_workers | 1 | process_cpu_ns | ms | 3 | 4.653 | 4.337 | 4.761 |
+| dict-namespace-cabi-idle-cpython | parallel_for_workers | 1 | wall_ns | ms | 3 | 5.084 | 4.712 | 5.209 |
+| dict-namespace-cabi-idle-cpython | parallel_for_workers | 2 | process_cpu_ns | ms | 3 | 4.387 | 4.359 | 4.549 |
+| dict-namespace-cabi-idle-cpython | parallel_for_workers | 2 | wall_ns | ms | 3 | 4.847 | 4.739 | 4.915 |
+| dict-namespace-cabi-idle-cpython | parallel_for_workers | 4 | process_cpu_ns | ms | 3 | 4.181 | 4.168 | 4.260 |
+| dict-namespace-cabi-idle-cpython | parallel_for_workers | 4 | wall_ns | ms | 3 | 4.667 | 4.551 | 4.706 |
+| dict-namespace-cabi-idle-cpython | parallel_source_workers | 1 | process_cpu_ns | ms | 3 | 6.080 | 6.028 | 6.503 |
+| dict-namespace-cabi-idle-cpython | parallel_source_workers | 1 | wall_ns | ms | 3 | 6.656 | 6.625 | 7.122 |
+| dict-namespace-cabi-idle-cpython | parallel_source_workers | 2 | process_cpu_ns | ms | 3 | 6.072 | 6.061 | 6.116 |
+| dict-namespace-cabi-idle-cpython | parallel_source_workers | 2 | wall_ns | ms | 3 | 6.565 | 6.563 | 6.654 |
+| dict-namespace-cabi-idle-cpython | parallel_source_workers | 4 | process_cpu_ns | ms | 3 | 5.815 | 5.784 | 5.933 |
+| dict-namespace-cabi-idle-cpython | parallel_source_workers | 4 | wall_ns | ms | 3 | 6.396 | 6.363 | 6.445 |
 | file-import-syntax | cleanup_iterations | - | active_region_bytes | bytes | 1 | 32.000 | 32.000 | 32.000 |
 | file-import-syntax | cleanup_iterations | - | cleanup_continuation_bytes | bytes | 1 | 48.000 | 48.000 | 48.000 |
 | file-import-syntax | cleanup_iterations | - | cleanup_function_ns | ms | 1 | 22.662 | 22.662 | 22.662 |
@@ -1024,6 +1285,48 @@ Derived from median wall/process CPU times. CPU/wall is not a speedup; 1-worker 
 
 | Series | Probe | Workers | Wall ms | CPU/Wall | Speedup | Efficiency |
 | --- | --- | --- | --- | --- | --- | --- |
+| dict-namespace-cabi-idle | parallel_class_workers | 1 | 370.151 | 0.923 | 1.000 | 1.000 |
+| dict-namespace-cabi-idle | parallel_class_workers | 2 | 221.473 | 1.704 | 1.671 | 0.836 |
+| dict-namespace-cabi-idle | parallel_class_workers | 4 | 167.027 | 2.826 | 2.216 | 0.554 |
+| dict-namespace-cabi-idle | parallel_closure_workers | 1 | 176.145 | 0.923 | 1.000 | 1.000 |
+| dict-namespace-cabi-idle | parallel_closure_workers | 2 | 99.932 | 1.752 | 1.763 | 0.881 |
+| dict-namespace-cabi-idle | parallel_closure_workers | 4 | 66.841 | 3.059 | 2.635 | 0.659 |
+| dict-namespace-cabi-idle | parallel_exception_workers | 1 | 287.931 | 0.923 | 1.000 | 1.000 |
+| dict-namespace-cabi-idle | parallel_exception_workers | 2 | 156.499 | 1.797 | 1.840 | 0.920 |
+| dict-namespace-cabi-idle | parallel_exception_workers | 4 | 114.843 | 3.150 | 2.507 | 0.627 |
+| dict-namespace-cabi-idle | parallel_float_workers | 1 | 195.855 | 0.923 | 1.000 | 1.000 |
+| dict-namespace-cabi-idle | parallel_float_workers | 2 | 102.301 | 1.795 | 1.914 | 0.957 |
+| dict-namespace-cabi-idle | parallel_float_workers | 4 | 68.681 | 3.232 | 2.852 | 0.713 |
+| dict-namespace-cabi-idle | parallel_for_workers | 1 | 116.251 | 0.923 | 1.000 | 1.000 |
+| dict-namespace-cabi-idle | parallel_for_workers | 2 | 62.716 | 1.763 | 1.854 | 0.927 |
+| dict-namespace-cabi-idle | parallel_for_workers | 4 | 44.610 | 2.924 | 2.606 | 0.651 |
+| dict-namespace-cabi-idle | parallel_source_workers | 1 | 172.272 | 0.923 | 1.000 | 1.000 |
+| dict-namespace-cabi-idle | parallel_source_workers | 2 | 95.088 | 1.788 | 1.812 | 0.906 |
+| dict-namespace-cabi-idle | parallel_source_workers | 4 | 67.015 | 3.078 | 2.571 | 0.643 |
+| dict-namespace-cabi-idle | parallel_storage_workers | 1 | 2.450 | 0.910 | 1.000 | 1.000 |
+| dict-namespace-cabi-idle | parallel_storage_workers | 2 | 2.273 | 1.198 | 1.078 | 0.539 |
+| dict-namespace-cabi-idle | parallel_storage_workers | 4 | 2.553 | 1.462 | 0.959 | 0.240 |
+| dict-namespace-cabi-idle | parallel_vm_workers | 1 | 146.755 | 0.916 | 1.000 | 1.000 |
+| dict-namespace-cabi-idle | parallel_vm_workers | 2 | 83.187 | 1.777 | 1.764 | 0.882 |
+| dict-namespace-cabi-idle | parallel_vm_workers | 4 | 58.660 | 2.998 | 2.502 | 0.625 |
+| dict-namespace-cabi-idle-cpython | parallel_class_workers | 1 | 9.093 | 0.922 | 1.000 | 1.000 |
+| dict-namespace-cabi-idle-cpython | parallel_class_workers | 2 | 9.409 | 0.921 | 0.966 | 0.483 |
+| dict-namespace-cabi-idle-cpython | parallel_class_workers | 4 | 9.216 | 0.910 | 0.987 | 0.247 |
+| dict-namespace-cabi-idle-cpython | parallel_closure_workers | 1 | 6.482 | 0.921 | 1.000 | 1.000 |
+| dict-namespace-cabi-idle-cpython | parallel_closure_workers | 2 | 6.409 | 0.922 | 1.011 | 0.506 |
+| dict-namespace-cabi-idle-cpython | parallel_closure_workers | 4 | 6.098 | 0.894 | 1.063 | 0.266 |
+| dict-namespace-cabi-idle-cpython | parallel_exception_workers | 1 | 7.686 | 0.922 | 1.000 | 1.000 |
+| dict-namespace-cabi-idle-cpython | parallel_exception_workers | 2 | 7.399 | 0.919 | 1.039 | 0.519 |
+| dict-namespace-cabi-idle-cpython | parallel_exception_workers | 4 | 7.649 | 0.922 | 1.005 | 0.251 |
+| dict-namespace-cabi-idle-cpython | parallel_float_workers | 1 | 5.964 | 0.923 | 1.000 | 1.000 |
+| dict-namespace-cabi-idle-cpython | parallel_float_workers | 2 | 6.113 | 0.920 | 0.976 | 0.488 |
+| dict-namespace-cabi-idle-cpython | parallel_float_workers | 4 | 6.504 | 0.910 | 0.917 | 0.229 |
+| dict-namespace-cabi-idle-cpython | parallel_for_workers | 1 | 5.084 | 0.915 | 1.000 | 1.000 |
+| dict-namespace-cabi-idle-cpython | parallel_for_workers | 2 | 4.847 | 0.905 | 1.049 | 0.525 |
+| dict-namespace-cabi-idle-cpython | parallel_for_workers | 4 | 4.667 | 0.896 | 1.089 | 0.272 |
+| dict-namespace-cabi-idle-cpython | parallel_source_workers | 1 | 6.656 | 0.913 | 1.000 | 1.000 |
+| dict-namespace-cabi-idle-cpython | parallel_source_workers | 2 | 6.565 | 0.925 | 1.014 | 0.507 |
+| dict-namespace-cabi-idle-cpython | parallel_source_workers | 4 | 6.396 | 0.909 | 1.041 | 0.260 |
 | file-import-syntax | parallel_class_workers | 1 | 616.409 | 0.923 | 1.000 | 1.000 |
 | file-import-syntax | parallel_class_workers | 2 | 378.717 | 1.732 | 1.628 | 0.814 |
 | file-import-syntax | parallel_class_workers | 4 | 315.753 | 2.269 | 1.952 | 0.488 |
@@ -1181,6 +1484,24 @@ The CPython probe executes the source kernel captured from the C++ benchmark, wi
 
 | Series | Probe | Workers | cxxpython ms | CPython ms | cxxpython/CPython |
 | --- | --- | --- | --- | --- | --- |
+| dict-namespace-cabi-idle | parallel_class_workers | 1 | 370.151 | 9.093 | 40.709 |
+| dict-namespace-cabi-idle | parallel_class_workers | 2 | 221.473 | 9.409 | 23.538 |
+| dict-namespace-cabi-idle | parallel_class_workers | 4 | 167.027 | 9.216 | 18.124 |
+| dict-namespace-cabi-idle | parallel_closure_workers | 1 | 176.145 | 6.482 | 27.176 |
+| dict-namespace-cabi-idle | parallel_closure_workers | 2 | 99.932 | 6.409 | 15.591 |
+| dict-namespace-cabi-idle | parallel_closure_workers | 4 | 66.841 | 6.098 | 10.960 |
+| dict-namespace-cabi-idle | parallel_exception_workers | 1 | 287.931 | 7.686 | 37.464 |
+| dict-namespace-cabi-idle | parallel_exception_workers | 2 | 156.499 | 7.399 | 21.153 |
+| dict-namespace-cabi-idle | parallel_exception_workers | 4 | 114.843 | 7.649 | 15.014 |
+| dict-namespace-cabi-idle | parallel_float_workers | 1 | 195.855 | 5.964 | 32.837 |
+| dict-namespace-cabi-idle | parallel_float_workers | 2 | 102.301 | 6.113 | 16.736 |
+| dict-namespace-cabi-idle | parallel_float_workers | 4 | 68.681 | 6.504 | 10.559 |
+| dict-namespace-cabi-idle | parallel_for_workers | 1 | 116.251 | 5.084 | 22.865 |
+| dict-namespace-cabi-idle | parallel_for_workers | 2 | 62.716 | 4.847 | 12.940 |
+| dict-namespace-cabi-idle | parallel_for_workers | 4 | 44.610 | 4.667 | 9.559 |
+| dict-namespace-cabi-idle | parallel_source_workers | 1 | 172.272 | 6.656 | 25.881 |
+| dict-namespace-cabi-idle | parallel_source_workers | 2 | 95.088 | 6.565 | 14.484 |
+| dict-namespace-cabi-idle | parallel_source_workers | 4 | 67.015 | 6.396 | 10.478 |
 | file-import-syntax-idle | parallel_class_workers | 1 | 536.521 | 9.512 | 56.402 |
 | file-import-syntax-idle | parallel_class_workers | 2 | 327.798 | 9.649 | 33.971 |
 | file-import-syntax-idle | parallel_class_workers | 4 | 251.190 | 9.459 | 26.557 |

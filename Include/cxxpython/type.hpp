@@ -42,11 +42,12 @@ struct TypeSnapshot {
 struct TypeObject {
     ObjectHeader header;
     AtomicGcEdge metadata;
-    // Builder-only fields, cleared at first metadata publication. B2 has no
-    // managed str type; B3 moves these into immutable TypeSnapshot storage.
+    // Before metadata publication, names may be native bootstrap text. Publication
+    // moves their managed identities to TypeSnapshot and clears these builders.
     std::variant<std::u32string, Value> name;
     std::variant<std::u32string, Value> qualname;
     std::optional<std::u32string> bootstrap_module = U"builtins";
+    // The structural graph and instance layout are frozen after type readiness.
     std::vector<Value> bases;
     std::vector<Value> mro;
     std::optional<Value> base;
@@ -132,6 +133,7 @@ void publish_type(Attachment &context, Value type);
 void type_name_store(Attachment &context, Value type, Value name, bool qualified);
 bool type_namespace_change(Attachment &context, Value type, const std::u32string &name,
                            std::optional<Value> key, std::optional<Value> value);
+bool publish_type_dictionary(Attachment &, Value type, Value expected, Value storage);
 Handle select_metaclass(Attachment &context, Handle metaclass, std::span<const Handle> bases,
                         RootScope &roots);
 } // namespace detail

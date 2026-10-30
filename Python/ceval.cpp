@@ -246,12 +246,8 @@ void make_frame(Attachment &context, Handle function, CallArgsView args,
 void namespace_lookup(Attachment &context, Value mapping, Value key, ReturnSlot &out)
 {
     if (context.type_of(mapping) == context.builtin(CoreObject::DictType)) {
-        const auto found =
-            detail::name_lookup(context, mapping, context.payload<StrObject>(key).value);
-        if (found)
-            out.ok(*found);
-        else
-            out.reset();
+        RootScope roots(context);
+        dict_lookup(context, roots.root(mapping), roots.root(key), out);
         return;
     }
     RootScope roots(context);
@@ -556,24 +552,27 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                     namespace_lookup(context, mapping, key, result);
                     if (result.tag() == ResultTag::Empty) {
                         const auto &function = context.payload<FunctionObject>(data.function);
-                        auto value = detail::name_lookup(context, function.globals, name);
-                        if (!value)
-                            value = detail::name_lookup(context, function.builtins, name);
-                        if (value)
-                            result.ok(*value);
-                        else
+                        namespace_lookup(context, function.globals, key, result);
+                        if (result.tag() == ResultTag::Empty)
+                            namespace_lookup(context, function.builtins, key, result);
+                        if (result.tag() == ResultTag::Empty)
                             raise_error(context, CoreObject::NameErrorType,
                                         U"name '" + name + U"' is not defined", result);
                     }
                     if (!raised(result))
                         data.operands[data.sp++] = result.value();
                 } else if (context.type_of(mapping) == context.builtin(CoreObject::DictType)) {
+                    RootScope roots(context);
                     result.reset();
                     if (opcode == Opcode::StoreName)
-                        detail::name_store(context, mapping, key, data.operands[data.sp - 1]);
-                    else if (!detail::name_erase(context, mapping, name))
-                        raise_error(context, CoreObject::NameErrorType,
-                                    U"name '" + name + U"' is not defined", result);
+                        dict_store(context, roots.root(mapping), roots.root(key),
+                                   roots.root(data.operands[data.sp - 1]), result);
+                    else {
+                        dict_erase(context, roots.root(mapping), roots.root(key), result);
+                        if (result.tag() == ResultTag::Empty)
+                            raise_error(context, CoreObject::NameErrorType,
+                                        U"name '" + name + U"' is not defined", result);
+                    }
                 } else {
                     RootScope roots(context);
                     if (opcode == Opcode::StoreName)
@@ -601,23 +600,32 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 const auto key = context.payload<TupleObject>(code.names).items[operand];
                 const auto &name = context.payload<StrObject>(key).value;
                 if (opcode == Opcode::LoadGlobal) {
-                    auto value = detail::name_lookup(context, function.globals, name);
-                    if (!value)
-                        value = detail::name_lookup(context, function.builtins, name);
-                    if (value)
-                        data.operands[data.sp++] = *value;
-                    else {
+                    namespace_lookup(context, function.globals, key, result);
+                    if (result.tag() == ResultTag::Empty)
+                        namespace_lookup(context, function.builtins, key, result);
+                    if (result.tag() == ResultTag::Empty)
                         raise_error(context, CoreObject::NameErrorType,
                                     U"name '" + name + U"' is not defined", result);
+                    if (raised(result))
                         activation.raising(result.exception());
-                    }
+                    else
+                        data.operands[data.sp++] = result.value();
                 } else if (opcode == Opcode::StoreGlobal) {
-                    detail::name_store(context, function.globals, key, data.operands[data.sp - 1]);
-                    data.operands[--data.sp] = context.builtin(CoreObject::None);
-                } else if (!detail::name_erase(context, function.globals, name)) {
-                    raise_error(context, CoreObject::NameErrorType,
-                                U"name '" + name + U"' is not defined", result);
-                    activation.raising(result.exception());
+                    RootScope roots(context);
+                    dict_store(context, roots.root(function.globals), roots.root(key),
+                               roots.root(data.operands[data.sp - 1]), result);
+                    if (raised(result))
+                        activation.raising(result.exception());
+                    else
+                        data.operands[--data.sp] = context.builtin(CoreObject::None);
+                } else {
+                    RootScope roots(context);
+                    dict_erase(context, roots.root(function.globals), roots.root(key), result);
+                    if (result.tag() == ResultTag::Empty)
+                        raise_error(context, CoreObject::NameErrorType,
+                                    U"name '" + name + U"' is not defined", result);
+                    if (raised(result))
+                        activation.raising(result.exception());
                 }
                 break;
             }

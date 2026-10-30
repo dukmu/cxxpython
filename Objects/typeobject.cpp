@@ -106,7 +106,7 @@ void create(Attachment &context, const TypeSpec &spec, const LayoutDescriptor *n
 {
     out.reset(context);
     if (spec.dictionary && !context.core_ready())
-        throw TypeDefinitionError("managed type namespaces require the B3 image");
+        throw TypeDefinitionError("managed type namespaces require an initialized core runtime");
     auto valid_text = [](const std::u32string &text) {
         return std::all_of(text.begin(), text.end(),
                            [](char32_t point) { return point <= 0x10ffff; });
@@ -438,6 +438,18 @@ bool type_namespace_change(Attachment &context, Value type, const std::u32string
         context.poll();
     }
 }
+bool publish_type_dictionary(Attachment &context, Value type, Value expected, Value storage)
+{
+    RootScope roots(context);
+    roots.root(type);
+    roots.root(expected);
+    roots.root(storage);
+    const auto &old = context.payload<TypeSnapshot>(expected);
+    ReturnSlot staged(context);
+    context.allocate<TypeSnapshot>(staged, old.name, old.qualname, old.dictionary, storage,
+                                   old.bases, old.mro);
+    return commit_type(context, type, expected, staged.value());
+}
 void type_ready(Attachment &context, Handle type, std::optional<Handle> source)
 {
     auto &payload = ready_type(context, type);
@@ -456,8 +468,7 @@ void type_ready(Attachment &context, Handle type, std::optional<Handle> source)
     initialize_type_dictionary(context, type);
     if (source) {
         DictView dictionary(context, source->get(context));
-        for (const auto &entry : dictionary.entries())
-            name_store(context, *payload.dictionary, entry.key, entry.value);
+        copy_dictionary_entries(context, *payload.dictionary, dictionary.entries());
     }
     if (name_lookup(context, *payload.dictionary, U"__eq__") &&
         !name_lookup(context, *payload.dictionary, U"__hash__")) {

@@ -467,7 +467,7 @@ CodeBuilder::CodeBuilder(Attachment &context, CodeSpec spec)
     : context_(context), roots_(context), spec_(std::move(spec))
 {
     if (!context.core_ready())
-        throw std::logic_error("CodeBuilder requires the B3 image");
+        throw std::logic_error("CodeBuilder requires an initialized core runtime");
     for (const auto &parameter : spec_.signature.parameters)
         if (parameter.default_value)
             roots_.root(*parameter.default_value);

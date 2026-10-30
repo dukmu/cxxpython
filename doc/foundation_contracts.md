@@ -15,7 +15,8 @@ at the user's request. That removal does not establish M9/N6 acceptance.
 
 N0-N5 and M0-M6 contain experimental slices; complete language, object/protocol,
 library, thread/resource, platform/install and performance acceptance remain.
-M7-M9/N6 are not complete. No CPython ABI, .pyc or extension ABI is promised.
+M7-M9/N6 are not complete. No CPython ABI or .pyc compatibility is promised;
+the experimental native extension ABI is specified below.
 
 The accepted source subset includes arbitrary integer/float/string literals,
 implemented unary/arithmetic/boolean/comparison protocols, name/attribute
@@ -29,8 +30,9 @@ Class definitions and decorators use the existing type/descriptor/call machinery
 with separate class namespaces, lexical forwarding and real __class__ Cells.
 Experimental int/float/tuple constructors use the same ordinary class call and
 descriptor boundary, including Python conversion callbacks and native subclasses.
-Mutable containers, slices, full iteration APIs, super(),
-exception groups, imports, suspension, f-strings, complex/power protocols,
+Dictionary construction/mutation and import/from/package syntax are experimental
+implemented slices. Other mutable containers, dictionary literals/comprehensions,
+slices, full iteration APIs, super(), exception groups, suspension, f-strings, complex/power protocols,
 full Unicode source handling and the remaining Python 3.12 matrix are
 unfinished. These are remaining delivery requirements, not a reduction of the
 basic-language objective. Existing native VM/type/cleanup interfaces do not imply
@@ -41,7 +43,7 @@ source or library support.
 The active module/import stage remains incomplete and experimental. A module
 uses its ordinary instance dictionary as the single namespace; layout tracing
 owns its type/dictionary/tail fields. There is no second attribute map. The
-interpreter's managed Modules dictionary is the sole registry, later exposed as
+interpreter's managed Modules dictionary is the sole registry, exposed as
 sys.modules. Native initialization and managed source use the same publication
 and rollback path. Host-only load records contain synchronization/definition
 metadata, never untraced Python values or a second cache of completed modules.
@@ -54,8 +56,9 @@ Failure removes an entry only if it still names that initialization's module;
 user replacements must survive. C/C++ extension ABI and Python import policy
 remain distinct from CPython binary compatibility, per Plan 2 section 11.2.
 
-Current inputs are registered immutable SourceUnits, filesystem source/packages
-and statically linked C++ initializers. __import__ handles absolute/relative names, fromlist and
+Current inputs are registered immutable SourceUnits, filesystem source/packages,
+statically linked C++ initializers and the C extension inputs specified below.
+__import__ handles absolute/relative names, fromlist and
 __all__, and binds loaded children onto the parent. The low-level C++
 import_module entry loads one full-name transaction; it is not the
 unimplemented Python importlib API. Native callbacks must publish None or a
@@ -90,12 +93,76 @@ state. Star honors __all__ with indexed sequence access or snapshots public
 namespace keys. Compiler private-name rules preserve raw fromlist spellings.
 CLI script entry uses its resolved directory for imports and publishes __file__.
 
-Complete sys/module/reflection methods, ModuleSpec/loader objects and Python importlib, general dictionary operations,
-mutable list-based path/argv, and dynamic C/extension loading are still gates.
+Complete sys/module/reflection methods, ModuleSpec/loader objects and Python importlib,
+the remaining container matrix and mutable list-based path/argv are still gates.
 The bootstrap path/argv tuples and static namespace-package path snapshots are
 experimental, not full sys/PEP 420 compatibility. Auto-refresh after a namespace
 parent search path changes, path hooks and bytecode caches remain pending.
 This node therefore does not complete the active module-stage goal.
+
+## Dictionary And Namespace Storage
+
+Ordinary Python dicts and module/instance namespaces share one insertion-ordered
+entry store; name and hash indexes are accelerators, not second binding maps.
+Hash/equality/truth callbacks run outside its per-object commit. Matching entries
+are rooted, then revalidated by stable identity after reentry; missing-key commits
+validate the key version. Replacement, erase and conditional import rollback do
+not allocate. Both ordered indexes use preallocated nodes, including the hash
+index: O(log n + collisions) lookup rather than an allocation/rehash under lock.
+This is not a claim of CPython's amortized constant-time dictionary performance.
+Native canonical-name helpers remain internal and do not invoke Python equality.
+
+The public slice includes constructors from mappings/pairs/keywords, subscripts,
+deletion, get/setdefault/pop/clear/copy/update, __missing__, equality and recursive
+repr. Known hashes survive exact-dict copy/update/equality. Numeric equal keys
+preserve the first key object; identity allows NaN lookup. Dynamic keys/values/items
+views trace their owner; iterators reject size/key changes, permit value replacement
+and stay exhausted. Shared iterator cursors use the owner's short commit.
+
+Type namespaces retain immutable snapshot/CAS publication, including explicit
+attribute reads/updates with custom equal keys. Python mappingproxy is read-only
+and reflects later publications; copy returns an ordinary independent dict.
+Implicit special-method/canonical import metadata lookups still use native name
+helpers, so arbitrary key aliases there are not a completed compatibility gate.
+fromkeys/popitem/union/reversed, view set operations, list/set and remaining source
+container syntax are still pending; this slice does not complete M3.
+
+## C Extension ABI V1
+
+`Include/cxxpython/extension.h` defines an experimental, versioned C ABI, not the
+CPython ABI. An extension exports `CxxPy_Module_v1`, returning immutable metadata
+whose version and size are checked before use. Metadata is copied; getter and
+entry addresses stay protected by the library lifetime. Native exec/methods use
+the same module initialization transaction and ordinary native-call binder/VM.
+The first platform loader accepts POSIX `*.cxxpy.so` modules and package
+`__init__.cxxpy.so`; arbitrary `.so` and CPython extension binaries are not inputs.
+
+The API table contains C function pointers, fixed-width integers, sizes and
+opaque context/handle pointers, never C++ layout, STL, exceptions or raw Python
+object addresses. A context belongs to one synchronous callback on its current
+OS thread. Handles remain precisely rooted until that callback returns and must
+not be cached in native globals, moved to another thread or reused in another
+callback. Module state belongs in that invocation's managed module namespace;
+method bindings trace their module. Returned objects/exceptions are copied to
+the caller's ReturnSlot before callback-local roots disappear. API failure is
+sticky for that callback: returning a success handle cannot hide an exception.
+Returning NULL without an exception raises RuntimeError. Exec must return None.
+
+V1 methods take a fixed count of positional-only arguments. Construction,
+attributes, calls, raising, index-to-int64 conversion, polling and synchronous
+GC-aware host waits are explicit table operations. Wait callbacks use only native
+data, not handles/API operations. No API runs Python under a registry lock or
+while parked. Background callbacks, stored native Python references, custom C
+object layouts, keyword method declarations and FFI are not offered by V1.
+
+Dynamic libraries are pinned per Interpreter until its shared State is destroyed
+after attachments/transfers retire. Method bindings also retain their definition
+and code lease. There is no user unload API; GC sweep never calls dlclose. This
+first lifetime policy deliberately does not claim prompt library unloading or
+support arbitrary extension-created background activity. Static C/C++ entrypoint
+code must outlive its registration and every callable it creates. Dynamic loader
+errors, ABI mismatches and module-name mismatches raise ImportError without
+publishing a module. Extension code must not throw C++ exceptions across the C ABI.
 
 ## Identity And Lifetime
 
@@ -345,8 +412,8 @@ __truediv__/__rtruediv__/__itruediv__ slots. No new VM execution path is introdu
 These are experimental numeric slices, not complete numeric support.
 Complex/power and remaining integer/float method matrices, bytes/buffer numeric
 construction, decimal conversion length limits and conversion warnings remain.
-The internal name dictionary is still not the general Python dict API; general
-dict/list/set construction, storage, protocols and source syntax remain gates.
+The experimental dictionary slice is specified above. Its remaining API matrix,
+list/set construction, protocols and source container syntax remain gates.
 
 ## Source Exceptions And Cleanup
 

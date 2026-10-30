@@ -86,20 +86,29 @@ struct SequenceIteratorObject {
     }
 };
 
-// B3 name dictionaries: managed keys/values, no public general mapping API.
+// Ordered dictionaries share one entry store between Python and name lookup.
 struct DictObject {
     struct Entry {
         Value key;
         Value value;
+        std::int64_t hash = 0;
+        std::uint64_t identity = 0;
     };
     ObjectHeader header;
     AtomicGcEdge namespace_owner;
     using Index = std::map<std::u32string, std::list<Entry>::iterator>;
+    using HashIndex = std::multimap<std::int64_t, std::list<Entry>::iterator>;
     struct Storage {
         std::mutex mutex;
         std::list<Entry> names;
         Index index;
+        HashIndex hashes;
+        std::uint64_t next_identity = 1, keys_version = 0;
         std::size_t bytes = 0;
+        std::size_t external_bytes() const noexcept
+        {
+            return sizeof(Storage) + bytes;
+        }
     };
     const std::unique_ptr<Storage> contents;
     explicit DictObject(InitialType head) : header(head), contents(std::make_unique<Storage>()) {}
@@ -113,7 +122,45 @@ struct DictObject {
     }
     std::size_t external_bytes() const noexcept
     {
-        return sizeof(Storage) + contents->bytes;
+        return contents->external_bytes();
+    }
+};
+// Empty means an absent key; Python exceptions remain in the caller's slot.
+ResultView dict_lookup(Attachment &, Handle dictionary, Handle key, ReturnSlot &);
+ResultView dict_store(Attachment &, Handle dictionary, Handle key, Handle value, ReturnSlot &);
+ResultView dict_erase(Attachment &, Handle dictionary, Handle key, ReturnSlot &);
+ResultView dict_setdefault(Attachment &, Handle dictionary, Handle key, Handle value, ReturnSlot &);
+void dict_clear(Attachment &, Handle dictionary, ReturnSlot &);
+enum class DictViewKind { Keys, Values, Items };
+struct DictViewObject {
+    ObjectHeader header;
+    const Value dictionary;
+    const DictViewKind kind;
+    DictViewObject(InitialType type, Value dictionary, DictViewKind kind)
+        : header(type), dictionary(dictionary), kind(kind)
+    {}
+    void trace(Tracer &tracer) const noexcept
+    {
+        tracer.visit(dictionary);
+    }
+};
+struct DictIteratorObject {
+    ObjectHeader header;
+    AtomicGcEdge dictionary;
+    const DictViewKind kind;
+    AtomicGcEdge snapshot;
+    // Cursor state is protected by the owning dictionary's storage mutex.
+    std::list<DictObject::Entry>::const_iterator cursor;
+    std::uint64_t version = 0, last_identity = 0;
+    std::size_t expected_size = 0, remaining = 0, position = 0;
+    bool invalid = false, exhausted = false;
+    DictIteratorObject(InitialType type, Value dictionary, DictViewKind kind)
+        : header(type), dictionary(dictionary), kind(kind)
+    {}
+    void trace(Tracer &tracer) const noexcept
+    {
+        tracer.visit(dictionary);
+        tracer.visit(snapshot);
     }
 };
 struct DictStorage {
@@ -121,10 +168,12 @@ struct DictStorage {
     const std::vector<DictObject::Entry> entries;
     const std::unordered_map<std::u32string, std::size_t> index;
     const std::size_t index_string_bytes;
+    const bool exact_string_keys;
     DictStorage(InitialType head, std::vector<DictObject::Entry> entries,
-                std::unordered_map<std::u32string, std::size_t> index, std::size_t string_bytes)
+                std::unordered_map<std::u32string, std::size_t> index, std::size_t string_bytes,
+                bool exact_string_keys = true)
         : header(head), entries(std::move(entries)), index(std::move(index)),
-          index_string_bytes(string_bytes)
+          index_string_bytes(string_bytes), exact_string_keys(exact_string_keys)
     {}
     void trace(Tracer &tracer) const noexcept;
     std::size_t external_bytes() const noexcept;
@@ -317,9 +366,18 @@ void name_store(Attachment &context, Value dictionary, Value name, Value value);
 bool name_erase_if(Attachment &context, Value dictionary, const std::u32string &name,
                    Value expected);
 void discard_name_table(Attachment &context, Value dictionary);
+std::int64_t name_hash(Attachment &, const std::u32string &);
+void install_dictionaries(Attachment &, std::span<const Handle>);
+void copy_dictionary_entries(Attachment &, Value destination, std::span<const DictObject::Entry>);
+void make_dict_iterator(Attachment &, Handle dictionary, DictViewKind, ReturnSlot &);
+void next_dict_item(Attachment &, Handle iterator, ReturnSlot &);
+std::size_t dictionary_size(Attachment &, Value dictionary);
+ResultView dict_lookup_hash(Attachment &, Handle, Handle, std::int64_t, ReturnSlot &);
+ResultView dict_store_hash(Attachment &, Handle, Handle, Handle, std::int64_t, ReturnSlot &);
 bool name_erase(Attachment &context, Value dictionary, const std::u32string &name);
 bool copy_name_storage(Attachment &context, std::optional<Value> source, const std::u32string &name,
                        std::optional<Value> key, std::optional<Value> value, ReturnSlot &out);
+void copy_dictionary_storage(Attachment &, std::span<const DictObject::Entry>, ReturnSlot &);
 std::optional<Value> type_attribute(Attachment &context, Value type, const std::u32string &name);
 struct TypeAttribute {
     Value owner;

@@ -1163,7 +1163,7 @@ Value Attachment::builtin(CoreObject object) const
     require_attached();
     auto index = static_cast<std::size_t>(object);
     if (index >= state_->core.size() || !state_->core[index])
-        throw std::logic_error("B3 core objects have not been initialized");
+        throw std::logic_error("core runtime image has not been initialized");
     return Value(*state_->core[index]);
 }
 std::uint64_t Attachment::publication_epoch(PublicationDomain domain) const

@@ -1,0 +1,369 @@
+{
+  "captured_at": "2026-10-30T04:48:07.647335+00:00",
+  "reference_version": "Python 3.12.14",
+  "provenance": {
+    "binary": {
+      "path": "/home/shefrin/repo/cxxpython/build/cxxpython",
+      "sha256": "c8e669a309f6bd660ec24f9f4343698b73f12588e483ec3756e30a6ee3b586d2"
+    },
+    "reference": {
+      "path": "/home/shefrin/repo/cxxpython/.cache/cpython31214-build/python",
+      "sha256": "06ee6bc43fafd0ddbc5842fc73163dc261b403c08eaacaac1f68a8f840d4277a"
+    }
+  },
+  "passed": true,
+  "observations": [
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "d = dict(((1, 'a'), ('x', 2)))\nd[True] = 'b'\nd[1.0] = 'c'\nk = next(iter(d))",
+        "--eval",
+        "len(d), k is 1, d[True], d['x']"
+      ],
+      "stdout": "(2, True, 'c', 2)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "d = dict(((1, 'a'), ('x', 2)))\nd[True] = 'b'\nd[1.0] = 'c'\nk = next(iter(d))\nprint(repr((len(d), k is 1, d[True], d['x'])))"
+      ],
+      "stdout": "(2, True, 'c', 2)\n",
+      "stderr": "<string>:5: SyntaxWarning: \"is\" with 'int' literal. Did you mean \"==\"?\n",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "n = float('nan')\nd = dict(((n, 1),))",
+        "--eval",
+        "d[n], next(iter(d)) is n"
+      ],
+      "stdout": "(1, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "n = float('nan')\nd = dict(((n, 1),))\nprint(repr((d[n], next(iter(d)) is n)))"
+      ],
+      "stdout": "(1, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "d = dict((('a', 1), ('b', 2), ('c', 3)))\nd['a'] = 4\ndel d['b']\nd['b'] = 5\nit = iter(d)",
+        "--eval",
+        "next(it), next(it), next(it), next(it, None), d['a']"
+      ],
+      "stdout": "('a', 'c', 'b', None, 4)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "d = dict((('a', 1), ('b', 2), ('c', 3)))\nd['a'] = 4\ndel d['b']\nd['b'] = 5\nit = iter(d)\nprint(repr((next(it), next(it), next(it), next(it, None), d['a'])))"
+      ],
+      "stdout": "('a', 'c', 'b', None, 4)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "d = dict(((1, 2),), x=3)\ne = dict(d)\ne.update(((1, 4), ('z', 5)))\np = e.pop('x')\ns = e.setdefault('new', 6)\nt = e.setdefault('new', 9)\ng = e.get('missing', 7)\nc = e.copy()\ne.clear()",
+        "--eval",
+        "d[1], p, s, t, g, c[1], c['z'], len(e)"
+      ],
+      "stdout": "(2, 3, 6, 6, 7, 4, 5, 0)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "d = dict(((1, 2),), x=3)\ne = dict(d)\ne.update(((1, 4), ('z', 5)))\np = e.pop('x')\ns = e.setdefault('new', 6)\nt = e.setdefault('new', 9)\ng = e.get('missing', 7)\nc = e.copy()\ne.clear()\nprint(repr((d[1], p, s, t, g, c[1], c['z'], len(e))))"
+      ],
+      "stdout": "(2, 3, 6, 6, 7, 4, 5, 0)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "class D(dict):\n    def __missing__(self, key):\n        return 42\nd = D()",
+        "--eval",
+        "d['missing'], d.get('missing'), len(d)"
+      ],
+      "stdout": "(42, None, 0)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "class D(dict):\n    def __missing__(self, key):\n        return 42\nd = D()\nprint(repr((d['missing'], d.get('missing'), len(d))))"
+      ],
+      "stdout": "(42, None, 0)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "d = dict()\nok = False\ntry:\n    hash(d)\nexcept TypeError:\n    ok = True",
+        "--eval",
+        "ok"
+      ],
+      "stdout": "True\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "d = dict()\nok = False\ntry:\n    hash(d)\nexcept TypeError:\n    ok = True\nprint(repr((ok)))"
+      ],
+      "stdout": "True\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "import sys\nn = sys.__dict__\nn['_dict_test_value'] = 12\na = sys._dict_test_value\ndel n['_dict_test_value']\nsys.modules['_dict_test_alias'] = sys\nb = sys.modules['_dict_test_alias'] is sys\ndel sys.modules['_dict_test_alias']",
+        "--eval",
+        "a, b"
+      ],
+      "stdout": "(12, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "import sys\nn = sys.__dict__\nn['_dict_test_value'] = 12\na = sys._dict_test_value\ndel n['_dict_test_value']\nsys.modules['_dict_test_alias'] = sys\nb = sys.modules['_dict_test_alias'] is sys\ndel sys.modules['_dict_test_alias']\nprint(repr((a, b)))"
+      ],
+      "stdout": "(12, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "class C:\n    x = 1\nv = C.__dict__\nC.x = 2\nC.y = 3\nreadonly = False\ntry:\n    v['x'] = 9\nexcept TypeError:\n    readonly = True",
+        "--eval",
+        "v['x'], v['y'], readonly"
+      ],
+      "stdout": "(2, 3, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "class C:\n    x = 1\nv = C.__dict__\nC.x = 2\nC.y = 3\nreadonly = False\ntry:\n    v['x'] = 9\nexcept TypeError:\n    readonly = True\nprint(repr((v['x'], v['y'], readonly)))"
+      ],
+      "stdout": "(2, 3, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "d = dict()\nclass K:\n    def __init__(self, value):\n        self.value = value\n    def __hash__(self):\n        return 3\n    def __eq__(self, other):\n        d['side'] = 8\n        return self.value == other.value\na = K(1)\nb = K(2)\nd[a] = 10\nd[b] = 20\nx = d[K(1)]",
+        "--eval",
+        "x, d[b], d['side'], len(d)"
+      ],
+      "stdout": "(10, 20, 8, 3)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "d = dict()\nclass K:\n    def __init__(self, value):\n        self.value = value\n    def __hash__(self):\n        return 3\n    def __eq__(self, other):\n        d['side'] = 8\n        return self.value == other.value\na = K(1)\nb = K(2)\nd[a] = 10\nd[b] = 20\nx = d[K(1)]\nprint(repr((x, d[b], d['side'], len(d))))"
+      ],
+      "stdout": "(10, 20, 8, 3)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "class H:\n    def __hash__(self):\n        raise ValueError('hash')\nclass E:\n    def __hash__(self):\n        return 5\n    def __eq__(self, other):\n        raise ValueError('eq')\nd = dict()\nd[E()] = 1\na = False\nb = False\ntry:\n    d[H()] = 2\nexcept ValueError:\n    a = True\ntry:\n    d[E()]\nexcept ValueError:\n    b = True",
+        "--eval",
+        "a, b, len(d)"
+      ],
+      "stdout": "(True, True, 1)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "class H:\n    def __hash__(self):\n        raise ValueError('hash')\nclass E:\n    def __hash__(self):\n        return 5\n    def __eq__(self, other):\n        raise ValueError('eq')\nd = dict()\nd[E()] = 1\na = False\nb = False\ntry:\n    d[H()] = 2\nexcept ValueError:\n    a = True\ntry:\n    d[E()]\nexcept ValueError:\n    b = True\nprint(repr((a, b, len(d))))"
+      ],
+      "stdout": "(True, True, 1)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "d = dict((('a', 1), ('b', 2)))\nk = d.keys()\nv = d.values()\ni = d.items()\nd['a'] = 4\ndel d['b']\nd['c'] = 3\nki = iter(k)\nvi = iter(v)\nii = iter(i)",
+        "--eval",
+        "len(k), len(v), len(i), next(ki), next(ki), next(vi), next(vi), next(ii), next(ii)"
+      ],
+      "stdout": "(2, 2, 2, 'a', 'c', 4, 3, ('a', 4), ('c', 3))\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "d = dict((('a', 1), ('b', 2)))\nk = d.keys()\nv = d.values()\ni = d.items()\nd['a'] = 4\ndel d['b']\nd['c'] = 3\nki = iter(k)\nvi = iter(v)\nii = iter(i)\nprint(repr((len(k), len(v), len(i), next(ki), next(ki), next(vi), next(vi), next(ii), next(ii))))"
+      ],
+      "stdout": "(2, 2, 2, 'a', 'c', 4, 3, ('a', 4), ('c', 3))\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "d = dict((('a', 1), ('b', 2)))\nit = iter(d)\na = next(it)\nd['b'] = 3\nb = next(it)\nend = next(it, 'end')\nd['c'] = 4\nagain = next(it, 'end')\nit2 = iter(d)\nnext(it2)\nd['d'] = 5\nchanged = False\ntry:\n    next(it2)\nexcept RuntimeError:\n    changed = True",
+        "--eval",
+        "a, b, end, again, changed"
+      ],
+      "stdout": "('a', 'b', 'end', 'end', True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "d = dict((('a', 1), ('b', 2)))\nit = iter(d)\na = next(it)\nd['b'] = 3\nb = next(it)\nend = next(it, 'end')\nd['c'] = 4\nagain = next(it, 'end')\nit2 = iter(d)\nnext(it2)\nd['d'] = 5\nchanged = False\ntry:\n    next(it2)\nexcept RuntimeError:\n    changed = True\nprint(repr((a, b, end, again, changed)))"
+      ],
+      "stdout": "('a', 'b', 'end', 'end', True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "d = dict((('a', 1), ('b', 2)))\nit = iter(d)\na = next(it)\ndel d['a']\nd['c'] = 3\nb = next(it)\nchanged = False\ntry:\n    next(it)\nexcept RuntimeError:\n    changed = True",
+        "--eval",
+        "a, b, changed"
+      ],
+      "stdout": "('a', 'b', True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "d = dict((('a', 1), ('b', 2)))\nit = iter(d)\na = next(it)\ndel d['a']\nd['c'] = 3\nb = next(it)\nchanged = False\ntry:\n    next(it)\nexcept RuntimeError:\n    changed = True\nprint(repr((a, b, changed)))"
+      ],
+      "stdout": "('a', 'b', True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "d = dict((('a', 1), ('b', 2)))\ne = dict((('b', 2), ('a', 1)))\nf = dict((('a', 1), ('b', 3)))",
+        "--eval",
+        "repr(d), repr(d.keys()), repr(d.values()), repr(d.items()), d == e, d == f, d != f"
+      ],
+      "stdout": "(\"{'a': 1, 'b': 2}\", \"dict_keys(['a', 'b'])\", 'dict_values([1, 2])', \"dict_items([('a', 1), ('b', 2)])\", True, False, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "d = dict((('a', 1), ('b', 2)))\ne = dict((('b', 2), ('a', 1)))\nf = dict((('a', 1), ('b', 3)))\nprint(repr((repr(d), repr(d.keys()), repr(d.values()), repr(d.items()), d == e, d == f, d != f)))"
+      ],
+      "stdout": "(\"{'a': 1, 'b': 2}\", \"dict_keys(['a', 'b'])\", 'dict_values([1, 2])', \"dict_items([('a', 1), ('b', 2)])\", True, False, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "C = type('C', (), dict(((1, 2), ('x', 3))))\np = C.__dict__\nc = dict(p)",
+        "--eval",
+        "p[1], c[1], c['x'], repr(p) == 'mappingproxy(' + repr(c) + ')'"
+      ],
+      "stdout": "(2, 2, 3, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "C = type('C', (), dict(((1, 2), ('x', 3))))\np = C.__dict__\nc = dict(p)\nprint(repr((p[1], c[1], c['x'], repr(p) == 'mappingproxy(' + repr(c) + ')')))"
+      ],
+      "stdout": "(2, 2, 3, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "import __main__ as main\nclass K:\n    def __hash__(self):\n        return hash('alias')\n    def __eq__(self, other):\n        return other == 'alias'\nkey = K()\nmain.__dict__[key] = 42\nseen = main.alias\ndef read():\n    return alias\nread_seen = read()\nalias = 43\nafter = main.__dict__[key]\ndel alias\nmissing = main.__dict__.get(key, 'absent')\nC = type('C', (), dict(((key, 11),)))\nbefore = C.alias\nC.alias = 12\nchanged = C.__dict__[key]\nkeys = C.__dict__.copy()\ndel C.alias\ngone = C.__dict__.get(key, 'absent')",
+        "--eval",
+        "seen, read_seen, after, missing, before, changed, keys[key], gone"
+      ],
+      "stdout": "(42, 42, 43, 'absent', 11, 12, 12, 'absent')\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "import __main__ as main\nclass K:\n    def __hash__(self):\n        return hash('alias')\n    def __eq__(self, other):\n        return other == 'alias'\nkey = K()\nmain.__dict__[key] = 42\nseen = main.alias\ndef read():\n    return alias\nread_seen = read()\nalias = 43\nafter = main.__dict__[key]\ndel alias\nmissing = main.__dict__.get(key, 'absent')\nC = type('C', (), dict(((key, 11),)))\nbefore = C.alias\nC.alias = 12\nchanged = C.__dict__[key]\nkeys = C.__dict__.copy()\ndel C.alias\ngone = C.__dict__.get(key, 'absent')\nprint(repr((seen, read_seen, after, missing, before, changed, keys[key], gone)))"
+      ],
+      "stdout": "(42, 42, 43, 'absent', 11, 12, 12, 'absent')\n",
+      "stderr": "",
+      "exit_code": 0
+    }
+  ]
+}

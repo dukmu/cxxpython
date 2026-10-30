@@ -1,11 +1,14 @@
 cmake_minimum_required(VERSION 3.22)
-project(cxxpython LANGUAGES CXX)
+project(cxxpython LANGUAGES C CXX)
 
 include(CTest)
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
+set(CMAKE_C_STANDARD 11)
+set(CMAKE_C_STANDARD_REQUIRED ON)
+set(CMAKE_C_EXTENSIONS OFF)
 
 find_package(Threads REQUIRED)
 find_path(BOOST_MULTIPRECISION_INCLUDE_DIR boost/multiprecision/cpp_int.hpp)
@@ -18,6 +21,7 @@ add_library(cxxpython_core
     Python/compile.cpp
     Python/bltinmodule.cpp
     Python/import.cpp
+    Python/extension.cpp
     Python/symtable.cpp
     Python/flowgraph.cpp
     Python/ceval.cpp
@@ -26,6 +30,7 @@ add_library(cxxpython_core
     Parser/parser.cpp
     Objects/typeobject.cpp
     Objects/object.cpp
+    Objects/dictobject.cpp
     Objects/moduleobject.cpp
     Objects/call.cpp
     Objects/descrobject.cpp
@@ -39,7 +44,7 @@ add_library(cxxpython_core
 )
 target_include_directories(cxxpython_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/Include)
 target_include_directories(cxxpython_core SYSTEM PRIVATE ${BOOST_MULTIPRECISION_INCLUDE_DIR})
-target_link_libraries(cxxpython_core PUBLIC Threads::Threads)
+target_link_libraries(cxxpython_core PUBLIC Threads::Threads ${CMAKE_DL_LIBS})
 target_compile_options(cxxpython_core PRIVATE -Wall -Wextra -Wpedantic -Werror)
 
 add_executable(cxxpython Programs/cxxpython.cpp)
@@ -55,8 +60,8 @@ endif()
 
 find_program(CLANG_FORMAT_EXECUTABLE NAMES clang-format-14 clang-format REQUIRED)
 file(GLOB_RECURSE FORMAT_SOURCES CONFIGURE_DEPENDS
-    Include/*.hpp Objects/*.cpp Parser/*.cpp Python/*.cpp Programs/*.cpp
-    Tests/cpp/*.cpp Tools/benchmarks/*.cpp)
+    Include/*.hpp Include/*.h Objects/*.cpp Parser/*.cpp Python/*.cpp Programs/*.cpp
+    Tests/cpp/*.cpp Tests/extensions/*.c Tools/benchmarks/*.cpp)
 add_custom_target(format
     COMMAND ${CLANG_FORMAT_EXECUTABLE} -i --style=file ${FORMAT_SOURCES}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
@@ -79,6 +84,16 @@ if(BUILD_TESTING)
     endif()
     include(GoogleTest)
 
+    add_library(test_extension_static OBJECT Tests/extensions/example.c)
+    target_include_directories(test_extension_static PRIVATE Include)
+    target_compile_options(test_extension_static PRIVATE -Wall -Wextra -Wpedantic -Werror)
+    add_library(test_extension_dynamic MODULE Tests/extensions/example.c)
+    target_include_directories(test_extension_dynamic PRIVATE Include)
+    target_compile_options(test_extension_dynamic PRIVATE -Wall -Wextra -Wpedantic -Werror)
+    set_target_properties(test_extension_dynamic PROPERTIES
+        PREFIX "" OUTPUT_NAME "_example.cxxpy" SUFFIX ".so"
+        LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/extension-fixtures")
+
     add_executable(test_runtime
         Tests/cpp/test_memory.cpp
         Tests/cpp/test_gc_epochs.cpp
@@ -90,6 +105,8 @@ if(BUILD_TESTING)
         Tests/cpp/test_constructors.cpp
         Tests/cpp/test_modules.cpp
         Tests/cpp/test_import.cpp
+        Tests/cpp/test_extension.cpp
+        Tests/cpp/test_dict.cpp
         Tests/cpp/test_import_files.cpp
         Tests/cpp/test_source_import.cpp
         Tests/cpp/test_tuple_constructor.cpp
@@ -106,7 +123,10 @@ if(BUILD_TESTING)
         Tests/cpp/test_with.cpp
         Tests/cpp/test_source.cpp
         Tests/cpp/test_iteration.cpp)
-    target_link_libraries(test_runtime PRIVATE cxxpython_core GTest::gtest_main)
+    target_link_libraries(test_runtime PRIVATE cxxpython_core GTest::gtest_main test_extension_static)
+    add_dependencies(test_runtime test_extension_dynamic)
+    target_compile_definitions(test_runtime PRIVATE
+        TEST_EXTENSION_DIRECTORY="${CMAKE_CURRENT_BINARY_DIR}/extension-fixtures")
     target_compile_options(test_runtime PRIVATE -Wall -Wextra -Wpedantic -Werror)
     gtest_discover_tests(test_runtime PROPERTIES TIMEOUT 15)
 
@@ -121,6 +141,10 @@ if(BUILD_TESTING)
         ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_constructors.py
         --binary $<TARGET_FILE:cxxpython> --reference ${CXXPYTHON_REFERENCE_PYTHON})
     set_tests_properties(Constructors.Differential PROPERTIES TIMEOUT 60)
+    add_test(NAME Dict.Differential COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_dict.py
+        --binary $<TARGET_FILE:cxxpython> --reference ${CXXPYTHON_REFERENCE_PYTHON})
+    set_tests_properties(Dict.Differential PROPERTIES TIMEOUT 60)
     add_test(NAME Benchmarks.Report COMMAND ${Python3_EXECUTABLE} -m unittest discover
         -s ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python -p test_benchmarks.py)
     set_tests_properties(Benchmarks.Report PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})

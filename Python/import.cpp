@@ -5,6 +5,7 @@
 #include <filesystem>
 #include <fstream>
 #include <iterator>
+#include <tuple>
 
 namespace cxxpython::core {
 namespace {
@@ -109,24 +110,6 @@ void main_init(Attachment &context, Handle module, ReturnSlot &out)
         out.ok(context.builtin(CoreObject::None));
 }
 
-void register_definition(Attachment &context, std::u32string name,
-                         std::shared_ptr<const ModuleDefinition> definition)
-{
-    if (name.empty())
-        throw std::invalid_argument("module registration requires a name");
-    std::map<std::u32string, std::shared_ptr<const ModuleDefinition>> prepared;
-    prepared.emplace(std::move(name), std::move(definition));
-    auto node = prepared.extract(prepared.begin());
-    decltype(prepared)::node_type previous;
-    auto &state = context.imports();
-    {
-        NativeWait parked(context);
-        std::lock_guard lock(state.mutex);
-        previous = state.definitions.extract(node.key());
-        state.definitions.insert(std::move(node));
-    }
-}
-
 std::shared_ptr<const ModuleDefinition> find_definition(Attachment &context,
                                                         const std::u32string &name)
 {
@@ -181,21 +164,38 @@ std::shared_ptr<const ModuleDefinition> find_file(Attachment &context, const std
     }
     const auto leaf = source_utf8(dot == std::u32string::npos ? name : name.substr(dot + 1));
     std::shared_ptr<const ModuleDefinition> result;
+    std::string native_path;
+    bool native_package = false;
     try {
         NativeWait parked(context);
         std::vector<std::string> portions;
         for (const auto &entry : paths) {
             const auto base = std::filesystem::absolute(entry.empty() ? "." : entry);
-            const auto package = base / leaf / "__init__.py";
-            const auto file = base / (leaf + ".py");
             std::error_code error;
-            bool is_package = std::filesystem::is_regular_file(package, error);
-            auto selected = is_package ? package : file;
-            if (!is_package && !std::filesystem::is_regular_file(file, error)) {
+            std::filesystem::path selected;
+            bool is_package = false, native = false;
+            for (auto [candidate, package, extension] :
+                 {std::tuple{base / leaf / "__init__.cxxpy.so", true, true},
+                  {base / leaf / "__init__.py", true, false},
+                  {base / (leaf + ".cxxpy.so"), false, true},
+                  {base / (leaf + ".py"), false, false}}) {
+                if (std::filesystem::is_regular_file(candidate, error)) {
+                    selected = std::move(candidate);
+                    is_package = package;
+                    native = extension;
+                    break;
+                }
+            }
+            if (selected.empty()) {
                 const auto directory = base / leaf;
                 if (std::filesystem::is_directory(directory, error))
                     portions.push_back(directory.string());
                 continue;
+            }
+            if (native) {
+                native_path = selected.string();
+                native_package = is_package;
+                break;
             }
             std::ifstream stream(selected, std::ios::binary);
             if (!stream)
@@ -212,7 +212,7 @@ std::shared_ptr<const ModuleDefinition> find_file(Attachment &context, const std
                            : std::vector<std::string>{}});
             break;
         }
-        if (!result && !portions.empty()) {
+        if (!result && native_path.empty() && !portions.empty()) {
             auto source = std::make_shared<const SourceUnit>(SourceBuffer(""));
             result = std::make_shared<const ModuleDefinition>(
                 ModuleDefinition{std::move(source), true, "", std::move(portions)});
@@ -227,6 +227,16 @@ std::shared_ptr<const ModuleDefinition> find_file(Attachment &context, const std
         raise_error(context, CoreObject::OSErrorType, U"cannot read module source", out);
     } catch (const std::filesystem::filesystem_error &) {
         raise_error(context, CoreObject::OSErrorType, U"cannot access module source", out);
+    }
+    if (!native_path.empty()) {
+        auto native = detail::load_extension(context, native_path, name, out);
+        if (native)
+            result = std::make_shared<const ModuleDefinition>(ModuleDefinition{
+                std::move(native), native_package, native_path,
+                native_package ? std::vector<std::string>{std::filesystem::path(native_path)
+                                                              .parent_path()
+                                                              .string()}
+                               : std::vector<std::string>{}});
     }
     return result;
 }
@@ -252,6 +262,24 @@ void import_error_set(Attachment &context, Value error, std::optional<Value> val
 }
 } // namespace
 
+void detail::register_definition(Attachment &context, std::u32string name,
+                                 std::shared_ptr<const ModuleDefinition> definition)
+{
+    if (name.empty())
+        throw std::invalid_argument("module registration requires a name");
+    std::map<std::u32string, std::shared_ptr<const ModuleDefinition>> prepared;
+    prepared.emplace(std::move(name), std::move(definition));
+    auto node = prepared.extract(prepared.begin());
+    decltype(prepared)::node_type previous;
+    auto &state = context.imports();
+    {
+        NativeWait parked(context);
+        std::lock_guard lock(state.mutex);
+        previous = state.definitions.extract(node.key());
+        state.definitions.insert(std::move(node));
+    }
+}
+
 detail::ImportState::ImportState()
 {
     for (auto [name, initializer] :
@@ -266,15 +294,15 @@ void register_source_module(Attachment &context, std::u32string name,
     if (!source)
         throw std::invalid_argument("source module requires source");
     const auto origin = source->source().filename();
-    register_definition(context, std::move(name),
-                        std::make_shared<const ModuleDefinition>(
-                            ModuleDefinition{std::move(source), package, origin, {}}));
+    detail::register_definition(context, std::move(name),
+                                std::make_shared<const ModuleDefinition>(
+                                    ModuleDefinition{std::move(source), package, origin, {}}));
 }
 void register_native_module(Attachment &context, std::u32string name, ModuleInitializer entry)
 {
     if (!entry)
         throw std::invalid_argument("native module requires an initializer");
-    register_definition(
+    detail::register_definition(
         context, std::move(name),
         std::make_shared<const ModuleDefinition>(ModuleDefinition{entry, false, "built-in", {}}));
 }
@@ -393,7 +421,11 @@ ResultView import_module(Attachment &context, const std::u32string &name, Return
             if (auto source = std::get_if<std::shared_ptr<const SourceUnit>>(&definition->loader))
                 run(context, {source->get(), dictionary}, out);
             else {
-                std::get<ModuleInitializer>(definition->loader)(context, module, out);
+                if (const auto native = std::get_if<std::shared_ptr<const detail::NativeModule>>(
+                        &definition->loader))
+                    detail::exec_extension(context, *native, module, out);
+                else
+                    std::get<ModuleInitializer>(definition->loader)(context, module, out);
                 if (out.tag() == ResultTag::Empty)
                     raise_error(context, CoreObject::RuntimeErrorType,
                                 U"module initializer did not publish a result", out);

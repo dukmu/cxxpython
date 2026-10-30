@@ -94,7 +94,7 @@
 
 模块初始化失败后必须在 OOM 下撤销自己的 sys.modules entry，又不能丢失并发成功导入的其他模块。原普通名字字典的整份 COW 删除需要再次分配，不适合这个回滚合同。因此普通 namespace 改为每对象短临界区内的保序存储：插入节点在锁外准备，替换和条件删除不分配受管对象，等待通过 NativeWait，锁内不执行 Python/GC/扩容。读取视图复制并显式保活键值；TypeView 生成的临时存储由其自身根槽保活。
 
-这不是改为全局字典锁或执行 GIL。Type 的公开元数据和类 namespace 继续使用 TypeSnapshot 的不可变存储与 epoch 发布；其原结构化字典在首次发布后释放本地存储，保留字典身份而不保留第二份字段真相。这里仍是 B3 名字字典，不代表通用 Python dict 的方法、键协议和源码容器矩阵已经完成。模块阶段 goal 继续要求完整的后续 loader/import/ABI 验收。
+这不是改为全局字典锁或执行 GIL。Type 的公开元数据和类 namespace 继续使用 TypeSnapshot 的不可变存储与 epoch 发布；其原结构化字典在首次发布后释放本地存储，保留字典身份而不保留第二份字段真相。后续实现已将普通 namespace 与通用 Python dict 的有序条目、哈希/相等协议、映射代理及迭代共用，具体已支持切片与剩余容器矩阵见 doc/foundation_contracts.md；不能继续用“B3 名字字典”注释代替实际迁移。模块阶段 goal 继续要求完整的后续 loader/import/ABI 验收。
 
 ## 1. 先确定兼容合同和架构边界
 

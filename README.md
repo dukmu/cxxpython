@@ -6,12 +6,12 @@ nonmoving stop-the-world tracing, not a GIL or Python reference counting.
 
 Only the current runtime is retained. The old interpreter, its standard library,
 extension API and tests have been removed. This is an experimental Python subset,
-not a complete CPython replacement; imports, standard libraries, Python thread/I/O
+not a complete CPython replacement; full import policy, standard libraries, Python thread/I/O
 APIs and the CPython performance acceptance gates remain unfinished.
 
 ## Build And Test
 
-Requirements: CMake 3.22+, a C++20 compiler, Threads, Boost.Multiprecision headers,
+Requirements: CMake 3.22+, C11/C++20 compilers, Threads, Boost.Multiprecision headers,
 clang-format 14, and host Python for test drivers. Tests use an installed GTest
 or CMake's pinned GoogleTest download.
 

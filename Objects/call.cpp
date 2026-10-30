@@ -424,6 +424,20 @@ bool attribute_name(Attachment &context, Handle name, ReturnSlot &out)
     type_error(context, U"attribute name must be string", out);
     return false;
 }
+void lookup_attribute(Attachment &context, Value type, Handle name, ReturnSlot &out)
+{
+    RootScope roots(context);
+    roots.root(type);
+    out.reset(context);
+    for (auto base : context.payload<TypeObject>(type).mro) {
+        TypeView view(context, base);
+        if (auto dictionary = view.dictionary()) {
+            dict_lookup(context, roots.root(*dictionary), name, out);
+            if (out.tag() != ResultTag::Empty)
+                return;
+        }
+    }
+}
 void get_default(Attachment &context, Handle object, Handle name, bool type_lookup, ReturnSlot &out)
 {
     auto value = object.get(context);
@@ -431,7 +445,14 @@ void get_default(Attachment &context, Handle object, Handle name, bool type_look
     auto type_root = roots.root(context.type_of(value));
     const auto type = type_root.get(context);
     const auto &text = context.payload<StrObject>(name).value;
-    auto attribute = type_attribute(context, type, text);
+    ReturnSlot lookup(context);
+    lookup_attribute(context, type, name, lookup);
+    if (raised(lookup)) {
+        out.raised(lookup.exception());
+        return;
+    }
+    const auto attribute =
+        lookup.tag() == ResultTag::Ok ? std::optional<Value>{lookup.value()} : std::nullopt;
     if (attribute)
         roots.root(*attribute);
     if (attribute && data_descriptor(context, *attribute) &&
@@ -440,17 +461,22 @@ void get_default(Attachment &context, Handle object, Handle name, bool type_look
         return;
     }
     if (type_lookup) {
-        if (auto class_attribute = type_attribute(context, value, text)) {
-            bind_descriptor(context, *class_attribute, {}, value, out);
+        lookup_attribute(context, value, name, lookup);
+        if (raised(lookup)) {
+            out.raised(lookup.exception());
+            return;
+        }
+        if (lookup.tag() == ResultTag::Ok) {
+            bind_descriptor(context, lookup.value(), {}, value, out);
             return;
         }
     } else {
         ReturnSlot dictionary(context);
-        if (dictionary_field(context, value, dictionary) && dictionary.tag() == ResultTag::Ok)
-            if (auto stored = detail::name_lookup(context, dictionary.value(), text)) {
-                out.ok(*stored);
+        if (dictionary_field(context, value, dictionary) && dictionary.tag() == ResultTag::Ok) {
+            dict_lookup(context, roots.root(dictionary.value()), name, out);
+            if (out.tag() != ResultTag::Empty)
                 return;
-            }
+        }
     }
     if (attribute) {
         bind_descriptor(context, *attribute, value, type, out);
@@ -472,7 +498,14 @@ void change_default(Attachment &context, Handle object, Handle name, std::option
             return;
         }
     }
-    auto descriptor = type_attribute(context, context.type_of(target), text);
+    ReturnSlot lookup(context);
+    lookup_attribute(context, context.type_of(target), name, lookup);
+    if (raised(lookup)) {
+        out.raised(lookup.exception());
+        return;
+    }
+    const auto descriptor =
+        lookup.tag() == ResultTag::Ok ? std::optional<Value>{lookup.value()} : std::nullopt;
     if (descriptor)
         roots.root(*descriptor);
     if (descriptor && data_descriptor(context, *descriptor)) {
@@ -516,12 +549,14 @@ void change_default(Attachment &context, Handle object, Handle name, std::option
         }
     }
     if (value)
-        detail::name_store(context, dictionary.value(), name.get(context), value->get(context));
-    else if (!detail::name_erase(context, dictionary.value(), text)) {
-        raise_error(context, CoreObject::AttributeErrorType, text, out);
-        return;
+        dict_store(context, roots.root(dictionary.value()), name, *value, out);
+    else {
+        dict_erase(context, roots.root(dictionary.value()), name, out);
+        if (out.tag() == ResultTag::Empty)
+            raise_error(context, CoreObject::AttributeErrorType, text, out);
+        else if (!raised(out))
+            out.ok(context.builtin(CoreObject::None));
     }
-    out.ok(context.builtin(CoreObject::None));
 }
 
 bool type_receiver(Attachment &context, Value value)

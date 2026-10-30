@@ -190,7 +190,7 @@ void native_len(Attachment &context, Handle, std::span<const Value> args, Return
     else if constexpr (std::is_same_v<T, TupleObject>)
         size = data.items.size();
     else
-        size = DictView(context, args[0]).entries().size();
+        size = detail::dictionary_size(context, args[0]);
     if (size > static_cast<std::size_t>(std::numeric_limits<std::int64_t>::max()))
         throw std::overflow_error("native container size exceeds addressable storage");
     make_int(context, static_cast<std::int64_t>(size), out);

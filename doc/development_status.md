@@ -1,5 +1,110 @@
 # Development Status
 
+## 2026-10-30 Source-Comment Migration: Dictionaries And Namespaces
+
+Prepended without rewriting the audit or earlier history. Previous stable node:
+1bfbaf3. This implements the concrete B3 storage debt identified below rather
+than removing its label and calling the foundation complete. The active
+module/unified-import service goal remains active.
+
+- Audited current source comments across Include/Objects/Python/Parser/Programs/
+  Tests/Tools/CMake. The B2-to-B3 managed type-name promotion already exists;
+  corrected that misleading builder comment to distinguish cleared names from
+  retained frozen structural/layout fields. M1 API and B3 guard wording now
+  describe actual runtime preconditions without weakening those guards.
+- Replaced the name-only dictionary limitation with a shared insertion-ordered
+  entry store and public hash/equality-aware dict protocols. Module/instance
+  attributes, VM name/global loads/stores/deletes and explicit class attributes
+  use the same mapping operations. Fixed real failures of sys.modules['sys'],
+  class mappingproxy subscripts, and custom keys equal to attribute/global names.
+  Type updates retain immutable snapshot/CAS publication and original key objects;
+  equality reentry is checked against the current metadata before committing.
+- Added constructors/mapping and pair update, get/setdefault/pop/clear/copy,
+  __missing__, equality/repr, dynamic keys/values/items and checked iterators.
+  Exact-dict copy/update/equality reuse recorded hashes. Both indexes prepare
+  insertion nodes before the short local commit; replacement and conditional
+  rollback deletion do not allocate. The hash index is currently an ordered
+  tree (logarithmic lookup), explicitly not CPython's constant-time hash table.
+  This closes the tested foundation slice, not the full M3 container matrix.
+- Retained and verified the preceding in-progress experimental C11 ABI slice:
+  static registration and POSIX .cxxpy.so discovery use the existing module
+  transaction; callback-local handles are precise roots, errors are sticky,
+  waits park through NativeWait, and library leases survive retained callables.
+  Ten focused native tests cover imports, errors, GC/OOM retry, code/module
+  lifetime, per-Interpreter state and polling/parked misuse. No further extension
+  surface was added as a substitute for the source-comment migration.
+- Final normal CTest passes 402/402 (397 native plus source/constructor/dict
+  drivers, recorder and format check). ASan/UBSan/LSan passes 397/397 native;
+  TSan passes 395/395, excluding only the established two bootstrap-allocation
+  enumerations covered by normal/ASan. ASan executable source differential
+  passes 14 groups, constructors 6 groups and dictionary differential 16 cases
+  against the retained CPython 3.12.14. Refreshed the dict differential JSON.
+- Sanitizer rebuilds first failed linking because cached Conda C/link paths
+  selected a sysroot libc script with unavailable /lib64 paths. Reconfigured
+  with system GCC/G++ 11.4 and empty inherited flags, then rebuilt and reran the
+  tests above. Failed build logs and final verification logs remain in .cache/;
+  the failed links were not counted as verification. The same toolchain cleanup
+  applies to the final ordinary/Release builds.
+- After every build/test process finished, the recorder captured three idle
+  Release runs as dict-namespace-cabi-idle and regenerated raw/CSV/Markdown.
+  Measurements preserve real same-Interpreter CPU parallelism, but absolute
+  CPython performance acceptance still fails. Compiler/flag provenance changed
+  from the earlier Conda-influenced capture, so lower timings do not isolate an
+  implementation speedup. See the generated report; no hand-filled table.
+- Remaining source-comment boundary: execution.hpp still explicitly restricts
+  invocation-owned Frame fields; general cross-thread rooted snapshots/STW
+  observation are not implemented. The N1-only benchmark comment remains a
+  correct limitation, and B2/B3 test names exercise actual bootstrap promotion,
+  not deferred production code. Remaining parser diagnostics are real syntax
+  gates, not comment-only cleanup. Do not claim these gaps were migrated.
+- Next dependencies remain Frame observation, the rest of containers/grammar,
+  canonical native namespace helpers' custom-key semantics, mutable path/argv,
+  ModuleSpec/loader/importlib policy, namespace path refresh and reload. Full
+  Base-to-Full libraries/product and absolute performance remain Plan 2 gates.
+  No GIL, legacy fallback, alternative VM or workload special case was added.
+  The user's temporary_plan.md deletion and untracked test2.py stay excluded.
+
+## 2026-10-30 Source Stage-Comment Audit
+
+Prepended without changing earlier records. The user requested a repository-wide
+audit of source comments promising later B/M/N-stage migration, not another broad
+milestone explanation. Inspected current Include/Objects/Python/Parser/Programs/
+Tools/Tests sources and CMake, excluding disposable build/dependency artifacts.
+The active module/import goal stays active. No stage completion is inferred.
+
+- Real unfinished foundation: Include/cxxpython/objects.hpp:89 still describes
+  a B3 name dictionary. Its keys/index remain string-name storage; ordinary Dict
+  only installs __len__, not a public mapping protocol. Actual CLI probes of
+  sys.modules['sys'] and C.__dict__['__module__'] both raise TypeError. Public
+  dictionary/mappingproxy/container behavior must be implemented, not relabeled.
+- Real remaining reflection boundary: Include/cxxpython/execution.hpp:420 still
+  defers general cross-thread Frame observations to N3 snapshots/STW. No general
+  Frame observation/snapshot API was found. f_lineno uses atomic instruction
+  state and f_back is initialized once; this finding does not assert those
+  existing narrow getters are racy. Serial Frame test comments explicitly avoid
+  concurrent writers and do not prove the missing observation contract.
+- Completed migration with misleading wording: type.hpp:45-46 describes B2/B3
+  name publication as if still deferred. type_ready and publish_type already
+  create managed names/namespaces, publish TypeSnapshot, clear builder names and
+  dictionary, and discard the initial namespace table. Structural seed fallback
+  before core readiness remains intentional and has promotion/rollback tests.
+  The comment's broad builder-only wording should not cover retained immutable
+  bases/MRO/layout fields. Focused existing readiness/type tests pass 21/21.
+- Stale terminology: runtime.hpp:19 still calls the main runtime API M1 storage.
+  B3 wording in gc.cpp:1166, typeobject.cpp:109 and flowgraph.cpp:470 is an actual
+  core-readiness guard, not a TODO or evidence that promotion never happened.
+  Benchmark runtime.cpp:650 correctly limits its N1 storage measurement claim;
+  the native-tail mixin test comment is also a current constraint, not a promise.
+- Additional executable deferrals remain in parser capability diagnostics:
+  bytes/f-strings, mutable-container syntax, call unpacking, annotations and
+  other explicitly rejected language forms. These are implementation debts,
+  separate from comment cleanup. Do not advance the extension surface as a
+  substitute for the dictionary/container and observation foundation.
+- One terra sidecar checked compiler/VM comments read-only; it is now closed.
+  Earlier C ABI/fixture edits remain uncommitted and integration-unverified.
+  This audit changed no production code and made no new commit or push. Its
+  machine-generated stage-comment location list is in ignored .cache/.
+
 ## 2026-10-30 Source Imports And Filesystem Packages
 
 Prepended without rewriting history. Previous stable node: fca9166. The active
