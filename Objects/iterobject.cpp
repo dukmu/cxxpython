@@ -1,5 +1,7 @@
 #include "cxxpython/protocol.hpp"
 
+#include <limits>
+
 namespace cxxpython::core {
 ResultView get_iter(Attachment &context, Handle value, ReturnSlot &out)
 {
@@ -258,6 +260,64 @@ void builtin_next(Attachment &context, Handle, std::span<const Value> args, Retu
     if (status == NextStatus::Done && !defaults.empty())
         out.ok(defaults[0]);
 }
+void tuple_add(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!sequence<TupleObject, CoreObject::TupleType>(context, args[0], out) ||
+        !sequence<TupleObject, CoreObject::TupleType>(context, args[1], out))
+        return;
+    RootScope roots(context);
+    const auto left = roots.root(args[0]), right = roots.root(args[1]);
+    const auto &a = context.payload<TupleObject>(left).items;
+    const auto &b = context.payload<TupleObject>(right).items;
+    if (a.empty() && context.type_of(right) == context.builtin(CoreObject::TupleType)) {
+        out.ok(right.get(context));
+        return;
+    }
+    if (b.empty() && context.type_of(left) == context.builtin(CoreObject::TupleType)) {
+        out.ok(left.get(context));
+        return;
+    }
+    std::vector<Value> values;
+    if (b.size() > values.max_size() - a.size())
+        throw std::bad_alloc();
+    values.reserve(a.size() + b.size());
+    values.insert(values.end(), a.begin(), a.end());
+    values.insert(values.end(), b.begin(), b.end());
+    cxxpython::core::make_tuple(context, values, out);
+}
+void tuple_repeat(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!sequence<TupleObject, CoreObject::TupleType>(context, args[0], out))
+        return;
+    RootScope roots(context);
+    const auto self = roots.root(args[0]);
+    ReturnSlot converted(context);
+    index(context, roots.root(args[1]), converted);
+    if (converted.tag() == ResultTag::Raised) {
+        out.raised(converted.exception());
+        return;
+    }
+    std::int64_t count;
+    if (!int_fits_signed(context, converted.value(), count)) {
+        raise_error(context, CoreObject::OverflowErrorType, U"repeat count is too large", out);
+        return;
+    }
+    const auto &items = context.payload<TupleObject>(self).items;
+    if ((count == 1 || items.empty()) &&
+        context.type_of(self) == context.builtin(CoreObject::TupleType)) {
+        out.ok(self.get(context));
+        return;
+    }
+    std::vector<Value> result;
+    if (count > 0 && !items.empty()) {
+        if (static_cast<std::uint64_t>(count) > result.max_size() / items.size())
+            throw std::bad_alloc();
+        result.reserve(static_cast<std::size_t>(count) * items.size());
+        for (std::int64_t i = 0; i < count; ++i)
+            result.insert(result.end(), items.begin(), items.end());
+    }
+    cxxpython::core::make_tuple(context, result, out);
+}
 } // namespace
 namespace detail {
 void stop_iteration(Attachment &context, ReturnSlot &out)
@@ -277,6 +337,12 @@ void install_iteration(Attachment &context, std::span<const Handle> core)
     pair.parameters.push_back({U"key", ParameterKind::PositionalOnly});
     install_native_attribute(context, core, at(CoreObject::TupleType), U"__getitem__", pair,
                              sequence_item<TupleObject, CoreObject::TupleType>);
+    install_native_attribute(context, core, at(CoreObject::TupleType), U"__add__", pair, tuple_add,
+                             {}, NativeSlotKind::Sequence);
+    install_native_attribute(context, core, at(CoreObject::TupleType), U"__mul__", pair,
+                             tuple_repeat, {}, NativeSlotKind::Sequence);
+    install_native_attribute(context, core, at(CoreObject::TupleType), U"__rmul__", pair,
+                             tuple_repeat, {}, NativeSlotKind::Sequence);
     install_native_attribute(context, core, at(CoreObject::StrType), U"__getitem__", pair,
                              sequence_item<StrObject, CoreObject::StrType>);
     install_native_attribute(

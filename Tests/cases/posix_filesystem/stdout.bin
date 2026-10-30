@@ -1,0 +1,13 @@
+b'posix_tree'
+[b'file', b'link']
+b'file'
+3 4
+True True 10 3 3
+True True
+10 6 7 None
+invalid stat sequence
+True True
+True True
+True True
+True
+True

@@ -1,0 +1,19 @@
+coroutine False False []
+not iterable
+coroutine_wrapper True ready
+True coroutine True
+return 42
+['parent', 'child', 'pause', 'finally'] None None False
+RuntimeError cannot reuse already awaited coroutine
+RuntimeError cannot reuse already awaited coroutine
+RuntimeError cannot reuse already awaited coroutine
+None
+ready
+caught
+ready
+None finally
+can't send non-None value to a just-started coroutine
+7
+scope rejected
+scope rejected
+scope rejected

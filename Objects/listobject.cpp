@@ -1,4 +1,5 @@
 #include "cxxpython/protocol.hpp"
+#include "internal/listsort.hpp"
 
 #include <algorithm>
 #include <deque>
@@ -97,6 +98,7 @@ void insert_values(Attachment &context, Handle self, std::span<const Value> valu
                     at = std::max<std::int64_t>(0, at + static_cast<std::int64_t>(items.size()));
                 const auto offset = std::min<std::size_t>(at, items.size());
                 items.insert(items.begin() + offset, values.begin(), values.end());
+                ++data.mutation_epoch;
                 return true;
             }))
             return;
@@ -109,6 +111,7 @@ void clear_list(Attachment &context, Handle self)
     auto &data = *context.payload<ListObject>(self).contents;
     locked(context, data, [&] {
         data.items.swap(removed);
+        ++data.mutation_epoch;
         context.account_external(self, sizeof(ListObject::Storage));
     });
 }
@@ -328,6 +331,8 @@ void slice_item(Attachment &context, Handle self, Handle key, std::optional<Hand
                         if (i + 1 < replacement.size())
                             position += selected.step;
                     }
+                    if (!replacement.empty())
+                        ++data.mutation_epoch;
                     return Commit::Done;
                 }
                 const auto remaining = items.size() - selected_size;
@@ -348,12 +353,15 @@ void slice_item(Attachment &context, Handle self, Handle key, std::optional<Hand
                 items.erase(first, first + selected.length);
                 items.insert(items.begin() + selected.start, replacement.begin(),
                              replacement.end());
+                if (selected.length || !replacement.empty())
+                    ++data.mutation_epoch;
                 context.account_external(self, sizeof(ListObject::Storage) +
                                                    items.capacity() * sizeof(Value));
                 return Commit::Done;
             } else {
                 if (!selected.length)
                     return Commit::Done;
+                ++data.mutation_epoch;
                 if (selected.step == 1) {
                     items.erase(items.begin() + selected.start, items.begin() + selected.stop);
                     return Commit::Done;
@@ -423,11 +431,14 @@ void item(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &
             return false;
         if constexpr (Operation == ItemOperation::Set) {
             data.items[at] = args[2];
+            ++data.mutation_epoch;
             out.ok(context.builtin(CoreObject::None));
         } else {
             out.ok(data.items[at]);
-            if constexpr (Operation != ItemOperation::Get)
+            if constexpr (Operation != ItemOperation::Get) {
                 data.items.erase(data.items.begin() + at);
+                ++data.mutation_epoch;
+            }
         }
         return true;
     });
@@ -465,8 +476,26 @@ void reverse(Attachment &context, Handle, std::span<const Value> args, ReturnSlo
     if (!receiver(context, args[0], out))
         return;
     auto &data = *context.payload<ListObject>(args[0]).contents;
-    locked(context, data, [&] { std::reverse(data.items.begin(), data.items.end()); });
+    locked(context, data, [&] {
+        std::reverse(data.items.begin(), data.items.end());
+        ++data.mutation_epoch;
+    });
     out.ok(context.builtin(CoreObject::None));
+}
+void sort(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!receiver(context, args[0], out))
+        return;
+    RootScope roots(context);
+    const auto self = roots.root(args[0]), key = roots.root(args[1]);
+    ReturnSlot converted(context);
+    truth(context, roots.root(args[2]), converted);
+    if (failed(converted)) {
+        out.raised(converted.exception());
+        return;
+    }
+    detail::sort_list(context, self, key, converted.value() == context.builtin(CoreObject::True),
+                      out);
 }
 void iterator(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
@@ -621,8 +650,10 @@ void search(Attachment &context, Handle, std::span<const Value> args, ReturnSlot
         } else {
             auto &data = *context.payload<ListObject>(self).contents;
             locked(context, data, [&] {
-                if (static_cast<std::size_t>(i) < data.items.size())
+                if (static_cast<std::size_t>(i) < data.items.size()) {
                     data.items.erase(data.items.begin() + i);
+                    ++data.mutation_epoch;
+                }
             });
             out.ok(context.builtin(CoreObject::None));
             return;
@@ -703,6 +734,7 @@ void repeat(Attachment &context, Handle, std::span<const Value> args, ReturnSlot
                         return true;
                     if (!repeats) {
                         items.swap(prepared);
+                        ++data.mutation_epoch;
                         context.account_external(self, sizeof(ListObject::Storage));
                         return true;
                     }
@@ -715,6 +747,7 @@ void repeat(Attachment &context, Handle, std::span<const Value> args, ReturnSlot
                     }
                     for (std::size_t i = size; i < needed; ++i)
                         items.push_back(items[i % size]);
+                    ++data.mutation_epoch;
                     context.account_external(self, sizeof(ListObject::Storage) +
                                                        items.capacity() * sizeof(Value));
                     return true;
@@ -735,6 +768,123 @@ void make_list(Attachment &context, std::span<const Value> values, ReturnSlot &o
                                           std::vector<Value>(values.begin(), values.end()));
 }
 namespace detail {
+void sort_list(Attachment &context, Handle self, Handle key, bool reverse, ReturnSlot &out)
+{
+    RootScope roots(context);
+    self = roots.root(self.get(context));
+    key = roots.root(key.get(context));
+    auto &data = *context.payload<ListObject>(self).contents;
+    std::deque<ReturnSlot> values, keys;
+    std::vector<Value> saved, reordered, discarded;
+    std::vector<std::size_t> order, scratch;
+    std::size_t count = 0;
+    std::uint64_t epoch = 0;
+    for (;;) {
+        const auto size = list_size(context, self);
+        prepare_roots(context, values, size);
+        prepare_roots(context, keys, size);
+        order.resize(size);
+        scratch.resize(size);
+        reordered.resize(size, context.builtin(CoreObject::None));
+        if (locked(context, data, [&] {
+                if (data.items.size() > values.size() || data.items.size() > order.size())
+                    return false;
+                count = data.items.size();
+                for (std::size_t i = 0; i < count; ++i)
+                    values[i].ok(data.items[i]);
+                data.items.swap(saved);
+                epoch = ++data.mutation_epoch;
+                return true;
+            }))
+            break;
+    }
+    // No managed allocation is needed to restore the detached list, even on a native fault.
+    struct Restore {
+        Attachment &context;
+        Handle self;
+        ListObject::Storage &data;
+        std::vector<Value> &saved;
+        std::vector<Value> &discarded;
+        bool active = true;
+        ~Restore()
+        {
+            if (active)
+                locked(context, data, [&] {
+                    data.items.swap(discarded);
+                    data.items.swap(saved);
+                    ++data.mutation_epoch;
+                    context.account_external(self, sizeof(ListObject::Storage) +
+                                                       data.items.capacity() * sizeof(Value));
+                });
+        }
+    } restore{context, self, data, saved, discarded};
+    reordered.resize(count, context.builtin(CoreObject::None));
+    ReturnSlot result(context), converted(context);
+    for (std::size_t i = 0; i < count; ++i) {
+        order[i] = i;
+        if (key.get(context) == context.builtin(CoreObject::None))
+            keys[i].ok(values[i].value());
+        else {
+            const std::array args{values[i].value()};
+            call(context, key, {args, {}}, result);
+            if (failed(result)) {
+                out.raised(result.exception());
+                return;
+            }
+            keys[i].ok(result.value());
+        }
+    }
+    for (std::size_t width = 1; width < count;) {
+        for (std::size_t start = 0; start < count;) {
+            const auto middle = start + std::min(width, count - start);
+            const auto end = middle + std::min(width, count - middle);
+            auto left = start, right = middle, dest = start;
+            while (left < middle && right < end) {
+                RootScope pair(context);
+                const auto a = pair.root(keys[order[reverse ? left : right]].value());
+                const auto b = pair.root(keys[order[reverse ? right : left]].value());
+                rich_compare(context, a, b, CompareOp::Lt, result);
+                if (failed(result)) {
+                    out.raised(result.exception());
+                    return;
+                }
+                truth(context, pair.root(result.value()), converted);
+                if (failed(converted)) {
+                    out.raised(converted.exception());
+                    return;
+                }
+                scratch[dest++] = converted.value() == context.builtin(CoreObject::True)
+                                      ? order[right++]
+                                      : order[left++];
+            }
+            while (left < middle)
+                scratch[dest++] = order[left++];
+            while (right < end)
+                scratch[dest++] = order[right++];
+            start = end;
+        }
+        order.swap(scratch);
+        if (width > count / 2)
+            break;
+        width *= 2;
+    }
+    for (std::size_t i = 0; i < count; ++i)
+        reordered[i] = values[order[i]].value();
+    bool modified = false;
+    locked(context, data, [&] {
+        modified = data.mutation_epoch != epoch;
+        data.items.swap(discarded);
+        data.items.swap(reordered);
+        ++data.mutation_epoch;
+        context.account_external(self, sizeof(ListObject::Storage) +
+                                           data.items.capacity() * sizeof(Value));
+        restore.active = false;
+    });
+    if (modified)
+        raise_error(context, CoreObject::ValueErrorType, U"list modified during sort", out);
+    else
+        out.ok(context.builtin(CoreObject::None));
+}
 void list_append(Attachment &context, Handle self, Handle value, ReturnSlot &out)
 {
     const std::array values{value.get(context)};
@@ -826,6 +976,12 @@ void install_lists(Attachment &context, std::span<const Handle> core)
     install(U"clear", unary, clear);
     install(U"copy", unary, copy);
     install(U"reverse", unary, reverse);
+    auto sort_signature = unary;
+    sort_signature.parameters.push_back(
+        {U"key", ParameterKind::KeywordOnly, at(CoreObject::None).get(context)});
+    sort_signature.parameters.push_back(
+        {U"reverse", ParameterKind::KeywordOnly, at(CoreObject::False).get(context)});
+    install(U"sort", sort_signature, sort);
     install(U"__iter__", unary, iterator);
     install(U"count", pair, search<Search::Count>);
     install(U"remove", pair, search<Search::Remove>);

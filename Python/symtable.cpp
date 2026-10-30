@@ -178,9 +178,17 @@ class ScopePass final {
                         error(value.span, "'yield' outside function");
                     if (comprehensions_[scope] && !node.implicit)
                         error(value.span, "'yield' inside comprehension");
+                    if (program_.scopes[scope].coroutine)
+                        throw SourceError(program_.source, value.span,
+                                          "async generator execution is not available yet",
+                                          SourceErrorKind::Capability);
                     program_.scopes[scope].generator = true;
                     if (node.value)
                         expression(*node.value, scope);
+                } else if constexpr (std::is_same_v<T, AwaitExpr>) {
+                    if (!program_.scopes[scope].coroutine)
+                        error(value.span, "'await' outside async function");
+                    expression(*node.value, scope);
                 } else if constexpr (std::is_same_v<T, UnaryExpr> || std::is_same_v<T, StarredExpr>)
                     expression(*node.value, scope);
                 else if constexpr (std::is_same_v<T, ConditionalExpr>) {
@@ -306,6 +314,7 @@ class ScopePass final {
             if (parameter.default_value)
                 expression(*parameter.default_value, scope);
         node.scope = add(ScopeKind::Function, node.name, qualified(node.name, scope), scope, span);
+        program_.scopes[node.scope].coroutine = node.coroutine;
         comprehensions_[node.scope] = node.comprehension;
         if (node.comprehension)
             iteration_targets(node.body, node.scope);

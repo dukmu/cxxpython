@@ -1,0 +1,6 @@
+bad awaitable True
+bad awaitable True
+pause
+None ['closed', 'outer']
+coroutine raised StopIteration StopIteration
+coroutine already executing

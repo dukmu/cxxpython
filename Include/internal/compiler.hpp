@@ -6,7 +6,7 @@ namespace cxxpython::core::detail {
 struct Expr;
 using ExprPtr = std::unique_ptr<Expr>;
 struct Literal {
-    enum class Kind { Integer, Float, String, Bytes, None, True, False, Ellipsis } kind;
+    enum class Kind { Integer, Float, Imaginary, String, Bytes, None, True, False, Ellipsis } kind;
     std::u32string text;
     double number = 0.0;
 };
@@ -38,6 +38,9 @@ struct YieldExpr {
     ExprPtr value;
     bool delegated = false;
     bool implicit = false;
+};
+struct AwaitExpr {
+    ExprPtr value;
 };
 struct FunctionStmt;
 struct LambdaExpr {
@@ -92,7 +95,7 @@ struct Expr {
     std::variant<Literal, NameExpr, UnaryExpr, BinaryExpr, BoolExpr, CompareExpr, CallExpr,
                  AttributeExpr, TupleExpr, ListExpr, SetExpr, DictExpr, SubscriptExpr,
                  ConditionalExpr, NamedExpr, StarredExpr, LambdaExpr, ComprehensionExpr, SliceExpr,
-                 JoinedStrExpr, FormattedExpr, YieldExpr>
+                 JoinedStrExpr, FormattedExpr, YieldExpr, AwaitExpr>
         node;
 };
 struct Stmt;
@@ -140,6 +143,7 @@ struct FunctionStmt {
     Suite body;
     std::size_t scope = 0;
     bool comprehension = false;
+    bool coroutine = false;
 };
 struct ClassStmt {
     std::u32string name, binding;

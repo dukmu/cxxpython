@@ -165,6 +165,106 @@ void tailmatch(Attachment &context, Handle, std::span<const Value> args, ReturnS
     }
     out.ok(context.builtin(match(value) ? CoreObject::True : CoreObject::False));
 }
+bool string_space(char32_t value)
+{
+    return detail::numeric_whitespace(value) || (value >= 0x1c && value <= 0x1f);
+}
+template <bool Reverse>
+void split(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(context);
+    const auto self = roots.root(args[0]), separator = roots.root(args[1]);
+    if (!is_string(context, self.get(context)) ||
+        (separator.get(context) != context.builtin(CoreObject::None) &&
+         !is_string(context, separator.get(context)))) {
+        raise_error(context, CoreObject::TypeErrorType,
+                    U"str.split requires a string separator or None", out);
+        return;
+    }
+    ReturnSlot limit(context), part(context);
+    index(context, roots.root(args[2]), limit);
+    if (limit.tag() == ResultTag::Raised) {
+        out.raised(limit.exception());
+        return;
+    }
+    std::int64_t count;
+    if (!int_fits_signed(context, limit.value(), count)) {
+        raise_error(context, CoreObject::OverflowErrorType,
+                    U"Python int too large to convert to C ssize_t", out);
+        return;
+    }
+    if (count < 0)
+        count = std::numeric_limits<std::int64_t>::max();
+    const auto &text = context.payload<StrObject>(self).value;
+    const bool whitespace = separator.get(context) == context.builtin(CoreObject::None);
+    const std::u32string_view sep =
+        whitespace ? std::u32string_view{} : context.payload<StrObject>(separator).value;
+    if (!whitespace && sep.empty()) {
+        raise_error(context, CoreObject::ValueErrorType, U"empty separator", out);
+        return;
+    }
+    std::vector<Value> items;
+    auto append = [&](std::size_t first, std::size_t last) {
+        make_str(context, text.substr(first, last - first), part);
+        items.push_back(roots.root(part.value()).get(context));
+    };
+    std::size_t first = 0, last = text.size();
+    for (;;) {
+        if (whitespace) {
+            if constexpr (Reverse) {
+                while (last > first && string_space(text[last - 1]))
+                    --last;
+            } else {
+                while (first < last && string_space(text[first]))
+                    ++first;
+            }
+            if (first == last)
+                break;
+        }
+        if (!count) {
+            append(first, last);
+            break;
+        }
+        if constexpr (Reverse) {
+            auto position = last;
+            if (whitespace) {
+                while (position > first && !string_space(text[position - 1]))
+                    --position;
+                append(position, last);
+                last = position;
+            } else {
+                position = std::u32string_view(text).substr(first, last - first).rfind(sep);
+                if (position == std::u32string_view::npos) {
+                    append(first, last);
+                    break;
+                }
+                position += first;
+                append(position + sep.size(), last);
+                last = position;
+            }
+        } else {
+            auto position = first;
+            if (whitespace) {
+                while (position < last && !string_space(text[position]))
+                    ++position;
+                append(first, position);
+                first = position;
+            } else {
+                position = text.find(sep, first);
+                if (position == std::u32string_view::npos) {
+                    append(first, last);
+                    break;
+                }
+                append(first, position);
+                first = position + sep.size();
+            }
+        }
+        --count;
+    }
+    if constexpr (Reverse)
+        std::reverse(items.begin(), items.end());
+    make_list(context, items, out);
+}
 } // namespace
 
 void detail::install_unicode_methods(Attachment &context, std::span<const Handle> core)
@@ -197,5 +297,17 @@ void detail::install_unicode_methods(Attachment &context, std::span<const Handle
                              find<false, true>);
     install_native_attribute(context, core, at(CoreObject::StrType), U"rindex", signature,
                              find<true, true>);
+    RootScope roots(context);
+    ReturnSlot negative(context);
+    context.allocate_instance<IntObject>(at(CoreObject::IntType), negative, -1);
+    SignatureLayout splitted;
+    splitted.parameters = {
+        {U"self", ParameterKind::PositionalOnly},
+        {U"sep", ParameterKind::PositionalOrKeyword, at(CoreObject::None).get(context)},
+        {U"maxsplit", ParameterKind::PositionalOrKeyword, negative.value()}};
+    install_native_attribute(context, core, at(CoreObject::StrType), U"split", splitted,
+                             split<false>);
+    install_native_attribute(context, core, at(CoreObject::StrType), U"rsplit", splitted,
+                             split<true>);
 }
 } // namespace cxxpython::core

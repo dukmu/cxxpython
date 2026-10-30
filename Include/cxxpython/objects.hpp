@@ -79,6 +79,7 @@ struct ListObject {
     struct Storage {
         std::mutex mutex;
         std::vector<Value> items;
+        std::uint64_t mutation_epoch = 0;
     };
     ObjectHeader header;
     const std::unique_ptr<Storage> contents;

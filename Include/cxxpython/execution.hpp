@@ -82,6 +82,7 @@ enum class Opcode : std::uint8_t {
     SetAdd,
     SetUpdate,
     PrintExpr,
+    GetAwaitable,
     YieldValue,
     YieldFrom,
     Count,
@@ -231,6 +232,7 @@ struct CodeSpec {
     std::vector<std::u32string> cellvars, freevars;
     CodeKind kind = CodeKind::Function;
     bool generator = false;
+    bool coroutine = false;
 };
 class CodeBuilder;
 class VerifiedCode final {
@@ -285,6 +287,10 @@ class VerifiedCode final {
     {
         return generator_;
     }
+    bool is_coroutine() const noexcept
+    {
+        return coroutine_;
+    }
     std::size_t max_stack() const noexcept
     {
         return max_stack_;
@@ -301,12 +307,13 @@ class VerifiedCode final {
                  std::vector<CallLayout> calls, std::vector<RegionLayout> regions,
                  SignatureLayout signature, std::vector<std::u32string> locals,
                  std::vector<std::u32string> cellvars, std::vector<std::u32string> freevars,
-                 std::size_t stack, std::uint32_t first_line, CodeKind kind, bool generator)
+                 std::size_t stack, std::uint32_t first_line, CodeKind kind, bool generator,
+                 bool coroutine)
         : instructions_(std::move(instructions)), positions_(std::move(positions)),
           calls_(std::move(calls)), regions_(std::move(regions)), signature_(std::move(signature)),
           locals_(std::move(locals)), cellvars_(std::move(cellvars)),
           freevars_(std::move(freevars)), max_stack_(stack), first_line_(first_line), kind_(kind),
-          generator_(generator)
+          generator_(generator), coroutine_(coroutine)
     {
         for (const auto &region : regions_)
             if (region.depth > max_regions_)
@@ -333,6 +340,7 @@ class VerifiedCode final {
     std::size_t max_regions_ = 0;
     CodeKind kind_;
     bool generator_;
+    bool coroutine_;
 };
 struct CodeObject {
     ObjectHeader header;

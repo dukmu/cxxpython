@@ -1,5 +1,67 @@
 # Development Status
 
+## 2026-10-30 Native Types, Coroutine Syntax And Real Library Dependencies
+
+Prepended without rewriting earlier records. Previous stable node: 46fac07,
+committed and pushed at the start of this work. The full Plan 2 goal remains
+active. The complete requested library list and dependency order are retained in
+doc/cpython_compatibility.md; this node does not complete that list or N4-N6.
+
+- Implemented immutable complex construction, conversion, mixed arithmetic,
+  hash/comparison and fields, imaginary literals and complex numeric formatting.
+  Negative real fractional powers now enter the same ordinary complex protocol.
+  Implemented bytearray construction/reinitialization, indexed/slice mutation,
+  concatenation/repetition, common mutation methods, iteration and decoding.
+  Short per-object commits and prepared amortized append avoid a new execution
+  lock. Scalar get/set and tail pop are O(1), not whole-buffer copies.
+- async def/await now lower through the generated CST adapter and existing
+  scope/CFG/VM. GET_AWAITABLE has native verifier/stack/disassembly tests. Native
+  coroutine/await-wrapper types reuse Frame suspension, delegation and unwind;
+  send/throw/close, nested returns and exception-state handoff work across Active
+  OS threads in one Interpreter/shared heap during GC. No event loop, host Python
+  execution or GIL was introduced. Async generators, async for/with, annotation
+  scopes and never-awaited warning policy remain explicit language dependencies.
+- Added stable list.sort/sorted, reversed/list reverse iterators, arbitrary-index
+  enumerate, zip(strict=...) and map. Sorting roots detached input/keys, invokes
+  callbacks without the list lock, detects mutation and restores storage on
+  failure. Added general tuple concatenation/repetition, str.split/rsplit, and
+  generator-expression call arguments. These close failures found by running
+  actual upstream library code, not library-specific runtime substitutions.
+- Native posix now provides descriptor I/O, cwd/listdir, path mutations,
+  stat/lstat/fstat/readlink, process IDs and environment primitives. Blocking
+  operations park; host directory/cwd resources use RAII. A readonly stat_result
+  has native tuple tail fields without enabling Python tuple slots. OSError has
+  errno-specific subclasses and traced errno/message/filename fields, including
+  normalized PathLike failure filenames. Full dir_fd/follow_symlinks, stat-result
+  reflection/pickle and the Python os/io/pathlib closures remain work.
+- Lib/bisect.py, heapq.py and operator.py copy the complete fixed CPython 3.12.14
+  sources with provenance and genuine optional-accelerator fallbacks. Their
+  tested operations execute in this runtime. CPython test_bisect's original 78
+  data cases drive 1638 bounded-search checks; test_heapq's two upstream merge
+  doctests execute through the product single-mode compiler. Complete unittest/
+  upstream test-package support remains a dependency, not a fake test facade.
+- Product/reference fixtures pass 54/54. Normal affected regression passes
+  141/141, with the final new await verifier passing separately; normal native
+  bootstrap/parallel selection also passes 7/7. ASan/UBSan/LSan affected native
+  tests pass 71/71, product fixtures 54/54 and upstream heapq doctests pass. TSan
+  affected VM/list/shared-bytearray/coroutine tests pass 22/22. The last localized
+  POSIX change has separate final normal/strict-ASan script passes. Sorting key
+  tests explicitly collect while input is detached. Format-check and all 244
+  generated-rule checks pass. No sanitizer suppression or new exclusion.
+- Initial retained failures exposed missing sorting, tuple concatenation,
+  generator-call lowering, Unicode separator semantics and errno descriptors;
+  those general dependencies were repaired. Filesystem cases now run in fresh
+  scratch directories instead of leaving state in fixture directories. Evidence
+  is under .cache/base-expansion-*, including initial failures and final logs.
+  Build/test handles were terminal before commit. No unrelated CPU/performance
+  rerun, manually copied measurement table or complete native sweep was added.
+- Next substantial dependency is the native buffer/codec registry and genuine
+  codecs/encodings/file-I/O closure, then upstream os/pathlib/glob and the
+  types/abc/collections family as their syntax/native dependencies become ready.
+  Pure-Python library additions use their library tests, reusing valid native
+  evidence; native/VM changes use affected contracts. User changes to
+  temporary_plan.md and test2.py remain excluded from the stable-point commit.
+
 ## 2026-10-30 Finalizers, Weak References And Script-Level Library Tests
 
 Prepended without changing earlier records. Previous stable node: 61b85ac,

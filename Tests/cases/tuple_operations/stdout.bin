@@ -1,0 +1,23 @@
+() True
+(4,) True
+(5,) True
+() () True
+() () True
+() () True
+() () True
+(1, 2) True
+(1, 2, 4) True
+(1, 2, 5) True
+() () True
+() () True
+(1, 2) (1, 2) True
+(1, 2, 1, 2, 1, 2) (1, 2, 1, 2, 1, 2) True
+(3,) True
+(3, 4) True
+(3, 5) True
+() () True
+() () True
+(3,) (3,) True
+(3, 3, 3) (3, 3, 3) True
+(1, 2, 1, 2)
+concat rejects list

@@ -1,4 +1,5 @@
 #include "cxxpython/floatobject.hpp"
+#include "cxxpython/complexobject.hpp"
 #include "cxxpython/protocol.hpp"
 #include "internal/long.hpp"
 
@@ -296,7 +297,12 @@ void float_arithmetic(Attachment &context, Handle, std::span<const Value> args, 
             }
             result = std::fmod(std::fabs(b), 2.0) == 1.0 ? a : 0.0;
         } else if (a < 0 && b != std::floor(b)) {
-            raise_error(context, CoreObject::TypeErrorType, U"complex power is not supported", out);
+            RootScope roots(context);
+            ReturnSlot base(context), exponent(context);
+            make_complex(context, a, 0.0, base);
+            make_float(context, b, exponent);
+            binary(context, roots.root(base.value()), roots.root(exponent.value()), BinaryOp::Power,
+                   out);
             return;
         } else {
             result = std::pow(a, b);

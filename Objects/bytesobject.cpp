@@ -1,3 +1,4 @@
+#include "cxxpython/bytearrayobject.hpp"
 #include "cxxpython/protocol.hpp"
 #include "internal/codecs.hpp"
 
@@ -118,6 +119,10 @@ void create(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
         }
         if (!exact)
             finish(c.payload<BytesObject>(out.value()).value);
+        return;
+    }
+    if (is_bytearray(c, source.get(c))) {
+        finish(detail::bytearray_snapshot(c, source));
         return;
     }
     if (c.has_layout<StrObject>(source.get(c))) {

@@ -1,0 +1,4 @@
+st_atime readonly
+st_atime_ns readonly
+st_blksize readonly
+st_mode readonly

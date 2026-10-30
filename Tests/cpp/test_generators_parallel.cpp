@@ -29,25 +29,32 @@ Handle setup(Attachment &context, RootScope &roots, const char *source)
     return globals;
 }
 
-TEST(ParallelGenerators, SuspendedFramesTransferExceptionStateBetweenActiveWorkers)
+void suspended_frame_transfer(bool coroutine)
 {
     Interpreter interpreter;
     Attachment owner(interpreter);
     owner.bootstrap_core();
     RootScope roots(owner);
-    const auto globals = setup(owner, roots,
-                               "def f():\n"
-                               "    for i in range(100):\n"
-                               "        try:\n"
-                               "            raise\n"
-                               "        except LookupError as e:\n"
-                               "            yield (e.args[0], i)\n"
-                               "def advance(g, tag):\n"
-                               "    try:\n"
-                               "        raise LookupError(tag)\n"
-                               "    except LookupError:\n"
-                               "        return next(g)\n"
-                               "g = f()\n");
+    const std::string source =
+        std::string(coroutine ? "class Pause:\n"
+                                "    def __init__(self, value):\n"
+                                "        self.value = value\n"
+                                "    def __await__(self):\n"
+                                "        yield self.value\n"
+                                "async def f():\n"
+                              : "def f():\n") +
+        "    for i in range(100):\n"
+        "        try:\n"
+        "            raise\n"
+        "        except LookupError as e:\n" +
+        (coroutine ? "            await Pause((e.args[0], i))\n"
+                   : "            yield (e.args[0], i)\n") +
+        "def advance(g, tag):\n"
+        "    try:\n"
+        "        raise LookupError(tag)\n"
+        "    except LookupError:\n" +
+        (coroutine ? "        return g.send(None)\n" : "        return next(g)\n") + "g = f()\n";
+    const auto globals = setup(owner, roots, source.c_str());
     const auto packet = evaluate(owner, roots, globals, "(g, advance)");
     std::array inputs{owner.make_transfer(packet), owner.make_transfer(packet)};
     std::array<std::future<void>, 2> workers;
@@ -106,12 +113,106 @@ TEST(ParallelGenerators, SuspendedFramesTransferExceptionStateBetweenActiveWorke
         for (auto &worker : workers)
             EXPECT_NO_THROW(worker.get());
     }
-    const auto result =
-        evaluate(owner, roots, globals,
-                 "(g.gi_suspended, g.gi_running, g.gi_frame.f_back, g.close(), g.gi_frame)");
+    const auto result = evaluate(
+        owner, roots, globals,
+        coroutine ? "(g.cr_suspended, g.cr_running, g.cr_frame.f_back, g.close(), g.cr_frame)"
+                  : "(g.gi_suspended, g.gi_running, g.gi_frame.f_back, g.close(), g.gi_frame)");
     ReturnSlot out(owner);
     repr(owner, result, out);
     EXPECT_EQ(owner.payload<StrObject>(out.value()).value, U"(True, False, None, None, None)");
+}
+
+TEST(ParallelGenerators, SuspendedFramesTransferExceptionStateBetweenActiveWorkers)
+{
+    suspended_frame_transfer(false);
+}
+TEST(ParallelCoroutines, SuspendedFramesTransferExceptionStateBetweenActiveWorkers)
+{
+    suspended_frame_transfer(true);
+}
+
+TEST(ParallelByteArrays, SharedAppendAndIteratorRemainRootedDuringCollection)
+{
+    Interpreter interpreter;
+    Attachment owner(interpreter);
+    owner.bootstrap_core();
+    RootScope roots(owner);
+    const auto globals = setup(owner, roots,
+                               "buffer = bytearray()\n"
+                               "cursor = iter(buffer)\n"
+                               "def fill(buffer, start):\n"
+                               "    for i in range(100):\n"
+                               "        buffer.append(start + i)\n");
+    const auto packet = evaluate(owner, roots, globals, "(buffer, cursor, fill)");
+    std::array transfers{owner.make_transfer(packet), owner.make_transfer(packet)};
+    std::array<std::future<void>, 2> workers;
+    std::array<std::atomic<unsigned>, 200> seen{};
+    std::latch ready(2), start(1), filled(2);
+    std::atomic<bool> failed{false};
+    {
+        NativeWait parked(owner);
+        for (unsigned id = 0; id < workers.size(); ++id)
+            workers[id] = std::async(
+                std::launch::async, [&, id, transfer = std::move(transfers[id])]() mutable {
+                    bool announced = false, completed = false;
+                    try {
+                        Attachment context(interpreter);
+                        RootScope local(context);
+                        ReturnSlot message(context), out(context), offset(context);
+                        context.receive(transfer, message);
+                        const auto &items = context.payload<TupleObject>(message.value()).items;
+                        const auto buffer = local.root(items[0]), cursor = local.root(items[1]),
+                                   fill = local.root(items[2]);
+                        make_int(context, id * 100, offset);
+                        {
+                            NativeWait wait(context);
+                            announced = true;
+                            ready.count_down();
+                            start.wait();
+                        }
+                        for (unsigned round = 0; round < 5; ++round) {
+                            const Value args[] = {buffer.get(context), offset.value()};
+                            call(context, fill, {args}, out);
+                            if (out.tag() != ResultTag::Ok)
+                                throw std::runtime_error("shared bytearray append raised");
+                            context.collect();
+                        }
+                        {
+                            NativeWait wait(context);
+                            completed = true;
+                            filled.count_down();
+                            filled.wait();
+                        }
+                        while (!failed.load()) {
+                            const auto status = iter_next(context, cursor, out);
+                            if (status == NextStatus::Done)
+                                break;
+                            if (status == NextStatus::Raised)
+                                throw std::runtime_error("shared bytearray iterator raised");
+                            const auto value = context.payload<IntObject>(out.value()).small;
+                            if (value < 0 || value >= 200)
+                                throw std::runtime_error("shared bytearray returned invalid byte");
+                            ++seen[static_cast<std::size_t>(value)];
+                            if (value % 19 == 0)
+                                context.collect();
+                        }
+                    } catch (...) {
+                        failed.store(true);
+                        if (!announced)
+                            ready.count_down();
+                        if (!completed)
+                            filled.count_down();
+                        throw;
+                    }
+                });
+        ready.wait();
+        start.count_down();
+        for (auto &worker : workers)
+            EXPECT_NO_THROW(worker.get());
+    }
+    EXPECT_FALSE(failed.load());
+    for (const auto &count : seen)
+        EXPECT_EQ(count.load(), 5U);
 }
 
 struct ResumeGate {

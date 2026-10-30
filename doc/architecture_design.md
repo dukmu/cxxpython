@@ -90,7 +90,9 @@ Float literals share the native conversion helper; the compiler freezes native
 binary64 constants into normal managed objects. Integer true division rounds
 exact ratios in longobject rather than narrowing both operands first.
 Power/shift/bitwise dispatch uses the same ordinary/reflected/in-place protocol
-boundary; complex values and the complete numeric API remain unfinished.
+boundary. `Objects/complexobject.cpp` owns immutable binary64 complex values,
+construction and mixed arithmetic. Imaginary literals freeze those same values;
+complex formatting shares the numeric format parser rather than a second one.
 `Objects/representation.cpp` provides other value representation/hash
 operations. `Objects/rangeobject.cpp` owns immutable arbitrary-integer ranges and
 their iterators; `Objects/iterobject.cpp` owns iteration and immutable sequence
@@ -110,6 +112,15 @@ than a second storage or lifetime authority. `Objects/listobject.cpp` owns mutab
 constructors and protocols, with prepared capacity growth and local commits.
 List displays lower through the same AST/CFG into BUILD_LIST; sys.path, regular
 package paths and CLI argv use that real container, not host-only arrays.
+Stable list sorting detaches a precisely rooted input and runs key/comparison
+callbacks without the list lock. Mutation epochs detect intervening writes;
+prepared short commits restore the list on failure. `sorted` uses the same
+implementation. `Objects/bytearrayobject.cpp` owns mutable byte sequences with
+short versioned commits and rooted iterator reads. Scalar reads/writes and tail
+pop do not copy the whole buffer; append uses prepared amortized growth.
+`Objects/enumobject.cpp` owns reversed/list-reverse iterators, enumerate, zip and
+map. Child iterators/callables are traced; ordinary protocol callbacks do not run
+under storage locks. Compound callback sequences are not advertised as atomic.
 `Objects/sliceobject.cpp` supplies traced immutable slice fields and normalization;
 sequence owners perform conversions before their rooted snapshots/local commits.
 `Objects/formatobject.cpp` supplies the common format/ascii protocol boundary;
@@ -138,6 +149,15 @@ type/MRO snapshots supply instance finalizers. `Objects/weakrefobject.cpp` owns
 weak reference protocols, while `Modules/_weakref.cpp` exposes native capability.
 `Python/errors.cpp` owns exception/unraisable hook dispatch, including callbacks
 from GC and generator close. `Modules/gcmodule.cpp` exposes collector controls.
+`Objects/exceptions.cpp` owns errno-based OSError construction and traced native
+error fields. `Modules/posixmodule.cpp` supplies real descriptor, directory,
+filesystem-status and process/environment primitives, with blocking host work
+parked. Its stat_result is a validated immutable tuple subtype with readonly
+native tail fields; native layout planning does not enable Python tuple slots.
+OS environment operations share a short process-wide host mutex because the
+underlying environment itself is process-wide. External embedding code must
+coordinate its own concurrent environment mutations. Full os/_io policy and
+resource-owning file objects remain separate library delivery work.
 
 Runtime contracts are in `Include/cxxpython/`. Compiler-private implementation
 structures belong in `Include/internal/`. All C++ interfaces remain unstable.
@@ -172,6 +192,13 @@ rooted atomic reads, not unprotected reads of live operand storage. Explicit
 close and automatic GC close use ordinary GeneratorExit/unwind. Coroutine/async
 execution, shutdown phases and unrestricted cross-thread frame-local snapshots
 remain work; a C++ destructor does not execute Python cleanup.
+Native coroutine calls create the same suspended Frame shape with a distinct
+coroutine type/code flag. GET_AWAITABLE validates the ordinary __await__ protocol;
+the existing delegation and unwind paths perform suspension, send/throw/close and
+return-value propagation. Await wrappers retain their coroutine owner. Coroutine
+Frames use the same cross-thread Running claim and exception-state handoff as
+generators, not an event loop or a serial executor. Async generators/async
+for/async with and never-awaited warning policy remain explicit dependencies.
 
 ## Tests And Tooling
 

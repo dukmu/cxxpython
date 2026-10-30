@@ -410,6 +410,32 @@ TEST_F(CoreExecution, YieldOpcodesRequireGeneratorCodeAndVerifiedResumptionSlots
     invalid(module, CodeErrorKind::Signature);
 }
 
+TEST_F(CoreExecution, AwaitOpcodeRequiresCoroutineCodeAndOneResumptionSlot)
+{
+    CodeBuilder ordinary(context);
+    ordinary.emit(Opcode::GetAwaitable);
+    invalid(ordinary, CodeErrorKind::Operand);
+    CodeSpec spec;
+    spec.coroutine = true;
+    CodeBuilder underflow(context, spec);
+    underflow.emit(Opcode::GetAwaitable);
+    invalid(underflow, CodeErrorKind::StackUnderflow);
+    CodeBuilder valid(context, spec);
+    valid.emit(Opcode::LoadConst, valid.constant(builtin(CoreObject::None)));
+    valid.emit(Opcode::GetAwaitable);
+    valid.emit(Opcode::YieldFrom);
+    valid.emit(Opcode::Return);
+    const auto program = code(valid);
+    EXPECT_TRUE(context.payload<CodeObject>(program).program.is_coroutine());
+    EXPECT_FALSE(context.payload<CodeObject>(program).program.is_generator());
+    EXPECT_EQ(context.payload<CodeObject>(program).program.max_stack(), 1U);
+    EXPECT_NE(disassemble(context, program).find("GET_AWAITABLE"), std::string::npos);
+    const auto effect = instruction_effect({Opcode::GetAwaitable, 0});
+    EXPECT_EQ(effect.inputs, 1U);
+    EXPECT_EQ(effect.pops, 1U);
+    EXPECT_EQ(effect.pushes, 1U);
+}
+
 TEST_F(CoreExecution, IterationAndUnpackOpcodesVerifyBothBranchStackEffects)
 {
     CodeBuilder empty(context);

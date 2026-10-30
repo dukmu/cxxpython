@@ -1,0 +1,15 @@
+0j 0j 0.0 0.0 False
+(3+0j) (3+0j) 3.0 0.0 True
+(3-4j) (3-4j) 3.0 -4.0 True
+(-0-0j) (-0-0j) -0.0 -0.0 False
+1j 1j 0.0 1.0 True
+(12.5-30j) (12.5-30j) 12.5 -30.0 True
+(inf+nanj) (inf+nanj) inf nan True
+(5+4j) (5+4j) (1+4j) (-1-4j) (6+8j) (6+8j)
+(1.5+2j) (0.24-0.32j) (-7+24j) (4+0j)
+(3+4j) (-3-4j) 5.0 (3-4j)
+True True True
+False
+True True
+(5+4j) (5+4j)
+False

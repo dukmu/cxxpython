@@ -55,6 +55,7 @@ struct ScopeInfo {
     std::vector<std::u32string> locals;
     std::vector<std::u32string> cellvars, freevars;
     bool generator = false;
+    bool coroutine = false;
 };
 namespace detail {
 struct SourceProgram;

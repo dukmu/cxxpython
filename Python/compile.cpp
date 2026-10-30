@@ -1,3 +1,4 @@
+#include "cxxpython/complexobject.hpp"
 #include "cxxpython/floatobject.hpp"
 #include "cxxpython/moduleobject.hpp"
 #include "internal/compiler.hpp"
@@ -326,6 +327,10 @@ class GraphPass final {
                     if (node.delegated)
                         emit(Opcode::GetIter, value.span);
                     emit(node.delegated ? Opcode::YieldFrom : Opcode::YieldValue, value.span);
+                } else if constexpr (std::is_same_v<T, AwaitExpr>) {
+                    expression(*node.value);
+                    emit(Opcode::GetAwaitable, value.span);
+                    emit(Opcode::YieldFrom, value.span);
                 } else if constexpr (std::is_same_v<T, ComprehensionExpr>) {
                     function_value(*node.function, value.span);
                     expression(*node.iterable);
@@ -938,6 +943,10 @@ class GraphPass final {
 
 void literal(Attachment &context, const Literal &value, ReturnSlot &out)
 {
+    if (value.kind == Literal::Kind::Imaginary) {
+        make_complex(context, 0.0, value.number, out);
+        return;
+    }
     if (value.kind == Literal::Kind::Bytes) {
         std::string data;
         data.reserve(value.text.size());
@@ -1031,6 +1040,7 @@ void SourceUnit::freeze(Attachment &context, ReturnSlot &out) const
             spec.cellvars = scope.cellvars;
             spec.freevars = scope.freevars;
             spec.generator = scope.generator;
+            spec.coroutine = scope.coroutine;
             spec.kind = scope.kind == ScopeKind::Class    ? CodeKind::ClassBody
                         : scope.kind == ScopeKind::Module ? CodeKind::Module
                                                           : CodeKind::Function;

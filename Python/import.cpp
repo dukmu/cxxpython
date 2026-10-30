@@ -2,6 +2,7 @@
 #include "cxxpython/protocol.hpp"
 #include "cxxpython/weakrefobject.hpp"
 #include "internal/compiler.hpp"
+#include "internal/posixmodule.hpp"
 #include "internal/stdio.hpp"
 #include "internal/sysmodule.hpp"
 
@@ -211,6 +212,7 @@ detail::ImportState::ImportState()
     for (auto [name, initializer] : {std::pair{U"builtins", builtin_init},
                                      {U"sys", sys_init},
                                      {U"gc", detail::initialize_gc},
+                                     {U"posix", detail::initialize_posix},
                                      {U"_weakref", detail::initialize_weakref},
                                      {U"__main__", main_init},
                                      {U"_imp", detail::initialize_imp}})

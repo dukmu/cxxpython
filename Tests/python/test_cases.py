@@ -5,6 +5,7 @@ import difflib
 from pathlib import Path
 import subprocess
 import sys
+import tempfile
 
 
 def compare(name, expected, actual):
@@ -40,8 +41,9 @@ def main():
         status_path = directory / "exitcode.txt"
         status = int(status_path.read_text()) if status_path.exists() else 0
         try:
-            result = subprocess.run([str(binary)], input=input_path.read_bytes(),
-                                    capture_output=True, cwd=directory, timeout=30)
+            with tempfile.TemporaryDirectory(prefix=f'cxxpython-{directory.name}-') as scratch:
+                result = subprocess.run([str(binary)], input=input_path.read_bytes(),
+                                        capture_output=True, cwd=scratch, timeout=30)
         except subprocess.TimeoutExpired:
             print(f"FAIL {directory.name}: exceeded 30 seconds", flush=True)
             failures += 1

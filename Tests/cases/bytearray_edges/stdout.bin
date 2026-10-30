@@ -1,0 +1,11 @@
+bytearray(b'AB')
+bytearray(b'aabcdefdef')
+bytearray(b'acedf')
+97
+[99, 101, 100, 102, 33]
+slice mismatch
+invalid byte
+missing encoding
+unhashable
+failed init bytearray(b'')
+self init bytearray(b'')

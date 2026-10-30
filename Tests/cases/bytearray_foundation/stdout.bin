@@ -1,0 +1,12 @@
+bytearray(b'abcd') 4 True 97 100 bytearray(b'bc')
+bytearray(b'ax12d')
+bytearray(b'XxY2Z')
+bytearray(b'x2')
+bytearray(b'2!?#') 46 120
+bytearray(b'#!2') bytearray(b'#!2') bytearray(b'#!2!') bytearray(b'#!2#!2')
+True bytearray(b'#!2z#!2z')
+True True True True
+bytearray(b'\x00\x00\x00') hé
+97 98
+exhausted
+bytearray(b'') False

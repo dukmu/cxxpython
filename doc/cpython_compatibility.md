@@ -46,9 +46,10 @@ acceptance evidence; this list is not a generated support matrix.
 ## Builtins And Product
 
 The canonical builtins module/dictionary, namespace lookup and core bootstrap are
-present. Base slices now include print, immutable bytes, set/frozenset, super, namespace/reflection,
-exec/eval compilation/execution and common aggregate builtins. Complete Python
-3.12 builtins are not: open/input, bytearray/memoryview, remaining
+present. Base slices now include print, bytes/bytearray, complex, set/frozenset,
+super, namespace/reflection, exec/eval compilation/execution, sorting, reverse
+iteration, enumerate/zip/map and common aggregate builtins. Complete Python
+3.12 builtins are not: open/input, memoryview, filter and other remaining
 iterators, compiler flags/modes and constructors/protocol matrices are still work.
 Complete their native dependencies and fixed-reference tests before copying
 dependent libraries wholesale. `__builtin__` is not the Python 3 module name;
@@ -63,7 +64,8 @@ the target is `builtins` and the `__builtins__` execution namespace.
   table without bypassing hash/equality callbacks or adding another lifetime
   authority. Operation-specific set/dict fast paths, iterable early termination,
   native subclasses, reflected operators and mutation failures have focused and
-  fixed-reference tests. Weakrefs are integrated; pickle and generic aliases remain dependencies;
+  fixed-reference tests. Weakrefs are integrated; pickle and generic aliases
+  remain dependencies;
   this is not completion of all common type/library integration or performance
   acceptance. Iteration order is not the reference's private table layout.
 - Generators adapt pinned genobject.c and PEP 380/479 behavior to the existing
@@ -75,9 +77,22 @@ the target is `builtins` and the `__builtins__` execution namespace.
   queue; delegated close-attribute lookup errors use sys.unraisablehook. The execution claim
   also covers throw argument preparation, so gi_running is already true inside
   a custom exception constructor. These edges need explicit compatibility work,
-  not a declaration of complete genobject.c parity. Async generators/coroutines
+  not a declaration of complete genobject.c parity. Async generators
   and the complete frame/code introspection API remain dependencies, not claimed
   generator completion.
+- Native coroutines now reuse Frame claims/delegation for async def and await,
+  with distinct coroutine and await-wrapper types, return/throw/close and
+  cross-thread suspension handoff. Async generators, async for/with and the
+  never-awaited warning policy remain unfinished; no fake asyncio is provided.
+- Complex construction/mixed arithmetic/hash, imaginary literals and numeric
+  formatting adapt the pinned native contracts. Bytearray construction, mutation,
+  slices, iteration and decoding use native synchronized storage, not a bytes
+  alias. Complete exported buffers/memoryview and all bytes-family methods remain.
+- Stable sorting and reversed/enumerate/zip/map close real Python library
+  dependencies. List sorting roots detached data and detects callback mutation;
+  no storage lock surrounds callbacks. These operations do not claim whole-call
+  atomicity across arbitrary callbacks. Tuple concatenation/repetition and
+  str.split/rsplit retain ordinary subtype/index/Unicode behavior.
 - Builtin compile/eval/exec reuse the existing compiler and VM. Ordinary module
   names now emit namespace instructions, matching separate globals/locals
   behavior; explicit global still emits global instructions. Current valid slices
@@ -115,7 +130,48 @@ the target is `builtins` and the `__builtins__` execution namespace.
 - Lib/stat.py, keyword.py and token.py copy complete pinned upstream modules.
   stat retains its optional _stat accelerator import and genuine Python fallback;
   no fake native module is installed. Provenance is recorded at each file head.
+- Lib/bisect.py, heapq.py and operator.py also copy complete pinned modules,
+  retaining their optional native accelerators and real Python fallback. The
+  bisect upstream corpus and heapq doctests run through the product. Full upstream
+  unittest suites still depend on unfinished unittest/collections/etc.
+- Native posix exposes descriptor I/O, cwd/listdir, path mutations, stat/lstat/
+  fstat, readlink, process IDs and environment primitives. Its readonly stat_result
+  uses native tuple fields; OSError carries errno/filename and specific subclasses.
+  dir_fd/follow_symlinks variants, complete stat-result reflection/pickle and the
+  Python os/pathlib/io closures are not claimed by this native slice.
 
 The configured source-tree stdlib path is development configuration, not final
 installation, isolation, environment or embedding acceptance. Full stdio/runpy,
 REPL/product configuration and requested library dependency closures remain in Plan 2.
+
+## Requested Library Delivery
+
+The requested Base-to-Full scope includes dis, collections, typing, types, ctypes,
+encodings, logging, multiprocessing, pathlib, re, string, unittest, abc, ast,
+base64, code, codecs, contextlib, dataclasses, enum, glob, hashlib, io, opcode,
+pdb, os, pickle, queue, socket, struct and threading. Earlier requests also include
+sys, posix, curses, importlib, weakref, runpy, tokenizer/tokenize, trace and uuid.
+These are delivery requirements, not a claim that the modules already work.
+
+- Close native buffer/resource and codec dependencies first, then upstream
+  encodings/codecs/io/os/pathlib/glob and complete runpy. Keep filesystem and
+  descriptor capability native, path and library policy in Python.
+- Complete native reflection, GenericAlias/Union, coroutine/async-generator and
+  class contracts for types/abc; then collections/itertools/functools dependencies,
+  contextlib/enum/dataclasses/typing. Do not replace these libraries with C++
+  facades to avoid their syntax or metaclass requirements.
+- Supply real regex, binascii, hash, struct, thread/queue, socket and foreign-call
+  capabilities for re/string/base64/hashlib/struct/threading/queue/socket/ctypes.
+  Build logging/pickle/multiprocessing on those dependencies, not on names-only
+  modules or a hidden host-Python execution path.
+- Connect ast/code/opcode/dis/pdb to this compiler's actual metadata and product
+  execution, preserving the independent bytecode and extension ABI contracts.
+- Each usable closure runs actual product scripts plus pinned upstream test data
+  and doctests where dependencies permit. The complete unittest and upstream
+  regression-test package are themselves unfinished closures, not a fake testing
+  facade. Host test drivers remain in Tests/python; a future Lib/test is the
+  actual adapted upstream Python test package, not host drivers or C++ tests.
+- Pure-Python additions rerun their dependency/library tests, not unchanged native
+  sweeps. Native type, GC or VM edits rerun the affected contracts and sanitizer
+  cases. Preserve valid earlier results instead of restarting unrelated CPU
+  performance campaigns for every library import.

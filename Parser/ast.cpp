@@ -254,15 +254,17 @@ class Adapter {
         }
         if (t.kind == TokenKind::NUMBER) {
             auto text = t.text;
-            if (!text.empty() && (text.back() == U'j' || text.back() == U'J'))
-                unsupported(n);
+            const bool imaginary = !text.empty() && (text.back() == U'j' || text.back() == U'J');
+            if (imaginary)
+                text.pop_back();
             text.erase(std::remove(text.begin(), text.end(), U'_'), text.end());
-            if (text.find_first_of(U".eE") != std::u32string::npos &&
+            if ((imaginary || text.find_first_of(U".eE") != std::u32string::npos) &&
                 !(text.size() > 1 && text[0] == U'0' && (text[1] == U'x' || text[1] == U'X'))) {
                 double value = 0;
                 if (!parse_float(text, value))
                     throw SourceError(source_, span(n), "invalid float literal");
-                return make(n, Literal{Literal::Kind::Float, text, value});
+                return make(n, Literal{imaginary ? Literal::Kind::Imaginary : Literal::Kind::Float,
+                                       text, value});
             }
             return make(n, Literal{Literal::Kind::Integer, text});
         }
@@ -276,8 +278,11 @@ class Adapter {
         auto r = rules(n);
         switch (n.rule) {
         case Rule::await_primary:
-            if (n.rule != Rule::await_primary || has(n, U"await"))
-                unsupported(n);
+            if (has(n, U"await")) {
+                auto value = expression(*r.at(0));
+                const auto depth = value->depth + 1;
+                return make(n, AwaitExpr{std::move(value)}, depth);
+            }
             break;
         case Rule::yield_expr: {
             auto value = r.empty() ? nullptr : expression(*r[0]);
@@ -525,6 +530,13 @@ class Adapter {
                 auto e = expression(*r[0]), key = expression(*r[1]);
                 auto d = std::max(e->depth, key->depth) + 1;
                 return make(n, SubscriptExpr{std::move(e), std::move(key)}, d);
+            }
+            if (r.size() == 2 && r[1]->rule == Rule::genexp) {
+                CallExpr call;
+                call.target = expression(*r[0]);
+                call.positional.push_back(comprehension(*r[1]));
+                const auto depth = std::max(call.target->depth, call.positional[0]->depth) + 1;
+                return make(n, std::move(call), depth);
             }
             if (has(n, U"(")) {
                 CallExpr call;
@@ -1305,9 +1317,10 @@ class Adapter {
             return s;
         }
         case Rule::function_def_raw: {
-            if (has(n, U"async") || has(n, U"->") || find(n, Rule::type_params))
+            if (has(n, U"->") || find(n, Rule::type_params))
                 unsupported(n);
             FunctionStmt f;
+            f.coroutine = has(n, U"async");
             f.name = definition_name(n, U"def");
             if (auto p = find(n, Rule::params))
                 parameters(*p, f);

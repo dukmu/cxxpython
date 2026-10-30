@@ -7,7 +7,8 @@ namespace {
 bool generator(Attachment &ctx, Value value, ReturnSlot &out)
 {
     if (ctx.has_layout<GeneratorObject>(value) &&
-        is_subtype(ctx, ctx.type_of(value), ctx.builtin(CoreObject::GeneratorType)))
+        (is_subtype(ctx, ctx.type_of(value), ctx.builtin(CoreObject::GeneratorType)) ||
+         ctx.type_of(value) == ctx.builtin(CoreObject::CoroutineType)))
         return true;
     raise_error(ctx, CoreObject::TypeErrorType, U"generator descriptor requires a generator", out);
     return false;
@@ -118,7 +119,7 @@ struct FrameClaim {
     }
 };
 
-void convert_stop_iteration(Attachment &ctx, ReturnSlot &out)
+void convert_stop_iteration(Attachment &ctx, bool coroutine, ReturnSlot &out)
 {
     if (out.tag() != ResultTag::Raised ||
         !exception_is(ctx, out.exception(), CoreObject::StopIterationType))
@@ -126,7 +127,9 @@ void convert_stop_iteration(Attachment &ctx, ReturnSlot &out)
     RootScope roots(ctx);
     const auto cause = roots.root(out.exception());
     ReturnSlot error(ctx), changed(ctx);
-    raise_error(ctx, CoreObject::RuntimeErrorType, U"generator raised StopIteration", error);
+    raise_error(ctx, CoreObject::RuntimeErrorType,
+                coroutine ? U"coroutine raised StopIteration" : U"generator raised StopIteration",
+                error);
     const auto replacement = roots.root(error.exception());
     set_exception_attribute(ctx, replacement, U"__context__", cause, changed);
     if (changed.tag() == ResultTag::Raised) {
@@ -151,11 +154,17 @@ void resume(Attachment &ctx, Value self_value, Operation operation, std::span<co
     }
     RootScope roots(ctx);
     const auto self = roots.root(self_value);
+    const bool coroutine = ctx.type_of(self) == ctx.builtin(CoreObject::CoroutineType);
     for (auto value : args)
         roots.root(value);
     ReturnSlot loaded(ctx), thrown(ctx);
     ctx.load(self_value, ctx.payload<GeneratorObject>(self).frame, loaded);
     if (loaded.tag() == ResultTag::Empty) {
+        if (coroutine && operation != Operation::Close) {
+            raise_error(ctx, CoreObject::RuntimeErrorType,
+                        U"cannot reuse already awaited coroutine", out);
+            return;
+        }
         if (operation == Operation::Throw) {
             normalize_throw(ctx, args, thrown);
             if (thrown.tag() == ResultTag::Raised)
@@ -173,10 +182,17 @@ void resume(Attachment &ctx, Value self_value, Operation operation, std::span<co
     auto state = data.state.load(std::memory_order_acquire);
     for (;;) {
         if (state == FrameState::Running) {
-            raise_error(ctx, CoreObject::ValueErrorType, U"generator already executing", out);
+            raise_error(ctx, CoreObject::ValueErrorType,
+                        coroutine ? U"coroutine already executing" : U"generator already executing",
+                        out);
             return;
         }
         if (state == FrameState::Completed) {
+            if (coroutine && operation != Operation::Close) {
+                raise_error(ctx, CoreObject::RuntimeErrorType,
+                            U"cannot reuse already awaited coroutine", out);
+                return;
+            }
             if (operation == Operation::Throw) {
                 normalize_throw(ctx, args, thrown);
                 if (thrown.tag() == ResultTag::Raised)
@@ -198,7 +214,9 @@ void resume(Attachment &ctx, Value self_value, Operation operation, std::span<co
     const auto none = ctx.builtin(CoreObject::None);
     if (operation == Operation::Send && state == FrameState::Created && args[0] != none) {
         raise_error(ctx, CoreObject::TypeErrorType,
-                    U"can't send non-None value to a just-started generator", out);
+                    coroutine ? U"can't send non-None value to a just-started coroutine"
+                              : U"can't send non-None value to a just-started generator",
+                    out);
         return;
     }
     if (operation == Operation::Close && state == FrameState::Created) {
@@ -244,20 +262,23 @@ void resume(Attachment &ctx, Value self_value, Operation operation, std::span<co
         ctx.store(self.get(ctx), ctx.payload<GeneratorObject>(self).frame, {});
     if (operation == Operation::Close) {
         if (result == detail::ResumeResult::Yielded)
-            raise_error(ctx, CoreObject::RuntimeErrorType, U"generator ignored GeneratorExit", out);
+            raise_error(ctx, CoreObject::RuntimeErrorType,
+                        coroutine ? U"coroutine ignored GeneratorExit"
+                                  : U"generator ignored GeneratorExit",
+                        out);
         else if (result == detail::ResumeResult::Returned ||
                  (out.tag() == ResultTag::Raised &&
                   exception_is(ctx, out.exception(), CoreObject::GeneratorExitType)))
             out.ok(none);
         else if (result == detail::ResumeResult::Raised)
-            convert_stop_iteration(ctx, out);
+            convert_stop_iteration(ctx, coroutine, out);
         return;
     }
     if (result == detail::ResumeResult::Returned) {
         const auto value = roots.root(out.value());
         detail::generator_stop(ctx, value, out);
     } else if (result == detail::ResumeResult::Raised)
-        convert_stop_iteration(ctx, out);
+        convert_stop_iteration(ctx, coroutine, out);
 }
 
 void iter(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
@@ -326,6 +347,12 @@ template <Field field> void get_field(Attachment &ctx, Value self, ReturnSlot &o
             ctx.load(value.get(ctx), data.delegate, out);
             if (out.tag() == ResultTag::Empty)
                 out.ok(ctx.builtin(CoreObject::None));
+            else if (ctx.type_of(self) == ctx.builtin(CoreObject::CoroutineType) &&
+                     ctx.type_of(out.value()) == ctx.builtin(CoreObject::CoroutineWrapperType)) {
+                const auto delegate = roots.root(out.value());
+                ctx.load(delegate.get(ctx), ctx.payload<SequenceIteratorObject>(delegate).owner,
+                         out);
+            }
         }
     }
 }
@@ -355,9 +382,41 @@ void repr_generator(Attachment &ctx, Handle, std::span<const Value> args, Return
     const auto converted = std::to_chars(std::begin(buffer), std::end(buffer),
                                          reinterpret_cast<std::uintptr_t>(args[0].object()), 16);
     make_str(ctx,
-             U"<generator object " + ctx.payload<StrObject>(name.value()).value + U" at 0x" +
+             (ctx.type_of(args[0]) == ctx.builtin(CoreObject::CoroutineType)
+                  ? U"<coroutine object "
+                  : U"<generator object ") +
+                 ctx.payload<StrObject>(name.value()).value + U" at 0x" +
                  std::u32string(buffer, converted.ptr) + U">",
              out);
+}
+void await_wrapper(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!generator(ctx, args[0], out))
+        return;
+    RootScope roots(ctx);
+    ctx.allocate_instance<SequenceIteratorObject>(
+        roots.root(ctx.builtin(CoreObject::CoroutineWrapperType)), out, args[0]);
+}
+void wrapper_iter(Attachment &, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    out.ok(args[0]);
+}
+template <Operation op>
+void wrapper_resume(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(ctx);
+    const auto self = roots.root(args[0]);
+    ReturnSlot owner(ctx);
+    ctx.load(self.get(ctx), ctx.payload<SequenceIteratorObject>(self).owner, owner);
+    const auto coroutine = roots.root(owner.value());
+    if constexpr (op == Operation::Throw) {
+        const auto tuple = roots.root(args[1]);
+        resume(ctx, coroutine.get(ctx), op, ctx.payload<TupleObject>(tuple).items, out, tuple);
+    } else if constexpr (op == Operation::Next) {
+        const Value none[] = {ctx.builtin(CoreObject::None)};
+        resume(ctx, coroutine.get(ctx), Operation::Send, none, out);
+    } else
+        resume(ctx, coroutine.get(ctx), op, args.subspan(1), out);
 }
 } // namespace
 void GeneratorObject::finalize(Attachment &context, Handle self, ReturnSlot &out)
@@ -368,7 +427,6 @@ void GeneratorObject::finalize(Attachment &context, Handle self, ReturnSlot &out
 
 namespace cxxpython::core::detail {
 // Based on CPython 3.12.14 Objects/genobject.c (PSF license).
-// N4: automatic generator finalization needs a GC finalizer; destruction is not close().
 void normalize_generator_throw(Attachment &context, std::span<const Value> args, ReturnSlot &out)
 {
     normalize_throw(context, args, out);
@@ -384,8 +442,31 @@ void make_generator(Attachment &context, Handle frame, ReturnSlot &out)
     const auto name = roots.root(metadata.name);
     const auto qualname = roots.root(metadata.qualname);
     context.allocate_instance<GeneratorObject>(
-        roots.root(context.builtin(CoreObject::GeneratorType)), out, rooted_frame.get(context),
-        code.get(context), name.get(context), qualname.get(context));
+        roots.root(context.builtin(context.payload<CodeObject>(code).program.is_coroutine()
+                                       ? CoreObject::CoroutineType
+                                       : CoreObject::GeneratorType)),
+        out, rooted_frame.get(context), code.get(context), name.get(context),
+        qualname.get(context));
+}
+
+void get_awaitable(Attachment &context, Handle value, ReturnSlot &out)
+{
+    RootScope roots(context);
+    const auto method = type_attribute(context, context.type_of(value), U"__await__");
+    if (!method) {
+        raise_error(context, CoreObject::TypeErrorType,
+                    U"object cannot be used in 'await' expression", out);
+        return;
+    }
+    invoke_special(context, value, roots.root(*method), {}, out);
+    if (out.tag() == ResultTag::Raised)
+        return;
+    const auto iterator = roots.root(out.value());
+    const auto next =
+        resolve_protocol(context, roots.root(context.type_of(iterator)), Protocol::Next, roots);
+    if (next.state == SlotState::Missing ||
+        context.type_of(iterator) == context.builtin(CoreObject::CoroutineType))
+        raise_error(context, CoreObject::TypeErrorType, U"__await__() returned non-iterator", out);
 }
 
 void generator_stop(Attachment &context, std::optional<Handle> value, ReturnSlot &out)
@@ -426,5 +507,30 @@ void install_generators(Attachment &context, std::span<const Handle> core)
                          set_name<Field::Name>);
     install_native_field(context, core, owner, U"__qualname__", get_field<Field::Qualname>,
                          set_name<Field::Qualname>);
+    const auto coroutine = core[static_cast<std::size_t>(CoreObject::CoroutineType)];
+    install_native_attribute(context, core, coroutine, U"__await__", unary, await_wrapper);
+    install_native_attribute(context, core, coroutine, U"send", pair, send);
+    install_native_attribute(context, core, coroutine, U"throw", variable, throw_);
+    install_native_attribute(context, core, coroutine, U"close", unary, close);
+    install_native_attribute(context, core, coroutine, U"__repr__", unary, repr_generator);
+    install_native_field(context, core, coroutine, U"cr_code", get_field<Field::Code>);
+    install_native_field(context, core, coroutine, U"cr_frame", get_field<Field::Frame>);
+    install_native_field(context, core, coroutine, U"cr_running", get_field<Field::Running>);
+    install_native_field(context, core, coroutine, U"cr_suspended", get_field<Field::Suspended>);
+    install_native_field(context, core, coroutine, U"cr_await", get_field<Field::YieldFrom>);
+    install_native_field(context, core, coroutine, U"__name__", get_field<Field::Name>,
+                         set_name<Field::Name>);
+    install_native_field(context, core, coroutine, U"__qualname__", get_field<Field::Qualname>,
+                         set_name<Field::Qualname>);
+    const auto wrapper = core[static_cast<std::size_t>(CoreObject::CoroutineWrapperType)];
+    install_native_attribute(context, core, wrapper, U"__iter__", unary, wrapper_iter);
+    install_native_attribute(context, core, wrapper, U"__next__", unary,
+                             wrapper_resume<Operation::Next>);
+    install_native_attribute(context, core, wrapper, U"send", pair,
+                             wrapper_resume<Operation::Send>);
+    install_native_attribute(context, core, wrapper, U"throw", variable,
+                             wrapper_resume<Operation::Throw>);
+    install_native_attribute(context, core, wrapper, U"close", unary,
+                             wrapper_resume<Operation::Close>);
 }
 } // namespace cxxpython::core::detail

@@ -1,0 +1,6 @@
+ValueError list modified during sort
+[1, 2, 3]
+RuntimeError key failed
+[3, 1, 2]
+RuntimeError compare failed
+2

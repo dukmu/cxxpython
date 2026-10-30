@@ -1,5 +1,6 @@
 #include "cxxpython/execution.hpp"
 #include "cxxpython/floatobject.hpp"
+#include "internal/listsort.hpp"
 
 #include <cmath>
 #include <limits>
@@ -57,6 +58,28 @@ void builtin_callable(Attachment &context, Handle, std::span<const Value> args, 
                   type == context.builtin(CoreObject::MethodDescriptorType) ||
                   detail::type_attribute(context, type, U"__call__").has_value();
     out.ok(context.builtin(result ? CoreObject::True : CoreObject::False));
+}
+void builtin_sorted(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(context);
+    ReturnSlot list(context), reverse(context), sorted(context);
+    call(context, roots.root(context.builtin(CoreObject::ListType)), {args.first(1), {}}, list);
+    if (failed(list)) {
+        out.raised(list.exception());
+        return;
+    }
+    truth(context, roots.root(args[2]), reverse);
+    if (failed(reverse)) {
+        out.raised(reverse.exception());
+        return;
+    }
+    const auto result = roots.root(list.value());
+    detail::sort_list(context, result, roots.root(args[1]),
+                      reverse.value() == context.builtin(CoreObject::True), sorted);
+    if (failed(sorted))
+        out.raised(sorted.exception());
+    else
+        out.ok(result.get(context));
 }
 template <bool Minimum>
 void builtin_min_max(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
@@ -656,6 +679,14 @@ void install_class_builtins(Attachment &context, std::span<const Handle> core, V
     sum_signature.parameters = {{U"iterable", ParameterKind::PositionalOnly},
                                 {U"start", ParameterKind::PositionalOrKeyword, zero.value()}};
     install("sum", U"sum", sum_signature, builtin_sum);
+    SignatureLayout sorted_signature;
+    sorted_signature.parameters = {
+        {U"iterable", ParameterKind::PositionalOnly},
+        {U"key", ParameterKind::KeywordOnly,
+         core[static_cast<std::size_t>(CoreObject::None)].get(context)},
+        {U"reverse", ParameterKind::KeywordOnly,
+         core[static_cast<std::size_t>(CoreObject::False)].get(context)}};
+    install("sorted", U"sorted", sorted_signature, builtin_sorted);
     context.allocate_instance<StrObject>(core[static_cast<std::size_t>(CoreObject::StrType)], name,
                                          U"");
     const auto empty_spec = roots.root(name.value());

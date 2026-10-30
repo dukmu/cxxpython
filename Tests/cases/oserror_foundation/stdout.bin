@@ -1,0 +1,12 @@
+True (2, 'message') 2 message input output [Errno 2] message: 'input' -> 'output'
+True (13, 'message') 13 message input output [Errno 13] message: 'input' -> 'output'
+True (17, 'message') 17 message input output [Errno 17] message: 'input' -> 'output'
+True (20, 'message') 20 message input output [Errno 20] message: 'input' -> 'output'
+True (21, 'message') 21 message input output [Errno 21] message: 'input' -> 'output'
+True (4, 'message') 4 message input output [Errno 4] message: 'input' -> 'output'
+True (11, 'message') 11 message input output [Errno 11] message: 'input' -> 'output'
+True (32, 'message') 32 message input output [Errno 32] message: 'input' -> 'output'
+True (9, 'message') 9 message input output [Errno 9] message: 'input' -> 'output'
+('one',) None None None None one
+(2, 'first') 2 x
+Child None None ()

@@ -1,3 +1,5 @@
+#include "cxxpython/bytearrayobject.hpp"
+#include "cxxpython/complexobject.hpp"
 #include "cxxpython/floatobject.hpp"
 #include "cxxpython/genobject.hpp"
 #include "cxxpython/moduleobject.hpp"
@@ -9,6 +11,8 @@
 #include "internal/builtinexec.hpp"
 #include "internal/codecs.hpp"
 #include "internal/errors.hpp"
+#include "internal/exceptions.hpp"
+#include "internal/reversed.hpp"
 #include "internal/stdio.hpp"
 #include "internal/stringformat.hpp"
 #include "internal/sysmodule.hpp"
@@ -51,6 +55,9 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
             spec.slots = std::vector<std::u32string>{U"value"};
         if (id == CoreObject::SystemExitType)
             spec.slots = std::vector<std::u32string>{U"code"};
+        if (id == CoreObject::OSErrorType)
+            spec.slots =
+                std::vector<std::u32string>{U"errno", U"strerror", U"filename", U"filename2"};
         if (id == CoreObject::UnicodeEncodeErrorType || id == CoreObject::UnicodeDecodeErrorType)
             spec.slots =
                 std::vector<std::u32string>{U"encoding", U"object", U"start", U"end", U"reason"};
@@ -182,8 +189,36 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     define(CoreObject::WeakRefType, "ReferenceType", LayoutDescriptor::of<WeakRefObject>());
     define(CoreObject::UnraisableHookArgsType, "UnraisableHookArgs",
            LayoutDescriptor::of<TupleObject>(), at(CoreObject::TupleType));
+    define(CoreObject::ComplexType, "complex", LayoutDescriptor::of<ComplexObject>());
+    define(CoreObject::ByteArrayType, "bytearray", LayoutDescriptor::of<ByteArrayObject>());
+    define(CoreObject::ByteArrayIteratorType, "bytearray_iterator",
+           LayoutDescriptor::of<SequenceIteratorObject>());
+    define(CoreObject::CoroutineType, "coroutine", LayoutDescriptor::of<GeneratorObject>());
+    define(CoreObject::CoroutineWrapperType, "coroutine_wrapper",
+           LayoutDescriptor::of<SequenceIteratorObject>());
+    define(CoreObject::PermissionErrorType, "PermissionError",
+           LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::OSErrorType));
+    define(CoreObject::FileExistsErrorType, "FileExistsError",
+           LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::OSErrorType));
+    define(CoreObject::IsADirectoryErrorType, "IsADirectoryError",
+           LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::OSErrorType));
+    define(CoreObject::NotADirectoryErrorType, "NotADirectoryError",
+           LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::OSErrorType));
+    define(CoreObject::InterruptedErrorType, "InterruptedError",
+           LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::OSErrorType));
+    define(CoreObject::BlockingIOErrorType, "BlockingIOError",
+           LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::OSErrorType));
+    define(CoreObject::BrokenPipeErrorType, "BrokenPipeError",
+           LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::OSErrorType));
+    define(CoreObject::ReversedType, "reversed", LayoutDescriptor::of<SequenceIteratorObject>());
+    define(CoreObject::ListReverseIteratorType, "list_reverseiterator",
+           LayoutDescriptor::of<SequenceIteratorObject>());
+    define(CoreObject::EnumerateType, "enumerate", LayoutDescriptor::of<EnumObject>());
+    define(CoreObject::ZipType, "zip", LayoutDescriptor::of<MultiIteratorObject>());
+    define(CoreObject::MapType, "map", LayoutDescriptor::of<MultiIteratorObject>());
     for (auto id : {CoreObject::FunctionType, CoreObject::ModuleType, CoreObject::CodeType,
-                    CoreObject::GeneratorType, CoreObject::SetType, CoreObject::FrozenSetType})
+                    CoreObject::GeneratorType, CoreObject::CoroutineType, CoreObject::SetType,
+                    CoreObject::FrozenSetType})
         context.payload<TypeObject>(at(id)).instance_layout.fields.weakrefs = true;
     for (auto id :
          {CoreObject::TupleType, CoreObject::BytesType, CoreObject::IntType, CoreObject::BoolType})
@@ -255,10 +290,12 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     install_construction(context, core);
     install_numbers(context, core);
     install_floats(context, core);
+    install_complex(context, core);
     install_protocols(context, core);
     install_dictionaries(context, core);
     install_lists(context, core);
     install_bytes(context, core);
+    install_bytearrays(context, core);
     install_codecs(context, core);
     install_super(context, core);
     install_sets(context, core);
@@ -272,9 +309,11 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     install_error_types(context, core);
     install_exception_runtime(context, core);
     install_system_exit(context, core);
+    install_os_errors(context, core);
     install_ranges(context, core);
     install_slices(context, core);
     install_iteration(context, core);
+    install_reversed(context, core);
     install_modules(context, core);
     for (std::size_t i = 0; i < static_cast<std::size_t>(CoreObject::None); ++i) {
         context.payload<TypeObject>(core[i]).immutable = true;
@@ -311,6 +350,10 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                     CoreObject::SequenceIteratorType,
                     CoreObject::SliceType,
                     CoreObject::BytesIteratorType,
+                    CoreObject::ByteArrayIteratorType,
+                    CoreObject::ListReverseIteratorType,
+                    CoreObject::CoroutineType,
+                    CoreObject::CoroutineWrapperType,
                     CoreObject::SetIteratorType,
                     CoreObject::GeneratorType})
         context.payload<TypeObject>(at(id)).subclassable = false;
@@ -335,6 +378,12 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                     CoreObject::IntType,
                     CoreObject::BoolType,
                     CoreObject::FloatType,
+                    CoreObject::ComplexType,
+                    CoreObject::ByteArrayType,
+                    CoreObject::ReversedType,
+                    CoreObject::EnumerateType,
+                    CoreObject::ZipType,
+                    CoreObject::MapType,
                     CoreObject::BaseExceptionType,
                     CoreObject::SystemExitType,
                     CoreObject::GeneratorExitType,
@@ -371,6 +420,13 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                     CoreObject::TabErrorType,
                     CoreObject::OSErrorType,
                     CoreObject::FileNotFoundErrorType,
+                    CoreObject::PermissionErrorType,
+                    CoreObject::FileExistsErrorType,
+                    CoreObject::IsADirectoryErrorType,
+                    CoreObject::NotADirectoryErrorType,
+                    CoreObject::InterruptedErrorType,
+                    CoreObject::BlockingIOErrorType,
+                    CoreObject::BrokenPipeErrorType,
                     CoreObject::PropertyType,
                     CoreObject::StaticMethodType,
                     CoreObject::ClassMethodType})

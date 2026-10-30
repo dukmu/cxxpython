@@ -1329,7 +1329,9 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                     }
                     const auto frame = roots.root(child.value());
                     if (context.payload<CodeObject>(context.payload<FrameObject>(frame).code)
-                            .program.is_generator()) {
+                            .program.is_generator() ||
+                        context.payload<CodeObject>(context.payload<FrameObject>(frame).code)
+                            .program.is_coroutine()) {
                         detail::make_generator(context, frame, result);
                         if (raised(result)) {
                             activation.raising(result.exception());
@@ -1450,6 +1452,15 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 data.operands[data.sp - 2] = result.value();
                 data.operands[--data.sp] = context.builtin(CoreObject::None);
                 break;
+            case Opcode::GetAwaitable: {
+                RootScope roots(context);
+                detail::get_awaitable(context, roots.root(data.operands[data.sp - 1]), result);
+                if (raised(result))
+                    activation.raising(result.exception());
+                else
+                    data.operands[data.sp - 1] = result.value();
+                break;
+            }
             case Opcode::YieldValue:
                 out.ok(data.operands[data.sp - 1]);
                 data.operands[data.sp - 1] = context.builtin(CoreObject::None);
@@ -1723,7 +1734,9 @@ void execute_function(Attachment &context, Handle function, CallArgsView args,
         return;
     }
     if (context.payload<CodeObject>(context.payload<FrameObject>(active.value()).code)
-            .program.is_generator()) {
+            .program.is_generator() ||
+        context.payload<CodeObject>(context.payload<FrameObject>(active.value()).code)
+            .program.is_coroutine()) {
         RootScope roots(context);
         make_generator(context, roots.root(active.value()), out);
         return;

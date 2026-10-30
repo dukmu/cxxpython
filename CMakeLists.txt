@@ -34,6 +34,7 @@ add_library(cxxpython_core
     Modules/sysmodule.cpp
     Modules/gcmodule.cpp
     Modules/_weakref.cpp
+    Modules/posixmodule.cpp
     Python/symtable.cpp
     Python/flowgraph.cpp
     Python/ceval.cpp
@@ -63,8 +64,12 @@ add_library(cxxpython_core
     Objects/typeconstruction.cpp
     Objects/longobject.cpp
     Objects/floatobject.cpp
+    Objects/complexobject.cpp
+    Objects/bytearrayobject.cpp
+    Objects/exceptions.cpp
     Objects/rangeobject.cpp
     Objects/iterobject.cpp
+    Objects/enumobject.cpp
     Objects/abstract.cpp
     Objects/representation.cpp
 )
@@ -216,6 +221,9 @@ if(BUILD_TESTING)
     add_test(NAME Scripts.Reference COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_cases.py --binary ${CXXPYTHON_REFERENCE_PYTHON})
     set_tests_properties(Scripts.Cases Scripts.Reference PROPERTIES TIMEOUT 120)
+    add_test(NAME Stdlib.Doctests COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_stdlib.py --binary $<TARGET_FILE:cxxpython>)
+    set_tests_properties(Stdlib.Doctests PROPERTIES TIMEOUT 45)
     add_test(NAME Syntax.Differential COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_syntax.py
         --binary $<TARGET_FILE:cxxpython> --reference ${CXXPYTHON_REFERENCE_PYTHON})

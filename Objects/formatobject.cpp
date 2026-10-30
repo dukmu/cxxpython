@@ -1,3 +1,4 @@
+#include "cxxpython/complexobject.hpp"
 #include "cxxpython/floatobject.hpp"
 #include "cxxpython/protocol.hpp"
 #include "internal/long.hpp"
@@ -382,6 +383,63 @@ void float_format(Attachment &context, Handle, std::span<const Value> args, Retu
     if (parse_spec(context, text, spec, out))
         render_float(context, context.payload<FloatObject>(args[0]).value, spec, out);
 }
+void complex_format(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!is_complex(context, args[0]) || !string_value(context, args[1])) {
+        error(context, U"complex.__format__ requires a complex and string", out,
+              CoreObject::TypeErrorType);
+        return;
+    }
+    const auto &text = context.payload<StrObject>(args[1]).value;
+    if (text.empty()) {
+        RootScope roots(context);
+        str(context, roots.root(args[0]), out);
+        return;
+    }
+    FormatSpec spec{.align = U'>', .type = 0};
+    if (!parse_spec(context, text, spec, out))
+        return;
+    if (spec.fill == U'0' || spec.align == U'=') {
+        error(context, U"Zero padding or '=' alignment is not allowed for complex", out);
+        return;
+    }
+    if (spec.type == U'%' || (spec.type && !floating_type(spec.type))) {
+        error(context, U"Unknown format code for complex", out);
+        return;
+    }
+    const auto &value = context.payload<ComplexObject>(args[0]);
+    const bool real_hidden = spec.type == 0 && value.real == 0.0 && !std::signbit(value.real);
+    FormatSpec component = spec;
+    component.width = 0;
+    component.align = U'>';
+    if (component.type == 0 && component.precision)
+        component.type = U'g';
+    std::u32string result;
+    ReturnSlot rendered(context);
+    auto append = [&](double number) {
+        render_float(context, number, component, rendered);
+        if (rendered.tag() == ResultTag::Raised) {
+            out.raised(rendered.exception());
+            return false;
+        }
+        auto part = context.payload<StrObject>(rendered.value()).value;
+        if (component.type == 0 && !component.alternate && part.ends_with(U".0"))
+            part.resize(part.size() - 2);
+        result += part;
+        return true;
+    };
+    if (!real_hidden) {
+        if (!append(value.real))
+            return;
+        component.sign = U'+';
+    }
+    if (!append(value.imag))
+        return;
+    result += U'j';
+    if (spec.type == 0 && !real_hidden)
+        result = U"(" + result + U")";
+    make_str(context, padded(std::move(result), spec), out);
+}
 void integer_format(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_int(context, args[0]) || !string_value(context, args[1])) {
@@ -540,11 +598,12 @@ void install_format(Attachment &context, std::span<const Handle> core)
                             {U"format_spec", ParameterKind::PositionalOnly}};
     install_native_attribute(context, core, roots.root(context.object_type()), U"__format__",
                              signature, format_method<object_format>);
-    for (const auto id :
-         {CoreObject::StrType, CoreObject::IntType, CoreObject::BoolType, CoreObject::FloatType}) {
-        const auto entry = id == CoreObject::StrType     ? format_method<string_format>
-                           : id == CoreObject::FloatType ? format_method<float_format>
-                                                         : format_method<integer_format>;
+    for (const auto id : {CoreObject::StrType, CoreObject::IntType, CoreObject::BoolType,
+                          CoreObject::FloatType, CoreObject::ComplexType}) {
+        const auto entry = id == CoreObject::StrType       ? format_method<string_format>
+                           : id == CoreObject::FloatType   ? format_method<float_format>
+                           : id == CoreObject::ComplexType ? format_method<complex_format>
+                                                           : format_method<integer_format>;
         install_native_attribute(context, core, core[static_cast<std::size_t>(id)], U"__format__",
                                  signature, entry);
     }

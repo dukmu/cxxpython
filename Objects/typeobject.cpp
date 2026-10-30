@@ -179,7 +179,7 @@ void create(Attachment &context, const TypeSpec &spec, const LayoutDescriptor *n
     bool dictionary = inherited_dictionary || (!metatype && !native_layout && !spec.slots);
     bool weakrefs = inherited_weakrefs || (!native_layout && !spec.slots && allow_weakrefs);
     std::vector<std::u32string> own_slots;
-    if (spec.slots && !spec.slots->empty() && !allow_slots)
+    if (spec.slots && !spec.slots->empty() && !allow_slots && !native_layout)
         throw TypeDefinitionError("nonempty slots are not allowed for this native base");
     if (spec.slots)
         for (auto name : *spec.slots) {
@@ -197,7 +197,7 @@ void create(Attachment &context, const TypeSpec &spec, const LayoutDescriptor *n
                 weakrefs = true;
                 continue;
             }
-            if (!allow_slots)
+            if (!allow_slots && !native_layout)
                 throw TypeDefinitionError("nonempty slots are not allowed for this native base");
             if (name.starts_with(U"__") && !name.ends_with(U"__")) {
                 auto first = spec.name.find_first_not_of(U'_');
