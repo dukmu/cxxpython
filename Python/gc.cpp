@@ -2,6 +2,8 @@
 #include "cxxpython/protocol.hpp"
 #include "cxxpython/runtime.hpp"
 #include "cxxpython/type.hpp"
+#include "cxxpython/weakrefobject.hpp"
+#include "internal/errors.hpp"
 #include "internal/import.hpp"
 
 #include <algorithm>
@@ -120,6 +122,10 @@ struct Allocation {
     std::atomic<std::size_t> external_bytes{0};
     AllocationSpan *const span;
     bool live = false, marked = false;
+    enum class Finalization : unsigned char { Unseen, Queued, Running, Finalized };
+    Finalization finalization = Finalization::Unseen;
+    Allocation *finalizer_next = nullptr;
+    WeakRefObject *weakrefs = nullptr;
 
     ObjectHeader *object() noexcept
     {
@@ -186,6 +192,9 @@ struct AllocationSpan {
         allocation.live = false;
         allocation.marked = false;
         allocation.external_bytes.store(0, std::memory_order_relaxed);
+        allocation.finalization = Allocation::Finalization::Unseen;
+        allocation.finalizer_next = nullptr;
+        assert(!allocation.weakrefs);
         allocation.next = free;
         free = &allocation;
     }
@@ -215,6 +224,9 @@ struct ThreadRecord {
     std::list<AllocationSpan> spans;
     AllocationSpan *current_span = nullptr;
     std::size_t pending_bytes = 0;
+    bool dispatching = false;
+    Allocation *finalizers = nullptr;
+    WeakRefObject *weak_callbacks = nullptr;
     // Borrowed identities, not roots. Sweep clears them before reuse.
     std::array<ProtocolEntry, 64> protocols;
     ProtocolEntry &protocol_entry(Value type, Protocol protocol) noexcept
@@ -384,6 +396,48 @@ struct State {
         allocation.next = worklist;
         worklist = &allocation;
     }
+    template <class F> void each_allocation(F visit)
+    {
+        auto scan = [&](auto &spans) {
+            for (auto &span : spans)
+                for (std::size_t i = 0; i < span.extent; ++i)
+                    if (auto &allocation = span.at(i); allocation.live)
+                        visit(allocation);
+        };
+        scan(retired_spans);
+        for (const auto &thread : threads)
+            scan(thread->spans);
+    }
+    static bool python_finalizer(Allocation &allocation) noexcept
+    {
+        auto *type = allocation.object()->type.object_.load(std::memory_order_relaxed);
+        if (!type ||
+            Allocation::from(type).span->layout.native_family != &native_layout_id<TypeObject>)
+            return false;
+        const auto &data = *reinterpret_cast<const TypeObject *>(type);
+        if (data.state != TypeState::Ready)
+            return false;
+        for (auto base : data.mro) {
+            const auto *metadata = reinterpret_cast<const TypeObject *>(base.object())
+                                       ->metadata.object_.load(std::memory_order_relaxed);
+            if (metadata && reinterpret_cast<const TypeSnapshot *>(metadata)->finalizer)
+                return true;
+        }
+        return false;
+    }
+    static void unlink_weakref(WeakRefObject &ref) noexcept
+    {
+        auto *target = ref.target.object_.load(std::memory_order_relaxed);
+        if (!target)
+            return;
+        if (ref.previous)
+            ref.previous->next = ref.next;
+        else
+            Allocation::from(target).weakrefs = ref.next;
+        if (ref.next)
+            ref.next->previous = ref.previous;
+        ref.previous = ref.next = nullptr;
+    }
 
     std::size_t sweep()
     {
@@ -403,12 +457,62 @@ struct State {
         mark(type_type);
         for (auto *object : core)
             mark(object);
-        while (worklist) {
-            Allocation *allocation = worklist;
-            worklist = allocation->next;
-            tracer.visit(allocation->object()->type);
-            allocation->span->layout.trace_storage(*allocation->object(), tracer);
-        }
+        auto trace_work = [&] {
+            while (worklist) {
+                Allocation *allocation = worklist;
+                worklist = allocation->next;
+                tracer.visit(allocation->object()->type);
+                allocation->span->layout.trace_storage(*allocation->object(), tracer);
+            }
+        };
+        trace_work();
+        // Weak death is decided from program roots, before quarantine retains
+        // the complete candidate graph. No Python or managed allocation here.
+        each_allocation([&](Allocation &allocation) {
+            if (allocation.marked)
+                return;
+            auto *ref = std::exchange(allocation.weakrefs, nullptr);
+            while (ref) {
+                auto *next = ref->next;
+                ref->target.object_.store(nullptr, std::memory_order_relaxed);
+                ref->previous = ref->next = nullptr;
+                auto *callback = ref->callback.object_.load(std::memory_order_relaxed);
+                if (callback && callback != core[static_cast<std::size_t>(CoreObject::None)] &&
+                    Allocation::from(&ref->header).marked) {
+                    ref->pending_next = nullptr;
+                    if (weak_callback_tail)
+                        weak_callback_tail->pending_next = ref;
+                    else
+                        weak_callback_head = ref;
+                    weak_callback_tail = ref;
+                }
+                ref = next;
+            }
+        });
+        // First register every unreachable finalizer; marking one candidate
+        // early would hide other finalizers in the same cyclic isolate.
+        each_allocation([&](Allocation &allocation) {
+            if (!allocation.marked && allocation.finalization == Allocation::Finalization::Unseen &&
+                (allocation.span->layout.finalize || python_finalizer(allocation))) {
+                allocation.finalization = Allocation::Finalization::Queued;
+                allocation.finalizer_next = nullptr;
+                if (finalizer_tail)
+                    finalizer_tail->finalizer_next = &allocation;
+                else
+                    finalizer_head = &allocation;
+                finalizer_tail = &allocation;
+            }
+        });
+        auto retain = [&](Allocation *finalizers, WeakRefObject *callbacks) {
+            for (auto *item = finalizers; item; item = item->finalizer_next)
+                mark(item->object());
+            for (auto *item = callbacks; item; item = item->pending_next)
+                mark(&item->header);
+        };
+        retain(finalizer_head, weak_callback_head);
+        for (const auto &thread : threads)
+            retain(thread->finalizers, thread->weak_callbacks);
+        trace_work();
         std::size_t collected = 0;
         reclaimed_bytes = 0;
         std::size_t live_bytes = 0;
@@ -429,6 +533,8 @@ struct State {
                         continue;
                     }
                     reclaimed_bytes = saturated_add(reclaimed_bytes, bytes);
+                    if (span.layout.native_family == &native_layout_id<WeakRefObject>)
+                        unlink_weakref(*reinterpret_cast<WeakRefObject *>(allocation.object()));
                     span.layout.destroy_storage(allocation.object());
                     span.discard(allocation);
                     ++collected;
@@ -476,6 +582,8 @@ struct State {
     TransferRecord *transfer_head = nullptr;
     std::size_t transfer_count = 0;
     Allocation *worklist = nullptr;
+    Allocation *finalizer_head = nullptr, *finalizer_tail = nullptr;
+    WeakRefObject *weak_callback_head = nullptr, *weak_callback_tail = nullptr;
     std::atomic<std::size_t> allocated_since_gc{0};
     std::size_t budget;
     std::size_t collections = 0;
@@ -1063,7 +1171,176 @@ void Attachment::account_external(Value owner, std::size_t bytes)
 std::size_t Attachment::collect()
 {
     require_safepoint();
-    return state_->rendezvous(*thread_record_);
+    auto collected = state_->rendezvous(*thread_record_);
+    if (dispatch_finalizers())
+        collected += state_->rendezvous(*thread_record_);
+    return collected;
+}
+bool Attachment::supports_weakrefs(Handle target) const
+{
+    const auto value = target.get(*this);
+    auto *type = value.object()->type.object_.load(std::memory_order_acquire);
+    // Semantic capability belongs to the frozen ready layout. In particular,
+    // object/type seeds predate the completed bootstrap layout publication.
+    return type && reinterpret_cast<const TypeObject *>(type)->instance_layout.fields.weakrefs;
+}
+void Attachment::weakref_lookup(Handle target, Handle type, ReturnSlot &out)
+{
+    out.reset(*this);
+    const auto value = target.get(*this);
+    const auto requested = type.get(*this);
+    std::lock_guard gate(state_->coordinator);
+    for (auto *ref = detail::Allocation::from(value.object()).weakrefs; ref; ref = ref->next)
+        if (ref->basic && type_of(Value(ref->header)) == requested) {
+            out.ok(Value(ref->header));
+            return;
+        }
+}
+void Attachment::register_weakref(Handle self, Handle target, bool cache, ReturnSlot &out)
+{
+    out.reset(*this);
+    if (!supports_weakrefs(target))
+        throw std::logic_error("weak reference registration requires a weak-capable target");
+    auto &ref = payload<WeakRefObject>(self);
+    auto &target_data = detail::Allocation::from(target.get(*this).object());
+    const auto type = type_of(self);
+    std::lock_guard gate(state_->coordinator);
+    if (cache)
+        for (auto *current = target_data.weakrefs; current; current = current->next)
+            if (current->basic && type_of(Value(current->header)) == type) {
+                // The unpublished candidate must not retain a weak edge after
+                // losing the cache commit: it was never linked to the target.
+                ref.target.object_.store(nullptr, std::memory_order_relaxed);
+                out.ok(Value(current->header));
+                return;
+            }
+    ref.basic = cache;
+    auto *after = !cache && target_data.weakrefs && target_data.weakrefs->basic
+                      ? target_data.weakrefs
+                      : nullptr;
+    ref.previous = after;
+    ref.next = after ? after->next : target_data.weakrefs;
+    if (ref.next)
+        ref.next->previous = &ref;
+    if (after)
+        after->next = &ref;
+    else
+        target_data.weakrefs = &ref;
+    out.ok(self.get(*this));
+}
+void Attachment::weakrefs(Handle target, RootScope &roots, std::vector<Value> &out)
+{
+    const auto value = target.get(*this);
+    std::lock_guard gate(state_->coordinator);
+    for (auto *ref = detail::Allocation::from(value.object()).weakrefs; ref; ref = ref->next)
+        out.push_back(roots.root(Value(ref->header)).get(*this));
+}
+bool Attachment::dispatch_finalizers()
+{
+    auto &thread = *thread_record_;
+    detail::Allocation *tail;
+    WeakRefObject *weak_tail;
+    {
+        std::lock_guard gate(state_->coordinator);
+        if (thread.dispatching || (!state_->finalizer_head && !state_->weak_callback_head))
+            return false;
+        thread.dispatching = true;
+        thread.finalizers = std::exchange(state_->finalizer_head, nullptr);
+        tail = std::exchange(state_->finalizer_tail, nullptr);
+        thread.weak_callbacks = std::exchange(state_->weak_callback_head, nullptr);
+        weak_tail = std::exchange(state_->weak_callback_tail, nullptr);
+    }
+    auto finish_weak = [&](WeakRefObject &item) {
+        std::lock_guard gate(state_->coordinator);
+        thread.weak_callbacks = item.pending_next;
+        item.pending_next = nullptr;
+    };
+    auto finish_finalizer = [&](detail::Allocation &item) {
+        std::lock_guard gate(state_->coordinator);
+        item.finalization = detail::Allocation::Finalization::Finalized;
+        thread.finalizers = item.finalizer_next;
+        item.finalizer_next = nullptr;
+    };
+    try {
+        while (auto *item = thread.weak_callbacks) {
+            try {
+                RootScope roots(*this);
+                const auto self = roots.root(Value(item->header));
+                ReturnSlot loaded(*this);
+                load(self.get(*this), item->callback, loaded);
+                const auto callback = roots.root(loaded.value());
+                ReturnSlot result(*this);
+                const Value args[] = {self.get(*this)};
+                call(*this, callback, {args}, result);
+                if (result.tag() == ResultTag::Raised)
+                    detail::write_unraisable(*this, roots.root(result.exception()), callback);
+            } catch (...) {
+                finish_weak(*item);
+                throw;
+            }
+            finish_weak(*item);
+        }
+        while (auto *item = thread.finalizers) {
+            {
+                std::lock_guard gate(state_->coordinator);
+                item->finalization = detail::Allocation::Finalization::Running;
+            }
+            try {
+                RootScope roots(*this);
+                const auto self = roots.root(Value(*item->object()));
+                ReturnSlot result(*this);
+                try {
+                    auto method =
+                        core_ready() && item->object()->type.object_.load(std::memory_order_acquire)
+                            ? detail::type_attribute(*this, type_of(self), U"__del__")
+                            : std::optional<Value>{};
+                    if (method)
+                        detail::invoke_special(*this, self, roots.root(*method), {}, result);
+                    else if (item->span->layout.finalize)
+                        item->span->layout.finalize(*this, self, result);
+                    if (result.tag() == ResultTag::Raised)
+                        detail::write_unraisable(*this, roots.root(result.exception()),
+                                                 method ? std::optional<Handle>{roots.root(*method)}
+                                                        : std::optional<Handle>{self});
+                } catch (const std::bad_alloc &) {
+                    if (core_ready())
+                        detail::write_unraisable(
+                            *this, roots.root(builtin(CoreObject::MemoryError)), self);
+                    else
+                        throw;
+                }
+            } catch (...) {
+                finish_finalizer(*item);
+                throw;
+            }
+            finish_finalizer(*item);
+        }
+    } catch (...) {
+        // A host fault propagates, but must not strand another candidate in
+        // a departing ThreadRecord or cause the failed callback to run twice.
+        std::lock_guard gate(state_->coordinator);
+        if (thread.finalizers) {
+            tail->finalizer_next = state_->finalizer_head;
+            state_->finalizer_head = thread.finalizers;
+            if (!state_->finalizer_tail)
+                state_->finalizer_tail = tail;
+        }
+        if (thread.weak_callbacks) {
+            weak_tail->pending_next = state_->weak_callback_head;
+            state_->weak_callback_head = thread.weak_callbacks;
+            if (!state_->weak_callback_tail)
+                state_->weak_callback_tail = weak_tail;
+        }
+        thread.finalizers = nullptr;
+        thread.weak_callbacks = nullptr;
+        thread.dispatching = false;
+        throw;
+    }
+    {
+        std::lock_guard gate(state_->coordinator);
+        thread.dispatching = false;
+    }
+    return true;
 }
 void Attachment::poll()
 {
@@ -1361,6 +1638,19 @@ void Attachment::set_gc_enabled(bool enabled)
 {
     require_attached();
     state_->gc_enabled = enabled;
+}
+bool Attachment::gc_enabled() const
+{
+    require_attached();
+    return state_->gc_enabled.load(std::memory_order_acquire);
+}
+bool Attachment::is_finalized(Handle object) const
+{
+    const auto value = object.get(*this);
+    std::lock_guard gate(state_->coordinator);
+    const auto state = detail::Allocation::from(value.object()).finalization;
+    return state == detail::Allocation::Finalization::Running ||
+           state == detail::Allocation::Finalization::Finalized;
 }
 HeapStats Attachment::stats() const
 {

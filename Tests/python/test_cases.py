@@ -1,0 +1,61 @@
+"""Execute script fixtures with byte-exact output checks, without native tests."""
+
+import argparse
+import difflib
+from pathlib import Path
+import subprocess
+import sys
+
+
+def compare(name, expected, actual):
+    if actual == expected:
+        return True
+    print(f"{name} differs:", flush=True)
+    diff = difflib.diff_bytes(difflib.unified_diff, expected.splitlines(keepends=True),
+                             actual.splitlines(keepends=True), b"expected", b"actual")
+    sys.stdout.flush()
+    sys.stdout.buffer.writelines(diff)
+    if not actual.endswith(b"\n"):
+        print("\n(actual has no final newline)")
+    return False
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--binary", required=True, type=Path)
+    parser.add_argument("--cases", type=Path, default=Path(__file__).resolve().parents[1] / "cases")
+    parser.add_argument("--case", help="Run one fixture directory without rebuilding")
+    args = parser.parse_args()
+    binary = args.binary.resolve()
+    root = args.cases.resolve()
+    inputs = sorted(root.glob("*/stdin.bin")) if args.case is None else [root / args.case / "stdin.bin"]
+    if not inputs:
+        parser.error("no script cases found")
+    failures = 0
+    for input_path in inputs:
+        directory = input_path.parent
+        expected = (directory / "stdout.bin").read_bytes()
+        error_path = directory / "stderr.bin"
+        stderr = error_path.read_bytes() if error_path.exists() else b""
+        status_path = directory / "exitcode.txt"
+        status = int(status_path.read_text()) if status_path.exists() else 0
+        try:
+            result = subprocess.run([str(binary)], input=input_path.read_bytes(),
+                                    capture_output=True, cwd=directory, timeout=30)
+        except subprocess.TimeoutExpired:
+            print(f"FAIL {directory.name}: exceeded 30 seconds", flush=True)
+            failures += 1
+            continue
+        ok = compare(f"{directory.name}/stdout", expected, result.stdout)
+        ok = compare(f"{directory.name}/stderr", stderr, result.stderr) and ok
+        if result.returncode != status:
+            print(f"{directory.name}: exit {result.returncode}, expected {status}")
+            ok = False
+        print(f"{'PASS' if ok else 'FAIL'} {directory.name}", flush=True)
+        failures += not ok
+    print(f"{len(inputs) - failures}/{len(inputs)} script cases passed")
+    return bool(failures)
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

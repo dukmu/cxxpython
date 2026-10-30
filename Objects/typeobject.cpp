@@ -4,6 +4,19 @@
 #include <algorithm>
 
 namespace cxxpython::core {
+TypeSnapshot::TypeSnapshot(InitialType head, Value name, Value qualname, Value dictionary,
+                           std::optional<Value> storage, Value bases, Value mro)
+    : header(head), name(name), qualname(qualname), dictionary(dictionary), bases(bases), mro(mro),
+      storage(storage), finalizer([&]() -> std::optional<Value> {
+          if (storage) {
+              const auto &data = *reinterpret_cast<const DictStorage *>(storage->object());
+              for (const auto &[key, index] : data.index)
+                  if (key == U"__del__")
+                      return data.entries[index].value;
+          }
+          return {};
+      }())
+{}
 TypeView::TypeView(Attachment &context, Value type)
     : context_(context), owner_(context), metadata_(context)
 {
@@ -156,12 +169,15 @@ void create(Attachment &context, const TypeSpec &spec, const LayoutDescriptor *n
     const bool metatype =
         std::find(ancestors.begin(), ancestors.end(), type.get(context)) != ancestors.end();
     bool allow_slots = true;
-    bool inherited_dictionary = false;
+    bool inherited_dictionary = false, inherited_weakrefs = false, allow_weakrefs = true;
     for (auto base : bases) {
         allow_slots &= ready_type(context, base).allow_slots;
         inherited_dictionary |= ready_type(context, base).instance_layout.fields.dictionary;
+        inherited_weakrefs |= ready_type(context, base).instance_layout.fields.weakrefs;
+        allow_weakrefs &= ready_type(context, base).allow_weakrefs;
     }
     bool dictionary = inherited_dictionary || (!metatype && !native_layout && !spec.slots);
+    bool weakrefs = inherited_weakrefs || (!native_layout && !spec.slots && allow_weakrefs);
     std::vector<std::u32string> own_slots;
     if (spec.slots && !spec.slots->empty() && !allow_slots)
         throw TypeDefinitionError("nonempty slots are not allowed for this native base");
@@ -175,8 +191,12 @@ void create(Attachment &context, const TypeSpec &spec, const LayoutDescriptor *n
                 dictionary = true;
                 continue;
             }
-            if (name == U"__weakref__")
-                throw TypeDefinitionError("weakref slots require the weak-reference contract");
+            if (name == U"__weakref__") {
+                if (weakrefs || !allow_weakrefs)
+                    throw TypeDefinitionError("weakref slot is already provided or disallowed");
+                weakrefs = true;
+                continue;
+            }
             if (!allow_slots)
                 throw TypeDefinitionError("nonempty slots are not allowed for this native base");
             if (name.starts_with(U"__") && !name.ends_with(U"__")) {
@@ -192,7 +212,7 @@ void create(Attachment &context, const TypeSpec &spec, const LayoutDescriptor *n
         }
     std::sort(own_slots.begin(), own_slots.end());
     slot_names.insert(slot_names.end(), own_slots.begin(), own_slots.end());
-    layout.fields = {slot_names.size(), dictionary};
+    layout.fields = {slot_names.size(), dictionary, weakrefs};
     (void)layout.storage_size();
 
     // Only a fully initialized type is handed to the caller. The staged
@@ -214,6 +234,7 @@ void create(Attachment &context, const TypeSpec &spec, const LayoutDescriptor *n
     payload.base = best_base.get(context);
     payload.slot_names = std::move(slot_names);
     payload.allow_slots = allow_slots;
+    payload.allow_weakrefs = allow_weakrefs;
     context.account_external(created, payload.external_bytes());
     payload.state = TypeState::Structural;
     if (context.core_ready())
@@ -488,6 +509,13 @@ void type_ready(Attachment &context, Handle type, std::optional<Handle> source)
                      }) &&
         !name_lookup(context, *payload.dictionary, U"__dict__"))
         install_instance_dictionary(context, type);
+    if (context.core_ready() && payload.instance_layout.fields.weakrefs &&
+        !std::any_of(payload.bases.begin(), payload.bases.end(),
+                     [&](Value base) {
+                         return context.payload<TypeObject>(base).instance_layout.fields.weakrefs;
+                     }) &&
+        !name_lookup(context, *payload.dictionary, U"__weakref__"))
+        install_instance_weakrefs(context, type);
     const auto inherited =
         payload.base ? context.payload<TypeObject>(*payload.base).slot_names.size() : 0;
     install_slot_descriptors(context, type, inherited);
@@ -526,6 +554,7 @@ void build_type_seeds(Attachment &context, ReturnSlot &object_out, ReturnSlot &t
     object_data.mro = {object.get(context)};
     object_data.solid_base = object.get(context);
     auto &type_data = context.payload<TypeObject>(type);
+    type_data.instance_layout.fields.weakrefs = true;
     type_data.bases = {object.get(context)};
     type_data.base = object.get(context);
     type_data.mro = {type.get(context), object.get(context)};

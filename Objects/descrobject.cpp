@@ -498,6 +498,20 @@ void install_instance_dictionary(Attachment &context, Handle type)
                   roots.root(context.builtin(CoreObject::StrType)), type, U"__dict__",
                   instance_dict_get, instance_dict_set);
 }
+void install_instance_weakrefs(Attachment &context, Handle type)
+{
+    RootScope roots(context);
+    install_field(
+        context, roots.root(context.builtin(CoreObject::GetSetDescriptorType)),
+        roots.root(context.builtin(CoreObject::StrType)), type, U"__weakref__",
+        +[](Attachment &context, Value self, ReturnSlot &out) {
+            RootScope roots(context);
+            std::vector<Value> refs;
+            context.weakrefs(roots.root(self), roots, refs);
+            out.ok(refs.empty() ? context.builtin(CoreObject::None) : refs.front());
+        },
+        nullptr);
+}
 void install_attribute_descriptors(Attachment &context, std::span<const Handle> core)
 {
     auto at = [&](CoreObject id) { return core[static_cast<std::size_t>(id)]; };

@@ -24,6 +24,9 @@ class ReturnSlot;
 class Tracer;
 class NoSafepoint;
 class Transfer;
+class Handle;
+class RootScope;
+struct WeakRefObject;
 enum class Protocol : std::size_t;
 struct ResolvedSlot;
 enum class CoreObject : std::size_t {
@@ -102,6 +105,8 @@ enum class CoreObject : std::size_t {
     FrozenSetType,
     SetIteratorType,
     GeneratorType,
+    WeakRefType,
+    UnraisableHookArgsType,
     None,
     NotImplemented,
     Ellipsis,
@@ -165,6 +170,7 @@ class AtomicGcEdge final {
   private:
     friend class Attachment;
     friend class Tracer;
+    friend struct detail::State;
     std::atomic<ObjectHeader *> object_;
 };
 
@@ -215,6 +221,7 @@ class Tracer final {
 struct InstanceFieldPlan {
     std::size_t slots = 0;
     bool dictionary = false;
+    bool weakrefs = false;
     bool operator==(const InstanceFieldPlan &) const = default;
 };
 
@@ -225,6 +232,7 @@ struct LayoutDescriptor final {
     void (*trace)(const ObjectHeader &, Tracer &) noexcept;
     void (*destroy)(ObjectHeader *) noexcept;
     InstanceFieldPlan fields;
+    void (*finalize)(Attachment &, Handle, ReturnSlot &) = nullptr;
     bool operator==(const LayoutDescriptor &) const = default;
 
     std::size_t storage_size() const
@@ -285,6 +293,13 @@ struct LayoutDescriptor final {
         static_assert(std::is_same_v<decltype(T::header), ObjectHeader>);
         static_assert(std::is_nothrow_destructible_v<T>);
         static_assert(noexcept(std::declval<const T &>().trace(std::declval<Tracer &>())));
+        auto finalizer = []() -> void (*)(Attachment &, Handle, ReturnSlot &) {
+            if constexpr (requires(Attachment & context, Handle self, ReturnSlot & out) {
+                              T::finalize(context, self, out);
+                          })
+                return T::finalize;
+            return nullptr;
+        }();
         return {
             &detail::native_layout_id<T>,
             sizeof(T),
@@ -294,6 +309,7 @@ struct LayoutDescriptor final {
             },
             [](ObjectHeader *object) noexcept { std::destroy_at(reinterpret_cast<T *>(object)); },
             {},
+            finalizer,
         };
     }
 };
@@ -506,6 +522,10 @@ class Attachment final {
                   ReturnSlot &previous);
     Transfer make_transfer(Handle value);
     void receive(Transfer &transfer, ReturnSlot &out);
+    bool supports_weakrefs(Handle target) const;
+    void weakref_lookup(Handle target, Handle type, ReturnSlot &out);
+    void register_weakref(Handle self, Handle target, bool cache, ReturnSlot &out);
+    void weakrefs(Handle target, RootScope &roots, std::vector<Value> &out);
     void account_external(Handle owner, std::size_t bytes);
     void account_external(Value owner, std::size_t bytes);
     void bootstrap();
@@ -540,6 +560,8 @@ class Attachment final {
     std::size_t collect();
     void poll();
     void set_gc_enabled(bool enabled);
+    bool gc_enabled() const;
+    bool is_finalized(Handle object) const;
     HeapStats stats() const;
     void require_attached() const;
 
@@ -565,6 +587,7 @@ class Attachment final {
     void *reserve_storage(LayoutDescriptor layout);
     void abandon_storage(ObjectHeader *object) noexcept;
     void adopt(ObjectHeader *object, ReturnSlot &out, std::size_t external);
+    bool dispatch_finalizers();
 
     template <class T, class... Args>
     void allocate_layout(LayoutDescriptor layout, std::optional<Handle> type, ReturnSlot &out,

@@ -2,6 +2,7 @@
 #include "cxxpython/genobject.hpp"
 #include "cxxpython/import.hpp"
 #include "cxxpython/setobject.hpp"
+#include "internal/errors.hpp"
 #include "internal/setobject.hpp"
 #include "internal/sysmodule.hpp"
 
@@ -514,12 +515,12 @@ DelegateResult delegate_step(Attachment &context, Value frame_value, FrameObject
             method(U"close");
             if (!missing()) {
                 if (target.tag() == ResultTag::Raised) {
-                    out.raised(target.exception());
-                    return DelegateResult::Raised;
+                    detail::write_unraisable(context, roots.root(target.exception()), iterator);
+                } else {
+                    call(context, roots.root(target.value()), {}, out);
+                    if (raised(out))
+                        return DelegateResult::Raised;
                 }
-                call(context, roots.root(target.value()), {}, out);
-                if (raised(out))
-                    return DelegateResult::Raised;
             }
             return normalize();
         }

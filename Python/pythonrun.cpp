@@ -1,4 +1,5 @@
 #include "internal/pythonrun.hpp"
+#include "internal/errors.hpp"
 
 #include "cxxpython/import.hpp"
 #include "cxxpython/parser.hpp"
@@ -8,6 +9,15 @@
 
 namespace cxxpython::core::detail {
 int report_exception(Attachment &context, Value exception)
+{
+    if (is_subtype(context, context.type_of(exception),
+                   context.builtin(CoreObject::SystemExitType)))
+        return report_exception_fallback(context, exception);
+    RootScope roots(context);
+    display_exception(context, roots.root(exception));
+    return 1;
+}
+int report_exception_fallback(Attachment &context, Value exception)
 {
     RootScope roots(context);
     const auto error = roots.root(exception);

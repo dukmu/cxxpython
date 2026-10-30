@@ -6,6 +6,7 @@
 #include "cxxpython/moduleobject.hpp"
 #include "cxxpython/protocol.hpp"
 #include "internal/codecs.hpp"
+#include "internal/errors.hpp"
 
 namespace cxxpython::core::detail {
 namespace {
@@ -228,7 +229,7 @@ void initialize_sys_hooks(Attachment &ctx, Handle sys, ReturnSlot &out)
     make_str(ctx, U"", function);
     if (!store(U"executable"))
         return;
-    out.ok(ctx.builtin(CoreObject::None));
+    install_error_hooks(ctx, sys, out);
 }
 void display_value(Attachment &ctx, Handle value, ReturnSlot &out)
 {

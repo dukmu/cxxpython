@@ -20,6 +20,7 @@ endif()
 
 add_library(cxxpython_core
     Python/gc.cpp
+    Python/errors.cpp
     Python/pylifecycle.cpp
     Python/pythonrun.cpp
     Python/compile.cpp
@@ -31,6 +32,8 @@ add_library(cxxpython_core
     Modules/_iomodule.cpp
     Modules/main.cpp
     Modules/sysmodule.cpp
+    Modules/gcmodule.cpp
+    Modules/_weakref.cpp
     Python/symtable.cpp
     Python/flowgraph.cpp
     Python/ceval.cpp
@@ -51,6 +54,7 @@ add_library(cxxpython_core
     Objects/unicodecodecs.cpp
     Objects/superobject.cpp
     Objects/genobject.cpp
+    Objects/weakrefobject.cpp
     Objects/setobject.cpp
     Objects/setoperations.cpp
     Objects/moduleobject.cpp
@@ -156,6 +160,9 @@ if(BUILD_TESTING)
         Tests/cpp/test_generators.cpp
         Tests/cpp/test_generators_source.cpp
         Tests/cpp/test_generators_parallel.cpp
+        Tests/cpp/test_finalization.cpp
+        Tests/cpp/test_weakrefs.cpp
+        Tests/cpp/test_error_hooks.cpp
         Tests/cpp/test_stringformat.cpp
         Tests/cpp/test_unicode_methods.cpp
         Tests/cpp/test_builtin_functions.cpp
@@ -204,6 +211,11 @@ if(BUILD_TESTING)
         ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_generators.py
         --binary $<TARGET_FILE:cxxpython> --reference ${CXXPYTHON_REFERENCE_PYTHON})
     set_tests_properties(Generators.Differential PROPERTIES TIMEOUT 90)
+    add_test(NAME Scripts.Cases COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_cases.py --binary $<TARGET_FILE:cxxpython>)
+    add_test(NAME Scripts.Reference COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_cases.py --binary ${CXXPYTHON_REFERENCE_PYTHON})
+    set_tests_properties(Scripts.Cases Scripts.Reference PROPERTIES TIMEOUT 120)
     add_test(NAME Syntax.Differential COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_syntax.py
         --binary $<TARGET_FILE:cxxpython> --reference ${CXXPYTHON_REFERENCE_PYTHON})

@@ -570,6 +570,10 @@ void tuple_new(Attachment &context, Handle, std::span<const Value> args, ReturnS
     RootScope roots(context);
     const auto cls = roots.root(args[0]);
     const bool exact = args[0] == context.builtin(CoreObject::TupleType);
+    if (!exact && context.payload<TypeObject>(args[0]).immutable) {
+        type_error(context, U"tuple.__new__ cannot bypass a native tuple subtype constructor", out);
+        return;
+    }
     if (exact && values.size() == 1 &&
         context.type_of(values[0]) == context.builtin(CoreObject::TupleType)) {
         out.ok(values[0]);

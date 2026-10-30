@@ -1,0 +1,4 @@
+True True True 5 5 0
+AttributeError
+IndexError
+[(True, 5, True, 'callback', True, None)] True True

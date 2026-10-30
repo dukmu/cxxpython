@@ -131,6 +131,13 @@ or dictionary and binds functions to that module's actual dictionary.
 spans/root arenas, attachment/parking, epoch rendezvous, transfer roots and core
 image lifecycle. These coupled lifetime operations remain in one translation
 unit; moving them does not introduce an extra lifetime authority or new locking.
+Weak targets and intrusive callback/finalizer batches are classified during STW;
+Python runs only after attachments resume. Pending and running batches retain
+their complete strong graphs, and a second mark checks resurrection. Immutable
+type/MRO snapshots supply instance finalizers. `Objects/weakrefobject.cpp` owns
+weak reference protocols, while `Modules/_weakref.cpp` exposes native capability.
+`Python/errors.cpp` owns exception/unraisable hook dispatch, including callbacks
+from GC and generator close. `Modules/gcmodule.cpp` exposes collector controls.
 
 Runtime contracts are in `Include/cxxpython/`. Compiler-private implementation
 structures belong in `Include/internal/`. All C++ interfaces remain unstable.
@@ -162,16 +169,19 @@ suspension. The next owner acquire-claims it, including on another OS thread.
 Borrowed caller exception state is detached at suspension; generator-owned
 handlers and cleanup continuations persist. Public back/delegate edges are
 rooted atomic reads, not unprotected reads of live operand storage. Explicit
-close uses ordinary GeneratorExit/unwind. Automatic GC finalization, coroutine/
-async execution and unrestricted cross-thread frame-local snapshots remain N4
-work; a C++ destructor does not execute Python cleanup.
+close and automatic GC close use ordinary GeneratorExit/unwind. Coroutine/async
+execution, shutdown phases and unrestricted cross-thread frame-local snapshots
+remain work; a C++ destructor does not execute Python cleanup.
 
 ## Tests And Tooling
 
 `Tests/cpp/` tests production runtime interfaces. `Tests/python/` contains host Python
 drivers for actual executable differential and measurement-report tests, not a
 ported standard library. `Lib/` is reserved for the interpreter's Python standard
-library. `Tools/benchmarks/runtime.cpp` runs the current runtime;
+library. Python-visible contracts default to `Tests/cases/*/stdin.bin` with exact
+stdout/stderr/status comparisons through `Tests/python/test_cases.py`, without
+compiling C++ wrappers. Native tests cover contracts inaccessible from Python.
+`Tools/benchmarks/runtime.cpp` runs the current runtime;
 `Tools/benchmarks/record.py` retains raw runs and generates comparison tables.
 
 The old implementation and its tests are absent, not disabled behind a build

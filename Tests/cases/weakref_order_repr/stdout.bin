@@ -1,0 +1,3 @@
+equal-result unequal-result True
+True True True
+True True True True [2, 1] 0 []

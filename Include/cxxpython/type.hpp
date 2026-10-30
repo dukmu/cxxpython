@@ -21,11 +21,9 @@ struct TypeSnapshot {
     ObjectHeader header;
     const Value name, qualname, dictionary, bases, mro;
     const std::optional<Value> storage;
+    const std::optional<Value> finalizer;
     TypeSnapshot(InitialType head, Value name, Value qualname, Value dictionary,
-                 std::optional<Value> storage, Value bases, Value mro)
-        : header(head), name(name), qualname(qualname), dictionary(dictionary), bases(bases),
-          mro(mro), storage(storage)
-    {}
+                 std::optional<Value> storage, Value bases, Value mro);
     void trace(Tracer &tracer) const noexcept
     {
         tracer.visit(name);
@@ -35,6 +33,8 @@ struct TypeSnapshot {
         tracer.visit(mro);
         if (storage)
             tracer.visit(*storage);
+        if (finalizer)
+            tracer.visit(*finalizer);
     }
 };
 
@@ -59,6 +59,7 @@ struct TypeObject {
     bool immutable = false;
     bool subclassable = true;
     bool allow_slots = true;
+    bool allow_weakrefs = true;
 
     TypeObject(InitialType head, std::u32string name_in, LayoutDescriptor layout)
         : header(head), name(std::move(name_in)), qualname(name), instance_layout(layout)

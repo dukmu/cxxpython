@@ -360,6 +360,10 @@ void repr_generator(Attachment &ctx, Handle, std::span<const Value> args, Return
              out);
 }
 } // namespace
+void GeneratorObject::finalize(Attachment &context, Handle self, ReturnSlot &out)
+{
+    resume(context, self.get(context), Operation::Close, {}, out);
+}
 } // namespace cxxpython::core
 
 namespace cxxpython::core::detail {

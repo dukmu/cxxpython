@@ -536,6 +536,7 @@ bool bind_arguments(Attachment &context, const SignatureLayout &signature, CallA
                     std::optional<Value> receiver, RootScope &roots, std::vector<Value> &bound,
                     ReturnSlot &out, std::optional<FunctionDefaults> defaults = {});
 void install_instance_dictionary(Attachment &context, Handle type);
+void install_instance_weakrefs(Attachment &context, Handle type);
 void install_slot_descriptors(Attachment &context, Handle type, std::size_t first);
 void get_native_field(Attachment &context, Value descriptor, std::optional<Value> receiver,
                       ReturnSlot &out);

@@ -7,6 +7,7 @@
 #include <map>
 
 namespace cxxpython::core::detail {
+void initialize_gc(Attachment &, Handle, ReturnSlot &);
 struct NativeLibrary;
 struct NativeModule {
     struct Method {

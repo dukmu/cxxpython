@@ -18,6 +18,7 @@ struct GeneratorObject {
         tracer.visit(name);
         tracer.visit(qualname);
     }
+    static void finalize(Attachment &, Handle, ReturnSlot &);
 };
 namespace detail {
 enum class ResumeResult { Yielded, Returned, Raised, Rejected };

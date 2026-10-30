@@ -5,8 +5,10 @@
 #include "cxxpython/protocol.hpp"
 #include "cxxpython/setobject.hpp"
 #include "cxxpython/superobject.hpp"
+#include "cxxpython/weakrefobject.hpp"
 #include "internal/builtinexec.hpp"
 #include "internal/codecs.hpp"
+#include "internal/errors.hpp"
 #include "internal/stdio.hpp"
 #include "internal/stringformat.hpp"
 #include "internal/sysmodule.hpp"
@@ -177,6 +179,15 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     define(CoreObject::FrozenSetType, "frozenset", LayoutDescriptor::of<SetObject>());
     define(CoreObject::SetIteratorType, "set_iterator", LayoutDescriptor::of<DictIteratorObject>());
     define(CoreObject::GeneratorType, "generator", LayoutDescriptor::of<GeneratorObject>());
+    define(CoreObject::WeakRefType, "ReferenceType", LayoutDescriptor::of<WeakRefObject>());
+    define(CoreObject::UnraisableHookArgsType, "UnraisableHookArgs",
+           LayoutDescriptor::of<TupleObject>(), at(CoreObject::TupleType));
+    for (auto id : {CoreObject::FunctionType, CoreObject::ModuleType, CoreObject::CodeType,
+                    CoreObject::GeneratorType, CoreObject::SetType, CoreObject::FrozenSetType})
+        context.payload<TypeObject>(at(id)).instance_layout.fields.weakrefs = true;
+    for (auto id :
+         {CoreObject::TupleType, CoreObject::BytesType, CoreObject::IntType, CoreObject::BoolType})
+        context.payload<TypeObject>(at(id)).allow_weakrefs = false;
     context.payload<TypeObject>(at(CoreObject::BytesType)).allow_slots = false;
     context.payload<TypeObject>(at(CoreObject::TupleType)).allow_slots = false;
     context.payload<TypeObject>(at(CoreObject::IntType)).allow_slots = false;
@@ -257,6 +268,8 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     install_unicode_methods(context, core);
     install_execution(context, core);
     install_generators(context, core);
+    install_weakrefs(context, core);
+    install_error_types(context, core);
     install_exception_runtime(context, core);
     install_system_exit(context, core);
     install_ranges(context, core);
@@ -301,6 +314,10 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                     CoreObject::SetIteratorType,
                     CoreObject::GeneratorType})
         context.payload<TypeObject>(at(id)).subclassable = false;
+    context.payload<TypeObject>(at(CoreObject::UnraisableHookArgsType)).subclassable = false;
+    context.allocate_instance<StrObject>(at(CoreObject::StrType), text, U"weakref");
+    name_store(context, *context.payload<TypeObject>(at(CoreObject::WeakRefType)).dictionary,
+               module_key.get(context), text.value());
 
     auto &builtins = *outputs[static_cast<std::size_t>(CoreObject::Builtins)];
     context.allocate_instance<DictObject>(at(CoreObject::DictType), builtins);

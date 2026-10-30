@@ -1,0 +1,3 @@
+a,b abc 
+str
+sequence item 1: expected str instance, int found [1, 2, 3]

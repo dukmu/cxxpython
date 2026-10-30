@@ -63,7 +63,7 @@ the target is `builtins` and the `__builtins__` execution namespace.
   table without bypassing hash/equality callbacks or adding another lifetime
   authority. Operation-specific set/dict fast paths, iterable early termination,
   native subclasses, reflected operators and mutation failures have focused and
-  fixed-reference tests. Weakrefs, pickle and generic aliases remain dependencies;
+  fixed-reference tests. Weakrefs are integrated; pickle and generic aliases remain dependencies;
   this is not completion of all common type/library integration or performance
   acceptance. Iteration order is not the reference's private table layout.
 - Generators adapt pinned genobject.c and PEP 380/479 behavior to the existing
@@ -71,9 +71,8 @@ the target is `builtins` and the `__builtins__` execution namespace.
   interpreter frames. Explicit send/throw/close, delegation, return values and
   lazy generator expressions have focused and fixed-reference tests. Frame-state
   CAS replaces GIL serialization; only suspension boundaries permit ownership
-  transfer. Automatic collection-time close still depends on the N4 GC finalizer
-  and unraisable-hook design. Delegated close-attribute lookup errors currently
-  propagate instead of upstream unraisable-hook reporting. The execution claim
+  transfer. Automatic collection-time close now uses the common GC finalizer
+  queue; delegated close-attribute lookup errors use sys.unraisablehook. The execution claim
   also covers throw argument preparation, so gi_running is already true inside
   a custom exception constructor. These edges need explicit compatibility work,
   not a declaration of complete genobject.c parity. Async generators/coroutines
@@ -99,7 +98,7 @@ the target is `builtins` and the `__builtins__` execution namespace.
 - Modules/main.cpp and Python/pythonrun.cpp provide the experimental product
   entry/REPL, with a thin Programs entry. Single mode uses live sys.displayhook
   and real SystemExit. Host input/diagnostics are bootstrap bridges, not full
-  sys.stdin.readline/sys.excepthook, readline/history, signals, environment/isolation
+  sys.stdin.readline, readline/history, signals, environment/isolation
   or installed-runtime compatibility. No host CPython executes guest code.
 - Bootstrap sys._StandardTextIO is an explicit temporary native stream type,
   using borrowed descriptors and UTF-8 unbuffered writes. Replace this bootstrap
@@ -108,6 +107,14 @@ the target is `builtins` and the `__builtins__` execution namespace.
   copy a fake Python io facade around it. print itself follows current sys.stdout
   and ordinary file.write/flush callbacks; closed-pipe handling does not install a
   process-global signal handler. Input/open and full stream configuration remain.
+- sys.excepthook/unraisablehook use real stderr and exception chains. _weakref.ref,
+  Python __del__ and gc collection controls use tracing-GC lifetime rather than
+  reference-count timing. Weak callbacks retain their strong callback edge after
+  clearing targets, as in upstream cyclic collection. Full gc statistics/debug
+  APIs, weak proxies and interpreter-shutdown phases remain dependencies.
+- Lib/stat.py, keyword.py and token.py copy complete pinned upstream modules.
+  stat retains its optional _stat accelerator import and genuine Python fallback;
+  no fake native module is installed. Provenance is recorded at each file head.
 
 The configured source-tree stdlib path is development configuration, not final
 installation, isolation, environment or embedding acceptance. Full stdio/runpy,

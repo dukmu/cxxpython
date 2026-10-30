@@ -57,6 +57,12 @@ data. Python drivers follow ordinary Python formatting.
 
 ## Semantic Changes
 
+- Python-visible behavior belongs in `Tests/cases/<name>/stdin.bin` plus reference-
+  generated `stdout.bin`, not C++ string literals calling SourceUnit. Run
+  `python3 Tests/python/test_cases.py --binary build/cxxpython` without rebuilding
+  tests. `Scripts.Cases` and `Scripts.Reference` run the same byte-exact fixtures
+  through the product and pinned reference. See `Tests/cases/README.md` for stderr
+  and exit status. Keep C++ for native-only ownership/IR/quota/fault/thread tests.
 - Add focused native contracts and, where supported, executable source tests.
 - Define ownership/traversal, synchronization, failure and callback boundaries
   with the behavior. No unrooted object may span an allocating/polling operation.

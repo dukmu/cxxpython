@@ -1,5 +1,50 @@
 # Development Status
 
+## 2026-10-30 Finalizers, Weak References And Script-Level Library Tests
+
+Prepended without changing earlier records. Previous stable node: 61b85ac,
+already pushed. The full Plan 2 frontend/library/N4-N6/M0-M9 goal remains active.
+
+- The tracing collector clears weak targets and prepares intrusive finalizer and
+  callback batches during STW, then runs Python after resuming attachments. All
+  finalizable objects in an isolate are registered before tracing their retained
+  graphs. Running batches remain precise roots; nested collection does not wait
+  for itself. A second mark checks resurrection. Finalization is once-only;
+  host failures restore unconsumed work rather than lose the batch. No execution
+  GIL, Python refcount, Python-in-destructor path or second collector was added.
+- Real _weakref.ref supports callbacks, hashing/equality, subclassing, canonical
+  type identity and exact no-callback caching. Weak-capable native layouts and
+  Python __slots__/__weakref__ participate in the same collector. Callback edges
+  remain strong after target clearing, matching CPython cyclic collection.
+  Generic instances use immutable MRO snapshots to find __del__. Unreachable
+  generators close through the existing VM and unwind paths, including cycles.
+- sys.excepthook and sys.unraisablehook use actual stderr callbacks and traced
+  exception chains; the hook argument type has a validated immutable tuple
+  layout. Delegated close lookup failures now use unraisable reporting. The gc
+  module exposes real collect/enable/disable/isenabled/is_finalized; generation
+  arguments currently select the same full tracing collector, not invented
+  generation statistics. Full shutdown, weak proxies and complete gc APIs remain.
+- General str.join and Unicode find/rfind/index/rindex close real dependencies.
+  Lib/stat.py, keyword.py and token.py copy complete pinned CPython 3.12.14
+  implementations with provenance. No names-only library or fake accelerator.
+- Python-visible behavior now has 32 stdin.bin/stdout.bin fixture directories,
+  executed by the product and exact-diffed with the fixed reference. Removed
+  pure-script generator C++ wrappers; retained native root/quota/host-fault,
+  compiler-IR and actual simultaneous-attachment contracts. These fixtures do
+  not need a C++ test rebuild. AGENTS and the development guide record this rule.
+- Final normal CTest passes 535/535; ASan/UBSan/LSan native tests pass 508/508,
+  plus both allocation enumerations serially within the unchanged 120s limit
+  (73.60s and 82.74s). Strict-ASan product fixtures pass 32/32. TSan affected
+  concurrency/GC/VM tests pass 71/71. Formatting and generated-parser checks pass.
+  Evidence is retained under .cache/finalization-*. All operation handles were
+  terminal before commit. No unrelated benchmark reruns or hand-filled tables.
+- Full native sweeps belong to this collector/layout change, not subsequent
+  Python-only library additions. Further Lib-only changes use their dependency
+  and product-script tests, reusing unchanged native evidence. Next work is
+  substantial missing types and POSIX/file/I/O capability followed by Python
+  library dependency closures, not another local hardening cycle. User changes
+  to temporary_plan.md and test2.py remain excluded.
+
 ## 2026-10-30 Shared-Heap Generator Suspension And Resumption
 
 Prepended without changing earlier records. Previous stable node: ccb4b18,
