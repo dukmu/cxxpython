@@ -269,6 +269,38 @@ void float_arithmetic(Attachment &context, Handle, std::span<const Value> args, 
         result = a - b;
     if constexpr (Op == BinaryOp::Multiply)
         result = a * b;
+    if constexpr (Op == BinaryOp::Power) {
+        if (b == 0.0)
+            result = 1.0;
+        else if (std::isnan(a))
+            result = a;
+        else if (std::isnan(b))
+            result = a == 1.0 ? 1.0 : b;
+        else if (std::isinf(b)) {
+            double magnitude = std::fabs(a);
+            result = magnitude == 1.0 ? 1.0 : ((b > 0) == (magnitude > 1.0) ? std::fabs(b) : 0.0);
+        } else if (std::isinf(a)) {
+            bool odd = std::fmod(std::fabs(b), 2.0) == 1.0;
+            result = b > 0 ? (odd ? a : std::fabs(a)) : (odd ? std::copysign(0.0, a) : 0.0);
+        } else if (a == 0.0) {
+            if (b < 0) {
+                raise_error(context, CoreObject::ZeroDivisionErrorType,
+                            U"0.0 cannot be raised to a negative power", out);
+                return;
+            }
+            result = std::fmod(std::fabs(b), 2.0) == 1.0 ? a : 0.0;
+        } else if (a < 0 && b != std::floor(b)) {
+            raise_error(context, CoreObject::TypeErrorType, U"complex power is not supported", out);
+            return;
+        } else {
+            result = std::pow(a, b);
+            if (std::isinf(result)) {
+                raise_error(context, CoreObject::OverflowErrorType,
+                            U"numerical result out of range", out);
+                return;
+            }
+        }
+    }
     if constexpr (Op == BinaryOp::TrueDivide)
         result = a / b;
     if constexpr (Op == BinaryOp::FloorDivide || Op == BinaryOp::Modulo) {
@@ -490,6 +522,8 @@ void detail::install_floats(Attachment &context, std::span<const Handle> core)
     install(U"__rmul__", float_arithmetic<BinaryOp::Multiply, true>, true);
     install(U"__truediv__", float_arithmetic<BinaryOp::TrueDivide, false>, true);
     install(U"__rtruediv__", float_arithmetic<BinaryOp::TrueDivide, true>, true);
+    install(U"__pow__", float_arithmetic<BinaryOp::Power, false>, true);
+    install(U"__rpow__", float_arithmetic<BinaryOp::Power, true>, true);
     install(U"__floordiv__", float_arithmetic<BinaryOp::FloorDivide, false>, true);
     install(U"__rfloordiv__", float_arithmetic<BinaryOp::FloorDivide, true>, true);
     install(U"__mod__", float_arithmetic<BinaryOp::Modulo, false>, true);

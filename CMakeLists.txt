@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.22)
 project(cxxpython LANGUAGES C CXX)
 
 include(CTest)
+set(CXXPYTHON_TEST_TIMEOUT 15 CACHE STRING "Per-native-test timeout; sanitizer builds may raise it")
 
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -11,6 +12,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
 find_package(Threads REQUIRED)
+add_subdirectory(Parser)
 find_path(BOOST_MULTIPRECISION_INCLUDE_DIR boost/multiprecision/cpp_int.hpp)
 if(NOT BOOST_MULTIPRECISION_INCLUDE_DIR)
     message(FATAL_ERROR "Boost.Multiprecision headers are required; set BOOST_MULTIPRECISION_INCLUDE_DIR")
@@ -27,11 +29,14 @@ add_library(cxxpython_core
     Python/ceval.cpp
     Python/traceback.cpp
     Python/unwind.cpp
-    Parser/parser.cpp
+    Parser/ast.cpp
+    Parser/source.cpp
     Objects/typeobject.cpp
     Objects/object.cpp
     Objects/dictobject.cpp
     Objects/listobject.cpp
+    Objects/sliceobject.cpp
+    Objects/formatobject.cpp
     Objects/moduleobject.cpp
     Objects/call.cpp
     Objects/descrobject.cpp
@@ -45,7 +50,7 @@ add_library(cxxpython_core
 )
 target_include_directories(cxxpython_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/Include)
 target_include_directories(cxxpython_core SYSTEM PRIVATE ${BOOST_MULTIPRECISION_INCLUDE_DIR})
-target_link_libraries(cxxpython_core PUBLIC Threads::Threads ${CMAKE_DL_LIBS})
+target_link_libraries(cxxpython_core PUBLIC cxxpython_parser Threads::Threads ${CMAKE_DL_LIBS})
 target_compile_options(cxxpython_core PRIVATE -Wall -Wextra -Wpedantic -Werror)
 
 add_executable(cxxpython Programs/cxxpython.cpp)
@@ -62,7 +67,19 @@ endif()
 find_program(CLANG_FORMAT_EXECUTABLE NAMES clang-format-14 clang-format REQUIRED)
 file(GLOB_RECURSE FORMAT_SOURCES CONFIGURE_DEPENDS
     Include/*.hpp Include/*.h Objects/*.cpp Parser/*.cpp Python/*.cpp Programs/*.cpp
-    Tests/cpp/*.cpp Tests/extensions/*.c Tools/benchmarks/*.cpp)
+    Tests/cpp/*.cpp Tests/extensions/*.c Tools/benchmarks/*.cpp Tools/parser/*.cpp)
+list(REMOVE_ITEM FORMAT_SOURCES
+    ${CMAKE_CURRENT_SOURCE_DIR}/Parser/generated_parser.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Include/cxxpython/grammar.hpp)
+find_package(Python3 COMPONENTS Interpreter QUIET)
+if(Python3_Interpreter_FOUND)
+    add_custom_target(regen-parser
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/Tools/peg_generator/generate.py
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    add_custom_target(parser-generated-check
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/Tools/peg_generator/generate.py --check
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+endif()
 add_custom_target(format
     COMMAND ${CLANG_FORMAT_EXECUTABLE} -i --style=file ${FORMAT_SOURCES}
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
@@ -84,6 +101,11 @@ if(BUILD_TESTING)
         FetchContent_MakeAvailable(googletest)
     endif()
     include(GoogleTest)
+
+    add_executable(test_parser Tests/cpp/test_parser.cpp Tests/cpp/test_tokenizer.cpp)
+    target_link_libraries(test_parser PRIVATE cxxpython_parser GTest::gtest_main Threads::Threads)
+    target_compile_options(test_parser PRIVATE -Wall -Wextra -Wpedantic -Werror)
+    gtest_discover_tests(test_parser PROPERTIES TIMEOUT ${CXXPYTHON_TEST_TIMEOUT})
 
     add_library(test_extension_static OBJECT Tests/extensions/example.c)
     target_include_directories(test_extension_static PRIVATE Include)
@@ -123,14 +145,14 @@ if(BUILD_TESTING)
         Tests/cpp/test_traceback.cpp
         Tests/cpp/test_unwind.cpp
         Tests/cpp/test_with.cpp
-        Tests/cpp/test_source.cpp
+        Tests/cpp/test_compiler.cpp
         Tests/cpp/test_iteration.cpp)
     target_link_libraries(test_runtime PRIVATE cxxpython_core GTest::gtest_main test_extension_static)
     add_dependencies(test_runtime test_extension_dynamic)
     target_compile_definitions(test_runtime PRIVATE
         TEST_EXTENSION_DIRECTORY="${CMAKE_CURRENT_BINARY_DIR}/extension-fixtures")
     target_compile_options(test_runtime PRIVATE -Wall -Wextra -Wpedantic -Werror)
-    gtest_discover_tests(test_runtime PROPERTIES TIMEOUT 15)
+    gtest_discover_tests(test_runtime PROPERTIES TIMEOUT ${CXXPYTHON_TEST_TIMEOUT})
 
     find_package(Python3 COMPONENTS Interpreter REQUIRED)
     set(CXXPYTHON_REFERENCE_PYTHON "${Python3_EXECUTABLE}" CACHE FILEPATH
@@ -139,6 +161,16 @@ if(BUILD_TESTING)
         ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_source.py
         --binary $<TARGET_FILE:cxxpython> --reference ${CXXPYTHON_REFERENCE_PYTHON})
     set_tests_properties(Source.Differential PROPERTIES TIMEOUT 60)
+    add_test(NAME Syntax.Differential COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_syntax.py
+        --binary $<TARGET_FILE:cxxpython> --reference ${CXXPYTHON_REFERENCE_PYTHON})
+    set_tests_properties(Syntax.Differential PROPERTIES TIMEOUT 90)
+    add_test(NAME Grammar.Differential COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_grammar.py
+        --binary $<TARGET_FILE:parser_probe> --reference ${CXXPYTHON_REFERENCE_PYTHON})
+    set_tests_properties(Grammar.Differential PROPERTIES TIMEOUT 90)
+    add_test(NAME Grammar.Generated COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/Tools/peg_generator/generate.py --check)
     add_test(NAME Constructors.Differential COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_constructors.py
         --binary $<TARGET_FILE:cxxpython> --reference ${CXXPYTHON_REFERENCE_PYTHON})

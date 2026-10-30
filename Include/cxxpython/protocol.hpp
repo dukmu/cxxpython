@@ -45,6 +45,28 @@ enum class Protocol : std::size_t {
     TrueDiv,
     RTrueDiv,
     ITrueDiv,
+    Power,
+    RPower,
+    IPower,
+    LeftShift,
+    RLeftShift,
+    ILeftShift,
+    RightShift,
+    RRightShift,
+    IRightShift,
+    BitAnd,
+    RBitAnd,
+    IBitAnd,
+    BitXor,
+    RBitXor,
+    IBitXor,
+    BitOr,
+    RBitOr,
+    IBitOr,
+    MatrixMultiply,
+    RMatrixMultiply,
+    IMatrixMultiply,
+    Contains,
     Count,
 };
 enum class ProtocolResult { Any, Boolean, Length, Integer, String, Hash };
@@ -63,8 +85,22 @@ struct ResolvedSlot {
     Handle descriptor;
     std::uint64_t epoch;
 };
-enum class CompareOp { Eq, Ne, Lt, Le, Gt, Ge, Is, IsNot };
-enum class BinaryOp { Add, Subtract, Multiply, FloorDivide, Modulo, TrueDivide };
+enum class CompareOp { Eq, Ne, Lt, Le, Gt, Ge, Is, IsNot, In, NotIn };
+enum class BinaryOp {
+    Add,
+    Subtract,
+    Multiply,
+    FloorDivide,
+    Modulo,
+    TrueDivide,
+    Power,
+    LeftShift,
+    RightShift,
+    BitAnd,
+    BitXor,
+    BitOr,
+    MatrixMultiply
+};
 enum class UnaryOp { Positive, Negative, Invert, Not };
 enum class NextStatus { Item, Done, Raised };
 
@@ -79,6 +115,8 @@ ResultView index(Attachment &context, Handle value, ReturnSlot &out);
 ResultView hash(Attachment &context, Handle value, ReturnSlot &out);
 ResultView repr(Attachment &context, Handle value, ReturnSlot &out);
 ResultView str(Attachment &context, Handle value, ReturnSlot &out);
+ResultView format(Attachment &context, Handle value, Handle spec, ReturnSlot &out);
+ResultView ascii(Attachment &context, Handle value, ReturnSlot &out);
 ResultView rich_compare(Attachment &context, Handle left, Handle right, CompareOp op,
                         ReturnSlot &out);
 ResultView container_equal(Attachment &context, Handle left, Handle right, ReturnSlot &out);
@@ -89,4 +127,7 @@ NextStatus iter_next(Attachment &context, Handle iterator, ReturnSlot &out);
 ResultView get_item(Attachment &context, Handle value, Handle key, ReturnSlot &out);
 ResultView set_item(Attachment &context, Handle value, Handle key, Handle item, ReturnSlot &out);
 ResultView del_item(Attachment &context, Handle value, Handle key, ReturnSlot &out);
+namespace detail {
+void install_format(Attachment &context, std::span<const Handle> core);
+}
 } // namespace cxxpython::core

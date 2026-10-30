@@ -93,6 +93,32 @@ void range_item(Attachment &context, Handle, std::span<const Value> args, Return
         return;
     RootScope roots(context);
     ReturnSlot converted(context);
+    if (context.type_of(args[1]) == context.builtin(CoreObject::SliceType)) {
+        const auto self = roots.root(args[0]);
+        detail::slice_indices(context, roots.root(args[1]), roots.root(value->length), converted);
+        if (converted.tag() == ResultTag::Raised) {
+            out.raised(converted.exception());
+            return;
+        }
+        const auto &indices = context.payload<TupleObject>(converted.value()).items;
+        const Integer start = number(context, indices[0]);
+        const Integer stop = number(context, indices[1]);
+        const Integer step = number(context, indices[2]);
+        const Integer base = number(context, value->start), stride = number(context, value->step);
+        Integer length = 0;
+        if (step > 0 && start < stop)
+            length = (stop - start - 1) / step + 1;
+        else if (step < 0 && start > stop)
+            length = (start - stop - 1) / -step + 1;
+        ReturnSlot a(context), b(context), c(context), count(context);
+        detail::publish_integer(context, base + stride * start, a);
+        detail::publish_integer(context, base + stride * stop, b);
+        detail::publish_integer(context, stride * step, c);
+        detail::publish_integer(context, std::move(length), count);
+        context.allocate_instance<RangeObject>(roots.root(context.type_of(self)), out, a.value(),
+                                               b.value(), c.value(), count.value());
+        return;
+    }
     index(context, roots.root(args[1]), converted);
     if (converted.tag() == ResultTag::Raised) {
         out.raised(converted.exception());

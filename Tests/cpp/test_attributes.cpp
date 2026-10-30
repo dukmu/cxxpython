@@ -77,6 +77,30 @@ TEST_F(CoreAttributes, ClassDescriptorUsesTheActualHeaderType)
     EXPECT_EQ(get(none, U"__class__").get(context), context.builtin(CoreObject::NoneType));
 }
 
+TEST_F(CoreAttributes, EmptyPropertyIsDataDescriptorAndDocIsWritable)
+{
+    ReturnSlot out(context);
+    auto property_type = roots.root(context.builtin(CoreObject::PropertyType));
+    call(context, property_type, {{}, {}}, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    auto property = roots.root(out.value());
+    EXPECT_EQ(get(property, U"fget").get(context), context.builtin(CoreObject::None));
+    auto doc = text(U"documentation");
+    set(property, U"__doc__", doc);
+    context.collect();
+    EXPECT_EQ(get(property, U"__doc__").get(context), doc.get(context));
+    auto cls = type("Owner");
+    set(cls, U"value", property);
+    EXPECT_EQ(get(cls, U"value").get(context), property.get(context));
+    auto self = instance(cls);
+    get_attribute(context, self, text(U"value"), out);
+    expect_error(out, CoreObject::AttributeErrorType);
+    set_attribute(context, self, text(U"value"), doc, out);
+    expect_error(out, CoreObject::AttributeErrorType);
+    del_attribute(context, self, text(U"value"), out);
+    expect_error(out, CoreObject::AttributeErrorType);
+}
+
 TEST_F(CoreAttributes, NativeDescriptorBindingDoesNotConfuseNoneWithAbsentReceiver)
 {
     auto none = roots.root(context.builtin(CoreObject::None));

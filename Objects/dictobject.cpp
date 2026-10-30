@@ -136,6 +136,16 @@ void clear(Attachment &context, Handle, std::span<const Value> args, ReturnSlot 
     dict_clear(context, roots.root(args[0]), out);
 }
 template <bool Proxy>
+void contains(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!receiver<Proxy>(context, args[0], out))
+        return;
+    RootScope roots(context);
+    dict_lookup(context, roots.root(mapping<Proxy>(context, args[0])), roots.root(args[1]), out);
+    if (!failed(out))
+        out.ok(context.builtin(out.tag() == ResultTag::Ok ? CoreObject::True : CoreObject::False));
+}
+template <bool Proxy>
 void copy(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver<Proxy>(context, args[0], out))
@@ -145,13 +155,24 @@ void copy(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &
     context.allocate_instance<DictObject>(roots.root(context.builtin(CoreObject::DictType)), out);
     detail::copy_dictionary_entries(context, out.value(), view.entries());
 }
-bool merge(Attachment &context, Handle self, Handle source, ReturnSlot &out)
+bool merge(Attachment &context, Handle self, Handle source, ReturnSlot &out, bool pairs = true,
+           bool unique = false)
 {
     RootScope roots(context);
     ReturnSlot key(context), value(context), iterator(context), next(context);
     if (context.type_of(source) == context.builtin(CoreObject::DictType)) {
         DictView view(context, source.get(context));
         for (const auto &entry : view.entries()) {
+            if (unique) {
+                detail::dict_lookup_hash(context, self, roots.root(entry.key), entry.hash, out);
+                if (failed(out))
+                    return false;
+                if (out.tag() == ResultTag::Ok) {
+                    raise_error(context, CoreObject::TypeErrorType,
+                                U"multiple values for keyword argument", out);
+                    return false;
+                }
+            }
             detail::dict_store_hash(context, self, roots.root(entry.key), roots.root(entry.value),
                                     entry.hash, out);
             if (failed(out))
@@ -181,12 +202,33 @@ bool merge(Attachment &context, Handle self, Handle source, ReturnSlot &out)
                 out.raised(key.exception());
                 return false;
             }
-            get_item(context, source, roots.root(key.value()), value);
+            const auto name = roots.root(key.value());
+            std::int64_t saved_hash = 0;
+            if (unique) {
+                hash(context, name, out);
+                if (failed(out))
+                    return false;
+                if (!int_fits_signed(context, out.value(), saved_hash))
+                    throw std::logic_error("invalid hash result");
+                detail::dict_lookup_hash(context, self, name, saved_hash, out);
+                if (failed(out))
+                    return false;
+                if (out.tag() == ResultTag::Ok) {
+                    raise_error(context, CoreObject::TypeErrorType,
+                                U"multiple values for keyword argument", out);
+                    return false;
+                }
+            }
+            get_item(context, source, name, value);
             if (failed(value)) {
                 out.raised(value.exception());
                 return false;
             }
-            dict_store(context, self, roots.root(key.value()), roots.root(value.value()), out);
+            if (unique)
+                detail::dict_store_hash(context, self, name, roots.root(value.value()), saved_hash,
+                                        out);
+            else
+                dict_store(context, self, name, roots.root(value.value()), out);
             if (failed(out))
                 return false;
         }
@@ -196,14 +238,19 @@ bool merge(Attachment &context, Handle self, Handle source, ReturnSlot &out)
         out.raised(value.exception());
         return false;
     }
+    if (!pairs) {
+        raise_error(context, CoreObject::TypeErrorType, U"argument after ** must be a mapping",
+                    out);
+        return false;
+    }
     get_iter(context, source, iterator);
     if (failed(iterator)) {
         out.raised(iterator.exception());
         return false;
     }
-    auto pairs = roots.root(iterator.value());
+    auto entries = roots.root(iterator.value());
     for (;;) {
-        const auto status = iter_next(context, pairs, next);
+        const auto status = iter_next(context, entries, next);
         if (status == NextStatus::Done)
             return true;
         if (status == NextStatus::Raised) {
@@ -386,6 +433,12 @@ void equal(Attachment &context, Handle, std::span<const Value> args, ReturnSlot 
     out.ok(context.builtin(CoreObject::True));
 }
 } // namespace
+void detail::dict_merge(Attachment &context, Handle self, Handle source, bool unique,
+                        ReturnSlot &out)
+{
+    if (merge(context, self, source, out, false, unique))
+        out.ok(context.builtin(CoreObject::None));
+}
 void detail::install_dictionaries(Attachment &context, std::span<const Handle> core)
 {
     auto at = [&](CoreObject id) { return core[static_cast<std::size_t>(id)]; };
@@ -421,6 +474,7 @@ void detail::install_dictionaries(Attachment &context, std::span<const Handle> c
     install(CoreObject::DictType, U"__init__", variadic, update);
     install(CoreObject::DictType, U"__getitem__", pair, getitem);
     install(CoreObject::DictType, U"__eq__", pair, equal);
+    install(CoreObject::DictType, U"__contains__", pair, contains<false>);
     install(CoreObject::DictType, U"__setitem__", set, setitem);
     install(CoreObject::DictType, U"__delitem__", pair, delitem);
     install(CoreObject::DictType, U"get", optional, get<false>);
@@ -431,6 +485,7 @@ void detail::install_dictionaries(Attachment &context, std::span<const Handle> c
     install(CoreObject::DictType, U"update", variadic, update);
     install(CoreObject::DictType, U"__iter__", unary, iterator<false>);
     install(CoreObject::MappingProxyType, U"__getitem__", pair, proxy_getitem);
+    install(CoreObject::MappingProxyType, U"__contains__", pair, contains<true>);
     install(CoreObject::MappingProxyType, U"__len__", unary, proxy_length);
     install(CoreObject::MappingProxyType, U"__iter__", unary, iterator<true>);
     install(CoreObject::MappingProxyType, U"get", optional, get<true>);

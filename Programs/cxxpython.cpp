@@ -106,8 +106,10 @@ int main(int argc, char **argv)
                 std::cerr << "cannot open " << *filename << '\n';
                 return 2;
             }
-            executable.emplace(
-                SourceBuffer(std::string(std::istreambuf_iterator<char>(file), {}), *filename));
+            std::string text(std::istreambuf_iterator<char>(file), {});
+            if (text.starts_with("\xef\xbb\xbf"))
+                text.erase(0, 3);
+            executable.emplace(SourceBuffer(std::move(text), *filename));
         } else if (command)
             executable.emplace(SourceBuffer(*command, "<string>"));
         if (expression)

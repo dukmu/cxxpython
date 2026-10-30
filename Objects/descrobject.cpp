@@ -1,10 +1,172 @@
-#include "cxxpython/objects.hpp"
+#include "cxxpython/protocol.hpp"
 
 namespace cxxpython::core {
 namespace {
 void type_error(Attachment &context, std::u32string message, ReturnSlot &out)
 {
     raise_error(context, CoreObject::TypeErrorType, std::move(message), out);
+}
+
+bool property_check(Attachment &context, Value value, ReturnSlot &out)
+{
+    if (context.has_layout<PropertyObject>(value) &&
+        is_subtype(context, context.type_of(value), context.builtin(CoreObject::PropertyType)))
+        return true;
+    type_error(context, U"property descriptor requires a property", out);
+    return false;
+}
+void property_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!context.has_layout<TypeObject>(args[0]) ||
+        !is_subtype(context, args[0], context.builtin(CoreObject::PropertyType))) {
+        type_error(context, U"property.__new__ requires a property subtype", out);
+        return;
+    }
+    RootScope roots(context);
+    context.allocate_instance<PropertyObject>(roots.root(args[0]), out);
+}
+void property_init(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!property_check(context, args[0], out))
+        return;
+    auto &property = context.payload<PropertyObject>(args[0]);
+    context.store(args[0], property.getter, args[1]);
+    context.store(args[0], property.setter, args[2]);
+    context.store(args[0], property.deleter, args[3]);
+    RootScope roots(context);
+    auto doc = roots.root(args[4]);
+    ReturnSlot name(context), result(context);
+    if (args[4] == context.builtin(CoreObject::None) &&
+        args[1] != context.builtin(CoreObject::None)) {
+        make_str(context, U"__doc__", name);
+        get_attribute(context, roots.root(args[1]), roots.root(name.value()), result);
+        if (result.tag() == ResultTag::Raised) {
+            if (!is_subtype(context, context.type_of(result.exception()),
+                            context.builtin(CoreObject::AttributeErrorType))) {
+                out.raised(result.exception());
+                return;
+            }
+        } else
+            doc = roots.root(result.value());
+    }
+    context.store(args[0], property.doc, doc.get(context));
+    property.doc_from_getter.store(args[4] == context.builtin(CoreObject::None),
+                                   std::memory_order_relaxed);
+    out.ok(context.builtin(CoreObject::None));
+}
+template <AtomicGcEdge PropertyObject::*Field>
+void property_field(Attachment &context, Value receiver, ReturnSlot &out)
+{
+    if (!property_check(context, receiver, out))
+        return;
+    context.load(receiver, context.payload<PropertyObject>(receiver).*Field, out);
+    if (out.tag() == ResultTag::Empty)
+        out.ok(context.builtin(CoreObject::None));
+}
+void property_doc_set(Attachment &context, Value receiver, std::optional<Value> value,
+                      ReturnSlot &out)
+{
+    if (!property_check(context, receiver, out))
+        return;
+    context.store(receiver, context.payload<PropertyObject>(receiver).doc,
+                  value.value_or(context.builtin(CoreObject::None)));
+    context.payload<PropertyObject>(receiver).doc_from_getter.store(false,
+                                                                    std::memory_order_relaxed);
+    out.ok(context.builtin(CoreObject::None));
+}
+template <AtomicGcEdge PropertyObject::*Field>
+void property_invoke(Attachment &context, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!property_check(context, args[0], out))
+        return;
+    RootScope roots(context);
+    ReturnSlot callback(context);
+    context.load(args[0], context.payload<PropertyObject>(args[0]).*Field, callback);
+    if (callback.tag() == ResultTag::Empty ||
+        callback.value() == context.builtin(CoreObject::None)) {
+        raise_error(context, CoreObject::AttributeErrorType, U"property has no accessor", out);
+        return;
+    }
+    call(context, roots.root(callback.value()), {args.subspan(1), {}}, out);
+}
+void property_get(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (args[1] == context.builtin(CoreObject::None)) {
+        if (property_check(context, args[0], out))
+            out.ok(args[0]);
+        return;
+    }
+    property_invoke<&PropertyObject::getter>(context, args.first(2), out);
+}
+void property_set(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    property_invoke<&PropertyObject::setter>(context, args, out);
+}
+void property_delete(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    property_invoke<&PropertyObject::deleter>(context, args, out);
+}
+template <AtomicGcEdge PropertyObject::*Field>
+void property_clone(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!property_check(context, args[0], out))
+        return;
+    RootScope roots(context);
+    auto self = roots.root(args[0]);
+    ReturnSlot getter(context), setter(context), deleter(context), doc(context);
+    auto &property = context.payload<PropertyObject>(self);
+    context.load(args[0], property.getter, getter);
+    context.load(args[0], property.setter, setter);
+    context.load(args[0], property.deleter, deleter);
+    context.load(args[0], property.doc, doc);
+    const auto none = context.builtin(CoreObject::None);
+    auto value = [&](ReturnSlot &slot) {
+        return slot.tag() == ResultTag::Empty ? none : slot.value();
+    };
+    std::array values{value(getter), value(setter), value(deleter), value(doc)};
+    if constexpr (Field == &PropertyObject::getter) {
+        values[0] = args[1];
+        if (property.doc_from_getter.load(std::memory_order_relaxed))
+            values[3] = none;
+    } else if constexpr (Field == &PropertyObject::setter)
+        values[1] = args[1];
+    else
+        values[2] = args[1];
+    call(context, roots.root(context.type_of(self)), {values, {}}, out);
+}
+void property_abstract(Attachment &context, Value receiver, ReturnSlot &out)
+{
+    if (!property_check(context, receiver, out))
+        return;
+    RootScope roots(context);
+    ReturnSlot callback(context), name(context), result(context), converted(context);
+    make_str(context, U"__isabstractmethod__", name);
+    auto key = roots.root(name.value());
+    for (auto field :
+         {&PropertyObject::getter, &PropertyObject::setter, &PropertyObject::deleter}) {
+        context.load(receiver, context.payload<PropertyObject>(receiver).*field, callback);
+        if (callback.tag() == ResultTag::Empty ||
+            callback.value() == context.builtin(CoreObject::None))
+            continue;
+        get_attribute(context, roots.root(callback.value()), key, result);
+        if (result.tag() == ResultTag::Raised) {
+            if (is_subtype(context, context.type_of(result.exception()),
+                           context.builtin(CoreObject::AttributeErrorType)))
+                continue;
+            out.raised(result.exception());
+            return;
+        }
+        truth(context, roots.root(result.value()), converted);
+        if (converted.tag() == ResultTag::Raised) {
+            out.raised(converted.exception());
+            return;
+        }
+        if (converted.value() == context.builtin(CoreObject::True)) {
+            out.ok(converted.value());
+            return;
+        }
+    }
+    out.ok(context.builtin(CoreObject::False));
 }
 
 GetSetDescriptorObject *descriptor(Attachment &context, Value value, ReturnSlot &out)
@@ -339,6 +501,32 @@ void install_instance_dictionary(Attachment &context, Handle type)
 void install_attribute_descriptors(Attachment &context, std::span<const Handle> core)
 {
     auto at = [&](CoreObject id) { return core[static_cast<std::size_t>(id)]; };
+    RootScope roots(context);
+    auto property_type = at(CoreObject::PropertyType);
+    SignatureLayout property_new_signature;
+    property_new_signature.parameters = {{U"cls", ParameterKind::PositionalOnly}};
+    property_new_signature.varargs = U"args";
+    property_new_signature.varkwargs = U"kwargs";
+    install_native_attribute(context, core, property_type, U"__new__", property_new_signature,
+                             property_new);
+    ReturnSlot wrapper(context);
+    auto function =
+        *name_lookup(context, *TypeView(context, property_type).dictionary(), U"__new__");
+    context.allocate_instance<StaticMethodObject>(at(CoreObject::StaticMethodType), wrapper,
+                                                  function);
+    auto wrapped = roots.root(wrapper.value());
+    context.allocate_instance<StrObject>(at(CoreObject::StrType), wrapper, U"__new__");
+    name_store(context, *TypeView(context, property_type).dictionary(), wrapper.value(),
+               wrapped.get(context));
+    SignatureLayout property_init_signature;
+    const auto none = at(CoreObject::None).get(context);
+    property_init_signature.parameters = {{U"self", ParameterKind::PositionalOnly},
+                                          {U"fget", ParameterKind::PositionalOrKeyword, none},
+                                          {U"fset", ParameterKind::PositionalOrKeyword, none},
+                                          {U"fdel", ParameterKind::PositionalOrKeyword, none},
+                                          {U"doc", ParameterKind::PositionalOrKeyword, none}};
+    install_native_attribute(context, core, property_type, U"__init__", property_init_signature,
+                             property_init);
     SignatureLayout get;
     get.parameters = {{U"self", ParameterKind::PositionalOnly},
                       {U"instance", ParameterKind::PositionalOnly},
@@ -356,8 +544,28 @@ void install_attribute_descriptors(Attachment &context, std::span<const Handle> 
     get.parameters.push_back(
         {U"owner", ParameterKind::PositionalOnly, at(CoreObject::None).get(context)});
     install_native_attribute(context, core, member_type, U"__get__", get, member_get);
-    RootScope roots(context);
+    install_native_attribute(context, core, property_type, U"__get__", get, property_get);
+    get.parameters.pop_back();
+    install_native_attribute(context, core, property_type, U"__delete__", get, property_delete);
+    install_native_attribute(context, core, property_type, U"getter", get,
+                             property_clone<&PropertyObject::getter>);
+    install_native_attribute(context, core, property_type, U"setter", get,
+                             property_clone<&PropertyObject::setter>);
+    install_native_attribute(context, core, property_type, U"deleter", get,
+                             property_clone<&PropertyObject::deleter>);
+    get.parameters.push_back({U"value", ParameterKind::PositionalOnly});
+    install_native_attribute(context, core, property_type, U"__set__", get, property_set);
     auto string_type = at(CoreObject::StrType);
+    install_field(context, descriptor_type, string_type, property_type, U"fget",
+                  property_field<&PropertyObject::getter>, nullptr);
+    install_field(context, descriptor_type, string_type, property_type, U"fset",
+                  property_field<&PropertyObject::setter>, nullptr);
+    install_field(context, descriptor_type, string_type, property_type, U"fdel",
+                  property_field<&PropertyObject::deleter>, nullptr);
+    install_field(context, descriptor_type, string_type, property_type, U"__doc__",
+                  property_field<&PropertyObject::doc>, property_doc_set);
+    install_field(context, descriptor_type, string_type, property_type, U"__isabstractmethod__",
+                  property_abstract, nullptr);
     install_field(context, descriptor_type, string_type, roots.root(context.object_type()),
                   U"__class__", class_get, class_set);
     install_field(context, descriptor_type, string_type, roots.root(context.type_type()),

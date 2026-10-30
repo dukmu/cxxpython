@@ -22,7 +22,7 @@ The accepted source subset includes arbitrary integer/float/string literals,
 implemented unary/arithmetic/boolean/comparison protocols, name/attribute
 operations, if/while/for control flow, calls, function definitions/defaults/variadic
 binding, globals/nonlocal, closures, docstrings, tuple expressions, recursive
-non-starred unpacking and integer/protocol subscripts. Experimental range,
+recursive/starred unpacking and integer/slice/protocol subscripts. Experimental range,
 tuple/string iteration, iter(obj), next(it[, default]) and exception construction
 use ordinary object protocols. Raise/reraise/chaining, try/except/else/finally and
 synchronous with use verified regions and the existing frame scheduler.
@@ -30,14 +30,26 @@ Class definitions and decorators use the existing type/descriptor/call machinery
 with separate class namespaces, lexical forwarding and real __class__ Cells.
 Experimental int/float/tuple constructors use the same ordinary class call and
 descriptor boundary, including Python conversion callbacks and native subclasses.
-Dictionary/list construction/mutation, list displays/non-starred targets and
-import/from/package syntax are experimental implemented slices.
-Other mutable containers, dictionary literals/comprehensions,
-slices, full iteration APIs, super(), exception groups, suspension, f-strings, complex/power protocols,
-full Unicode source handling and the remaining Python 3.12 matrix are
+Dictionary/list displays and comprehensions, conditional/lambda/named expressions,
+assert, expanded calls, power/shift/bitwise protocols, property/attribute builtins,
+Unicode identifiers and f-strings use the existing compiler/VM/protocol path.
+Import/from/package syntax remains an experimental implemented slice.
+Set/bytes/complex execution, full iteration APIs, super(), exception groups,
+suspension, annotations/type parameters, patterns, locale formatting and the
+remaining Python 3.12 matrix are
 unfinished. These are remaining delivery requirements, not a reduction of the
 basic-language objective. Existing native VM/type/cleanup interfaces do not imply
 source or library support.
+
+The independent parser recognizes the fixed complete Python 3.12.14 PEG grammar,
+including those not-yet-executable families. `Grammar/` is the source of truth;
+`Tools/peg_generator/generate.py` uses vendored pegen grammar/SCC analysis and
+emits checked-in C++ rules. Ordinary parser builds link only the standard library.
+It accepts UTF-8 Unicode source; file encoding-cookie decoding is a loader gate.
+The CST adapter in `Parser/ast.cpp` is not a grammar recognizer. The previous
+handwritten parser and its dedicated parser tests have been removed; compiler,
+execution and precise-root tests remain on the new frontend. The native parser's
+generic syntax errors do not claim CPython's invalid_* second-pass wording.
 
 ## Experimental Module Foundation
 
@@ -140,7 +152,7 @@ key aliases there are not a completed compatibility gate. Remaining canonical
 writes in the import/VM setup paths initialize newly private/bootstrap mappings;
 they do not read an alternative public module registry.
 fromkeys/popitem/union/reversed, view set operations, set and remaining source
-container syntax are still pending; this slice does not complete M3.
+remaining mapping APIs are still pending; this slice does not complete M3.
 
 ## Mutable Lists And Iteration
 
@@ -170,9 +182,15 @@ IndexError/StopIteration; explicit __iter__ = None still prevents iteration.
 BUILD_LIST has a count operand and n-input/1-output stack effect, is verified and
 disassembled normally, can allocate/raise, and keeps its operands traced until
 construction succeeds. List displays, nested lists, function defaults and
-non-starred assignment/delete/for targets use the existing scope/CFG pipeline.
-Slices, starred displays/targets, comprehensions, sort/reversed, iterator hints
-and the complete direct-special-method matrix remain gates, not placeholder APIs.
+assignment/delete/for targets use the existing scope/CFG pipeline. Starred displays
+and calls build private list/dict buffers through verified append/extend/merge
+instructions; duplicate keyword detection precedes the ordinary call binder.
+Slice objects retain three immutable traced fields and follow Python 3.12's
+conditional hashability. Sequence conversion callbacks precede length observation;
+list replacements materialize inputs before prepared short local commits.
+List/dict comprehensions preserve lexical isolation and outer walrus bindings.
+Sort/reversed, iterator hints and the complete direct-special-method matrix remain
+gates, not placeholder APIs.
 
 ## C Extension ABI V1
 
@@ -464,10 +482,10 @@ The / and /= source forms use the existing BINARY/INPLACE instructions and their
 __truediv__/__rtruediv__/__itruediv__ slots. No new VM execution path is introduced.
 
 These are experimental numeric slices, not complete numeric support.
-Complex/power and remaining integer/float method matrices, bytes/buffer numeric
+Complex values, modular power and remaining integer/float method matrices, bytes/buffer numeric
 construction, decimal conversion length limits and conversion warnings remain.
 The experimental dictionary slice is specified above. Its remaining API matrix,
-list/set construction, protocols and source container syntax remain gates.
+set construction/protocols and remaining source container features remain gates.
 
 ## Source Exceptions And Cleanup
 

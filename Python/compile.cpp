@@ -138,6 +138,54 @@ class GraphPass final {
         current().instructions.back().function = child;
         emit(Opcode::MakeFunction, span, flags | (!freevars.empty() ? 4 : 0));
     }
+    void function_value(const FunctionStmt &node, Span span)
+    {
+        nested(node.scope, node.body, &node);
+        std::uint32_t defaults = 0;
+        std::vector<std::u32string> keywords;
+        for (const auto &parameter : node.parameters)
+            if (parameter.default_value && parameter.kind != ParameterKind::KeywordOnly) {
+                expression(*parameter.default_value);
+                ++defaults;
+            }
+        if (defaults)
+            emit(Opcode::BuildTuple, span, defaults);
+        for (const auto &parameter : node.parameters)
+            if (parameter.default_value && parameter.kind == ParameterKind::KeywordOnly) {
+                expression(*parameter.default_value);
+                keywords.push_back(parameter.name);
+            }
+        if (!keywords.empty()) {
+            emit(Opcode::BuildNameDict, span);
+            current().instructions.back().keywords = keywords;
+        }
+        make_function(node.scope, span, (defaults ? 1 : 0) | (!keywords.empty() ? 2 : 0));
+    }
+    void sequence(const std::vector<ExprPtr> &items, Span span, bool tuple)
+    {
+        const bool unpack = std::any_of(items.begin(), items.end(), [](const auto &item) {
+            return std::holds_alternative<StarredExpr>(item->node);
+        });
+        if (!unpack) {
+            for (const auto &item : items)
+                expression(*item);
+            emit(tuple ? Opcode::BuildTuple : Opcode::BuildList, span,
+                 static_cast<std::uint32_t>(items.size()));
+            return;
+        }
+        emit(Opcode::BuildList, span);
+        for (const auto &item : items) {
+            if (const auto *star = std::get_if<StarredExpr>(&item->node)) {
+                expression(*star->value);
+                emit(Opcode::ListExtend, item->span);
+            } else {
+                expression(*item);
+                emit(Opcode::ListAppend, item->span);
+            }
+        }
+        if (tuple)
+            emit(Opcode::ListToTuple, span);
+    }
     void test(const Expr &value, std::size_t yes, std::size_t no, bool preserve = false)
     {
         // Jump-context lowering must not repeat an observable __bool__.
@@ -208,14 +256,79 @@ class GraphPass final {
                     expression(*node.object);
                     emit(Opcode::LoadAttr, value.span, 0, node.name);
                 } else if constexpr (std::is_same_v<T, TupleExpr> || std::is_same_v<T, ListExpr>) {
-                    for (const auto &item : node.items)
-                        expression(*item);
-                    emit(std::is_same_v<T, TupleExpr> ? Opcode::BuildTuple : Opcode::BuildList,
-                         value.span, static_cast<std::uint32_t>(node.items.size()));
+                    sequence(node.items, value.span, std::is_same_v<T, TupleExpr>);
+                } else if constexpr (std::is_same_v<T, DictExpr>) {
+                    std::uint32_t pending = 0;
+                    bool built = false;
+                    auto flush = [&] {
+                        if (!pending && built)
+                            return;
+                        emit(Opcode::BuildMap, value.span, pending);
+                        if (built)
+                            emit(Opcode::DictUpdate, value.span);
+                        built = true;
+                        pending = 0;
+                    };
+                    for (const auto &[key, item] : node.items) {
+                        if (key) {
+                            expression(*key);
+                            expression(*item);
+                            ++pending;
+                        } else {
+                            flush();
+                            expression(*item);
+                            emit(Opcode::DictUpdate, item->span);
+                        }
+                    }
+                    flush();
+                } else if constexpr (std::is_same_v<T, NamedExpr>) {
+                    expression(*node.value);
+                    emit(Opcode::DupTop, value.span);
+                    store(*node.target);
+                } else if constexpr (std::is_same_v<T, ConditionalExpr>) {
+                    const auto yes = block(), no = block(), done = block();
+                    test(*node.test, yes, no);
+                    select(yes);
+                    expression(*node.body);
+                    jump(done, value.span);
+                    select(no);
+                    expression(*node.alternative);
+                    jump(done, value.span);
+                    select(done);
+                } else if constexpr (std::is_same_v<T, LambdaExpr>) {
+                    function_value(*node.function, value.span);
+                } else if constexpr (std::is_same_v<T, ComprehensionExpr>) {
+                    function_value(*node.function, value.span);
+                    expression(*node.iterable);
+                    emit(Opcode::GetIter, value.span);
+                    emit(Opcode::Call, value.span, 1);
+                } else if constexpr (std::is_same_v<T, StarredExpr>) {
+                    error(value.span, "starred expression cannot be used here");
                 } else if constexpr (std::is_same_v<T, SubscriptExpr>) {
                     expression(*node.object);
                     expression(*node.key);
                     emit(Opcode::LoadItem, value.span);
+                } else if constexpr (std::is_same_v<T, SliceExpr>) {
+                    for (const auto *item : {&node.start, &node.stop, &node.step}) {
+                        if (*item)
+                            expression(**item);
+                        else
+                            none(value.span);
+                    }
+                    emit(Opcode::BuildSlice, value.span);
+                } else if constexpr (std::is_same_v<T, JoinedStrExpr>) {
+                    for (const auto &item : node.items)
+                        expression(*item);
+                    emit(Opcode::BuildString, value.span,
+                         static_cast<std::uint32_t>(node.items.size()));
+                } else if constexpr (std::is_same_v<T, FormattedExpr>) {
+                    expression(*node.value);
+                    expression(*node.spec);
+                    emit(Opcode::FormatValue, value.span,
+                         node.conversion == 's'   ? 1
+                         : node.conversion == 'r' ? 2
+                         : node.conversion == 'a' ? 3
+                                                  : 0);
                 } else if constexpr (std::is_same_v<T, BoolExpr>) {
                     const auto right = block(), done = block();
                     test(*node.left, node.conjunction ? right : done,
@@ -252,6 +365,27 @@ class GraphPass final {
                     select(done);
                 } else if constexpr (std::is_same_v<T, CallExpr>) {
                     expression(*node.target);
+                    const bool unpack =
+                        std::any_of(node.positional.begin(), node.positional.end(),
+                                    [](const auto &item) {
+                                        return std::holds_alternative<StarredExpr>(item->node);
+                                    }) ||
+                        std::any_of(node.keywords.begin(), node.keywords.end(),
+                                    [](const auto &item) { return item.first.empty(); });
+                    if (unpack) {
+                        sequence(node.positional, value.span, true);
+                        emit(Opcode::BuildMap, value.span);
+                        for (const auto &[name, item] : node.keywords) {
+                            if (!name.empty())
+                                literal({Literal::Kind::String, name}, item->span);
+                            expression(*item);
+                            if (!name.empty())
+                                emit(Opcode::BuildMap, item->span, 1);
+                            emit(Opcode::DictMerge, item->span);
+                        }
+                        emit(Opcode::CallEx, value.span);
+                        return;
+                    }
                     for (const auto &item : node.positional)
                         expression(*item);
                     for (const auto &item : node.keywords)
@@ -267,19 +401,34 @@ class GraphPass final {
     }
     void store(const Expr &target, bool erase = false)
     {
+        auto unpack = [&](const auto &items) {
+            auto star = std::find_if(items.begin(), items.end(), [](const auto &item) {
+                return std::holds_alternative<StarredExpr>(item->node);
+            });
+            if (star == items.end())
+                emit(Opcode::UnpackSequence, target.span, static_cast<std::uint32_t>(items.size()));
+            else {
+                const auto before = static_cast<std::size_t>(star - items.begin());
+                const auto after = items.size() - before - 1;
+                if (before > 65535 || after > 65535)
+                    error(target.span, "too many expressions in star-unpacking assignment");
+                emit(Opcode::UnpackEx, target.span,
+                     static_cast<std::uint32_t>(before | (after << 16)));
+            }
+        };
         if (const auto *tuple = std::get_if<TupleExpr>(&target.node)) {
             if (!erase)
-                emit(Opcode::UnpackSequence, target.span,
-                     static_cast<std::uint32_t>(tuple->items.size()));
+                unpack(tuple->items);
             for (const auto &item : tuple->items)
                 store(*item, erase);
         } else if (const auto *list = std::get_if<ListExpr>(&target.node)) {
             if (!erase)
-                emit(Opcode::UnpackSequence, target.span,
-                     static_cast<std::uint32_t>(list->items.size()));
+                unpack(list->items);
             for (const auto &item : list->items)
                 store(*item, erase);
-        } else if (const auto *entry = std::get_if<NameExpr>(&target.node))
+        } else if (const auto *star = std::get_if<StarredExpr>(&target.node))
+            store(*star->value, erase);
+        else if (const auto *entry = std::get_if<NameExpr>(&target.node))
             name(entry->name, target.span, erase ? Opcode::DeleteFast : Opcode::StoreFast,
                  erase ? Opcode::DeleteGlobal : Opcode::StoreGlobal);
         else if (const auto *item = std::get_if<SubscriptExpr>(&target.node)) {
@@ -481,7 +630,8 @@ class GraphPass final {
                         select(done);
                     } else if constexpr (std::is_same_v<T, ForStmt>) {
                         expression(*node.iterable);
-                        emit(Opcode::GetIter, span);
+                        if (!node.iterator_ready)
+                            emit(Opcode::GetIter, span);
                         const auto test = block(), body = block(), exhausted = block(),
                                    broken = block(), done = block();
                         const auto loop = region(RegionKind::Loop, span, test, broken);
@@ -562,34 +712,31 @@ class GraphPass final {
                              span, static_cast<std::uint32_t>(loops_.back()));
                         current().exit = FlowBlock::Exit::Stop;
                     } else if constexpr (std::is_same_v<T, FunctionStmt>) {
-                        nested(node.scope, node.body, &node);
                         for (const auto &decorator : node.decorators)
                             expression(*decorator);
-                        std::uint32_t defaults = 0;
-                        std::vector<std::u32string> keywords;
-                        for (const auto &parameter : node.parameters)
-                            if (parameter.default_value &&
-                                parameter.kind != ParameterKind::KeywordOnly) {
-                                expression(*parameter.default_value);
-                                ++defaults;
-                            }
-                        if (defaults)
-                            emit(Opcode::BuildTuple, span, defaults);
-                        for (const auto &parameter : node.parameters)
-                            if (parameter.default_value &&
-                                parameter.kind == ParameterKind::KeywordOnly) {
-                                expression(*parameter.default_value);
-                                keywords.push_back(parameter.name);
-                            }
-                        if (!keywords.empty()) {
-                            emit(Opcode::BuildNameDict, span);
-                            current().instructions.back().keywords = keywords;
-                        }
-                        make_function(node.scope, span,
-                                      (defaults ? 1 : 0) | (!keywords.empty() ? 2 : 0));
+                        function_value(node, span);
                         for (std::size_t i = 0; i < node.decorators.size(); ++i)
                             emit(Opcode::Call, span, 1);
                         name(node.binding, span, Opcode::StoreFast, Opcode::StoreGlobal);
+                    } else if constexpr (std::is_same_v<T, AssertStmt>) {
+                        const auto done = block(), failed = block();
+                        test(*node.test, done, failed);
+                        select(failed);
+                        emit(Opcode::LoadAssertionError, span);
+                        if (node.message)
+                            expression(*node.message);
+                        emit(Opcode::Call, span, node.message ? 1 : 0);
+                        emit(Opcode::RaiseInstance, span);
+                        current().exit = FlowBlock::Exit::Stop;
+                        select(done);
+                    } else if constexpr (std::is_same_v<T, CollectionAddStmt>) {
+                        expression(*node.collection);
+                        if (node.key)
+                            expression(*node.key);
+                        expression(*node.value);
+                        emit(node.key ? Opcode::StoreItem : Opcode::ListAppend, span);
+                        if (!node.key)
+                            emit(Opcode::PopTop, span);
                     } else if constexpr (std::is_same_v<T, ImportStmt>) {
                         auto level = std::to_string(node.level);
                         if (node.module) {
@@ -650,13 +797,45 @@ class GraphPass final {
                         emit(Opcode::LoadBuildClass, span);
                         make_function(node.scope, span);
                         literal({Literal::Kind::String, node.name}, span);
-                        for (const auto &base : node.bases)
-                            expression(*base);
-                        for (const auto &keyword : node.keywords)
-                            expression(*keyword.second);
-                        emit(Opcode::Call, span, static_cast<std::uint32_t>(node.bases.size() + 2));
-                        for (const auto &keyword : node.keywords)
-                            current().instructions.back().keywords.push_back(keyword.first);
+                        const bool unpack =
+                            std::any_of(node.bases.begin(), node.bases.end(),
+                                        [](const auto &base) {
+                                            return std::holds_alternative<StarredExpr>(base->node);
+                                        }) ||
+                            std::any_of(node.keywords.begin(), node.keywords.end(),
+                                        [](const auto &keyword) { return keyword.first.empty(); });
+                        if (unpack) {
+                            emit(Opcode::BuildList, span, 2);
+                            for (const auto &base : node.bases) {
+                                if (const auto *star = std::get_if<StarredExpr>(&base->node)) {
+                                    expression(*star->value);
+                                    emit(Opcode::ListExtend, base->span);
+                                } else {
+                                    expression(*base);
+                                    emit(Opcode::ListAppend, base->span);
+                                }
+                            }
+                            emit(Opcode::ListToTuple, span);
+                            emit(Opcode::BuildMap, span);
+                            for (const auto &[name, item] : node.keywords) {
+                                if (!name.empty())
+                                    literal({Literal::Kind::String, name}, item->span);
+                                expression(*item);
+                                if (!name.empty())
+                                    emit(Opcode::BuildMap, item->span, 1);
+                                emit(Opcode::DictMerge, item->span);
+                            }
+                            emit(Opcode::CallEx, span);
+                        } else {
+                            for (const auto &base : node.bases)
+                                expression(*base);
+                            for (const auto &keyword : node.keywords)
+                                expression(*keyword.second);
+                            emit(Opcode::Call, span,
+                                 static_cast<std::uint32_t>(node.bases.size() + 2));
+                            for (const auto &keyword : node.keywords)
+                                current().instructions.back().keywords.push_back(keyword.first);
+                        }
                         for (std::size_t i = 0; i < node.decorators.size(); ++i)
                             emit(Opcode::Call, span, 1);
                         name(node.binding, span, Opcode::StoreFast, Opcode::StoreGlobal);
@@ -727,9 +906,10 @@ void literal(Attachment &context, const Literal &value, ReturnSlot &out)
         return;
     }
     if (value.kind != Literal::Kind::Integer) {
-        out.ok(context.builtin(value.kind == Literal::Kind::None   ? CoreObject::None
-                               : value.kind == Literal::Kind::True ? CoreObject::True
-                                                                   : CoreObject::False));
+        out.ok(context.builtin(value.kind == Literal::Kind::Ellipsis ? CoreObject::Ellipsis
+                               : value.kind == Literal::Kind::None   ? CoreObject::None
+                               : value.kind == Literal::Kind::True   ? CoreObject::True
+                                                                     : CoreObject::False));
         return;
     }
     boost::multiprecision::cpp_int number = 0;

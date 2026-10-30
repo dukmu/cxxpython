@@ -8,6 +8,19 @@
 #include <unordered_map>
 
 namespace cxxpython::core {
+struct PropertyObject {
+    ObjectHeader header;
+    AtomicGcEdge getter, setter, deleter, doc;
+    std::atomic<bool> doc_from_getter{false};
+    explicit PropertyObject(InitialType head) : header(head) {}
+    void trace(Tracer &tracer) const noexcept
+    {
+        tracer.visit(getter);
+        tracer.visit(setter);
+        tracer.visit(deleter);
+        tracer.visit(doc);
+    }
+};
 // Value/call buffers are immutable after construction. Shared mutable
 // references are atomic edges; load them into a caller-owned ReturnSlot.
 struct NoneObject {
@@ -72,6 +85,21 @@ struct ListObject {
     }
 };
 void make_list(Attachment &, std::span<const Value>, ReturnSlot &);
+
+struct SliceObject {
+    ObjectHeader header;
+    const Value start, stop, step;
+    SliceObject(InitialType head, Value start, Value stop, Value step)
+        : header(head), start(start), stop(stop), step(step)
+    {}
+    void trace(Tracer &tracer) const noexcept
+    {
+        tracer.visit(start);
+        tracer.visit(stop);
+        tracer.visit(step);
+    }
+};
+void make_slice(Attachment &, Handle start, Handle stop, Handle step, ReturnSlot &);
 
 struct RangeObject {
     ObjectHeader header;
@@ -386,6 +414,9 @@ ResultView set_attribute(Attachment &context, Handle object, Handle name, Handle
 ResultView del_attribute(Attachment &context, Handle object, Handle name, ReturnSlot &out);
 
 namespace detail {
+void list_append(Attachment &, Handle, Handle, ReturnSlot &);
+void list_extend(Attachment &, Handle, Handle, ReturnSlot &);
+void dict_merge(Attachment &, Handle, Handle, bool unique, ReturnSlot &);
 constexpr auto core_count = static_cast<std::size_t>(CoreObject::Count);
 void build_core_objects(Attachment &context, std::span<ReturnSlot *const> outputs);
 std::optional<Value> name_lookup(Attachment &context, Value dictionary, const std::u32string &name);
@@ -400,6 +431,18 @@ void discard_name_table(Attachment &context, Value dictionary);
 std::int64_t name_hash(Attachment &, const std::u32string &);
 void install_dictionaries(Attachment &, std::span<const Handle>);
 void install_lists(Attachment &, std::span<const Handle>);
+void install_slices(Attachment &, std::span<const Handle>);
+struct SliceIndices {
+    std::int64_t start, stop, step, length;
+};
+struct SliceBounds {
+    std::int64_t start, stop, step;
+    SliceIndices adjust(std::size_t length) const noexcept;
+};
+// Convert callbacks once, before a mutable sequence's length/storage is locked.
+bool unpack_slice(Attachment &, Handle slice, SliceBounds &, ReturnSlot &);
+// Arbitrary-integer normalization used by slice.indices and range slicing.
+void slice_indices(Attachment &, Handle slice, Handle length, ReturnSlot &);
 std::size_t list_size(Attachment &, Handle);
 void list_item(Attachment &, Handle, std::size_t, ReturnSlot &);
 void list_snapshot(Attachment &, Handle, RootScope &, std::vector<Value> &);

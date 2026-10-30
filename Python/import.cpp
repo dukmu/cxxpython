@@ -231,6 +231,8 @@ std::shared_ptr<const ModuleDefinition> find_file(Attachment &context, const std
                              std::istreambuf_iterator<char>()};
             if (stream.bad())
                 throw std::ios_base::failure("cannot read module source");
+            if (text.starts_with("\xef\xbb\xbf"))
+                text.erase(0, 3);
             const auto origin = selected.string();
             auto source = std::make_shared<const SourceUnit>(SourceBuffer(std::move(text), origin));
             result = std::make_shared<const ModuleDefinition>(ModuleDefinition{

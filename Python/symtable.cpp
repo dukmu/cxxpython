@@ -144,6 +144,8 @@ class ScopePass final {
     {
         const auto id = bindings_.size();
         bindings_.emplace_back();
+        comprehensions_.push_back(false);
+        iteration_names_.emplace_back();
         private_names_.push_back(parent ? private_names_[*parent] : std::u32string{});
         program_.scopes.push_back(
             {kind, std::move(name), std::move(qualname), parent, span, {}, {}, {}, {}});
@@ -171,9 +173,51 @@ class ScopePass final {
                     bindings_[scope].get(node.name, value.span).used = true;
                     if (node.name == U"super" && program_.scopes[scope].kind == ScopeKind::Function)
                         bindings_[scope].get(U"__class__", value.span).used = true;
-                } else if constexpr (std::is_same_v<T, UnaryExpr>)
+                } else if constexpr (std::is_same_v<T, UnaryExpr> || std::is_same_v<T, StarredExpr>)
                     expression(*node.value, scope);
-                else if constexpr (std::is_same_v<T, BinaryExpr> || std::is_same_v<T, BoolExpr>) {
+                else if constexpr (std::is_same_v<T, ConditionalExpr>) {
+                    expression(*node.test, scope);
+                    expression(*node.body, scope);
+                    expression(*node.alternative, scope);
+                } else if constexpr (std::is_same_v<T, NamedExpr>) {
+                    if (comprehension_iterable_)
+                        error(value.span, "assignment expression cannot be used in a comprehension "
+                                          "iterable expression");
+                    expression(*node.value, scope);
+                    auto owner = scope;
+                    const auto &name = std::get<NameExpr>(node.target->node).name;
+                    while (comprehensions_[owner]) {
+                        if (std::find(iteration_names_[owner].begin(),
+                                      iteration_names_[owner].end(),
+                                      mangle(name, owner)) != iteration_names_[owner].end())
+                            error(value.span, "assignment expression cannot rebind comprehension "
+                                              "iteration variable");
+                        owner = *program_.scopes[owner].parent;
+                    }
+                    if (owner != scope) {
+                        if (program_.scopes[owner].kind == ScopeKind::Class)
+                            error(value.span, "assignment expression within a comprehension cannot "
+                                              "be used in a class body");
+                        auto &entry = bindings_[scope].get(mangle(name, scope), value.span);
+                        entry.global = program_.scopes[owner].kind == ScopeKind::Module;
+                        entry.nonlocal = !entry.global;
+                        auto &outer = bindings_[owner].get(mangle(name, owner), value.span);
+                        if (outer.global || outer.nonlocal) {
+                            entry.global = outer.global;
+                            entry.nonlocal = outer.nonlocal;
+                        } else
+                            outer.bound = true;
+                        std::get<NameExpr>(node.target->node).name = mangle(name, scope);
+                    } else
+                        target(*node.target, scope);
+                } else if constexpr (std::is_same_v<T, LambdaExpr>)
+                    function(*node.function, scope, value.span);
+                else if constexpr (std::is_same_v<T, ComprehensionExpr>) {
+                    ++comprehension_iterable_;
+                    expression(*node.iterable, scope);
+                    --comprehension_iterable_;
+                    function(*node.function, scope, value.span);
+                } else if constexpr (std::is_same_v<T, BinaryExpr> || std::is_same_v<T, BoolExpr>) {
                     expression(*node.left, scope);
                     expression(*node.right, scope);
                 } else if constexpr (std::is_same_v<T, CompareExpr>) {
@@ -192,9 +236,28 @@ class ScopePass final {
                 } else if constexpr (std::is_same_v<T, TupleExpr> || std::is_same_v<T, ListExpr>) {
                     for (const auto &item : node.items)
                         expression(*item, scope);
+                } else if constexpr (std::is_same_v<T, DictExpr>) {
+                    for (const auto &[key, item] : node.items) {
+                        if (key)
+                            expression(*key, scope);
+                        expression(*item, scope);
+                    }
                 } else if constexpr (std::is_same_v<T, SubscriptExpr>) {
                     expression(*node.object, scope);
                     expression(*node.key, scope);
+                } else if constexpr (std::is_same_v<T, SliceExpr>) {
+                    if (node.start)
+                        expression(*node.start, scope);
+                    if (node.stop)
+                        expression(*node.stop, scope);
+                    if (node.step)
+                        expression(*node.step, scope);
+                } else if constexpr (std::is_same_v<T, JoinedStrExpr>) {
+                    for (const auto &item : node.items)
+                        expression(*item, scope);
+                } else if constexpr (std::is_same_v<T, FormattedExpr>) {
+                    expression(*node.value, scope);
+                    expression(*node.spec, scope);
                 } else
                     static_assert(std::is_same_v<T, Literal>, "scope traversal missing expression");
             },
@@ -202,7 +265,9 @@ class ScopePass final {
     }
     void target(Expr &value, std::size_t scope, bool read = false)
     {
-        if (const auto *tuple = std::get_if<TupleExpr>(&value.node)) {
+        if (const auto *star = std::get_if<StarredExpr>(&value.node)) {
+            target(*star->value, scope, read);
+        } else if (const auto *tuple = std::get_if<TupleExpr>(&value.node)) {
             for (const auto &item : tuple->items)
                 target(*item, scope, read);
         } else if (const auto *list = std::get_if<ListExpr>(&value.node)) {
@@ -222,6 +287,57 @@ class ScopePass final {
             auto &attribute = std::get<AttributeExpr>(value.node);
             expression(*attribute.object, scope);
             attribute.name = mangle(std::move(attribute.name), scope);
+        }
+    }
+    void function(FunctionStmt &node, std::size_t scope, Span span)
+    {
+        for (const auto &decorator : node.decorators)
+            expression(*decorator, scope);
+        for (const auto &parameter : node.parameters)
+            if (parameter.default_value)
+                expression(*parameter.default_value, scope);
+        node.scope = add(ScopeKind::Function, node.name, qualified(node.name, scope), scope, span);
+        comprehensions_[node.scope] = node.comprehension;
+        if (node.comprehension)
+            iteration_targets(node.body, node.scope);
+        for (auto &parameter : node.parameters) {
+            parameter.name = mangle(std::move(parameter.name), node.scope);
+            auto &entry = bindings_[node.scope].get(parameter.name, parameter.span);
+            if (entry.parameter)
+                error(parameter.span, "duplicate parameter name");
+            entry.bound = entry.parameter = true;
+        }
+        for (auto *name : {&node.varargs, &node.varkwargs})
+            if (*name) {
+                **name = mangle(std::move(**name), node.scope);
+                auto &entry = bindings_[node.scope].get(**name, span);
+                if (entry.parameter)
+                    error(span, "duplicate parameter name");
+                entry.bound = entry.parameter = true;
+            }
+        collect(node.body, node.scope);
+    }
+    void iteration_target(const Expr &item, std::size_t scope)
+    {
+        if (const auto *name = std::get_if<NameExpr>(&item.node))
+            iteration_names_[scope].push_back(mangle(name->name, scope));
+        else if (const auto *star = std::get_if<StarredExpr>(&item.node))
+            iteration_target(*star->value, scope);
+        else if (const auto *tuple = std::get_if<TupleExpr>(&item.node))
+            for (const auto &child : tuple->items)
+                iteration_target(*child, scope);
+        else if (const auto *list = std::get_if<ListExpr>(&item.node))
+            for (const auto &child : list->items)
+                iteration_target(*child, scope);
+    }
+    void iteration_targets(const Suite &body, std::size_t scope)
+    {
+        for (const auto &statement : body) {
+            if (const auto *loop = std::get_if<ForStmt>(&statement->node)) {
+                iteration_target(*loop->target, scope);
+                iteration_targets(loop->body, scope);
+            } else if (const auto *filter = std::get_if<IfStmt>(&statement->node))
+                iteration_targets(filter->body, scope);
         }
     }
     void collect(Suite &body, std::size_t scope)
@@ -249,7 +365,12 @@ class ScopePass final {
                         collect(node.alternative, scope);
                     } else if constexpr (std::is_same_v<T, ForStmt>) {
                         target(*node.target, scope);
+                        if (comprehensions_[scope]) {
+                            ++comprehension_iterable_;
+                        }
                         expression(*node.iterable, scope);
+                        if (comprehensions_[scope])
+                            --comprehension_iterable_;
                         collect(node.body, scope);
                         collect(node.alternative, scope);
                     } else if constexpr (std::is_same_v<T, ReturnStmt>) {
@@ -260,6 +381,15 @@ class ScopePass final {
                             expression(*node.exception, scope);
                         if (node.cause)
                             expression(*node.cause, scope);
+                    } else if constexpr (std::is_same_v<T, AssertStmt>) {
+                        expression(*node.test, scope);
+                        if (node.message)
+                            expression(*node.message, scope);
+                    } else if constexpr (std::is_same_v<T, CollectionAddStmt>) {
+                        expression(*node.collection, scope);
+                        if (node.key)
+                            expression(*node.key, scope);
+                        expression(*node.value, scope);
                     } else if constexpr (std::is_same_v<T, TryStmt>) {
                         collect(node.body, scope);
                         for (auto &handler : node.handlers) {
@@ -321,29 +451,7 @@ class ScopePass final {
                             error(statement->span, "cannot assign __debug__");
                         node.binding = mangle(node.name, scope);
                         bindings_[scope].get(node.binding, statement->span).bound = true;
-                        for (const auto &decorator : node.decorators)
-                            expression(*decorator, scope);
-                        for (const auto &parameter : node.parameters)
-                            if (parameter.default_value)
-                                expression(*parameter.default_value, scope);
-                        node.scope = add(ScopeKind::Function, node.name,
-                                         qualified(node.name, scope), scope, statement->span);
-                        for (auto &parameter : node.parameters) {
-                            parameter.name = mangle(std::move(parameter.name), node.scope);
-                            auto &entry = bindings_[node.scope].get(parameter.name, parameter.span);
-                            if (entry.parameter)
-                                error(parameter.span, "duplicate parameter name");
-                            entry.bound = entry.parameter = true;
-                        }
-                        for (auto *name : {&node.varargs, &node.varkwargs})
-                            if (*name) {
-                                **name = mangle(std::move(**name), node.scope);
-                                auto &entry = bindings_[node.scope].get(**name, statement->span);
-                                if (entry.parameter)
-                                    error(statement->span, "duplicate parameter name");
-                                entry.bound = entry.parameter = true;
-                            }
-                        collect(node.body, node.scope);
+                        function(node, scope, statement->span);
                     } else if constexpr (std::is_same_v<T, ClassStmt>) {
                         if (node.name == U"__debug__")
                             error(statement->span, "cannot assign __debug__");
@@ -370,6 +478,9 @@ class ScopePass final {
     Suite &body_;
     std::vector<ScopeBindings> bindings_;
     std::vector<std::u32string> private_names_;
+    std::vector<bool> comprehensions_;
+    std::vector<std::vector<std::u32string>> iteration_names_;
+    std::size_t comprehension_iterable_ = 0;
 };
 
 } // namespace

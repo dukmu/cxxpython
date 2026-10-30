@@ -1,6 +1,7 @@
 #include "cxxpython/protocol.hpp"
 
 #include <algorithm>
+#include <deque>
 #include <limits>
 
 namespace cxxpython::core {
@@ -214,6 +215,183 @@ void insert(Attachment &context, Handle, std::span<const Value> args, ReturnSlot
     out.ok(context.builtin(CoreObject::None));
 }
 enum class ItemOperation { Get, Set, Delete, Pop };
+void prepare_roots(Attachment &context, std::deque<ReturnSlot> &slots, std::size_t count)
+{
+    while (slots.size() < count)
+        slots.emplace_back(context);
+}
+void sliced_items(Attachment &context, Handle self, const detail::SliceBounds &bounds,
+                  ReturnSlot &out)
+{
+    auto &data = *context.payload<ListObject>(self).contents;
+    std::deque<ReturnSlot> slots;
+    std::size_t wanted = 0, count = 0;
+    for (;;) {
+        if (locked(context, data, [&] {
+                const auto selected = bounds.adjust(data.items.size());
+                wanted = static_cast<std::size_t>(selected.length);
+                if (wanted > slots.size())
+                    return false;
+                auto position = selected.start;
+                for (std::size_t i = 0; i < wanted; ++i) {
+                    slots[i].ok(data.items[position]);
+                    if (i + 1 < wanted)
+                        position += selected.step;
+                }
+                count = wanted;
+                return true;
+            }))
+            break;
+        prepare_roots(context, slots, wanted);
+    }
+    std::vector<Value> values;
+    values.reserve(count);
+    for (std::size_t i = 0; i < count; ++i)
+        values.push_back(slots[i].value());
+    make_list(context, values, out);
+}
+bool replacement_items(Attachment &context, Handle self, Handle source, RootScope &roots,
+                       std::vector<Value> &values, ReturnSlot &out)
+{
+    const auto type = context.type_of(source);
+    if (self.get(context) == source.get(context) || type == context.builtin(CoreObject::ListType)) {
+        detail::list_snapshot(context, source, roots, values);
+        return true;
+    }
+    if (type == context.builtin(CoreObject::TupleType)) {
+        const auto &items = context.payload<TupleObject>(source).items;
+        values.assign(items.begin(), items.end());
+        return true;
+    }
+    ReturnSlot iterator(context), value(context);
+    get_iter(context, source, iterator);
+    if (failed(iterator)) {
+        out.raised(iterator.exception());
+        return false;
+    }
+    const auto input = roots.root(iterator.value());
+    // PySequence_Fast materializes the iterator through the normal list path.
+    get_iter(context, input, iterator);
+    if (failed(iterator)) {
+        out.raised(iterator.exception());
+        return false;
+    }
+    const auto it = roots.root(iterator.value());
+    const auto hint = detail::length_hint(context, input, out);
+    if (!hint)
+        return false;
+    if (*hint > values.max_size())
+        throw std::bad_alloc();
+    values.reserve(*hint);
+    for (;;) {
+        const auto status = iter_next(context, it, value);
+        if (status == NextStatus::Done)
+            return true;
+        if (status == NextStatus::Raised) {
+            out.raised(value.exception());
+            return false;
+        }
+        values.push_back(roots.root(value.value()).get(context));
+    }
+}
+template <ItemOperation Operation>
+void slice_item(Attachment &context, Handle self, Handle key, std::optional<Handle> source,
+                ReturnSlot &out)
+{
+    detail::SliceBounds bounds;
+    if (!detail::unpack_slice(context, key, bounds, out))
+        return;
+    if constexpr (Operation == ItemOperation::Get) {
+        sliced_items(context, self, bounds, out);
+        return;
+    }
+    RootScope roots(context);
+    std::vector<Value> replacement, prepared;
+    if constexpr (Operation == ItemOperation::Set)
+        if (!replacement_items(context, self, *source, roots, replacement, out))
+            return;
+    auto &data = *context.payload<ListObject>(self).contents;
+    enum class Commit { Done, Grow, Mismatch };
+    std::size_t needed = 0, selected_size = 0;
+    for (;;) {
+        const auto result = locked(context, data, [&] {
+            auto &items = data.items;
+            const auto selected = bounds.adjust(items.size());
+            selected_size = static_cast<std::size_t>(selected.length);
+            if constexpr (Operation == ItemOperation::Set) {
+                if (selected.step != 1) {
+                    if (replacement.size() != selected_size)
+                        return Commit::Mismatch;
+                    auto position = selected.start;
+                    for (std::size_t i = 0; i < replacement.size(); ++i) {
+                        items[position] = replacement[i];
+                        if (i + 1 < replacement.size())
+                            position += selected.step;
+                    }
+                    return Commit::Done;
+                }
+                const auto remaining = items.size() - selected_size;
+                if (replacement.size() > items.max_size() - remaining)
+                    throw std::bad_alloc();
+                needed = remaining + replacement.size();
+                if (needed > items.capacity()) {
+                    if (needed > prepared.capacity()) {
+                        needed = std::max(needed, items.capacity() +
+                                                      std::min(items.max_size() - items.capacity(),
+                                                               items.capacity() / 2 + 4));
+                        return Commit::Grow;
+                    }
+                    prepared.assign(items.begin(), items.end());
+                    items.swap(prepared);
+                }
+                const auto first = items.begin() + selected.start;
+                items.erase(first, first + selected.length);
+                items.insert(items.begin() + selected.start, replacement.begin(),
+                             replacement.end());
+                context.account_external(self, sizeof(ListObject::Storage) +
+                                                   items.capacity() * sizeof(Value));
+                return Commit::Done;
+            } else {
+                if (!selected.length)
+                    return Commit::Done;
+                if (selected.step == 1) {
+                    items.erase(items.begin() + selected.start, items.begin() + selected.stop);
+                    return Commit::Done;
+                }
+                auto position = selected.step > 0
+                                    ? selected.start
+                                    : selected.start + (selected.length - 1) * selected.step;
+                const auto stride = selected.step > 0 ? selected.step : -selected.step;
+                auto left = selected.length;
+                std::size_t write = 0;
+                for (std::size_t read = 0; read < items.size(); ++read) {
+                    if (left && read == static_cast<std::size_t>(position)) {
+                        if (--left)
+                            position += stride;
+                    } else
+                        items[write++] = items[read];
+                }
+                items.erase(items.begin() + write, items.end());
+                return Commit::Done;
+            }
+        });
+        if (result == Commit::Mismatch) {
+            const auto a = std::to_string(replacement.size()), b = std::to_string(selected_size);
+            raise_error(context, CoreObject::ValueErrorType,
+                        U"attempt to assign sequence of size " +
+                            std::u32string(a.begin(), a.end()) + U" to extended slice of size " +
+                            std::u32string(b.begin(), b.end()),
+                        out);
+            return;
+        }
+        if (result == Commit::Done) {
+            out.ok(context.builtin(CoreObject::None));
+            return;
+        }
+        prepared.reserve(needed);
+        context.poll();
+    }
+}
 template <ItemOperation Operation>
 void item(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
@@ -221,6 +399,15 @@ void item(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &
         return;
     RootScope roots(context);
     const auto self = roots.root(args[0]);
+    if constexpr (Operation != ItemOperation::Pop) {
+        if (context.type_of(args[1]) == context.builtin(CoreObject::SliceType)) {
+            std::optional<Handle> source;
+            if constexpr (Operation == ItemOperation::Set)
+                source = roots.root(args[2]);
+            slice_item<Operation>(context, self, roots.root(args[1]), source, out);
+            return;
+        }
+    }
     std::int64_t at;
     if (!integer(context, roots.root(args[1]), at,
                  Operation == ItemOperation::Pop ? CoreObject::OverflowErrorType
@@ -548,6 +735,16 @@ void make_list(Attachment &context, std::span<const Value> values, ReturnSlot &o
                                           std::vector<Value>(values.begin(), values.end()));
 }
 namespace detail {
+void list_append(Attachment &context, Handle self, Handle value, ReturnSlot &out)
+{
+    const std::array values{value.get(context)};
+    insert_values(context, self, values);
+    out.ok(context.builtin(CoreObject::None));
+}
+void list_extend(Attachment &context, Handle self, Handle source, ReturnSlot &out)
+{
+    extend_list(context, self, source, out);
+}
 std::size_t list_size(Attachment &context, Handle self)
 {
     auto &data = *context.payload<ListObject>(self).contents;
@@ -569,18 +766,24 @@ void list_snapshot(Attachment &context, Handle self, RootScope &roots, std::vect
 {
     self = roots.root(self.get(context));
     auto &data = *context.payload<ListObject>(self).contents;
+    std::deque<ReturnSlot> slots;
+    std::size_t count = 0;
     for (;;) {
-        values.reserve(list_size(context, self));
+        prepare_roots(context, slots, list_size(context, self));
         if (locked(context, data, [&] {
-                if (data.items.size() > values.capacity())
+                if (data.items.size() > slots.size())
                     return false;
-                values.assign(data.items.begin(), data.items.end());
+                count = data.items.size();
+                for (std::size_t i = 0; i < count; ++i)
+                    slots[i].ok(data.items[i]);
                 return true;
             }))
             break;
     }
-    for (auto value : values)
-        roots.root(value);
+    values.clear();
+    values.reserve(count);
+    for (std::size_t i = 0; i < count; ++i)
+        values.push_back(roots.root(slots[i].value()).get(context));
 }
 void install_lists(Attachment &context, std::span<const Handle> core)
 {

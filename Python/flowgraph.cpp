@@ -70,6 +70,20 @@ constexpr std::array definitions{
     OpcodeDefinition{"IMPORT_FROM", 1, 0, 1, OperandDomain::Name, FlowKind::Next, true, true},
     OpcodeDefinition{"IMPORT_STAR", 1, 1, 0, OperandDomain::None, FlowKind::Next, true, true},
     OpcodeDefinition{"BUILD_LIST", 0, 0, 1, OperandDomain::Count, FlowKind::Next, true, true},
+    OpcodeDefinition{"BUILD_MAP", 0, 0, 1, OperandDomain::Count, FlowKind::Next, true, true},
+    OpcodeDefinition{"DICT_UPDATE", 2, 1, 0, OperandDomain::None, FlowKind::Next, true, true},
+    OpcodeDefinition{"DICT_MERGE", 2, 1, 0, OperandDomain::None, FlowKind::Next, true, true},
+    OpcodeDefinition{"LIST_APPEND", 2, 1, 0, OperandDomain::None, FlowKind::Next, true, true},
+    OpcodeDefinition{"LIST_EXTEND", 2, 1, 0, OperandDomain::None, FlowKind::Next, true, true},
+    OpcodeDefinition{"LIST_TO_TUPLE", 1, 1, 1, OperandDomain::None, FlowKind::Next, true, true},
+    OpcodeDefinition{"CALL_EX", 3, 3, 1, OperandDomain::None, FlowKind::Next, true, true},
+    OpcodeDefinition{"UNPACK_EX", 1, 1, 0, OperandDomain::UnpackCounts, FlowKind::Next, true, true},
+    OpcodeDefinition{"LOAD_ASSERTION_ERROR", 0, 0, 1, OperandDomain::None, FlowKind::Next, false,
+                     false},
+    OpcodeDefinition{"BUILD_SLICE", 3, 3, 1, OperandDomain::None, FlowKind::Next, true, true},
+    OpcodeDefinition{"BUILD_STRING", 0, 0, 1, OperandDomain::Count, FlowKind::Next, true, true},
+    OpcodeDefinition{"FORMAT_VALUE", 2, 2, 1, OperandDomain::Conversion, FlowKind::Next, true,
+                     true},
 };
 static_assert(definitions.size() == static_cast<std::size_t>(Opcode::Count));
 [[noreturn]] void invalid(CodeErrorKind kind, const char *message,
@@ -191,11 +205,11 @@ std::size_t verify(const CodeSpec &spec, std::span<const Instruction> instructio
                 invalid(CodeErrorKind::JumpBounds, "jump target out of bounds", pc);
             break;
         case OperandDomain::Binary:
-            if (operand > static_cast<std::uint32_t>(BinaryOp::TrueDivide))
+            if (operand > static_cast<std::uint32_t>(BinaryOp::MatrixMultiply))
                 invalid(CodeErrorKind::Operand, "invalid binary operator", pc);
             break;
         case OperandDomain::Compare:
-            if (operand > static_cast<std::uint32_t>(CompareOp::IsNot))
+            if (operand > static_cast<std::uint32_t>(CompareOp::NotIn))
                 invalid(CodeErrorKind::Operand, "invalid comparison operator", pc);
             break;
         case OperandDomain::Unary:
@@ -212,6 +226,12 @@ std::size_t verify(const CodeSpec &spec, std::span<const Instruction> instructio
             if (operand != 1 && operand != 2)
                 invalid(CodeErrorKind::Operand, "raise expects an exception and optional cause",
                         pc);
+            break;
+        case OperandDomain::UnpackCounts:
+            break;
+        case OperandDomain::Conversion:
+            if (operand > 3)
+                invalid(CodeErrorKind::Operand, "invalid format conversion", pc);
             break;
         case OperandDomain::CallSite:
             if (operand >= calls.size())
@@ -425,6 +445,12 @@ StackEffect instruction_effect(Instruction instruction, std::span<const CallLayo
         return {instruction.operand, instruction.operand, 0};
     if (instruction.opcode == Opcode::UnpackSequence)
         return {1, 1, instruction.operand};
+    if (instruction.opcode == Opcode::UnpackEx)
+        return {1, 1, (instruction.operand & 65535U) + (instruction.operand >> 16) + 1};
+    if (instruction.opcode == Opcode::BuildMap) {
+        const auto count = static_cast<std::size_t>(instruction.operand) * 2;
+        return {count, count, 1};
+    }
     if (definition.operand == OperandDomain::CallSite && instruction.operand >= calls.size())
         invalid(CodeErrorKind::CallBounds, "call-site index out of bounds");
     const auto arguments = definition.operand == OperandDomain::CallSite

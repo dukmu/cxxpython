@@ -1,5 +1,89 @@
 # Development Status
 
+## 2026-10-30 Independent Generated Parser Replaces The Handwritten Frontend
+
+Prepended without changing earlier records. Previous stable node: d33dc7a. The
+current full parser/import/library/N4-N6/M0-M9 goal remains active; recognizing
+complete grammar is not completion of all executable Python features.
+
+- Fixed CPython 3.12.14 grammar/Tokens and pegen grammar/SCC analysis now generate
+  the standalone C++ parser reproducibly. All 244 upstream rule definitions are
+  retained; diagnostic-only invalid_* rules do not accept programs. Native
+  literal checks retain acceptance constraints previously in CPython AST actions.
+  The checked-in generated files pass regeneration consistency checks. No
+  CPython, ANTLR, Boost or Python heap is linked into the parser-only target.
+- Removed Parser/parser.cpp and the handwritten parser/lexer, with no fallback.
+  Parser/ast.cpp performs CST-to-AST lowering; Parser/source.cpp owns runtime
+  source diagnostics. Removed the old parser-test file and parser-specific
+  rejection cases; preserved applicable compiler/VM/root regressions in
+  Tests/cpp/test_compiler.cpp. New independent grammar/tokenizer tests exercise
+  recognition separately from execution, including async, patterns and types.
+- Added complete operator precedence, membership, dictionary displays, expanded
+  displays/calls/targets, conditional/lambda/named expressions, assert, list/dict
+  comprehensions and slices through the existing scope/CFG/verifier/scheduler.
+  Property/attribute builtins, native slice/format/ascii protocols and string
+  join/rpartition close real language dependencies. Boolean bit operations now
+  belong to bool rather than changing direct int method result types.
+- UTF-8 source tokens retain raw spellings; AST names use Unicode 15 NFKC after
+  keyword decisions. XID validation, numeric/string escapes and PEP 701 f-string
+  tokenization cover the new grammar. Named Unicode escapes use the fixed
+  licensed CPython compressed database without its runtime. Debug f-strings
+  preserve whitespace but omit comments; conversions and nested specs call the
+  normal formatting protocol. UTF-8 BOM decoding belongs to script/file loaders,
+  while the Unicode-source parser rejects a literal leading U+FEFF.
+- Final normal CTest passes 442/442. ASan/UBSan/LSan passes 434/434 native; TSan
+  passes 432/432, excluding only the established two bootstrap allocation
+  enumerations covered by normal/ASan. ASan executable syntax differential
+  passes 11 groups; independent ASan grammar differential passes all 162 samples
+  including 82 extracted upstream syntax-error cases. Retained final logs under
+  .cache/generated-*-stable-* and .cache/generated-asan-{grammar,syntax}.*.
+- The final fixed-reference grammar report passes 1884 comparisons: 80 explicit
+  positive/negative/entry-mode cases plus 1804 UTF-8 Python files from the pinned
+  Lib tree. The additional upstream syntax report passes 162 comparisons.
+  Reports retain raw observations, input grammar hash and executable hashes in
+  .cache/generated-grammar-all-lib-final.json and
+  .cache/generated-upstream-syntax.json. Non-UTF-8 file decoding remains a loader
+  gate. This does not claim CPython's complete specialized error wording.
+- A separate clean system-compiler Parser build succeeds with standard-library
+  dependencies only; readelf confirms libc/libstdc++/libgcc and no Python or
+  parser runtime. Reusable builds and reference Unicode tooling remain in
+  .cache/. No CPU performance suite or comparison tables were rerun.
+- Initial sanitizer failures exposed a fixture bug: object-address-based /tmp
+  names collided between instrumented processes. File tests now use mkdtemp.
+  Debug sanitizer tests use the explicit 120-second test-timeout setting; normal
+  tests retain 15 seconds. All affected tests, including the previous timeouts,
+  passed in the final runs; no new sanitizer exclusion was introduced.
+- Remaining execution gates include bytes/set/complex values, generators and
+  async suspension, patterns, annotations/type parameters and the full builtin
+  and library matrices. Next dependency is real ModuleSpec/loader/Python
+  bootstrap/reload, then the remaining N4 runtime and N5 library/product work,
+  followed by N6 optimization/release. No GIL was added. User temporary_plan.md
+  deletion and untracked test2.py remain excluded from the stable-point commit.
+
+## 2026-10-30 Generated Grammar Route And Goal Replacement
+
+Prepended without rewriting earlier records. The user selected an independent
+automatically generated complete Python 3.12 grammar frontend before continuing
+the unfinished import/library and N4-N6/M0-M9 gates. The goal panel has been
+replaced and restored to active; the earlier import goal was not marked achieved.
+
+Vendored fixed CPython 3.12.14 grammar/Tokens and pegen grammar reader/SCC analysis
+with the complete upstream license. A C++ generation backend now emits all 244
+upstream rule definitions and typed grammar identifiers, replacing CPython C AST
+actions with native CST construction. Diagnostic-only invalid_* rules cannot
+accept programs. A separate Parser CMake entry builds the parser and native probe
+using only the C++ standard library. The initial independent build succeeded and
+recognizes async/await, patterns and type parameters, without the Python heap.
+
+This is a route/progress record, not final acceptance. The tokenizer needs its
+remaining Unicode/literal compliance work, the CST adapter is being integrated,
+and final grammar/execution/sanitizer results have not yet been obtained. Earlier
+uncommitted object/VM syntax work is retained for this integration; the unfinished
+import-bootstrap experiment was preserved in ignored .cache patches instead of
+left as an unresolved build dependency. No new CPU benchmark suite was run and
+no unverified stable-point commit was made. User temporary_plan.md deletion and
+untracked test2.py remain outside the agent's changes.
+
 ## 2026-10-30 Mutable Lists Close Path And Argument Storage Dependencies
 
 Prepended without changing earlier records. Previous stable node: ef77be4. The

@@ -6,7 +6,7 @@ namespace cxxpython::core::detail {
 struct Expr;
 using ExprPtr = std::unique_ptr<Expr>;
 struct Literal {
-    enum class Kind { Integer, Float, String, None, True, False } kind;
+    enum class Kind { Integer, Float, String, None, True, False, Ellipsis } kind;
     std::u32string text;
     double number = 0.0;
 };
@@ -24,6 +24,23 @@ struct BinaryExpr {
 struct BoolExpr {
     bool conjunction;
     ExprPtr left, right;
+};
+struct ConditionalExpr {
+    ExprPtr test, body, alternative;
+};
+struct NamedExpr {
+    ExprPtr target, value;
+};
+struct StarredExpr {
+    ExprPtr value;
+};
+struct FunctionStmt;
+struct LambdaExpr {
+    std::unique_ptr<FunctionStmt> function;
+};
+struct ComprehensionExpr {
+    std::unique_ptr<FunctionStmt> function;
+    ExprPtr iterable;
 };
 struct CompareExpr {
     std::vector<ExprPtr> values;
@@ -44,14 +61,30 @@ struct TupleExpr {
 struct ListExpr {
     std::vector<ExprPtr> items;
 };
+struct DictExpr {
+    // A missing key denotes **mapping, not a key with the value None.
+    std::vector<std::pair<ExprPtr, ExprPtr>> items;
+};
 struct SubscriptExpr {
     ExprPtr object, key;
+};
+struct SliceExpr {
+    ExprPtr start, stop, step;
+};
+struct JoinedStrExpr {
+    std::vector<ExprPtr> items;
+};
+struct FormattedExpr {
+    ExprPtr value, spec;
+    char conversion = 0;
 };
 struct Expr {
     Span span;
     std::size_t depth;
     std::variant<Literal, NameExpr, UnaryExpr, BinaryExpr, BoolExpr, CompareExpr, CallExpr,
-                 AttributeExpr, TupleExpr, ListExpr, SubscriptExpr>
+                 AttributeExpr, TupleExpr, ListExpr, DictExpr, SubscriptExpr, ConditionalExpr,
+                 NamedExpr, StarredExpr, LambdaExpr, ComprehensionExpr, SliceExpr, JoinedStrExpr,
+                 FormattedExpr>
         node;
 };
 struct Stmt;
@@ -82,6 +115,7 @@ struct WhileStmt {
 struct ForStmt {
     ExprPtr target, iterable;
     Suite body, alternative;
+    bool iterator_ready = false;
 };
 struct ParameterSpec {
     std::u32string name;
@@ -97,6 +131,7 @@ struct FunctionStmt {
     std::optional<std::u32string> varargs, varkwargs;
     Suite body;
     std::size_t scope = 0;
+    bool comprehension = false;
 };
 struct ClassStmt {
     std::u32string name, binding;
@@ -110,6 +145,12 @@ struct ReturnStmt {
 };
 struct RaiseStmt {
     ExprPtr exception, cause;
+};
+struct AssertStmt {
+    ExprPtr test, message;
+};
+struct CollectionAddStmt {
+    ExprPtr collection, key, value;
 };
 struct ExceptHandler {
     ExprPtr type;
@@ -151,7 +192,7 @@ struct Stmt {
     Span span;
     std::variant<ExprStmt, AssignStmt, AugAssignStmt, DeleteStmt, IfStmt, WhileStmt, ForStmt,
                  FunctionStmt, ClassStmt, ReturnStmt, RaiseStmt, TryStmt, WithStmt, DeclareStmt,
-                 ImportStmt, ControlStmt>
+                 ImportStmt, AssertStmt, CollectionAddStmt, ControlStmt>
         node;
 };
 // CFG instructions use native literals/names until one attached freeze task

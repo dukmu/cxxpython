@@ -66,6 +66,18 @@ enum class Opcode : std::uint8_t {
     ImportFrom,
     ImportStar,
     BuildList,
+    BuildMap,
+    DictUpdate,
+    DictMerge,
+    ListAppend,
+    ListExtend,
+    ListToTuple,
+    CallEx,
+    UnpackEx,
+    LoadAssertionError,
+    BuildSlice,
+    BuildString,
+    FormatValue,
     Count,
 };
 enum class OperandDomain {
@@ -83,7 +95,9 @@ enum class OperandDomain {
     StackDepth,
     Count,
     Cell,
-    RaiseArity
+    RaiseArity,
+    UnpackCounts,
+    Conversion
 };
 enum class FunctionFlags : std::uint32_t {
     None = 0,

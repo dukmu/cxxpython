@@ -31,6 +31,90 @@ class ConstructorDifferential(unittest.TestCase):
         self.assertEqual(actual.returncode, 0, actual.stderr)
         self.assertEqual(actual.stdout, reference.stdout)
 
+    def test_string_rpartition(self):
+        setup = "class Text(str):\n    pass\n"
+        for expression in (
+            "'a.b.c'.rpartition('.')", "'abc'.rpartition('.')",
+            "'.abc'.rpartition('.')", "'abc.'.rpartition('.')",
+            "'a😀b😀c'.rpartition('😀')", "'aaa'.rpartition('aa')",
+            "Text('a.b').rpartition(Text('.'))", "'abc'.rpartition('')",
+            "'abc'.rpartition(1)",
+        ):
+            with self.subTest(expression=expression):
+                self.check_expression(expression, setup)
+
+    def test_string_join(self):
+        setup = '''
+class Text(str):
+    pass
+class Broken:
+    def __iter__(self):
+        return self
+    def __next__(self):
+        raise ValueError('iterator failed')
+'''
+        for expression in (
+            "'.'.join([])", "'.'.join(['one'])", "'.'.join(['a', 'b', 'c'])",
+            "'😀'.join(['α', 'β'])", "Text('.').join([Text('a'), Text('b')])",
+            "'-'.join('abc')", "''.join(['a', 1])", "''.join(1)",
+            "''.join(Broken())",
+        ):
+            with self.subTest(expression=expression):
+                self.check_expression(expression, setup)
+
+    def test_ellipsis_and_assertion_error_seeds(self):
+        for expression in (
+            "repr(Ellipsis)", "str(Ellipsis)", "bool(Ellipsis)",
+            "type(Ellipsis).__name__", "AssertionError('failure')",
+            "AssertionError.__base__.__name__",
+        ):
+            with self.subTest(expression=expression):
+                self.check_expression(expression)
+
+    def test_property_and_attribute_builtins(self):
+        setup = '''
+class Example:
+    def read(self):
+        "property documentation"
+        return self.value
+    def write(self, value):
+        self.value = value
+    def remove(self):
+        del self.value
+    item = property(read, write, remove)
+class ChildProperty(property):
+    pass
+class Broken:
+    def __getattr__(self, name):
+        raise ValueError('failure')
+class Abstract:
+    __isabstractmethod__ = True
+def exercise():
+    obj = Example()
+    setattr(obj, 'item', 17)
+    before = (getattr(obj, 'item'), hasattr(obj, 'value'))
+    delattr(obj, 'item')
+    return before, hasattr(obj, 'value')
+def document():
+    p = property()
+    p.__doc__ = 'changed'
+    return p.__doc__
+'''
+        for expression in (
+            "exercise()", "document()",
+            "Example.item.fget.__name__", "Example.item.__doc__",
+            "Example.item.__isabstractmethod__", "property(Abstract()).__isabstractmethod__",
+            "type(ChildProperty().getter(Example.read)).__name__",
+            "getattr(Example(), 'missing', 42)", "hasattr(Example(), 'missing')",
+            "getattr(Broken(), 'missing', 42)", "hasattr(Broken(), 'missing')",
+            "getattr(Example(), 1, 42)", "setattr(Example(), 1, 42)",
+            "delattr(Example(), 1)", "property().__get__(Example(), Example)",
+            "property().__set__(Example(), 1)", "property().__delete__(Example())",
+            "setattr(property(), 'fget', None)",
+        ):
+            with self.subTest(expression=expression):
+                self.check_expression(expression, setup)
+
     def test_integer_strings_and_bases(self):
         cases = (
             "int()", "int(42)", "int(True)", "int('  -123  ')",

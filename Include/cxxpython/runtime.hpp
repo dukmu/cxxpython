@@ -27,6 +27,7 @@ class Transfer;
 enum class Protocol : std::size_t;
 struct ResolvedSlot;
 enum class CoreObject : std::size_t {
+    PropertyType,
     NoneType,
     StrType,
     TupleType,
@@ -35,8 +36,10 @@ enum class CoreObject : std::size_t {
     BoolType,
     FloatType,
     NotImplementedType,
+    EllipsisType,
     BaseExceptionType,
     ExceptionType,
+    AssertionErrorType,
     TypeErrorType,
     AttributeErrorType,
     ValueErrorType,
@@ -85,8 +88,10 @@ enum class CoreObject : std::size_t {
     ListType,
     ListIteratorType,
     SequenceIteratorType,
+    SliceType,
     None,
     NotImplemented,
+    Ellipsis,
     False,
     True,
     IntZero,

@@ -67,6 +67,47 @@ void sequence_item(Attachment &context, Handle, std::span<const Value> args, Ret
     if (!sequence<T, Type>(context, args[0], out))
         return;
     RootScope roots(context);
+    const auto self = roots.root(args[0]);
+    if (context.type_of(args[1]) == context.builtin(CoreObject::SliceType)) {
+        detail::SliceBounds bounds;
+        if (!detail::unpack_slice(context, roots.root(args[1]), bounds, out))
+            return;
+        const auto &data = context.payload<T>(self);
+        const auto length = [&] {
+            if constexpr (Type == CoreObject::TupleType)
+                return data.items.size();
+            else
+                return data.value.size();
+        }();
+        const auto selected = bounds.adjust(length);
+        if (selected.step == 1 && selected.start == 0 &&
+            static_cast<std::size_t>(selected.length) == length &&
+            context.type_of(self) == context.builtin(Type)) {
+            out.ok(self.get(context));
+            return;
+        }
+        auto position = selected.start;
+        if constexpr (Type == CoreObject::TupleType) {
+            std::vector<Value> values;
+            values.reserve(static_cast<std::size_t>(selected.length));
+            for (std::int64_t i = 0; i < selected.length; ++i) {
+                values.push_back(data.items[position]);
+                if (i + 1 < selected.length)
+                    position += selected.step;
+            }
+            cxxpython::core::make_tuple(context, values, out);
+        } else {
+            std::u32string text;
+            text.reserve(static_cast<std::size_t>(selected.length));
+            for (std::int64_t i = 0; i < selected.length; ++i) {
+                text += data.value[position];
+                if (i + 1 < selected.length)
+                    position += selected.step;
+            }
+            make_str(context, std::move(text), out);
+        }
+        return;
+    }
     ReturnSlot converted(context);
     index(context, roots.root(args[1]), converted);
     if (converted.tag() == ResultTag::Raised) {

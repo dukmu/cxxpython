@@ -585,6 +585,7 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                            *outputs[static_cast<std::size_t>(id)]);
         core.push_back(roots.root(outputs[static_cast<std::size_t>(id)]->result().value()));
     };
+    define(CoreObject::PropertyType, "property", LayoutDescriptor::of<PropertyObject>());
     define(CoreObject::NoneType, "NoneType", LayoutDescriptor::of<NoneObject>());
     define(CoreObject::StrType, "str", LayoutDescriptor::of<StrObject>());
     define(CoreObject::TupleType, "tuple", LayoutDescriptor::of<TupleObject>());
@@ -595,9 +596,12 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     define(CoreObject::FloatType, "float", LayoutDescriptor::of<FloatObject>());
     define(CoreObject::NotImplementedType, "NotImplementedType",
            LayoutDescriptor::of<NoneObject>());
+    define(CoreObject::EllipsisType, "ellipsis", LayoutDescriptor::of<NoneObject>());
     define(CoreObject::BaseExceptionType, "BaseException", LayoutDescriptor::of<ExceptionObject>());
     define(CoreObject::ExceptionType, "Exception", LayoutDescriptor::of<ExceptionObject>(),
            at(CoreObject::BaseExceptionType));
+    define(CoreObject::AssertionErrorType, "AssertionError",
+           LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::ExceptionType));
     define(CoreObject::TypeErrorType, "TypeError", LayoutDescriptor::of<ExceptionObject>(),
            at(CoreObject::ExceptionType));
     define(CoreObject::AttributeErrorType, "AttributeError",
@@ -681,6 +685,7 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
            LayoutDescriptor::of<SequenceIteratorObject>());
     define(CoreObject::SequenceIteratorType, "iterator",
            LayoutDescriptor::of<SequenceIteratorObject>());
+    define(CoreObject::SliceType, "slice", LayoutDescriptor::of<SliceObject>());
     context.payload<TypeObject>(at(CoreObject::TupleType)).allow_slots = false;
     context.payload<TypeObject>(at(CoreObject::IntType)).allow_slots = false;
     for (auto type : core) {
@@ -699,6 +704,9 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     auto &not_implemented = *outputs[static_cast<std::size_t>(CoreObject::NotImplemented)];
     context.allocate_instance<NoneObject>(at(CoreObject::NotImplementedType), not_implemented);
     core.push_back(roots.root(not_implemented.value()));
+    auto &ellipsis = *outputs[static_cast<std::size_t>(CoreObject::Ellipsis)];
+    context.allocate_instance<NoneObject>(at(CoreObject::EllipsisType), ellipsis);
+    core.push_back(roots.root(ellipsis.value()));
     for (auto id : {CoreObject::False, CoreObject::True, CoreObject::IntZero, CoreObject::IntOne}) {
         auto &output = *outputs[static_cast<std::size_t>(id)];
         const bool boolean = id == CoreObject::False || id == CoreObject::True;
@@ -748,9 +756,11 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     install_dictionaries(context, core);
     install_lists(context, core);
     install_value_protocols(context, core);
+    install_format(context, core);
     install_execution(context, core);
     install_exception_runtime(context, core);
     install_ranges(context, core);
+    install_slices(context, core);
     install_iteration(context, core);
     install_modules(context, core);
     for (std::size_t i = 0; i < static_cast<std::size_t>(CoreObject::None); ++i) {
@@ -762,6 +772,7 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     for (auto id : {CoreObject::NoneType,
                     CoreObject::BoolType,
                     CoreObject::NotImplementedType,
+                    CoreObject::EllipsisType,
                     CoreObject::NativeFunctionType,
                     CoreObject::MethodDescriptorType,
                     CoreObject::BoundMethodType,
@@ -784,7 +795,8 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                     CoreObject::DictValueIteratorType,
                     CoreObject::DictItemIteratorType,
                     CoreObject::ListIteratorType,
-                    CoreObject::SequenceIteratorType})
+                    CoreObject::SequenceIteratorType,
+                    CoreObject::SliceType})
         context.payload<TypeObject>(at(id)).subclassable = false;
 
     auto &builtins = *outputs[static_cast<std::size_t>(CoreObject::Builtins)];
@@ -805,6 +817,7 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                     CoreObject::FloatType,
                     CoreObject::BaseExceptionType,
                     CoreObject::ExceptionType,
+                    CoreObject::AssertionErrorType,
                     CoreObject::TypeErrorType,
                     CoreObject::AttributeErrorType,
                     CoreObject::ValueErrorType,
@@ -819,6 +832,7 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                     CoreObject::KeyErrorType,
                     CoreObject::StopIterationType,
                     CoreObject::RangeType,
+                    CoreObject::SliceType,
                     CoreObject::NameErrorType,
                     CoreObject::UnboundLocalErrorType,
                     CoreObject::ImportErrorType,
@@ -827,12 +841,14 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                     CoreObject::IndentationErrorType,
                     CoreObject::TabErrorType,
                     CoreObject::OSErrorType,
+                    CoreObject::PropertyType,
                     CoreObject::StaticMethodType,
                     CoreObject::ClassMethodType})
         publish(std::get<Value>(context.payload<TypeObject>(at(id)).name), at(id).get(context));
     for (auto type : {context.object_type(), context.type_type()})
         publish(std::get<Value>(context.payload<TypeObject>(type).name), type);
     for (auto [name, id] : {std::pair{U"None", CoreObject::None},
+                            {U"Ellipsis", CoreObject::Ellipsis},
                             {U"True", CoreObject::True},
                             {U"False", CoreObject::False},
                             {U"NotImplemented", CoreObject::NotImplemented}}) {

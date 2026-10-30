@@ -10,9 +10,22 @@ Historical designs are in `archive/`; Plan 2 remains the full delivery objective
 copying. It enters the runtime through SourceUnit/RunRequest, not a second parser
 or VM. There is one executable, `cxxpython`, linked to `cxxpython_core`.
 
-`Parser/parser.cpp` owns SourceBuffer decoding/positions, tokens, the native AST
-and parser. `Include/internal/compiler.hpp` is the private contract between that
-parser and compiler; it contains no hidden managed Python references.
+`Parser/tokenizer.cpp` and the automatically generated
+`Parser/generated_parser.cpp` form a standalone UTF-8 Python 3.12 syntax library.
+`Grammar/python.gram` and `Grammar/Tokens` are fixed CPython 3.12.14 inputs;
+`Tools/peg_generator/` retains upstream pegen's grammar reader/left-recursion
+analysis and this project's C++ output backend. Generated rules construct a native
+immutable CST using per-parse memo state, not CPython AST objects. The independent
+Parser CMake entry needs only a C++ compiler and standard library. Host Python is
+needed for explicit regeneration/checks, not normal parser builds or execution.
+
+`Parser/source.cpp` owns the runtime's SourceBuffer decoding and diagnostics.
+`Parser/ast.cpp` adapts the generated CST to the existing native compiler AST;
+it does not recognize grammar or retain a handwritten parser fallback.
+`Include/internal/compiler.hpp` is the private compiler IR contract and contains
+no hidden managed Python references. Full grammar recognition and executable
+language support are separate: missing AST/compiler/VM capabilities remain
+explicit errors after parsing, not rules deleted from the upstream grammar.
 
 `Python/symtable.cpp` performs lexical scope analysis. `Python/compile.cpp`
 constructs native CFGs and freezes managed constants/Code through CodeBuilder.
@@ -58,7 +71,8 @@ conversion shares Unicode decimal/whitespace helpers in `Include/internal/long.h
 Float literals share the native conversion helper; the compiler freezes native
 binary64 constants into normal managed objects. Integer true division rounds
 exact ratios in longobject rather than narrowing both operands first.
-Complex/power and the complete numeric API remain unfinished.
+Power/shift/bitwise dispatch uses the same ordinary/reflected/in-place protocol
+boundary; complex values and the complete numeric API remain unfinished.
 `Objects/representation.cpp` provides other value representation/hash
 operations. `Objects/rangeobject.cpp` owns immutable arbitrary-integer ranges and
 their iterators; `Objects/iterobject.cpp` owns iteration and immutable sequence
@@ -71,8 +85,13 @@ protocols outside storage locks. `Objects/listobject.cpp` owns mutable list stor
 constructors and protocols, with prepared capacity growth and local commits.
 List displays lower through the same AST/CFG into BUILD_LIST; sys.path, regular
 package paths and CLI argv use that real container, not host-only arrays.
-Generated Unicode tables are private
-to Objects and retain their generator/source provenance.
+`Objects/sliceobject.cpp` supplies traced immutable slice fields and normalization;
+sequence owners perform conversions before their rooted snapshots/local commits.
+`Objects/formatobject.cpp` supplies the common format/ascii protocol boundary;
+f-string lowering uses it rather than an alternate string-conversion path.
+Generated Unicode tables retain their generator/source provenance. The immutable
+XID ranges are reused by the standalone tokenizer; its normalization and licensed
+character-name tables remain native parser data, not Python objects or imports.
 `Objects/moduleobject.cpp` uses the ordinary instance dictionary as the module
 namespace, including descriptor lookup and module-level __getattr__. Module
 payloads add no second dictionary or lifetime manager. The CLI now executes in

@@ -38,10 +38,18 @@ compiler, VM, and extension platform implemented in a C/C++ mix.
 - Advance through N0-N6 and the complete M0-M9 acceptance gates. Record actual tests,
   remaining gates and the next dependency in `doc/development_status.md`.
   Do not mark a whole milestone complete based on a narrower passing slice.
-- The active service goal is now the module/unified-import foundation stage;
+- The active service goal is now the independent generated Python 3.12 grammar
+  frontend, followed by the unfinished module/unified-import foundation stage;
   the full language, standard-library and product scope remains in Plan 2
   sections 0.8 and 11.2. Complete a stage only on its actual acceptance evidence,
   then promptly commit/push and create the next dependent stage goal.
+- `Grammar/python.gram` and `Grammar/Tokens` are fixed CPython 3.12.14 inputs.
+  Use the vendored pegen grammar reader/left-recursion analysis and the standalone
+  C++ output backend in `Tools/peg_generator/`; do not add handwritten grammar
+  branches or retain the former parser as a fallback. The generated parser and
+  tokenizer depend only on the C++ standard library. Native CST-to-AST lowering
+  is distinct from recognition and must report missing execution capabilities
+  honestly. Regenerate with `regen-parser` and verify `parser-generated-check`.
 - Follow CPython's native/Python responsibilities: `Modules/` supplies necessary
   C/C++ capabilities, `Lib/` supplies Python libraries and policy. Do not rewrite
   an entire Python library in C++ just to avoid completing its syntax/dependencies.
@@ -85,8 +93,8 @@ compiler, VM, and extension platform implemented in a C/C++ mix.
   check process handles and artifacts before assuming a build/test survived.
 - Use the checked-in `.clang-format` for all C++ sources. Run
   `cmake --build build --target format` after edits and `format-check` before
-  committing. CTest also checks formatting. Do not hand-format generated Unicode
-  tables or third-party code. `Lib/` is reserved for the interpreter's standard
+  committing. CTest also checks formatting. Do not hand-format generated parser,
+  grammar headers, Unicode tables or third-party code. `Lib/` is reserved for the interpreter's standard
   library. Host-side Python test drivers belong in `Tests/python/`, native
   contract tests in `Tests/cpp/`, benchmarks in `Tools/benchmarks/`.
 - Small vertical slices are preferred: parser/compiler bytecode, runtime

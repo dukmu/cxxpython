@@ -733,11 +733,11 @@ class SourceDifferential(unittest.TestCase):
     def test_file_entry_and_unicode_diagnostics(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "source.py"
-            path.write_text("def f(n):\n    return n + 1\n", encoding="utf-8")
+            path.write_text("def f(n):\n    return n + 1\n", encoding="utf-8-sig")
             actual = self.execute([self.binary, str(path), "--eval", "f(41)"])
             self.assertEqual(actual.returncode, 0, actual.stderr)
             self.assertEqual(actual.stdout, "42\n")
-            (Path(directory) / "sibling.py").write_text("answer = 42\n", encoding="utf-8")
+            (Path(directory) / "sibling.py").write_text("answer = 42\n", encoding="utf-8-sig")
             path.write_text("import sibling\nvalue = sibling.answer\n", encoding="utf-8")
             actual = self.execute([self.binary, str(path), "--eval", "value, __file__"])
             path.write_text("import sibling\nvalue = sibling.answer\nprint(repr((value, __file__)))\n", encoding="utf-8")

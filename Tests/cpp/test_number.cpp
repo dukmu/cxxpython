@@ -75,6 +75,38 @@ TEST_F(CoreNumbers, SignedOverflowPromotesAndResultsNormalizeWithoutLosingPrecis
     expect_integer(out, "-9223372036854775809");
 }
 
+TEST_F(CoreNumbers, ExtendedIntegerOperators)
+{
+    ReturnSlot out(context);
+    auto two = integer("2");
+    auto exponent = integer("100");
+    binary(context, two, exponent, BinaryOp::Power, out);
+    expect_integer(out, "1267650600228229401496703205376");
+    binary(context, two, exponent, BinaryOp::LeftShift, out);
+    expect_integer(out, "2535301200456458802993406410752");
+    auto negative = integer("-5");
+    auto one = integer("1");
+    binary(context, negative, one, BinaryOp::RightShift, out);
+    expect_integer(out, "-3");
+    binary(context, negative, integer("3"), BinaryOp::BitAnd, out);
+    expect_integer(out, "3");
+    binary(context, negative, one, BinaryOp::BitXor, out);
+    expect_integer(out, "-6");
+    binary(context, negative, one, BinaryOp::BitOr, out);
+    expect_integer(out, "-5");
+    binary(context, two, negative, BinaryOp::LeftShift, out);
+    ASSERT_EQ(out.result().tag(), ResultTag::Raised);
+    EXPECT_EQ(context.type_of(out.result().exception()),
+              context.builtin(CoreObject::ValueErrorType));
+    binary(context, two, integer("-2"), BinaryOp::Power, out);
+    ASSERT_EQ(out.result().tag(), ResultTag::Ok);
+    EXPECT_EQ(context.payload<FloatObject>(out.result().value()).value, 0.25);
+    binary(context, integer("0"), negative, BinaryOp::Power, out);
+    ASSERT_EQ(out.result().tag(), ResultTag::Raised);
+    EXPECT_EQ(context.type_of(out.result().exception()),
+              context.builtin(CoreObject::ZeroDivisionErrorType));
+}
+
 TEST_F(CoreNumbers, FloorDivisionAndModuloHaveDivisorSignForSmallAndLargeOperands)
 {
     struct Sample {

@@ -119,6 +119,92 @@ void string_str(Attachment &context, Handle, std::span<const Value> args, Return
     else
         make_str(context, context.payload<StrObject>(args[0]).value, out);
 }
+void string_contains(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    for (auto value : args) {
+        if (!context.has_layout<StrObject>(value) ||
+            !is_subtype(context, context.type_of(value), context.builtin(CoreObject::StrType))) {
+            raise_error(context, CoreObject::TypeErrorType, U"string containment requires a string",
+                        out);
+            return;
+        }
+    }
+    const auto &text = context.payload<StrObject>(args[0]).value;
+    const auto &part = context.payload<StrObject>(args[1]).value;
+    out.ok(context.builtin(text.find(part) == text.npos ? CoreObject::False : CoreObject::True));
+}
+void string_rpartition(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!string_value(context, args[0]) || !string_value(context, args[1])) {
+        type_error(context, out);
+        return;
+    }
+    const auto &text = context.payload<StrObject>(args[0]).value;
+    const auto &separator = context.payload<StrObject>(args[1]).value;
+    if (separator.empty()) {
+        raise_error(context, CoreObject::ValueErrorType, U"empty separator", out);
+        return;
+    }
+    const auto position = text.rfind(separator);
+    const auto before = position == std::u32string::npos ? U"" : text.substr(0, position);
+    const auto middle = position == std::u32string::npos ? U"" : separator;
+    const auto after =
+        position == std::u32string::npos ? text : text.substr(position + separator.size());
+    RootScope roots(context);
+    ReturnSlot part(context);
+    make_str(context, before, part);
+    const auto first = roots.root(part.value());
+    make_str(context, middle, part);
+    const auto second = roots.root(part.value());
+    make_str(context, after, part);
+    const auto third = roots.root(part.value());
+    const std::array values{first.get(context), second.get(context), third.get(context)};
+    cxxpython::core::make_tuple(context, values, out);
+}
+void string_join(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!string_value(context, args[0])) {
+        type_error(context, out);
+        return;
+    }
+    RootScope roots(context);
+    const auto separator = roots.root(args[0]);
+    ReturnSlot iterator(context), item(context);
+    get_iter(context, roots.root(args[1]), iterator);
+    if (raised(iterator)) {
+        out.raised(iterator.exception());
+        return;
+    }
+    const auto it = roots.root(iterator.value());
+    std::vector<Handle> items;
+    for (;;) {
+        const auto status = iter_next(context, it, item);
+        if (status == NextStatus::Done)
+            break;
+        if (status == NextStatus::Raised) {
+            out.raised(item.exception());
+            return;
+        }
+        items.push_back(roots.root(item.value()));
+    }
+    if (items.size() == 1 && context.type_of(items[0]) == context.builtin(CoreObject::StrType)) {
+        out.ok(items[0].get(context));
+        return;
+    }
+    std::u32string joined;
+    const auto &separator_text = context.payload<StrObject>(separator).value;
+    for (std::size_t i = 0; i < items.size(); ++i) {
+        const auto value = items[i].get(context);
+        if (!string_value(context, value)) {
+            raise_error(context, CoreObject::TypeErrorType, U"sequence item is not a string", out);
+            return;
+        }
+        if (i)
+            joined += separator_text;
+        joined += context.payload<StrObject>(value).value;
+    }
+    make_str(context, std::move(joined), out);
+}
 bool printable(char32_t point)
 {
     if (point == U' ')
@@ -526,6 +612,11 @@ void install_value_protocols(Attachment &context, std::span<const Handle> core)
     install(at(CoreObject::StrType), U"__hash__", string_hash);
     install(at(CoreObject::StrType), U"__str__", string_str);
     install(at(CoreObject::StrType), U"__repr__", string_repr);
+    install_native_attribute(context, core, at(CoreObject::StrType), U"rpartition", pair,
+                             string_rpartition);
+    install_native_attribute(context, core, at(CoreObject::StrType), U"join", pair, string_join);
+    install_native_attribute(context, core, at(CoreObject::StrType), U"__contains__", pair,
+                             string_contains);
     install_native_attribute(context, core, at(CoreObject::StrType), U"__add__", pair, string_add,
                              {}, NativeSlotKind::Sequence);
     install(at(CoreObject::TupleType), U"__hash__", tuple_hash);
@@ -540,8 +631,9 @@ void install_value_protocols(Attachment &context, std::span<const Handle> core)
     install(at(CoreObject::BaseExceptionType), U"__repr__", exception_repr);
     install(at(CoreObject::BaseExceptionType), U"__str__", exception_str<false>);
     install(at(CoreObject::KeyErrorType), U"__str__", exception_str<true>);
-    for (auto [id, label] :
-         {std::pair{CoreObject::None, U"None"}, {CoreObject::NotImplemented, U"NotImplemented"}}) {
+    for (auto [id, label] : {std::pair{CoreObject::None, U"None"},
+                             {CoreObject::NotImplemented, U"NotImplemented"},
+                             {CoreObject::Ellipsis, U"Ellipsis"}}) {
         ReturnSlot text(context);
         context.allocate_instance<StrObject>(at(CoreObject::StrType), text, label);
         auto name = roots.root(text.value());

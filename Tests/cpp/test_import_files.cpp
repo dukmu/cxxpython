@@ -2,6 +2,7 @@
 #include "cxxpython/import.hpp"
 #include "internal/compiler.hpp"
 
+#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <gtest/gtest.h>
@@ -18,9 +19,11 @@ class FileImports : public testing::Test {
     void SetUp() override
     {
         context.bootstrap_core();
-        directory = std::filesystem::temp_directory_path() /
-                    ("cxxpython-import-" + std::to_string(reinterpret_cast<std::uintptr_t>(this)));
-        std::filesystem::create_directories(directory);
+        auto pattern =
+            (std::filesystem::temp_directory_path() / "cxxpython-import-XXXXXX").string();
+        if (!mkdtemp(pattern.data()))
+            throw std::runtime_error("cannot create import fixture directory");
+        directory = pattern;
         ReturnSlot out(context);
         const std::array paths{directory.string()};
         set_import_path(context, paths, out);

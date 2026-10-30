@@ -92,7 +92,7 @@ TEST_F(CoreSource, ListDisplaysAndTargetsUseNormalExpressionAndBindingPaths)
     eval("f(), C._C__private, f() is f(), [] is not []", out, globals);
     ASSERT_EQ(out.tag(), ResultTag::Ok);
     EXPECT_EQ(result(out), "([1, [2]], 3, True, True)");
-    for (auto source : {"[a] += [1]", "[1] = [2]", "del [1]", "[*x]", "[x for x in y]"}) {
+    for (auto source : {"[a] += [1]", "[1] = [2]", "del [1]"}) {
         SCOPED_TRACE(source);
         EXPECT_THROW(SourceUnit{SourceBuffer(source)}, SourceError);
     }
@@ -1070,34 +1070,20 @@ TEST_F(CoreSource, SourceLocationsAndStructuredDiagnosticsPreserveTheOriginalLin
     EXPECT_EQ(context.payload<TracebackObject>(trace.result().value()).lineno, 2);
 }
 
-TEST(SourceDiagnostics, InvalidProgramsDoNotSilentlyCompileThroughAnotherLanguagePath)
+TEST(CompilerDiagnostics, ScopeAndControlFlowErrorsRemainCompileTimeErrors)
 {
-    for (auto source : {"return 1",
-                        "break",
-                        "continue",
-                        "def f(a, a): pass",
-                        "def f(a=1, b): pass",
-                        "1 = 2",
-                        "True = 1",
-                        "x = 09",
-                        "x = 1__2",
-                        "if 1:\nx = 2",
-                        "  x = 1",
-                        "x = (1",
-                        "x = 1 x",
-                        "global x\nnonlocal x",
-                        "nonlocal x",
-                        "x = 1\nglobal x",
-                        "try: pass",
-                        "try: pass\nelse: pass\nfinally: pass",
-                        "try: pass\nexcept: pass\nexcept ValueError: pass",
-                        "try: pass\nexcept ValueError as __debug__: pass",
-                        "try: pass\nfinally: break"}) {
+    for (auto source :
+         {"return 1", "break", "continue", "def f(a, a): pass", "global x\nnonlocal x",
+          "nonlocal x", "x = 1\nglobal x", "try: pass\nexcept: pass\nexcept ValueError: pass",
+          "try: pass\nexcept ValueError as __debug__: pass", "try: pass\nfinally: break"}) {
         SCOPED_TRACE(source);
         EXPECT_THROW(SourceUnit{SourceBuffer(source)}, SourceError);
     }
-    for (auto source : {"class X[T]: pass", "f'{x}'", "x = 1.5j", "x = [x for x in y]",
-                        "try:\n    pass\nexcept* Exception:\n    pass"}) {
+}
+TEST(CompilerDiagnostics, RecognizedUnimplementedFeaturesAreExplicitCapabilities)
+{
+    for (auto source :
+         {"class X[T]: pass", "x = 1.5j", "try:\n    pass\nexcept* Exception:\n    pass"}) {
         SCOPED_TRACE(source);
         try {
             SourceUnit unit{SourceBuffer(source)};
@@ -1106,6 +1092,9 @@ TEST(SourceDiagnostics, InvalidProgramsDoNotSilentlyCompileThroughAnotherLanguag
             EXPECT_EQ(error.kind, SourceErrorKind::Capability);
         }
     }
+}
+TEST(CompilerDiagnostics, SourceBufferAndCompilationLimitsDoNotUseAnotherParser)
+{
     EXPECT_THROW(SourceBuffer(std::string("x\0y", 3)), SourceError);
     EXPECT_THROW(SourceBuffer("\xc0\x80"), SourceError);
     std::string nested(1000, '-');

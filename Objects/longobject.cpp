@@ -187,6 +187,102 @@ void arithmetic(Attachment &context, Handle, std::span<const Value> args, Return
     }
     publish(context, std::move(result), out);
 }
+template <BinaryOp Op, bool Reflected>
+void integer_extended(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!is_int(context, args[0])) {
+        type_error(context, out);
+        return;
+    }
+    if (!is_int(context, args[1])) {
+        out.ok(context.builtin(CoreObject::NotImplemented));
+        return;
+    }
+    Integer a = expanded(integer(context, args[Reflected ? 1 : 0]));
+    Integer b = expanded(integer(context, args[Reflected ? 0 : 1]));
+    Integer result;
+    if constexpr (Op == BinaryOp::BitAnd)
+        result = a & b;
+    if constexpr (Op == BinaryOp::BitXor)
+        result = a ^ b;
+    if constexpr (Op == BinaryOp::BitOr)
+        result = a | b;
+    if constexpr (Op == BinaryOp::LeftShift || Op == BinaryOp::RightShift) {
+        if (b < 0) {
+            raise_error(context, CoreObject::ValueErrorType, U"negative shift count", out);
+            return;
+        }
+        if (b > std::numeric_limits<std::size_t>::max()) {
+            if constexpr (Op == BinaryOp::RightShift) {
+                make_int(context, a < 0 ? -1 : 0, out);
+                return;
+            }
+            if (a == 0) {
+                make_int(context, 0, out);
+                return;
+            }
+            raise_error(context, CoreObject::OverflowErrorType, U"too many digits in integer", out);
+            return;
+        }
+        auto shift = b.convert_to<std::size_t>();
+        if constexpr (Op == BinaryOp::RightShift) {
+            Integer magnitude = a < 0 ? -a : a;
+            if (magnitude == 0 || shift > boost::multiprecision::msb(magnitude)) {
+                make_int(context, a < 0 ? -1 : 0, out);
+                return;
+            }
+        }
+        if constexpr (Op == BinaryOp::LeftShift)
+            result = a << shift;
+        else
+            result = a >> shift;
+    }
+    if constexpr (Op == BinaryOp::Power) {
+        if (b < 0) {
+            double x = a.convert_to<double>(), y = b.convert_to<double>();
+            if (std::isinf(x) || std::isinf(y)) {
+                raise_error(context, CoreObject::OverflowErrorType,
+                            U"int too large to convert to float", out);
+                return;
+            }
+            RootScope roots(context);
+            ReturnSlot tmp(context);
+            make_float(context, x, tmp);
+            auto left = roots.root(tmp.value());
+            make_float(context, y, tmp);
+            auto right = roots.root(tmp.value());
+            binary(context, left, right, BinaryOp::Power, out);
+            return;
+        }
+        result = 1;
+        while (b != 0) {
+            context.poll();
+            if ((b & 1) != 0)
+                result *= a;
+            b >>= 1;
+            if (b != 0)
+                a *= a;
+        }
+    }
+    publish(context, std::move(result), out);
+}
+template <BinaryOp Op>
+void bool_bitwise(Attachment &context, Handle function, std::span<const Value> args,
+                  ReturnSlot &out)
+{
+    const auto yes = context.builtin(CoreObject::True), no = context.builtin(CoreObject::False);
+    if ((args[0] != yes && args[0] != no) || (args[1] != yes && args[1] != no)) {
+        integer_extended<Op, false>(context, function, args, out);
+        return;
+    }
+    const bool a = args[0] == yes, b = args[1] == yes;
+    if constexpr (Op == BinaryOp::BitAnd)
+        boolean(context, a && b, out);
+    if constexpr (Op == BinaryOp::BitXor)
+        boolean(context, a != b, out);
+    if constexpr (Op == BinaryOp::BitOr)
+        boolean(context, a || b, out);
+}
 template <CompareOp Op>
 void compare(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
@@ -607,6 +703,25 @@ void install_numbers(Attachment &context, std::span<const Handle> core)
     install(U"__rfloordiv__", arithmetic<BinaryOp::FloorDivide, true>, true);
     install(U"__mod__", arithmetic<BinaryOp::Modulo, false>, true);
     install(U"__rmod__", arithmetic<BinaryOp::Modulo, true>, true);
+    install(U"__pow__", integer_extended<BinaryOp::Power, false>, true);
+    install(U"__rpow__", integer_extended<BinaryOp::Power, true>, true);
+    install(U"__lshift__", integer_extended<BinaryOp::LeftShift, false>, true);
+    install(U"__rlshift__", integer_extended<BinaryOp::LeftShift, true>, true);
+    install(U"__rshift__", integer_extended<BinaryOp::RightShift, false>, true);
+    install(U"__rrshift__", integer_extended<BinaryOp::RightShift, true>, true);
+    install(U"__and__", integer_extended<BinaryOp::BitAnd, false>, true);
+    install(U"__rand__", integer_extended<BinaryOp::BitAnd, true>, true);
+    install(U"__xor__", integer_extended<BinaryOp::BitXor, false>, true);
+    install(U"__rxor__", integer_extended<BinaryOp::BitXor, true>, true);
+    install(U"__or__", integer_extended<BinaryOp::BitOr, false>, true);
+    install(U"__ror__", integer_extended<BinaryOp::BitOr, true>, true);
+    for (auto [name, entry] : {std::pair{U"__and__", bool_bitwise<BinaryOp::BitAnd>},
+                               {U"__rand__", bool_bitwise<BinaryOp::BitAnd>},
+                               {U"__xor__", bool_bitwise<BinaryOp::BitXor>},
+                               {U"__rxor__", bool_bitwise<BinaryOp::BitXor>},
+                               {U"__or__", bool_bitwise<BinaryOp::BitOr>},
+                               {U"__ror__", bool_bitwise<BinaryOp::BitOr>}})
+        install_native_attribute(context, core, at(CoreObject::BoolType), name, pair, entry);
     install(U"__eq__", compare<CompareOp::Eq>, true);
     install(U"__ne__", compare<CompareOp::Ne>, true);
     install(U"__lt__", compare<CompareOp::Lt>, true);

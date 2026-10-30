@@ -713,7 +713,8 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                     data.operands[data.sp++] = result.value();
                 break;
             }
-            case Opcode::UnpackSequence: {
+            case Opcode::UnpackSequence:
+            case Opcode::UnpackEx: {
                 RootScope roots(context);
                 ReturnSlot iterator(context);
                 get_iter(context, roots.root(data.operands[data.sp - 1]), iterator);
@@ -723,9 +724,11 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 }
                 const auto source = roots.root(iterator.value());
                 std::vector<Value> values;
-                values.reserve(operand);
+                const auto before = opcode == Opcode::UnpackEx ? operand & 65535U : operand;
+                const auto after = opcode == Opcode::UnpackEx ? operand >> 16 : 0;
+                values.reserve(static_cast<std::size_t>(before) + after);
                 bool failed = false;
-                for (std::size_t i = 0; i < operand; ++i) {
+                for (std::size_t i = 0; i < before; ++i) {
                     const auto status = iter_next(context, source, result);
                     if (status != NextStatus::Item) {
                         if (status == NextStatus::Done)
@@ -739,17 +742,187 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 }
                 if (failed)
                     break;
-                const auto status = iter_next(context, source, result);
-                if (status != NextStatus::Done) {
-                    if (status == NextStatus::Item)
+                if (opcode == Opcode::UnpackEx) {
+                    for (;;) {
+                        const auto status = iter_next(context, source, result);
+                        if (status == NextStatus::Done)
+                            break;
+                        if (status == NextStatus::Raised) {
+                            activation.raising(result.exception());
+                            failed = true;
+                            break;
+                        }
+                        values.push_back(roots.root(result.value()).get(context));
+                    }
+                    if (failed)
+                        break;
+                    if (values.size() - before < after) {
                         raise_error(context, CoreObject::ValueErrorType,
-                                    U"too many values to unpack", result);
-                    activation.raising(result.exception());
-                    break;
+                                    U"not enough values to unpack", result);
+                        activation.raising(result.exception());
+                        break;
+                    }
+                    const auto rest = values.size() - before - after;
+                    make_list(context, std::span<const Value>{values.data() + before, rest},
+                              result);
+                    if (raised(result)) {
+                        activation.raising(result.exception());
+                        break;
+                    }
+                    const auto middle = roots.root(result.value());
+                    std::vector<Value> unpacked;
+                    unpacked.reserve(static_cast<std::size_t>(before) + after + 1);
+                    unpacked.insert(unpacked.end(), values.begin(), values.begin() + before);
+                    unpacked.push_back(middle.get(context));
+                    unpacked.insert(unpacked.end(), values.end() - after, values.end());
+                    values.swap(unpacked);
+                } else {
+                    const auto status = iter_next(context, source, result);
+                    if (status != NextStatus::Done) {
+                        if (status == NextStatus::Item)
+                            raise_error(context, CoreObject::ValueErrorType,
+                                        U"too many values to unpack", result);
+                        activation.raising(result.exception());
+                        break;
+                    }
                 }
                 data.operands[--data.sp] = context.builtin(CoreObject::None);
                 for (auto i = values.size(); i-- > 0;)
                     data.operands[data.sp++] = values[i];
+                break;
+            }
+            case Opcode::BuildMap: {
+                const auto base = data.sp - static_cast<std::size_t>(operand) * 2;
+                RootScope roots(context);
+                ReturnSlot mapping(context);
+                context.allocate_instance<DictObject>(
+                    roots.root(context.builtin(CoreObject::DictType)), mapping);
+                const auto owner = roots.root(mapping.value());
+                result.reset(context);
+                for (std::size_t i = base; i < data.sp; i += 2) {
+                    dict_store(context, owner, roots.root(data.operands[i]),
+                               roots.root(data.operands[i + 1]), result);
+                    if (raised(result))
+                        break;
+                }
+                if (raised(result))
+                    activation.raising(result.exception());
+                else {
+                    data.trim_stack(context, base);
+                    data.operands[data.sp++] = owner.get(context);
+                }
+                break;
+            }
+            case Opcode::DictUpdate:
+            case Opcode::DictMerge:
+            case Opcode::ListAppend:
+            case Opcode::ListExtend: {
+                RootScope roots(context);
+                const auto owner = roots.root(data.operands[data.sp - 2]),
+                           item = roots.root(data.operands[data.sp - 1]);
+                if (opcode == Opcode::DictUpdate || opcode == Opcode::DictMerge) {
+                    if (context.type_of(owner) != context.builtin(CoreObject::DictType))
+                        type_error(context, U"dictionary builder requires an exact dict", result);
+                    else
+                        detail::dict_merge(context, owner, item, opcode == Opcode::DictMerge,
+                                           result);
+                } else if (context.type_of(owner) != context.builtin(CoreObject::ListType))
+                    type_error(context, U"list builder requires an exact list", result);
+                else if (opcode == Opcode::ListAppend)
+                    detail::list_append(context, owner, item, result);
+                else
+                    detail::list_extend(context, owner, item, result);
+                if (raised(result))
+                    activation.raising(result.exception());
+                else
+                    data.trim_stack(context, data.sp - 1);
+                break;
+            }
+            case Opcode::ListToTuple: {
+                RootScope roots(context);
+                const auto owner = roots.root(data.operands[data.sp - 1]);
+                if (context.type_of(owner) != context.builtin(CoreObject::ListType))
+                    type_error(context, U"list conversion requires an exact list", result);
+                else {
+                    std::vector<Value> items;
+                    detail::list_snapshot(context, owner, roots, items);
+                    cxxpython::core::make_tuple(context, items, result);
+                }
+                if (raised(result))
+                    activation.raising(result.exception());
+                else
+                    data.operands[data.sp - 1] = result.value();
+                break;
+            }
+            case Opcode::LoadAssertionError:
+                data.operands[data.sp++] = context.builtin(CoreObject::AssertionErrorType);
+                break;
+            case Opcode::BuildSlice: {
+                RootScope roots(context);
+                const auto base = data.sp - 3;
+                make_slice(context, roots.root(data.operands[base]),
+                           roots.root(data.operands[base + 1]), roots.root(data.operands[base + 2]),
+                           result);
+                if (raised(result))
+                    activation.raising(result.exception());
+                else {
+                    data.trim_stack(context, base);
+                    data.operands[data.sp++] = result.value();
+                }
+                break;
+            }
+            case Opcode::FormatValue: {
+                RootScope roots(context);
+                const auto base = data.sp - 2;
+                auto value = roots.root(data.operands[base]);
+                const auto spec = roots.root(data.operands[base + 1]);
+                if (operand) {
+                    if (operand == 1)
+                        str(context, value, result);
+                    else if (operand == 2)
+                        repr(context, value, result);
+                    else
+                        ascii(context, value, result);
+                    if (raised(result)) {
+                        activation.raising(result.exception());
+                        break;
+                    }
+                    value = roots.root(result.value());
+                }
+                format(context, value, spec, result);
+                if (raised(result))
+                    activation.raising(result.exception());
+                else {
+                    data.trim_stack(context, base);
+                    data.operands[data.sp++] = result.value();
+                }
+                break;
+            }
+            case Opcode::BuildString: {
+                const auto base = data.sp - operand;
+                result.reset(context);
+                std::u32string text;
+                for (std::size_t i = base; i < data.sp; ++i) {
+                    if (!kind<StrObject, CoreObject::StrType>(context, data.operands[i])) {
+                        type_error(context, U"string builder requires string operands", result);
+                        break;
+                    }
+                    const auto &part = context.payload<StrObject>(data.operands[i]).value;
+                    if (part.size() > text.max_size() - text.size())
+                        throw std::bad_alloc();
+                    text += part;
+                }
+                if (raised(result))
+                    activation.raising(result.exception());
+                else {
+                    make_str(context, std::move(text), result);
+                    if (raised(result))
+                        activation.raising(result.exception());
+                    else {
+                        data.trim_stack(context, base);
+                        data.operands[data.sp++] = result.value();
+                    }
+                }
                 break;
             }
             case Opcode::StoreItem:
@@ -918,20 +1091,53 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 activation.raising(exception);
                 break;
             }
-            case Opcode::Call: {
-                const auto &layout = code.program.calls()[operand];
-                const auto base = data.sp - layout.argument_count() - 1;
-                const auto &keywords =
-                    context
-                        .payload<TupleObject>(
-                            context.payload<TupleObject>(code.call_keywords).items[operand])
-                        .items;
-                std::vector<KeywordArg> named;
-                for (std::size_t i = 0; i < keywords.size(); ++i)
-                    named.push_back({keywords[i], data.operands[base + 1 + layout.positional + i]});
-                CallArgsView args{{data.operands.data() + base + 1, layout.positional}, named};
-                data.pending_call = base;
+            case Opcode::Call:
+            case Opcode::CallEx: {
                 RootScope roots(context);
+                const auto layout =
+                    opcode == Opcode::Call ? code.program.calls()[operand] : CallLayout{0, 0};
+                const auto base =
+                    opcode == Opcode::Call ? data.sp - layout.argument_count() - 1 : data.sp - 3;
+                std::vector<KeywordArg> named;
+                std::span<const Value> positional;
+                if (opcode == Opcode::CallEx) {
+                    result.reset(context);
+                    const auto tuple = roots.root(data.operands[base + 1]);
+                    const auto dict = roots.root(data.operands[base + 2]);
+                    if (context.type_of(tuple) != context.builtin(CoreObject::TupleType) ||
+                        context.type_of(dict) != context.builtin(CoreObject::DictType)) {
+                        type_error(context, U"expanded call requires tuple and dict arguments",
+                                   result);
+                        activation.raising(result.exception());
+                        break;
+                    }
+                    positional = context.payload<TupleObject>(tuple).items;
+                    DictView view(context, dict.get(context));
+                    for (const auto &entry : view.entries()) {
+                        if (!kind<StrObject, CoreObject::StrType>(context, entry.key)) {
+                            type_error(context, U"keywords must be strings", result);
+                            break;
+                        }
+                        named.push_back({roots.root(entry.key).get(context),
+                                         roots.root(entry.value).get(context)});
+                    }
+                    if (raised(result)) {
+                        activation.raising(result.exception());
+                        break;
+                    }
+                } else {
+                    const auto &keywords =
+                        context
+                            .payload<TupleObject>(
+                                context.payload<TupleObject>(code.call_keywords).items[operand])
+                            .items;
+                    for (std::size_t i = 0; i < keywords.size(); ++i)
+                        named.push_back(
+                            {keywords[i], data.operands[base + 1 + layout.positional + i]});
+                    positional = {data.operands.data() + base + 1, layout.positional};
+                }
+                CallArgsView args{positional, named};
+                data.pending_call = base;
                 auto prepared = detail::prepare_call(context, roots.root(data.operands[base]), args,
                                                      roots, result);
                 if (prepared) {

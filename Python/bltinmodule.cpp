@@ -11,6 +11,53 @@ bool failed(const ReturnSlot &out)
 {
     return out.tag() == ResultTag::Raised;
 }
+void attribute_get(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(context);
+    const auto &defaults = context.payload<TupleObject>(args[2]).items;
+    if (defaults.size() > 1) {
+        raise_error(context, CoreObject::TypeErrorType, U"getattr expected at most 3 arguments",
+                    out);
+        return;
+    }
+    get_attribute(context, roots.root(args[0]), roots.root(args[1]), out);
+    if (failed(out) && !defaults.empty() &&
+        is_subtype(context, context.type_of(out.exception()),
+                   context.builtin(CoreObject::AttributeErrorType)))
+        out.ok(defaults[0]);
+}
+void attribute_has(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(context);
+    get_attribute(context, roots.root(args[0]), roots.root(args[1]), out);
+    if (failed(out)) {
+        if (!is_subtype(context, context.type_of(out.exception()),
+                        context.builtin(CoreObject::AttributeErrorType)))
+            return;
+        out.ok(context.builtin(CoreObject::False));
+    } else
+        out.ok(context.builtin(CoreObject::True));
+}
+void attribute_set(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(context);
+    set_attribute(context, roots.root(args[0]), roots.root(args[1]), roots.root(args[2]), out);
+}
+void attribute_delete(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(context);
+    del_attribute(context, roots.root(args[0]), roots.root(args[1]), out);
+}
+void builtin_format(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(context);
+    format(context, roots.root(args[0]), roots.root(args[1]), out);
+}
+void builtin_ascii(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(context);
+    ascii(context, roots.root(args[0]), out);
+}
 void mapping_store(Attachment &context, Handle mapping, std::u32string name, Value value,
                    ReturnSlot &out)
 {
@@ -174,6 +221,36 @@ void install_class_builtins(Attachment &context, std::span<const Handle> core, V
     context.allocate_instance<StrObject>(core[static_cast<std::size_t>(CoreObject::StrType)], name,
                                          U"__build_class__");
     name_store(context, mapping, name.value(), function.value());
+    auto install = [&](const char *label, std::u32string key, SignatureLayout layout,
+                       NativeEntry entry) {
+        context.allocate_instance<NativeFunctionObject>(
+            core[static_cast<std::size_t>(CoreObject::NativeFunctionType)], function, label,
+            std::move(layout), entry, std::vector<Value>{});
+        context.allocate_instance<StrObject>(core[static_cast<std::size_t>(CoreObject::StrType)],
+                                             name, std::move(key));
+        name_store(context, mapping, name.value(), function.value());
+    };
+    SignatureLayout attributes;
+    attributes.parameters = {{U"object", ParameterKind::PositionalOnly},
+                             {U"name", ParameterKind::PositionalOnly}};
+    install("hasattr", U"hasattr", attributes, attribute_has);
+    install("delattr", U"delattr", attributes, attribute_delete);
+    auto get = attributes;
+    get.varargs = U"default";
+    install("getattr", U"getattr", get, attribute_get);
+    attributes.parameters.push_back({U"value", ParameterKind::PositionalOnly});
+    install("setattr", U"setattr", attributes, attribute_set);
+    SignatureLayout ascii_signature;
+    ascii_signature.parameters = {{U"object", ParameterKind::PositionalOnly}};
+    install("ascii", U"ascii", ascii_signature, builtin_ascii);
+    context.allocate_instance<StrObject>(core[static_cast<std::size_t>(CoreObject::StrType)], name,
+                                         U"");
+    const auto empty_spec = roots.root(name.value());
+    SignatureLayout format_signature;
+    format_signature.parameters = {
+        {U"value", ParameterKind::PositionalOnly},
+        {U"format_spec", ParameterKind::PositionalOnly, empty_spec.get(context)}};
+    install("format", U"format", format_signature, builtin_format);
 }
 } // namespace detail
 } // namespace cxxpython::core

@@ -44,6 +44,28 @@ constexpr std::array definitions{
     ProtocolDefinition{U"__truediv__", 1, ProtocolResult::Any},
     ProtocolDefinition{U"__rtruediv__", 1, ProtocolResult::Any},
     ProtocolDefinition{U"__itruediv__", 1, ProtocolResult::Any},
+    ProtocolDefinition{U"__pow__", 1, ProtocolResult::Any},
+    ProtocolDefinition{U"__rpow__", 1, ProtocolResult::Any},
+    ProtocolDefinition{U"__ipow__", 1, ProtocolResult::Any},
+    ProtocolDefinition{U"__lshift__", 1, ProtocolResult::Any},
+    ProtocolDefinition{U"__rlshift__", 1, ProtocolResult::Any},
+    ProtocolDefinition{U"__ilshift__", 1, ProtocolResult::Any},
+    ProtocolDefinition{U"__rshift__", 1, ProtocolResult::Any},
+    ProtocolDefinition{U"__rrshift__", 1, ProtocolResult::Any},
+    ProtocolDefinition{U"__irshift__", 1, ProtocolResult::Any},
+    ProtocolDefinition{U"__and__", 1, ProtocolResult::Any},
+    ProtocolDefinition{U"__rand__", 1, ProtocolResult::Any},
+    ProtocolDefinition{U"__iand__", 1, ProtocolResult::Any},
+    ProtocolDefinition{U"__xor__", 1, ProtocolResult::Any},
+    ProtocolDefinition{U"__rxor__", 1, ProtocolResult::Any},
+    ProtocolDefinition{U"__ixor__", 1, ProtocolResult::Any},
+    ProtocolDefinition{U"__or__", 1, ProtocolResult::Any},
+    ProtocolDefinition{U"__ror__", 1, ProtocolResult::Any},
+    ProtocolDefinition{U"__ior__", 1, ProtocolResult::Any},
+    ProtocolDefinition{U"__matmul__", 1, ProtocolResult::Any},
+    ProtocolDefinition{U"__rmatmul__", 1, ProtocolResult::Any},
+    ProtocolDefinition{U"__imatmul__", 1, ProtocolResult::Any},
+    ProtocolDefinition{U"__contains__", 1, ProtocolResult::Any},
 };
 static_assert(definitions.size() == static_cast<std::size_t>(Protocol::Count));
 constexpr std::array comparisons{Protocol::Eq, Protocol::Ne, Protocol::Lt,
@@ -57,6 +79,13 @@ constexpr std::array operations{
     std::array{Protocol::FloorDiv, Protocol::RFloorDiv, Protocol::IFloorDiv},
     std::array{Protocol::Mod, Protocol::RMod, Protocol::IMod},
     std::array{Protocol::TrueDiv, Protocol::RTrueDiv, Protocol::ITrueDiv},
+    std::array{Protocol::Power, Protocol::RPower, Protocol::IPower},
+    std::array{Protocol::LeftShift, Protocol::RLeftShift, Protocol::ILeftShift},
+    std::array{Protocol::RightShift, Protocol::RRightShift, Protocol::IRightShift},
+    std::array{Protocol::BitAnd, Protocol::RBitAnd, Protocol::IBitAnd},
+    std::array{Protocol::BitXor, Protocol::RBitXor, Protocol::IBitXor},
+    std::array{Protocol::BitOr, Protocol::RBitOr, Protocol::IBitOr},
+    std::array{Protocol::MatrixMultiply, Protocol::RMatrixMultiply, Protocol::IMatrixMultiply},
 };
 template <class F> ResultView guarded(Attachment &context, ReturnSlot &out, F &&function)
 {
@@ -499,6 +528,54 @@ ResultView rich_compare(Attachment &context, Handle left, Handle right, CompareO
         out.reset(context);
         if (op == CompareOp::Is || op == CompareOp::IsNot) {
             boolean(context, (a.get(context) == b.get(context)) == (op == CompareOp::Is), out);
+            return;
+        }
+        if (op == CompareOp::In || op == CompareOp::NotIn) {
+            ReturnSlot result(context);
+            auto slot = resolve(context, b, Protocol::Contains, roots);
+            bool found = false;
+            if (slot.state != SlotState::Missing) {
+                std::array args{a.get(context)};
+                invoke_protocol(context, b, slot, args, result);
+                if (raised(result)) {
+                    out.raised(result.exception());
+                    return;
+                }
+                truth(context, roots.root(result.value()), result);
+                if (raised(result)) {
+                    out.raised(result.exception());
+                    return;
+                }
+                found = result.value() == context.builtin(CoreObject::True);
+            } else {
+                get_iter(context, b, result);
+                if (raised(result)) {
+                    out.raised(result.exception());
+                    return;
+                }
+                auto iterator = roots.root(result.value());
+                for (;;) {
+                    auto status = iter_next(context, iterator, result);
+                    if (status == NextStatus::Raised) {
+                        out.raised(result.exception());
+                        return;
+                    }
+                    if (status == NextStatus::Done)
+                        break;
+                    RootScope iteration(context);
+                    auto item = iteration.root(result.value());
+                    container_equal(context, item, a, result);
+                    if (raised(result)) {
+                        out.raised(result.exception());
+                        return;
+                    }
+                    if (result.value() == context.builtin(CoreObject::True)) {
+                        found = true;
+                        break;
+                    }
+                }
+            }
+            boolean(context, found == (op == CompareOp::In), out);
             return;
         }
         auto normal = comparisons.at(static_cast<std::size_t>(op));

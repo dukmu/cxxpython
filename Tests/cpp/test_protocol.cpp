@@ -1,6 +1,8 @@
+#include "cxxpython/floatobject.hpp"
 #include "cxxpython/protocol.hpp"
 
 #include <gtest/gtest.h>
+#include <limits>
 
 namespace {
 using namespace cxxpython::core;
@@ -143,6 +145,21 @@ TEST_F(CoreProtocols, RichComparisonKeepsArbitraryResultsAndContainerIdentityIsS
     container_equal(context, obj, other, out);
     EXPECT_EQ(out.result().value(), context.builtin(CoreObject::True));
     rich_compare(context, obj, other, CompareOp::Ne, out);
+    EXPECT_EQ(out.result().value(), context.builtin(CoreObject::False));
+}
+
+TEST_F(CoreProtocols, ContainsUsesTruthAndNotInNegates)
+{
+    auto cls = type();
+    auto container = instance(cls);
+    auto item = integer(1);
+    method(cls, U"__contains__", integer(2), 1);
+    ReturnSlot out(context);
+    rich_compare(context, item, container, CompareOp::In, out);
+    ASSERT_EQ(out.result().tag(), ResultTag::Ok);
+    EXPECT_EQ(out.result().value(), context.builtin(CoreObject::True));
+    rich_compare(context, item, container, CompareOp::NotIn, out);
+    ASSERT_EQ(out.result().tag(), ResultTag::Ok);
     EXPECT_EQ(out.result().value(), context.builtin(CoreObject::False));
 }
 
@@ -450,5 +467,196 @@ TEST_F(CoreProtocols, ForeignOperandsResultsAndEvenStaleResolutionAreRejected)
     EXPECT_THROW(truth(context, value, foreign_out), std::logic_error);
     EXPECT_EQ(foreign_out.result().value(), foreign.builtin(CoreObject::None));
     EXPECT_NE(context.builtin(CoreObject::IntOne), foreign.builtin(CoreObject::IntOne));
+}
+
+TEST_F(CoreProtocols, FormatUsesTypeLookupAndValidatesCallbackResultsUnderCollection)
+{
+    auto cls = type();
+    auto obj = instance(cls);
+    auto marker = text(U"formatted");
+    method(cls, U"__format__", marker, 1);
+    ReturnSlot out(context);
+    set_attribute(context, obj, text(U"__format__"), function(integer(99), 1), out);
+    ASSERT_EQ(out.result().tag(), ResultTag::Ok);
+    method(cls, U"__getattribute__", integer(99), 1);
+    format(context, obj, text(U"custom"), out);
+    ASSERT_EQ(out.result().tag(), ResultTag::Ok);
+    EXPECT_EQ(out.result().value(), marker.get(context));
+    method(cls, U"__format__", integer(9), 1);
+    format(context, obj, text(U""), out);
+    error(out, CoreObject::TypeErrorType);
+    format(context, obj, integer(0), out);
+    error(out, CoreObject::TypeErrorType);
+    put(cls, U"__format__", builtin(CoreObject::None));
+    format(context, obj, text(U""), out);
+    error(out, CoreObject::TypeErrorType);
+}
+
+TEST_F(CoreProtocols, FormatBindsCustomDescriptorsBeforeCallingWithOnlySpec)
+{
+    auto cls = type();
+    auto obj = instance(cls);
+    SignatureLayout callable_signature;
+    callable_signature.parameters = {{U"spec", ParameterKind::PositionalOnly}};
+    ReturnSlot out(context);
+    make_native_function(
+        context, "format callback", callable_signature,
+        [](Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out) {
+            c.collect();
+            out.ok(args[0]);
+        },
+        {}, out);
+    auto callback = roots.root(out.result().value());
+    auto descriptor_type = type();
+    SignatureLayout get_signature;
+    get_signature.parameters = {{U"self"}, {U"instance"}, {U"owner"}};
+    std::array captures{callback.get(context), obj.get(context), cls.get(context)};
+    make_native_function(
+        context, "format descriptor", get_signature,
+        [](Attachment &c, Handle fn, std::span<const Value> args, ReturnSlot &out) {
+            c.collect();
+            const auto &captured = c.payload<NativeFunctionObject>(fn).captures;
+            EXPECT_EQ(args[1], captured[1]);
+            EXPECT_EQ(args[2], captured[2]);
+            out.ok(captured[0]);
+        },
+        captures, out);
+    put(descriptor_type, U"__get__", roots.root(out.result().value()));
+    put(cls, U"__format__", instance(descriptor_type));
+    format(context, obj, text(U"bound spec"), out);
+    ASSERT_EQ(out.result().tag(), ResultTag::Ok);
+    EXPECT_EQ(context.payload<StrObject>(out.result().value()).value, U"bound spec");
+}
+
+TEST_F(CoreProtocols, FormatObjectStringAndBooleanSemantics)
+{
+    ReturnSlot out(context);
+    auto cls = type();
+    auto obj = instance(cls);
+    method(cls, U"__str__", text(U"plain"));
+    format(context, obj, text(U""), out);
+    ASSERT_EQ(out.result().tag(), ResultTag::Ok);
+    EXPECT_EQ(context.payload<StrObject>(out.result().value()).value, U"plain");
+    format(context, obj, text(U">8"), out);
+    error(out, CoreObject::TypeErrorType);
+    struct Sample {
+        const char32_t *value;
+        const char32_t *spec;
+        const char32_t *expected;
+    };
+    for (auto sample : {Sample{U"abc", U"*^8.2s", U"***ab***"},
+                        {U"abc", U"05", U"abc00"},
+                        {U"\U0001f600xy", U"\u4e2d>4.2", U"\u4e2d\u4e2d\U0001f600x"}}) {
+        format(context, text(sample.value), text(sample.spec), out);
+        ASSERT_EQ(out.result().tag(), ResultTag::Ok);
+        EXPECT_EQ(context.payload<StrObject>(out.result().value()).value, sample.expected);
+    }
+    format(context, builtin(CoreObject::True), text(U""), out);
+    ASSERT_EQ(out.result().tag(), ResultTag::Ok);
+    EXPECT_EQ(context.payload<StrObject>(out.result().value()).value, U"True");
+    format(context, builtin(CoreObject::True), text(U"d"), out);
+    ASSERT_EQ(out.result().tag(), ResultTag::Ok);
+    EXPECT_EQ(context.payload<StrObject>(out.result().value()).value, U"1");
+    for (auto spec : {U"+s", U"=5", U"#s", U"zs", U",s", U".s"}) {
+        format(context, text(U"x"), text(spec), out);
+        error(out, CoreObject::ValueErrorType);
+    }
+}
+
+TEST_F(CoreProtocols, FormatIntegersPreservesPrecisionPrefixesAndGrouping)
+{
+    ReturnSlot out(context);
+    struct Sample {
+        std::int64_t value;
+        const char32_t *spec;
+        const char32_t *expected;
+    };
+    for (auto sample : {Sample{-42, U"+08d", U"-0000042"},
+                        {42, U"#08x", U"0x00002a"},
+                        {0, U"#b", U"0b0"},
+                        {1234, U"010,d", U"00,001,234"},
+                        {-42, U"*=8d", U"-*****42"},
+                        {0x12345, U"#_X", U"0X1_2345"},
+                        {65, U"4c", U"   A"},
+                        {12, U".1f", U"12.0"}}) {
+        format(context, integer(sample.value), text(sample.spec), out);
+        ASSERT_EQ(out.result().tag(), ResultTag::Ok);
+        EXPECT_EQ(context.payload<StrObject>(out.result().value()).value, sample.expected);
+    }
+    make_int_decimal(context, "1267650600228229401496703205376", out);
+    auto big = roots.root(out.result().value());
+    format(context, big, text(U"_d"), out);
+    ASSERT_EQ(out.result().tag(), ResultTag::Ok);
+    EXPECT_EQ(context.payload<StrObject>(out.result().value()).value,
+              U"1_267_650_600_228_229_401_496_703_205_376");
+    format(context, big, text(U"#x"), out);
+    ASSERT_EQ(out.result().tag(), ResultTag::Ok);
+    EXPECT_EQ(context.payload<StrObject>(out.result().value()).value,
+              U"0x10000000000000000000000000");
+    for (auto spec : {U".2d", U"zd", U",x", U"_,d", U"+c", U"q", U"n"}) {
+        format(context, integer(1), text(spec), out);
+        error(out, CoreObject::ValueErrorType);
+    }
+    format(context, integer(-1), text(U"c"), out);
+    error(out, CoreObject::OverflowErrorType);
+}
+
+TEST_F(CoreProtocols, FormatFloatsHandlesRoundingSpecialValuesAndDefaultType)
+{
+    ReturnSlot out(context);
+    struct Sample {
+        double value;
+        const char32_t *spec;
+        const char32_t *expected;
+    };
+    for (auto sample : {Sample{2.5, U".0f", U"2"},
+                        {3.5, U".0f", U"4"},
+                        {1.0, U"#.0f", U"1."},
+                        {1.0, U"#.4g", U"1.000"},
+                        {1234.5, U",.2f", U"1,234.50"},
+                        {0.125, U".1%", U"12.5%"},
+                        {-0.0, U".1f", U"-0.0"},
+                        {-0.01, U"z.1f", U"0.0"},
+                        {-0.01, U"+z.1f", U"+0.0"},
+                        {100.0, U".3", U"1e+02"},
+                        {100.0, U".3g", U"100"},
+                        {1e16, U">1", U"1e+16"},
+                        {1e-5, U".2e", U"1.00e-05"},
+                        {std::numeric_limits<double>::infinity(), U"+F", U"+INF"},
+                        {-std::numeric_limits<double>::quiet_NaN(), U"G", U"NAN"}}) {
+        make_float(context, sample.value, out);
+        auto value = roots.root(out.result().value());
+        format(context, value, text(sample.spec), out);
+        ASSERT_EQ(out.result().tag(), ResultTag::Ok);
+        EXPECT_EQ(context.payload<StrObject>(out.result().value()).value, sample.expected);
+    }
+}
+
+TEST_F(CoreProtocols, AsciiEscapesUnicodeAfterCustomReprAndBuiltinsHaveDefaults)
+{
+    auto cls = type();
+    auto obj = instance(cls);
+    method(cls, U"__repr__", text(U"\u00e9\u4e2d\U0001f600"));
+    ReturnSlot out(context);
+    ascii(context, obj, out);
+    ASSERT_EQ(out.result().tag(), ResultTag::Ok);
+    EXPECT_EQ(context.payload<StrObject>(out.result().value()).value, U"\\xe9\\u4e2d\\U0001f600");
+    method(cls, U"__repr__", integer(1));
+    ascii(context, obj, out);
+    error(out, CoreObject::TypeErrorType);
+    auto mapping = context.builtin(CoreObject::Builtins);
+    auto format_function = detail::name_lookup(context, mapping, U"format");
+    auto ascii_function = detail::name_lookup(context, mapping, U"ascii");
+    ASSERT_TRUE(format_function);
+    ASSERT_TRUE(ascii_function);
+    const auto formatter = roots.root(*format_function);
+    const auto ascii_builtin = roots.root(*ascii_function);
+    const std::array args{context.builtin(CoreObject::True)};
+    call(context, formatter, {args, {}}, out);
+    ASSERT_EQ(out.result().tag(), ResultTag::Ok);
+    EXPECT_EQ(context.payload<StrObject>(out.result().value()).value, U"True");
+    call(context, ascii_builtin, {args, {}}, out);
+    ASSERT_EQ(out.result().tag(), ResultTag::Ok);
+    EXPECT_EQ(context.payload<StrObject>(out.result().value()).value, U"True");
 }
 } // namespace
