@@ -88,11 +88,23 @@ ResolvedSlot resolve(Attachment &context, Handle value, Protocol id, RootScope &
 {
     return resolve_protocol(context, roots.root(context.type_of(value)), id, roots);
 }
-bool attempt(Attachment &context, Handle receiver, Handle argument, Protocol id, ReturnSlot &out)
+enum class SlotPhase { Any, Numeric, Sequence };
+bool sequence_slot(Attachment &context, const ResolvedSlot &slot)
+{
+    if (slot.state != SlotState::Native)
+        return false;
+    const auto &function = context.payload<NativeFunctionObject>(slot.descriptor);
+    return function.sequence_owner &&
+           is_subtype(context, slot.owner.get(context), *function.sequence_owner);
+}
+bool attempt(Attachment &context, Handle receiver, Handle argument, Protocol id, ReturnSlot &out,
+             SlotPhase phase = SlotPhase::Any)
 {
     RootScope roots(context);
     auto slot = resolve(context, receiver, id, roots);
     if (slot.state == SlotState::Missing)
+        return false;
+    if (phase != SlotPhase::Any && sequence_slot(context, slot) != (phase == SlotPhase::Sequence))
         return false;
     std::array args{argument.get(context)};
     invoke_protocol(context, receiver, slot, args, out);
@@ -137,6 +149,43 @@ bool reflected_override(Attachment &context, Handle left_type, Handle right_type
         return false;
     }
     return converted.value() == context.builtin(CoreObject::True);
+}
+bool binary_numeric(Attachment &context, Handle a, Handle b, BinaryOp op, ReturnSlot &out)
+{
+    const auto &ids = operations.at(static_cast<std::size_t>(op));
+    const auto ltype = context.type_of(a), rtype = context.type_of(b);
+    const bool different = ltype != rtype;
+    bool right_first = false;
+    if (different) {
+        RootScope roots(context);
+        const auto left = roots.root(ltype), right = roots.root(rtype);
+        if (is_subtype(context, right, left)) {
+            const auto reflected = resolve(context, b, ids[1], roots);
+            const auto normal = resolve(context, b, ids[0], roots);
+            if ((reflected.state != SlotState::Missing && !sequence_slot(context, reflected)) ||
+                (normal.state != SlotState::Missing && !sequence_slot(context, normal)))
+                right_first = reflected_override(context, left, right, ids[1], out);
+            if (raised(out))
+                return true;
+        }
+    }
+    if (right_first && attempt(context, b, a, ids[1], out, SlotPhase::Numeric))
+        return true;
+    if (attempt(context, a, b, ids[0], out, SlotPhase::Numeric))
+        return true;
+    return different && !right_first && attempt(context, b, a, ids[1], out, SlotPhase::Numeric);
+}
+bool sequence_binary(Attachment &context, Handle a, Handle b, BinaryOp op, bool inplace,
+                     ReturnSlot &out)
+{
+    if (op != BinaryOp::Add && op != BinaryOp::Multiply)
+        return false;
+    const auto &ids = operations.at(static_cast<std::size_t>(op));
+    if (inplace && attempt(context, a, b, ids[2], out, SlotPhase::Sequence))
+        return true;
+    if (attempt(context, a, b, ids[0], out, SlotPhase::Sequence))
+        return true;
+    return op == BinaryOp::Multiply && attempt(context, b, a, ids[1], out, SlotPhase::Sequence);
 }
 void object_eq(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
@@ -495,25 +544,8 @@ ResultView binary(Attachment &context, Handle left, Handle right, BinaryOp op, R
         auto a = roots.root(left.get(context));
         auto b = roots.root(right.get(context));
         out.reset(context);
-        const auto &ids = operations.at(static_cast<std::size_t>(op));
-        const auto ltype = context.type_of(a);
-        const auto rtype = context.type_of(b);
-        const bool different = ltype != rtype;
-        bool right_first = false;
-        if (different && is_subtype(context, rtype, ltype)) {
-            auto reflected = resolve(context, b, ids[1], roots);
-            auto normal = resolve(context, b, ids[0], roots);
-            if (reflected.state != SlotState::Missing || normal.state != SlotState::Missing)
-                right_first =
-                    reflected_override(context, roots.root(ltype), roots.root(rtype), ids[1], out);
-            if (out.tag() == ResultTag::Raised)
-                return;
-        }
-        if (right_first && attempt(context, b, a, ids[1], out))
-            return;
-        if (attempt(context, a, b, ids[0], out))
-            return;
-        if (different && !right_first && attempt(context, b, a, ids[1], out))
+        if (binary_numeric(context, a, b, op, out) ||
+            sequence_binary(context, a, b, op, false, out))
             return;
         type_error(context, U"unsupported operand types for binary operation", out);
     });
@@ -525,9 +557,11 @@ ResultView inplace(Attachment &context, Handle left, Handle right, BinaryOp op, 
         auto a = roots.root(left.get(context));
         auto b = roots.root(right.get(context));
         out.reset(context);
-        if (attempt(context, a, b, operations.at(static_cast<std::size_t>(op))[2], out))
+        if (attempt(context, a, b, operations.at(static_cast<std::size_t>(op))[2], out,
+                    SlotPhase::Numeric) ||
+            binary_numeric(context, a, b, op, out) || sequence_binary(context, a, b, op, true, out))
             return;
-        binary(context, a, b, op, out);
+        type_error(context, U"unsupported operand types for inplace operation", out);
     });
 }
 ResultView get_item(Attachment &context, Handle value, Handle key, ReturnSlot &out)

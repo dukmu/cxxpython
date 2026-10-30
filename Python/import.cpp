@@ -105,10 +105,11 @@ void sys_init(Attachment &context, Handle module, ReturnSlot &out)
     ReturnSlot temporary(context);
     make_str(context, U"", temporary);
     std::array paths{temporary.value()};
-    cxxpython::core::make_tuple(context, paths, temporary);
+    make_list(context, paths, temporary);
     if (store_name(context, dictionary, U"path", temporary.value(), out) == ResultTag::Raised)
         return;
-    store_name(context, dictionary, U"argv", context.builtin(CoreObject::EmptyTuple), out);
+    make_list(context, {}, temporary);
+    store_name(context, dictionary, U"argv", temporary.value(), out);
 }
 void main_init(Attachment &context, Handle module, ReturnSlot &out)
 {
@@ -159,25 +160,34 @@ std::shared_ptr<const ModuleDefinition> find_file(Attachment &context, const std
         return nullptr;
     const auto rooted_path = roots.root(out.value());
     ReturnSlot item(context);
-    get_iter(context, rooted_path, item);
-    if (item.tag() == ResultTag::Raised) {
-        out.raised(item.exception());
-        return nullptr;
-    }
-    const auto iterator = roots.root(item.value());
     std::vector<std::string> paths;
-    for (;;) {
-        const auto status = iter_next(context, iterator, item);
-        if (status == NextStatus::Done)
-            break;
-        if (status == NextStatus::Raised) {
+    auto append_path = [&](Value value) {
+        if (context.has_layout<StrObject>(value) &&
+            is_subtype(context, context.type_of(value), context.builtin(CoreObject::StrType)))
+            paths.push_back(source_utf8(context.payload<StrObject>(value).value));
+    };
+    if (context.type_of(rooted_path) == context.builtin(CoreObject::ListType)) {
+        std::vector<Value> entries;
+        detail::list_snapshot(context, rooted_path, roots, entries);
+        for (auto value : entries)
+            append_path(value);
+    } else {
+        get_iter(context, rooted_path, item);
+        if (item.tag() == ResultTag::Raised) {
             out.raised(item.exception());
             return nullptr;
         }
-        if (context.has_layout<StrObject>(item.value()) &&
-            is_subtype(context, context.type_of(item.value()),
-                       context.builtin(CoreObject::StrType)))
-            paths.push_back(source_utf8(context.payload<StrObject>(item.value()).value));
+        const auto iterator = roots.root(item.value());
+        for (;;) {
+            const auto status = iter_next(context, iterator, item);
+            if (status == NextStatus::Done)
+                break;
+            if (status == NextStatus::Raised) {
+                out.raised(item.exception());
+                return nullptr;
+            }
+            append_path(item.value());
+        }
     }
     const auto leaf = source_utf8(dot == std::u32string::npos ? name : name.substr(dot + 1));
     std::shared_ptr<const ModuleDefinition> result;
@@ -428,7 +438,7 @@ ResultView import_module(Attachment &context, const std::u32string &name, Return
                 make_str(context, detail::decode_filename(SourceBuffer("", path)), temporary);
                 paths.push_back(roots.root(temporary.value()).get(context));
             }
-            cxxpython::core::make_tuple(context, paths, temporary);
+            make_list(context, paths, temporary);
             if (store_name(context, dictionary.get(context), U"__path__", temporary.value(), out) ==
                 ResultTag::Raised)
                 return out.result();
@@ -719,7 +729,7 @@ void set_import_path(Attachment &context, std::span<const std::string> paths, Re
         make_str(context, detail::decode_filename(SourceBuffer("", path)), out);
         values.push_back(roots.root(out.value()).get(context));
     }
-    cxxpython::core::make_tuple(context, values, out);
+    make_list(context, values, out);
     store_name(context, module_dict(context, module.get(context)), U"path", out.value(), out);
 }
 void detail::install_import_builtins(Attachment &context, std::span<const Handle> core,

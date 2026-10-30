@@ -48,6 +48,30 @@ struct TupleObject {
         return items.capacity() * sizeof(Value);
     }
 };
+struct ListObject {
+    struct Storage {
+        std::mutex mutex;
+        std::vector<Value> items;
+    };
+    ObjectHeader header;
+    const std::unique_ptr<Storage> contents;
+    explicit ListObject(InitialType head, std::vector<Value> values = {})
+        : header(head), contents(std::make_unique<Storage>())
+    {
+        contents->items = std::move(values);
+    }
+    // Only the owner lock or an acknowledged collector stop may inspect items.
+    void trace(Tracer &tracer) const noexcept
+    {
+        for (auto value : contents->items)
+            tracer.visit(value);
+    }
+    std::size_t external_bytes() const noexcept
+    {
+        return sizeof(Storage) + contents->items.capacity() * sizeof(Value);
+    }
+};
+void make_list(Attachment &, std::span<const Value>, ReturnSlot &);
 
 struct RangeObject {
     ObjectHeader header;
@@ -227,6 +251,7 @@ struct CallArgsView {
     std::span<const KeywordArg> keywords = {};
 };
 using NativeEntry = void (*)(Attachment &, Handle function, std::span<const Value>, ReturnSlot &);
+enum class NativeSlotKind { Ordinary, Sequence };
 
 struct NativeFunctionObject {
     ObjectHeader header;
@@ -234,10 +259,12 @@ struct NativeFunctionObject {
     const SignatureLayout signature;
     const NativeEntry entry;
     const std::vector<Value> captures;
+    const std::optional<Value> sequence_owner;
     NativeFunctionObject(InitialType head, std::string name_in, SignatureLayout signature_in,
-                         NativeEntry entry_in, std::vector<Value> captures_in)
+                         NativeEntry entry_in, std::vector<Value> captures_in,
+                         std::optional<Value> sequence = {})
         : header(head), name(std::move(name_in)), signature(std::move(signature_in)),
-          entry(entry_in), captures(std::move(captures_in))
+          entry(entry_in), captures(std::move(captures_in)), sequence_owner(sequence)
     {}
     void trace(Tracer &tracer) const noexcept;
     std::size_t external_bytes() const noexcept;
@@ -372,6 +399,11 @@ bool dict_erase_binding(Attachment &, Handle dictionary, DictBinding, Handle exp
 void discard_name_table(Attachment &context, Value dictionary);
 std::int64_t name_hash(Attachment &, const std::u32string &);
 void install_dictionaries(Attachment &, std::span<const Handle>);
+void install_lists(Attachment &, std::span<const Handle>);
+std::size_t list_size(Attachment &, Handle);
+void list_item(Attachment &, Handle, std::size_t, ReturnSlot &);
+void list_snapshot(Attachment &, Handle, RootScope &, std::vector<Value> &);
+std::optional<std::size_t> length_hint(Attachment &, Handle, ReturnSlot &);
 void copy_dictionary_entries(Attachment &, Value destination, std::span<const DictObject::Entry>);
 void make_dict_iterator(Attachment &, Handle dictionary, DictViewKind, ReturnSlot &);
 void next_dict_item(Attachment &, Handle iterator, ReturnSlot &);
@@ -397,7 +429,8 @@ void invoke_special(Attachment &context, Handle receiver, Handle descriptor, Cal
                     ReturnSlot &out);
 void install_native_attribute(Attachment &context, std::span<const Handle> core, Handle owner,
                               std::u32string name, SignatureLayout signature, NativeEntry entry,
-                              std::vector<Value> captures = {});
+                              std::vector<Value> captures = {},
+                              NativeSlotKind kind = NativeSlotKind::Ordinary);
 void install_native_field(Attachment &context, std::span<const Handle> core, Handle owner,
                           std::u32string name, NativeGetter getter, NativeSetter setter = nullptr);
 void install_iteration(Attachment &context, std::span<const Handle> core);
@@ -448,6 +481,6 @@ void get_native_member(Attachment &context, Value descriptor, std::optional<Valu
                        ReturnSlot &out);
 void allocate_function(Attachment &context, Handle type, std::string name,
                        SignatureLayout signature, NativeEntry entry, std::vector<Value> captures,
-                       ReturnSlot &out);
+                       ReturnSlot &out, std::optional<Value> sequence_owner = {});
 } // namespace detail
 } // namespace cxxpython::core

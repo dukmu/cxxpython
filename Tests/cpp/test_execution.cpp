@@ -325,6 +325,14 @@ TEST_F(CoreExecution, SourceLoweringOpcodesHaveVerifiedOperandsAndStackInputs)
     CodeBuilder tuple(context);
     tuple.emit(Opcode::BuildTuple, 1);
     invalid(tuple, CodeErrorKind::StackUnderflow);
+    CodeBuilder list(context);
+    list.emit(Opcode::BuildList, 1);
+    invalid(list, CodeErrorKind::StackUnderflow);
+    const auto list_effect = instruction_effect({Opcode::BuildList, 3});
+    EXPECT_EQ(list_effect.inputs, 3U);
+    EXPECT_EQ(list_effect.pops, 3U);
+    EXPECT_EQ(list_effect.pushes, 1U);
+    EXPECT_EQ(opcode_definition(Opcode::BuildList).name, "BUILD_LIST");
     for (auto opcode : {Opcode::LoadAttr, Opcode::StoreAttr, Opcode::DeleteAttr}) {
         CodeBuilder attribute(context);
         attribute.emit(opcode);

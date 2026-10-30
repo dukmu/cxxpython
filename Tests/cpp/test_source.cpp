@@ -78,6 +78,26 @@ TEST_F(CoreSource, LiteralArithmeticBooleanAndComparisonProgramsUseOrdinaryProto
     }
 }
 
+TEST_F(CoreSource, ListDisplaysAndTargetsUseNormalExpressionAndBindingPaths)
+{
+    const auto globals = dictionary();
+    ReturnSlot out(context);
+    exec("[a, (b, c)] = [1, [2, 3]]\n"
+         "def f(x=[a, [b]]): return x\n"
+         "class C:\n    [__private] = [c]\n"
+         "del [a, (b, c)]\n"
+         "[] = []\ndel []\n",
+         globals, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    eval("f(), C._C__private, f() is f(), [] is not []", out, globals);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(result(out), "([1, [2]], 3, True, True)");
+    for (auto source : {"[a] += [1]", "[1] = [2]", "del [1]", "[*x]", "[x for x in y]"}) {
+        SCOPED_TRACE(source);
+        EXPECT_THROW(SourceUnit{SourceBuffer(source)}, SourceError);
+    }
+}
+
 TEST_F(CoreSource, FloatLiteralsAndArithmeticUseOrdinaryNumericProtocolsDuringGc)
 {
     ReturnSlot out(context);
@@ -1076,7 +1096,7 @@ TEST(SourceDiagnostics, InvalidProgramsDoNotSilentlyCompileThroughAnotherLanguag
         SCOPED_TRACE(source);
         EXPECT_THROW(SourceUnit{SourceBuffer(source)}, SourceError);
     }
-    for (auto source : {"class X[T]: pass", "f'{x}'", "x = 1.5j", "x = [1]",
+    for (auto source : {"class X[T]: pass", "f'{x}'", "x = 1.5j", "x = [x for x in y]",
                         "try:\n    pass\nexcept* Exception:\n    pass"}) {
         SCOPED_TRACE(source);
         try {

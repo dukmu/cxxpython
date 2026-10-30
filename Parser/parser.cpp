@@ -986,6 +986,11 @@ class Parser final {
                 target(*item);
             return;
         }
+        if (const auto *list = std::get_if<ListExpr>(&value.node)) {
+            for (const auto &item : list->items)
+                target(*item);
+            return;
+        }
         if (!std::holds_alternative<NameExpr>(value.node) &&
             !std::holds_alternative<AttributeExpr>(value.node) &&
             !std::holds_alternative<SubscriptExpr>(value.node))
@@ -1088,7 +1093,8 @@ class Parser final {
                 } else if (is(K::AddAssign) || is(K::SubAssign) || is(K::MulAssign) ||
                            is(K::FloorAssign) || is(K::ModAssign) || is(K::DivAssign)) {
                     target(*value);
-                    if (std::holds_alternative<TupleExpr>(value->node))
+                    if (std::holds_alternative<TupleExpr>(value->node) ||
+                        std::holds_alternative<ListExpr>(value->node))
                         fail(peek(), "illegal augmented assignment target");
                     const auto kind = take().kind;
                     const auto op = kind == K::AddAssign     ? BinaryOp::Add
@@ -1350,9 +1356,28 @@ class Parser final {
             --expression_depth_;
             return value;
         }
-        case K::LeftBracket:
-            fail(token, "list literals require the remaining mutable-container capability",
-                 SourceErrorKind::Capability);
+        case K::LeftBracket: {
+            if (++expression_depth_ > 128)
+                fail(token, "too many nested brackets");
+            ListExpr list;
+            std::size_t depth = 0;
+            while (!is(K::RightBracket)) {
+                if (is(K::Star))
+                    fail(peek(), "starred list displays require the unpacking capability",
+                         SourceErrorKind::Capability);
+                auto item = expression();
+                depth = std::max(depth, item->depth);
+                list.items.push_back(std::move(item));
+                if (is(K::For))
+                    fail(peek(), "list comprehensions require the comprehension capability",
+                         SourceErrorKind::Capability);
+                if (!accept(K::Comma))
+                    break;
+            }
+            const auto end = expect(K::RightBracket).span.end;
+            --expression_depth_;
+            return node(std::move(list), {token.span.begin, end}, depth + 1);
+        }
         default:
             fail(token, "expected an expression");
         }

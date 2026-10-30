@@ -717,14 +717,15 @@ ResultView del_attribute(Attachment &context, Handle object, Handle name, Return
 namespace detail {
 void install_native_attribute(Attachment &context, std::span<const Handle> core, Handle owner,
                               std::u32string name, SignatureLayout signature, NativeEntry entry,
-                              std::vector<Value> captures)
+                              std::vector<Value> captures, NativeSlotKind kind)
 {
     auto at = [&](CoreObject id) { return core[static_cast<std::size_t>(id)]; };
     RootScope roots(context);
     ReturnSlot function(context);
-    allocate_function(context, at(CoreObject::NativeFunctionType),
-                      std::string(name.begin(), name.end()), std::move(signature), entry,
-                      std::move(captures), function);
+    allocate_function(
+        context, at(CoreObject::NativeFunctionType), std::string(name.begin(), name.end()),
+        std::move(signature), entry, std::move(captures), function,
+        kind == NativeSlotKind::Sequence ? std::optional<Value>{owner.get(context)} : std::nullopt);
     auto callable = roots.root(function.value());
     ReturnSlot key(context);
     context.allocate_instance<StrObject>(at(CoreObject::StrType), key, std::move(name));

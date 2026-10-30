@@ -118,7 +118,7 @@ TEST_F(CoreIteration, UserProtocolsPreserveStopIterationValuesAndOtherExceptions
 TEST(ParallelIteration, SharedBuiltinIteratorClaimsEachItemOnceDuringGc)
 {
     constexpr std::size_t count = 700;
-    for (int kind : {0, 1, 2}) {
+    for (int kind : {0, 1, 2, 3}) {
         Interpreter interpreter;
         Attachment owner(interpreter);
         owner.bootstrap_core();
@@ -128,13 +128,16 @@ TEST(ParallelIteration, SharedBuiltinIteratorClaimsEachItemOnceDuringGc)
             SourceUnit unit(SourceBuffer("iter(range(700))"), InputMode::Eval);
             run(owner, {&unit}, out);
         } else {
-            if (kind == 1) {
+            if (kind == 1 || kind == 3) {
                 std::vector<Value> values;
                 for (std::size_t i = 0; i < count; ++i) {
                     make_int(owner, i, out);
                     values.push_back(roots.root(out.value()).get(owner));
                 }
-                cxxpython::core::make_tuple(owner, values, out);
+                if (kind == 1)
+                    cxxpython::core::make_tuple(owner, values, out);
+                else
+                    make_list(owner, values, out);
             } else {
                 std::u32string values;
                 for (std::size_t i = 0; i < count; ++i)

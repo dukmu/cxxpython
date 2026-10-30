@@ -238,6 +238,38 @@ void tuple_repr(Attachment &context, Handle, std::span<const Value> args, Return
     result += U')';
     make_str(context, std::move(result), out);
 }
+void list_repr(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!instance_of<ListObject, CoreObject::ListType>(context, args[0])) {
+        type_error(context, out);
+        return;
+    }
+    RootScope roots(context);
+    const auto self = roots.root(args[0]);
+    ReprGuard recursion(context, self);
+    if (!recursion.entered) {
+        make_str(context, U"[...]", out);
+        return;
+    }
+    std::u32string result = U"[";
+    ReturnSlot item(context), text(context);
+    for (std::size_t i = 0;; ++i) {
+        detail::list_item(context, self, i, item);
+        if (item.tag() == ResultTag::Empty)
+            break;
+        RootScope iteration(context);
+        repr(context, iteration.root(item.value()), text);
+        if (raised(text)) {
+            out.raised(text.exception());
+            return;
+        }
+        if (i)
+            result += U", ";
+        result += context.payload<StrObject>(text.value()).value;
+    }
+    result += U']';
+    make_str(context, std::move(result), out);
+}
 void tuple_hash(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     if (!instance_of<TupleObject, CoreObject::TupleType>(context, args[0])) {
@@ -417,7 +449,8 @@ void string_add(Attachment &context, Handle, std::span<const Value> args, Return
         return;
     }
     if (!string_value(context, args[1])) {
-        out.ok(context.builtin(CoreObject::NotImplemented));
+        raise_error(context, CoreObject::TypeErrorType,
+                    U"can only concatenate a string to a string", out);
         return;
     }
     make_str(context,
@@ -493,9 +526,11 @@ void install_value_protocols(Attachment &context, std::span<const Handle> core)
     install(at(CoreObject::StrType), U"__hash__", string_hash);
     install(at(CoreObject::StrType), U"__str__", string_str);
     install(at(CoreObject::StrType), U"__repr__", string_repr);
-    install_native_attribute(context, core, at(CoreObject::StrType), U"__add__", pair, string_add);
+    install_native_attribute(context, core, at(CoreObject::StrType), U"__add__", pair, string_add,
+                             {}, NativeSlotKind::Sequence);
     install(at(CoreObject::TupleType), U"__hash__", tuple_hash);
     install(at(CoreObject::TupleType), U"__repr__", tuple_repr);
+    install(at(CoreObject::ListType), U"__repr__", list_repr);
     for (auto type : {CoreObject::DictType, CoreObject::MappingProxyType, CoreObject::DictKeysType,
                       CoreObject::DictValuesType, CoreObject::DictItemsType})
         install(at(type), U"__repr__", dictionary_repr);

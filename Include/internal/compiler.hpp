@@ -41,6 +41,9 @@ struct AttributeExpr {
 struct TupleExpr {
     std::vector<ExprPtr> items;
 };
+struct ListExpr {
+    std::vector<ExprPtr> items;
+};
 struct SubscriptExpr {
     ExprPtr object, key;
 };
@@ -48,7 +51,7 @@ struct Expr {
     Span span;
     std::size_t depth;
     std::variant<Literal, NameExpr, UnaryExpr, BinaryExpr, BoolExpr, CompareExpr, CallExpr,
-                 AttributeExpr, TupleExpr, SubscriptExpr>
+                 AttributeExpr, TupleExpr, ListExpr, SubscriptExpr>
         node;
 };
 struct Stmt;

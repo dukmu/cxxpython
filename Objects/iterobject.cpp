@@ -9,6 +9,16 @@ ResultView get_iter(Attachment &context, Handle value, ReturnSlot &out)
         const auto self = roots.root(value.get(context));
         auto slot =
             resolve_protocol(context, roots.root(context.type_of(self)), Protocol::Iter, roots);
+        if (slot.state == SlotState::Missing) {
+            auto item = resolve_protocol(context, roots.root(context.type_of(self)),
+                                         Protocol::GetItem, roots);
+            if (item.state != SlotState::Missing) {
+                context.allocate_instance<SequenceIteratorObject>(
+                    roots.root(context.builtin(CoreObject::SequenceIteratorType)), out,
+                    self.get(context));
+                return out.result();
+            }
+        }
         invoke_protocol(context, self, slot, {}, out);
         if (out.tag() == ResultTag::Ok) {
             auto next = resolve_protocol(context, roots.root(context.type_of(out.value())),
@@ -137,6 +147,47 @@ void iterator_self(Attachment &, Handle, std::span<const Value> args, ReturnSlot
 {
     out.ok(args[0]);
 }
+void indexed_next(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!sequence<SequenceIteratorObject, CoreObject::SequenceIteratorType>(context, args[0], out))
+        return;
+    RootScope roots(context);
+    const auto self = roots.root(args[0]);
+    auto &state = context.payload<SequenceIteratorObject>(self);
+    ReturnSlot owner(context), key(context), value(context);
+    for (;;) {
+        context.load(self.get(context), state.owner, owner);
+        if (owner.tag() == ResultTag::Empty) {
+            detail::stop_iteration(context, out);
+            return;
+        }
+        auto position = state.index.load(std::memory_order_relaxed);
+        if (position == static_cast<std::size_t>(std::numeric_limits<std::intptr_t>::max())) {
+            raise_error(context, CoreObject::OverflowErrorType, U"iterator index is too large",
+                        out);
+            return;
+        }
+        make_int(context, static_cast<std::int64_t>(position), key);
+        RootScope iteration(context);
+        get_item(context, iteration.root(owner.value()), iteration.root(key.value()), value);
+        if (value.tag() == ResultTag::Raised) {
+            const auto type = context.type_of(value.exception());
+            if (is_subtype(context, type, context.builtin(CoreObject::IndexErrorType)) ||
+                is_subtype(context, type, context.builtin(CoreObject::StopIterationType))) {
+                context.store(self.get(context), state.owner, {});
+                detail::stop_iteration(context, out);
+            } else
+                out.raised(value.exception());
+            return;
+        }
+        if (state.index.compare_exchange_strong(position, position + 1,
+                                                std::memory_order_relaxed)) {
+            out.ok(value.value());
+            return;
+        }
+        context.poll();
+    }
+}
 void stop_value(Attachment &context, Value value, ReturnSlot &out)
 {
     context.load(value, context.instance_slot(value, 0), out);
@@ -199,6 +250,10 @@ void install_iteration(Attachment &context, std::span<const Handle> core)
                              sequence_next<StrObject, CoreObject::StrIteratorType>);
     for (auto id : {CoreObject::TupleIteratorType, CoreObject::StrIteratorType})
         install_native_attribute(context, core, at(id), U"__iter__", unary, iterator_self);
+    install_native_attribute(context, core, at(CoreObject::SequenceIteratorType), U"__iter__",
+                             unary, iterator_self);
+    install_native_attribute(context, core, at(CoreObject::SequenceIteratorType), U"__next__",
+                             unary, indexed_next);
     install_native_field(context, core, at(CoreObject::StopIterationType), U"value", stop_value,
                          stop_value_set);
 }

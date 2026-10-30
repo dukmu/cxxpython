@@ -65,6 +65,7 @@ enum class Opcode : std::uint8_t {
     ImportName,
     ImportFrom,
     ImportStar,
+    BuildList,
     Count,
 };
 enum class OperandDomain {

@@ -1,5 +1,64 @@
 # Development Status
 
+## 2026-10-30 Mutable Lists Close Path And Argument Storage Dependencies
+
+Prepended without changing earlier records. Previous stable node: ef77be4. The
+module/unified-import goal remains active; this implements its mutable-container
+dependency rather than introducing placeholder loader/library objects.
+
+- Added one ListObject Value buffer with precise traversal, external capacity
+  accounting and per-object synchronization. Geometric capacity growth prepares
+  host storage outside the lock, then copies/swaps in a no-safepoint commit.
+  No Python call, managed allocation or host expansion runs under the list lock.
+  Rooted reads/snapshots retain elements across callbacks and GC; no GIL was added.
+- Added list construction/subclasses, integer indexing and mutation, length,
+  equality/order, recursive repr, append/extend/insert/pop/remove/count/index,
+  clear/copy/reverse, concatenation/repetition and in-place forms. Generic extend
+  preserves partial progress on iterator failure. Exact self-extension snapshots
+  values; a subclass's overridden iterator is materialized before self-extension.
+  Tuple/list construction now share the existing length-hint implementation.
+- Added the ordinary __getitem__ iterator fallback, with IndexError/StopIteration
+  exhaustion and explicit __iter__ = None remaining disabled. List iterators
+  share the owner lock for cursor claims, observe live mutation and stay exhausted
+  after dropping the owner edge. The existing shared-iterator/GC test now includes
+  lists, and new tests cover concurrent append, rooted reentry and cycle collection.
+- Terra implemented ListExpr, list displays/non-starred targets and BUILD_LIST
+  through the existing scope/CFG/verifier/VM. Main integrated/reviewed the changes,
+  removed the stale test rejecting an ordinary list display, and implemented
+  storage/protocols/integration. The appended opcode preserves earlier encodings,
+  uses n-input/1-output stack accounting and keeps operands traced until success.
+  The agent is closed; no alternate execution path or old runtime was restored.
+- Closed a real numeric/sequence dispatch boundary exposed by list repetition:
+  numeric/reflected methods must run before sequence concatenation/repetition,
+  including in-place operations and __index__ callbacks. Native definitions retain
+  a traced sequence-defining Type, so inherited native methods retain their role
+  while unrelated Python assignments use ordinary method semantics. List and str
+  use the same generic dispatch phases, not a list/workload branch in the VM.
+- sys.path, regular package __path__, and sys.argv now use actual mutable lists.
+  File lookup takes a rooted exact-list snapshot before filesystem waits and still
+  accepts other iterables. CLI script/-c entry publishes argv[0] and trailing
+  arguments; --eval remains its experimental host inspection option. Namespace
+  package paths are still static snapshots, not dynamically refreshed PEP 420 paths.
+- Final CTest passes 413/413 (408 native plus five driver/tool/format checks).
+  ASan/UBSan/LSan passes 408/408 native; TSan passes 406/406, excluding only the
+  established two bootstrap allocation enumerations covered by normal/ASan.
+  Executable source differential and final ASan differential pass 17 groups;
+  ASan constructors pass 6 groups and dictionary protocols 16 cases against fixed
+  CPython 3.12.14. Updated the generated source differential JSON. Final logs and
+  reusable builds remain in .cache/list-final-* and existing .cache/build-*.
+  An earlier integration run failed only formatting after an edit; the final
+  format/check/build/test sequence above supersedes it without deleting its log.
+- No new performance samples or comparison tables were generated in this slice.
+  Existing raw evidence remains unchanged and is not presented as a measurement
+  of this new binary. Correctness validation is not CPython performance acceptance.
+- Remaining list/language gates include slices, starred displays/targets,
+  comprehensions, sort/reversed, iterator hints and the full special-method matrix.
+  This is not complete M3 or the full Base language. The next module-stage
+  dependency is real ModuleSpec/loader metadata and Python bootstrap policy,
+  followed by namespace-path refresh/reload and their language prerequisites.
+  General cross-thread Frame observation remains separate and incomplete. User
+  temporary_plan.md deletion and untracked test2.py remain excluded from staging.
+
 ## 2026-10-30 Benchmark Cadence Correction
 
 The user rejected repeated full-suite performance runs for routine semantic fixes.

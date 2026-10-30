@@ -31,6 +31,7 @@ add_library(cxxpython_core
     Objects/typeobject.cpp
     Objects/object.cpp
     Objects/dictobject.cpp
+    Objects/listobject.cpp
     Objects/moduleobject.cpp
     Objects/call.cpp
     Objects/descrobject.cpp
@@ -107,6 +108,7 @@ if(BUILD_TESTING)
         Tests/cpp/test_import.cpp
         Tests/cpp/test_extension.cpp
         Tests/cpp/test_dict.cpp
+        Tests/cpp/test_list.cpp
         Tests/cpp/test_import_files.cpp
         Tests/cpp/test_source_import.cpp
         Tests/cpp/test_tuple_constructor.cpp

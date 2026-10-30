@@ -477,7 +477,8 @@ void type_prepare(Attachment &context, Handle, std::span<const Value>, ReturnSlo
     RootScope roots(context);
     context.allocate_instance<DictObject>(roots.root(context.builtin(CoreObject::DictType)), out);
 }
-std::optional<std::size_t> tuple_length_hint(Attachment &context, Handle source, ReturnSlot &out)
+} // namespace
+std::optional<std::size_t> detail::length_hint(Attachment &context, Handle source, ReturnSlot &out)
 {
     RootScope roots(context);
     const auto type = roots.root(context.type_of(source));
@@ -537,6 +538,7 @@ std::optional<std::size_t> tuple_length_hint(Attachment &context, Handle source,
     }
     return static_cast<std::size_t>(value);
 }
+namespace {
 void tuple_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_type(context, args[0]) ||
@@ -567,7 +569,7 @@ void tuple_new(Attachment &context, Handle, std::span<const Value> args, ReturnS
             return;
         }
         const auto input = roots.root(iterator.value());
-        const auto hint = tuple_length_hint(context, source, item);
+        const auto hint = detail::length_hint(context, source, item);
         if (!hint) {
             out.raised(item.exception());
             return;

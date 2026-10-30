@@ -69,6 +69,7 @@ constexpr std::array definitions{
     OpcodeDefinition{"IMPORT_NAME", 2, 2, 1, OperandDomain::Name, FlowKind::Next, true, true},
     OpcodeDefinition{"IMPORT_FROM", 1, 0, 1, OperandDomain::Name, FlowKind::Next, true, true},
     OpcodeDefinition{"IMPORT_STAR", 1, 1, 0, OperandDomain::None, FlowKind::Next, true, true},
+    OpcodeDefinition{"BUILD_LIST", 0, 0, 1, OperandDomain::Count, FlowKind::Next, true, true},
 };
 static_assert(definitions.size() == static_cast<std::size_t>(Opcode::Count));
 [[noreturn]] void invalid(CodeErrorKind kind, const char *message,

@@ -155,7 +155,7 @@ TEST_F(FileImports, NamespacePortionsAndIterablePathReassignment)
     ASSERT_EQ(out.tag(), ResultTag::Ok);
     const auto package = roots.root(out.value());
     auto package_path = roots.root(attribute(package, U"__path__"));
-    EXPECT_EQ(context.payload<TupleObject>(package_path).items.size(), 2u);
+    EXPECT_EQ(detail::list_size(context, package_path), 2u);
     EXPECT_FALSE(
         detail::name_lookup(context, module_dict(context, package.get(context)), U"__file__"));
     import_module(context, U"ns.second", out);

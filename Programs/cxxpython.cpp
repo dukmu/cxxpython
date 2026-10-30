@@ -1,5 +1,6 @@
 #include "cxxpython/compiler.hpp"
 #include "cxxpython/import.hpp"
+#include "internal/compiler.hpp"
 
 #include <filesystem>
 #include <fstream>
@@ -73,16 +74,26 @@ int main(int argc, char **argv)
     using namespace cxxpython::core;
     try {
         std::optional<std::string> command, filename, expression;
+        std::vector<std::string> arguments;
+        bool trailing = false;
         for (int i = 1; i < argc; ++i) {
             const std::string option = argv[i];
-            if ((option == "-c" || option == "--eval") && i + 1 < argc) {
+            if (trailing)
+                arguments.push_back(option);
+            else if (option == "--" && (command || filename))
+                trailing = true;
+            else if (((option == "-c" && !command && !filename) || option == "--eval") &&
+                     i + 1 < argc) {
                 auto &target = option == "-c" ? command : expression;
                 if (target)
                     throw std::invalid_argument("duplicate execution option");
                 target = argv[++i];
-            } else if (!option.starts_with('-') && !filename)
+            } else if (!option.starts_with('-') && !filename && !command)
                 filename = option;
-            else
+            else if (command || filename) {
+                trailing = true;
+                arguments.push_back(option);
+            } else
                 throw std::invalid_argument(
                     "usage: cxxpython [-c SOURCE | FILE] [--eval EXPRESSION]");
         }
@@ -117,6 +128,22 @@ int main(int argc, char **argv)
         const auto globals = roots.root(module_dict(context, main_module.get(context)));
         const std::array paths{search_path};
         set_import_path(context, paths, out);
+        if (out.tag() == ResultTag::Raised)
+            return report(context, out.exception());
+        import_module(context, U"sys", out);
+        if (out.tag() == ResultTag::Raised)
+            return report(context, out.exception());
+        const auto sys = roots.root(out.value());
+        arguments.insert(arguments.begin(), filename ? *filename : command ? "-c" : "");
+        std::vector<Value> argv_values;
+        for (const auto &argument : arguments) {
+            make_str(context, detail::decode_filename(SourceBuffer("", argument)), out);
+            argv_values.push_back(roots.root(out.value()).get(context));
+        }
+        make_list(context, argv_values, out);
+        const auto argv_list = roots.root(out.value());
+        make_str(context, U"argv", out);
+        set_attribute(context, sys, roots.root(out.value()), argv_list, out);
         if (out.tag() == ResultTag::Raised)
             return report(context, out.exception());
         if (script) {

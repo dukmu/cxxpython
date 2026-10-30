@@ -1,10 +1,10 @@
 {
-  "captured_at": "2026-10-30T05:11:57.954466+00:00",
+  "captured_at": "2026-10-30T05:55:33.354517+00:00",
   "reference_version": "Python 3.12.14",
   "provenance": {
     "binary": {
       "path": "/home/shefrin/repo/cxxpython/build/cxxpython",
-      "sha256": "966907e739286754119751e6a09e447f2a177cb8efcff43c23a86845869fa006"
+      "sha256": "10a655b00cf8fb5dfea725f057cf46bbeb41109a16cb9635d97aed7e3637e298"
     },
     "reference": {
       "path": "/home/shefrin/repo/cxxpython/.cache/cpython31214-build/python",
@@ -792,6 +792,56 @@
       "stdout": "",
       "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 4, in <module>\nRuntimeError: __class__ not set defining 'C' as <class '__main__.C'>. Was __classcell__ propagated to type.__new__?\n",
       "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "import sys\nsys.argv.append('tail')",
+        "--eval",
+        "sys.argv, type(sys.argv) is list",
+        "alpha",
+        "--flag"
+      ],
+      "stdout": "(['-c', 'alpha', '--flag', 'tail'], True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "import sys\nsys.argv.append('tail')\nprint(repr((sys.argv, type(sys.argv) is list)))",
+        "alpha",
+        "--flag"
+      ],
+      "stdout": "(['-c', 'alpha', '--flag', 'tail'], True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "/tmp/tmpbswzfwjn/argv_script.py",
+        "--eval",
+        "sys.argv, type(sys.argv) is list",
+        "alpha",
+        "--flag"
+      ],
+      "stdout": "(['/tmp/tmpbswzfwjn/argv_script.py', 'alpha', '--flag', 'tail'], True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "/tmp/tmpbswzfwjn/argv_script.py",
+        "alpha",
+        "--flag"
+      ],
+      "stdout": "(['/tmp/tmpbswzfwjn/argv_script.py', 'alpha', '--flag', 'tail'], True)\n",
+      "stderr": "",
+      "exit_code": 0
     },
     {
       "command": [
@@ -1768,7 +1818,7 @@
     {
       "command": [
         "build/cxxpython",
-        "/tmp/tmp7js_sda2/source.py",
+        "/tmp/tmpq_cmpcfv/source.py",
         "--eval",
         "f(41)"
       ],
@@ -1779,20 +1829,20 @@
     {
       "command": [
         "build/cxxpython",
-        "/tmp/tmp7js_sda2/source.py",
+        "/tmp/tmpq_cmpcfv/source.py",
         "--eval",
         "value, __file__"
       ],
-      "stdout": "(42, '/tmp/tmp7js_sda2/source.py')\n",
+      "stdout": "(42, '/tmp/tmpq_cmpcfv/source.py')\n",
       "stderr": "",
       "exit_code": 0
     },
     {
       "command": [
         ".cache/cpython31214-build/python",
-        "/tmp/tmp7js_sda2/source.py"
+        "/tmp/tmpq_cmpcfv/source.py"
       ],
-      "stdout": "(42, '/tmp/tmp7js_sda2/source.py')\n",
+      "stdout": "(42, '/tmp/tmpq_cmpcfv/source.py')\n",
       "stderr": "",
       "exit_code": 0
     },
@@ -1810,11 +1860,11 @@
       "command": [
         "build/cxxpython",
         "-c",
-        "import sys\nsys.path = ('/tmp/tmp_jvngq7v', '/tmp/tmp_jvngq7v/one', '/tmp/tmp_jvngq7v/two')\nimport pkg.child as alias\nfrom pkg.child import *\nimport pkg.child",
+        "import sys\nsys.path = ('/tmp/tmpp2zv956m', '/tmp/tmpp2zv956m/one', '/tmp/tmpp2zv956m/two')\nimport pkg.child as alias\nfrom pkg.child import *\nimport pkg.child",
         "--eval",
         "answer, alias is pkg.child, pkg.value, alias.__package__, alias.__file__"
       ],
-      "stdout": "(42, True, 10, 'pkg', '/tmp/tmp_jvngq7v/pkg/child.py')\n",
+      "stdout": "(42, True, 10, 'pkg', '/tmp/tmpp2zv956m/pkg/child.py')\n",
       "stderr": "",
       "exit_code": 0
     },
@@ -1822,9 +1872,9 @@
       "command": [
         ".cache/cpython31214-build/python",
         "-c",
-        "import sys\nsys.path = ('/tmp/tmp_jvngq7v', '/tmp/tmp_jvngq7v/one', '/tmp/tmp_jvngq7v/two')\nimport pkg.child as alias\nfrom pkg.child import *\nimport pkg.child\nprint(repr((answer, alias is pkg.child, pkg.value, alias.__package__, alias.__file__)))"
+        "import sys\nsys.path = ('/tmp/tmpp2zv956m', '/tmp/tmpp2zv956m/one', '/tmp/tmpp2zv956m/two')\nimport pkg.child as alias\nfrom pkg.child import *\nimport pkg.child\nprint(repr((answer, alias is pkg.child, pkg.value, alias.__package__, alias.__file__)))"
       ],
-      "stdout": "(42, True, 10, 'pkg', '/tmp/tmp_jvngq7v/pkg/child.py')\n",
+      "stdout": "(42, True, 10, 'pkg', '/tmp/tmpp2zv956m/pkg/child.py')\n",
       "stderr": "",
       "exit_code": 0
     },
@@ -1832,7 +1882,7 @@
       "command": [
         "build/cxxpython",
         "-c",
-        "import sys\nsys.path = ('/tmp/tmp_jvngq7v', '/tmp/tmp_jvngq7v/one', '/tmp/tmp_jvngq7v/two')\nimport left, right",
+        "import sys\nsys.path = ('/tmp/tmpp2zv956m', '/tmp/tmpp2zv956m/one', '/tmp/tmpp2zv956m/two')\nimport left, right",
         "--eval",
         "left.answer, right.first"
       ],
@@ -1844,7 +1894,7 @@
       "command": [
         ".cache/cpython31214-build/python",
         "-c",
-        "import sys\nsys.path = ('/tmp/tmp_jvngq7v', '/tmp/tmp_jvngq7v/one', '/tmp/tmp_jvngq7v/two')\nimport left, right\nprint(repr((left.answer, right.first)))"
+        "import sys\nsys.path = ('/tmp/tmpp2zv956m', '/tmp/tmpp2zv956m/one', '/tmp/tmpp2zv956m/two')\nimport left, right\nprint(repr((left.answer, right.first)))"
       ],
       "stdout": "(42, 1)\n",
       "stderr": "",
@@ -1854,7 +1904,7 @@
       "command": [
         "build/cxxpython",
         "-c",
-        "import sys\nsys.path = ('/tmp/tmp_jvngq7v', '/tmp/tmp_jvngq7v/one', '/tmp/tmp_jvngq7v/two')\nimport ns.a, ns.b\nns.__path__ = ('/tmp/tmp_jvngq7v/other',)\nfrom ns import extra",
+        "import sys\nsys.path = ('/tmp/tmpp2zv956m', '/tmp/tmpp2zv956m/one', '/tmp/tmpp2zv956m/two')\nimport ns.a, ns.b\nns.__path__ = ('/tmp/tmpp2zv956m/other',)\nfrom ns import extra",
         "--eval",
         "ns.a.value, ns.b.value, extra.value"
       ],
@@ -1866,7 +1916,7 @@
       "command": [
         ".cache/cpython31214-build/python",
         "-c",
-        "import sys\nsys.path = ('/tmp/tmp_jvngq7v', '/tmp/tmp_jvngq7v/one', '/tmp/tmp_jvngq7v/two')\nimport ns.a, ns.b\nns.__path__ = ('/tmp/tmp_jvngq7v/other',)\nfrom ns import extra\nprint(repr((ns.a.value, ns.b.value, extra.value)))"
+        "import sys\nsys.path = ('/tmp/tmpp2zv956m', '/tmp/tmpp2zv956m/one', '/tmp/tmpp2zv956m/two')\nimport ns.a, ns.b\nns.__path__ = ('/tmp/tmpp2zv956m/other',)\nfrom ns import extra\nprint(repr((ns.a.value, ns.b.value, extra.value)))"
       ],
       "stdout": "(1, 2, 8)\n",
       "stderr": "",
@@ -1876,7 +1926,7 @@
       "command": [
         "build/cxxpython",
         "-c",
-        "import sys\nsys.path = ('/tmp/tmp_jvngq7v', '/tmp/tmp_jvngq7v/one', '/tmp/tmp_jvngq7v/two')\ntry:\n    import bad\nexcept SyntaxError:\n    syntax = True\ntry:\n    from fails import value\nexcept ModuleNotFoundError as error:\n    dependency = error.name",
+        "import sys\nsys.path = ('/tmp/tmpp2zv956m', '/tmp/tmpp2zv956m/one', '/tmp/tmpp2zv956m/two')\ntry:\n    import bad\nexcept SyntaxError:\n    syntax = True\ntry:\n    from fails import value\nexcept ModuleNotFoundError as error:\n    dependency = error.name",
         "--eval",
         "syntax, dependency"
       ],
@@ -1888,9 +1938,53 @@
       "command": [
         ".cache/cpython31214-build/python",
         "-c",
-        "import sys\nsys.path = ('/tmp/tmp_jvngq7v', '/tmp/tmp_jvngq7v/one', '/tmp/tmp_jvngq7v/two')\ntry:\n    import bad\nexcept SyntaxError:\n    syntax = True\ntry:\n    from fails import value\nexcept ModuleNotFoundError as error:\n    dependency = error.name\nprint(repr((syntax, dependency)))"
+        "import sys\nsys.path = ('/tmp/tmpp2zv956m', '/tmp/tmpp2zv956m/one', '/tmp/tmpp2zv956m/two')\ntry:\n    import bad\nexcept SyntaxError:\n    syntax = True\ntry:\n    from fails import value\nexcept ModuleNotFoundError as error:\n    dependency = error.name\nprint(repr((syntax, dependency)))"
       ],
       "stdout": "(True, 'missing_dependency_for_test')\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "import sys\nsys.path = ('/tmp/tmpp2zv956m', '/tmp/tmpp2zv956m/one', '/tmp/tmpp2zv956m/two')\nsys.path = list(sys.path)\nsaved = sys.path\nsys.path.append('/tmp/tmpp2zv956m/other')\nimport extra\nremoved = sys.path.pop()",
+        "--eval",
+        "extra.value, saved is sys.path, removed"
+      ],
+      "stdout": "(8, True, '/tmp/tmpp2zv956m/other')\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "import sys\nsys.path = ('/tmp/tmpp2zv956m', '/tmp/tmpp2zv956m/one', '/tmp/tmpp2zv956m/two')\nsys.path = list(sys.path)\nsaved = sys.path\nsys.path.append('/tmp/tmpp2zv956m/other')\nimport extra\nremoved = sys.path.pop()\nprint(repr((extra.value, saved is sys.path, removed)))"
+      ],
+      "stdout": "(8, True, '/tmp/tmpp2zv956m/other')\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "import sys\nsys.path = ('/tmp/tmpp2zv956m', '/tmp/tmpp2zv956m/one', '/tmp/tmpp2zv956m/two')\nimport pkg\nsaved = pkg.__path__\npkg.__path__.append('/tmp/tmpp2zv956m/other')\nfrom pkg import extra",
+        "--eval",
+        "extra.value, saved is pkg.__path__, type(saved) is list"
+      ],
+      "stdout": "(8, True, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "import sys\nsys.path = ('/tmp/tmpp2zv956m', '/tmp/tmpp2zv956m/one', '/tmp/tmpp2zv956m/two')\nimport pkg\nsaved = pkg.__path__\npkg.__path__.append('/tmp/tmpp2zv956m/other')\nfrom pkg import extra\nprint(repr((extra.value, saved is pkg.__path__, type(saved) is list)))"
+      ],
+      "stdout": "(8, True, True)\n",
       "stderr": "",
       "exit_code": 0
     },
@@ -3015,6 +3109,712 @@
       "stdout": "(('message',), None)\n",
       "stderr": "",
       "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "",
+        "--eval",
+        "[], [1,], [1, [2, 3]]"
+      ],
+      "stdout": "([], [1], [1, [2, 3]])\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "\nprint(repr(([], [1,], [1, [2, 3]])))"
+      ],
+      "stdout": "([], [1], [1, [2, 3]])\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "counter = 0\ndef next_value():\n    global counter\n    counter += 1\n    return counter\nx = [next_value(), [next_value(), next_value()]]",
+        "--eval",
+        "x, counter"
+      ],
+      "stdout": "([1, [2, 3]], 3)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "counter = 0\ndef next_value():\n    global counter\n    counter += 1\n    return counter\nx = [next_value(), [next_value(), next_value()]]\nprint(repr((x, counter)))"
+      ],
+      "stdout": "([1, [2, 3]], 3)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "[a, (b, c)] = [1, [2, 3]]\ndel [a, (b, c)]\n[] = []\ndel []",
+        "--eval",
+        "42"
+      ],
+      "stdout": "42\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "[a, (b, c)] = [1, [2, 3]]\ndel [a, (b, c)]\n[] = []\ndel []\nprint(repr((42)))"
+      ],
+      "stdout": "42\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "def f(x=[1, [2]]): return x\na = f()\nb = f()",
+        "--eval",
+        "a, a is b, [] is not []"
+      ],
+      "stdout": "([1, [2]], True, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "def f(x=[1, [2]]): return x\na = f()\nb = f()\nprint(repr((a, a is b, [] is not [])))"
+      ],
+      "stdout": "([1, [2]], True, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "class C:\n    [__x, (__y,)] = [4, [5]]\n    def get(self): return [self.__x, self.__y]",
+        "--eval",
+        "C().get()"
+      ],
+      "stdout": "[4, 5]\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "class C:\n    [__x, (__y,)] = [4, [5]]\n    def get(self): return [self.__x, self.__y]\nprint(repr((C().get())))"
+      ],
+      "stdout": "[4, 5]\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "total = 0\nfor [a, b] in [[1, 2], [3, 4]]:\n    total += a * b",
+        "--eval",
+        "total"
+      ],
+      "stdout": "14\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "total = 0\nfor [a, b] in [[1, 2], [3, 4]]:\n    total += a * b\nprint(repr((total)))"
+      ],
+      "stdout": "14\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "[a] += [1]"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 1\n    [a] += [1]\n    ^^^\nSyntaxError: 'list' is an illegal expression for augmented assignment\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "[a] += [1]"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 1\n[a] += [1]\n    ^\nSyntaxError: illegal augmented assignment target\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "[1] = [2]"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 1\n    [1] = [2]\n     ^\nSyntaxError: cannot assign to literal\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "[1] = [2]"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 1\n[1] = [2]\n ^\nSyntaxError: cannot assign/delete this expression\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "del [1]"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 1\n    del [1]\n         ^\nSyntaxError: cannot delete literal\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "del [1]"
+      ],
+      "stdout": "",
+      "stderr": "  File \"<string>\", line 1\ndel [1]\n     ^\nSyntaxError: cannot assign/delete this expression\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "a = [1, 2]\nb = list(a)\nc = list(range(3))",
+        "--eval",
+        "a, b, a is not b, c, list('ab')"
+      ],
+      "stdout": "([1, 2], [1, 2], True, [0, 1, 2], ['a', 'b'])\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "a = [1, 2]\nb = list(a)\nc = list(range(3))\nprint(repr((a, b, a is not b, c, list('ab'))))"
+      ],
+      "stdout": "([1, 2], [1, 2], True, [0, 1, 2], ['a', 'b'])\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "a = [1, 2]\na.append(3)\na.insert(-1, 4)\nx = a.pop(0)\na[0] = 8\ndel a[-1]\nb = a.copy()\na.reverse()",
+        "--eval",
+        "x, a, b, a.count(8), a.index(8)"
+      ],
+      "stdout": "(1, [4, 8], [8, 4], 1, 1)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "a = [1, 2]\na.append(3)\na.insert(-1, 4)\nx = a.pop(0)\na[0] = 8\ndel a[-1]\nb = a.copy()\na.reverse()\nprint(repr((x, a, b, a.count(8), a.index(8))))"
+      ],
+      "stdout": "(1, [4, 8], [8, 4], 1, 1)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "a = [1, 2]\na.extend(a)\nb = a\na += (3, 4)\na *= 2\nc = a + [9]\nd = 2 * [3]\ne = [4] * -1",
+        "--eval",
+        "a, b is a, c, d, e"
+      ],
+      "stdout": "([1, 2, 1, 2, 3, 4, 1, 2, 1, 2, 3, 4], True, [1, 2, 1, 2, 3, 4, 1, 2, 1, 2, 3, 4, 9], [3, 3], [])\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "a = [1, 2]\na.extend(a)\nb = a\na += (3, 4)\na *= 2\nc = a + [9]\nd = 2 * [3]\ne = [4] * -1\nprint(repr((a, b is a, c, d, e)))"
+      ],
+      "stdout": "([1, 2, 1, 2, 3, 4, 1, 2, 1, 2, 3, 4], True, [1, 2, 1, 2, 3, 4, 1, 2, 1, 2, 3, 4, 9], [3, 3], [])\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "a = [1, 2]\nit = iter(a)\nx = next(it)\na.append(3)\ny = next(it)\nz = next(it)\nend = next(it, None)\na.append(4)\nagain = next(it, None)",
+        "--eval",
+        "x, y, z, end, again, iter(it) is it"
+      ],
+      "stdout": "(1, 2, 3, None, None, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "a = [1, 2]\nit = iter(a)\nx = next(it)\na.append(3)\ny = next(it)\nz = next(it)\nend = next(it, None)\na.append(4)\nagain = next(it, None)\nprint(repr((x, y, z, end, again, iter(it) is it)))"
+      ],
+      "stdout": "(1, 2, 3, None, None, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "a = []\na.append(a)\nn = float('nan')\nb = [n]",
+        "--eval",
+        "repr(a), b == [n], b == b, [1] < [2], [1] == (1,)"
+      ],
+      "stdout": "('[[...]]', True, True, True, False)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "a = []\na.append(a)\nn = float('nan')\nb = [n]\nprint(repr((repr(a), b == [n], b == b, [1] < [2], [1] == (1,))))"
+      ],
+      "stdout": "('[[...]]', True, True, True, False)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "class L(list):\n    def __iter__(self):\n        return iter((8, 9))\na = L([1])\na.extend(a)\nb = a.copy()\na.__init__(a)",
+        "--eval",
+        "a, b, type(a) is L, type(b) is list"
+      ],
+      "stdout": "([8, 9], [1, 8, 9], True, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "class L(list):\n    def __iter__(self):\n        return iter((8, 9))\na = L([1])\na.extend(a)\nb = a.copy()\na.__init__(a)\nprint(repr((a, b, type(a) is L, type(b) is list)))"
+      ],
+      "stdout": "([8, 9], [1, 8, 9], True, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "events = []\nclass Source:\n    def __iter__(self):\n        events.append('iter')\n        return iter((1, 2))\n    def __len__(self):\n        events.append('len')\n        raise TypeError('decline')\n    def __length_hint__(self):\n        events.append('hint')\n        return 2\na = list(Source())",
+        "--eval",
+        "a, events"
+      ],
+      "stdout": "([1, 2], ['iter', 'len', 'hint'])\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "events = []\nclass Source:\n    def __iter__(self):\n        events.append('iter')\n        return iter((1, 2))\n    def __len__(self):\n        events.append('len')\n        raise TypeError('decline')\n    def __length_hint__(self):\n        events.append('hint')\n        return 2\na = list(Source())\nprint(repr((a, events)))"
+      ],
+      "stdout": "([1, 2], ['iter', 'len', 'hint'])\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "class Source:\n    def __getitem__(self, i):\n        if i == 3:\n            raise IndexError(i)\n        return i + 1\na = list(Source())\nb = tuple(Source())",
+        "--eval",
+        "a, b"
+      ],
+      "stdout": "([1, 2, 3], (1, 2, 3))\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "class Source:\n    def __getitem__(self, i):\n        if i == 3:\n            raise IndexError(i)\n        return i + 1\na = list(Source())\nb = tuple(Source())\nprint(repr((a, b)))"
+      ],
+      "stdout": "([1, 2, 3], (1, 2, 3))\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "class NoIter:\n    __iter__ = None\n    def __getitem__(self, i):\n        return i\nok = False\ntry:\n    list(NoIter())\nexcept TypeError:\n    ok = True",
+        "--eval",
+        "ok"
+      ],
+      "stdout": "True\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "class NoIter:\n    __iter__ = None\n    def __getitem__(self, i):\n        return i\nok = False\ntry:\n    list(NoIter())\nexcept TypeError:\n    ok = True\nprint(repr((ok)))"
+      ],
+      "stdout": "True\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "a = [1]\nclass Source:\n    def __iter__(self):\n        return self\n    def __next__(self):\n        if len(a) == 1:\n            return 2\n        raise ValueError('next')\nok = False\ntry:\n    a.extend(Source())\nexcept ValueError:\n    ok = True",
+        "--eval",
+        "a, ok"
+      ],
+      "stdout": "([1, 2], True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "a = [1]\nclass Source:\n    def __iter__(self):\n        return self\n    def __next__(self):\n        if len(a) == 1:\n            return 2\n        raise ValueError('next')\nok = False\ntry:\n    a.extend(Source())\nexcept ValueError:\n    ok = True\nprint(repr((a, ok)))"
+      ],
+      "stdout": "([1, 2], True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "a = []\nclass Item:\n    def __repr__(self):\n        a.clear()\n        return 'item'\na.extend((Item(), 2))\ntext = repr(a)",
+        "--eval",
+        "text, a"
+      ],
+      "stdout": "('[item]', [])\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "a = []\nclass Item:\n    def __repr__(self):\n        a.clear()\n        return 'item'\na.extend((Item(), 2))\ntext = repr(a)\nprint(repr((text, a)))"
+      ],
+      "stdout": "('[item]', [])\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "a = []\nclass Item:\n    def __eq__(self, other):\n        a.clear()\n        return True\na.extend((Item(), 2))\nresult = a.remove(0)",
+        "--eval",
+        "result, a"
+      ],
+      "stdout": "(None, [])\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "a = []\nclass Item:\n    def __eq__(self, other):\n        a.clear()\n        return True\na.extend((Item(), 2))\nresult = a.remove(0)\nprint(repr((result, a)))"
+      ],
+      "stdout": "(None, [])\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "a = [1]\nclass Index:\n    def __index__(self):\n        a.clear()\n        a.append(7)\n        return 0\nx = a[Index()]\na[Index()] = 8",
+        "--eval",
+        "x, a"
+      ],
+      "stdout": "(7, [8])\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "a = [1]\nclass Index:\n    def __index__(self):\n        a.clear()\n        a.append(7)\n        return 0\nx = a[Index()]\na[Index()] = 8\nprint(repr((x, a)))"
+      ],
+      "stdout": "(7, [8])\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "a = [1]\nok = False\ntry:\n    hash(a)\nexcept TypeError:\n    ok = True\na.clear()",
+        "--eval",
+        "ok, bool(a), a"
+      ],
+      "stdout": "(True, False, [])\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "a = [1]\nok = False\ntry:\n    hash(a)\nexcept TypeError:\n    ok = True\na.clear()\nprint(repr((ok, bool(a), a)))"
+      ],
+      "stdout": "(True, False, [])\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "events = []\nclass Right:\n    def __rmul__(self, other):\n        events.append('rmul')\n        return 99\n    def __radd__(self, other):\n        events.append('radd')\n        return 88\n    def __index__(self):\n        events.append('index')\n        return 2\na = [1]\nx = a * Right()\na *= Right()\nb = [2]\ny = b + Right()\nb += Right()",
+        "--eval",
+        "x, a, y, b, events"
+      ],
+      "stdout": "(99, 99, 88, 88, ['rmul', 'rmul', 'radd', 'radd'])\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "events = []\nclass Right:\n    def __rmul__(self, other):\n        events.append('rmul')\n        return 99\n    def __radd__(self, other):\n        events.append('radd')\n        return 88\n    def __index__(self):\n        events.append('index')\n        return 2\na = [1]\nx = a * Right()\na *= Right()\nb = [2]\ny = b + Right()\nb += Right()\nprint(repr((x, a, y, b, events)))"
+      ],
+      "stdout": "(99, 99, 88, 88, ['rmul', 'rmul', 'radd', 'radd'])\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "events = []\nclass Right:\n    def __rmul__(self, other):\n        events.append('rmul')\n        return NotImplemented\n    def __index__(self):\n        events.append('index')\n        return 2\na = [1]\nb = a\na *= Right()",
+        "--eval",
+        "a, b is a, events"
+      ],
+      "stdout": "([1, 1], True, ['rmul', 'index'])\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "events = []\nclass Right:\n    def __rmul__(self, other):\n        events.append('rmul')\n        return NotImplemented\n    def __index__(self):\n        events.append('index')\n        return 2\na = [1]\nb = a\na *= Right()\nprint(repr((a, b is a, events)))"
+      ],
+      "stdout": "([1, 1], True, ['rmul', 'index'])\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "class L(list):\n    __mul__ = list.__mul__\nclass Right:\n    def __rmul__(self, other): return 99\n    def __index__(self): return 2\nclass Unrelated:\n    __mul__ = list.__mul__\nbad = False\ntry:\n    Unrelated() * Right()\nexcept TypeError:\n    bad = True",
+        "--eval",
+        "L([1]) * Right(), bad"
+      ],
+      "stdout": "(99, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "class L(list):\n    __mul__ = list.__mul__\nclass Right:\n    def __rmul__(self, other): return 99\n    def __index__(self): return 2\nclass Unrelated:\n    __mul__ = list.__mul__\nbad = False\ntry:\n    Unrelated() * Right()\nexcept TypeError:\n    bad = True\nprint(repr((L([1]) * Right(), bad)))"
+      ],
+      "stdout": "(99, True)\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "list(iterable=())"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError: unexpected or positional-only keyword: iterable\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "list(iterable=())"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError: list() takes no keyword arguments\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "[1][4]"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nIndexError: list index out of range\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "[1][4]"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nIndexError: list index out of range\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "[].pop()"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nIndexError: list index out of range\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "[].pop()"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nIndexError: pop from empty list\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "[].index(1)"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nValueError: 1 is not in list\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "[].index(1)"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nValueError: 1 is not in list\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "[].remove(1)"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nValueError: list.remove(x): x not in list\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "[].remove(1)"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nValueError: list.remove(x): x not in list\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "list.__add__([], 1)"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError: can only concatenate a list to a list\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "list.__add__([], 1)"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError: can only concatenate list (not \"int\") to list\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "[1] * 1000000000000000000000000000000000"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nOverflowError: list index or count is too large\n",
+      "exit_code": 1
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "[1] * 1000000000000000000000000000000000"
+      ],
+      "stdout": "",
+      "stderr": "Traceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nOverflowError: cannot fit 'int' into an index-sized integer\n",
+      "exit_code": 1
     },
     {
       "command": [

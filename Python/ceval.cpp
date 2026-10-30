@@ -769,12 +769,18 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 break;
             }
             case Opcode::BuildTuple:
+            case Opcode::BuildList:
             case Opcode::BuildNameDict: {
-                const auto count =
-                    opcode == Opcode::BuildTuple ? operand : code.program.calls()[operand].keywords;
+                const auto count = opcode == Opcode::BuildNameDict
+                                       ? code.program.calls()[operand].keywords
+                                       : operand;
                 const auto base = data.sp - count;
                 if (opcode == Opcode::BuildTuple)
                     cxxpython::core::make_tuple(
+                        context, std::span<const Value>{data.operands.data() + base, count},
+                        result);
+                else if (opcode == Opcode::BuildList)
+                    cxxpython::core::make_list(
                         context, std::span<const Value>{data.operands.data() + base, count},
                         result);
                 else {
@@ -787,8 +793,12 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                         detail::name_store(context, result.value(), names[i],
                                            data.operands[base + i]);
                 }
-                data.trim_stack(context, base);
-                data.operands[data.sp++] = result.value();
+                if (raised(result))
+                    activation.raising(result.exception());
+                else {
+                    data.trim_stack(context, base);
+                    data.operands[data.sp++] = result.value();
+                }
                 break;
             }
             case Opcode::Unary: {

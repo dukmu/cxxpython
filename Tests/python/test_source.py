@@ -111,6 +111,85 @@ class SourceDifferential(unittest.TestCase):
             with self.subTest(source=source, expression=expression):
                 self.check_program(source, expression)
 
+    def test_list_displays_and_targets(self):
+        cases = [
+            ("", "[], [1,], [1, [2, 3]]"),
+            ("counter = 0\ndef next_value():\n    global counter\n    counter += 1\n    return counter\nx = [next_value(), [next_value(), next_value()]]", "x, counter"),
+            ("[a, (b, c)] = [1, [2, 3]]\ndel [a, (b, c)]\n[] = []\ndel []", "42"),
+            ("def f(x=[1, [2]]): return x\na = f()\nb = f()", "a, a is b, [] is not []"),
+            ("class C:\n    [__x, (__y,)] = [4, [5]]\n    def get(self): return [self.__x, self.__y]", "C().get()"),
+            ("total = 0\nfor [a, b] in [[1, 2], [3, 4]]:\n    total += a * b", "total"),
+        ]
+        for source, expression in cases:
+            with self.subTest(source=source, expression=expression):
+                self.check_program(source, expression)
+        for source in ["[a] += [1]", "[1] = [2]", "del [1]"]:
+            with self.subTest(source=source):
+                self.assertNotEqual(self.execute([self.reference, "-c", source]).returncode, 0)
+                self.assertNotEqual(self.execute([self.binary, "-c", source]).returncode, 0)
+
+    def test_list_protocols_mutation_and_callbacks(self):
+        cases = [
+            ("a = [1, 2]\nb = list(a)\nc = list(range(3))", "a, b, a is not b, c, list('ab')"),
+            ("a = [1, 2]\na.append(3)\na.insert(-1, 4)\nx = a.pop(0)\na[0] = 8\n"
+             "del a[-1]\nb = a.copy()\na.reverse()", "x, a, b, a.count(8), a.index(8)"),
+            ("a = [1, 2]\na.extend(a)\nb = a\na += (3, 4)\na *= 2\n"
+             "c = a + [9]\nd = 2 * [3]\ne = [4] * -1", "a, b is a, c, d, e"),
+            ("a = [1, 2]\nit = iter(a)\nx = next(it)\na.append(3)\ny = next(it)\n"
+             "z = next(it)\nend = next(it, None)\na.append(4)\nagain = next(it, None)",
+             "x, y, z, end, again, iter(it) is it"),
+            ("a = []\na.append(a)\nn = float('nan')\nb = [n]", "repr(a), b == [n], b == b, [1] < [2], [1] == (1,)"),
+            ("class L(list):\n    def __iter__(self):\n        return iter((8, 9))\na = L([1])\n"
+             "a.extend(a)\nb = a.copy()\na.__init__(a)", "a, b, type(a) is L, type(b) is list"),
+            ("events = []\nclass Source:\n"
+             "    def __iter__(self):\n        events.append('iter')\n        return iter((1, 2))\n"
+             "    def __len__(self):\n        events.append('len')\n        raise TypeError('decline')\n"
+             "    def __length_hint__(self):\n        events.append('hint')\n        return 2\na = list(Source())",
+             "a, events"),
+            ("class Source:\n    def __getitem__(self, i):\n        if i == 3:\n            raise IndexError(i)\n"
+             "        return i + 1\na = list(Source())\nb = tuple(Source())", "a, b"),
+            ("class NoIter:\n    __iter__ = None\n    def __getitem__(self, i):\n        return i\n"
+             "ok = False\ntry:\n    list(NoIter())\nexcept TypeError:\n    ok = True", "ok"),
+            ("a = [1]\nclass Source:\n    def __iter__(self):\n        return self\n"
+             "    def __next__(self):\n        if len(a) == 1:\n            return 2\n        raise ValueError('next')\n"
+             "ok = False\ntry:\n    a.extend(Source())\nexcept ValueError:\n    ok = True", "a, ok"),
+            ("a = []\nclass Item:\n    def __repr__(self):\n        a.clear()\n        return 'item'\n"
+             "a.extend((Item(), 2))\ntext = repr(a)", "text, a"),
+            ("a = []\nclass Item:\n    def __eq__(self, other):\n        a.clear()\n        return True\n"
+             "a.extend((Item(), 2))\nresult = a.remove(0)", "result, a"),
+            ("a = [1]\nclass Index:\n    def __index__(self):\n        a.clear()\n        a.append(7)\n        return 0\n"
+             "x = a[Index()]\na[Index()] = 8", "x, a"),
+            ("a = [1]\nok = False\ntry:\n    hash(a)\nexcept TypeError:\n    ok = True\n"
+             "a.clear()", "ok, bool(a), a"),
+            ("events = []\nclass Right:\n"
+             "    def __rmul__(self, other):\n        events.append('rmul')\n        return 99\n"
+             "    def __radd__(self, other):\n        events.append('radd')\n        return 88\n"
+             "    def __index__(self):\n        events.append('index')\n        return 2\n"
+             "a = [1]\nx = a * Right()\na *= Right()\nb = [2]\ny = b + Right()\nb += Right()",
+             "x, a, y, b, events"),
+            ("events = []\nclass Right:\n"
+             "    def __rmul__(self, other):\n        events.append('rmul')\n        return NotImplemented\n"
+             "    def __index__(self):\n        events.append('index')\n        return 2\n"
+             "a = [1]\nb = a\na *= Right()", "a, b is a, events"),
+            ("class L(list):\n    __mul__ = list.__mul__\n"
+             "class Right:\n    def __rmul__(self, other): return 99\n    def __index__(self): return 2\n"
+             "class Unrelated:\n    __mul__ = list.__mul__\n"
+             "bad = False\ntry:\n    Unrelated() * Right()\nexcept TypeError:\n    bad = True",
+             "L([1]) * Right(), bad"),
+        ]
+        for source, expression in cases:
+            with self.subTest(source=source, expression=expression):
+                self.check_program(source, expression)
+        for source, error in [("list(iterable=())", "TypeError"), ("[1][4]", "IndexError"),
+                              ("[].pop()", "IndexError"), ("[].index(1)", "ValueError"),
+                              ("[].remove(1)", "ValueError"),
+                              ("list.__add__([], 1)", "TypeError"),
+                              ("[1] * 1000000000000000000000000000000000", "OverflowError")]:
+            for binary in (self.binary, self.reference):
+                result = self.execute([binary, "-c", source])
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertIn(error, result.stderr)
+
     def test_iteration_errors_preserve_python_exception_types(self):
         for source, error in [
             ("next(iter(()))", "StopIteration"),
@@ -759,10 +838,32 @@ class SourceDifferential(unittest.TestCase):
                 ("try:\n    import bad\nexcept SyntaxError:\n    syntax = True\n"
                  "try:\n    from fails import value\nexcept ModuleNotFoundError as error:\n    dependency = error.name",
                  "syntax, dependency"),
+                ("sys.path = list(sys.path)\nsaved = sys.path\nsys.path.append(" + repr(str(root / "other")) + ")\n"
+                 "import extra\nremoved = sys.path.pop()", "extra.value, saved is sys.path, removed"),
+                ("import pkg\nsaved = pkg.__path__\npkg.__path__.append(" + repr(str(root / "other")) + ")\n"
+                 "from pkg import extra", "extra.value, saved is pkg.__path__, type(saved) is list"),
             ]
             for source, expression in cases:
                 with self.subTest(expression=expression):
                     self.check_program(setup + source, expression)
+
+    def test_cli_argv_is_a_mutable_list(self):
+        source = "import sys\nsys.argv.append('tail')"
+        expression = "sys.argv, type(sys.argv) is list"
+        actual = self.execute([self.binary, "-c", source, "--eval", expression, "alpha", "--flag"])
+        expected = self.execute([self.reference, "-c", source + "\nprint(repr((" + expression + ")))", "alpha", "--flag"])
+        self.assertEqual(expected.returncode, 0, expected.stderr)
+        self.assertEqual(actual.returncode, 0, actual.stderr)
+        self.assertEqual(actual.stdout, expected.stdout)
+        with tempfile.TemporaryDirectory() as directory:
+            script = Path(directory) / "argv_script.py"
+            script.write_text(source, encoding="utf-8")
+            actual = self.execute([self.binary, str(script), "--eval", expression, "alpha", "--flag"])
+            script.write_text(source + "\nprint(repr((" + expression + ")))\n", encoding="utf-8")
+            expected = self.execute([self.reference, str(script), "alpha", "--flag"])
+            self.assertEqual(expected.returncode, 0, expected.stderr)
+            self.assertEqual(actual.returncode, 0, actual.stderr)
+            self.assertEqual(actual.stdout, expected.stdout)
 
 
 if __name__ == "__main__":

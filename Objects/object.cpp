@@ -190,6 +190,8 @@ void SignatureLayout::trace(Tracer &tracer) const noexcept
 void NativeFunctionObject::trace(Tracer &tracer) const noexcept
 {
     signature.trace(tracer);
+    if (sequence_owner)
+        tracer.visit(*sequence_owner);
     for (auto value : captures)
         tracer.visit(value);
 }
@@ -551,14 +553,15 @@ void initialize_type_dictionary(Attachment &context, Handle type)
 }
 void allocate_function(Attachment &context, Handle type, std::string name,
                        SignatureLayout signature, NativeEntry entry, std::vector<Value> captures,
-                       ReturnSlot &out)
+                       ReturnSlot &out, std::optional<Value> sequence_owner)
 {
     out.reset(context);
     signature.validate();
     if (!entry)
         throw std::invalid_argument("native function requires an entrypoint");
-    context.allocate_instance<NativeFunctionObject>(
-        type, out, std::move(name), std::move(signature), entry, std::move(captures));
+    context.allocate_instance<NativeFunctionObject>(type, out, std::move(name),
+                                                    std::move(signature), entry,
+                                                    std::move(captures), sequence_owner);
 }
 void build_core_objects(Attachment &context, std::span<ReturnSlot *const> outputs)
 {
@@ -673,6 +676,11 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
            LayoutDescriptor::of<DictIteratorObject>());
     define(CoreObject::DictItemIteratorType, "dict_itemiterator",
            LayoutDescriptor::of<DictIteratorObject>());
+    define(CoreObject::ListType, "list", LayoutDescriptor::of<ListObject>());
+    define(CoreObject::ListIteratorType, "list_iterator",
+           LayoutDescriptor::of<SequenceIteratorObject>());
+    define(CoreObject::SequenceIteratorType, "iterator",
+           LayoutDescriptor::of<SequenceIteratorObject>());
     context.payload<TypeObject>(at(CoreObject::TupleType)).allow_slots = false;
     context.payload<TypeObject>(at(CoreObject::IntType)).allow_slots = false;
     for (auto type : core) {
@@ -738,6 +746,7 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     install_floats(context, core);
     install_protocols(context, core);
     install_dictionaries(context, core);
+    install_lists(context, core);
     install_value_protocols(context, core);
     install_execution(context, core);
     install_exception_runtime(context, core);
@@ -773,7 +782,9 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                     CoreObject::DictItemsType,
                     CoreObject::DictKeyIteratorType,
                     CoreObject::DictValueIteratorType,
-                    CoreObject::DictItemIteratorType})
+                    CoreObject::DictItemIteratorType,
+                    CoreObject::ListIteratorType,
+                    CoreObject::SequenceIteratorType})
         context.payload<TypeObject>(at(id)).subclassable = false;
 
     auto &builtins = *outputs[static_cast<std::size_t>(CoreObject::Builtins)];
@@ -787,6 +798,7 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     publish(text.value(), module_name.get(context));
     for (auto id : {CoreObject::StrType,
                     CoreObject::TupleType,
+                    CoreObject::ListType,
                     CoreObject::DictType,
                     CoreObject::IntType,
                     CoreObject::BoolType,

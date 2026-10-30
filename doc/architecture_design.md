@@ -67,7 +67,11 @@ and publication helper, without a second numeric implementation.
 `Objects/object.cpp` contains the initial values, shared dictionary/namespace
 storage, core image and common object construction. `Objects/dictobject.cpp` owns
 public dict/mappingproxy methods, views and iterators; callbacks use ordinary
-protocols outside storage locks. Generated Unicode tables are private
+protocols outside storage locks. `Objects/listobject.cpp` owns mutable list storage,
+constructors and protocols, with prepared capacity growth and local commits.
+List displays lower through the same AST/CFG into BUILD_LIST; sys.path, regular
+package paths and CLI argv use that real container, not host-only arrays.
+Generated Unicode tables are private
 to Objects and retain their generator/source provenance.
 `Objects/moduleobject.cpp` uses the ordinary instance dictionary as the module
 namespace, including descriptor lookup and module-level __getattr__. Module

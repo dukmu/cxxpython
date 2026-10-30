@@ -30,8 +30,9 @@ Class definitions and decorators use the existing type/descriptor/call machinery
 with separate class namespaces, lexical forwarding and real __class__ Cells.
 Experimental int/float/tuple constructors use the same ordinary class call and
 descriptor boundary, including Python conversion callbacks and native subclasses.
-Dictionary construction/mutation and import/from/package syntax are experimental
-implemented slices. Other mutable containers, dictionary literals/comprehensions,
+Dictionary/list construction/mutation, list displays/non-starred targets and
+import/from/package syntax are experimental implemented slices.
+Other mutable containers, dictionary literals/comprehensions,
 slices, full iteration APIs, super(), exception groups, suspension, f-strings, complex/power protocols,
 full Unicode source handling and the remaining Python 3.12 matrix are
 unfinished. These are remaining delivery requirements, not a reduction of the
@@ -101,10 +102,14 @@ state. Star honors __all__ with indexed sequence access or snapshots public
 namespace keys. Compiler private-name rules preserve raw fromlist spellings.
 CLI script entry uses its resolved directory for imports and publishes __file__.
 
-Complete sys/module/reflection methods, ModuleSpec/loader objects and Python importlib,
-the remaining container matrix and mutable list-based path/argv are still gates.
-The bootstrap path/argv tuples and static namespace-package path snapshots are
-experimental, not full sys/PEP 420 compatibility. Auto-refresh after a namespace
+sys.path and regular package __path__ are real mutable lists; exact-list path
+reads take a rooted snapshot before filesystem waits, while other iterables retain
+their normal protocol. The CLI publishes a mutable sys.argv for script/-c and
+trailing arguments. Its existing --eval inspection option remains reserved;
+-- separates trailing Python arguments from those host options.
+Complete sys/module/reflection methods, ModuleSpec/loader objects, Python importlib
+and the remaining container matrix are still gates. Namespace-package paths are
+currently mutable static list snapshots, not full PEP 420 paths. Auto-refresh after a namespace
 parent search path changes, path hooks and bytecode caches remain pending.
 This node therefore does not complete the active module-stage goal.
 
@@ -134,8 +139,40 @@ Implicit special-method type lookups still use native name helpers, so arbitrary
 key aliases there are not a completed compatibility gate. Remaining canonical
 writes in the import/VM setup paths initialize newly private/bootstrap mappings;
 they do not read an alternative public module registry.
-fromkeys/popitem/union/reversed, view set operations, list/set and remaining source
+fromkeys/popitem/union/reversed, view set operations, set and remaining source
 container syntax are still pending; this slice does not complete M3.
+
+## Mutable Lists And Iteration
+
+ListObject has one contiguous Value buffer, traced only during an acknowledged
+collector stop. Every ordinary access uses its per-object mutex. Capacity growth
+is geometric: allocate a replacement buffer outside the lock, recheck current
+size/capacity, then copy/swap in a no-safepoint commit. Append is amortized O(1);
+insertion/deletion are O(n). No Python call or host expansion occurs under that
+lock. Rooted snapshots keep copied values alive across callbacks/GC. Comparisons
+and representation read each current element into a result root before user
+callbacks; compound operations are not globally atomic.
+
+The experimental API covers list construction, integer get/set/delete, length,
+equality/order, recursive repr, append/extend/insert/pop/remove/count/index,
+clear/copy/reverse, concatenation/repetition and their in-place forms. Constructors
+and generic extend share tuple construction's length-hint rules; iterator failures
+preserve already appended values. Self-extension snapshots exact lists and
+materializes a subclass's overridden iterator before appending. List subclasses
+use the normal native-prefix layout and ordinary instance tails.
+
+List iterators trace their owner and share its short commit to claim a cursor.
+They see later appends before exhaustion, tolerate mutation rather than enforcing
+dictionary key versions, and stay exhausted after their owner edge is cleared.
+The general iter protocol also supports the __getitem__ fallback, stopping on
+IndexError/StopIteration; explicit __iter__ = None still prevents iteration.
+
+BUILD_LIST has a count operand and n-input/1-output stack effect, is verified and
+disassembled normally, can allocate/raise, and keeps its operands traced until
+construction succeeds. List displays, nested lists, function defaults and
+non-starred assignment/delete/for targets use the existing scope/CFG pipeline.
+Slices, starred displays/targets, comprehensions, sort/reversed, iterator hints
+and the complete direct-special-method matrix remain gates, not placeholder APIs.
 
 ## C Extension ABI V1
 
@@ -240,6 +277,13 @@ All call shapes use the same binder and caller-owned result boundary. Complete
 positional native calls borrow spans or prefix a receiver in bounded stack
 storage, with a vector for larger arities. Defaults, keyword-only/variadic cases,
 recursion guards, callback roots and return validation remain intact.
+
+Native sequence slot definitions retain their defining Type as a traced immutable
+edge. Arithmetic tries numeric/reflected methods before concatenation/repetition
+fallbacks, including in-place operations; __index__ runs only at the sequence
+stage. Inherited native sequence definitions retain this role, while assigning
+the same callable to an unrelated Python class uses ordinary method semantics.
+This classification belongs to the callable definition, not a VM list special case.
 
 ## Code, Frames And Closures
 

@@ -207,11 +207,11 @@ class GraphPass final {
                 } else if constexpr (std::is_same_v<T, AttributeExpr>) {
                     expression(*node.object);
                     emit(Opcode::LoadAttr, value.span, 0, node.name);
-                } else if constexpr (std::is_same_v<T, TupleExpr>) {
+                } else if constexpr (std::is_same_v<T, TupleExpr> || std::is_same_v<T, ListExpr>) {
                     for (const auto &item : node.items)
                         expression(*item);
-                    emit(Opcode::BuildTuple, value.span,
-                         static_cast<std::uint32_t>(node.items.size()));
+                    emit(std::is_same_v<T, TupleExpr> ? Opcode::BuildTuple : Opcode::BuildList,
+                         value.span, static_cast<std::uint32_t>(node.items.size()));
                 } else if constexpr (std::is_same_v<T, SubscriptExpr>) {
                     expression(*node.object);
                     expression(*node.key);
@@ -272,6 +272,12 @@ class GraphPass final {
                 emit(Opcode::UnpackSequence, target.span,
                      static_cast<std::uint32_t>(tuple->items.size()));
             for (const auto &item : tuple->items)
+                store(*item, erase);
+        } else if (const auto *list = std::get_if<ListExpr>(&target.node)) {
+            if (!erase)
+                emit(Opcode::UnpackSequence, target.span,
+                     static_cast<std::uint32_t>(list->items.size()));
+            for (const auto &item : list->items)
                 store(*item, erase);
         } else if (const auto *entry = std::get_if<NameExpr>(&target.node))
             name(entry->name, target.span, erase ? Opcode::DeleteFast : Opcode::StoreFast,
