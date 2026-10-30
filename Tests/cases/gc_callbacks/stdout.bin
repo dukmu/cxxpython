@@ -1,0 +1,3 @@
+[('first', 'start', ['collected', 'generation', 'uncollectable']), ('second', 'start', True), ('first', 'stop', ['collected', 'generation', 'uncollectable']), ('second', 'stop', True)]
+[('ValueError', 'start', True), ('ValueError', 'stop', True)]
+[('mutate', 'start'), ('appended', 'start'), ('mutate', 'stop'), ('appended', 'stop')]

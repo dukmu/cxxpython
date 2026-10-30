@@ -7,6 +7,9 @@
 #include "internal/codecregistry.hpp"
 #include "internal/collectionsmodule.hpp"
 #include "internal/compiler.hpp"
+#ifdef CXXPYTHON_HAVE_CURSES
+#include "internal/cursesmodule.hpp"
+#endif
 #include "internal/hashmodule.hpp"
 #include "internal/iomodule.hpp"
 #include "internal/itertoolsmodule.hpp"
@@ -249,6 +252,9 @@ detail::ImportState::ImportState()
                                      {U"_opcode", detail::initialize_opcode},
 #ifdef CXXPYTHON_HAVE_READLINE
                                      {U"readline", detail::initialize_readline},
+#endif
+#ifdef CXXPYTHON_HAVE_CURSES
+                                     {U"_curses", detail::initialize_curses},
 #endif
                                      {U"_thread", detail::initialize_thread},
                                      {U"_abc", detail::initialize_abc},

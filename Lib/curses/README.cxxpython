@@ -1,0 +1,5 @@
+The Python files in this directory are copied unchanged from CPython 3.12.14,
+Lib/curses. They are distributed under the CPython license retained at
+doc/licenses/python-3.12.14.txt. Native _curses is optional (ncursesw via CMake);
+the complete native API and _curses_panel are not yet provided. Copied Python
+source is not a claim that panel/textpad and every curses operation work.

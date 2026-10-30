@@ -17,6 +17,7 @@
 #include <list>
 #include <map>
 #include <random>
+#include <unordered_set>
 
 namespace cxxpython::core {
 void LayoutDescriptor::trace_storage(const ObjectHeader &object, Tracer &tracer) const noexcept
@@ -225,6 +226,8 @@ struct ThreadRecord {
     std::list<AllocationSpan> spans;
     AllocationSpan *current_span = nullptr;
     std::size_t pending_bytes = 0;
+    std::size_t allocations_since_gc = 0;
+    bool collecting_callbacks = false;
     bool dispatching = false;
     Allocation *finalizers = nullptr;
     WeakRefObject *weak_callbacks = nullptr;
@@ -282,6 +285,9 @@ struct State {
                          last_rendezvous_ns,
                          max_rendezvous_ns};
         result.transfer_roots = transfer_count;
+        result.reclaimed_objects = reclaimed_objects;
+        result.allocated_bytes = allocated_since_gc.load(std::memory_order_relaxed);
+        result.gc_budget = budget;
         auto count = [&](const auto &spans) {
             for (const auto &span : spans) {
                 ++result.spans;
@@ -299,8 +305,14 @@ struct State {
             }
         };
         count(retired_spans);
-        for (const auto &thread : threads)
+        for (const auto &thread : threads) {
             count(thread->spans);
+            result.allocations_since_gc =
+                saturated_add(result.allocations_since_gc, thread->allocations_since_gc);
+            result.allocated_bytes = saturated_add(result.allocated_bytes, thread->pending_bytes);
+        }
+        result.allocations_since_gc =
+            saturated_add(result.allocations_since_gc, retired_allocations_since_gc);
         return result;
     }
     void charge(ThreadRecord &thread, std::size_t bytes) noexcept
@@ -334,7 +346,8 @@ struct State {
         assert(transfer_count);
         --transfer_count;
     }
-    std::size_t rendezvous(ThreadRecord &caller, HeapStats *snapshot = nullptr)
+    std::size_t rendezvous(ThreadRecord &caller, void (*observe)(State &, void *) = nullptr,
+                           void *data = nullptr)
     {
         std::unique_lock gate(coordinator);
         for (;;) {
@@ -347,18 +360,18 @@ struct State {
             caller.state.store(MutatorState::Parked, std::memory_order_release);
             changed.notify_all();
             resume(caller, gate);
-            if (!snapshot && joined_collection)
+            if (!observe && joined_collection)
                 return caller.collection_result;
         }
-        if (snapshot && !other_active(&caller)) {
-            *snapshot = capture_stats();
+        if (observe && !other_active(&caller)) {
+            observe(*this, data);
             return 0;
         }
         const auto epoch = request_epoch.load(std::memory_order_relaxed) + 1;
         if (!epoch)
             throw std::overflow_error("GC epochs exhausted");
         phase = GcPhase::Requesting;
-        collection_request = snapshot == nullptr;
+        collection_request = observe == nullptr;
         caller.wait_epoch = epoch;
         caller.ack_epoch = epoch;
         caller.state.store(MutatorState::Collector, std::memory_order_release);
@@ -366,7 +379,7 @@ struct State {
         request_epoch.store(epoch, std::memory_order_release);
         changed.notify_all();
         changed.wait(gate, [&] { return !other_active(&caller); });
-        if (!snapshot) {
+        if (!observe) {
             last_rendezvous_ns =
                 static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
                                                std::chrono::steady_clock::now() - requested)
@@ -376,15 +389,28 @@ struct State {
         phase = GcPhase::Collecting;
         // Membership cannot change until Running; exiting owners keep
         // their record/State leases while waiting for this round.
-        const auto collected = snapshot ? (*snapshot = capture_stats(), std::size_t{0}) : sweep();
-        for (const auto &thread : threads)
-            if (thread->wait_epoch == epoch)
-                thread->collection_result = collected;
-        completed_epoch = epoch;
-        caller.observed_epoch = epoch;
-        caller.state.store(MutatorState::Active, std::memory_order_release);
-        phase = GcPhase::Running;
-        changed.notify_all();
+        auto finish = [&](std::size_t collected) {
+            for (const auto &thread : threads)
+                if (thread->wait_epoch == epoch)
+                    thread->collection_result = collected;
+            completed_epoch = epoch;
+            caller.observed_epoch = epoch;
+            caller.state.store(MutatorState::Active, std::memory_order_release);
+            phase = GcPhase::Running;
+            changed.notify_all();
+        };
+        std::size_t collected;
+        try {
+            if (observe) {
+                observe(*this, data);
+                collected = 0;
+            } else
+                collected = sweep();
+        } catch (...) {
+            finish(0);
+            throw;
+        }
+        finish(collected);
         return collected;
     }
 
@@ -411,6 +437,44 @@ struct State {
         scan(retired_spans);
         for (const auto &thread : threads)
             scan(thread->spans);
+    }
+    static bool python_object(ObjectHeader *object) noexcept
+    {
+        return object && object->type.object_.load(std::memory_order_relaxed);
+    }
+    // Internal snapshots/storage are transparent to Python heap inspection.
+    // Stop at each Python object rather than following its transitive graph.
+    static std::vector<ObjectHeader *> referents(ObjectHeader *source)
+    {
+        struct Edges {
+            std::vector<ObjectHeader *> pending, visible;
+            std::exception_ptr error;
+        } edges;
+        Tracer tracer(&edges, [](void *opaque, ObjectHeader *object) noexcept {
+            auto &edges = *static_cast<Edges *>(opaque);
+            if (!object || edges.error)
+                return;
+            try {
+                (python_object(object) ? edges.visible : edges.pending).push_back(object);
+            } catch (...) {
+                edges.error = std::current_exception();
+            }
+        });
+        auto trace = [&](ObjectHeader *object) {
+            tracer.visit(object->type);
+            Allocation::from(object).span->layout.trace_storage(*object, tracer);
+            if (edges.error)
+                std::rethrow_exception(edges.error);
+        };
+        trace(source);
+        std::unordered_set<ObjectHeader *> visited;
+        while (!edges.pending.empty()) {
+            auto *object = edges.pending.back();
+            edges.pending.pop_back();
+            if (visited.insert(object).second)
+                trace(object);
+        }
+        return std::move(edges.visible);
     }
     static bool python_finalizer(Allocation &allocation) noexcept
     {
@@ -462,6 +526,7 @@ struct State {
         for (auto *object : core)
             mark(object);
         mark(exit_callbacks);
+        mark(gc_callbacks);
         mark(sys_dictionary);
         auto trace_work = [&] {
             while (worklist) {
@@ -558,10 +623,13 @@ struct State {
             thread->current_span = nullptr;
             sweep_spans(thread->spans);
             thread->pending_bytes = 0;
+            thread->allocations_since_gc = 0;
         }
         // Budget all allocations, including leaf objects and external buffers.
         budget = std::max(config.minimum_gc_budget, live_bytes);
         allocated_since_gc = 0;
+        retired_allocations_since_gc = 0;
+        reclaimed_objects = saturated_add(reclaimed_objects, collected);
         ++collections;
         last_pause_ns =
             static_cast<std::uint64_t>(std::chrono::duration_cast<std::chrono::nanoseconds>(
@@ -595,6 +663,7 @@ struct State {
     std::atomic<std::size_t> allocated_since_gc{0};
     std::size_t budget;
     std::size_t collections = 0;
+    std::size_t reclaimed_objects = 0, retired_allocations_since_gc = 0;
     std::size_t reclaimed_bytes = 0;
     std::uint64_t last_pause_ns = 0;
     std::uint64_t last_rendezvous_ns = 0, max_rendezvous_ns = 0;
@@ -604,6 +673,7 @@ struct State {
     ObjectHeader *type_type = nullptr;
     std::array<ObjectHeader *, detail::core_count> core{};
     ObjectHeader *exit_callbacks = nullptr;
+    ObjectHeader *gc_callbacks = nullptr;
     ObjectHeader *sys_dictionary = nullptr;
     bool core_published = false;
     std::atomic<std::uint64_t> type_epoch{0}, exception_epoch{0};
@@ -691,6 +761,8 @@ Attachment::~Attachment()
     state_->changed.notify_all();
     state_->changed.wait(gate, [&] { return state_->phase == GcPhase::Running; });
     state_->retired_spans.splice(state_->retired_spans.end(), thread_record_->spans);
+    state_->retired_allocations_since_gc = detail::saturated_add(
+        state_->retired_allocations_since_gc, thread_record_->allocations_since_gc);
     std::erase(state_->threads, thread_record_);
     state_->changed.notify_all();
 }
@@ -797,6 +869,10 @@ detail::RootCell &Attachment::cell(Handle handle) const
 Handle Attachment::acquire(const void *scope)
 {
     require_safepoint();
+    return acquire_cell(scope);
+}
+Handle Attachment::acquire_cell(const void *scope)
+{
     auto &arena = thread_record_->roots;
     auto *cell = arena.free;
     if (cell)
@@ -1038,6 +1114,8 @@ void Attachment::adopt(ObjectHeader *object, ReturnSlot &out, std::size_t extern
         out.store_root_noexcept(ResultTag::Ok, object);
     }
     state_->charge(*thread_record_, bytes);
+    thread_record_->allocations_since_gc =
+        detail::saturated_add(thread_record_->allocations_since_gc, std::size_t{1});
 }
 
 void Attachment::require_edge(Value value, const void *edge, std::size_t bytes) const
@@ -1219,10 +1297,69 @@ void Attachment::account_external(Value owner, std::size_t bytes)
 std::size_t Attachment::collect()
 {
     require_safepoint();
-    auto collected = state_->rendezvous(*thread_record_);
-    if (dispatch_finalizers())
-        collected += state_->rendezvous(*thread_record_);
-    return collected;
+    auto perform = [&] {
+        auto collected = state_->rendezvous(*thread_record_);
+        if (dispatch_finalizers())
+            collected += state_->rendezvous(*thread_record_);
+        return collected;
+    };
+    if (thread_record_->collecting_callbacks)
+        return perform();
+    ReturnSlot callbacks(*this);
+    load_gc_callbacks(callbacks);
+    if (callbacks.tag() == ResultTag::Empty)
+        return perform();
+    RootScope roots(*this);
+    auto list = roots.root(callbacks.value());
+    thread_record_->collecting_callbacks = true;
+    try {
+        dispatch_gc_callbacks(list, true, 0);
+        auto collected = perform();
+        dispatch_gc_callbacks(list, false, collected);
+        thread_record_->collecting_callbacks = false;
+        return collected;
+    } catch (...) {
+        thread_record_->collecting_callbacks = false;
+        throw;
+    }
+}
+void Attachment::dispatch_gc_callbacks(Handle callbacks, bool starting, std::size_t collected)
+{
+    if (!detail::list_size(*this, callbacks))
+        return;
+    try {
+        RootScope roots(*this);
+        ReturnSlot phase(*this), info(*this), name(*this), number(*this), result(*this);
+        make_str(*this, starting ? U"start" : U"stop", phase);
+        allocate_instance<DictObject>(roots.root(builtin(CoreObject::DictType)), info);
+        const auto dictionary = roots.root(info.value());
+        for (auto [key, value] : {std::pair{U"generation", std::size_t{2}},
+                                  {U"collected", collected},
+                                  {U"uncollectable", 0}}) {
+            make_str(*this, key, name);
+            make_int(*this, value, number);
+            dict_store(*this, dictionary, roots.root(name.value()), roots.root(number.value()),
+                       result);
+            if (result.tag() == ResultTag::Raised) {
+                detail::write_unraisable(*this, roots.root(result.exception()), callbacks);
+                return;
+            }
+        }
+        for (std::size_t i = 0;; ++i) {
+            detail::list_item(*this, callbacks, i, result);
+            if (result.tag() == ResultTag::Empty)
+                break;
+            RootScope invocation(*this);
+            auto callback = invocation.root(result.value());
+            const Value args[] = {phase.value(), dictionary.get(*this)};
+            call(*this, callback, {args}, result);
+            if (result.tag() == ResultTag::Raised)
+                detail::write_unraisable(*this, invocation.root(result.exception()), callback);
+        }
+    } catch (const std::bad_alloc &) {
+        RootScope roots(*this);
+        detail::write_unraisable(*this, roots.root(builtin(CoreObject::MemoryError)), callbacks);
+    }
 }
 bool Attachment::supports_weakrefs(Handle target) const
 {
@@ -1507,6 +1644,24 @@ void Attachment::publish_exit_callbacks(Handle candidate, ReturnSlot &out)
         state_->exit_callbacks = value.object();
     out.ok(Value(*state_->exit_callbacks));
 }
+void Attachment::load_gc_callbacks(ReturnSlot &out)
+{
+    out.reset(*this);
+    std::lock_guard gate(state_->coordinator);
+    if (state_->gc_callbacks)
+        out.ok(Value(*state_->gc_callbacks));
+}
+void Attachment::publish_gc_callbacks(Handle candidate, ReturnSlot &out)
+{
+    const auto value = candidate.get(*this);
+    if (!has_layout<ListObject>(value))
+        throw std::logic_error("GC callbacks require a list");
+    out.reset(*this);
+    std::lock_guard gate(state_->coordinator);
+    if (!state_->gc_callbacks)
+        state_->gc_callbacks = value.object();
+    out.ok(Value(*state_->gc_callbacks));
+}
 void Attachment::load_sys_dictionary(ReturnSlot &out)
 {
     out.reset(*this);
@@ -1753,8 +1908,64 @@ HeapStats Attachment::stats() const
 {
     require_safepoint();
     HeapStats result{};
-    state_->rendezvous(*thread_record_, &result);
+    state_->rendezvous(
+        *thread_record_,
+        [](detail::State &state, void *out) {
+            *static_cast<HeapStats *>(out) = state.capture_stats();
+        },
+        &result);
     return result;
+}
+void Attachment::inspect_heap(HeapInspection kind, std::span<const Value> targets, RootScope &roots,
+                              std::vector<Value> &out)
+{
+    require_safepoint();
+    if (&roots.context_ != this)
+        throw std::logic_error("heap inspection requires caller-owned roots");
+    for (auto value : targets) {
+        require_owns(value);
+        roots.root(value);
+    }
+    auto inspect = [&](detail::State &state) {
+        auto publish = [&](ObjectHeader *object) {
+            auto handle = acquire_cell(&roots);
+            auto &cell = *handle.cell_;
+            cell.object = object;
+            cell.tag = ResultTag::Ok;
+            cell.next = roots.head_;
+            roots.head_ = &cell;
+            out.emplace_back(*object);
+        };
+        if (kind == HeapInspection::Referents) {
+            for (auto target : targets)
+                for (auto *object : detail::State::referents(target.object()))
+                    publish(object);
+            return;
+        }
+        std::unordered_set<ObjectHeader *> sought;
+        for (auto target : targets)
+            sought.insert(target.object());
+        if (kind == HeapInspection::Referrers && sought.empty())
+            return;
+        state.each_allocation([&](detail::Allocation &allocation) {
+            auto *object = allocation.object();
+            if (!detail::State::python_object(object))
+                return;
+            if (kind == HeapInspection::Objects) {
+                publish(object);
+                return;
+            }
+            for (auto *referent : detail::State::referents(object))
+                if (sought.contains(referent)) {
+                    publish(object);
+                    break;
+                }
+        });
+    };
+    state_->rendezvous(
+        *thread_record_,
+        [](detail::State &state, void *data) { (*static_cast<decltype(inspect) *>(data))(state); },
+        &inspect);
 }
 
 NoSafepoint::NoSafepoint(Attachment &context) : context_(context)

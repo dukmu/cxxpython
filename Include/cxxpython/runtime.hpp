@@ -389,7 +389,10 @@ struct HeapStats {
     std::uint64_t last_rendezvous_ns, max_rendezvous_ns;
     std::size_t spans = 0, reserved_bytes = 0;
     std::size_t transfer_roots = 0;
+    std::size_t reclaimed_objects = 0, allocations_since_gc = 0;
+    std::size_t allocated_bytes = 0, gc_budget = 0;
 };
+enum class HeapInspection { Objects, Referents, Referrers };
 enum class MutatorState { PendingAttach, Active, Parked, NativeWait, Collector, Exiting };
 enum class GcPhase { Running, Requesting, Collecting };
 enum class PublicationDomain { Type, Exception };
@@ -462,6 +465,7 @@ class RootScope final {
     void release(Handle handle);
 
   private:
+    friend class Attachment;
     Attachment &context_;
     detail::RootCell *head_ = nullptr;
 };
@@ -595,6 +599,8 @@ class Attachment final {
     // The interpreter, not a replaceable module namespace, owns pending exit callbacks.
     void load_exit_callbacks(ReturnSlot &);
     void publish_exit_callbacks(Handle candidate, ReturnSlot &);
+    void load_gc_callbacks(ReturnSlot &);
+    void publish_gc_callbacks(Handle candidate, ReturnSlot &);
     void load_sys_dictionary(ReturnSlot &);
     void set_sys_dictionary(Handle dictionary);
     Value builtin(CoreObject object) const;
@@ -629,6 +635,9 @@ class Attachment final {
     bool gc_enabled() const;
     bool is_finalized(Handle object) const;
     HeapStats stats() const;
+    // Frozen heap inspection publishes precise roots before mutators resume.
+    void inspect_heap(HeapInspection, std::span<const Value> targets, RootScope &,
+                      std::vector<Value> &out);
     void require_attached() const;
 
   private:
@@ -652,12 +661,14 @@ class Attachment final {
     void require_edge(Value owner, const void *edge, std::size_t bytes) const;
     detail::RootCell &cell(Handle handle) const;
     Handle acquire(const void *scope);
+    Handle acquire_cell(const void *scope);
     void release(detail::RootCell &cell) noexcept;
     void prepare_allocation(ReturnSlot &out, std::size_t bytes);
     void *reserve_storage(LayoutDescriptor layout);
     void abandon_storage(ObjectHeader *object) noexcept;
     void adopt(ObjectHeader *object, ReturnSlot &out, std::size_t external);
     bool dispatch_finalizers();
+    void dispatch_gc_callbacks(Handle callbacks, bool starting, std::size_t collected);
 
     template <class T, class... Args>
     void allocate_layout(LayoutDescriptor layout, std::optional<Handle> type, ReturnSlot &out,

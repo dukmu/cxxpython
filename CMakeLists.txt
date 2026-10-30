@@ -16,6 +16,7 @@ find_package(OpenSSL 3.0 REQUIRED COMPONENTS Crypto)
 find_package(PkgConfig QUIET)
 if(PkgConfig_FOUND)
     pkg_check_modules(Readline QUIET IMPORTED_TARGET readline)
+    pkg_check_modules(Ncurses QUIET IMPORTED_TARGET ncursesw)
 endif()
 add_subdirectory(Parser)
 find_path(BOOST_MULTIPRECISION_INCLUDE_DIR boost/multiprecision/cpp_int.hpp)
@@ -123,6 +124,11 @@ if(TARGET PkgConfig::Readline)
     target_link_libraries(cxxpython_core PRIVATE PkgConfig::Readline)
     target_compile_definitions(cxxpython_core PRIVATE CXXPYTHON_HAVE_READLINE=1)
 endif()
+if(TARGET PkgConfig::Ncurses)
+    target_sources(cxxpython_core PRIVATE Modules/_cursesmodule.cpp)
+    target_link_libraries(cxxpython_core PRIVATE PkgConfig::Ncurses)
+    target_compile_definitions(cxxpython_core PRIVATE CXXPYTHON_HAVE_CURSES=1)
+endif()
 target_compile_options(cxxpython_core PRIVATE -Wall -Wextra -Wpedantic -Werror)
 
 add_executable(cxxpython Programs/cxxpython.cpp)
@@ -192,6 +198,7 @@ if(BUILD_TESTING)
     add_executable(test_runtime
         Tests/cpp/test_memory.cpp
         Tests/cpp/test_gc_epochs.cpp
+        Tests/cpp/test_gc_inspection.cpp
         Tests/cpp/test_parallel_vm.cpp
         Tests/cpp/test_types.cpp
         Tests/cpp/test_call.cpp
@@ -265,6 +272,17 @@ if(BUILD_TESTING)
     add_test(NAME VM.Dis COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_dis.py --binary $<TARGET_FILE:cxxpython>)
     set_tests_properties(VM.Dis PROPERTIES TIMEOUT 30)
+    add_test(NAME GC.Inspection COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_cases.py
+        --binary $<TARGET_FILE:cxxpython> --cases ${CMAKE_CURRENT_SOURCE_DIR}/Tests/vm_cases
+        --case gc_vm)
+    set_tests_properties(GC.Inspection PROPERTIES TIMEOUT 30)
+    if(TARGET PkgConfig::Ncurses)
+        add_test(NAME Curses.Terminal COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_curses.py
+            --binary $<TARGET_FILE:cxxpython> --reference ${CXXPYTHON_REFERENCE_PYTHON})
+        set_tests_properties(Curses.Terminal PROPERTIES TIMEOUT 60)
+    endif()
     if(TARGET PkgConfig::Readline)
         add_test(NAME Readline.Terminal COMMAND ${Python3_EXECUTABLE}
             ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_readline.py --binary $<TARGET_FILE:cxxpython>)

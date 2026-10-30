@@ -484,6 +484,38 @@ dispatch polls periodically, including allocation-free loops. NativeWait freezes
 roots but grants no detached payload access and does not serialize resume.
 Blocking host operations must release heap access through that boundary.
 
+Heap inspection uses the same epoch rendezvous, without sweeping. Objects are
+published into the requesting attachment's precise root arena before other
+mutators resume; no Python callback or managed allocation runs while frozen.
+Native allocation failure restores the epoch and leaves already published roots
+valid. Objects without a Python type are internal storage, not Python values:
+get_objects omits them and referent/referrer queries traverse through them, stopping
+at the next typed Python object. Header/type edges are real referents. This may
+differ from CPython's RC/cycle-only tracking: all boxed Python objects, including
+ints and strings, are tracked here. Inspection is a point-in-time graph view, not
+a way to make concurrent subsequent mutations atomic.
+
+The collector currently has one full-heap generation, reported as generation 2.
+collect(0/1/2) all request full collections; get_objects(0/1) are empty, and only
+the last get_stats row contains physical sweep/reclamation totals. get_count's
+first item is managed allocations since the last sweep (including internal
+storage), not allocations minus RC frees; the other items are zero. get_heap_stats
+exposes actual byte budgets, roots, spans, allocation and pause counters. These
+are tracing diagnostics, not fabricated CPython generational heuristics. There
+are no legacy tp_del uncollectable cycles; garbage is initially empty. Generational
+threshold tuning, debug/save-all and permanent-generation freezing remain open.
+
+The Interpreter owns the original gc.callbacks list independently of replaceable
+module bindings. Each outer Attachment::collect request emits start/stop in Active
+state, with generation 2 and actual physical reclamation returned by that request;
+concurrent requests may join the same epoch and their callback pairs may overlap.
+Finalizer cleanup sweeps belong to that pair, not additional callback pairs.
+Callbacks use rooted live-list reads (including mutation), hold no coordinator
+lock, and exceptions are unraisable. Recursive collections on that owner thread
+still perform normal epoch collection but do not recursively invoke callbacks.
+Other threads retain ordinary collection/CPU progress. No callback run claim or
+interpreter execution lock is introduced.
+
 Transfer is a move-only delivery lease backed by a managed, collector-visible
 record. Receive roots the payload before unlinking delivery ownership. Handle
 and ReturnSlot are never transferred directly between threads. Closing rejects
@@ -609,6 +641,25 @@ including native exception unwind. Callback-local roots must end before that
 exit; caller-owned result slots may retain callback results. The surrounding
 NativeWait must outlive the callback. This neither admits a foreign OS thread nor
 creates a second Attachment; foreign callbacks still need ordinary admission.
+
+_curses uses the platform ncursesw/terminfo library, with unchanged pinned Python
+curses policy. Python argument conversion and result/exception allocation happen
+Active and outside the process-native resource mutex. Whole ncurses calls and
+waits for that mutex use NativeWait, including blocking input/output. Window
+objects precisely trace their exception type and own a separate native Resource;
+parked calls access that native storage, not managed payload fields. Native
+window disposal uses the existing post-STW finalizer mechanism, never a blocking
+C++ collector destructor. Constructor failure releases newly acquired windows.
+The mutex coordinates ncurses' process-global terminal state, not Python
+execution; unrelated threads can execute and collect while a reader waits.
+The upstream wrapper restores keypad/echo/cbreak/screen state on ordinary and
+exceptional exits. newterm reports initialization failure without exiting the
+process. The process-native screen cache adopts its terminal and releases the
+temporary setupterm object; repeated wrappers reuse the screen rather than
+losing terminfo allocations. Product LC_CTYPE is initialized from the environment before
+creating interpreter threads; embedders retain responsibility for libc locale.
+Subwindows/pads, panels, full character/cell/resize APIs, textpad and multi-screen
+session policy remain open, not supported merely because Python files exist.
 The versioned C11 extension ABI is unchanged by this C++ scope API.
 Readline's module-owned typed state precisely traces callback edges and owns a separate
 native history snapshot. A process-local lease swaps that state into GNU's globals

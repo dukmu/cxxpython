@@ -1,5 +1,83 @@
 # Development Status
 
+## 2026-10-31 Shared-Heap GC Inspection, Callbacks And Native Curses
+
+Prepended after 0f8614b without rewriting earlier records. Terra supplied the
+initial curses wrapper/native slice and PTY tests; parent work implemented GC
+inspection/statistics/callbacks, completed native resource/input integration and
+fixed the sanitizer-discovered terminal leak. No sol/astra, host-Python guest
+execution, second heap registry or interpreter execution mutex was introduced.
+The full frontend/import/library/product/N4-N6 service goal remains active.
+
+- gc now supplies get_objects/get_referents/get_referrers/is_tracked, get_stats,
+  get_count, get_heap_stats, callbacks and garbage alongside existing controls.
+  Inspection reuses the existing diagnostic epoch rendezvous, publishes precise
+  owner-arena roots before resume, and hides/traverses through untyped storage.
+  Native observation failure restores the epoch. Type edges remain real edges;
+  all boxed Python objects participate in tracing. The one physical full-heap
+  generation is reported in row 2, not fabricated CPython generation statistics.
+  Counters include retired owners and pending byte batches; reclaimed object
+  totals, byte pressure, roots/spans and pauses report actual collector state.
+- Interpreter state owns the original callback list independently of module
+  replacement/reimport. Outer collection requests invoke live rooted callbacks
+  in Active state without coordinator locks, report Python failures unraisably
+  and suppress recursive callback invocation only on that owner. Concurrent
+  requests can join one epoch and their pairs may overlap. Finalizer cleanup
+  sweeps belong to the same request. A parked callback test proves that another
+  OS thread still collects and invokes callbacks, rather than waiting on a
+  disguised whole-interpreter run claim.
+- Optional native _curses uses ncursesw; the five Lib/curses Python sources are
+  byte-identical to the retained CPython 3.12.14 source, with provenance/license
+  notes. Real windows, geometry, screen modes, refresh/clearing, narrow/wide
+  input, Unicode/byte strings with coordinates/attributes, colors and terminfo
+  support the unchanged upstream wrapper. _curses.error is a distinct exception
+  type. Native resource storage, post-STW finalization and allocation-failure
+  rollback replace RC disposal; no collector destructor blocks on curses.
+  Native calls/resource-lock waits park, not ordinary Python execution.
+- Strict LSan caught lost terminfo allocations from repeated setupterm/initscr
+  initialization. newterm now reports failure without process exit; its screen
+  takes over terminal ownership and releases the temporary setupterm object.
+  Repeated wrappers reuse that screen. The final strict LSan PTY rerun passes,
+  including two consecutive wrapper sessions, Unicode, input/attributes/colors,
+  error/normal restoration, unknown TERM, nonterminal failure and CPU/GC progress
+  during blocked getch. Product LC_CTYPE initializes before interpreter threads;
+  embedded hosts remain responsible for their libc locale.
+- Normal acceptance passes all 275 portable scripts and 86 selected native/entry/
+  GC/finalizer contracts. After the terminal fix and fixture changes, affected
+  scripts, GC.Inspection and Curses.Terminal pass again. Strict ASan/UBSan/LSan
+  covers 86 selected contracts across the batch plus corrected terminal rerun,
+  and 11 affected scripts; final four-thread inspection is rechecked. TSan covers
+  89 selected native/terminal contracts across the batch and final isolated
+  GC/terminal checks, plus all four selected shared-heap scripts. Formatting,
+  upstream byte comparison and retained binary/source hashes pass.
+- Initial TSan GC checks timed out, without race reports. Bounded progress
+  diagnostics completed both original workloads. The VM callback test no longer
+  repeats whole-heap type-name reflection in each phase; its initial complete
+  reflection check and callback heap inspection remain. The shared-heap script
+  retains all 100 graph mutations/referent checks and 20 collections, enumerating
+  the whole heap once per owner rather than repeatedly retaining/iterating
+  concurrent snapshots. Both pass their original time limits. No sanitizer,
+  leak detection or deadline was relaxed. A mistaken old fixture name aborted
+  one ASan driver after five passing additions; the six real related fixtures
+  were then run successfully. All failed runs remain under .cache/repl-gc-curses-*,
+  alongside builds, diagnostics, final logs and binary/source hashes. No unrelated
+  performance campaign or hand-written benchmark table was added.
+- All fixture programs remain test.py; stdin.bin remains process input. The
+  fixture audit found no orphan stdin.bin. Native additions test roots/quotas,
+  synthetic-storage transparency and retired-thread accounting, not C++-wrapped
+  Python feature programs. An incomplete terra except* draft was removed from
+  production sources/tests, with its patch/reference example retained in .cache;
+  it is not reported as executable syntax. Next work is the actual compiler/Frame/
+  unwind except* closure, then remaining syntax/library/product dependencies.
+- Remaining gates include GC generation thresholds/debug/save-all/freeze, full
+  curses subwindows/pads/panels/cells/resize/textpad and multi-screen policy,
+  readline automatic completion/signal policy, full dis/reflection, typing/regex,
+  further standard libraries and N6 release/performance acceptance. Copied Python
+  files and this stable slice do not complete those gates. Origin push still
+  awaits the explicit destination authorization requested after auto-review's
+  rejection; no workaround was attempted. User-owned temporary_plan.md deletion
+  and root test2.py remain excluded from the stable commit.
+
 ## 2026-10-31 Async Iteration, Native Terminal Callbacks And Real VM Inspection
 
 Prepended after 91d3fe3 without changing earlier records. Two terra workers owned

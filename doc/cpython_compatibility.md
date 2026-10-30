@@ -459,6 +459,21 @@ contextlib import alone is not their acceptance evidence.
 
 ## Requested Library Delivery
 
+gc controls and diagnostics use the existing precise shared-heap tracing collector,
+not CPython's reference-count/cyclic-GC internals. get_objects/get_referents/
+get_referrers freeze via existing epochs and root results before resume; untyped
+storage is hidden/transparent, and real header/type edges are included. All boxed
+objects are tracked, including leaf numbers/strings. get_stats assigns actual
+physical sweeps/reclamation totals to generation 2; generation 0/1 have no objects
+or fabricated statistics. collect's generation arguments remain full-heap aliases.
+get_count reports allocation pressure, and get_heap_stats exposes native byte,
+root, span and pause counters (reclaimed_bytes is the last sweep, reclaimed_objects
+is cumulative). gc.callbacks uses the interpreter-owned original list, active
+owner-thread Python calls, unraisable reporting and per-owner recursion suppression.
+Each outer request has a pair, so concurrent pairs can overlap/join one epoch;
+no callback or execution lock serializes the shared heap. Generation thresholds,
+debug/save-all, permanent-generation freeze and full upstream tests remain open.
+
 GNU readline supplies real line editing, history mutation/files, completer and
 startup/pre-input callbacks, delimiters and line/index helpers. Its private typed
 module state traces callback edges and owns native history; a process-local
@@ -469,6 +484,18 @@ refreeze on return/unwind. Session cleanup restores tty and native callbacks/str
 signal handling disabled. CMake detects the external library; no fake readline
 module is installed without it. Full display hooks, automatic rlcompleter,
 reload/history policy and product signal integration remain dependencies.
+
+Lib/curses is copied byte-for-byte from the fixed reference. Native _curses uses
+ncursesw for windows, terminal mode/restoration, narrow/wide input, Unicode/byte
+strings with optional coordinates/attributes, drawing/refresh basics, colors
+and terminfo. It defines a real _curses.error rather than aliasing RuntimeError.
+Opaque native resources and post-STW finalization replace CPython's refcounted
+WINDOW disposal; parked calls coordinate the native terminal, not the interpreter.
+PTY acceptance covers wrapper exceptions, terminal restoration, blocked input
+with concurrent CPU/GC progress, Unicode and nonterminal/unknown-TERM failures.
+The complete panel/textpad sources retain their native dependencies and are not
+claimed functional: subwindows/pads, panels, resizing, full cell/character methods,
+complete parameter/encoding policy and multi-screen sessions remain gates.
 
 opcode/dis adapt inspection policy and public Instruction/Positions tuple
 protocols to this runtime's actual verified instruction stream. Recursive listing,
