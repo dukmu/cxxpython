@@ -38,6 +38,10 @@ add_library(cxxpython_core
     Modules/_io/stringio.cpp
     Modules/_threadmodule.cpp
     Modules/_abc.cpp
+    Modules/itertoolsmodule.cpp
+    Modules/itertools_combinatorics.cpp
+    Modules/itertools_groups.cpp
+    Modules/_collectionsmodule.cpp
     Modules/binascii.cpp
     Modules/main.cpp
     Modules/sysmodule.cpp
@@ -58,6 +62,7 @@ add_library(cxxpython_core
     Parser/source.cpp
     Objects/typeobject.cpp
     Objects/object.cpp
+    Objects/funcobject.cpp
     Objects/dictobject.cpp
     Objects/dictstorage.cpp
     Objects/listobject.cpp
@@ -74,6 +79,7 @@ add_library(cxxpython_core
     Objects/genericaliasobject.cpp
     Objects/unionobject.cpp
     Objects/weakrefobject.cpp
+    Objects/weakproxyobject.cpp
     Objects/setobject.cpp
     Objects/setoperations.cpp
     Objects/moduleobject.cpp

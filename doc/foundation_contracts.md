@@ -444,8 +444,12 @@ publication and retained unchanged through name/dictionary updates. __bases__,
 __mro__ and __base__ expose that hierarchy, not newly assembled representations.
 Dynamic __bases__ replacement remains unsupported.
 
-Code and Function/default/closure identities are immutable; dictionaries and
-referenced values retain their own synchronization semantics. Per-thread protocol
+Code and Function code/globals/builtins/closure identities are immutable. Function
+defaults, keyword defaults, name/qualname, annotations, module/doc and type-parameter
+references are precise atomic edges. Call binding roots both default snapshots
+before allocation or callbacks; independent Python attribute assignments are not
+an atomic pair update. Referenced dictionaries and values retain their own
+synchronization semantics. Per-thread protocol
 caches guard on Type identity, typed protocol and matching publication epoch.
 They hold borrowed identities, are cleared before sweep/address reuse and root
 entries before a safepoint. Shared Code does not contain mutable execution caches.

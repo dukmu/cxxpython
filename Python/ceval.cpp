@@ -11,18 +11,6 @@
 #include <charconv>
 
 namespace cxxpython::core {
-void FunctionObject::trace(Tracer &tracer) const noexcept
-{
-    for (auto value : {code, globals, builtins, name, qualname})
-        tracer.visit(value);
-    if (defaults)
-        tracer.visit(*defaults);
-    if (kwdefaults)
-        tracer.visit(*kwdefaults);
-    if (closure)
-        tracer.visit(*closure);
-    tracer.visit(annotations);
-}
 namespace detail {
 class FrameActivation final {
   public:
@@ -253,10 +241,15 @@ void make_frame(Attachment &context, Handle function, CallArgsView args,
     RootScope roots(context);
     const auto &callable = context.payload<FunctionObject>(function);
     auto code = roots.root(callable.code);
-    auto defaults = roots.root(callable.defaults.value_or(context.builtin(CoreObject::EmptyTuple)));
+    ReturnSlot default_values(context), keyword_values(context);
+    context.load(function.get(context), callable.defaults, default_values);
+    auto defaults =
+        roots.root(default_values.tag() == ResultTag::Ok ? default_values.value()
+                                                         : context.builtin(CoreObject::EmptyTuple));
     std::optional<Value> keywords;
-    if (callable.kwdefaults)
-        keywords = roots.root(*callable.kwdefaults).get(context);
+    context.load(function.get(context), callable.kwdefaults, keyword_values);
+    if (keyword_values.tag() == ResultTag::Ok)
+        keywords = keyword_values.value();
     const auto &program = context.payload<CodeObject>(code).program;
     std::optional<Value> mapping;
     ReturnSlot space(context);
@@ -1557,74 +1550,6 @@ void code_firstline(Attachment &c, Value value, ReturnSlot &out)
 {
     make_int(c, c.payload<CodeObject>(value).program.first_line(), out);
 }
-void function_code(Attachment &c, Value value, ReturnSlot &out)
-{
-    out.ok(c.payload<FunctionObject>(value).code);
-}
-void function_name(Attachment &c, Value value, ReturnSlot &out)
-{
-    out.ok(c.payload<FunctionObject>(value).name);
-}
-void function_qualname(Attachment &c, Value value, ReturnSlot &out)
-{
-    out.ok(c.payload<FunctionObject>(value).qualname);
-}
-void function_globals(Attachment &c, Value value, ReturnSlot &out)
-{
-    out.ok(c.payload<FunctionObject>(value).globals);
-}
-void function_builtins(Attachment &c, Value value, ReturnSlot &out)
-{
-    out.ok(c.payload<FunctionObject>(value).builtins);
-}
-void function_closure(Attachment &c, Value value, ReturnSlot &out)
-{
-    out.ok(c.payload<FunctionObject>(value).closure.value_or(c.builtin(CoreObject::None)));
-}
-void function_doc(Attachment &c, Value value, ReturnSlot &out)
-{
-    out.ok(c.payload<CodeObject>(c.payload<FunctionObject>(value).code).docstring);
-}
-void function_defaults(Attachment &c, Value value, ReturnSlot &out)
-{
-    out.ok(c.payload<FunctionObject>(value).defaults.value_or(c.builtin(CoreObject::None)));
-}
-void function_keywords(Attachment &c, Value value, ReturnSlot &out)
-{
-    out.ok(c.payload<FunctionObject>(value).kwdefaults.value_or(c.builtin(CoreObject::None)));
-}
-void function_annotations(Attachment &context, Value value, ReturnSlot &out)
-{
-    auto &edge = context.payload<FunctionObject>(value).annotations;
-    context.load(value, edge, out);
-    if (out.tag() == ResultTag::Ok)
-        return;
-    RootScope roots(context);
-    ReturnSlot candidate(context);
-    context.allocate_instance<DictObject>(roots.root(context.builtin(CoreObject::DictType)),
-                                          candidate);
-    for (;;) {
-        if (context.compare_exchange(value, edge, {}, candidate.value())) {
-            out.ok(candidate.value());
-            return;
-        }
-        context.load(value, edge, out);
-        if (out.tag() == ResultTag::Ok)
-            return;
-    }
-}
-void function_annotations_set(Attachment &context, Value receiver, std::optional<Value> value,
-                              ReturnSlot &out)
-{
-    if (value && *value == context.builtin(CoreObject::None))
-        value.reset();
-    if (value && !context.has_layout<DictObject>(*value)) {
-        type_error(context, U"__annotations__ must be set to a dict object", out);
-        return;
-    }
-    context.store(receiver, context.payload<FunctionObject>(receiver).annotations, value);
-    out.ok(context.builtin(CoreObject::None));
-}
 void frame_code(Attachment &c, Value value, ReturnSlot &out)
 {
     out.ok(c.payload<FrameObject>(value).code);
@@ -1668,10 +1593,7 @@ void execution_repr(Attachment &c, Handle fn, std::span<const Value> args, Retur
         return;
     }
     std::u32string result;
-    if (owner == c.builtin(CoreObject::FunctionType))
-        result =
-            U"<function " + c.payload<StrObject>(c.payload<FunctionObject>(args[0]).qualname).value;
-    else if (owner == c.builtin(CoreObject::CodeType))
+    if (owner == c.builtin(CoreObject::CodeType))
         result = U"<code object " + c.payload<StrObject>(c.payload<CodeObject>(args[0]).name).value;
     else
         result = U"<frame";
@@ -1738,10 +1660,12 @@ void make_function(Attachment &context, const FunctionSpec &spec, ReturnSlot &ou
                 return;
             }
     }
-    context.allocate_instance<FunctionObject>(roots.root(context.builtin(CoreObject::FunctionType)),
-                                              out, code.get(context), globals.get(context),
-                                              defaults, keywords, program.name, program.qualname,
-                                              builtins.get(context), closure, annotations);
+    const auto module = roots.root(detail::name_lookup(context, globals.get(context), U"__name__")
+                                       .value_or(context.builtin(CoreObject::None)));
+    context.allocate_instance<FunctionObject>(
+        roots.root(context.builtin(CoreObject::FunctionType)), out, code.get(context),
+        globals.get(context), defaults, keywords, program.name, program.qualname,
+        builtins.get(context), closure, annotations, module.get(context), program.docstring);
 }
 namespace detail {
 void frame_locals(Attachment &context, Handle frame, ReturnSlot &out)
@@ -1858,17 +1782,7 @@ void install_execution(Attachment &context, std::span<const Handle> core)
     field(CoreObject::CodeType, U"co_names", code_names);
     field(CoreObject::CodeType, U"co_cellvars", code_cellvars);
     field(CoreObject::CodeType, U"co_freevars", code_freevars);
-    field(CoreObject::FunctionType, U"__code__", function_code);
-    field(CoreObject::FunctionType, U"__name__", function_name);
-    field(CoreObject::FunctionType, U"__qualname__", function_qualname);
-    field(CoreObject::FunctionType, U"__globals__", function_globals);
-    field(CoreObject::FunctionType, U"__builtins__", function_builtins);
-    field(CoreObject::FunctionType, U"__closure__", function_closure);
-    field(CoreObject::FunctionType, U"__doc__", function_doc);
-    field(CoreObject::FunctionType, U"__defaults__", function_defaults);
-    field(CoreObject::FunctionType, U"__kwdefaults__", function_keywords);
-    field(CoreObject::FunctionType, U"__annotations__", function_annotations,
-          function_annotations_set);
+    install_function_descriptors(context, core);
     field(CoreObject::FrameType, U"f_code", frame_code);
     field(CoreObject::FrameType, U"f_back", frame_back);
     field(CoreObject::FrameType, U"f_globals", frame_globals);
@@ -1876,7 +1790,7 @@ void install_execution(Attachment &context, std::span<const Handle> core)
     field(CoreObject::FrameType, U"f_lineno", frame_lineno);
     SignatureLayout unary;
     unary.parameters = {{U"self", ParameterKind::PositionalOnly}};
-    for (auto kind : {CoreObject::CodeType, CoreObject::FunctionType, CoreObject::FrameType})
+    for (auto kind : {CoreObject::CodeType, CoreObject::FrameType})
         install_native_attribute(context, core, at(kind), U"__repr__", unary, execution_repr,
                                  {at(kind).get(context)});
 }

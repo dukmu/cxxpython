@@ -11,7 +11,8 @@ namespace cxxpython::core {
 namespace {
 bool receiver(Attachment &c, Value self, ReturnSlot &out)
 {
-    if (c.has_layout<WeakRefObject>(self))
+    if (c.has_layout<WeakRefObject>(self) &&
+        is_subtype(c, c.type_of(self), c.builtin(CoreObject::WeakRefType)))
         return true;
     raise_error(c, CoreObject::TypeErrorType, U"descriptor requires a weak reference", out);
     return false;
@@ -143,7 +144,8 @@ void ref_compare(Attachment &c, Handle, std::span<const Value> args, ReturnSlot 
 {
     if (!receiver(c, args[0], out))
         return;
-    if (!c.has_layout<WeakRefObject>(args[1])) {
+    if (!c.has_layout<WeakRefObject>(args[1]) ||
+        !is_subtype(c, c.type_of(args[1]), c.builtin(CoreObject::WeakRefType))) {
         out.ok(c.builtin(CoreObject::NotImplemented));
         return;
     }

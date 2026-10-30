@@ -1,0 +1,7 @@
+[]
+[]
+[('A', 'B'), ('B', 'C'), ('C', 'D')]
+True (1, 2) (2, 3)
+done done
+ValueError broken
+done

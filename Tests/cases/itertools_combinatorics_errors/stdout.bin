@@ -1,0 +1,22 @@
+[('a', 'a'), ('a', 'b'), ('b', 'a'), ('b', 'b')]
+[('a', 'b'), ('a', 'c'), ('b', 'c')]
+[('a', 'a'), ('a', 'b'), ('b', 'b')]
+TypeError
+ValueError
+ValueError
+ValueError
+ValueError
+TypeError
+OverflowError
+OverflowError
+OverflowError
+TypeError
+consume
+ValueError source
+consume
+ValueError source
+consume
+ValueError source
+consume
+ValueError source
+[()]

@@ -364,6 +364,37 @@ void update(Attachment &context, Handle, std::span<const Value> args, ReturnSlot
         return;
     out.ok(context.builtin(CoreObject::None));
 }
+template <bool Reflected>
+void union_with(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!dictionary(context, args[0], out))
+        return;
+    if (!context.has_layout<DictObject>(args[1]) ||
+        !is_subtype(context, context.type_of(args[1]), context.builtin(CoreObject::DictType))) {
+        out.ok(context.builtin(CoreObject::NotImplemented));
+        return;
+    }
+    RootScope roots(context);
+    const auto left = roots.root(args[Reflected ? 1 : 0]);
+    const auto right = roots.root(args[Reflected ? 0 : 1]);
+    DictView view(context, left.get(context));
+    ReturnSlot result(context);
+    context.allocate_instance<DictObject>(roots.root(context.builtin(CoreObject::DictType)),
+                                          result);
+    const auto target = roots.root(result.value());
+    detail::copy_dictionary_entries(context, target.get(context), view.entries());
+    if (merge(context, target, right, out))
+        out.ok(target.get(context));
+}
+void inplace_union(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!dictionary(context, args[0], out))
+        return;
+    RootScope roots(context);
+    const auto self = roots.root(args[0]);
+    if (merge(context, self, roots.root(args[1]), out))
+        out.ok(self.get(context));
+}
 void create(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     if (!context.has_layout<TypeObject>(args[0]) ||
@@ -603,6 +634,9 @@ void detail::install_dictionaries(Attachment &context, std::span<const Handle> c
     install(CoreObject::DictType, U"clear", unary, clear);
     install(CoreObject::DictType, U"copy", unary, copy<false>);
     install(CoreObject::DictType, U"update", variadic, update);
+    install(CoreObject::DictType, U"__or__", pair, union_with<false>);
+    install(CoreObject::DictType, U"__ror__", pair, union_with<true>);
+    install(CoreObject::DictType, U"__ior__", pair, inplace_union);
     install(CoreObject::DictType, U"__iter__", unary, iterator<false>);
     install(CoreObject::MappingProxyType, U"__getitem__", pair, proxy_getitem);
     auto proxy_constructor = pair;

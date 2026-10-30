@@ -1,0 +1,11 @@
+[1] [2] ['called'] True
+None ['called']
+KeyError ('missing',)
+42 42
+missing:x
+TypeError first argument must be callable or None
+123
+TypeError 'int' object is not callable
+False
+True
+slot [9] True True

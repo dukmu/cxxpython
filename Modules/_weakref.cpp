@@ -3,6 +3,7 @@
 
 #include "cxxpython/moduleobject.hpp"
 #include "cxxpython/objects.hpp"
+#include "internal/weakproxy.hpp"
 
 namespace cxxpython::core {
 namespace {
@@ -23,6 +24,11 @@ void getweakrefs(Attachment &c, Handle, std::span<const Value> args, ReturnSlot 
     c.weakrefs(target, roots, values);
     make_list(c, values, out);
 }
+void make_proxy(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(c);
+    detail::make_weakproxy(c, roots.root(args[0]), roots.root(args[1]), out);
+}
 } // namespace
 
 void detail::initialize_weakref(Attachment &c, Handle module, ReturnSlot &out)
@@ -40,7 +46,9 @@ void detail::initialize_weakref(Attachment &c, Handle module, ReturnSlot &out)
         }
         return true;
     };
-    if (!publish(U"ref", ref_type) || !publish(U"ReferenceType", ref_type))
+    if (!publish(U"ref", ref_type) || !publish(U"ReferenceType", ref_type) ||
+        !publish(U"ProxyType", roots.root(c.builtin(CoreObject::WeakProxyType))) ||
+        !publish(U"CallableProxyType", roots.root(c.builtin(CoreObject::CallableWeakProxyType))))
         return;
     SignatureLayout unary;
     unary.parameters = {{U"object", ParameterKind::PositionalOnly}};
@@ -51,6 +59,12 @@ void detail::initialize_weakref(Attachment &c, Handle module, ReturnSlot &out)
     make_native_function(c, "getweakrefs", unary, getweakrefs, {}, function,
                          NativeFunctionBinding::Function);
     if (!publish(U"getweakrefs", roots.root(function.value())))
+        return;
+    unary.parameters.push_back(
+        {U"callback", ParameterKind::PositionalOnly, c.builtin(CoreObject::None)});
+    make_native_function(c, "proxy", unary, make_proxy, {}, function,
+                         NativeFunctionBinding::Function);
+    if (!publish(U"proxy", roots.root(function.value())))
         return;
     out.ok(c.builtin(CoreObject::None));
 }

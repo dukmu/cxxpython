@@ -1,0 +1,11 @@
+[2, 3, 4] 3
+[0, 2, 3]
+[3, 0, 2] 3 2
+[7, 6, 8] 1 1
+[8, 6, 7] 7 8
+deque([1, 9, 3]) True True
+1
+RuntimeError deque mutated during iteration
+4
+RuntimeError deque mutated during iteration
+IndexError deque already at its maximum size

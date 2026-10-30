@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <bit>
 #include <charconv>
+#include <limits>
 
 namespace cxxpython::core {
 namespace {
@@ -60,6 +61,17 @@ void object_hash(Attachment &context, Handle, std::span<const Value> args, Retur
 {
     make_int(context, signed_hash(std::rotr(reinterpret_cast<std::uintptr_t>(args[0].object()), 4)),
              out);
+}
+void object_sizeof(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(context);
+    const auto bytes = context.object_size(roots.root(args[0]));
+    if (bytes > static_cast<std::size_t>(std::numeric_limits<std::ptrdiff_t>::max())) {
+        raise_error(context, CoreObject::OverflowErrorType, U"object size does not fit Py_ssize_t",
+                    out);
+        return;
+    }
+    make_int(context, static_cast<std::int64_t>(bytes), out);
 }
 void object_repr(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
@@ -618,6 +630,7 @@ void install_value_protocols(Attachment &context, std::span<const Handle> core)
     install(object, U"__hash__", object_hash);
     install(object, U"__repr__", object_repr);
     install(object, U"__str__", object_str);
+    install(object, U"__sizeof__", object_sizeof);
     install(roots.root(context.type_type()), U"__repr__", type_repr);
     install(at(CoreObject::StrType), U"__hash__", string_hash);
     install(at(CoreObject::StrType), U"__str__", string_str);

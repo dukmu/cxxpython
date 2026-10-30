@@ -121,6 +121,9 @@ ResultView rich_compare(Attachment &context, Handle left, Handle right, CompareO
                         ReturnSlot &out);
 ResultView container_equal(Attachment &context, Handle left, Handle right, ReturnSlot &out);
 ResultView binary(Attachment &context, Handle left, Handle right, BinaryOp op, ReturnSlot &out);
+ResultView divmod(Attachment &context, Handle left, Handle right, ReturnSlot &out);
+ResultView power(Attachment &context, Handle base, Handle exponent, Handle modulus,
+                 ReturnSlot &out);
 ResultView inplace(Attachment &context, Handle left, Handle right, BinaryOp op, ReturnSlot &out);
 ResultView get_iter(Attachment &context, Handle value, ReturnSlot &out);
 NextStatus iter_next(Attachment &context, Handle iterator, ReturnSlot &out);

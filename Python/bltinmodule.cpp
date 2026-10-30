@@ -170,34 +170,12 @@ void builtin_min_max(Attachment &context, Handle, std::span<const Value> args, R
 void builtin_divmod(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
-    auto left = roots.root(args[0]);
-    auto right = roots.root(args[1]);
-    auto left_type = context.type_of(left);
-    auto right_type = context.type_of(right);
-    auto lookup = [&](Value type, const char32_t *name) -> std::optional<Handle> {
-        auto method = detail::type_attribute(context, type, name);
-        return method ? std::optional<Handle>{roots.root(*method)} : std::nullopt;
-    };
-    auto normal = lookup(left_type, U"__divmod__");
-    auto reflected = lookup(right_type, U"__rdivmod__");
-    auto inherited = lookup(left_type, U"__rdivmod__");
-    bool first_reflected = left_type != right_type && is_subtype(context, right_type, left_type) &&
-                           reflected &&
-                           (!inherited || reflected->get(context) != inherited->get(context));
-    auto invoke = [&](Handle receiver, Handle argument, const std::optional<Handle> &method) {
-        if (!method)
-            return false;
-        const std::array values{argument.get(context)};
-        detail::invoke_special(context, receiver, *method, {values, {}}, out);
-        return failed(out) || out.value() != context.builtin(CoreObject::NotImplemented);
-    };
-    if (first_reflected && invoke(right, left, reflected))
-        return;
-    if (invoke(left, right, normal))
-        return;
-    if (!first_reflected && left_type != right_type && invoke(right, left, reflected))
-        return;
-    raise_error(context, CoreObject::TypeErrorType, U"unsupported operand types for divmod()", out);
+    divmod(context, roots.root(args[0]), roots.root(args[1]), out);
+}
+void builtin_pow(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(context);
+    power(context, roots.root(args[0]), roots.root(args[1]), roots.root(args[2]), out);
 }
 void builtin_sum(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
@@ -683,6 +661,12 @@ void install_class_builtins(Attachment &context, std::span<const Handle> core, V
     pair_signature.parameters = {{U"x", ParameterKind::PositionalOnly},
                                  {U"y", ParameterKind::PositionalOnly}};
     install("divmod", U"divmod", pair_signature, builtin_divmod);
+    SignatureLayout pow_signature;
+    pow_signature.parameters = {{U"base", ParameterKind::PositionalOrKeyword},
+                                {U"exp", ParameterKind::PositionalOrKeyword},
+                                {U"mod", ParameterKind::PositionalOrKeyword,
+                                 core[static_cast<std::size_t>(CoreObject::None)].get(context)}};
+    install("pow", U"pow", pow_signature, builtin_pow);
     SignatureLayout min_max_signature;
     min_max_signature.varargs = U"args";
     min_max_signature.varkwargs = U"kwargs";

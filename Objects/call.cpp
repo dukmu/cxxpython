@@ -391,7 +391,11 @@ void invoke(Attachment &context, Handle target, CallArgsView args, std::optional
     }
     auto attribute = type_attribute(context, context.type_of(callable), U"__call__");
     if (!attribute) {
-        type_error(context, U"object is not callable", out);
+        auto name = TypeView(context, context.type_of(callable)).name();
+        auto text = std::holds_alternative<Value>(name)
+                        ? context.payload<StrObject>(std::get<Value>(name)).value
+                        : std::get<std::u32string>(name);
+        type_error(context, U"'" + text + U"' object is not callable", out);
         return;
     }
     invoke_special_impl(context, target, roots.root(*attribute), args, out, preparation);

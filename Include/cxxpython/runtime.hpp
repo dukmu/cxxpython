@@ -155,6 +155,9 @@ enum class CoreObject : std::size_t {
     UnionType,
     BinasciiErrorType,
     BinasciiIncompleteType,
+    WeakProxyType,
+    CallableWeakProxyType,
+    ReferenceErrorType,
     None,
     NotImplemented,
     Ellipsis,
@@ -579,6 +582,9 @@ class Attachment final {
     void weakrefs(Handle target, RootScope &roots, std::vector<Value> &out);
     void account_external(Handle owner, std::size_t bytes);
     void account_external(Value owner, std::size_t bytes);
+    void intern(Handle string, ReturnSlot &out);
+    std::size_t object_size(Handle owner) const;
+    std::size_t gc_metadata_size(Handle owner) const;
     void bootstrap();
     void bootstrap_core();
     bool core_ready() const;

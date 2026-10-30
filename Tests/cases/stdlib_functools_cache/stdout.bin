@@ -1,0 +1,7 @@
+[0, 1, 1, 2, 3, 5, 8, 13]
+CacheInfo(hits=12, misses=8, maxsize=None, currsize=8)
+CacheInfo(hits=0, misses=0, maxsize=None, currsize=0)
+1 4 1 9 4
+CacheInfo(hits=1, misses=4, maxsize=2, currsize=2)
+2 2 1
+4 2

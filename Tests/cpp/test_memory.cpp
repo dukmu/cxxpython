@@ -1,4 +1,4 @@
-#include "cxxpython/runtime.hpp"
+#include "cxxpython/objects.hpp"
 
 #include <gtest/gtest.h>
 
@@ -683,5 +683,31 @@ TEST(FoundationThreads, ClosingRejectsAdmissionButExistingLeaseCanResume)
     }
     EXPECT_NO_THROW(node.get(context));
     EXPECT_EQ(context.collect(), 0U);
+}
+TEST(FoundationMemory, InternedStringsDoNotKeepUnusedManagedObjectsAlive)
+{
+    Interpreter interpreter;
+    Attachment context(interpreter);
+    context.bootstrap_core();
+    context.collect();
+    const auto baseline = context.stats().objects;
+    {
+        RootScope roots(context);
+        ReturnSlot string(context), interned(context);
+        for (unsigned n = 0; n < 100; ++n) {
+            const auto digits = std::to_string(n);
+            make_str(context, U"mortal intern " + std::u32string(digits.begin(), digits.end()),
+                     string);
+            auto input = roots.root(string.value());
+            context.intern(input, interned);
+            ASSERT_EQ(interned.tag(), ResultTag::Ok);
+            EXPECT_EQ(interned.value(), string.value());
+            roots.release(input);
+            string.reset();
+            interned.reset();
+        }
+    }
+    context.collect();
+    EXPECT_EQ(context.stats().objects, baseline);
 }
 } // namespace

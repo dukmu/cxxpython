@@ -80,12 +80,17 @@ compiler, VM, and extension platform implemented in a C/C++ mix.
 - Prefer correctness and Python semantics over short-term compatibility hacks.
 - Use test-driven development. Every supported behavior needs focused tests and,
   when useful, script-level integration tests.
-- Test Python-visible behavior directly with `Tests/cases/<name>/stdin.bin` and
-  `stdout.bin` fixtures through `Tests/python/test_cases.py`; optional
+- Test Python-visible behavior directly with `Tests/cases/<name>/test.py` and
+  `stdout.bin` fixtures through `Tests/python/test_cases.py`. Optional `stdin.bin`
+  contains process input, never Python source; optional
   `stderr.bin` and `exitcode.txt` describe other output/status. Generate goldens
   with the pinned reference. Do not wrap runnable Python programs in compiled
   C++ tests. Native tests are for roots, quotas, host faults, IR and shared-heap
   OS-thread contracts that cannot be expressed through the current interpreter.
+- Complete readline, curses, dis and gc alongside the REPL/product roadmap:
+  editing/history/completion, terminal restoration, actual VM disassembly and
+  tracing-GC-compatible inspection/control. Do not advertise placeholder modules
+  or reintroduce reference-count/GIL assumptions for these interfaces.
 - Align architecture and naming with CPython where it helps readability:
   `Include/`, `Objects/`, `Python/`, `Parser/`, `Modules/`, `Lib/`,
   `Programs/`, `Tools/`, and `Tests/`.

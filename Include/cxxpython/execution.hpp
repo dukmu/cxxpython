@@ -422,15 +422,15 @@ class CodeBuilder final {
 struct FunctionObject {
     ObjectHeader header;
     const Value code, globals, builtins;
-    const std::optional<Value> defaults, kwdefaults, closure;
-    const Value name, qualname;
-    AtomicGcEdge annotations;
+    const std::optional<Value> closure;
+    AtomicGcEdge defaults, kwdefaults, name, qualname, annotations, module, doc, type_params;
     FunctionObject(InitialType head, Value code, Value globals, std::optional<Value> defaults,
                    std::optional<Value> kwdefaults, Value name, Value qualname, Value builtins,
-                   std::optional<Value> closure, std::optional<Value> annotations_in = {})
-        : header(head), code(code), globals(globals), builtins(builtins), defaults(defaults),
-          kwdefaults(kwdefaults), closure(closure), name(name), qualname(qualname),
-          annotations(annotations_in)
+                   std::optional<Value> closure, std::optional<Value> annotations_in = {},
+                   std::optional<Value> module_in = {}, std::optional<Value> doc_in = {})
+        : header(head), code(code), globals(globals), builtins(builtins), closure(closure),
+          defaults(defaults), kwdefaults(kwdefaults), name(name), qualname(qualname),
+          annotations(annotations_in), module(module_in), doc(doc_in)
     {}
     void trace(Tracer &tracer) const noexcept;
 };
@@ -510,6 +510,7 @@ StackEffect instruction_effect(Instruction instruction, std::span<const CallLayo
 std::string disassemble(Attachment &context, Handle code);
 void make_function(Attachment &context, const FunctionSpec &spec, ReturnSlot &out);
 namespace detail {
+void install_function_descriptors(Attachment &, std::span<const Handle>);
 void exception_match(Attachment &context, Value exception, Value matcher, ReturnSlot &out);
 void normalize_exception(Attachment &context, Handle value, ReturnSlot &out);
 } // namespace detail

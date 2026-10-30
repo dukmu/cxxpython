@@ -2,10 +2,12 @@
 // PSF license: doc/licenses/python-3.12.14.txt.
 #include "internal/sysmodule.hpp"
 
+#include "cxxpython/execution.hpp"
 #include "cxxpython/import.hpp"
 #include "cxxpython/moduleobject.hpp"
 #include "cxxpython/namespaceobject.hpp"
 #include "cxxpython/protocol.hpp"
+#include "cxxpython/type.hpp"
 #include "internal/codecs.hpp"
 #include "internal/errors.hpp"
 
@@ -79,6 +81,137 @@ bool attribute(Attachment &ctx, Handle object, const char32_t *name, ReturnSlot 
     make_str(ctx, name, key);
     get_attribute(ctx, object, roots.root(key.value()), out);
     return !failed(out);
+}
+
+// CPython 3.12.14 Python/sysmodule.c: only exact str objects may be interned.
+void sys_intern(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(ctx);
+    auto value = roots.root(args[0]);
+    auto type = roots.root(ctx.type_of(value));
+    if (type.get(ctx) != ctx.builtin(CoreObject::StrType)) {
+        TypeView view(ctx, type);
+        const auto name = view.name();
+        const auto text = std::holds_alternative<std::u32string>(name)
+                              ? std::get<std::u32string>(name)
+                              : ctx.payload<StrObject>(std::get<Value>(name)).value;
+        const bool string_subclass =
+            is_subtype(ctx, type.get(ctx), ctx.builtin(CoreObject::StrType));
+        raise_error(ctx, CoreObject::TypeErrorType,
+                    string_subclass ? U"can't intern " + text
+                                    : U"intern() argument must be str, not " + text,
+                    out);
+        return;
+    }
+    ctx.intern(value, out);
+}
+
+// Match _PySys_GetSizeOf: use the type's special method, not an instance attribute.
+void sys_getsizeof(Attachment &ctx, Handle function, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(ctx);
+    auto object = roots.root(args[0]);
+    auto fallback = roots.root(args[1]);
+    const bool has_default =
+        fallback.get(ctx) != ctx.payload<NativeFunctionObject>(function).captures[0];
+    ReturnSlot result(ctx);
+    special(ctx, object.get(ctx), U"__sizeof__", {}, result);
+    if (!failed(result)) {
+        if (!is_int(ctx, result.value()))
+            raise_error(ctx, CoreObject::TypeErrorType, U"an integer is required", result);
+        else {
+            std::int64_t size;
+            if (!int_fits_signed(ctx, result.value(), size) ||
+                size > std::numeric_limits<std::ptrdiff_t>::max() ||
+                size < std::numeric_limits<std::ptrdiff_t>::min())
+                raise_error(ctx, CoreObject::OverflowErrorType,
+                            U"Python int too large to convert to C ssize_t", result);
+            else if (size < 0)
+                raise_error(ctx, CoreObject::ValueErrorType, U"__sizeof__() should return >= 0",
+                            result);
+            else {
+                const auto total = static_cast<std::size_t>(size) + ctx.gc_metadata_size(object);
+                make_int_decimal(ctx, std::to_string(total), out);
+                return;
+            }
+        }
+    }
+    if (has_default &&
+        is_subtype(ctx, ctx.type_of(result.exception()), ctx.builtin(CoreObject::TypeErrorType)))
+        out.ok(fallback.get(ctx));
+    else
+        out.raised(result.exception());
+}
+
+bool frame_depth(Attachment &ctx, Value value, int &depth, ReturnSlot &out)
+{
+    RootScope roots(ctx);
+    ReturnSlot converted(ctx);
+    index(ctx, roots.root(value), converted);
+    if (failed(converted)) {
+        out.raised(converted.exception());
+        return false;
+    }
+    std::int64_t number;
+    if (!int_fits_signed(ctx, converted.value(), number) ||
+        number < std::numeric_limits<int>::min() || number > std::numeric_limits<int>::max()) {
+        raise_error(ctx, CoreObject::OverflowErrorType, U"Python int too large to convert to C int",
+                    out);
+        return false;
+    }
+    depth = static_cast<int>(number);
+    return true;
+}
+
+// Walk only this attachment's active chain, rooting each atomic back-edge load.
+void find_frame(Attachment &ctx, int depth, ReturnSlot &out)
+{
+    RootScope roots(ctx);
+    const auto current = ctx.current_frame();
+    if (!current)
+        return;
+    auto frame = roots.root(*current);
+    ReturnSlot previous(ctx);
+    while (depth > 0) {
+        ctx.load(frame.get(ctx), ctx.payload<FrameObject>(frame).back, previous);
+        if (previous.tag() == ResultTag::Empty)
+            return;
+        frame = roots.root(previous.value());
+        --depth;
+    }
+    out.ok(frame.get(ctx));
+}
+
+void sys_getframe(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    int depth;
+    if (!frame_depth(ctx, args[0], depth, out))
+        return;
+    ReturnSlot frame(ctx);
+    find_frame(ctx, depth, frame);
+    if (frame.tag() == ResultTag::Empty)
+        raise_error(ctx, CoreObject::ValueErrorType, U"call stack is not deep enough", out);
+    else
+        out.ok(frame.value());
+}
+
+void sys_getframemodulename(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    int depth;
+    if (!frame_depth(ctx, args[0], depth, out))
+        return;
+    ReturnSlot frame(ctx);
+    find_frame(ctx, depth, frame);
+    if (frame.tag() == ResultTag::Empty) {
+        out.ok(ctx.builtin(CoreObject::None));
+        return;
+    }
+    RootScope roots(ctx);
+    auto owner = roots.root(frame.value());
+    auto function = roots.root(ctx.payload<FrameObject>(owner).function);
+    ctx.load(function.get(ctx), ctx.payload<FunctionObject>(function).module, out);
+    if (out.tag() == ResultTag::Empty)
+        out.ok(ctx.builtin(CoreObject::None));
 }
 bool set_last(Attachment &ctx, Handle value, ReturnSlot &out)
 {
@@ -231,6 +364,36 @@ void initialize_sys_hooks(Attachment &ctx, Handle sys, ReturnSlot &out)
     make_native_function(ctx, "displayhook", display_signature, sys_displayhook, {}, function,
                          NativeFunctionBinding::Function);
     if (!store(U"displayhook") || !store(U"__displayhook__"))
+        return;
+    SignatureLayout intern_signature;
+    intern_signature.parameters = {{U"string", ParameterKind::PositionalOnly}};
+    make_native_function(ctx, "intern", intern_signature, sys_intern, {}, function,
+                         NativeFunctionBinding::Function);
+    if (!store(U"intern"))
+        return;
+    make_list(ctx, {}, function);
+    auto missing = roots.root(function.value());
+    SignatureLayout sizeof_signature;
+    sizeof_signature.parameters = {
+        {U"object", ParameterKind::PositionalOrKeyword},
+        {U"default", ParameterKind::PositionalOrKeyword, missing.get(ctx)}};
+    const Value missing_value = missing.get(ctx);
+    make_native_function(ctx, "getsizeof", sizeof_signature, sys_getsizeof, {&missing_value, 1},
+                         function, NativeFunctionBinding::Function);
+    if (!store(U"getsizeof"))
+        return;
+    ReturnSlot zero(ctx);
+    make_int(ctx, 0, zero);
+    SignatureLayout frame_signature;
+    frame_signature.parameters = {{U"depth", ParameterKind::PositionalOnly, zero.value()}};
+    make_native_function(ctx, "_getframe", frame_signature, sys_getframe, {}, function,
+                         NativeFunctionBinding::Function);
+    if (!store(U"_getframe"))
+        return;
+    frame_signature.parameters[0].kind = ParameterKind::PositionalOrKeyword;
+    make_native_function(ctx, "_getframemodulename", frame_signature, sys_getframemodulename, {},
+                         function, NativeFunctionBinding::Function);
+    if (!store(U"_getframemodulename"))
         return;
     make_str(ctx, U"", function);
     if (!store(U"executable"))

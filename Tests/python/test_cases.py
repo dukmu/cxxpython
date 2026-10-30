@@ -25,16 +25,20 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--binary", required=True, type=Path)
     parser.add_argument("--cases", type=Path, default=Path(__file__).resolve().parents[1] / "cases")
-    parser.add_argument("--case", help="Run one fixture directory without rebuilding")
+    parser.add_argument("--case", action="append",
+                        help="Run a fixture directory without rebuilding; repeat to select several")
     args = parser.parse_args()
     binary = args.binary.resolve()
     root = args.cases.resolve()
-    inputs = sorted(root.glob("*/stdin.bin")) if args.case is None else [root / args.case / "stdin.bin"]
-    if not inputs:
+    scripts = (sorted(root.glob("*/test.py")) if args.case is None else
+               [root / name / "test.py" for name in args.case])
+    if not scripts:
         parser.error("no script cases found")
     failures = 0
-    for input_path in inputs:
-        directory = input_path.parent
+    for script in scripts:
+        directory = script.parent
+        input_path = directory / "stdin.bin"
+        stdin = input_path.read_bytes() if input_path.exists() else b""
         expected = (directory / "stdout.bin").read_bytes()
         error_path = directory / "stderr.bin"
         stderr = error_path.read_bytes() if error_path.exists() else b""
@@ -42,7 +46,7 @@ def main():
         status = int(status_path.read_text()) if status_path.exists() else 0
         try:
             with tempfile.TemporaryDirectory(prefix=f'cxxpython-{directory.name}-') as scratch:
-                result = subprocess.run([str(binary)], input=input_path.read_bytes(),
+                result = subprocess.run([str(binary), str(script)], input=stdin,
                                         capture_output=True, cwd=scratch, timeout=30)
         except subprocess.TimeoutExpired:
             print(f"FAIL {directory.name}: exceeded 30 seconds", flush=True)
@@ -55,7 +59,7 @@ def main():
             ok = False
         print(f"{'PASS' if ok else 'FAIL'} {directory.name}", flush=True)
         failures += not ok
-    print(f"{len(inputs) - failures}/{len(inputs)} script cases passed")
+    print(f"{len(scripts) - failures}/{len(scripts)} script cases passed")
     return bool(failures)
 
 

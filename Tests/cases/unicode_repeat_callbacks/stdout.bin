@@ -1,0 +1,6 @@
+temporary-αtemporary-αtemporary-α 1 {}
+β-temporaryβ-temporaryβ-temporary 1 {}
+aa bb
+('reflected', 'abc')
+abab
+OverflowError cannot fit 'HugeIndex' into an index-sized integer

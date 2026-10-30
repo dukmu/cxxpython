@@ -444,8 +444,11 @@ void make_generator(Attachment &context, Handle frame, ReturnSlot &out)
     const auto code = roots.root(context.payload<FrameObject>(rooted_frame).code);
     const auto &metadata =
         context.payload<FunctionObject>(context.payload<FrameObject>(rooted_frame).function);
-    const auto name = roots.root(metadata.name);
-    const auto qualname = roots.root(metadata.qualname);
+    ReturnSlot loaded(context);
+    context.load(context.payload<FrameObject>(rooted_frame).function, metadata.name, loaded);
+    const auto name = roots.root(loaded.value());
+    context.load(context.payload<FrameObject>(rooted_frame).function, metadata.qualname, loaded);
+    const auto qualname = roots.root(loaded.value());
     const auto &program = context.payload<CodeObject>(code).program;
     const auto type =
         program.is_coroutine()

@@ -1,0 +1,11 @@
+1024 0.25 8.0 8.0
+4 81
+4 -6 -4
+0 0
+4513390862648046276768842806
+ValueError pow() 3rd argument cannot be 0
+ValueError base is not invertible for the given modulus
+('power', 3, None) ('power', 3, 7)
+('reflected', 2)
+no ternary reflected
+3 3

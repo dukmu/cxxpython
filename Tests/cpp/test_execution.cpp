@@ -181,8 +181,10 @@ TEST_F(CoreExecution, FunctionCreationConsumesDefaultsInDeclaredStackOrder)
     call(context, function(code(parent)), {}, out);
     ASSERT_EQ(out.result().tag(), ResultTag::Ok);
     const auto fn = roots.root(out.result().value());
-    EXPECT_EQ(context.payload<FunctionObject>(fn).defaults, defaults.get(context));
-    EXPECT_EQ(context.payload<FunctionObject>(fn).kwdefaults, keywords.get(context));
+    context.load(fn.get(context), context.payload<FunctionObject>(fn).defaults, out);
+    EXPECT_EQ(out.value(), defaults.get(context));
+    context.load(fn.get(context), context.payload<FunctionObject>(fn).kwdefaults, out);
+    EXPECT_EQ(out.value(), keywords.get(context));
     call(context, fn, {}, out);
     ASSERT_EQ(out.result().tag(), ResultTag::Ok);
     EXPECT_EQ(int_decimal(context, out.result().value()), "42");

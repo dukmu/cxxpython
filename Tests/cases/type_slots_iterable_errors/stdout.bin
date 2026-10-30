@@ -1,0 +1,12 @@
+TypeError __slots__ items must be strings, not 'int'
+TypeError __slots__ items must be strings, not 'NoneType'
+TypeError __slots__ items must be strings, not 'list'
+TypeError __slots__ must be identifiers
+TypeError __slots__ must be identifiers
+TypeError __slots__ items must be strings, not 'int'
+not iterable
+not iterable
+True iterator failure ['first', 'later']
+True
+True
+__slots__ items must be strings, not 'int' ['first', 'last']

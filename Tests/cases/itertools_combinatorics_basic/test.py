@@ -1,0 +1,26 @@
+from itertools import product, permutations, combinations, combinations_with_replacement
+
+print(list(product()))
+print(list(product('ab', range(2))))
+print(list(product('ab', repeat=2)))
+print(list(product('ab', [], 'x')))
+print(list(product(None, repeat=0)))
+print(list(permutations('ABC', 2)))
+print(list(permutations(range(3))))
+print(list(permutations('AB', 3)))
+print(list(combinations('ABCD', 2)))
+print(list(combinations(range(4), 3)))
+print(list(combinations('AB', 3)))
+print(list(combinations_with_replacement('ABC', 2)))
+for factory in (permutations, combinations, combinations_with_replacement):
+    print(list(factory('', 0)), list(factory('', 1)))
+    print(list(factory('AA', 1)))
+
+p = product('ab', 'xy')
+print(next(p), next(p), list(p), next(p, 'done'))
+p = permutations('ABC', 2)
+print(next(p), list(p), next(p, 'done'))
+p = combinations('ABCD', 2)
+print(next(p), list(p), next(p, 'done'))
+p = combinations_with_replacement('ABC', 2)
+print(next(p), list(p), next(p, 'done'))

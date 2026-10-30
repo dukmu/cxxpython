@@ -1,0 +1,6 @@
+None
+[('a', 8), ('b', 1), ('c', 1)]
+[('get', 'a', 0), ('set', 'a', 1), ('get', 'b', 0), ('set', 'b', 1), ('get', 'a', 0), ('set', 'a', 2)] [('a', 2), ('b', 1)]
+10 first element
+IndexError tuple index out of range
+AttributeError can't set attribute

@@ -4,9 +4,11 @@
 #include "internal/abc.hpp"
 #include "internal/binascii.hpp"
 #include "internal/codecregistry.hpp"
+#include "internal/collectionsmodule.hpp"
 #include "internal/compiler.hpp"
 #include "internal/hashmodule.hpp"
 #include "internal/iomodule.hpp"
+#include "internal/itertoolsmodule.hpp"
 #include "internal/posixmodule.hpp"
 #include "internal/stdio.hpp"
 #include "internal/structmodule.hpp"
@@ -226,6 +228,8 @@ detail::ImportState::ImportState()
                                      {U"_io", detail::initialize_io},
                                      {U"_thread", detail::initialize_thread},
                                      {U"_abc", detail::initialize_abc},
+                                     {U"itertools", detail::initialize_itertools},
+                                     {U"_collections", detail::initialize_collections},
                                      {U"binascii", detail::install_binascii},
                                      {U"posix", detail::initialize_posix},
                                      {U"_weakref", detail::initialize_weakref},

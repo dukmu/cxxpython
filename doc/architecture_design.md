@@ -167,7 +167,8 @@ Weak targets and intrusive callback/finalizer batches are classified during STW;
 Python runs only after attachments resume. Pending and running batches retain
 their complete strong graphs, and a second mark checks resurrection. Immutable
 type/MRO snapshots supply instance finalizers. `Objects/weakrefobject.cpp` owns
-weak reference protocols, while `Modules/_weakref.cpp` exposes native capability.
+weak reference protocols; `Objects/weakproxyobject.cpp` forwards proxy operations
+through rooted referents. `Modules/_weakref.cpp` exposes that native capability.
 `Python/errors.cpp` owns exception/unraisable hook dispatch, including callbacks
 from GC and generator close. `Modules/gcmodule.cpp` exposes collector controls.
 `Objects/exceptions.cpp` owns errno-based OSError construction and traced native
@@ -233,8 +234,11 @@ parks a thread without exclusive execution permission on resume.
 Mutable shared references use rooted atomic edge operations. Ordinary name
 dictionaries use per-object short commits, prepared host nodes and rooted views;
 replacement/deletion do not require managed allocation. Type dictionaries and
-metadata still publish immutable snapshots; Code and Function metadata are
-immutable. Closure Cell identities are shared, while each call owns its Frame
+metadata still publish immutable snapshots. Code and a Function's code/global/
+builtin/closure identities are immutable. Function names, documentation, module,
+annotations, type parameters and default argument edges use rooted atomic
+publication; each call keeps its default snapshots alive while binding. Closure
+Cell identities are shared, while each call owns its Frame
 and fresh local Cells. CodeKind distinguishes function, module and class-body
 namespace rules; a class Frame owns/traces its supplied mapping and implicit
 class Cell rather than putting invocation state in shared Function/Code.
@@ -265,6 +269,11 @@ holding a mutex. Completion, rejection and native exception unwind release the
 claim. Async-generator finalizer hooks, event-loop shutdown, async for/with and
 never-awaited warning policy remain explicit dependencies.
 
+`Objects/funcobject.cpp` owns Function traversal and metadata descriptors; the VM
+owns construction and call binding, not a second metadata dictionary. Independently
+assigned defaults and keyword defaults are not a multi-field transaction.
+Writable __code__ and Code.replace remain separate compatibility work.
+
 Function annotations are evaluated in the defining scope after defaults and
 carried by MAKE_FUNCTION's annotation flag. Their mutable dictionary edge uses
 rooted atomic reads, stores and lazy compare-exchange publication; it is not a
@@ -275,13 +284,22 @@ __class_getitem__ protocol. NamespaceObject reuses the existing traced instance
 dictionary tail, and mappingproxy delegates to the wrapped mapping's real
 protocols rather than assuming that every mapping has a DictObject payload.
 
+`Modules/itertoolsmodule.cpp`, `itertools_combinatorics.cpp` and
+`itertools_groups.cpp` divide iterator algorithms by shared state shape.
+`Modules/_collectionsmodule.cpp` supplies native deque, dict-backed defaultdict
+and tuple fields; `Lib/collections`, `reprlib` and `functools` retain upstream
+Python policy. No native copy of these complete Python libraries is introduced.
+The weak sys.intern pool belongs to the Interpreter heap coordinator and is
+pruned before sweep releases string storage, not kept as permanent module roots.
+
 ## Tests And Tooling
 
 `Tests/cpp/` tests production runtime interfaces. `Tests/python/` contains host Python
 drivers for actual executable differential and measurement-report tests, not a
 ported standard library. `Lib/` is reserved for the interpreter's Python standard
-library. Python-visible contracts default to `Tests/cases/*/stdin.bin` with exact
-stdout/stderr/status comparisons through `Tests/python/test_cases.py`, without
+library. Python-visible contracts use `Tests/cases/*/test.py`, with optional
+`stdin.bin` for process input and exact stdout/stderr/status comparisons through
+`Tests/python/test_cases.py`, without
 compiling C++ wrappers. Native tests cover contracts inaccessible from Python.
 `Tools/benchmarks/runtime.cpp` runs the current runtime;
 `Tools/benchmarks/record.py` retains raw runs and generates comparison tables.

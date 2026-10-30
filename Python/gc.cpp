@@ -15,6 +15,7 @@
 #include <deque>
 #include <limits>
 #include <list>
+#include <map>
 #include <random>
 
 namespace cxxpython::core {
@@ -244,6 +245,9 @@ std::size_t saturated_add(std::size_t a, std::size_t b) noexcept
 
 struct State {
     explicit State(HeapConfig config_in) : config(config_in), budget(config.minimum_gc_budget) {}
+
+    // Weak identity cache; sweep removes entries before reclaiming allocations.
+    std::map<std::u32string, ObjectHeader *> interned_strings;
 
     bool other_active(const ThreadRecord *self = nullptr) const
     {
@@ -514,6 +518,8 @@ struct State {
             retain(thread->finalizers, thread->weak_callbacks);
         trace_work();
         std::size_t collected = 0;
+        std::erase_if(interned_strings,
+                      [](const auto &entry) { return !Allocation::from(entry.second).marked; });
         reclaimed_bytes = 0;
         std::size_t live_bytes = 0;
         auto sweep_spans = [&](auto &spans) {
@@ -1156,6 +1162,40 @@ void Transfer::reset() noexcept
     }
 }
 
+void Attachment::intern(Handle string, ReturnSlot &out)
+{
+    const auto value = string.get(*this);
+    out.reset(*this);
+    if (type_of(value) != builtin(CoreObject::StrType)) {
+        raise_error(*this, CoreObject::TypeErrorType, U"intern() requires an exact str", out);
+        return;
+    }
+    const auto &text = payload<StrObject>(value).value;
+    {
+        std::lock_guard gate(state_->coordinator);
+        if (auto found = state_->interned_strings.find(text);
+            found != state_->interned_strings.end()) {
+            out.ok(Value(*found->second));
+            return;
+        }
+    }
+    decltype(state_->interned_strings) prepared;
+    prepared.emplace(text, value.object());
+    auto node = prepared.extract(prepared.begin());
+    std::lock_guard gate(state_->coordinator);
+    auto inserted = state_->interned_strings.insert(std::move(node));
+    out.ok(Value(*inserted.position->second));
+}
+std::size_t Attachment::object_size(Handle owner) const
+{
+    const auto &allocation = detail::Allocation::from(owner.get(*this).object());
+    return detail::saturated_add(allocation.span->layout.storage_size(),
+                                 allocation.external_bytes.load(std::memory_order_relaxed));
+}
+std::size_t Attachment::gc_metadata_size(Handle owner) const
+{
+    return detail::Allocation::from(owner.get(*this).object()).span->object_offset;
+}
 void Attachment::account_external(Handle owner, std::size_t bytes)
 {
     account_external(owner.get(*this), bytes);

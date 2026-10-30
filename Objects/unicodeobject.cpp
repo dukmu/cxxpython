@@ -5,6 +5,7 @@
 #include "internal/long.hpp"
 
 #include <algorithm>
+#include <array>
 #include <limits>
 
 namespace cxxpython::core {
@@ -27,6 +28,62 @@ bool is_string(Attachment &context, Value value)
 {
     return context.has_layout<StrObject>(value) &&
            is_subtype(context, context.type_of(value), context.builtin(CoreObject::StrType));
+}
+// CPython 3.12.14 unicode_repeat: convert the count before testing for empty output.
+void repeat(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!is_string(context, args[0])) {
+        raise_error(context, CoreObject::TypeErrorType, U"str descriptor requires a str", out);
+        return;
+    }
+    RootScope roots(context);
+    const auto self = roots.root(args[0]), count = roots.root(args[1]);
+    ReturnSlot converted(context);
+    index(context, count, converted);
+    if (converted.tag() == ResultTag::Raised) {
+        out.raised(converted.exception());
+        return;
+    }
+    const auto number = detail::integer_value(context.payload<IntObject>(converted.value()));
+    if (number < std::numeric_limits<std::intptr_t>::min() ||
+        number > std::numeric_limits<std::intptr_t>::max()) {
+        auto name = TypeView(context, context.type_of(count)).name();
+        const auto kind = std::holds_alternative<Value>(name)
+                              ? context.payload<StrObject>(std::get<Value>(name)).value
+                              : std::get<std::u32string>(name);
+        raise_error(context, CoreObject::OverflowErrorType,
+                    U"cannot fit '" + kind + U"' into an index-sized integer", out);
+        return;
+    }
+    const auto &text = context.payload<StrObject>(self).value;
+    if (number == 1 && context.type_of(self) == context.builtin(CoreObject::StrType)) {
+        out.ok(self.get(context));
+        return;
+    }
+    if (number <= 0 || text.empty()) {
+        make_str(context, {}, out);
+        return;
+    }
+    const auto copies = number.convert_to<std::size_t>();
+    if (text.size() >
+        static_cast<std::size_t>(std::numeric_limits<std::intptr_t>::max()) / copies) {
+        raise_error(context, CoreObject::OverflowErrorType, U"repeated string is too long", out);
+        return;
+    }
+    const auto size = text.size() * copies;
+    std::u32string result;
+    if (size > result.max_size()) {
+        out.raised(context.builtin(CoreObject::MemoryError));
+        return;
+    }
+    result.resize(size);
+    std::copy(text.begin(), text.end(), result.begin());
+    for (auto filled = text.size(); filled < size;) {
+        const auto chunk = std::min(filled, size - filled);
+        std::copy_n(result.data(), chunk, result.data() + filled);
+        filled += chunk;
+    }
+    make_str(context, std::move(result), out);
 }
 void join(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
@@ -184,7 +241,7 @@ bool string_space(char32_t value)
     return _PyUnicode_IsWhitespace(value);
 }
 
-enum class Predicate { Ascii, Alnum, Alpha, Space, Decimal, Digit, Numeric };
+enum class Predicate { Ascii, Alnum, Alpha, Space, Decimal, Digit, Numeric, Identifier };
 template <Predicate Kind>
 void predicate(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
@@ -194,6 +251,7 @@ void predicate(Attachment &context, Handle, std::span<const Value> args, ReturnS
     }
     const auto &text = context.payload<StrObject>(args[0]).value;
     bool result = Kind == Predicate::Ascii || !text.empty();
+    bool first = true;
     for (auto ch : text) {
         const auto flags = unicode_record(ch).flags;
         bool matches = false;
@@ -211,12 +269,209 @@ void predicate(Attachment &context, Handle, std::span<const Value> args, ReturnS
             matches = flags & (0x01 | 0x02 | 0x04 | 0x800);
         if constexpr (Kind == Predicate::Space)
             matches = string_space(ch);
+        if constexpr (Kind == Predicate::Identifier)
+            matches = first ? ch == U'_' || (flags & 0x100) : (flags & 0x200);
+        first = false;
         if (!matches) {
             result = false;
             break;
         }
     }
     out.ok(context.builtin(result ? CoreObject::True : CoreObject::False));
+}
+
+// Follows CPython 3.12's charmap translation, including its ASCII cache.
+void translate(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!is_string(context, args[0])) {
+        raise_error(context, CoreObject::TypeErrorType, U"str descriptor requires a str", out);
+        return;
+    }
+    RootScope roots(context);
+    const auto self = roots.root(args[0]), mapping = roots.root(args[1]);
+    const auto text = context.payload<StrObject>(self).value;
+    std::u32string result;
+    std::array<int, 128> cache;
+    cache.fill(-3);
+    bool fast = std::all_of(text.begin(), text.end(), [](char32_t ch) { return ch < 128; });
+    ReturnSlot key(context), item(context);
+    for (auto ch : text) {
+        if (fast && cache[ch] != -3) {
+            if (cache[ch] >= 0)
+                result += static_cast<char32_t>(cache[ch]);
+            continue;
+        }
+        auto lookup = [&]() {
+            make_int(context, ch, key);
+            const auto rooted_key = roots.root(key.value());
+            get_item(context, mapping, rooted_key, item);
+            roots.release(rooted_key);
+        };
+        lookup();
+    process_mapping:
+        if (item.tag() == ResultTag::Raised) {
+            if (!is_subtype(context, context.type_of(item.exception()),
+                            context.builtin(CoreObject::LookupErrorType))) {
+                out.raised(item.exception());
+                return;
+            }
+            if (fast)
+                cache[ch] = static_cast<int>(ch);
+            result += ch;
+            continue;
+        }
+        auto value = item.value();
+        if (value == context.builtin(CoreObject::None)) {
+            if (fast)
+                cache[ch] = -2;
+            continue;
+        }
+        if (context.has_layout<IntObject>(value) &&
+            is_subtype(context, context.type_of(value), context.builtin(CoreObject::IntType))) {
+            const auto number = detail::integer_value(context.payload<IntObject>(value));
+            if (number < 0 || number > 0x10ffff) {
+                raise_error(context, CoreObject::ValueErrorType,
+                            U"character mapping must be in range(0x110000)", out);
+                return;
+            }
+            auto replacement = number.convert_to<char32_t>();
+            if (fast && replacement < 128)
+                cache[ch] = static_cast<int>(replacement);
+            else if (fast) {
+                fast = false;
+                lookup();
+                goto process_mapping;
+            }
+            result += replacement;
+            continue;
+        }
+        if (is_string(context, value)) {
+            auto replacement = context.payload<StrObject>(value).value;
+            if (fast && replacement.size() == 1 && replacement[0] < 128) {
+                cache[ch] = static_cast<int>(replacement[0]);
+                result += replacement;
+                continue;
+            }
+            if (!fast) {
+                result += replacement;
+                continue;
+            }
+            fast = false;
+            lookup();
+            goto process_mapping;
+        }
+        raise_error(context, CoreObject::TypeErrorType,
+                    U"character mapping must return integer, None or str", out);
+        return;
+    }
+    make_str(context, std::move(result), out);
+}
+
+void maketrans(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(context);
+    const auto arguments = roots.root(args[0]);
+    const auto &values = context.payload<TupleObject>(arguments).items;
+    if (values.empty() || values.size() > 3) {
+        const auto count = std::to_string(values.size());
+        raise_error(context, CoreObject::TypeErrorType,
+                    (values.empty() ? U"maketrans expected at least 1 argument, got "
+                                    : U"maketrans expected at most 3 arguments, got ") +
+                        std::u32string(count.begin(), count.end()),
+                    out);
+        return;
+    }
+    const auto x = roots.root(values[0]);
+    ReturnSlot created(context), key(context), item(context), stored(context);
+    context.allocate_instance<DictObject>(roots.root(context.builtin(CoreObject::DictType)),
+                                          created);
+    const auto result = roots.root(created.value());
+    auto put = [&](Handle k, Handle v) {
+        set_item(context, result, k, v, stored);
+        if (stored.tag() == ResultTag::Raised) {
+            out.raised(stored.exception());
+            return false;
+        }
+        return true;
+    };
+    if (values.size() == 1) {
+        if (context.type_of(x.get(context)) != context.builtin(CoreObject::DictType)) {
+            raise_error(context, CoreObject::TypeErrorType,
+                        U"if you give only one argument to maketrans it must be a dict", out);
+            return;
+        }
+        DictView view(context, x.get(context));
+        for (const auto &entry : view.entries()) {
+            RootScope iteration(context);
+            auto k = iteration.root(entry.key);
+            if (is_string(context, k.get(context))) {
+                const auto &text = context.payload<StrObject>(k).value;
+                if (text.size() != 1) {
+                    raise_error(context, CoreObject::ValueErrorType,
+                                U"string keys in translate table must be of length 1", out);
+                    return;
+                }
+                make_int(context, text[0], key);
+                k = iteration.root(key.value());
+            } else if (!context.has_layout<IntObject>(k.get(context)) ||
+                       !is_subtype(context, context.type_of(k.get(context)),
+                                   context.builtin(CoreObject::IntType))) {
+                raise_error(context, CoreObject::TypeErrorType,
+                            U"keys in translate table must be strings or integers", out);
+                return;
+            }
+            if (!put(k, iteration.root(entry.value)))
+                return;
+        }
+    } else {
+        const auto y = roots.root(values[1]);
+        for (std::size_t i = 1; i < values.size(); ++i) {
+            if (!is_string(context, values[i])) {
+                auto name = TypeView(context, context.type_of(values[i])).name();
+                const auto kind = values[i] == context.builtin(CoreObject::None) ? U"None"
+                                  : std::holds_alternative<Value>(name)
+                                      ? context.payload<StrObject>(std::get<Value>(name)).value
+                                      : std::get<std::u32string>(name);
+                raise_error(context, CoreObject::TypeErrorType,
+                            (i == 1 ? U"maketrans() argument 2 must be str, not "
+                                    : U"maketrans() argument 3 must be str, not ") +
+                                kind,
+                            out);
+                return;
+            }
+        }
+        if (!is_string(context, x.get(context))) {
+            raise_error(context, CoreObject::TypeErrorType,
+                        U"first maketrans argument must be a string if there is a second argument",
+                        out);
+            return;
+        }
+        const auto from = context.payload<StrObject>(x).value;
+        const auto to = context.payload<StrObject>(y).value;
+        if (from.size() != to.size()) {
+            raise_error(context, CoreObject::ValueErrorType,
+                        U"the first two maketrans arguments must have equal length", out);
+            return;
+        }
+        for (std::size_t i = 0; i < from.size(); ++i) {
+            RootScope iteration(context);
+            make_int(context, from[i], key);
+            make_int(context, to[i], item);
+            if (!put(iteration.root(key.value()), iteration.root(item.value())))
+                return;
+        }
+        if (values.size() == 3) {
+            const auto deleted = context.payload<StrObject>(values[2]).value;
+            for (auto ch : deleted) {
+                RootScope iteration(context);
+                make_int(context, ch, key);
+                if (!put(iteration.root(key.value()),
+                         iteration.root(context.builtin(CoreObject::None))))
+                    return;
+            }
+        }
+    }
+    out.ok(result.get(context));
 }
 
 enum class Case { Lower, Upper, Fold };
@@ -505,6 +760,13 @@ void split(Attachment &context, Handle, std::span<const Value> args, ReturnSlot 
 void detail::install_unicode_methods(Attachment &context, std::span<const Handle> core)
 {
     auto at = [&](CoreObject id) { return core[static_cast<std::size_t>(id)]; };
+    SignatureLayout repeated;
+    repeated.parameters = {{U"self", ParameterKind::PositionalOnly},
+                           {U"count", ParameterKind::PositionalOnly}};
+    install_native_attribute(context, core, at(CoreObject::StrType), U"__mul__", repeated, repeat,
+                             {}, NativeSlotKind::Sequence);
+    install_native_attribute(context, core, at(CoreObject::StrType), U"__rmul__", repeated, repeat,
+                             {}, NativeSlotKind::Sequence);
     SignatureLayout signature;
     signature.parameters = {
         {U"self", ParameterKind::PositionalOnly},
@@ -560,6 +822,24 @@ void detail::install_unicode_methods(Attachment &context, std::span<const Handle
                              predicate<Predicate::Digit>);
     install_native_attribute(context, core, at(CoreObject::StrType), U"isnumeric", unary,
                              predicate<Predicate::Numeric>);
+    install_native_attribute(context, core, at(CoreObject::StrType), U"isidentifier", unary,
+                             predicate<Predicate::Identifier>);
+    SignatureLayout translated = unary;
+    translated.parameters.push_back({U"table", ParameterKind::PositionalOnly});
+    install_native_attribute(context, core, at(CoreObject::StrType), U"translate", translated,
+                             translate);
+    SignatureLayout translation_table;
+    translation_table.varargs = U"args";
+    install_native_attribute(context, core, at(CoreObject::StrType), U"maketrans",
+                             translation_table, maketrans);
+    ReturnSlot static_wrapper(context), static_name(context);
+    const auto table_function = roots.root(*name_lookup(
+        context, *TypeView(context, at(CoreObject::StrType)).dictionary(), U"maketrans"));
+    context.allocate_instance<StaticMethodObject>(at(CoreObject::StaticMethodType), static_wrapper,
+                                                  table_function.get(context));
+    context.allocate_instance<StrObject>(at(CoreObject::StrType), static_name, U"maketrans");
+    name_store(context, *TypeView(context, at(CoreObject::StrType)).dictionary(),
+               static_name.value(), static_wrapper.value());
     install_native_attribute(context, core, at(CoreObject::StrType), U"lower", unary,
                              change_case<Case::Lower>);
     install_native_attribute(context, core, at(CoreObject::StrType), U"upper", unary,

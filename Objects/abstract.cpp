@@ -650,6 +650,26 @@ ResultView inplace(Attachment &context, Handle left, Handle right, BinaryOp op, 
         type_error(context, U"unsupported operand types for inplace operation", out);
     });
 }
+ResultView power(Attachment &context, Handle base, Handle exponent, Handle modulus, ReturnSlot &out)
+{
+    if (modulus.get(context) == context.builtin(CoreObject::None))
+        return binary(context, base, exponent, BinaryOp::Power, out);
+    return guarded(context, out, [&] {
+        RootScope roots(context);
+        auto self = roots.root(base.get(context));
+        auto other = roots.root(exponent.get(context));
+        auto mod = roots.root(modulus.get(context));
+        out.reset(context);
+        // Python 3.12's three-argument power does not call __rpow__.
+        if (auto slot = detail::type_attribute(context, context.type_of(self), U"__pow__")) {
+            const Value args[] = {other.get(context), mod.get(context)};
+            detail::invoke_special(context, self, roots.root(*slot), {args}, out);
+            if (raised(out) || out.value() != context.builtin(CoreObject::NotImplemented))
+                return;
+        }
+        type_error(context, U"unsupported operand types for modular power", out);
+    });
+}
 ResultView get_item(Attachment &context, Handle value, Handle key, ReturnSlot &out)
 {
     return guarded(context, out, [&] {
@@ -680,6 +700,35 @@ ResultView get_item(Attachment &context, Handle value, Handle key, ReturnSlot &o
             }
         }
         invoke_protocol(context, self, slot, args, out);
+    });
+}
+ResultView divmod(Attachment &context, Handle left, Handle right, ReturnSlot &out)
+{
+    return guarded(context, out, [&] {
+        RootScope roots(context);
+        left = roots.root(left.get(context));
+        right = roots.root(right.get(context));
+        const auto ltype = context.type_of(left), rtype = context.type_of(right);
+        auto lookup = [&](Value type, const char32_t *name) -> std::optional<Handle> {
+            auto method = detail::type_attribute(context, type, name);
+            return method ? std::optional<Handle>{roots.root(*method)} : std::nullopt;
+        };
+        auto normal = lookup(ltype, U"__divmod__");
+        auto reflected = lookup(rtype, U"__rdivmod__");
+        auto inherited = lookup(ltype, U"__rdivmod__");
+        const bool first = ltype != rtype && is_subtype(context, rtype, ltype) && reflected &&
+                           (!inherited || reflected->get(context) != inherited->get(context));
+        auto invoke = [&](Handle self, Handle argument, const std::optional<Handle> &method) {
+            if (!method)
+                return false;
+            const Value values[] = {argument.get(context)};
+            detail::invoke_special(context, self, *method, {values}, out);
+            return raised(out) || out.value() != context.builtin(CoreObject::NotImplemented);
+        };
+        if ((first && invoke(right, left, reflected)) || invoke(left, right, normal) ||
+            (!first && ltype != rtype && invoke(right, left, reflected)))
+            return;
+        type_error(context, U"unsupported operand types for divmod()", out);
     });
 }
 ResultView set_item(Attachment &context, Handle value, Handle key, Handle item, ReturnSlot &out)

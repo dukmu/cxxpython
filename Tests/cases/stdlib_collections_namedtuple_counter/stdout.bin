@@ -1,0 +1,8 @@
+Point(x=3, y=10) 3 10 ('x', 'y') {'y': 10}
+Point(x=3, y=4) {'x': 5, 'y': 6}
+('x', '_1', '_2')
+ValueError Encountered duplicate field name: 'x'
+5 0 11
+[('a', 5), ('b', 2)]
+3 3 [('a', 1), ('b', 1), ('c', 1)]
+[('a', 3), ('c', 2)]

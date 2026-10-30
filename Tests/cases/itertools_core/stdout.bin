@@ -1,0 +1,20 @@
+['A', 'B', 3, 4]
+['a', 'b', 'c']
+[]
+['x', 'x', 'x'] []
+2 y 1 ['y']
+['z', 'z', 'z']
+[2, 5, 8]
+[0, 1, 2, 3, 4]
+[2, 3, 4] 5
+[8, 9]
+[('a', 'b'), ('b', 'c')]
+TypeError
+ValueError
+ValueError
+TypeError
+callback
+4 done
+1
+bad inner
+done

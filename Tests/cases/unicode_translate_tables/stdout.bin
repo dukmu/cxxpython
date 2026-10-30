@@ -1,0 +1,23 @@
+{97: 65, 98: None, 99: None}
+ArAAdArA
+xy😀α
+AXY
+{97: 122}
+{True: 2000000, 97: []}
+TypeError maketrans expected at least 1 argument, got 0
+TypeError if you give only one argument to maketrans it must be a dict
+TypeError maketrans() argument 2 must be str, not None
+TypeError first maketrans argument must be a string if there is a second argument
+TypeError maketrans() argument 2 must be str, not int
+TypeError maketrans() argument 3 must be str, not None
+ValueError the first two maketrans arguments must have equal length
+TypeError maketrans expected at most 3 arguments, got 4
+ValueError string keys in translate table must be of length 1
+TypeError keys in translate table must be strings or integers
+TypeError if you give only one argument to maketrans it must be a dict
+ValueError character mapping must be in range(0x110000)
+ValueError character mapping must be in range(0x110000)
+ValueError character mapping must be in range(0x110000)
+TypeError character mapping must return integer, None or str
+TypeError character mapping must return integer, None or str
+TypeError character mapping must return integer, None or str

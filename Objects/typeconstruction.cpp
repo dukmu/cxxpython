@@ -533,28 +533,61 @@ void type_new(Attachment &context, Handle, std::span<const Value> args, ReturnSl
         spec.qualname = context.payload<StrObject>(*qualname).value;
     }
     if (auto slots = detail::name_lookup(context, args[3], U"__slots__")) {
+        const auto source = roots.root(*slots);
         spec.slots.emplace();
-        auto append = [&](Value value) {
-            if (!is_instance(context, value, CoreObject::StrType))
-                return false;
-            spec.slots->push_back(context.payload<StrObject>(value).value);
-            return true;
-        };
-        bool valid = true;
-        if (is_instance(context, *slots, CoreObject::StrType))
-            valid = append(*slots);
-        else if (is_instance(context, *slots, CoreObject::TupleType)) {
-            for (auto item : context.payload<TupleObject>(*slots).items)
-                valid &= append(item);
-        } else if (is_instance(context, *slots, CoreObject::DictType)) {
-            DictView names(context, *slots);
-            for (auto entry : names.entries())
-                valid &= append(entry.key);
-        } else
-            valid = false;
-        if (!valid) {
-            type_error(context, U"__slots__ requires string names from str, tuple or dict", out);
-            return;
+        std::vector<Value> items;
+        if (is_instance(context, source.get(context), CoreObject::StrType))
+            items.push_back(source.get(context));
+        else {
+            ReturnSlot iterator(context), item(context);
+            get_iter(context, source, iterator);
+            if (raised(iterator)) {
+                out.raised(iterator.exception());
+                return;
+            }
+            const auto input = roots.root(iterator.value());
+            const auto hint = detail::length_hint(context, source, item);
+            if (!hint) {
+                out.raised(item.exception());
+                return;
+            }
+            if (*hint > items.max_size()) {
+                out.raised(context.builtin(CoreObject::MemoryError));
+                return;
+            }
+            items.reserve(*hint);
+            // CPython 3.12.14 type_new_get_slots materializes the entire
+            // iterable before validating names. Keep yielded objects rooted
+            // across later callbacks, even if they remove __slots__ and collect.
+            for (;;) {
+                const auto status = iter_next(context, input, item);
+                if (status == NextStatus::Done)
+                    break;
+                if (status == NextStatus::Raised) {
+                    out.raised(item.exception());
+                    return;
+                }
+                items.push_back(roots.root(item.value()).get(context));
+            }
+        }
+        for (auto item : items) {
+            if (!is_instance(context, item, CoreObject::StrType)) {
+                TypeView type(context, context.type_of(item));
+                const auto name = type.name();
+                const auto text = std::holds_alternative<Value>(name)
+                                      ? context.payload<StrObject>(std::get<Value>(name)).value
+                                      : std::get<std::u32string>(name);
+                type_error(context,
+                           U"__slots__ items must be strings, not '" + text.substr(0, 200) + U"'",
+                           out);
+                return;
+            }
+            const auto &text = context.payload<StrObject>(item).value;
+            if (!is_identifier(text)) {
+                type_error(context, U"__slots__ must be identifiers", out);
+                return;
+            }
+            spec.slots->push_back(text);
         }
     }
     auto classcell = detail::name_lookup(context, args[3], U"__classcell__");

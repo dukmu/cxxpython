@@ -1,0 +1,12 @@
+True True True
+True target 3 [1, 2, 3]
+9 8 True
+True True
+unhashable
+2 False
+['ProxyType']
+ReferenceError
+ReferenceError
+ReferenceError
+ReferenceError
+True True 12

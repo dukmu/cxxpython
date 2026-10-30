@@ -283,6 +283,71 @@ void bool_bitwise(Attachment &context, Handle function, std::span<const Value> a
     if constexpr (Op == BinaryOp::BitOr)
         boolean(context, a || b, out);
 }
+template <bool Reflected>
+void integer_power(Attachment &context, Handle function, std::span<const Value> args,
+                   ReturnSlot &out)
+{
+    if (args[2] == context.builtin(CoreObject::None)) {
+        integer_extended<BinaryOp::Power, Reflected>(context, function, args.first(2), out);
+        return;
+    }
+    if (!is_int(context, args[0])) {
+        type_error(context, out);
+        return;
+    }
+    if (!is_int(context, args[1]) || !is_int(context, args[2])) {
+        out.ok(context.builtin(CoreObject::NotImplemented));
+        return;
+    }
+    Integer base = expanded(integer(context, args[Reflected ? 1 : 0]));
+    Integer exponent = expanded(integer(context, args[Reflected ? 0 : 1]));
+    Integer modulus = expanded(integer(context, args[2]));
+    if (modulus == 0) {
+        raise_error(context, CoreObject::ValueErrorType, U"pow() 3rd argument cannot be 0", out);
+        return;
+    }
+    const bool negative = modulus < 0;
+    if (negative)
+        modulus = -modulus;
+    base %= modulus;
+    if (base < 0)
+        base += modulus;
+    if (exponent < 0) {
+        // Extended Euclid supplies the inverse without a second integer implementation.
+        Integer a = base, b = modulus, x = 1, y = 0;
+        while (b != 0) {
+            context.poll();
+            Integer quotient = a / b;
+            Integer remainder = a % b;
+            Integer next = x - quotient * y;
+            a = std::move(b);
+            b = std::move(remainder);
+            x = std::move(y);
+            y = std::move(next);
+        }
+        if (a != 1) {
+            raise_error(context, CoreObject::ValueErrorType,
+                        U"base is not invertible for the given modulus", out);
+            return;
+        }
+        base = x % modulus;
+        if (base < 0)
+            base += modulus;
+        exponent = -exponent;
+    }
+    Integer result = Integer(1) % modulus;
+    while (exponent != 0) {
+        context.poll();
+        if ((exponent & 1) != 0)
+            result = (result * base) % modulus;
+        exponent >>= 1;
+        if (exponent != 0)
+            base = (base * base) % modulus;
+    }
+    if (negative && result != 0)
+        result -= modulus;
+    publish(context, std::move(result), out);
+}
 template <CompareOp Op>
 void compare(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
@@ -738,8 +803,13 @@ void install_numbers(Attachment &context, std::span<const Handle> core)
     install(U"__rmod__", arithmetic<BinaryOp::Modulo, true>, true);
     install(U"__divmod__", int_divmod<false>, true);
     install(U"__rdivmod__", int_divmod<true>, true);
-    install(U"__pow__", integer_extended<BinaryOp::Power, false>, true);
-    install(U"__rpow__", integer_extended<BinaryOp::Power, true>, true);
+    auto power_signature = pair;
+    power_signature.parameters.push_back(
+        {U"mod", ParameterKind::PositionalOnly, at(CoreObject::None).get(context)});
+    install_native_attribute(context, core, at(CoreObject::IntType), U"__pow__", power_signature,
+                             integer_power<false>);
+    install_native_attribute(context, core, at(CoreObject::IntType), U"__rpow__", power_signature,
+                             integer_power<true>);
     install(U"__lshift__", integer_extended<BinaryOp::LeftShift, false>, true);
     install(U"__rlshift__", integer_extended<BinaryOp::LeftShift, true>, true);
     install(U"__rshift__", integer_extended<BinaryOp::RightShift, false>, true);

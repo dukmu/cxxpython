@@ -1,0 +1,17 @@
+'' False
+'_' True
+'class' True
+'a1' True
+'1a' False
+'a-b' False
+'\u03b1\u0301' True
+'\u0301a' False
+'\u2118' True
+'\xb7' False
+'a\xb7' True
+'\uff3fa' False
+'\U00010400x' True
+'\ud800' False
+'a\u200c' False
+True False
+TypeError

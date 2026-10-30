@@ -126,7 +126,8 @@ the target is `builtins` and the `__builtins__` execution namespace.
   Python __del__ and gc collection controls use tracing-GC lifetime rather than
   reference-count timing. Weak callbacks retain their strong callback edge after
   clearing targets, as in upstream cyclic collection. Full gc statistics/debug
-  APIs, weak proxies and interpreter-shutdown phases remain dependencies.
+  APIs and interpreter-shutdown phases remain dependencies. Weak proxies are
+  described with the collection dependency closure below.
 - Lib/stat.py, keyword.py and token.py copy complete pinned upstream modules.
   stat retains its optional _stat accelerator import and genuine Python fallback;
   no fake native module is installed. Provenance is recorded at each file head.
@@ -190,7 +191,7 @@ the target is `builtins` and the `__builtins__` execution namespace.
   abstract collection registration, sequence/set mixins and wrapped mappings
   execute here. This is not a claim that the complete collections package,
   typing, unittest or every types constructor/helper is available. In particular
-  types.coroutine's functools/Code.replace dependencies, mutable function code
+  types.coroutine's Code.replace dependency, mutable function code
   metadata and the distinct CPython native-callable descriptor matrix remain.
 - Native SimpleNamespace owns the ordinary traced instance-dictionary tail;
   kwargs construction, subclassing, repr/recursion, comparison and reduction use
@@ -277,6 +278,49 @@ The configured source-tree stdlib path is development configuration, not final
 installation, isolation, environment or embedding acceptance. Full stdio/runpy,
 REPL/product configuration and requested library dependency closures remain in Plan 2.
 
+## Collection And Callable Dependencies
+
+- `Lib/reprlib.py`, `Lib/collections/__init__.py` and `Lib/functools.py` copy
+  complete, unchanged CPython 3.12.14 files. Their optional accelerators remain
+  optional. Product fixtures derived from upstream tests exercise recursive and
+  bounded repr, namedtuple, Counter, OrderedDict, ChainMap, UserDict/UserList/
+  UserString, wrappers, partial/reduce/comparison helpers, LRU/cache and cached
+  properties. Full upstream unittest suites and functools.singledispatch's
+  weakref/typing closure are not delivered merely by successful imports.
+- Native itertools supplies chain, repeat, islice, starmap, pairwise, predicate
+  iterators, compress, accumulate, batched, count, cycle, product, permutations,
+  both combination families, tee and groupby. Mutable iterator state has an
+  execution claim, not a mutex held over Python callbacks. tee uses precise
+  forward cache nodes that become collectible when all cursors pass them.
+  zip_longest, complete reduction/pickle and iterator reflection remain work.
+- `_collections` supplies deque, defaultdict, _tuplegetter and _count_elements.
+  deque prepares list nodes before short per-object commits; endpoint operations
+  remain O(1), indexing O(n), and iteration checks structural versions. Reads
+  own rooted snapshots or slots before callbacks. defaultdict retains the
+  existing DictObject layout with one precise factory tail slot, not a second
+  mapping engine. Native module reload retains canonical types. deque arithmetic,
+  complete reduction/pickle and the full invalid-input matrices remain gates.
+- `_thread.RLock` tracks the actual owning OS thread and recursion depth. Native
+  waits park the attachment without blocking GC. Save/restore supports condition
+  semantics, but coordinated process fork is absent: _at_fork_reinit reports
+  NotImplementedError instead of claiming fork safety. Full threading remains a
+  distinct Python/native dependency closure.
+- `_weakref.proxy` uses the collector's existing weak-target/callback storage and
+  roots each live referent before forwarding protocols; dead access raises the
+  canonical ReferenceError. Proxy types are distinct from ReferenceType and
+  unhashable. These primitives do not substitute for Lib/weakref.py.
+- Function metadata/default descriptors use atomic precise edges and snapshot
+  binding; update_wrapper no longer fails on readonly Python metadata. Code and
+  closure replacement remain work. Iterable __slots__, Unicode identifier/
+  translation tables and repetition, dict union, divmod and pow are ordinary
+  type/protocol operations, not rewrites tailored to library source. Integer
+  modular power uses existing BigInt arithmetic and extended Euclid for inverses.
+- sys.intern uses a per-Interpreter weak string pool, pruned during sweep; it does
+  not permanently retain every interned string. sys.getsizeof reports this
+  runtime's storage/accounting rather than invented CPython byte sizes. Frame
+  helpers inspect only the calling thread's rooted frame chain; unrestricted
+  cross-thread frame-local inspection remains unsupported.
+
 ## Requested Library Delivery
 
 The requested Base-to-Full scope includes dis, collections, typing, types, ctypes,
@@ -284,6 +328,8 @@ encodings, logging, multiprocessing, pathlib, re, string, unittest, abc, ast,
 base64, code, codecs, contextlib, dataclasses, enum, glob, hashlib, io, opcode,
 pdb, os, pickle, queue, socket, struct and threading. Earlier requests also include
 sys, posix, curses, importlib, weakref, runpy, tokenizer/tokenize, trace and uuid.
+The REPL delivery also requires readline, complete curses, actual-bytecode dis
+and tracing-GC-compatible gc inspection/control/statistics, not just imports.
 These are delivery requirements, not a claim that the modules already work.
 
 - Close native buffer/resource and codec dependencies first, then upstream

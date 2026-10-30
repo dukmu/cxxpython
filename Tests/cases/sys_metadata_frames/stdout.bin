@@ -1,0 +1,18 @@
+True True
+inner outer
+True True
+__main__ __main__
+True
+ValueError call stack is not deep enough
+inner <module>
+True True
+changed __main__
+True
+ValueError call stack is not deep enough
+True
+True
+42
+True
+OverflowError
+TypeError
+['worker', '__main__']

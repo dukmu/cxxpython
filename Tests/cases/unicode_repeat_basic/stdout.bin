@@ -1,0 +1,19 @@
+-3 '' ''
+0 '' ''
+1 'abc' 'abc'
+4 'abcabcabcabc' 'abcabcabcabc'
+False '' ''
+True 'abc' 'abc'
+'' ''
+'a\u03b1\U0001f600\ud800a\u03b1\U0001f600\ud800'
+ababab ababab
+True True False
+'' True False
+'' True False
+'' True False
+'' True False
+'ab' True False
+'ab' True False
+'ababab' True False
+'ababab' True False
+6000 abcabc abcabc

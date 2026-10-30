@@ -1,0 +1,13 @@
+renamed scope.renamed alternate updated (<class 'int'>,)
+{} True f
+True
+(3, 4)
+None None
+TypeError
+__name__ TypeError
+__qualname__ TypeError
+__defaults__ TypeError
+__kwdefaults__ TypeError
+__type_params__ TypeError
+5 None
+changed scope.changed

@@ -27,6 +27,7 @@
 #include "internal/structmodule.hpp"
 #include "internal/sysmodule.hpp"
 #include "internal/unicodeobject.hpp"
+#include "internal/weakproxy.hpp"
 
 #include <algorithm>
 
@@ -294,6 +295,11 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
            at(CoreObject::ValueErrorType));
     define(CoreObject::BinasciiIncompleteType, "Incomplete",
            LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::ExceptionType));
+    define(CoreObject::WeakProxyType, "ProxyType", LayoutDescriptor::of<WeakRefObject>());
+    define(CoreObject::CallableWeakProxyType, "CallableProxyType",
+           LayoutDescriptor::of<WeakRefObject>());
+    define(CoreObject::ReferenceErrorType, "ReferenceError",
+           LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::ExceptionType));
     for (auto id :
          {CoreObject::FunctionType, CoreObject::ModuleType, CoreObject::CodeType,
           CoreObject::GeneratorType, CoreObject::CoroutineType, CoreObject::SetType,
@@ -395,6 +401,7 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     install_genericalias(context, core);
     install_union(context, core);
     install_weakrefs(context, core);
+    install_weakproxies(context, core);
     install_error_types(context, core);
     install_exception_runtime(context, core);
     install_system_exit(context, core);
@@ -459,10 +466,14 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                     CoreObject::SetIteratorType,
                     CoreObject::GeneratorType})
         context.payload<TypeObject>(at(id)).subclassable = false;
+    for (auto id : {CoreObject::WeakProxyType, CoreObject::CallableWeakProxyType})
+        context.payload<TypeObject>(at(id)).subclassable = false;
     context.payload<TypeObject>(at(CoreObject::UnraisableHookArgsType)).subclassable = false;
     context.allocate_instance<StrObject>(at(CoreObject::StrType), text, U"weakref");
-    name_store(context, *context.payload<TypeObject>(at(CoreObject::WeakRefType)).dictionary,
-               module_key.get(context), text.value());
+    for (auto id :
+         {CoreObject::WeakRefType, CoreObject::WeakProxyType, CoreObject::CallableWeakProxyType})
+        name_store(context, *context.payload<TypeObject>(at(id)).dictionary,
+                   module_key.get(context), text.value());
     for (auto [id, module] : {std::pair{CoreObject::StructType, U"_struct"},
                               {CoreObject::StructIteratorType, U"_struct"},
                               {CoreObject::StructErrorType, U"struct"},
@@ -535,6 +546,7 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                     CoreObject::RuntimeErrorType,
                     CoreObject::NotImplementedErrorType,
                     CoreObject::MemoryErrorType,
+                    CoreObject::ReferenceErrorType,
                     CoreObject::RecursionErrorType,
                     CoreObject::ArithmeticErrorType,
                     CoreObject::ZeroDivisionErrorType,

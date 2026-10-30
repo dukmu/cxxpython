@@ -1,5 +1,65 @@
 # Development Status
 
+## 2026-10-31 Parallel Collection And Callable Library Closure
+
+Prepended without changing earlier history. Previous stable node: e9cabf4.
+Four terra workers owned disjoint iterator/collection, thread/sys, Python-library
+and Unicode tasks; parent integration completed shared protocols, Function
+metadata, weak proxies and GC-owned weak interning. No sol/astra workers, hidden
+host-Python execution or execution-wide mutex were introduced. The full active
+service goal and Plan 2 N4-N6/M0-M9 gates remain unfinished, not marked complete.
+
+- Copied complete, unchanged CPython 3.12.14 reprlib.py, collections/__init__.py
+  and functools.py. Product tests derived from upstream exercise bounded and
+  recursive repr, namedtuple/Counter/OrderedDict/ChainMap/User objects, wraps,
+  partial/reduce/comparison helpers, LRU/cache and cached_property. Native deque,
+  defaultdict, tuple fields and itertools provide real dependencies, not library
+  facades. Source comparisons confirm all three copied files are unchanged.
+- Split iterator algorithms into basic, combinatorial and shared-group files.
+  Implemented product/permutation/combination families and actual tee/groupby
+  laziness. Execution claims protect iterator state across collecting Python
+  callbacks without serializing other Python threads. tee's precise forward
+  cache releases passed values through ordinary tracing. deque uses prepared
+  nodes, short local commits, rooted reads and versioned iteration; defaultdict
+  uses the existing DictObject with one precise factory slot. Reload preserves
+  actual native types. Shared deque/cache and chain/combination/tee scripts run
+  on multiple OS threads in one Interpreter while collecting.
+- Added _thread.RLock ownership/recursion/save/restore with GC-aware waits,
+  canonical weak proxy types and ReferenceError, mutable atomic Function metadata
+  and defaults, weak sys.intern storage, actual getsizeof accounting and own-
+  thread frame helpers. Moved Function descriptors/traversal into funcobject.cpp.
+  Unicode translation/identifier/repetition, iterable __slots__, dict union,
+  shared divmod and integer modular pow are general runtime fixes; no copied
+  library source was simplified to avoid them.
+- Corrected the fixture contract at the user's request: Python source is
+  Tests/cases/<name>/test.py; stdin.bin is optional process input. The driver
+  invokes the .py file directly and accepts repeated --case selectors. All old
+  source-as-stdin files were renamed, not retained as a fallback. A separate
+  input fixture verifies actual stdin data, including end-of-file handling.
+- Product and fixed-reference scripts pass 176/176 after that migration; the
+  additional shared-iterator fixture passes both interpreters, covering all 177
+  current paths. Before renaming, strict ASan/UBSan/LSan passed all 175 then-
+  existing scripts; the two later additions pass strict checks separately.
+  Normal affected native batches pass 77/77 and 166/166, including every OOM
+  shard; source/generator/syntax/constructor/dict/product/doctest checks pass
+  12/12. Strict ASan/UBSan/LSan native checks pass 197/197, including all 16
+  exhaustive OOM shards with unchanged limits. Final formatting checks pass.
+  TSan native checks pass 89/89, and six new shared-heap scenarios plus
+  the real-input fixture pass 7/7. An unnecessarily broad TSan script batch hit
+  the existing 30-second codecs_singlebyte limit under concurrent build/OOM
+  load; it was terminated, not reported as passing. Its log is retained and the
+  affected concurrent paths were tested explicitly, without raising timeouts.
+- Full weakref/typing/singledispatch, deque arithmetic/pickle, zip_longest, mutable
+  code/Code.replace, coordinated fork and full upstream test suites remain.
+  Next dependencies are weakref and the enum/typing closure, io/os/contextlib
+  and the genuine regex closure, not more unrelated performance resampling.
+  Per the user's new requirement, Plan 2 and AGENTS now explicitly include
+  readline/curses, actual-bytecode dis and tracing-GC inspection/statistics for
+  the complete REPL, including terminal cleanup and redirected-input behavior.
+
+Verification artifacts are retained under .cache/collections-functools-*.log;
+no benchmark table was hand-edited and no absolute performance gate is claimed.
+
 ## 2026-10-31 Parallel Type, Collection And Binary Conversion Closures
 
 Prepended without rewriting earlier records. Previous node: edb159a, committed
