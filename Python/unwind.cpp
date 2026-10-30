@@ -16,8 +16,8 @@ void FrameObject::trace(Tracer &tracer) const noexcept
 {
     tracer.visit(function);
     tracer.visit(code);
-    if (back)
-        tracer.visit(*back);
+    tracer.visit(back);
+    tracer.visit(delegate);
     if (namespace_mapping)
         tracer.visit(*namespace_mapping);
     if (locals_snapshot)
@@ -31,6 +31,12 @@ void FrameObject::trace(Tracer &tracer) const noexcept
         tracer.visit(operands[i]);
     if (handled_exception)
         tracer.visit(*handled_exception);
+    if (resume_value)
+        tracer.visit(*resume_value);
+    if (resume_exception)
+        tracer.visit(*resume_exception);
+    if (resume_throw_args)
+        tracer.visit(*resume_throw_args);
     if (reason)
         trace_reason(*reason, tracer);
     for (const auto &region : regions)
@@ -64,10 +70,12 @@ bool FrameObject::unwind(Attachment &context)
         trim_stack(context, active.stack_base);
         if (top->phase == RegionPhase::Protected) {
             if (layout.kind == RegionKind::Finally || layout.kind == RegionKind::With) {
-                cleanups.push_back({top->region, *reason, handled_exception});
+                cleanups.push_back({top->region, *reason, handled_exception, handled_inherited});
                 regions.back().token.phase = RegionPhase::Cleanup;
-                if (const auto *raised = std::get_if<ExceptionRaise>(&*reason))
+                if (const auto *raised = std::get_if<ExceptionRaise>(&*reason)) {
                     handled_exception = raised->exception;
+                    handled_inherited = false;
+                }
                 pc = layout.handler_pc;
                 reason.reset();
                 return true;
@@ -76,7 +84,9 @@ bool FrameObject::unwind(Attachment &context)
                 raised && layout.kind == RegionKind::Except) {
                 regions.back().token.phase = RegionPhase::Handler;
                 regions.back().previous_exception = handled_exception;
+                regions.back().previous_inherited = handled_inherited;
                 handled_exception = raised->exception;
+                handled_inherited = false;
                 operands[sp++] = raised->exception;
                 pc = layout.handler_pc;
                 reason.reset();
@@ -98,10 +108,12 @@ bool FrameObject::unwind(Attachment &context)
                 }
             }
         }
-        if (top->phase == RegionPhase::Handler)
+        if (top->phase == RegionPhase::Handler) {
             handled_exception = active.previous_exception;
-        else if (top->phase == RegionPhase::Cleanup) {
+            handled_inherited = active.previous_inherited;
+        } else if (top->phase == RegionPhase::Cleanup) {
             handled_exception = cleanups.back().previous_exception;
+            handled_inherited = cleanups.back().previous_inherited;
             cleanups.pop_back();
         }
         if (layout.kind == RegionKind::With)
@@ -117,10 +129,12 @@ void FrameObject::finish_handler(Attachment &context)
     regions.pop_back();
     if (active.token.phase == RegionPhase::Handler) {
         handled_exception = active.previous_exception;
+        handled_inherited = active.previous_inherited;
         pc = layout.after_pc;
     } else {
         reason = cleanups.back().saved_reason;
         handled_exception = cleanups.back().previous_exception;
+        handled_inherited = cleanups.back().previous_inherited;
         cleanups.pop_back();
         if (layout.kind == RegionKind::With)
             trim_stack(context, active.stack_base - 1);

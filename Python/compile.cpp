@@ -318,6 +318,14 @@ class GraphPass final {
                     select(done);
                 } else if constexpr (std::is_same_v<T, LambdaExpr>) {
                     function_value(*node.function, value.span);
+                } else if constexpr (std::is_same_v<T, YieldExpr>) {
+                    if (node.value)
+                        expression(*node.value);
+                    else
+                        none(value.span);
+                    if (node.delegated)
+                        emit(Opcode::GetIter, value.span);
+                    emit(node.delegated ? Opcode::YieldFrom : Opcode::YieldValue, value.span);
                 } else if constexpr (std::is_same_v<T, ComprehensionExpr>) {
                     function_value(*node.function, value.span);
                     expression(*node.iterable);
@@ -1022,6 +1030,7 @@ void SourceUnit::freeze(Attachment &context, ReturnSlot &out) const
             spec.docstring = graph.docstring;
             spec.cellvars = scope.cellvars;
             spec.freevars = scope.freevars;
+            spec.generator = scope.generator;
             spec.kind = scope.kind == ScopeKind::Class    ? CodeKind::ClassBody
                         : scope.kind == ScopeKind::Module ? CodeKind::Module
                                                           : CodeKind::Function;

@@ -88,6 +88,8 @@ constexpr std::array definitions{
     OpcodeDefinition{"SET_ADD", 2, 1, 0, OperandDomain::None, FlowKind::Next, true, true},
     OpcodeDefinition{"SET_UPDATE", 2, 1, 0, OperandDomain::None, FlowKind::Next, true, true},
     OpcodeDefinition{"PRINT_EXPR", 1, 1, 0, OperandDomain::None, FlowKind::Next, true, true},
+    OpcodeDefinition{"YIELD_VALUE", 1, 1, 1, OperandDomain::None, FlowKind::Next, true, true},
+    OpcodeDefinition{"YIELD_FROM", 1, 1, 1, OperandDomain::None, FlowKind::Next, true, true},
 };
 static_assert(definitions.size() == static_cast<std::size_t>(Opcode::Count));
 [[noreturn]] void invalid(CodeErrorKind kind, const char *message,
@@ -119,6 +121,8 @@ std::size_t verify(const CodeSpec &spec, std::span<const Instruction> instructio
         invalid(CodeErrorKind::EmptyCode, "empty instruction sequence");
     if (!spec.first_line)
         invalid(CodeErrorKind::SourcePosition, "first line must be positive");
+    if (spec.generator && spec.kind != CodeKind::Function)
+        invalid(CodeErrorKind::Signature, "only function code can be a generator");
     if (spec.kind < CodeKind::Function || spec.kind > CodeKind::ClassBody ||
         (spec.kind != CodeKind::Function &&
          (!spec.locals.empty() || !spec.signature.parameters.empty() || spec.signature.varargs ||
@@ -164,6 +168,8 @@ std::size_t verify(const CodeSpec &spec, std::span<const Instruction> instructio
                     "free variable must be distinct from locals and other cells");
     for (std::size_t pc = 0; pc < instructions.size(); ++pc) {
         const auto [opcode, operand] = instructions[pc];
+        if ((opcode == Opcode::YieldValue || opcode == Opcode::YieldFrom) && !spec.generator)
+            invalid(CodeErrorKind::Operand, "yield requires generator code", pc);
         if (static_cast<std::size_t>(opcode) >= definitions.size())
             invalid(CodeErrorKind::UnknownOpcode, "unknown opcode", pc);
         const auto &definition = opcode_definition(opcode);
@@ -618,7 +624,7 @@ void CodeBuilder::freeze(ReturnSlot &out)
                                 constants_.size(), names_.size());
     VerifiedCode verified(std::move(instructions), positions_, std::move(calls), std::move(regions),
                           spec_.signature, spec_.locals, spec_.cellvars, spec_.freevars, maximum,
-                          spec_.first_line, spec_.kind);
+                          spec_.first_line, spec_.kind, spec_.generator);
     RootScope roots(context_);
     ReturnSlot temporary(context_);
     cxxpython::core::make_tuple(context_, constants_, temporary);

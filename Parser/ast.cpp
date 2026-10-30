@@ -275,12 +275,15 @@ class Adapter {
         auto c = children(n);
         auto r = rules(n);
         switch (n.rule) {
-        case Rule::genexp:
-        case Rule::yield_expr:
         case Rule::await_primary:
             if (n.rule != Rule::await_primary || has(n, U"await"))
                 unsupported(n);
             break;
+        case Rule::yield_expr: {
+            auto value = r.empty() ? nullptr : expression(*r[0]);
+            auto depth = value ? value->depth + 1 : 1;
+            return make(n, YieldExpr{std::move(value), has(n, U"from")}, depth);
+        }
         case Rule::lambdef: {
             auto fn = std::make_unique<FunctionStmt>();
             fn->name = U"<lambda>";
@@ -298,6 +301,7 @@ class Adapter {
         case Rule::listcomp:
         case Rule::dictcomp:
         case Rule::setcomp:
+        case Rule::genexp:
             return comprehension(n);
         case Rule::fstring:
             return fstring(n);
@@ -613,9 +617,11 @@ class Adapter {
             unsupported(*loops[0]);
         auto iterable = expression(*first_iter);
         auto fn = std::make_unique<FunctionStmt>();
-        fn->name = n.rule == Rule::listcomp  ? U"<listcomp>"
-                   : n.rule == Rule::setcomp ? U"<setcomp>"
-                                             : U"<dictcomp>";
+        const bool generator = n.rule == Rule::genexp;
+        fn->name = generator                  ? U"<genexpr>"
+                   : n.rule == Rule::listcomp ? U"<listcomp>"
+                   : n.rule == Rule::setcomp  ? U"<setcomp>"
+                                              : U"<dictcomp>";
         fn->comprehension = true;
         fn->parameters.push_back(
             ParameterSpec{U".0", ParameterKind::PositionalOnly, nullptr, span(n)});
@@ -628,7 +634,8 @@ class Adapter {
             init.value = make(n, SetExpr{});
         else
             init.value = make(n, DictExpr{});
-        fn->body.push_back(stmt(n, std::move(init)));
+        if (!generator)
+            fn->body.push_back(stmt(n, std::move(init)));
         CollectionAddStmt add;
         add.collection = name();
         add.kind = n.rule == Rule::listcomp  ? CollectionKind::List
@@ -644,13 +651,19 @@ class Adapter {
             add.key = expression(*values[0]);
             add.value = expression(*values[1]);
         } else {
-            auto value = find(n, Rule::named_expression);
+            auto parts = rules(n);
+            auto value =
+                generator ? (parts.empty() ? nullptr : parts[0]) : find(n, Rule::named_expression);
             if (!value)
                 unsupported(n);
             add.value = expression(*value);
         }
         Suite body;
-        body.push_back(stmt(n, std::move(add)));
+        if (generator)
+            body.push_back(
+                stmt(n, ExprStmt{make(n, YieldExpr{std::move(add.value), false, true})}));
+        else
+            body.push_back(stmt(n, std::move(add)));
         for (std::size_t index = loops.size(); index-- > 0;) {
             const auto &clause = *loops[index];
             if (has(clause, U"async"))
@@ -683,7 +696,8 @@ class Adapter {
         }
         for (auto &item : body)
             fn->body.push_back(std::move(item));
-        fn->body.push_back(stmt(n, ReturnStmt{name()}));
+        if (!generator)
+            fn->body.push_back(stmt(n, ReturnStmt{name()}));
         return make(n, ComprehensionExpr{std::move(fn), std::move(iterable)}, 2);
     }
     std::u32string fstring_text(const Node &n, bool raw)
@@ -1085,6 +1099,9 @@ class Adapter {
         switch (n.rule) {
         case Rule::star_expressions:
             result.push_back(stmt(n, ExprStmt{expression(n)}));
+            break;
+        case Rule::yield_stmt:
+            result.push_back(stmt(n, ExprStmt{expression(*r.at(0))}));
             break;
         case Rule::assignment: {
             if (find(n, Rule::augassign)) {

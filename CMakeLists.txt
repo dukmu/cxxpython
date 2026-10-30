@@ -50,6 +50,7 @@ add_library(cxxpython_core
     Objects/bytesobject.cpp
     Objects/unicodecodecs.cpp
     Objects/superobject.cpp
+    Objects/genobject.cpp
     Objects/setobject.cpp
     Objects/setoperations.cpp
     Objects/moduleobject.cpp
@@ -152,6 +153,9 @@ if(BUILD_TESTING)
         Tests/cpp/test_runpy.cpp
         Tests/cpp/test_sys.cpp
         Tests/cpp/test_interactive.cpp
+        Tests/cpp/test_generators.cpp
+        Tests/cpp/test_generators_source.cpp
+        Tests/cpp/test_generators_parallel.cpp
         Tests/cpp/test_stringformat.cpp
         Tests/cpp/test_unicode_methods.cpp
         Tests/cpp/test_builtin_functions.cpp
@@ -196,6 +200,10 @@ if(BUILD_TESTING)
     add_test(NAME Main.Entry COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_main.py $<TARGET_FILE:cxxpython>)
     set_tests_properties(Main.Entry PROPERTIES TIMEOUT 90)
+    add_test(NAME Generators.Differential COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_generators.py
+        --binary $<TARGET_FILE:cxxpython> --reference ${CXXPYTHON_REFERENCE_PYTHON})
+    set_tests_properties(Generators.Differential PROPERTIES TIMEOUT 90)
     add_test(NAME Syntax.Differential COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_syntax.py
         --binary $<TARGET_FILE:cxxpython> --reference ${CXXPYTHON_REFERENCE_PYTHON})

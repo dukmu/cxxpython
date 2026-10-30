@@ -66,6 +66,19 @@ the target is `builtins` and the `__builtins__` execution namespace.
   fixed-reference tests. Weakrefs, pickle and generic aliases remain dependencies;
   this is not completion of all common type/library integration or performance
   acceptance. Iteration order is not the reference's private table layout.
+- Generators adapt pinned genobject.c and PEP 380/479 behavior to the existing
+  precise Frame/VM rather than borrowing CPython's reference-count/GIL-dependent
+  interpreter frames. Explicit send/throw/close, delegation, return values and
+  lazy generator expressions have focused and fixed-reference tests. Frame-state
+  CAS replaces GIL serialization; only suspension boundaries permit ownership
+  transfer. Automatic collection-time close still depends on the N4 GC finalizer
+  and unraisable-hook design. Delegated close-attribute lookup errors currently
+  propagate instead of upstream unraisable-hook reporting. The execution claim
+  also covers throw argument preparation, so gi_running is already true inside
+  a custom exception constructor. These edges need explicit compatibility work,
+  not a declaration of complete genobject.c parity. Async generators/coroutines
+  and the complete frame/code introspection API remain dependencies, not claimed
+  generator completion.
 - Builtin compile/eval/exec reuse the existing compiler and VM. Ordinary module
   names now emit namespace instructions, matching separate globals/locals
   behavior; explicit global still emits global instructions. Current valid slices

@@ -718,7 +718,7 @@ ExecOutcome 用于函数或恢复边界。普通 call 使用 `ReturnSlot<Value>`
 
 PythonFunction 适配器在 NoSafepoint 区间把 Returned 转交到普通 call 的 Ok 槽，然后才解除 callee 根。调用 generator 函数先产生 generator 对象；resume 才执行 Frame 并可能 Yield。send/next/close 在各自协议边界转换结果、Done/StopIteration 和异常。
 
-目标 Frame 状态为 Created/Running/Suspended/Completed，Running 状态的 generator 禁止重入；当前核心尚需补暂停态与线程交付（§9.7）。暂停时把自身 handled-exception 上下文保存到 Frame，并恢复调用者上下文；恢复时反向交换。continuation、异常和所有待恢复输入都由稳定根或 Frame 字段持有，不能依赖一次 resume 调用的 C++ 局部变量。
+Frame 状态为 Created/Running/Suspended/Completed，Running 状态的 generator 禁止重入；核心已接入显式 generator 暂停与线程交付（§9.7），不代表 async 或自动终结完成。暂停时把自身 handled-exception 上下文保存到 Frame，并恢复调用者上下文；恢复时反向交换。continuation、异常和所有待恢复输入都由稳定根或 Frame 字段持有，不能依赖一次 resume 调用的 C++ 局部变量。
 
 Reason 表示某次离开词法区域的控制转移。Break/Continue 带明确 LoopId，不能扫描所有活跃 finally 后无条件执行。普通区域内的分支保持简单跳转；跨 cleanup 区域的跳转进入统一 unwind。
 
@@ -791,7 +791,7 @@ CodeBuilder、AST、ScopeInfo、CFG 属于一次编译任务。纯宿主解析�
 
 ### 9.7 generator 和 coroutine 的执行权移交
 
-现有 FrameState 为 Created/Running/Completed，尚未实现完整暂停；新增 Suspended 与 owner token。[R17] resume 只能从 Created/Suspended 原子取得唯一执行权；Running 时的并发 send/throw/close 按协议拒绝，不能等待一个持锁运行的生成器函数体。
+旧 FrameState 仅有 Created/Running/Completed。[R17] 当前显式 generator 已增加 Suspended 与 owner token；resume 只能从 Created/Suspended 原子取得唯一执行权；Running 时的并发 send/throw/close 按协议拒绝，不能等待一个持锁运行的生成器函数体。GC 自动终结、coroutine/async 与完整 frame 观察仍属未完成验收项。
 
 yield 时先保存 Frame/continuations/handled context、写调用方结果、撤销 active Frame 身份，再 release 发布 Suspended。发布之后旧 owner 不再访问可变 Frame；新线程 acquire 接管。FrameActivation 增加显式暂停出口，避免其当前析构把挂起 Frame 当作 Completed 清空。[R19]
 

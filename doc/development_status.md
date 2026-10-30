@@ -1,5 +1,65 @@
 # Development Status
 
+## 2026-10-30 Shared-Heap Generator Suspension And Resumption
+
+Prepended without changing earlier records. Previous stable node: ccb4b18,
+already pushed. The full frontend/import/library/N4-N6/M0-M9 goal remains active;
+explicit generator execution is a slice, not completion of N4 or full Python.
+
+- Generated-CST lowering, scope analysis and the existing CFG now support yield,
+  yield from and synchronous generator expressions. Code retains its generator
+  flag; generator calls bind arguments/create Frames without running their body.
+  Genexpr outer iterators are acquired immediately; iteration/filter/element work
+  is lazy, with ordinary closure and walrus bindings. Illegal yield scopes are
+  rejected. YIELD_VALUE/YIELD_FROM have verifier, stack/exception, disassembly and
+  source tests. No parser fallback or second execution engine was added.
+- Objects/genobject.cpp owns send/throw/close, metadata, identity protocols and
+  execution claims. Existing ceval/FrameActivation/unwind save the operand stack,
+  handlers and cleanup continuations. Created/Suspended-to-Running CAS rejects
+  concurrent/reentrant resumes instead of waiting around the function body.
+  The old owner detaches the Frame and restores caller state before release
+  publication; the next owner acquire-claims it, including on another OS thread.
+  Public back/delegate edges are rooted atomic reads. There is no new GIL.
+- Borrowed caller exception state is cleared on suspension and rebound on resume;
+  generator-owned handlers/cleanups survive. Tests alternate one generator across
+  two Active OS threads in one Interpreter/shared heap during GC, including bare
+  raise and inherited exception restoration. Running next/send/throw/close reject
+  immediately while a native body waits. Existing CPU-parallel proof is retained;
+  the wait/rejection test alone is not presented as CPU-parallel evidence.
+- Explicit close injects GeneratorExit through ordinary cleanup; PEP 479 links
+  escaping StopIteration to RuntimeError. Delegated throw retains original args
+  and defers normalization; rejected lookup/validation preserves suspension.
+  Reuse the rooted argument tuple rather than allocate a duplicate. Delegation
+  reads native StopIteration.value, not an overridden property; None returns have
+  empty StopIteration.args. Code identity is retained, not reconstructed.
+- A quota-failure regression first reproduced an abandoned delegate reference
+  when allocation failed before delegate_step returned. The existing raising
+  exit now clears delegation/resume inputs before unwind, including when a
+  handler yields again. Host faults and managed allocation failures complete the
+  claim and drop the generator's frame edge; preparation failures remain retryable.
+- Final normal CTest passes 537/537. Final ASan/UBSan/LSan affected tests pass
+  108/108, plus both full allocation-failure enumerations. Their first loaded
+  parallel run timed out at 120 seconds; retained empty-load serial reruns pass
+  in 84.20/88.30 seconds without changing that limit or disabling leak detection.
+  The initial sandbox LSan/ptrace discovery failure is retained; outside-sandbox
+  builds/checks keep all instrumentation enabled. TSan affected tests pass 107/107
+  before the last localized delegation/return fixes; final generator/verifier/
+  unwind reruns pass 33/33. Only the two established TSan allocation-enumeration
+  exclusions remain. No sanitizer diagnostic was suppressed.
+- Final strict-ASan product tests pass all 13 fixed-CPython-3.12.14 generator
+  differential cases and all 10 CLI/PTY tests. Formatting and all 244 generated
+  grammar-rule checks pass. Evidence under .cache/generators-* retains raw tests,
+  the quota reproduction, initial failures, copied native outputs and executable
+  hashes. Every build/test handle was terminal before replacement/commit. No CPU
+  performance samples, support tables or derived speedups were hand-filled.
+- Remaining gates include GC automatic close/weakrefs/finalizers, unraisable
+  hooks, async/coroutines and full frame/code reflection. The adaptation ledger
+  explicitly records close-lookup diagnostics and throw-preparation gi_running
+  differences. Next dependency is real exception/unraisable hooks and finalizer
+  lifecycle, followed by buffer/file/posix/_io and Python library closures. No
+  names-only libraries or C++ destructor running Python cleanup were introduced.
+  User changes to temporary_plan.md and test2.py are excluded from this commit.
+
 ## 2026-10-30 Interactive Execution And Product Entry
 
 Prepended without changing earlier records. Previous stable node: aad2d75, already

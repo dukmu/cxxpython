@@ -396,7 +396,7 @@ TEST(ParallelVm, SharedExceptionSurvivesOrdinaryCallsWithAndFinally)
     while (trace.result().tag() == ResultTag::Ok) {
         const auto node = trace.result().value();
         const auto &data = source.payload<TracebackObject>(node);
-        EXPECT_EQ(source.payload<FrameObject>(data.frame).state, FrameState::Completed);
+        EXPECT_EQ(source.payload<FrameObject>(data.frame).state.load(), FrameState::Completed);
         source.load(node, data.next, trace);
         ASSERT_LE(++count, 80U);
     }

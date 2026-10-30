@@ -1,4 +1,5 @@
 #include "cxxpython/execution.hpp"
+#include "cxxpython/genobject.hpp"
 #include "cxxpython/import.hpp"
 #include "cxxpython/setobject.hpp"
 #include "internal/setobject.hpp"
@@ -22,25 +23,33 @@ void FunctionObject::trace(Tracer &tracer) const noexcept
 namespace detail {
 class FrameActivation final {
   public:
-    FrameActivation(Attachment &context, ReturnSlot &active)
+    FrameActivation(Attachment &context, ReturnSlot &active, bool generator = false)
         : context_(context), active_(active), root_(active.value()), current_(root_),
-          previous_(context.current_frame_), previous_exception_(context.handled_exception_)
+          previous_(context.current_frame_), previous_exception_(context.handled_exception_),
+          generator_(generator)
     {
         auto &data = context.payload<FrameObject>(root_);
-        data.back = previous_;
-        data.handled_exception = previous_exception_;
-        data.state = FrameState::Running;
+        context.store(root_, data.back, previous_);
+        inherited(data, previous_exception_);
+        data.state.store(FrameState::Running, std::memory_order_relaxed);
+        data.owner.store(std::this_thread::get_id(), std::memory_order_relaxed);
         activate(root_);
     }
     ~FrameActivation()
     {
         while (current() != root_) {
-            const auto parent = *frame().back;
+            ReturnSlot parent(context_);
+            context_.load(current_, frame().back, parent);
             complete(frame());
-            activate(parent);
+            activate(parent.value());
             context_.leave_call();
         }
-        complete(frame());
+        if (suspended_)
+            inherited(frame(), {});
+        else
+            complete(frame());
+        if (generator_)
+            context_.store(root_, frame().back, {});
         context_.current_frame_ = previous_;
         context_.handled_exception_ = previous_exception_;
     }
@@ -60,14 +69,23 @@ class FrameActivation final {
     {
         context_.handled_exception_ = frame().handled_exception;
     }
+    void suspend() noexcept
+    {
+        suspended_ = true;
+    }
+    bool suspended() const noexcept
+    {
+        return suspended_;
+    }
     bool descend(Handle frame)
     {
         if (!context_.enter_call())
             return false;
         auto &child = context_.payload<FrameObject>(frame);
-        child.back = current();
+        context_.store(frame.get(context_), child.back, current());
         child.handled_exception = context_.handled_exception_;
-        child.state = FrameState::Running;
+        child.state.store(FrameState::Running, std::memory_order_relaxed);
+        child.owner.store(std::this_thread::get_id(), std::memory_order_relaxed);
         activate(frame.get(context_));
         return true;
     }
@@ -78,7 +96,9 @@ class FrameActivation final {
             return true;
         }
         auto &child = frame();
-        const auto parent_value = *child.back;
+        ReturnSlot parent_root(context_);
+        context_.load(current_, child.back, parent_root);
+        const auto parent_value = parent_root.value();
         auto &parent = context_.payload<FrameObject>(parent_value);
         const auto base = *parent.pending_call;
         // Publish into the parent's traced stack before dropping the child root.
@@ -95,6 +115,15 @@ class FrameActivation final {
     void raising(Value exception, bool traceback = true)
     {
         auto &data = frame();
+        const auto lasti = data.last_instruction.load(std::memory_order_relaxed);
+        if (lasti != std::numeric_limits<std::size_t>::max() &&
+            code().program.instructions()[lasti].opcode == Opcode::YieldFrom) {
+            // Also covers host allocation failures before delegate_step returns.
+            context_.store(current_, data.delegate, {});
+            data.resume_value.reset();
+            data.resume_exception.reset();
+            data.resume_throw_args.reset();
+        }
         data.reason = ExceptionRaise{exception};
         data.pending_call.reset();
         if (traceback && exception != context_.builtin(CoreObject::MemoryError)) {
@@ -111,7 +140,9 @@ class FrameActivation final {
             return true;
         }
         auto &child = frame();
-        const auto parent_value = *child.back;
+        ReturnSlot parent_root(context_);
+        context_.load(current_, child.back, parent_root);
+        const auto parent_value = parent_root.value();
         auto &parent = context_.payload<FrameObject>(parent_value);
         parent.reason = ExceptionRaise{exception};
         parent.trim_stack(context_, *parent.pending_call);
@@ -124,6 +155,18 @@ class FrameActivation final {
     }
 
   private:
+    static void inherited(FrameObject &frame, std::optional<Value> value) noexcept
+    {
+        // Borrowed exception state follows the resuming caller, not the generator.
+        if (frame.handled_inherited)
+            frame.handled_exception = value;
+        for (auto &region : frame.regions)
+            if (region.previous_inherited)
+                region.previous_exception = value;
+        for (auto &cleanup : frame.cleanups)
+            if (cleanup.previous_inherited)
+                cleanup.previous_exception = value;
+    }
     void activate(Value value)
     {
         // The active slot roots this nonmoving Frame and its immutable Code.
@@ -143,7 +186,14 @@ class FrameActivation final {
         frame.cleanups.clear();
         frame.reason.reset();
         frame.handled_exception.reset();
-        frame.state = FrameState::Completed;
+        frame.resume_value.reset();
+        frame.resume_exception.reset();
+        frame.resume_throw_args.reset();
+        context_.store(current_, frame.delegate, {});
+        if (!generator_ || current_ != root_) {
+            frame.owner.store({}, std::memory_order_relaxed);
+            frame.state.store(FrameState::Completed, std::memory_order_release);
+        }
     }
     Attachment &context_;
     ReturnSlot &active_;
@@ -153,6 +203,8 @@ class FrameActivation final {
     const CodeObject *code_ = nullptr;
     std::optional<Value> previous_;
     std::optional<Value> previous_exception_;
+    bool generator_ = false;
+    bool suspended_ = false;
 };
 } // namespace detail
 namespace {
@@ -408,6 +460,104 @@ void import_star(Attachment &context, Handle from, Handle mapping, ReturnSlot &o
             return;
         }
     }
+}
+enum class DelegateResult { Yielded, Returned, Raised, Rejected };
+DelegateResult delegate_step(Attachment &context, Value frame_value, FrameObject &frame,
+                             ReturnSlot &out)
+{
+    RootScope roots(context);
+    ReturnSlot target(context);
+    context.load(frame_value, frame.delegate, target);
+    const auto iterator = roots.root(target.value());
+    const auto sent = roots.root(frame.resume_value.value_or(context.builtin(CoreObject::None)));
+    std::optional<Handle> thrown, arguments;
+    if (frame.resume_exception)
+        thrown = roots.root(*frame.resume_exception);
+    if (frame.resume_throw_args)
+        arguments = roots.root(*frame.resume_throw_args);
+    frame.resume_value.reset();
+    frame.resume_exception.reset();
+    frame.resume_throw_args.reset();
+    auto method = [&](const char32_t *name) {
+        make_str(context, name, out);
+        if (raised(out)) {
+            target.raised(out.exception());
+            return;
+        }
+        get_attribute(context, iterator, roots.root(out.value()), target);
+    };
+    auto missing = [&] {
+        return target.tag() == ResultTag::Raised &&
+               is_subtype(context, context.type_of(target.exception()),
+                          context.builtin(CoreObject::AttributeErrorType));
+    };
+    auto normalize = [&] {
+        if (arguments)
+            detail::normalize_generator_throw(context,
+                                              context.payload<TupleObject>(*arguments).items, out);
+        else
+            out.ok(thrown->get(context));
+        if (raised(out))
+            return DelegateResult::Rejected;
+        out.raised(out.value());
+        return DelegateResult::Raised;
+    };
+    if (thrown || arguments) {
+        const auto type =
+            arguments ? context.payload<TupleObject>(*arguments).items[0] : thrown->get(context);
+        const auto exit_type = context.builtin(CoreObject::GeneratorExitType);
+        const bool closing = is_subtype(context, context.type_of(type), exit_type) ||
+                             (context.has_layout<TypeObject>(type) &&
+                              is_subtype(context, context.type_of(type), context.type_type()) &&
+                              is_subtype(context, type, exit_type));
+        if (closing) {
+            method(U"close");
+            if (!missing()) {
+                if (target.tag() == ResultTag::Raised) {
+                    out.raised(target.exception());
+                    return DelegateResult::Raised;
+                }
+                call(context, roots.root(target.value()), {}, out);
+                if (raised(out))
+                    return DelegateResult::Raised;
+            }
+            return normalize();
+        }
+        method(U"throw");
+        if (missing()) {
+            return normalize();
+        }
+        if (target.tag() == ResultTag::Raised) {
+            out.raised(target.exception());
+            return DelegateResult::Rejected;
+        }
+        const Value normalized[] = {thrown ? thrown->get(context)
+                                           : context.builtin(CoreObject::None)};
+        call(context, roots.root(target.value()),
+             {arguments ? std::span<const Value>{context.payload<TupleObject>(*arguments).items}
+                        : std::span<const Value>{normalized}},
+             out);
+    } else if (sent.get(context) == context.builtin(CoreObject::None))
+        iter_next(context, iterator, out);
+    else {
+        method(U"send");
+        if (target.tag() == ResultTag::Raised) {
+            out.raised(target.exception());
+            return DelegateResult::Raised;
+        }
+        const Value values[] = {sent.get(context)};
+        call(context, roots.root(target.value()), {values}, out);
+    }
+    if (!raised(out))
+        return DelegateResult::Yielded;
+    if (!is_subtype(context, context.type_of(out.exception()),
+                    context.builtin(CoreObject::StopIterationType)))
+        return DelegateResult::Raised;
+    const auto stopped = roots.root(out.exception());
+    context.load(stopped.get(context), context.instance_slot(stopped.get(context), 0), out);
+    if (out.tag() == ResultTag::Empty)
+        out.ok(context.builtin(CoreObject::None));
+    return DelegateResult::Returned;
 }
 void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &out)
 {
@@ -1176,7 +1326,18 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                         activation.raising(child.exception());
                         break;
                     }
-                    if (!activation.descend(roots.root(child.value()))) {
+                    const auto frame = roots.root(child.value());
+                    if (context.payload<CodeObject>(context.payload<FrameObject>(frame).code)
+                            .program.is_generator()) {
+                        detail::make_generator(context, frame, result);
+                        if (raised(result)) {
+                            activation.raising(result.exception());
+                            break;
+                        }
+                        data.operands[base] = result.value();
+                        data.trim_stack(context, base + 1);
+                        data.pending_call.reset();
+                    } else if (!activation.descend(frame)) {
                         raise_error(context, CoreObject::RecursionErrorType,
                                     U"maximum call depth exceeded", result);
                         activation.raising(result.exception());
@@ -1288,6 +1449,42 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 data.operands[data.sp - 2] = result.value();
                 data.operands[--data.sp] = context.builtin(CoreObject::None);
                 break;
+            case Opcode::YieldValue:
+                out.ok(data.operands[data.sp - 1]);
+                data.operands[data.sp - 1] = context.builtin(CoreObject::None);
+                activation.suspend();
+                return;
+            case Opcode::YieldFrom: {
+                context.load(activation.current(), data.delegate, result);
+                if (result.tag() == ResultTag::Empty) {
+                    context.store(activation.current(), data.delegate, data.operands[data.sp - 1]);
+                    data.operands[data.sp - 1] = context.builtin(CoreObject::None);
+                }
+                const bool throwing = data.resume_exception || data.resume_throw_args;
+                const auto status = delegate_step(context, activation.current(), data, result);
+                if (status == DelegateResult::Yielded) {
+                    --data.pc;
+                    out.ok(result.value());
+                    activation.suspend();
+                    return;
+                }
+                if (status == DelegateResult::Rejected) {
+                    --data.pc;
+                    out.raised(result.exception());
+                    activation.suspend();
+                    return;
+                }
+                if (status == DelegateResult::Raised) {
+                    data.trim_stack(context, data.sp - 1);
+                    if (throwing && !data.handled_inherited)
+                        detail::link_exception_context(context, result.exception());
+                    activation.raising(result.exception());
+                } else {
+                    context.store(activation.current(), data.delegate, {});
+                    data.operands[data.sp - 1] = result.value();
+                }
+                break;
+            }
             case Opcode::Count:
                 throw std::logic_error("unverified opcode reached execution");
             }
@@ -1386,7 +1583,9 @@ void frame_builtins(Attachment &c, Value value, ReturnSlot &out)
 }
 void frame_back(Attachment &c, Value value, ReturnSlot &out)
 {
-    out.ok(c.payload<FrameObject>(value).back.value_or(c.builtin(CoreObject::None)));
+    c.load(value, c.payload<FrameObject>(value).back, out);
+    if (out.tag() == ResultTag::Empty)
+        out.ok(c.builtin(CoreObject::None));
 }
 void frame_lineno(Attachment &c, Value value, ReturnSlot &out)
 {
@@ -1522,8 +1721,45 @@ void execute_function(Attachment &context, Handle function, CallArgsView args,
         out.raised(active.exception());
         return;
     }
+    if (context.payload<CodeObject>(context.payload<FrameObject>(active.value()).code)
+            .program.is_generator()) {
+        RootScope roots(context);
+        make_generator(context, roots.root(active.value()), out);
+        return;
+    }
     FrameActivation activation(context, active);
     run(context, activation, out);
+}
+ResumeResult resume_generator_frame(Attachment &context, Handle frame, Handle sent,
+                                    std::optional<Handle> thrown, ReturnSlot &out,
+                                    std::optional<Handle> throw_args)
+{
+    ReturnSlot active(context);
+    active.ok(frame.get(context));
+    FrameActivation activation(context, active, true);
+    auto &data = activation.frame();
+    const auto lasti = data.last_instruction.load(std::memory_order_relaxed);
+    const bool started = lasti != std::numeric_limits<std::size_t>::max();
+    const bool delegating =
+        started && activation.code().program.instructions()[lasti].opcode == Opcode::YieldFrom;
+    if (delegating) {
+        data.resume_value = sent.get(context);
+        if (thrown)
+            data.resume_exception = thrown->get(context);
+        if (throw_args)
+            data.resume_throw_args = throw_args->get(context);
+    } else if (thrown) {
+        if (started)
+            data.trim_stack(context, data.sp - 1);
+        if (!data.handled_inherited)
+            link_exception_context(context, thrown->get(context));
+        activation.raising(thrown->get(context));
+    } else if (started)
+        data.operands[data.sp - 1] = sent.get(context);
+    run(context, activation, out);
+    return activation.suspended() ? (raised(out) ? ResumeResult::Rejected : ResumeResult::Yielded)
+           : raised(out)          ? ResumeResult::Raised
+                                  : ResumeResult::Returned;
 }
 LayoutDescriptor execution_layout(CoreObject type)
 {

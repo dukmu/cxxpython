@@ -49,6 +49,10 @@ continuations as native bytecode, not a second source-only exception mechanism.
 verified bytecode and calls normal object protocols. Python-to-Python calls do
 not grow the C++ stack. `Python/unwind.cpp` handles structured control reasons and
 cleanup continuations. `Python/traceback.cpp` owns traceback operations.
+`Objects/genobject.cpp` owns generator protocols and execution claims. Generator
+functions bind/create an ordinary Frame without executing its body; yield and
+yield-from suspend that same Frame/operand stack/cleanup state. Resumption is
+still ceval, not another interpreter or source execution path.
 `Python/bltinmodule.cpp` owns the ordinary __build_class__ builtin, coordinating
 base expansion, metaclass preparation, a normal class-body Frame and existing
 type construction. It is not a separate class VM or lifetime authority.
@@ -149,6 +153,18 @@ and fresh local Cells. CodeKind distinguishes function, module and class-body
 namespace rules; a class Frame owns/traces its supplied mapping and implicit
 class Cell rather than putting invocation state in shared Function/Code.
 There is no whole-interpreter ordinary execution lock.
+
+Generator Frames have Created/Running/Suspended/Completed states. A resumer
+atomically claims Created or Suspended; concurrent/reentrant send/throw/close
+reject Running rather than waiting for the function body. The VM detaches the
+Frame and restores caller exception state before the owner release-publishes a
+suspension. The next owner acquire-claims it, including on another OS thread.
+Borrowed caller exception state is detached at suspension; generator-owned
+handlers and cleanup continuations persist. Public back/delegate edges are
+rooted atomic reads, not unprotected reads of live operand storage. Explicit
+close uses ordinary GeneratorExit/unwind. Automatic GC finalization, coroutine/
+async execution and unrestricted cross-thread frame-local snapshots remain N4
+work; a C++ destructor does not execute Python cleanup.
 
 ## Tests And Tooling
 

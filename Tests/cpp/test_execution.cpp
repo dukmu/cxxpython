@@ -371,6 +371,45 @@ TEST_F(CoreExecution, SourceLoweringOpcodesHaveVerifiedOperandsAndStackInputs)
     invalid(dictionary, CodeErrorKind::StackUnderflow);
 }
 
+TEST_F(CoreExecution, YieldOpcodesRequireGeneratorCodeAndVerifiedResumptionSlots)
+{
+    for (auto opcode : {Opcode::YieldValue, Opcode::YieldFrom}) {
+        CodeBuilder ordinary(context);
+        ordinary.emit(opcode);
+        invalid(ordinary, CodeErrorKind::Operand);
+        CodeSpec spec;
+        spec.generator = true;
+        CodeBuilder underflow(context, spec);
+        underflow.emit(opcode);
+        invalid(underflow, CodeErrorKind::StackUnderflow);
+        CodeBuilder operand(context, spec);
+        operand.emit(opcode, 1);
+        invalid(operand, CodeErrorKind::Operand);
+        CodeBuilder valid(context, spec);
+        valid.emit(Opcode::LoadConst, valid.constant(builtin(CoreObject::None)));
+        valid.emit(opcode);
+        valid.emit(Opcode::Return);
+        const auto program = code(valid);
+        EXPECT_TRUE(context.payload<CodeObject>(program).program.is_generator());
+        EXPECT_EQ(context.payload<CodeObject>(program).program.max_stack(), 1U);
+        EXPECT_NE(disassemble(context, program).find(opcode_definition(opcode).name),
+                  std::string::npos);
+        const auto effect = instruction_effect({opcode, 0});
+        EXPECT_EQ(effect.inputs, 1U);
+        EXPECT_EQ(effect.pops, 1U);
+        EXPECT_EQ(effect.pushes, 1U);
+        EXPECT_TRUE(opcode_definition(opcode).may_raise);
+        EXPECT_TRUE(opcode_definition(opcode).safepoint);
+    }
+    CodeSpec mapping;
+    mapping.generator = true;
+    mapping.kind = CodeKind::Module;
+    CodeBuilder module(context, mapping);
+    module.emit(Opcode::LoadConst, module.constant(builtin(CoreObject::None)));
+    module.emit(Opcode::Return);
+    invalid(module, CodeErrorKind::Signature);
+}
+
 TEST_F(CoreExecution, IterationAndUnpackOpcodesVerifyBothBranchStackEffects)
 {
     CodeBuilder empty(context);
@@ -864,7 +903,7 @@ TEST_F(CoreExecution, RunningFrameSlotsSurviveCallbacksGcAndCompletedFrameObserv
         [](Attachment &c, Handle fn, std::span<const Value> args, ReturnSlot &out) {
             auto frame = *c.current_frame();
             auto &data = c.payload<FrameObject>(frame);
-            EXPECT_EQ(data.state, FrameState::Running);
+            EXPECT_EQ(data.state.load(), FrameState::Running);
             EXPECT_EQ(data.sp, 2U);
             EXPECT_EQ(data.operands[0], args[0]);
             auto *address = data.operands.data();
@@ -901,7 +940,7 @@ TEST_F(CoreExecution, RunningFrameSlotsSurviveCallbacksGcAndCompletedFrameObserv
     ASSERT_TRUE(read_cell(context, observed.get(context), snapshot));
     auto frame = roots.root(snapshot.result().value());
     auto &data = context.payload<FrameObject>(frame);
-    EXPECT_EQ(data.state, FrameState::Completed);
+    EXPECT_EQ(data.state.load(), FrameState::Completed);
     EXPECT_EQ(data.sp, 0U);
     EXPECT_EQ(data.locals[0], self.get(context));
     for (auto value : data.operands)
@@ -1057,7 +1096,9 @@ TEST_F(CoreExecution, NativeReentryRestoresFramesAndHostFaultsUnwindThem)
         [](Attachment &c, Handle fn, std::span<const Value> args, ReturnSlot &out) {
             const auto &captures = c.payload<NativeFunctionObject>(fn).captures;
             const auto frame = *c.current_frame();
-            if (c.payload<FrameObject>(frame).back) {
+            ReturnSlot back(c);
+            c.load(frame, c.payload<FrameObject>(frame).back, back);
+            if (back.tag() == ResultTag::Ok) {
                 write_cell(c, captures[1], frame);
                 c.collect();
                 out.ok(args[1]);
@@ -1084,7 +1125,10 @@ TEST_F(CoreExecution, NativeReentryRestoresFramesAndHostFaultsUnwindThem)
     ASSERT_TRUE(read_cell(context, inner_cell.get(context), inner_snapshot));
     auto outer_frame = outer_snapshot.result().value();
     auto inner_frame = inner_snapshot.result().value();
-    EXPECT_EQ(context.payload<FrameObject>(inner_frame).back, outer_frame);
+    ReturnSlot back(context);
+    context.load(inner_frame, context.payload<FrameObject>(inner_frame).back, back);
+    ASSERT_EQ(back.tag(), ResultTag::Ok);
+    EXPECT_EQ(back.value(), outer_frame);
     EXPECT_FALSE(context.current_frame());
     make_native_function(
         context, "host fault", signature,
@@ -1099,7 +1143,7 @@ TEST_F(CoreExecution, NativeReentryRestoresFramesAndHostFaultsUnwindThem)
     EXPECT_FALSE(context.current_frame());
     ASSERT_TRUE(read_cell(context, outer_cell.get(context), outer_snapshot));
     const auto &failed = context.payload<FrameObject>(outer_snapshot.result().value());
-    EXPECT_EQ(failed.state, FrameState::Completed);
+    EXPECT_EQ(failed.state.load(), FrameState::Completed);
     EXPECT_EQ(failed.sp, 0U);
     set_attribute(context, cls, name, observer, out);
     call(context, outer, {args, {}}, out);

@@ -34,6 +34,11 @@ struct NamedExpr {
 struct StarredExpr {
     ExprPtr value;
 };
+struct YieldExpr {
+    ExprPtr value;
+    bool delegated = false;
+    bool implicit = false;
+};
 struct FunctionStmt;
 struct LambdaExpr {
     std::unique_ptr<FunctionStmt> function;
@@ -87,7 +92,7 @@ struct Expr {
     std::variant<Literal, NameExpr, UnaryExpr, BinaryExpr, BoolExpr, CompareExpr, CallExpr,
                  AttributeExpr, TupleExpr, ListExpr, SetExpr, DictExpr, SubscriptExpr,
                  ConditionalExpr, NamedExpr, StarredExpr, LambdaExpr, ComprehensionExpr, SliceExpr,
-                 JoinedStrExpr, FormattedExpr>
+                 JoinedStrExpr, FormattedExpr, YieldExpr>
         node;
 };
 struct Stmt;

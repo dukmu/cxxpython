@@ -38,8 +38,9 @@ compiler, VM, and extension platform implemented in a C/C++ mix.
 - Advance through N0-N6 and the complete M0-M9 acceptance gates. Record actual tests,
   remaining gates and the next dependency in `doc/development_status.md`.
   Do not mark a whole milestone complete based on a narrower passing slice.
-- The active service goal is now the independent generated Python 3.12 grammar
-  frontend, followed by the unfinished module/unified-import foundation stage;
+- The active service goal covers the generated Python 3.12 frontend, unified
+  imports and the remaining standard-library/product/N4-N6 work. A verified
+  slice does not complete that full objective;
   the full language, standard-library and product scope remains in Plan 2
   sections 0.8 and 11.2. Complete a stage only on its actual acceptance evidence,
   then promptly commit/push and create the next dependent stage goal.

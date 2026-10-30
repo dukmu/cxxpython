@@ -82,6 +82,8 @@ enum class Opcode : std::uint8_t {
     SetAdd,
     SetUpdate,
     PrintExpr,
+    YieldValue,
+    YieldFrom,
     Count,
 };
 enum class OperandDomain {
@@ -148,11 +150,13 @@ struct ActiveRegion {
     RegionToken token;
     std::size_t stack_base;
     std::optional<Value> previous_exception;
+    bool previous_inherited = true;
 };
 struct CleanupContinuation {
     std::uint32_t region;
     TracedReason saved_reason;
     std::optional<Value> previous_exception;
+    bool previous_inherited = true;
 };
 struct OpcodeDefinition {
     std::string_view name;
@@ -226,6 +230,7 @@ struct CodeSpec {
     std::optional<std::u32string> docstring;
     std::vector<std::u32string> cellvars, freevars;
     CodeKind kind = CodeKind::Function;
+    bool generator = false;
 };
 class CodeBuilder;
 class VerifiedCode final {
@@ -276,6 +281,10 @@ class VerifiedCode final {
     {
         return kind_;
     }
+    bool is_generator() const noexcept
+    {
+        return generator_;
+    }
     std::size_t max_stack() const noexcept
     {
         return max_stack_;
@@ -292,11 +301,12 @@ class VerifiedCode final {
                  std::vector<CallLayout> calls, std::vector<RegionLayout> regions,
                  SignatureLayout signature, std::vector<std::u32string> locals,
                  std::vector<std::u32string> cellvars, std::vector<std::u32string> freevars,
-                 std::size_t stack, std::uint32_t first_line, CodeKind kind)
+                 std::size_t stack, std::uint32_t first_line, CodeKind kind, bool generator)
         : instructions_(std::move(instructions)), positions_(std::move(positions)),
           calls_(std::move(calls)), regions_(std::move(regions)), signature_(std::move(signature)),
           locals_(std::move(locals)), cellvars_(std::move(cellvars)),
-          freevars_(std::move(freevars)), max_stack_(stack), first_line_(first_line), kind_(kind)
+          freevars_(std::move(freevars)), max_stack_(stack), first_line_(first_line), kind_(kind),
+          generator_(generator)
     {
         for (const auto &region : regions_)
             if (region.depth > max_regions_)
@@ -322,6 +332,7 @@ class VerifiedCode final {
     std::uint32_t first_line_;
     std::size_t max_regions_ = 0;
     CodeKind kind_;
+    bool generator_;
 };
 struct CodeObject {
     ObjectHeader header;
@@ -418,7 +429,7 @@ struct FunctionSpec {
     std::optional<Handle> builtins = {};
     std::optional<Handle> closure = {};
 };
-enum class FrameState { Created, Running, Completed };
+enum class FrameState { Created, Running, Suspended, Completed };
 struct TracebackObject {
     ObjectHeader header;
     AtomicGcEdge next;
@@ -439,8 +450,8 @@ struct FrameObject {
     // Cross-thread observation still requires N3 snapshots/STW, not raw reads.
     ObjectHeader header;
     const Value function, code;
-    // Set once before execution can expose this frame to Python callbacks.
-    std::optional<Value> back;
+    AtomicGcEdge back;
+    AtomicGcEdge delegate;
     std::vector<std::optional<Value>> locals;
     std::vector<Value> operands;
     const std::vector<Value> cells;
@@ -454,7 +465,10 @@ struct FrameObject {
     std::vector<CleanupContinuation> cleanups;
     std::optional<TracedReason> reason;
     std::optional<Value> handled_exception;
-    FrameState state = FrameState::Created;
+    bool handled_inherited = true;
+    std::optional<Value> resume_value, resume_exception, resume_throw_args;
+    std::atomic<FrameState> state{FrameState::Created};
+    std::atomic<std::thread::id> owner{};
     FrameObject(InitialType head, Value function, Value code, std::size_t local_count,
                 std::size_t stack_count, Value padding, std::size_t max_regions = 0,
                 std::vector<Value> cells = {}, std::optional<Value> namespace_mapping = {})

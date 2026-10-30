@@ -173,6 +173,14 @@ class ScopePass final {
                     bindings_[scope].get(node.name, value.span).used = true;
                     if (node.name == U"super" && program_.scopes[scope].kind == ScopeKind::Function)
                         bindings_[scope].get(U"__class__", value.span).used = true;
+                } else if constexpr (std::is_same_v<T, YieldExpr>) {
+                    if (program_.scopes[scope].kind != ScopeKind::Function)
+                        error(value.span, "'yield' outside function");
+                    if (comprehensions_[scope] && !node.implicit)
+                        error(value.span, "'yield' inside comprehension");
+                    program_.scopes[scope].generator = true;
+                    if (node.value)
+                        expression(*node.value, scope);
                 } else if constexpr (std::is_same_v<T, UnaryExpr> || std::is_same_v<T, StarredExpr>)
                     expression(*node.value, scope);
                 else if constexpr (std::is_same_v<T, ConditionalExpr>) {

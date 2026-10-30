@@ -1,4 +1,5 @@
 #include "cxxpython/floatobject.hpp"
+#include "cxxpython/genobject.hpp"
 #include "cxxpython/moduleobject.hpp"
 #include "cxxpython/objects.hpp"
 #include "cxxpython/protocol.hpp"
@@ -69,6 +70,8 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     define(CoreObject::EllipsisType, "ellipsis", LayoutDescriptor::of<NoneObject>());
     define(CoreObject::BaseExceptionType, "BaseException", LayoutDescriptor::of<ExceptionObject>());
     define(CoreObject::SystemExitType, "SystemExit", LayoutDescriptor::of<ExceptionObject>(),
+           at(CoreObject::BaseExceptionType));
+    define(CoreObject::GeneratorExitType, "GeneratorExit", LayoutDescriptor::of<ExceptionObject>(),
            at(CoreObject::BaseExceptionType));
     define(CoreObject::ExceptionType, "Exception", LayoutDescriptor::of<ExceptionObject>(),
            at(CoreObject::BaseExceptionType));
@@ -173,6 +176,7 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     define(CoreObject::SetType, "set", LayoutDescriptor::of<SetObject>());
     define(CoreObject::FrozenSetType, "frozenset", LayoutDescriptor::of<SetObject>());
     define(CoreObject::SetIteratorType, "set_iterator", LayoutDescriptor::of<DictIteratorObject>());
+    define(CoreObject::GeneratorType, "generator", LayoutDescriptor::of<GeneratorObject>());
     context.payload<TypeObject>(at(CoreObject::BytesType)).allow_slots = false;
     context.payload<TypeObject>(at(CoreObject::TupleType)).allow_slots = false;
     context.payload<TypeObject>(at(CoreObject::IntType)).allow_slots = false;
@@ -252,6 +256,7 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     install_string_format(context, core);
     install_unicode_methods(context, core);
     install_execution(context, core);
+    install_generators(context, core);
     install_exception_runtime(context, core);
     install_system_exit(context, core);
     install_ranges(context, core);
@@ -293,7 +298,8 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                     CoreObject::SequenceIteratorType,
                     CoreObject::SliceType,
                     CoreObject::BytesIteratorType,
-                    CoreObject::SetIteratorType})
+                    CoreObject::SetIteratorType,
+                    CoreObject::GeneratorType})
         context.payload<TypeObject>(at(id)).subclassable = false;
 
     auto &builtins = *outputs[static_cast<std::size_t>(CoreObject::Builtins)];
@@ -314,6 +320,7 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                     CoreObject::FloatType,
                     CoreObject::BaseExceptionType,
                     CoreObject::SystemExitType,
+                    CoreObject::GeneratorExitType,
                     CoreObject::ExceptionType,
                     CoreObject::AssertionErrorType,
                     CoreObject::TypeErrorType,

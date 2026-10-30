@@ -126,10 +126,10 @@ TEST_F(CoreTraceback, ScheduledErrorsKeepActualFramesInOuterToInnerOrder)
         EXPECT_EQ(int_decimal(context, get(trace, U"tb_lasti").get(context)), "1");
         EXPECT_EQ(int_decimal(context, get(trace, U"tb_lineno").get(context)),
                   std::to_string(lines[i]));
-        EXPECT_EQ(data.state, FrameState::Completed);
+        EXPECT_EQ(data.state.load(), FrameState::Completed);
         EXPECT_EQ(data.sp, 0U);
         EXPECT_FALSE(data.pending_call);
-        EXPECT_EQ(data.back, previous);
+        EXPECT_EQ(read_edge(context, frame, &FrameObject::back), previous);
         previous = frame.get(context);
         trace = get(trace, U"tb_next");
         context.collect();
@@ -369,7 +369,7 @@ TEST(CoreTracebackLifecycle, TracebackFrameLocalExceptionCyclesReturnToTheBaseli
         const auto frame = context.payload<TracebackObject>(*trace).frame;
         EXPECT_EQ(context.payload<FrameObject>(frame).locals[0], exception.get(context));
         context.collect();
-        EXPECT_EQ(context.payload<FrameObject>(frame).state, FrameState::Completed);
+        EXPECT_EQ(context.payload<FrameObject>(frame).state.load(), FrameState::Completed);
     }
     context.collect();
     EXPECT_EQ(context.stats().objects, baseline);
@@ -426,9 +426,9 @@ TEST(CoreTracebackLifecycle, ThousandsOfExceptionalFramesUnwindWithoutNativeRecu
     for (auto trace = read_edge(context, exception, &ExceptionObject::traceback); trace;
          trace = read_edge(context, *trace, &TracebackObject::next)) {
         ++count;
-        EXPECT_EQ(
-            context.payload<FrameObject>(context.payload<TracebackObject>(*trace).frame).state,
-            FrameState::Completed);
+        EXPECT_EQ(context.payload<FrameObject>(context.payload<TracebackObject>(*trace).frame)
+                      .state.load(),
+                  FrameState::Completed);
     }
     EXPECT_EQ(count, 6001U);
     context.store(exception.get(context), data.traceback, {});

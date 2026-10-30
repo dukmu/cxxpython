@@ -232,8 +232,10 @@ TEST_F(CoreScheduling, ChildFrameBackEdgesKeepParkedOperandsAndContinuationsRoot
         [](Attachment &c, Handle fn, std::span<const Value>, ReturnSlot &out) {
             const auto child = *c.current_frame();
             const auto &data = c.payload<FrameObject>(child);
-            ASSERT_TRUE(data.back);
-            const auto &parent = c.payload<FrameObject>(*data.back);
+            ReturnSlot back(c);
+            c.load(child, data.back, back);
+            ASSERT_EQ(back.tag(), ResultTag::Ok);
+            const auto &parent = c.payload<FrameObject>(back.value());
             EXPECT_TRUE(parent.pending_call);
             EXPECT_EQ(parent.sp, 1U);
             EXPECT_EQ(c.type_of(parent.operands[0]), c.builtin(CoreObject::FunctionType));
@@ -256,9 +258,12 @@ TEST_F(CoreScheduling, ChildFrameBackEdgesKeepParkedOperandsAndContinuationsRoot
     ASSERT_TRUE(read_cell(context, observed.get(context), snapshot));
     auto saved = roots.root(snapshot.result().value());
     const auto &inner = context.payload<FrameObject>(saved);
-    const auto &outer = context.payload<FrameObject>(*inner.back);
+    ReturnSlot back(context);
+    context.load(saved.get(context), inner.back, back);
+    ASSERT_EQ(back.tag(), ResultTag::Ok);
+    const auto &outer = context.payload<FrameObject>(back.value());
     for (const auto *frame : {&inner, &outer}) {
-        EXPECT_EQ(frame->state, FrameState::Completed);
+        EXPECT_EQ(frame->state.load(), FrameState::Completed);
         EXPECT_FALSE(frame->pending_call);
         EXPECT_EQ(frame->sp, 0U);
     }
@@ -306,12 +311,14 @@ TEST_F(CoreScheduling, RaisedAndHostFaultsCompleteEveryParkedFrame)
     auto frame = snapshot.result().value();
     for (;;) {
         const auto &data = context.payload<FrameObject>(frame);
-        EXPECT_EQ(data.state, FrameState::Completed);
+        EXPECT_EQ(data.state.load(), FrameState::Completed);
         EXPECT_EQ(data.sp, 0U);
         EXPECT_FALSE(data.pending_call);
-        if (!data.back)
+        ReturnSlot parent(context);
+        context.load(frame, data.back, parent);
+        if (parent.tag() == ResultTag::Empty)
             break;
-        frame = *data.back;
+        frame = parent.value();
     }
     CodeBuilder raises(context);
     raise_error(context, CoreObject::ValueErrorType, U"child error", out);
