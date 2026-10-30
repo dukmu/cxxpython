@@ -146,8 +146,8 @@ class MainTests(unittest.TestCase):
                                    stderr=slave, close_fds=True)
         os.close(slave)
         try:
-            os.write(master, b"1 + 2\n\x04")
             output = bytearray()
+            sent = False
             while process.poll() is None:
                 ready, _, _ = select.select([master], [], [], 10)
                 if not ready:
@@ -156,6 +156,9 @@ class MainTests(unittest.TestCase):
                     output.extend(os.read(master, 4096))
                 except OSError:
                     break
+                if not sent and b">>>" in output:
+                    os.write(master, b"1 + 2\n\x04")
+                    sent = True
             self.assertEqual(process.wait(timeout=10), 0)
             self.assertIn(b">>>", output)
             self.assertIn(b"3", output)

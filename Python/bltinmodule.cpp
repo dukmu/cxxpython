@@ -5,6 +5,7 @@
 #include "internal/ioopen.hpp"
 #include "internal/listsort.hpp"
 #include "internal/long.hpp"
+#include "internal/stdio.hpp"
 #include "internal/sysmodule.hpp"
 
 #include <cmath>
@@ -85,49 +86,53 @@ void builtin_input(Attachment &context, Handle, std::span<const Value> args, Ret
             call(context, roots.root(method.value()), {{}, {}}, result);
     };
     flush(ferr);
-    get_method(fin, U"fileno");
-    if (!failed(method)) {
-        call(context, roots.root(method.value()), {{}, {}}, result);
-        if (!failed(result)) {
-            index(context, roots.root(result.value()), text);
+    const auto prompt =
+        items.empty() ? std::optional<Handle>{} : std::optional<Handle>{roots.root(items[0])};
+    if (!detail::read_terminal_input(context, fin, fout, prompt, result)) {
+        get_method(fin, U"fileno");
+        if (!failed(method)) {
+            call(context, roots.root(method.value()), {{}, {}}, result);
+            if (!failed(result)) {
+                index(context, roots.root(result.value()), text);
+                if (failed(text)) {
+                    out.raised(text.exception());
+                    return;
+                }
+                const auto value = detail::integer_value(context.payload<IntObject>(text.value()));
+                if (value < std::numeric_limits<long>::min() ||
+                    value > std::numeric_limits<long>::max()) {
+                    raise_error(context, CoreObject::OverflowErrorType,
+                                U"Python int too large to convert to C long", out);
+                    return;
+                }
+            }
+        }
+        if (!items.empty()) {
+            get_method(fout, U"write");
+            if (failed(method)) {
+                out.raised(method.exception());
+                return;
+            }
+            str(context, roots.root(items[0]), text);
             if (failed(text)) {
                 out.raised(text.exception());
                 return;
             }
-            const auto value = detail::integer_value(context.payload<IntObject>(text.value()));
-            if (value < std::numeric_limits<long>::min() ||
-                value > std::numeric_limits<long>::max()) {
-                raise_error(context, CoreObject::OverflowErrorType,
-                            U"Python int too large to convert to C long", out);
+            const Value value[] = {text.value()};
+            call(context, roots.root(method.value()), {value, {}}, result);
+            if (failed(result)) {
+                out.raised(result.exception());
                 return;
             }
         }
-    }
-    if (!items.empty()) {
-        get_method(fout, U"write");
+        flush(fout);
+        get_method(fin, U"readline");
         if (failed(method)) {
             out.raised(method.exception());
             return;
         }
-        str(context, roots.root(items[0]), text);
-        if (failed(text)) {
-            out.raised(text.exception());
-            return;
-        }
-        const Value value[] = {text.value()};
-        call(context, roots.root(method.value()), {value, {}}, result);
-        if (failed(result)) {
-            out.raised(result.exception());
-            return;
-        }
+        call(context, roots.root(method.value()), {{}, {}}, result);
     }
-    flush(fout);
-    get_method(fin, U"readline");
-    if (failed(method)) {
-        out.raised(method.exception());
-        return;
-    }
-    call(context, roots.root(method.value()), {{}, {}}, result);
     if (failed(result)) {
         out.raised(result.exception());
         return;

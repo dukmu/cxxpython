@@ -634,6 +634,7 @@ class Attachment final {
   private:
     friend class NoSafepoint;
     friend class NativeWait;
+    friend class NativeCallback;
     friend class RootScope;
     friend class ReturnSlot;
     friend class ResultView;
@@ -642,6 +643,8 @@ class Attachment final {
     explicit Attachment(std::shared_ptr<detail::State> state);
     void require_owns(Value value) const;
     void require_safepoint() const;
+    void enter_native_wait();
+    void leave_native_wait();
     void require_layout(Value value, const void *family) const;
     const LayoutDescriptor &allocation_layout(Value value) const;
     bool has_native_layout(Value value, const void *family) const;
@@ -713,6 +716,19 @@ class NativeWait final {
     ~NativeWait();
     NativeWait(const NativeWait &) = delete;
     NativeWait &operator=(const NativeWait &) = delete;
+
+  private:
+    friend class NativeCallback;
+    Attachment &context_;
+};
+
+// Synchronous, owner-thread callback inside an enclosing NativeWait.
+class NativeCallback final {
+  public:
+    explicit NativeCallback(NativeWait &native);
+    ~NativeCallback();
+    NativeCallback(const NativeCallback &) = delete;
+    NativeCallback &operator=(const NativeCallback &) = delete;
 
   private:
     Attachment &context_;

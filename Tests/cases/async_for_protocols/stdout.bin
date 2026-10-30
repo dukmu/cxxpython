@@ -1,0 +1,14 @@
+no iter TypeError 'async for' requires an object with __aiter__ method, got int
+bad iter TypeError 'async for' received an object from __aiter__ that does not implement __anext__: list
+bad next TypeError 'async for' received an invalid object from __anext__: int
+cause TypeError True
+bad await TypeError 'async for' received an invalid object from __anext__: BadAwait
+cause TypeError True
+failing await TypeError 'async for' received an invalid object from __anext__: FailingAwait
+cause LookupError True
+done done
+next error ValueError next body
+suspended remove
+deleted next 'async for' requires an iterator with __anext__ method, got Deleted
+instance ignored TypeError 'async for' requires an object with __aiter__ method, got InstanceOnly
+target not swallowed target

@@ -3,6 +3,7 @@
 #include "cxxpython/genobject.hpp"
 #include "cxxpython/import.hpp"
 #include "cxxpython/setobject.hpp"
+#include "internal/aiterobject.hpp"
 #include "internal/errors.hpp"
 #include "internal/setobject.hpp"
 #include "internal/sysmodule.hpp"
@@ -12,6 +13,10 @@
 
 namespace cxxpython::core {
 namespace detail {
+bool delegation_opcode(Opcode opcode)
+{
+    return opcode == Opcode::YieldFrom || opcode == Opcode::ForAwait;
+}
 class FrameActivation final {
   public:
     FrameActivation(Attachment &context, ReturnSlot &active, bool generator = false)
@@ -108,7 +113,7 @@ class FrameActivation final {
         auto &data = frame();
         const auto lasti = data.last_instruction.load(std::memory_order_relaxed);
         if (lasti != std::numeric_limits<std::size_t>::max() &&
-            code().program.instructions()[lasti].opcode == Opcode::YieldFrom) {
+            delegation_opcode(code().program.instructions()[lasti].opcode)) {
             // Also covers host allocation failures before delegate_step returns.
             context_.store(current_, data.delegate, {});
             data.resume_value.reset();
@@ -852,6 +857,15 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                     data.operands[data.sp - 1] = result.value();
                 break;
             }
+            case Opcode::GetAiter: {
+                RootScope roots(context);
+                detail::get_async_iter(context, roots.root(data.operands[data.sp - 1]), result);
+                if (raised(result))
+                    activation.raising(result.exception());
+                else
+                    data.operands[data.sp - 1] = result.value();
+                break;
+            }
             case Opcode::ForIter: {
                 RootScope roots(context);
                 const auto status =
@@ -1493,11 +1507,32 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 data.operands[data.sp - 1] = context.builtin(CoreObject::None);
                 activation.suspend();
                 return;
+            case Opcode::ForAwait:
             case Opcode::YieldFrom: {
+                const bool asynchronous_loop = opcode == Opcode::ForAwait;
+                auto exhausted = [&] {
+                    return asynchronous_loop && raised(result) &&
+                           is_subtype(context, context.type_of(result.exception()),
+                                      context.builtin(CoreObject::StopAsyncIterationType));
+                };
                 context.load(activation.current(), data.delegate, result);
                 if (result.tag() == ResultTag::Empty) {
-                    context.store(activation.current(), data.delegate, data.operands[data.sp - 1]);
-                    data.operands[data.sp - 1] = context.builtin(CoreObject::None);
+                    if (asynchronous_loop) {
+                        RootScope roots(context);
+                        detail::get_async_next(context, roots.root(data.operands[data.sp - 1]),
+                                               result);
+                        if (raised(result)) {
+                            if (exhausted())
+                                data.pc = operand;
+                            else
+                                activation.raising(result.exception());
+                            break;
+                        }
+                    } else
+                        result.ok(data.operands[data.sp - 1]);
+                    context.store(activation.current(), data.delegate, result.value());
+                    if (!asynchronous_loop)
+                        data.operands[data.sp - 1] = context.builtin(CoreObject::None);
                 }
                 const bool throwing = data.resume_exception || data.resume_throw_args;
                 const auto status = delegate_step(context, activation.current(), data, result);
@@ -1514,13 +1549,22 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                     return;
                 }
                 if (status == DelegateResult::Raised) {
-                    data.trim_stack(context, data.sp - 1);
-                    if (throwing && !data.handled_inherited)
-                        detail::link_exception_context(context, result.exception());
-                    activation.raising(result.exception());
+                    if (exhausted()) {
+                        context.store(activation.current(), data.delegate, {});
+                        data.pc = operand;
+                    } else {
+                        if (!asynchronous_loop)
+                            data.trim_stack(context, data.sp - 1);
+                        if (throwing && !data.handled_inherited)
+                            detail::link_exception_context(context, result.exception());
+                        activation.raising(result.exception());
+                    }
                 } else {
                     context.store(activation.current(), data.delegate, {});
-                    data.operands[data.sp - 1] = result.value();
+                    if (asynchronous_loop)
+                        data.operands[data.sp++] = result.value();
+                    else
+                        data.operands[data.sp - 1] = result.value();
                 }
                 break;
             }
@@ -1748,7 +1792,7 @@ ResumeResult resume_generator_frame(Attachment &context, Handle frame, Handle se
     const auto lasti = data.last_instruction.load(std::memory_order_relaxed);
     const bool started = lasti != std::numeric_limits<std::size_t>::max();
     const bool delegating =
-        started && activation.code().program.instructions()[lasti].opcode == Opcode::YieldFrom;
+        started && delegation_opcode(activation.code().program.instructions()[lasti].opcode);
     if (delegating) {
         data.resume_value = sent.get(context);
         if (thrown)

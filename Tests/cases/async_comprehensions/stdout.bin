@@ -1,0 +1,12 @@
+eager ([10, 11, 12, 2, 2, 1, True, 0, False, True, 6], ([2, 6], [(0, 10), (1, 11), (2, 12)], [1, 2], [0, 6], [[0, 1], [1, 2]], [(1, 3), (1, 4), (2, 3), (2, 4)]))
+created ['iter']
+module generator ([], [2, 4])
+await generator ([5, 6], [5, 6])
+nested generator ([], [[0], [1]])
+bindings ([], ([0, 1, 2], 2, [2, 2, 2]))
+class generator ([], [7])
+invalid scope
+invalid scope
+invalid scope
+invalid scope
+invalid scope

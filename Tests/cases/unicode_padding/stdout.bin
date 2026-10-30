@@ -1,0 +1,55 @@
+ljust '.' 'xy...'
+ljust '\x00' 'xy\x00\x00\x00'
+ljust '中' 'xy中中中'
+ljust '🙂' 'xy🙂🙂🙂'
+ljust '\ud800' 'xy\ud800\ud800\ud800'
+rjust '.' '...xy'
+rjust '\x00' '\x00\x00\x00xy'
+rjust '中' '中中中xy'
+rjust '🙂' '🙂🙂🙂xy'
+rjust '\ud800' '\ud800\ud800\ud800xy'
+center '.' '..xy.'
+center '\x00' '\x00\x00xy\x00'
+center '中' '中中xy中'
+center '🙂' '🙂🙂xy🙂'
+center '\ud800' '\ud800\ud800xy\ud800'
+zfill '' '000000'
+zfill '+' '+00000'
+zfill '-' '-00000'
+zfill '+12' '+00012'
+zfill '-12' '-00012'
+zfill '12' '000012'
+zfill ' 12' '000 12'
+zfill '−12' '000−12'
+zfill '\x00-1' '000\x00-1'
+identity and subclasses ok
+OverflowError Python int too large to convert to C ssize_t
+OverflowError Python int too large to convert to C ssize_t
+TypeError The fill character must be exactly one character long
+TypeError The fill character must be exactly one character long
+TypeError The fill character must be exactly one character long
+TypeError The fill character must be a unicode character, not bytes
+TypeError The fill character must be a unicode character, not NoneType
+TypeError The fill character must be a unicode character, not int
+LookupError index failed
+OverflowError Python int too large to convert to C ssize_t
+OverflowError Python int too large to convert to C ssize_t
+TypeError The fill character must be exactly one character long
+TypeError The fill character must be exactly one character long
+TypeError The fill character must be exactly one character long
+TypeError The fill character must be a unicode character, not bytes
+TypeError The fill character must be a unicode character, not NoneType
+TypeError The fill character must be a unicode character, not int
+LookupError index failed
+OverflowError Python int too large to convert to C ssize_t
+OverflowError Python int too large to convert to C ssize_t
+TypeError The fill character must be exactly one character long
+TypeError The fill character must be exactly one character long
+TypeError The fill character must be exactly one character long
+TypeError The fill character must be a unicode character, not bytes
+TypeError The fill character must be a unicode character, not NoneType
+TypeError The fill character must be a unicode character, not int
+LookupError index failed
+OverflowError Python int too large to convert to C ssize_t
+OverflowError Python int too large to convert to C ssize_t
+width, fill, callback order and GC ok

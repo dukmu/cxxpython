@@ -1,0 +1,14 @@
+send pause
+returned done
+events ['await closed', 'next finally', 'exhausted', 'task finally'] True
+throw pause
+returned done
+events ['await closed', 'next finally', 12, 'task finally'] True
+stop pause
+returned done
+events ['await closed', 'next finally', 'exhausted', 'task finally'] True
+close pause
+closed None
+events ['await closed', 'next finally', 'task finally'] True
+throw rejected False
+after rejection cannot reuse already awaited coroutine ['await closed', 'next finally', 'task finally']

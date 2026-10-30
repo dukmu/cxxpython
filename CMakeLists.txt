@@ -13,6 +13,10 @@ set(CMAKE_C_EXTENSIONS OFF)
 
 find_package(Threads REQUIRED)
 find_package(OpenSSL 3.0 REQUIRED COMPONENTS Crypto)
+find_package(PkgConfig QUIET)
+if(PkgConfig_FOUND)
+    pkg_check_modules(Readline QUIET IMPORTED_TARGET readline)
+endif()
 add_subdirectory(Parser)
 find_path(BOOST_MULTIPRECISION_INCLUDE_DIR boost/multiprecision/cpp_int.hpp)
 if(NOT BOOST_MULTIPRECISION_INCLUDE_DIR)
@@ -32,6 +36,7 @@ add_library(cxxpython_core
     Modules/_impmodule.cpp
     Modules/_iomodule.cpp
     Modules/_operator.cpp
+    Modules/_opcodemodule.cpp
     Modules/_io/stdio.cpp
     Modules/_io/iobase.cpp
     Modules/_io/bufferedio.cpp
@@ -113,6 +118,11 @@ set(CXXPYTHON_STDLIB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Lib" CACHE PATH "Python st
 target_compile_definitions(cxxpython_core PRIVATE CXXPYTHON_STDLIB_DIR="${CXXPYTHON_STDLIB_DIR}")
 target_link_libraries(cxxpython_core PUBLIC cxxpython_parser Threads::Threads ${CMAKE_DL_LIBS})
 target_link_libraries(cxxpython_core PRIVATE OpenSSL::Crypto)
+if(TARGET PkgConfig::Readline)
+    target_sources(cxxpython_core PRIVATE Modules/readlinemodule.cpp)
+    target_link_libraries(cxxpython_core PRIVATE PkgConfig::Readline)
+    target_compile_definitions(cxxpython_core PRIVATE CXXPYTHON_HAVE_READLINE=1)
+endif()
 target_compile_options(cxxpython_core PRIVATE -Wall -Wextra -Wpedantic -Werror)
 
 add_executable(cxxpython Programs/cxxpython.cpp)
@@ -252,6 +262,16 @@ if(BUILD_TESTING)
     add_test(NAME Main.Entry COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_main.py $<TARGET_FILE:cxxpython>)
     set_tests_properties(Main.Entry PROPERTIES TIMEOUT 90)
+    add_test(NAME VM.Dis COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_dis.py --binary $<TARGET_FILE:cxxpython>)
+    set_tests_properties(VM.Dis PROPERTIES TIMEOUT 30)
+    if(TARGET PkgConfig::Readline)
+        add_test(NAME Readline.Terminal COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_readline.py --binary $<TARGET_FILE:cxxpython>)
+        add_test(NAME Main.Terminal COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_repl.py --binary $<TARGET_FILE:cxxpython>)
+        set_tests_properties(Readline.Terminal Main.Terminal PROPERTIES TIMEOUT 60)
+    endif()
     add_test(NAME Generators.Differential COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_generators.py
         --binary $<TARGET_FILE:cxxpython> --reference ${CXXPYTHON_REFERENCE_PYTHON})

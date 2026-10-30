@@ -49,6 +49,7 @@ struct LambdaExpr {
 struct ComprehensionExpr {
     std::unique_ptr<FunctionStmt> function;
     ExprPtr iterable;
+    bool asynchronous_iterable = false;
 };
 struct CompareExpr {
     std::vector<ExprPtr> values;
@@ -127,6 +128,7 @@ struct ForStmt {
     ExprPtr target, iterable;
     Suite body, alternative;
     bool iterator_ready = false;
+    bool asynchronous = false;
 };
 struct ParameterSpec {
     std::u32string name;
@@ -229,6 +231,7 @@ struct FlowBlock {
         Branch,
         Return,
         IterNext,
+        AsyncIterNext,
         Stop,
         Leave,
         EndHandler

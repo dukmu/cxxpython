@@ -20,6 +20,8 @@ struct AnextAwaitableObject {
 namespace detail {
 void builtin_aiter(Attachment &, Handle, std::span<const Value>, ReturnSlot &);
 void builtin_anext(Attachment &, Handle, std::span<const Value>, ReturnSlot &);
+void get_async_iter(Attachment &, Handle, ReturnSlot &);
+void get_async_next(Attachment &, Handle, ReturnSlot &);
 void install_async_iteration(Attachment &, std::span<const Handle>);
 } // namespace detail
 } // namespace cxxpython::core

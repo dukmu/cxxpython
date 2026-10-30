@@ -678,8 +678,6 @@ class Adapter {
             body.push_back(stmt(n, std::move(add)));
         for (std::size_t index = loops.size(); index-- > 0;) {
             const auto &clause = *loops[index];
-            if (has(clause, U"async"))
-                unsupported(clause);
             auto target = find(clause, Rule::star_targets);
             auto parts = rules(clause);
             if (!target)
@@ -698,6 +696,7 @@ class Adapter {
                 body.push_back(stmt(*tests[j], std::move(condition)));
             }
             ForStmt loop;
+            loop.asynchronous = has(clause, U"async");
             loop.target = expression(*target);
             loop.iterator_ready = index == 0;
             validate_target(*loop.target);
@@ -710,7 +709,8 @@ class Adapter {
             fn->body.push_back(std::move(item));
         if (!generator)
             fn->body.push_back(stmt(n, ReturnStmt{name()}));
-        return make(n, ComprehensionExpr{std::move(fn), std::move(iterable)}, 2);
+        return make(
+            n, ComprehensionExpr{std::move(fn), std::move(iterable), has(*loops[0], U"async")}, 2);
     }
     std::u32string fstring_text(const Node &n, bool raw)
     {
@@ -1233,9 +1233,8 @@ class Adapter {
             break;
         }
         case Rule::for_stmt: {
-            if (has(n, U"async"))
-                unsupported(n);
             ForStmt s;
+            s.asynchronous = has(n, U"async");
             s.target = expression(*find(n, Rule::star_targets));
             s.iterable = expression(*find(n, Rule::star_expressions));
             s.body = suite(*find(n, Rule::block));

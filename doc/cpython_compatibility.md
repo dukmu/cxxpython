@@ -85,8 +85,11 @@ the target is `builtins` and the `__builtins__` execution namespace.
   cross-thread suspension handoff. Async with uses the same Frame/unwind path,
   awaiting both entry and cleanup, including exceptions and nonlocal exits.
   aiter/anext use actual special-method lookup; the default-bearing anext wrapper
-  has precise edges and a per-object execution claim. Async for and the
-  never-awaited warning policy remain unfinished; no fake asyncio is provided.
+  has precise edges and a per-object execution claim. Async for and async
+  list/set/dict/generator comprehensions now reuse that same delegation, including
+  eager outer-iterator acquisition, implicit child awaits and cross-thread
+  handoff. Never-awaited warnings and event-loop shutdown remain unfinished;
+  no fake asyncio is provided.
 - Complex construction/mixed arithmetic/hash, imaginary literals and numeric
   formatting adapt the pinned native contracts. Bytearray construction, mutation,
   slices, iteration and decoding use native synchronized storage, not a bytes
@@ -107,18 +110,18 @@ the target is `builtins` and the `__builtins__` execution namespace.
   conversion/nested-spec behavior and startswith/endswith use ordinary typed
   protocols and callback error paths. Complete Unicode APIs and exact malformed
   diagnostic matrices remain broader acceptance work.
-- `Lib/runpy.py` copies the pinned _run_code, _get_module_details,
-  _run_module_as_main and _get_main_module_details flows. It deliberately omits
-  public run_module/run_path and their helpers until temporary-module/filesystem/
-  io/os closures are complete. The warnings branch retains its lazy import;
-  warnings/RuntimeWarning integration is still a dependency, not a deleted branch.
-  Restore omitted upstream helpers/APIs once those dependencies land.
+- `Lib/runpy.py` is now the complete, unchanged pinned source, including public
+  run_module/run_path and temporary-module/argv helpers. run_module has executable
+  namespace, initialization-global, package/relative-import and failure-restoration
+  tests. run_path still needs actual pkgutil/marshal/import-cache dependencies;
+  the warnings/RuntimeWarning branch is retained with its lazy import. Source
+  completeness does not declare those remaining paths compatible.
 - Modules/main.cpp and Python/pythonrun.cpp provide the experimental product
   entry/REPL, with a thin Programs entry. Single mode uses live sys.displayhook
   and real SystemExit; source input and REPL lines use actual sys.stdin methods,
   including replacement streams. Execution and finalization flush through Python
   protocols; final flush failure returns 120. Emergency native diagnostics/banner
-  remain host bridges. Readline/history, signals, environment/isolation and
+  remain host bridges. Full signal handling, environment/isolation and
   installed-runtime compatibility remain work. No host CPython executes guest code.
 - The temporary sys._StandardTextIO implementation is deleted. Standard streams
   are real TextIOWrapper instances over buffered FileIO, borrowing descriptors
@@ -129,7 +132,9 @@ the target is `builtins` and the `__builtins__` execution namespace.
   configuration, reconfigure and the complete shutdown sequence remain work.
   print and input use the Interpreter's original sys dictionary, even after
   sys.modules['sys'] is replaced/deleted. Input follows ordinary prompt, flush,
-  readline, EOF and error behavior; TTY/readline and audit paths are unfinished.
+  readline, EOF and error behavior. GNU readline now handles eligible actual
+  terminals for both input and REPL, while redirection/replacement stays on the
+  Python stream path. Audit and complete terminal/signal policy remain unfinished.
 - sys.exception()/exc_info() inspect the active handled exception, including
   its currently synchronized traceback rather than a frozen raise-time copy.
   Nested handlers/calls, finally, generators and coroutine handoff have differential
@@ -248,7 +253,7 @@ the target is `builtins` and the `__builtins__` execution namespace.
   and reuse the existing VM Frame/unwind. asend/athrow/aclose requests preserve
   their generator-running claim across await suspension and reject competitors.
   Tests transfer a suspended request between OS threads in one shared heap while
-  collecting. Async for, asynchronous finalizer hooks, event-loop shutdown
+  collecting. Asynchronous finalizer hooks, event-loop shutdown
   and the full upstream async-generator matrix remain explicit gates.
 - binascii supplies base64, hexadecimal, uu, quoted-printable and CRC32/CRC-HQX
   conversions based on the pinned native algorithms. The module consumes shared
@@ -453,6 +458,28 @@ except* compiler lowering, group tree diagnostics and serialization remain work;
 contextlib import alone is not their acceptance evidence.
 
 ## Requested Library Delivery
+
+GNU readline supplies real line editing, history mutation/files, completer and
+startup/pre-input callbacks, delimiters and line/index helpers. Its private typed
+module state traces callback edges and owns native history; a process-local
+external-resource claim swaps GNU history rather than copying it on every call.
+Whole GNU calls park for GC, including terminal output backpressure; synchronous
+Python callbacks resume through NativeCallback without an internal mutex and
+refreeze on return/unwind. Session cleanup restores tty and native callbacks/streams, with GNU longjmp
+signal handling disabled. CMake detects the external library; no fake readline
+module is installed without it. Full display hooks, automatic rlcompleter,
+reload/history policy and product signal integration remain dependencies.
+
+opcode/dis adapt inspection policy and public Instruction/Positions tuple
+protocols to this runtime's actual verified instruction stream. Recursive listing,
+current-offset/traceback selection, constants/names/cells, UTF-8 byte source
+columns and actual branch effects are exposed. Numeric offsets are instruction
+indexes, not CPython wordcode bytes. Standalone stack_effect rejects call-table
+indexes; code-aware Bytecode.stack_effect reads the actual call layout. No
+co_code/cache/specialization facade is manufactured. Full upstream dis/reflection
+and control-region inspection remain gates. Native str.ljust/rjust/center/zfill
+close real formatting dependencies with index conversion, Unicode fills,
+sign/parity, overflow and exact-string/subtype identity behavior.
 
 The requested Base-to-Full scope includes dis, collections, typing, types, ctypes,
 encodings, logging, multiprocessing, pathlib, re, string, unittest, abc, ast,

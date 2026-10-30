@@ -1770,18 +1770,36 @@ NoSafepoint::~NoSafepoint()
     --context_.no_safepoint_depth_;
 }
 
+void Attachment::enter_native_wait()
+{
+    require_safepoint();
+    std::lock_guard gate(state_->coordinator);
+    thread_record_->ack_epoch = state_->request_epoch.load(std::memory_order_relaxed);
+    thread_record_->state.store(MutatorState::NativeWait, std::memory_order_release);
+    state_->changed.notify_all();
+}
+void Attachment::leave_native_wait()
+{
+    if (thread_record_->owner != std::this_thread::get_id() ||
+        thread_record_->state.load(std::memory_order_relaxed) != MutatorState::NativeWait)
+        throw std::logic_error("native callback requires its waiting owning thread");
+    std::unique_lock gate(state_->coordinator);
+    state_->resume(*thread_record_, gate);
+}
 NativeWait::NativeWait(Attachment &context) : context_(context)
 {
-    context_.require_safepoint();
-    std::lock_guard gate(context_.state_->coordinator);
-    context_.thread_record_->ack_epoch =
-        context_.state_->request_epoch.load(std::memory_order_relaxed);
-    context_.thread_record_->state.store(MutatorState::NativeWait, std::memory_order_release);
-    context_.state_->changed.notify_all();
+    context_.enter_native_wait();
 }
 NativeWait::~NativeWait()
 {
-    std::unique_lock gate(context_.state_->coordinator);
-    context_.state_->resume(*context_.thread_record_, gate);
+    context_.leave_native_wait();
+}
+NativeCallback::NativeCallback(NativeWait &native) : context_(native.context_)
+{
+    context_.leave_native_wait();
+}
+NativeCallback::~NativeCallback()
+{
+    context_.enter_native_wait();
 }
 } // namespace cxxpython::core

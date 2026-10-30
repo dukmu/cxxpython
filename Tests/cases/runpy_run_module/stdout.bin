@@ -1,0 +1,6 @@
+plain 42 ('module', '', 'module') False
+altered 42 ('temporary_run', '', 'module') True True
+package 73 ('named.package', 'package', 'package.__main__')
+error body failure [True]
+lookup rejected
+lookup rejected

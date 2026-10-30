@@ -257,9 +257,34 @@ original sys dictionary has a precise Interpreter root independent of module
 table replacement. Input, print, display and exception hooks resolve its live
 attributes; a fresh reimported sys module does not redefine interpreter stdio.
 The CLI and REPL read through those Python streams and flush after execution and
-at finalization. Locale/environment configuration, readline/history, signals,
+at finalization. Locale/environment configuration, signals,
 warnings, TextIOWrapper.reconfigure and complete stream protocol/diagnostic
 matrices remain work, not implied by the existing stream hierarchy.
+
+`Modules/readlinemodule.cpp` supplies GNU readline when its development library
+is detected. Typed module state traces completer/startup/pre-input callbacks and
+owns its native history. A short process-local claim coordinates only GNU's
+external, process-global terminal state; no mutex covers Python callbacks or
+ordinary VM execution. History state swaps avoid copying the whole history for
+each API call. Terminal sessions restore streams, callbacks, TLS and tty state;
+the whole GNU call parks with NativeWait, including blocked terminal output.
+NativeCallback admits only the Python hook/completion portions as Active and
+refreezes roots afterward, including native exception unwind. GNU's
+longjmp-based signal handling is disabled rather than crossing C++/GC scopes.
+The shared stdio selector uses GNU only for saved standard-stream identities,
+descriptors 0/1 and real terminals. Redirected/replaced streams retain ordinary
+readline/write protocols. Full signal integration, display hooks, automatic
+rlcompleter policy and curses remain dependencies.
+
+`Modules/_opcodemodule.cpp` exposes immutable instruction, source-position,
+signature and stack-effect metadata. `Lib/opcode.py` and `Lib/dis.py` implement
+Python inspection/formatting policy, including ordinary tuple protocols,
+recursive listing, current-offset marking and traceback selection. Offsets are
+actual instruction indexes, not invented CPython wordcode bytes. Call operands
+index the owning Code's call table, so code-aware Bytecode.stack_effect reads
+that table; standalone effects reject those operands rather than treating them
+as arity. Full frame reflection, control-region inspection and upstream dis
+compatibility remain separate gates.
 
 `Modules/atexitmodule.cpp` owns an Interpreter-rooted traced callback registry.
 Prepared callback records and short local commits separate mutation from Python
@@ -351,9 +376,13 @@ holding a mutex. Completion, rejection and native exception unwind release the
 claim. Async with retains a flag in the existing control region and lowers entry
 and cleanup through GET_AWAITABLE/YIELD_FROM; no second Frame or cleanup scheduler
 is introduced. Objects/aiterobject.cpp supplies aiter/anext and the traced,
-execution-claimed default-bearing wrapper. Async-generator finalizer hooks,
-event-loop shutdown, async for and never-awaited warning policy remain explicit
-dependencies.
+execution-claimed default-bearing wrapper. Async for uses GET_AITER and FOR_AWAIT;
+the latter reuses the same Frame delegate and resume inputs as YIELD_FROM,
+branching only on next-step exhaustion. Async comprehensions retain ordinary
+scope/closure analysis, with eager outer-iterator evaluation and implicit awaits
+for asynchronous collection comprehensions. No hidden local slots or second
+coroutine scheduler are added. Async-generator finalizer hooks, event-loop
+shutdown and never-awaited warning policy remain explicit dependencies.
 
 `Objects/exceptiongroup.cpp` extends the existing exception layout with message
 and child slots. Native constructors, derive/subgroup/split and metadata copying

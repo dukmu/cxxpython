@@ -6,9 +6,13 @@
 #include "internal/errors.hpp"
 #include "internal/iomodule.hpp"
 #include "internal/sysmodule.hpp"
+#ifdef CXXPYTHON_HAVE_READLINE
+#include "internal/readlinemodule.hpp"
+#endif
 
 #include <cerrno>
 #include <fcntl.h>
+#include <tuple>
 #include <unistd.h>
 
 namespace cxxpython::core {
@@ -140,6 +144,55 @@ bool write_object(Attachment &ctx, Handle file, Handle value, ReturnSlot &out)
 }
 } // namespace
 namespace detail {
+bool read_terminal_input(Attachment &ctx, Handle input, Handle output, std::optional<Handle> prompt,
+                         ReturnSlot &out)
+{
+#ifdef CXXPYTHON_HAVE_READLINE
+    RootScope roots(ctx);
+    ReturnSlot original(ctx), descriptor(ctx), converted(ctx), text(ctx);
+    for (auto [name, stream, expected] :
+         {std::tuple{U"__stdin__", input, 0}, std::tuple{U"__stdout__", output, 1}}) {
+        get_sys_attribute(ctx, name, original);
+        if (failed(original) || original.value() != stream.get(ctx))
+            return false;
+        if (!io_call(ctx, stream, U"fileno", {}, descriptor))
+            return false;
+        index(ctx, roots.root(descriptor.value()), converted);
+        if (failed(converted)) {
+            out.raised(converted.exception());
+            return true;
+        }
+        std::int64_t fd;
+        if (!int_fits_signed(ctx, converted.value(), fd) || fd != expected)
+            return false;
+    }
+    {
+        NativeWait wait(ctx);
+        if (!::isatty(STDIN_FILENO) || !::isatty(STDOUT_FILENO))
+            return false;
+    }
+    if (prompt)
+        str(ctx, *prompt, text);
+    else
+        make_str(ctx, U"", text);
+    if (failed(text)) {
+        out.raised(text.exception());
+        return true;
+    }
+    const auto message = roots.root(text.value());
+    // Match ordinary input's best-effort output flush before native reading.
+    io_call(ctx, output, U"flush", {}, converted);
+    read_terminal_line(ctx, STDIN_FILENO, STDOUT_FILENO, message, out);
+    return true;
+#else
+    (void)ctx;
+    (void)input;
+    (void)output;
+    (void)prompt;
+    (void)out;
+    return false;
+#endif
+}
 void initialize_stdio(Attachment &ctx, Handle module, ReturnSlot &out)
 {
     RootScope roots(ctx);

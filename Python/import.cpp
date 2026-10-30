@@ -10,7 +10,11 @@
 #include "internal/hashmodule.hpp"
 #include "internal/iomodule.hpp"
 #include "internal/itertoolsmodule.hpp"
+#include "internal/opcodemodule.hpp"
 #include "internal/operatormodule.hpp"
+#ifdef CXXPYTHON_HAVE_READLINE
+#include "internal/readlinemodule.hpp"
+#endif
 #include "internal/posixmodule.hpp"
 #include "internal/stdio.hpp"
 #include "internal/structmodule.hpp"
@@ -242,6 +246,10 @@ detail::ImportState::ImportState()
                                      {U"_blake2", detail::initialize_blake2},
                                      {U"_io", detail::initialize_io},
                                      {U"_operator", detail::initialize_operator},
+                                     {U"_opcode", detail::initialize_opcode},
+#ifdef CXXPYTHON_HAVE_READLINE
+                                     {U"readline", detail::initialize_readline},
+#endif
                                      {U"_thread", detail::initialize_thread},
                                      {U"_abc", detail::initialize_abc},
                                      {U"itertools", detail::initialize_itertools},

@@ -1,0 +1,8 @@
+0
+3
+[None, 'alpha', 'beta', 'gamma', None]
+['changed', 'gamma', None]
+ValueError
+ValueError
+7
+0

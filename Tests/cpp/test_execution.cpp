@@ -486,6 +486,43 @@ TEST_F(CoreExecution, AsyncWithVerifiesAwaitedCleanupStackAndOperandDomain)
     EXPECT_THROW(ordinary.region(RegionKind::Finally, true), CodeValidationError);
 }
 
+TEST_F(CoreExecution, AsyncIterationReusesDelegationAndVerifiesBothBranchStacks)
+{
+    const auto item = instruction_effect({Opcode::ForAwait, 0});
+    const auto exhausted = instruction_effect({Opcode::ForAwait, 0}, {}, true);
+    EXPECT_EQ(item.inputs, 1U);
+    EXPECT_EQ(item.pops, 0U);
+    EXPECT_EQ(item.pushes, 1U);
+    EXPECT_EQ(exhausted.pops, 0U);
+    EXPECT_EQ(exhausted.pushes, 0U);
+    EXPECT_TRUE(opcode_definition(Opcode::ForAwait).may_raise);
+    EXPECT_TRUE(opcode_definition(Opcode::ForAwait).safepoint);
+    CodeBuilder ordinary(context);
+    ordinary.emit(Opcode::ForAwait);
+    invalid(ordinary, CodeErrorKind::Operand);
+    CodeSpec spec;
+    spec.coroutine = true;
+    CodeBuilder underflow(context, spec);
+    underflow.emit(Opcode::ForAwait);
+    invalid(underflow, CodeErrorKind::StackUnderflow);
+    CodeBuilder bad_operand(context, spec);
+    bad_operand.emit(Opcode::GetAiter, 1);
+    invalid(bad_operand, CodeErrorKind::Operand);
+    CodeBuilder valid(context, spec);
+    const auto loop = valid.label(), done = valid.label();
+    valid.emit(Opcode::LoadConst, valid.constant(builtin(CoreObject::None)));
+    valid.emit(Opcode::GetAiter);
+    valid.bind(loop);
+    valid.jump(Opcode::ForAwait, done);
+    valid.emit(Opcode::PopTop);
+    valid.jump(Opcode::Jump, loop);
+    valid.bind(done);
+    valid.emit(Opcode::Return);
+    const auto program = code(valid);
+    EXPECT_EQ(context.payload<CodeObject>(program).program.max_stack(), 2U);
+    EXPECT_NE(disassemble(context, program).find("FOR_AWAIT"), std::string::npos);
+}
+
 TEST_F(CoreExecution, IterationAndUnpackOpcodesVerifyBothBranchStackEffects)
 {
     CodeBuilder empty(context);

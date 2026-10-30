@@ -139,6 +139,7 @@ int run_interactive(Attachment &context, Handle globals, Handle sys, bool prompt
     std::string pending;
     for (;;) {
         RootScope iteration(context);
+        std::optional<Handle> prompt;
         if (prompts) {
             make_str(context, pending.empty() ? U"ps1" : U"ps2", key);
             get_attribute(context, sys, iteration.root(key.value()), value);
@@ -148,22 +149,35 @@ int run_interactive(Attachment &context, Handle globals, Handle sys, bool prompt
                 report_exception(context, value.tag() == ResultTag::Raised ? value.exception()
                                                                            : result.exception());
             else {
-                const auto prompt = iteration.root(result.value());
-                get_sys_attribute(context, U"stderr", value);
-                if (value.tag() == ResultTag::Raised)
-                    return report_exception(context, value.exception());
-                const auto stream = iteration.root(value.value());
-                const Value argument = prompt.get(context);
-                if (!io_call(context, stream, U"write", {&argument, 1}, result) ||
-                    !io_call(context, stream, U"flush", {}, result))
-                    return report_exception(context, result.exception());
+                prompt = iteration.root(result.value());
             }
         }
         std::string line;
         get_sys_attribute(context, U"stdin", value);
         if (value.tag() == ResultTag::Raised)
             return report_exception(context, value.exception());
-        if (!io_call(context, iteration.root(value.value()), U"readline", {}, result))
+        const auto input = iteration.root(value.value());
+        bool terminal = false;
+        if (prompts) {
+            get_sys_attribute(context, U"stdout", value);
+            if (value.tag() == ResultTag::Ok)
+                terminal = read_terminal_input(context, input, iteration.root(value.value()),
+                                               prompt, result);
+        }
+        if (!terminal) {
+            if (prompt) {
+                get_sys_attribute(context, U"stderr", value);
+                if (value.tag() == ResultTag::Raised)
+                    return report_exception(context, value.exception());
+                const auto stream = iteration.root(value.value());
+                const Value argument = prompt->get(context);
+                if (!io_call(context, stream, U"write", {&argument, 1}, result) ||
+                    !io_call(context, stream, U"flush", {}, result))
+                    return report_exception(context, result.exception());
+            }
+            io_call(context, input, U"readline", {}, result);
+        }
+        if (result.tag() == ResultTag::Raised)
             return report_exception(context, result.exception());
         if (!context.has_layout<StrObject>(result.value())) {
             raise_error(context, CoreObject::TypeErrorType, U"stdin.readline() returned non-string",

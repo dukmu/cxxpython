@@ -100,30 +100,87 @@ void awaitable_resume(Attachment &ctx, Handle, std::span<const Value> args, Retu
                    ctx.builtin(CoreObject::StopAsyncIterationType)))
         detail::generator_stop(ctx, roots.root(data.default_value), out);
 }
-} // namespace
-
-namespace detail {
-void builtin_aiter(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void async_iter(Attachment &ctx, Handle iterable, bool for_loop, ReturnSlot &out)
 {
     RootScope roots(ctx);
-    const auto iterable = roots.root(args[0]);
     ReturnSlot method(ctx);
     lookup_special(ctx, roots.root(ctx.type_of(iterable)), U"__aiter__", method);
     if (method.tag() == ResultTag::Empty) {
         raise_error(ctx, CoreObject::TypeErrorType,
-                    U"'" + type_name(ctx, iterable) + U"' object is not an async iterable", out);
+                    for_loop
+                        ? U"'async for' requires an object with __aiter__ method, got " +
+                              type_name(ctx, iterable)
+                        : U"'" + type_name(ctx, iterable) + U"' object is not an async iterable",
+                    out);
         return;
     }
-    invoke_special(ctx, iterable, roots.root(method.value()), {}, out);
+    detail::invoke_special(ctx, iterable, roots.root(method.value()), {}, out);
     if (out.tag() == ResultTag::Raised)
         return;
     const auto iterator = roots.root(out.value());
     lookup_special(ctx, roots.root(ctx.type_of(iterator)), U"__anext__", method);
     if (method.tag() == ResultTag::Empty)
         raise_error(ctx, CoreObject::TypeErrorType,
-                    U"aiter() returned not an async iterator of type '" + type_name(ctx, iterator) +
-                        U"'",
+                    for_loop ? U"'async for' received an object from __aiter__ that does not "
+                               U"implement __anext__: " +
+                                   type_name(ctx, iterator)
+                             : U"aiter() returned not an async iterator of type '" +
+                                   type_name(ctx, iterator) + U"'",
                     out);
+}
+void async_next(Attachment &ctx, Handle iterator, bool for_loop, ReturnSlot &out)
+{
+    RootScope roots(ctx);
+    ReturnSlot method(ctx);
+    lookup_special(ctx, roots.root(ctx.type_of(iterator)), U"__anext__", method);
+    if (method.tag() == ResultTag::Empty) {
+        raise_error(ctx, CoreObject::TypeErrorType,
+                    for_loop
+                        ? U"'async for' requires an iterator with __anext__ method, got " +
+                              type_name(ctx, iterator)
+                        : U"'" + type_name(ctx, iterator) + U"' object is not an async iterator",
+                    out);
+        return;
+    }
+    detail::invoke_special(ctx, iterator, roots.root(method.value()), {}, out);
+}
+} // namespace
+
+namespace detail {
+void builtin_aiter(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(ctx);
+    async_iter(ctx, roots.root(args[0]), false, out);
+}
+void get_async_iter(Attachment &ctx, Handle iterable, ReturnSlot &out)
+{
+    async_iter(ctx, iterable, true, out);
+}
+void get_async_next(Attachment &ctx, Handle iterator, ReturnSlot &out)
+{
+    RootScope roots(ctx);
+    ReturnSlot next(ctx);
+    async_next(ctx, iterator, true, next);
+    if (next.tag() == ResultTag::Raised) {
+        out.raised(next.exception());
+        return;
+    }
+    const auto awaitable = roots.root(next.value());
+    get_awaitable(ctx, awaitable, next);
+    if (next.tag() != ResultTag::Raised) {
+        out.ok(next.value());
+        return;
+    }
+    const auto cause = roots.root(next.exception());
+    raise_error(ctx, CoreObject::TypeErrorType,
+                U"'async for' received an invalid object from __anext__: " +
+                    type_name(ctx, awaitable),
+                out);
+    ctx.store(out.exception(), ctx.payload<ExceptionObject>(out.exception()).cause, cause.get(ctx));
+    ctx.store(out.exception(), ctx.payload<ExceptionObject>(out.exception()).context,
+              cause.get(ctx));
+    ctx.payload<ExceptionObject>(out.exception())
+        .suppress_context.store(true, std::memory_order_release);
 }
 
 void builtin_anext(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
@@ -136,14 +193,8 @@ void builtin_anext(Attachment &ctx, Handle, std::span<const Value> args, ReturnS
         raise_error(ctx, CoreObject::TypeErrorType, U"anext expected at most 2 arguments", out);
         return;
     }
-    ReturnSlot method(ctx), awaitable(ctx);
-    lookup_special(ctx, roots.root(ctx.type_of(iterator)), U"__anext__", method);
-    if (method.tag() == ResultTag::Empty) {
-        raise_error(ctx, CoreObject::TypeErrorType,
-                    U"'" + type_name(ctx, iterator) + U"' object is not an async iterator", out);
-        return;
-    }
-    invoke_special(ctx, iterator, roots.root(method.value()), {}, awaitable);
+    ReturnSlot awaitable(ctx);
+    async_next(ctx, iterator, false, awaitable);
     if (awaitable.tag() == ResultTag::Raised)
         out.raised(awaitable.exception());
     else if (values.empty())

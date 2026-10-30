@@ -120,10 +120,13 @@ REPL input uses typed incomplete-input probing in the same tokenizer/PEG parser,
 then compiles single mode into the normal VM. Namespace state survives syntax and
 runtime errors; each input releases its temporary roots. NativeWait surrounds
 host input waits. CLI path[0] changes preserve the configured library path.
-The adapted runpy slice locates module/package __main__ through real importlib
-and executes in the canonical __main__ dictionary. It is not the complete public
-runpy module. Both stdin source execution and interactive line reads use the real
-Python-visible sys.stdin, not host getline. Missing readline/history, signal
+The complete pinned runpy.py locates module/package __main__ through real importlib
+and executes in the canonical __main__ dictionary. run_module also supports fresh
+namespaces, initialization globals and temporary module/argv restoration on both
+success and failure. run_path's pkgutil/marshal/cache dependencies are not complete.
+Both stdin source execution and interactive line reads use the real
+Python-visible streams, not host getline. Optional GNU readline supplies terminal
+editing/history/completion without bypassing ordinary replacement streams. Signal
 interruption, emergency native diagnostics and installed/isolated path configuration
 remain product/I/O gates. Legacy --eval remains an explicit test-only CLI extension.
 
@@ -140,7 +143,7 @@ are borrowed with closefd=False; absent descriptors produce None. POSIX defaults
 are UTF-8, surrogateescape for input/output and backslashreplace for stderr, with
 terminal/stderr line buffering. SIGPIPE remains scoped to the writing thread.
 Silent post-execution flushing precedes atexit; final stdout/stderr flush failures
-produce exit 120 with ordinary unraisable reporting. Readline/TTY input, locale/
+produce exit 120 with ordinary unraisable reporting. Full terminal/signal policy, locale/
 environment configuration, audit and the remaining platform/shutdown matrix are
 gates. IOBase/FileIO, BytesIO/StringIO, buffered binary streams and TextIOWrapper
 also back unchanged pinned Lib/io.py and builtin open.
@@ -583,6 +586,47 @@ coroutine flags, stack joins and the exact awaited cleanup template. No native
 stack local carries a cleanup reason across suspension. aiter/anext use class
 special-method lookup; the default wrapper traces both operands and rejects
 concurrent/reentrant execution using its own atomic claim, not a GIL.
+
+GET_AITER replaces one input with its class-protocol async iterator. It may
+call/allocate/raise and is a safepoint; it is also legal in ordinary code when
+constructing an async generator expression. FOR_AWAIT requires coroutine code,
+has one protected iterator input, pops none, and pushes one result on success or
+none on the exhausted branch. It is a raising safepoint with a verified target.
+It fuses next/await/exhaustion using the existing Frame delegate and resume state,
+not a temporary local, sentinel or new scheduler. Only exceptions from obtaining
+or awaiting the next item can terminate iteration via StopAsyncIteration; target
+binding and loop-body exceptions unwind normally. Break/continue/else and cleanup
+retain existing Loop regions. Async collection comprehensions implicitly await
+their child function; async generator expressions stay lazy after eager outer
+iterator acquisition. Nested async comprehensions propagate coroutine scope
+requirements without leaking comprehension bindings.
+
+GNU readline is a native external-resource boundary, not execution serialization.
+The C++ embedding boundary pairs NativeWait with NativeCallback(NativeWait &).
+NativeCallback is owner-thread-only: it waits for a pending GC epoch before
+admitting Active managed work, then republishes frozen roots on scope exit,
+including native exception unwind. Callback-local roots must end before that
+exit; caller-owned result slots may retain callback results. The surrounding
+NativeWait must outlive the callback. This neither admits a foreign OS thread nor
+creates a second Attachment; foreign callbacks still need ordinary admission.
+The versioned C11 extension ABI is unchanged by this C++ scope API.
+Readline's module-owned typed state precisely traces callback edges and owns a separate
+native history snapshot. A process-local lease swaps that state into GNU's globals
+and coordinates competing readline operations with GC-aware parking. Reentrant
+configuration calls during callbacks remain valid; recursive terminal reads are
+rejected. Whole GNU calls park, callbacks execute Active, and tty/callback/stream state
+is restored on exit. GNU longjmp signal handling is disabled. Shared-heap Python
+workers can collect/compute during input waits and output backpressure. Full signal integration,
+display hooks, automatic rlcompleter, reload/history policy and curses remain gates.
+
+Native _opcode metadata reads immutable Code data into rooted results. Python
+opcode/dis supply tuple protocols, instruction iteration, recursive formatting,
+source positions and traceback/current-offset selection. Public offsets are VM
+instruction indexes. Source columns retain zero-based UTF-8 byte offsets. Code-
+aware Bytecode.stack_effect accounts for actual call-site layouts; standalone
+effects must not interpret call-table indexes as arities. No CPython co_code,
+cache bytes or specialization records are fabricated. Full upstream reflection
+and control-region inspection remain work.
 
 BaseExceptionGroup and ExceptionGroup use the existing exception storage plus
 readonly message/child slots. Construction validates children and group families;

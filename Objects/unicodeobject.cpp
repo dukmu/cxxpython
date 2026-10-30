@@ -1,4 +1,4 @@
-// Tail matching follows CPython 3.12.14 Objects/unicodeobject.c.
+// String methods follow CPython 3.12.14 Objects/unicodeobject.c.
 // PSF license: doc/licenses/python-3.12.14.txt.
 #include "internal/unicodeobject.hpp"
 #include "cxxpython/protocol.hpp"
@@ -156,6 +156,87 @@ bool bound(Attachment &context, Handle value, std::intptr_t &number, ReturnSlot 
              : n > high ? std::numeric_limits<std::intptr_t>::max()
                         : n.convert_to<std::intptr_t>();
     return true;
+}
+
+// Adapted from CPython 3.12.14 pad, unicode_{ljust,rjust,center,zfill}_impl
+// and their Argument Clinic width/fill converters.
+enum class Padding { LeftJustify, RightJustify, Center, ZeroFill };
+
+template <Padding Mode>
+void pad(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(context);
+    const auto self = roots.root(args[0]), width_arg = roots.root(args[1]);
+    if (!is_string(context, self.get(context))) {
+        raise_error(context, CoreObject::TypeErrorType, U"str descriptor requires a str", out);
+        return;
+    }
+    std::optional<Handle> fill_arg;
+    if constexpr (Mode != Padding::ZeroFill)
+        fill_arg = roots.root(args[2]);
+    ReturnSlot converted(context);
+    index(context, width_arg, converted);
+    if (converted.tag() == ResultTag::Raised) {
+        out.raised(converted.exception());
+        return;
+    }
+    const auto number = detail::integer_value(context.payload<IntObject>(converted.value()));
+    if (number < std::numeric_limits<std::intptr_t>::min() ||
+        number > std::numeric_limits<std::intptr_t>::max()) {
+        raise_error(context, CoreObject::OverflowErrorType,
+                    U"Python int too large to convert to C ssize_t", out);
+        return;
+    }
+    const auto width = number.template convert_to<std::intptr_t>();
+    char32_t fill = U'0';
+    if constexpr (Mode != Padding::ZeroFill) {
+        if (!is_string(context, fill_arg->get(context))) {
+            auto name = TypeView(context, context.type_of(*fill_arg)).name();
+            auto kind = std::holds_alternative<Value>(name)
+                            ? context.payload<StrObject>(std::get<Value>(name)).value
+                            : std::get<std::u32string>(name);
+            kind.resize(std::min<std::size_t>(kind.size(), 100));
+            raise_error(context, CoreObject::TypeErrorType,
+                        U"The fill character must be a unicode character, not " + kind, out);
+            return;
+        }
+        const auto &value = context.payload<StrObject>(*fill_arg).value;
+        if (value.size() != 1) {
+            raise_error(context, CoreObject::TypeErrorType,
+                        U"The fill character must be exactly one character long", out);
+            return;
+        }
+        fill = value[0];
+    }
+    const auto &text = context.payload<StrObject>(self).value;
+    if (width <= 0 || static_cast<std::size_t>(width) <= text.size()) {
+        if (context.type_of(self) == context.builtin(CoreObject::StrType))
+            out.ok(self.get(context));
+        else
+            make_str(context, text, out);
+        return;
+    }
+    const auto size = static_cast<std::size_t>(width);
+    const auto margin = size - text.size();
+    std::size_t left = 0;
+    if constexpr (Mode == Padding::RightJustify || Mode == Padding::ZeroFill)
+        left = margin;
+    else if constexpr (Mode == Padding::Center)
+        left = margin / 2 + (margin & size & 1);
+    std::u32string result;
+    if (size > result.max_size()) {
+        out.raised(context.builtin(CoreObject::MemoryError));
+        return;
+    }
+    result.assign(size, fill);
+    std::copy(text.begin(), text.end(), result.begin() + left);
+    if constexpr (Mode == Padding::ZeroFill) {
+        if (!text.empty() && (text[0] == U'+' || text[0] == U'-')) {
+            result[0] = text[0];
+            result[left] = U'0';
+        }
+    }
+    make_str(context, std::move(result), out);
 }
 
 template <bool Reverse, bool Raising>
@@ -821,6 +902,22 @@ void detail::install_unicode_methods(Attachment &context, std::span<const Handle
                              split<true>);
     SignatureLayout unary;
     unary.parameters = {{U"self", ParameterKind::PositionalOnly}};
+    ReturnSlot space(context);
+    context.allocate_instance<StrObject>(at(CoreObject::StrType), space, U" ");
+    const auto fill_space = roots.root(space.value());
+    SignatureLayout padded;
+    padded.parameters = {{U"self", ParameterKind::PositionalOnly},
+                         {U"width", ParameterKind::PositionalOnly},
+                         {U"fillchar", ParameterKind::PositionalOnly, fill_space.get(context)}};
+    install_native_attribute(context, core, at(CoreObject::StrType), U"ljust", padded,
+                             pad<Padding::LeftJustify>);
+    install_native_attribute(context, core, at(CoreObject::StrType), U"rjust", padded,
+                             pad<Padding::RightJustify>);
+    install_native_attribute(context, core, at(CoreObject::StrType), U"center", padded,
+                             pad<Padding::Center>);
+    padded.parameters.pop_back();
+    install_native_attribute(context, core, at(CoreObject::StrType), U"zfill", padded,
+                             pad<Padding::ZeroFill>);
     install_native_attribute(context, core, at(CoreObject::StrType), U"__getnewargs__", unary,
                              unicode_getnewargs);
     install_native_attribute(context, core, at(CoreObject::StrType), U"isascii", unary,

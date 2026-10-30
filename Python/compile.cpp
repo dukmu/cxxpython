@@ -348,8 +348,14 @@ class GraphPass final {
                 } else if constexpr (std::is_same_v<T, ComprehensionExpr>) {
                     function_value(*node.function, value.span);
                     expression(*node.iterable);
-                    emit(Opcode::GetIter, value.span);
+                    emit(node.asynchronous_iterable ? Opcode::GetAiter : Opcode::GetIter,
+                         value.span);
                     emit(Opcode::Call, value.span, 1);
+                    const auto &child = program_.scopes[node.function->scope];
+                    if (child.coroutine && !child.generator) {
+                        emit(Opcode::GetAwaitable, value.span);
+                        emit(Opcode::YieldFrom, value.span);
+                    }
                 } else if constexpr (std::is_same_v<T, StarredExpr>) {
                     error(value.span, "starred expression cannot be used here");
                 } else if constexpr (std::is_same_v<T, SubscriptExpr>) {
@@ -688,13 +694,14 @@ class GraphPass final {
                     } else if constexpr (std::is_same_v<T, ForStmt>) {
                         expression(*node.iterable);
                         if (!node.iterator_ready)
-                            emit(Opcode::GetIter, span);
+                            emit(node.asynchronous ? Opcode::GetAiter : Opcode::GetIter, span);
                         const auto test = block(), body = block(), exhausted = block(),
                                    broken = block(), done = block();
                         const auto loop = region(RegionKind::Loop, span, test, broken);
                         jump(test, span);
                         select(test);
-                        current().exit = FlowBlock::Exit::IterNext;
+                        current().exit = node.asynchronous ? FlowBlock::Exit::AsyncIterNext
+                                                           : FlowBlock::Exit::IterNext;
                         current().target = body;
                         current().alternative = exhausted;
                         current().span = span;
@@ -1105,8 +1112,12 @@ void SourceUnit::freeze(Attachment &context, ReturnSlot &out) const
                     builder.emit(Opcode::Return, 0, position);
                 else if (block.exit == detail::FlowBlock::Exit::Jump)
                     builder.jump(Opcode::Jump, labels[block.target], position);
-                else if (block.exit == detail::FlowBlock::Exit::IterNext) {
-                    builder.jump(Opcode::ForIter, labels[block.alternative], position);
+                else if (block.exit == detail::FlowBlock::Exit::IterNext ||
+                         block.exit == detail::FlowBlock::Exit::AsyncIterNext) {
+                    builder.jump(block.exit == detail::FlowBlock::Exit::AsyncIterNext
+                                     ? Opcode::ForAwait
+                                     : Opcode::ForIter,
+                                 labels[block.alternative], position);
                     builder.jump(Opcode::Jump, labels[block.target], position);
                 } else if (block.exit == detail::FlowBlock::Exit::Branch) {
                     builder.jump(Opcode::JumpIfFalse, labels[block.alternative], position);

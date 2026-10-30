@@ -511,6 +511,61 @@ TEST(FoundationThreads, NativeWaitPublishesRootsAndRestoresAdmission)
     EXPECT_EQ(destroyed, 0);
 }
 
+TEST(FoundationThreads, NativeCallbacksPublishResultsAndRefreezeRootsOnUnwind)
+{
+    int destroyed = 0;
+    Interpreter interpreter;
+    Attachment context(interpreter);
+    RootScope caller(context);
+    auto original = make_node(context, caller, &destroyed);
+    ReturnSlot result(context);
+    auto collect_elsewhere = [&] {
+        return std::async(std::launch::async,
+                          [&] {
+                              Attachment other(interpreter);
+                              return other.collect();
+                          })
+            .get();
+    };
+    {
+        NativeWait native(context);
+        {
+            NativeCallback callback(native);
+            RootScope local(context);
+            auto value = make_node(context, local, &destroyed);
+            result.ok(value.get(context));
+            EXPECT_EQ(context.collect(), 0U);
+            EXPECT_THROW(NativeCallback duplicate(native), std::logic_error);
+            {
+                NativeWait nested(context);
+                EXPECT_EQ(collect_elsewhere(), 0U);
+            }
+        }
+        EXPECT_THROW(result.value(), std::logic_error);
+        EXPECT_EQ(collect_elsewhere(), 0U);
+        EXPECT_THROW(
+            {
+                NativeCallback callback(native);
+                RootScope local(context);
+                make_node(context, local, &destroyed);
+                throw std::runtime_error("callback failure");
+            },
+            std::runtime_error);
+        EXPECT_THROW(context.require_attached(), std::logic_error);
+        EXPECT_EQ(collect_elsewhere(), 1U);
+        auto foreign = std::async(std::launch::async, [&] {
+            EXPECT_THROW(NativeCallback wrong_thread(native), std::logic_error);
+        });
+        foreign.get();
+    }
+    EXPECT_NO_THROW(original.get(context));
+    EXPECT_TRUE(context.has_layout<Node>(result.value()));
+    EXPECT_EQ(destroyed, 1);
+    result.reset();
+    EXPECT_EQ(context.collect(), 1U);
+    EXPECT_EQ(destroyed, 2);
+}
+
 TEST(FoundationThreads, SameInterpreterHandlesBelongToTheirOwningArena)
 {
     Interpreter interpreter;

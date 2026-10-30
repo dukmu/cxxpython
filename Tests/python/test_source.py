@@ -299,7 +299,7 @@ class SourceDifferential(unittest.TestCase):
         if not Path('/proc/self/fd/0').exists():
             self.skipTest('Linux descriptor fixture')
         source = ("import _imp\nimport sys\n_imp._get_source('/proc/self/fd/0')\n"
-                  "try:\n    print('closed pipe')\n"
+                  "try:\n    print('closed pipe', flush=True)\n"
                   "except OSError:\n    sys.stdout = None\n    sys.stderr.write('caught\\n')\n")
         process = subprocess.Popen([self.binary, '-c', source], stdin=subprocess.PIPE,
                                    stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)

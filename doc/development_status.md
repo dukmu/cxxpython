@@ -1,5 +1,85 @@
 # Development Status
 
+## 2026-10-31 Async Iteration, Native Terminal Callbacks And Real VM Inspection
+
+Prepended after 91d3fe3 without changing earlier records. Two terra workers owned
+readline and dis/opcode; the dis worker was then reused for native Unicode padding.
+Parent work completed async syntax, shared entry integration, runpy restoration,
+the native callback transition and acceptance. No sol/astra, guest host-Python
+execution, new scheduler or interpreter-wide execution mutex was introduced.
+The full active frontend/import/library/product/N4-N6 objective remains unfinished.
+
+- Added async for and asynchronous list/set/dict/generator comprehensions through
+  the existing CST adapter, scope pass, CFG and VM. GET_AITER and FOR_AWAIT have
+  verified operands, coroutine/branch stack rules, safepoints and disassembly.
+  FOR_AWAIT reuses Frame delegate/resume state and catches only next-step async
+  exhaustion, not target-binding/body errors. Eager outer iterator acquisition,
+  implicit collection awaits, nested scopes/closures, cancellation/close and
+  cross-OS-thread handoff have fixed-reference scripts. No temporary local slots,
+  sentinel objects or duplicated cleanup scheduler were added.
+- GNU readline now provides actual editing, history mutation/files, completion,
+  hooks and line/index helpers for eligible terminal streams. Typed module state
+  traces callbacks and owns native history; a process-local external-resource
+  claim swaps history rather than copying it per operation. Generic/replaced/
+  redirected streams still use ordinary Python protocols. GNU streams, callbacks,
+  TLS and tty state restore on exit; native longjmp signal handling is disabled.
+  File names use the existing filesystem conversion, including bytes/PathLike,
+  and append/write honor the reference's truncation and invalid-count rules.
+- A new PTY regression demonstrated a real GC deadlock when GNU blocked writing
+  a large prompt while only its byte reads used NativeWait; the fixed reference
+  passed. The C++ NativeCallback(NativeWait &) scope now admits owner-thread
+  callbacks only after pending epochs complete and republishes frozen roots on
+  exit/unwind. The entire GNU call stays NativeWait, not an ad hoc set of syscall
+  wrappers. Native tests verify result-slot publication, nested native waits,
+  exception cleanup, foreign-thread rejection and collection from another worker.
+  PTY tests verify editing/completion/history, tty restoration, CPU/GC progress
+  during input waits and GC progress during unread terminal output.
+- _opcode reads actual immutable instructions, signatures, positions and stack
+  effects. Python opcode/dis provide ordinary Instruction/Positions tuple
+  protocols, listings, recursion, current-offset/traceback selection and code
+  information. Offsets are instruction indexes, not fabricated CPython wordcode.
+  Bytecode.stack_effect uses owning call layouts; standalone effects reject
+  call-table indexes. Native str.ljust/rjust/center/zfill close real upstream
+  formatting dependencies, with index/overflow/order, Unicode fill, sign/parity,
+  exact-string/subtype identity and collecting-callback tests.
+- Restored complete runpy.py byte-for-byte from retained CPython 3.12.14. Public
+  run_module now has namespace/init-globals, module/package/relative import,
+  temporary module/argv and failure-restoration acceptance. run_path's actual
+  pkgutil/marshal/cache dependencies remain, as do warning paths. Source
+  completeness is not a claim that every API branch now works.
+- Final normal product passes all 270 portable script fixtures and 190 affected
+  native/entry contracts, including all 16 exhaustive normal bootstrap/promotion
+  failure shards. Thirteen additions have fixed-reference goldens; real stdin.bin
+  remains input data. Private VM assertions live in Tests/vm_cases and PTY sources
+  in Tests/pty_cases, not skipped reference cases or C++-wrapped Python programs.
+  Final strict ASan/UBSan/LSan passes 18 affected scripts and covers 173 native/
+  terminal contracts across the batch and corrected terminal rerun. Final TSan
+  passes the two shared-heap scripts and covers 71 native/terminal contracts:
+  69 batch passes plus isolated dis and corrected terminal passes. Earlier six-
+  script TSan acceptance and all intermediate failures remain available.
+- Initial integration exposed the primitive codec's (result, consumed) return
+  contract, missing Unicode alignment, a stale imaginary-literal rejection and
+  old unbuffered-print assumptions; native fixes/accurate tests replaced those
+  assumptions, not Lib compatibility shortcuts. A pre-prompt Ctrl-D race also
+  failed the reference; tests now wait for the prompt. TSan dis passed isolated
+  under its original 30-second limit after concurrent load ended. Long-prompt
+  readiness investigation retained native stacks in GNU multibyte scanning and
+  TSan strlen interception; only the ASCII backpressure child uses C locale,
+  with the same payload, GC assertions and deadlines. Other terminal tests keep
+  their locale. No sanitizer was disabled or acceptance timeout raised. Pinned
+  readline/_opcode build artifacts were linked into the reference's retained
+  extension directory; no foreign-version extension or host guest execution was
+  substituted. Evidence/hashes remain under .cache/repl-*; format-check and
+  upstream runpy byte comparison pass. No unrelated performance suite was run.
+- Remaining gates include full readline display/automatic rlcompleter/signal and
+  reload policy, curses, tracing-GC inspection/statistics/callbacks, complete dis
+  reflection/control-region inspection, remaining language forms (including
+  except* and type/annotation scopes), typing/regex and further standard-library,
+  product/install and N6 performance/release acceptance. This stable slice does
+  not mark them complete. Origin push still awaits the explicit destination
+  authorization requested after the previous auto-review rejection. The user's
+  temporary_plan.md deletion and root test2.py remain excluded.
+
 ## 2026-10-31 Real Standard Streams, Async Context Management And Contextlib
 
 Prepended after the e0de728 stable node, without rewriting previous evidence.

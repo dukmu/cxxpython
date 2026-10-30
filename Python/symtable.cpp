@@ -184,8 +184,7 @@ class ScopePass final {
                     if (node.value)
                         expression(*node.value, scope);
                 } else if constexpr (std::is_same_v<T, AwaitExpr>) {
-                    if (!program_.scopes[scope].coroutine)
-                        error(value.span, "'await' outside async function");
+                    async_scope(scope, value.span, "'await' outside async function");
                     expression(*node.value, scope);
                 } else if constexpr (std::is_same_v<T, UnaryExpr> || std::is_same_v<T, StarredExpr>)
                     expression(*node.value, scope);
@@ -231,6 +230,11 @@ class ScopePass final {
                     expression(*node.iterable, scope);
                     --comprehension_iterable_;
                     function(*node.function, scope, value.span);
+                    const auto &child = program_.scopes[node.function->scope];
+                    if (child.coroutine && !child.generator)
+                        async_scope(scope, value.span,
+                                    "asynchronous comprehension outside of an "
+                                    "asynchronous function");
                 } else if constexpr (std::is_same_v<T, BinaryExpr> || std::is_same_v<T, BoolExpr>) {
                     expression(*node.left, scope);
                     expression(*node.right, scope);
@@ -277,6 +281,13 @@ class ScopePass final {
                     static_assert(std::is_same_v<T, Literal>, "scope traversal missing expression");
             },
             value.node);
+    }
+    void async_scope(std::size_t scope, Span span, const char *message)
+    {
+        if (comprehensions_[scope])
+            program_.scopes[scope].coroutine = true;
+        else if (!program_.scopes[scope].coroutine)
+            error(span, message);
     }
     void target(Expr &value, std::size_t scope, bool read = false)
     {
@@ -384,6 +395,9 @@ class ScopePass final {
                         collect(node.body, scope);
                         collect(node.alternative, scope);
                     } else if constexpr (std::is_same_v<T, ForStmt>) {
+                        if (node.asynchronous)
+                            async_scope(scope, statement->span,
+                                        "'async for' outside async function");
                         target(*node.target, scope);
                         if (comprehensions_[scope]) {
                             ++comprehension_iterable_;

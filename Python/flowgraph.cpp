@@ -94,6 +94,8 @@ constexpr std::array definitions{
     OpcodeDefinition{"YIELD_VALUE", 1, 1, 1, OperandDomain::None, FlowKind::Next, true, true},
     OpcodeDefinition{"YIELD_FROM", 1, 1, 1, OperandDomain::None, FlowKind::Next, true, true},
     OpcodeDefinition{"ASYNC_YIELD_VALUE", 1, 1, 1, OperandDomain::None, FlowKind::Next, true, true},
+    OpcodeDefinition{"GET_AITER", 1, 1, 1, OperandDomain::None, FlowKind::Next, true, true},
+    OpcodeDefinition{"FOR_AWAIT", 1, 0, 1, OperandDomain::Target, FlowKind::IterBranch, true, true},
 };
 static_assert(definitions.size() == static_cast<std::size_t>(Opcode::Count));
 [[noreturn]] void invalid(CodeErrorKind kind, const char *message,
@@ -175,7 +177,7 @@ std::size_t verify(const CodeSpec &spec, std::span<const Instruction> instructio
         if ((opcode == Opcode::YieldValue && (!spec.generator || spec.coroutine)) ||
             (opcode == Opcode::YieldFrom && !spec.generator && !spec.coroutine))
             invalid(CodeErrorKind::Operand, "yield requires generator code", pc);
-        if (opcode == Opcode::GetAwaitable && !spec.coroutine)
+        if ((opcode == Opcode::GetAwaitable || opcode == Opcode::ForAwait) && !spec.coroutine)
             invalid(CodeErrorKind::Operand, "await requires coroutine code", pc);
         if (opcode == Opcode::AsyncYieldValue && (!spec.generator || !spec.coroutine))
             invalid(CodeErrorKind::Operand, "async yield requires async generator code", pc);
@@ -462,7 +464,8 @@ StackEffect instruction_effect(Instruction instruction, std::span<const CallLayo
                                bool jump_taken)
 {
     const auto &definition = opcode_definition(instruction.opcode);
-    if (instruction.opcode == Opcode::ForIter && jump_taken)
+    if ((instruction.opcode == Opcode::ForIter || instruction.opcode == Opcode::ForAwait) &&
+        jump_taken)
         return {1, 0, 0};
     if (instruction.opcode == Opcode::Raise)
         return {instruction.operand, instruction.operand, 0};
@@ -579,7 +582,8 @@ void CodeBuilder::jump(Opcode opcode, Label target, SourcePosition source)
 {
     if (target.owner != this || target.index >= labels_.size())
         invalid(CodeErrorKind::ForeignLabel, "label belongs to a different builder");
-    if (opcode != Opcode::Jump && opcode != Opcode::JumpIfFalse && opcode != Opcode::ForIter)
+    if (opcode != Opcode::Jump && opcode != Opcode::JumpIfFalse && opcode != Opcode::ForIter &&
+        opcode != Opcode::ForAwait)
         invalid(CodeErrorKind::Operand, "not a branch opcode");
     fixups_.push_back({instructions_.size(), target});
     try {
