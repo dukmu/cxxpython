@@ -10,6 +10,7 @@
 #include "cxxpython/type.hpp"
 #include "internal/codecs.hpp"
 #include "internal/errors.hpp"
+#include "internal/import.hpp"
 
 #include <bit>
 #include <limits>
@@ -19,6 +20,11 @@ namespace {
 bool failed(const ReturnSlot &out)
 {
     return out.tag() == ResultTag::Raised;
+}
+template <bool Errors>
+void filesystem_encoding(Attachment &ctx, Handle, std::span<const Value>, ReturnSlot &out)
+{
+    make_str(ctx, Errors ? U"surrogateescape" : U"utf-8", out);
 }
 
 void system_exit_init(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
@@ -352,6 +358,22 @@ void initialize_sys_hooks(Attachment &ctx, Handle sys, ReturnSlot &out)
         dict_store(ctx, dict, roots.root(key.value()), roots.root(function.value()), out);
         return !failed(out);
     };
+    std::vector<Value> builtin_modules;
+    for (auto &name : builtin_names(ctx)) {
+        make_str(ctx, std::move(name), function);
+        builtin_modules.push_back(roots.root(function.value()).get(ctx));
+    }
+    cxxpython::core::make_tuple(ctx, builtin_modules, function);
+    if (!store(U"builtin_module_names"))
+        return;
+    make_native_function(ctx, "getfilesystemencoding", {}, filesystem_encoding<false>, {}, function,
+                         NativeFunctionBinding::Function);
+    if (!store(U"getfilesystemencoding"))
+        return;
+    make_native_function(ctx, "getfilesystemencodeerrors", {}, filesystem_encoding<true>, {},
+                         function, NativeFunctionBinding::Function);
+    if (!store(U"getfilesystemencodeerrors"))
+        return;
     SignatureLayout exit_signature;
     exit_signature.parameters = {
         {U"status", ParameterKind::PositionalOnly, ctx.builtin(CoreObject::None)}};

@@ -59,7 +59,7 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
         TypeSpec spec{name, bases};
         spec.module = U"builtins";
         if (id == CoreObject::FunctionType || id == CoreObject::ModuleType ||
-            id == CoreObject::SimpleNamespaceType)
+            id == CoreObject::SimpleNamespaceType || id == CoreObject::BaseExceptionType)
             spec.slots = std::vector<std::u32string>{U"__dict__"};
         if (id == CoreObject::ImportErrorType)
             spec.slots = std::vector<std::u32string>{U"name", U"path", U"msg", U"name_from"};
@@ -68,8 +68,8 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
         if (id == CoreObject::SystemExitType)
             spec.slots = std::vector<std::u32string>{U"code"};
         if (id == CoreObject::OSErrorType)
-            spec.slots =
-                std::vector<std::u32string>{U"errno", U"strerror", U"filename", U"filename2"};
+            spec.slots = std::vector<std::u32string>{U"errno", U"strerror", U"filename",
+                                                     U"filename2", U"characters_written"};
         if (id == CoreObject::UnicodeEncodeErrorType || id == CoreObject::UnicodeDecodeErrorType)
             spec.slots =
                 std::vector<std::u32string>{U"encoding", U"object", U"start", U"end", U"reason"};
@@ -411,10 +411,35 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     install_iteration(context, core);
     install_reversed(context, core);
     install_modules(context, core);
+    {
+        ReturnSlot name(context), documentation(context);
+        context.allocate_instance<StrObject>(core[static_cast<std::size_t>(CoreObject::StrType)],
+                                             name, U"__doc__");
+        const auto none = core[static_cast<std::size_t>(CoreObject::None)].get(context);
+        for (std::size_t i = 0; i < static_cast<std::size_t>(CoreObject::None); ++i) {
+            const auto dictionary = *TypeView(context, core[i]).dictionary();
+            if (!name_lookup(context, dictionary, U"__doc__"))
+                name_store(context, dictionary, name.value(), none);
+        }
+        for (const auto &[type, text] :
+             {std::pair{context.object_type(),
+                        U"The base class of the class hierarchy.\n\nWhen called, it accepts "
+                        U"no arguments and returns a new featureless\ninstance that has no "
+                        U"instance attributes and cannot be given any.\n"},
+              std::pair{context.type_type(),
+                        U"type(object) -> the object's type\ntype(name, bases, dict, "
+                        U"**kwds) -> a new type"}}) {
+            context.allocate_instance<StrObject>(
+                core[static_cast<std::size_t>(CoreObject::StrType)], documentation, text);
+            name_store(context, *TypeView(context, type).dictionary(), name.value(),
+                       documentation.value());
+        }
+    }
     for (std::size_t i = 0; i < static_cast<std::size_t>(CoreObject::None); ++i) {
         context.payload<TypeObject>(core[i]).immutable = true;
         context.payload<TypeObject>(core[i]).state = TypeState::Ready;
     }
+    context.payload<TypeObject>(at(CoreObject::UnsupportedOperationType)).immutable = false;
     for (auto type : {context.object_type(), context.type_type()})
         context.payload<TypeObject>(type).state = TypeState::Ready;
     for (auto id : {CoreObject::NoneType,

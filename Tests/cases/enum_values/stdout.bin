@@ -1,0 +1,8 @@
+[('FIRST', 1), ('SECOND', 2), ('THIRD', 3)]
+False
+True SECOND
+['FIRST', 'ALIAS', 'SECOND']
+200 ERROR 500
+ValueError 0 is not a valid Status
+ValueError 300 is not a valid Status
+alpha0 beta1

@@ -1,0 +1,10 @@
+True
+True 6 data.bin
+b'ab' 2 b'cdef'
+True
+b'abXYef'
+True 3 w
+'A\n\u03b2' '\r\n'
+True b'a'
+b'a' True
+b''

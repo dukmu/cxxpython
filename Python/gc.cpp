@@ -461,6 +461,7 @@ struct State {
         mark(type_type);
         for (auto *object : core)
             mark(object);
+        mark(exit_callbacks);
         auto trace_work = [&] {
             while (worklist) {
                 Allocation *allocation = worklist;
@@ -601,6 +602,7 @@ struct State {
     ObjectHeader *object_type = nullptr;
     ObjectHeader *type_type = nullptr;
     std::array<ObjectHeader *, detail::core_count> core{};
+    ObjectHeader *exit_callbacks = nullptr;
     bool core_published = false;
     std::atomic<std::uint64_t> type_epoch{0}, exception_epoch{0};
     CallExecutor call_executor = nullptr;
@@ -1486,6 +1488,22 @@ Value Attachment::builtin(CoreObject object) const
     if (index >= state_->core.size() || !state_->core[index])
         throw std::logic_error("core runtime image has not been initialized");
     return Value(*state_->core[index]);
+}
+void Attachment::load_exit_callbacks(ReturnSlot &out)
+{
+    out.reset(*this);
+    std::lock_guard gate(state_->coordinator);
+    if (state_->exit_callbacks)
+        out.ok(Value(*state_->exit_callbacks));
+}
+void Attachment::publish_exit_callbacks(Handle candidate, ReturnSlot &out)
+{
+    const auto value = candidate.get(*this);
+    out.reset(*this);
+    std::lock_guard gate(state_->coordinator);
+    if (!state_->exit_callbacks)
+        state_->exit_callbacks = value.object();
+    out.ok(Value(*state_->exit_callbacks));
 }
 std::uint64_t Attachment::publication_epoch(PublicationDomain domain) const
 {

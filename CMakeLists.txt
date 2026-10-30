@@ -33,11 +33,15 @@ add_library(cxxpython_core
     Modules/_iomodule.cpp
     Modules/_io/stdio.cpp
     Modules/_io/iobase.cpp
+    Modules/_io/bufferedio.cpp
+    Modules/_io/textio.cpp
+    Modules/_io/open.cpp
     Modules/_io/fileio.cpp
     Modules/_io/bytesio.cpp
     Modules/_io/stringio.cpp
     Modules/_threadmodule.cpp
     Modules/_abc.cpp
+    Modules/atexitmodule.cpp
     Modules/itertoolsmodule.cpp
     Modules/itertools_combinatorics.cpp
     Modules/itertools_groups.cpp
@@ -71,6 +75,7 @@ add_library(cxxpython_core
     Objects/stringformat.cpp
     Objects/unicodeobject.cpp
     Objects/bytesobject.cpp
+    Objects/bytesmethods.cpp
     Objects/unicodecodecs.cpp
     Objects/superobject.cpp
     Objects/genobject.cpp
@@ -97,6 +102,7 @@ add_library(cxxpython_core
     Objects/enumobject.cpp
     Objects/abstract.cpp
     Objects/representation.cpp
+    Objects/reduction.cpp
 )
 target_include_directories(cxxpython_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/Include)
 target_include_directories(cxxpython_core SYSTEM PRIVATE ${BOOST_MULTIPRECISION_INCLUDE_DIR})
@@ -251,7 +257,11 @@ if(BUILD_TESTING)
         ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_cases.py --binary $<TARGET_FILE:cxxpython>)
     add_test(NAME Scripts.Reference COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_cases.py --binary ${CXXPYTHON_REFERENCE_PYTHON})
+    add_test(NAME Scripts.NoGil COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_cases.py
+        --binary $<TARGET_FILE:cxxpython> --cases ${CMAKE_CURRENT_SOURCE_DIR}/Tests/nogil_cases)
     set_tests_properties(Scripts.Cases Scripts.Reference PROPERTIES TIMEOUT 120)
+    set_tests_properties(Scripts.NoGil PROPERTIES TIMEOUT 60)
     add_test(NAME Stdlib.Doctests COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_stdlib.py --binary $<TARGET_FILE:cxxpython>)
     set_tests_properties(Stdlib.Doctests PROPERTIES TIMEOUT 45)

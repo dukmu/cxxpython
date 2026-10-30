@@ -1,0 +1,8 @@
+BlockingIOError 4 (0, 'write could not complete without blocking', 4)
+BlockingIOError 0
+b'abcd'
+2
+b'abcdef'
+2
+2
+b'abcd'

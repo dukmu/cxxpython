@@ -1,0 +1,10 @@
+/a/b/../c
+//a/c
+('/a/b', '') ('/a/.profile', '')
+b'\xff' b'/a'
+/a
+../b/c
+True True True
+True 3
+True
+False True

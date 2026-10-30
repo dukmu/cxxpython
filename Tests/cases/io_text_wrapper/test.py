@@ -1,0 +1,23 @@
+import _io
+
+raw = _io.BytesIO('a中\r\nb\rc\nend'.encode('utf-8'))
+f = _io.TextIOWrapper(raw, encoding='utf-8', newline=None)
+print(f.encoding, f.errors, f.closed)
+print(repr(f.read(2)))
+cookie = f.tell()
+print(repr(f.readline()))
+print(repr(f.readline()))
+f.seek(cookie)
+print(repr(f.readline()))
+print(repr(f.read()))
+f.seek(0)
+print(repr(f.read(3)))
+print(f.detach() is raw)
+
+raw = _io.BytesIO()
+f = _io.TextIOWrapper(raw, encoding='utf-8', newline='\r\n')
+print(f.write('中\nx'))
+f.flush()
+print(repr(raw.getvalue()))
+f.close()
+print(f.closed)

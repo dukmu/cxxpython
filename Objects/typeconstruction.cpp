@@ -1,6 +1,7 @@
 #include "cxxpython/genericaliasobject.hpp"
 #include "cxxpython/protocol.hpp"
 #include "cxxpython/unionobject.hpp"
+#include "internal/exceptions.hpp"
 
 #include <algorithm>
 
@@ -443,15 +444,29 @@ void finish_class(Attachment &context, Handle cls, std::span<const KeywordArg> n
         std::array args{cls.get(context), entry.key};
         detail::special(context, entry.value, U"__set_name__", {args, {}}, callback);
         if (raised(callback)) {
-            const auto cause = callback.exception();
-            raise_error(context, CoreObject::RuntimeErrorType, U"error calling __set_name__", out);
-            if (context.type_of(out.exception()) == context.builtin(CoreObject::RuntimeErrorType)) {
-                auto &error = context.payload<ExceptionObject>(out.exception());
-                const auto wrapped = out.exception();
-                context.store(wrapped, error.cause, cause);
-                context.store(wrapped, error.context, cause);
-                error.suppress_context.store(true, std::memory_order_release);
+            auto original = roots.root(callback.exception());
+            auto name = [&](Value type) {
+                const auto value = TypeView(context, type).name();
+                return (std::holds_alternative<Value>(value)
+                            ? context.payload<StrObject>(std::get<Value>(value)).value
+                            : std::get<std::u32string>(value))
+                    .substr(0, 100);
+            };
+            const auto descriptor = name(context.type_of(entry.value));
+            const auto owner = name(cls.get(context));
+            ReturnSlot key(context), note(context);
+            repr(context, roots.root(entry.key), key);
+            if (raised(key)) {
+                out.raised(key.exception());
+                return;
             }
+            make_str(context,
+                     U"Error calling __set_name__ on '" + descriptor + U"' instance " +
+                         context.payload<StrObject>(key.value()).value + U" in '" + owner + U"'",
+                     note);
+            detail::add_exception_note(context, original, roots.root(note.value()), out);
+            if (!raised(out))
+                out.raised(original.get(context));
             return;
         }
     }

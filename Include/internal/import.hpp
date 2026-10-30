@@ -56,6 +56,7 @@ void execute_definition(Attachment &, const std::shared_ptr<const ModuleDefiniti
 std::shared_ptr<const SourceUnit> definition_source(Attachment &, const ModuleDefinition &,
                                                     ReturnSlot &);
 void register_definition(Attachment &, std::u32string, std::shared_ptr<const ModuleDefinition>);
+std::vector<std::u32string> builtin_names(Attachment &);
 std::shared_ptr<const NativeModule> load_extension(Attachment &, const std::string &,
                                                    const std::u32string &, ReturnSlot &);
 void exec_extension(Attachment &, const std::shared_ptr<const NativeModule> &, Handle,

@@ -29,6 +29,33 @@ void make_proxy(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &
     RootScope roots(c);
     detail::make_weakproxy(c, roots.root(args[0]), roots.root(args[1]), out);
 }
+void remove_dead_weakref(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(c);
+    auto dictionary = roots.root(args[0]), key = roots.root(args[1]);
+    detail::DictBinding binding;
+    ReturnSlot value(c), target(c);
+    detail::dict_lookup_binding(c, dictionary, key, binding, value);
+    if (value.tag() == ResultTag::Raised) {
+        out.raised(value.exception());
+        return;
+    }
+    if (value.tag() == ResultTag::Ok) {
+        auto ref = roots.root(value.value());
+        const auto type = c.type_of(ref);
+        if (!c.has_layout<WeakRefObject>(ref.get(c)) ||
+            (!is_subtype(c, type, c.builtin(CoreObject::WeakRefType)) &&
+             type != c.builtin(CoreObject::WeakProxyType) &&
+             type != c.builtin(CoreObject::CallableWeakProxyType))) {
+            raise_error(c, CoreObject::TypeErrorType, U"not a weakref", out);
+            return;
+        }
+        c.load(ref.get(c), c.payload<WeakRefObject>(ref).target, target);
+        if (target.tag() == ResultTag::Empty)
+            detail::dict_erase_binding(c, dictionary, binding, ref);
+    }
+    out.ok(c.builtin(CoreObject::None));
+}
 } // namespace
 
 void detail::initialize_weakref(Attachment &c, Handle module, ReturnSlot &out)
@@ -59,6 +86,13 @@ void detail::initialize_weakref(Attachment &c, Handle module, ReturnSlot &out)
     make_native_function(c, "getweakrefs", unary, getweakrefs, {}, function,
                          NativeFunctionBinding::Function);
     if (!publish(U"getweakrefs", roots.root(function.value())))
+        return;
+    SignatureLayout remove_signature;
+    remove_signature.parameters = {{U"dct", ParameterKind::PositionalOnly},
+                                   {U"key", ParameterKind::PositionalOnly}};
+    make_native_function(c, "_remove_dead_weakref", remove_signature, remove_dead_weakref, {},
+                         function, NativeFunctionBinding::Function);
+    if (!publish(U"_remove_dead_weakref", roots.root(function.value())))
         return;
     unary.parameters.push_back(
         {U"callback", ParameterKind::PositionalOnly, c.builtin(CoreObject::None)});

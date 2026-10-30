@@ -66,8 +66,8 @@ is introduced. Frozenset fills its unpublished table before allocating the visib
 object and caches its order-independent hash atomically. Subclasses retain their
 ordinary native layout and traced tails. Bulk algebra uses rooted snapshots and
 short per-key commits, not a promise that an entire multi-operand update is one
-atomic transaction. Native weakrefs, pickle/generic-alias integration and the
-remaining common type APIs are still gates.
+atomic transaction. Native weakrefs and generic aliases are integrated; pickle
+and the remaining common type APIs are still gates.
 
 Method forms accept iterables, binary operators require set/frozenset, and in-place
 operations preserve mutable set identity. Cached hashes are reused only on the
@@ -133,12 +133,16 @@ _io.TextIOWrapper compatibility. They borrow standard descriptors, use operation
 leases for close/write coordination, and park only around host operations without
 holding internal mutexes during blocking writes. SIGPIPE is scoped to the writing
 thread rather than changing the embedding host's process-wide disposition.
-These are unbuffered UTF-8 bootstrap streams; input/read, open, full _io layering,
-buffering, stream configuration and errno/platform error matrices remain gates.
-The bridge now lives in Modules/_io/stdio.cpp. Separate native IOBase/FileIO and
-BytesIO/StringIO implementations provide actual descriptor/memory operations,
-not yet the complete buffered/text/io/open dependency closure. File operations
-use descriptor leases and NativeWait, not a lock held across blocking syscalls.
+These remain unbuffered UTF-8 bootstrap streams in Modules/_io/stdio.cpp; input,
+real standard-stream installation/configuration and the remaining errno/platform
+matrix are gates. The separate IOBase/FileIO, BytesIO/StringIO, buffered binary
+streams and TextIOWrapper now back unchanged pinned Lib/io.py and builtin open.
+File operations use descriptor leases and NativeWait, not a lock held across
+blocking syscalls. Buffered/text streams claim only their own operation state;
+competing threads park, same-thread incompatible reentry raises, and Python
+callbacks run without internal mutexes. Decoder-state replay cookies preserve
+logical text positions independently of raw descriptor offsets. Complete codec,
+warning, subclass and configuration matrices are not implied by this slice.
 
 The unchanged pinned abc.py uses real _abc weak registries and epoch-tagged
 negative caches. Type abstract flags publish with immutable namespace snapshots;
@@ -152,7 +156,39 @@ and OS-thread VM. A Transfer retains state for admission without borrowing an
 Interpreter C++ lifetime; close rejects new admissions. Admitted threads keep
 their state/precise roots alive, and lock waits park for GC. Python exceptions
 are reported through the unraisable hook, except quiet SystemExit. Threading
-joins, signals, RLock/local and complete product shutdown remain requirements.
+joins, signals, local and complete product shutdown remain requirements. RLock
+provides recursive ownership and save/restore using the same GC-aware waits.
+
+## Weak References And Exit Callbacks
+
+Pinned weakref.py, _weakrefset.py and copyreg.py use the ordinary object/GC path.
+Conditional weak-mapping removal snapshots a rooted dictionary binding and
+erases only that same entry/value identity after confirming its weak target is
+dead. A concurrent live replacement is not removed. Bound-method equality uses
+function equality and receiver identity; hashing does not invoke the receiver's
+possibly absent hash protocol. Object reduction snapshots ordinary dictionaries
+and slots through rooted reads, preserving user constructor/state callbacks.
+This is reduction support, not completion of pickle/deepcopy.
+
+BaseException owns an ordinary instance-dictionary tail; __notes__ has no second
+storage authority. Concurrent first-use add_note publishes one list through the
+existing dictionary commit and appends through normal list synchronization.
+Class __set_name__ failures preserve the original exception and attach the
+Python 3.12 diagnostic note rather than replacing it with a wrapper exception.
+
+The Interpreter state owns one precise exit-callback root independent of the
+replaceable sys.modules and module dictionaries. Atexit registration prepares
+nodes before short local commits; unregister compares rooted snapshots outside
+the mutex and revalidates stable node identities. Invocation pops each callback
+before running Python. A per-state reentrant execution claim prevents concurrent
+double invocation without serializing unrelated bytecode or callback execution
+under a mutex. Normal product exit invokes these callbacks; joining non-daemon
+threads, full embedding finalization and emergency-exit policy remain gates.
+
+The integer-fast itertools.count path reserves its next value under a short
+per-object claim and releases before boxing/allocation. Competing OS threads
+wait with NativeWait; generic callback-driven count retains an execution claim.
+Neither path introduces an interpreter-wide execution lock.
 
 The independent parser recognizes the fixed complete Python 3.12.14 PEG grammar,
 including those not-yet-executable families. `Grammar/` is the source of truth;
@@ -712,7 +748,13 @@ RunRequest accepts distinct globals/locals, with Python compile/exec/eval and
 their remaining option/mode gates specified above.
 
 Native contracts live in Tests/cpp; actual executable differential drivers live
-in Tests/python and use fixed CPython 3.12.14 when configured. Lib is reserved for
+in Tests/python and use fixed CPython 3.12.14 when configured. Portable fixtures
+are Tests/cases/<name>/test.py with optional real stdin.bin input and byte-exact
+stdout/stderr expectations. Tests/nogil_cases uses the same driver for explicitly
+different concurrent contracts: concurrent atexit execution must invoke each
+callback at most once, unlike the pinned reference's private-function behavior.
+These are separate from, not skipped inside, the reference compatibility suite.
+Lib is reserved for
 the interpreter's Python standard library. Benchmark source kernels
 are captured verbatim for the paired reference; raw runs retain version/build/hash
 provenance and generate tables. Same-Function source, closure, for-loop, exception and method probes

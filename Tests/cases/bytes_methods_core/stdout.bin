@@ -1,0 +1,30 @@
+2 6 2 8
+2 14 -1 3
+2 -1
+(b'  ab', b'--', b'ab--c  ') (b'  ab--ab', b'--', b'c  ') (b'  ab--ab--c  ', b'', b'')
+b'ab--ab--c' b'ab--ab--c  ' b'  ab--ab--c' b'ab--ab--'
+[b'  ab', b'ab', b'c  '] [b'  ab--ab', b'c  ']
+[b'ab--ab--c'] [b'ab--ab--c  '] [b'  ab--ab--c']
+[b'a', b'b  '] [b'  a', b'b']
+[b'', b'', b'', b''] [b'a', b'', b'']
+ValueError
+ValueError
+ValueError
+OverflowError
+TypeError
+2 6 2 8
+2 14 -1 3
+2 -1
+(bytearray(b'  ab'), bytearray(b'--'), bytearray(b'ab--c  ')) (bytearray(b'  ab--ab'), bytearray(b'--'), bytearray(b'c  ')) (bytearray(b'  ab--ab--c  '), bytearray(b''), bytearray(b''))
+bytearray(b'ab--ab--c') bytearray(b'ab--ab--c  ') bytearray(b'  ab--ab--c') bytearray(b'ab--ab--')
+[bytearray(b'  ab'), bytearray(b'ab'), bytearray(b'c  ')] [bytearray(b'  ab--ab'), bytearray(b'c  ')]
+[bytearray(b'ab--ab--c')] [bytearray(b'ab--ab--c  ')] [bytearray(b'  ab--ab--c')]
+[bytearray(b'a'), bytearray(b'b  ')] [bytearray(b'  a'), bytearray(b'b')]
+[bytearray(b''), bytearray(b''), bytearray(b''), bytearray(b'')] [bytearray(b'a'), bytearray(b''), bytearray(b'')]
+ValueError
+ValueError
+ValueError
+OverflowError
+TypeError
+1 1
+1 bytearray(b'abc')

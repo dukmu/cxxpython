@@ -9,6 +9,7 @@
 
 #include <atomic>
 #include <limits>
+#include <thread>
 
 namespace cxxpython::core::detail {
 namespace {
@@ -153,6 +154,7 @@ struct Count {
     std::int64_t fast_value;
     bool fast;
     std::atomic_flag active = ATOMIC_FLAG_INIT;
+    std::atomic<std::thread::id> owner{};
     Count(InitialType type, Value start, Value increment, std::int64_t number, bool fast_mode)
         : header(type), current(start), step(increment), fast_value(number), fast(fast_mode)
     {}
@@ -166,13 +168,36 @@ struct Count {
 struct Lease {
     std::atomic_flag &flag;
     bool acquired;
+    std::atomic<std::thread::id> *owner = nullptr;
     explicit Lease(std::atomic_flag &value)
         : flag(value), acquired(!flag.test_and_set(std::memory_order_acquire))
     {}
+    Lease(Attachment &ctx, std::atomic_flag &value, std::atomic<std::thread::id> &identity)
+        : flag(value), acquired(false), owner(&identity)
+    {
+        while (flag.test_and_set(std::memory_order_acquire)) {
+            if (owner->load(std::memory_order_acquire) == std::this_thread::get_id())
+                return;
+            NativeWait parked(ctx);
+            flag.wait(true, std::memory_order_acquire);
+        }
+        owner->store(std::this_thread::get_id(), std::memory_order_release);
+        acquired = true;
+    }
     ~Lease()
     {
-        if (acquired)
+        release();
+    }
+    void release() noexcept
+    {
+        if (acquired) {
+            if (owner)
+                owner->store({}, std::memory_order_release);
             flag.clear(std::memory_order_release);
+            if (owner)
+                flag.notify_one();
+            acquired = false;
+        }
     }
 };
 
@@ -875,14 +900,15 @@ void count_next(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot
     RootScope roots(ctx);
     auto self = roots.root(args[0]);
     auto &state = ctx.payload<Count>(self);
-    Lease lease(state.active);
+    Lease lease(ctx, state.active, state.owner);
     if (!acquire(ctx, lease, out))
         return;
     ReturnSlot current(ctx), next(ctx);
     if (state.fast && state.fast_value < std::numeric_limits<std::int64_t>::max()) {
-        make_int(ctx, state.fast_value, out);
-        if (!failed(out))
-            ++state.fast_value;
+        // Reserve before boxing: allocation/GC may invoke another counter user.
+        const auto value = state.fast_value++;
+        lease.release();
+        make_int(ctx, value, out);
         return;
     }
     if (state.fast) {

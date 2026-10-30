@@ -1,0 +1,10 @@
+RED 1 True
+True [<Color.RED: 1>, <Color.BLUE: 2>] ['RED', 'CRIMSON', 'BLUE']
+Color.BLUE <Color.RED: 1> Color.BLUE
+2 True 3
+first second-value True
+Permission.READ|WRITE True [<Permission.READ: 1>, <Permission.WRITE: 2>] 4
+3 9 2
+ValueError duplicate values found in <enum 'Color'>: CRIMSON -> RED
+3 4 True
+12 8

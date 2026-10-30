@@ -655,6 +655,23 @@ void method_get(Attachment &context, Handle, std::span<const Value> args, Return
         context, args[0],
         args[1] == context.builtin(CoreObject::None) ? std::optional<Value>{} : args[1], out);
 }
+void method_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (args[0] != context.builtin(CoreObject::BoundMethodType)) {
+        type_error(context, U"method.__new__ requires method type", out);
+        return;
+    }
+    if (!detail::type_attribute(context, context.type_of(args[1]), U"__call__")) {
+        type_error(context, U"first argument must be callable", out);
+        return;
+    }
+    if (args[2] == context.builtin(CoreObject::None)) {
+        type_error(context, U"instance must not be None", out);
+        return;
+    }
+    RootScope roots(context);
+    context.allocate_instance<BoundMethodObject>(roots.root(args[0]), out, args[1], args[2]);
+}
 void call_bridge(Attachment &context, Handle function, std::span<const Value> args, ReturnSlot &out)
 {
     auto owner = context.payload<NativeFunctionObject>(function).captures[0];
@@ -742,7 +759,9 @@ void install_native_attribute(Attachment &context, std::span<const Handle> core,
     allocate_function(
         context, at(CoreObject::NativeFunctionType), std::string(name.begin(), name.end()),
         std::move(signature), entry, std::move(captures), function,
-        kind == NativeSlotKind::Sequence ? std::optional<Value>{owner.get(context)} : std::nullopt);
+        kind == NativeSlotKind::Sequence ? std::optional<Value>{owner.get(context)} : std::nullopt,
+        NativeFunctionBinding::Descriptor,
+        name == U"__new__" ? std::optional<Value>{owner.get(context)} : std::nullopt);
     auto callable = roots.root(function.value());
     ReturnSlot key(context);
     context.allocate_instance<StrObject>(at(CoreObject::StrType), key, std::move(name));
@@ -751,6 +770,22 @@ void install_native_attribute(Attachment &context, std::span<const Handle> core,
 void install_call_descriptors(Attachment &context, std::span<const Handle> core)
 {
     auto at = [&](CoreObject id) { return core[static_cast<std::size_t>(id)]; };
+    {
+        RootScope roots(context);
+        const auto method = at(CoreObject::BoundMethodType);
+        SignatureLayout constructor;
+        constructor.parameters = {{U"cls", ParameterKind::PositionalOnly},
+                                  {U"function", ParameterKind::PositionalOnly},
+                                  {U"instance", ParameterKind::PositionalOnly}};
+        install_native_attribute(context, core, method, U"__new__", constructor, method_new);
+        const auto dictionary = *TypeView(context, method).dictionary();
+        auto function = roots.root(*name_lookup(context, dictionary, U"__new__"));
+        ReturnSlot wrapper(context), key(context);
+        context.allocate_instance<StaticMethodObject>(at(CoreObject::StaticMethodType), wrapper,
+                                                      function.get(context));
+        context.allocate_instance<StrObject>(at(CoreObject::StrType), key, U"__new__");
+        name_store(context, dictionary, key.value(), wrapper.value());
+    }
     SignatureLayout get;
     get.parameters = {{U"self", ParameterKind::PositionalOnly},
                       {U"instance", ParameterKind::PositionalOnly},

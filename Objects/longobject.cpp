@@ -2,6 +2,7 @@
 #include "cxxpython/protocol.hpp"
 #include "internal/long.hpp"
 
+#include <bit>
 #include <boost/multiprecision/cpp_int.hpp>
 #include <boost/version.hpp>
 #include <cmath>
@@ -52,6 +53,27 @@ void publish(Attachment &context, Integer value, ReturnSlot &out)
 void boolean(Attachment &context, bool value, ReturnSlot &out)
 {
     out.ok(context.builtin(value ? CoreObject::True : CoreObject::False));
+}
+template <bool Count>
+void int_bits(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!is_int(context, args[0])) {
+        type_error(context, out);
+        return;
+    }
+    Integer value = expanded(integer(context, args[0]));
+    if (value < 0)
+        value = -value;
+    Integer result = 0;
+    if constexpr (Count) {
+        const auto &backend = value.backend();
+        for (std::size_t i = 0; i < backend.size(); ++i)
+            result += std::popcount(backend.limbs()[i]);
+    } else if (value != 0) {
+        result = boost::multiprecision::msb(value);
+        ++result;
+    }
+    publish(context, std::move(result), out);
 }
 template <bool Reflected>
 void true_divide(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
@@ -834,6 +856,8 @@ void install_numbers(Attachment &context, std::span<const Handle> core)
     install(U"__gt__", compare<CompareOp::Gt>, true);
     install(U"__ge__", compare<CompareOp::Ge>, true);
     install(U"__bool__", int_bool);
+    install(U"bit_length", int_bits<false>);
+    install(U"bit_count", int_bits<true>);
     install(U"__int__", int_identity);
     install(U"__index__", int_identity);
     install(U"__pos__", int_unary<UnaryOp::Positive>);

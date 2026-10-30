@@ -1,4 +1,5 @@
 #include "cxxpython/protocol.hpp"
+#include "internal/reduction.hpp"
 
 #include <algorithm>
 #include <bit>
@@ -505,6 +506,52 @@ void tuple_compare(Attachment &context, Handle, std::span<const Value> args, Ret
     }
     order_result<Op>(context, (left.size() > right.size()) - (left.size() < right.size()), out);
 }
+template <bool NotEqual>
+void method_compare(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!instance_of<BoundMethodObject, CoreObject::BoundMethodType>(c, args[0])) {
+        type_error(c, out);
+        return;
+    }
+    if (!instance_of<BoundMethodObject, CoreObject::BoundMethodType>(c, args[1])) {
+        out.ok(c.builtin(CoreObject::NotImplemented));
+        return;
+    }
+    RootScope roots(c);
+    auto self = roots.root(args[0]), other = roots.root(args[1]);
+    const auto &left = c.payload<BoundMethodObject>(self);
+    const auto &right = c.payload<BoundMethodObject>(other);
+    ReturnSlot compared(c);
+    container_equal(c, roots.root(left.function), roots.root(right.function), compared);
+    if (raised(compared)) {
+        out.raised(compared.exception());
+        return;
+    }
+    const bool equal = compared.value() == c.builtin(CoreObject::True) && left.self == right.self;
+    out.ok(c.builtin(equal != NotEqual ? CoreObject::True : CoreObject::False));
+}
+void method_hash(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!instance_of<BoundMethodObject, CoreObject::BoundMethodType>(c, args[0])) {
+        type_error(c, out);
+        return;
+    }
+    RootScope roots(c);
+    auto self = roots.root(args[0]);
+    const auto &method = c.payload<BoundMethodObject>(self);
+    ReturnSlot hashed(c);
+    hash(c, roots.root(method.function), hashed);
+    if (raised(hashed)) {
+        out.raised(hashed.exception());
+        return;
+    }
+    std::int64_t function_hash;
+    int_fits_signed(c, hashed.value(), function_hash);
+    auto result =
+        signed_hash(std::rotr(reinterpret_cast<std::uintptr_t>(method.self.object()), 4)) ^
+        function_hash;
+    make_int(c, result == -1 ? -2 : result, out);
+}
 template <CompareOp Op>
 void cell_compare(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
@@ -631,6 +678,12 @@ void install_value_protocols(Attachment &context, std::span<const Handle> core)
     install(object, U"__repr__", object_repr);
     install(object, U"__str__", object_str);
     install(object, U"__sizeof__", object_sizeof);
+    install_reduction(context, core);
+    install(at(CoreObject::BoundMethodType), U"__hash__", method_hash);
+    install_native_attribute(context, core, at(CoreObject::BoundMethodType), U"__eq__", pair,
+                             method_compare<false>);
+    install_native_attribute(context, core, at(CoreObject::BoundMethodType), U"__ne__", pair,
+                             method_compare<true>);
     install(roots.root(context.type_type()), U"__repr__", type_repr);
     install(at(CoreObject::StrType), U"__hash__", string_hash);
     install(at(CoreObject::StrType), U"__str__", string_str);

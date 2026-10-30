@@ -1,0 +1,11 @@
+(11, 'busy', 4) None 4 [Errno 11] busy
+8
+False
+characters_written
+6
+-2
+False
+ValueError
+TypeError
+3 (11, 'busy') False
+9

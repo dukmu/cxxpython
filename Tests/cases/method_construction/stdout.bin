@@ -1,0 +1,7 @@
+12 True 7
+TypeError first argument must be callable
+TypeError instance must not be None
+True
+True
+True
+None True

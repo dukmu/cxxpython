@@ -1,6 +1,7 @@
 #include "internal/main.hpp"
 #include "cxxpython/compiler.hpp"
 #include "cxxpython/import.hpp"
+#include "internal/atexitmodule.hpp"
 #include "internal/compiler.hpp"
 #include "internal/pythonrun.hpp"
 
@@ -282,8 +283,11 @@ int pymain(int argc, char **argv)
             status = report_source_error(error);
         }
         if (repl_only || options.interactive)
-            return run_interactive(context, globals, sys, tty || options.interactive,
-                                   tty && !options.quiet && repl_only);
+            status = run_interactive(context, globals, sys, tty || options.interactive,
+                                     tty && !options.quiet && repl_only);
+        run_exitfuncs(context, out);
+        if (out.tag() == ResultTag::Raised)
+            return report_exception(context, out.exception());
         return status;
     } catch (const SourceError &error) {
         return report_source_error(error);

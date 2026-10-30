@@ -1,0 +1,15 @@
+b'on' 2 b'e\n'
+b'e\n' b'two' 7
+0 b'one\ntwo\nthree' b''
+True True
+ValueError
+3 b'' 3
+3 b'abc' 6
+b'abcdef' 6
+True True
+b'ab' 2
+2 4
+0 b'abXYef' 6
+b'he' 3 b''
+b'llo' b'abc'
+True True True

@@ -1,0 +1,10 @@
+6
+b'abcdef'
+True
+ValueError
+None b'' b'' b''
+True
+2 b'ab'
+1 b'cb'
+b'def'
+RuntimeError

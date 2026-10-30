@@ -149,6 +149,8 @@ enum class Op {
     Read,
     Write,
     Seek,
+    Chdir,
+    Fchdir,
     Mkdir,
     Rmdir,
     Unlink,
@@ -166,6 +168,15 @@ template <Op op> void entry(Attachment &c, Handle, std::span<const Value> a, Ret
     std::int64_t n = 0, extra = 0;
     std::string p, q, data;
     ssize_t result = 0;
+    bool chdir_fd = false;
+    if constexpr (op == Op::Chdir) {
+        chdir_fd = is_int(c, a[0]);
+        if (chdir_fd) {
+            if (!descriptor(c, a[0], fd, out))
+                return;
+        } else if (!path(c, a[0], p, out, &filename))
+            return;
+    }
     if constexpr (op == Op::Open || op == Op::Mkdir || op == Op::Rmdir || op == Op::Unlink ||
                   op == Op::Rename || op == Op::Symlink)
         if (!path(c, a[0], p, out, &filename))
@@ -173,7 +184,8 @@ template <Op op> void entry(Attachment &c, Handle, std::span<const Value> a, Ret
     if constexpr (op == Op::Rename || op == Op::Symlink)
         if (!path(c, a[1], q, out, &filename2))
             return;
-    if constexpr (op == Op::Close || op == Op::Read || op == Op::Write || op == Op::Seek)
+    if constexpr (op == Op::Close || op == Op::Read || op == Op::Write || op == Op::Seek ||
+                  op == Op::Fchdir)
         if (!descriptor(c, a[0], fd, out))
             return;
     if constexpr (op == Op::Open || op == Op::Mkdir || op == Op::Read || op == Op::Seek)
@@ -240,6 +252,10 @@ template <Op op> void entry(Attachment &c, Handle, std::span<const Value> a, Ret
         }
         if constexpr (op == Op::Seek)
             result = ::lseek(fd, static_cast<off_t>(n), static_cast<int>(extra));
+        if constexpr (op == Op::Chdir)
+            result = chdir_fd ? ::fchdir(fd) : ::chdir(p.c_str());
+        if constexpr (op == Op::Fchdir)
+            result = ::fchdir(fd);
         if constexpr (op == Op::Mkdir)
             result = ::mkdir(p.c_str(), static_cast<mode_t>(n));
         if constexpr (op == Op::Rmdir)
@@ -264,7 +280,13 @@ template <Op op> void entry(Attachment &c, Handle, std::span<const Value> a, Ret
     if (error) {
         if constexpr (op == Op::Rename || op == Op::Symlink)
             os_error(c, error, out, filename.value(), filename2.value());
-        else if constexpr (op == Op::Open || op == Op::Mkdir || op == Op::Rmdir || op == Op::Unlink)
+        else if constexpr (op == Op::Chdir) {
+            if (chdir_fd)
+                os_error(c, error, out);
+            else
+                os_error(c, error, out, filename.value());
+        } else if constexpr (op == Op::Open || op == Op::Mkdir || op == Op::Rmdir ||
+                             op == Op::Unlink)
             os_error(c, error, out, filename.value());
         else
             os_error(c, error, out);
@@ -273,8 +295,9 @@ template <Op op> void entry(Attachment &c, Handle, std::span<const Value> a, Ret
     if constexpr (op == Op::Read) {
         data.resize(static_cast<std::size_t>(result));
         make_bytes(c, std::move(data), out);
-    } else if constexpr (op == Op::Close || op == Op::Mkdir || op == Op::Rmdir ||
-                         op == Op::Unlink || op == Op::Rename || op == Op::Symlink)
+    } else if constexpr (op == Op::Close || op == Op::Chdir || op == Op::Fchdir ||
+                         op == Op::Mkdir || op == Op::Rmdir || op == Op::Unlink ||
+                         op == Op::Rename || op == Op::Symlink)
         out.ok(c.builtin(CoreObject::None));
     else
         make_int(c, result, out);
@@ -548,9 +571,29 @@ void stat_entry(Attachment &c, Handle function, std::span<const Value> a, Return
     ReturnSlot filename(c);
     auto type = roots.root(c.payload<NativeFunctionObject>(function).captures[0]);
     const auto &name = c.payload<NativeFunctionObject>(function).name;
-    bool by_fd = name == "fstat", nofollow = name == "lstat";
+    bool by_fd = name == "fstat" || (name == "stat" && is_int(c, a[0]));
+    bool nofollow = name == "lstat";
     std::string p;
     int fd = -1;
+    int dir_fd = AT_FDCWD;
+    if (name != "fstat" && a[1] != c.builtin(CoreObject::None)) {
+        if (!descriptor(c, a[1], dir_fd, out))
+            return;
+        if (by_fd) {
+            raise_error(c, CoreObject::ValueErrorType,
+                        U"stat: can't specify dir_fd without matching path", out);
+            return;
+        }
+    }
+    if (name == "stat") {
+        ReturnSlot follows(c);
+        truth(c, roots.root(a[2]), follows);
+        if (failed(follows)) {
+            out.raised(follows.exception());
+            return;
+        }
+        nofollow = follows.value() == c.builtin(CoreObject::False);
+    }
     if (by_fd) {
         if (!descriptor(c, a[0], fd, out))
             return;
@@ -560,9 +603,8 @@ void stat_entry(Attachment &c, Handle function, std::span<const Value> a, Return
     int error = 0;
     {
         NativeWait wait(c);
-        int result = by_fd      ? ::fstat(fd, &st)
-                     : nofollow ? ::lstat(p.c_str(), &st)
-                                : ::stat(p.c_str(), &st);
+        int result = by_fd ? ::fstat(fd, &st)
+                           : ::fstatat(dir_fd, p.c_str(), &st, nofollow ? AT_SYMLINK_NOFOLLOW : 0);
         if (result < 0)
             error = errno;
     }
@@ -676,8 +718,16 @@ void initialize_posix(Attachment &c, Handle module, ReturnSlot &out)
         return;
     const std::vector<Value> stat_capture{stat_type.get(c)};
     if (!install("fspath", signature({patharg}), fspath) ||
-        !install("stat", signature({patharg}), stat_entry, stat_capture) ||
-        !install("lstat", signature({patharg}), stat_entry, stat_capture) ||
+        !install("stat",
+                 signature({patharg,
+                            {U"dir_fd", ParameterKind::KeywordOnly, c.builtin(CoreObject::None)},
+                            {U"follow_symlinks", ParameterKind::KeywordOnly,
+                             c.builtin(CoreObject::True)}}),
+                 stat_entry, stat_capture) ||
+        !install("lstat",
+                 signature({patharg,
+                            {U"dir_fd", ParameterKind::KeywordOnly, c.builtin(CoreObject::None)}}),
+                 stat_entry, stat_capture) ||
         !install("fstat", signature({fdarg}), stat_entry, stat_capture) ||
         !install("getcwd", {}, cwd) || !install("getcwdb", {}, cwd) ||
         !install("listdir", signature({{U"path", only, c.builtin(CoreObject::None)}}), listdir) ||
@@ -689,6 +739,8 @@ void initialize_posix(Attachment &c, Handle module, ReturnSlot &out)
                  signature({patharg, {U"flags", only}, {U"mode", only, mode_default.get(c)}}),
                  entry<Op::Open>) ||
         !install("close", signature({fdarg}), entry<Op::Close>) ||
+        !install("chdir", signature({patharg}), entry<Op::Chdir>) ||
+        !install("fchdir", signature({fdarg}), entry<Op::Fchdir>) ||
         !install("read", signature({fdarg, {U"length", only}}), entry<Op::Read>) ||
         !install("write", signature({fdarg, {U"data", only}}), entry<Op::Write>) ||
         !install("lseek", signature({fdarg, {U"position", only}, {U"how", only}}),
@@ -712,6 +764,16 @@ void initialize_posix(Attachment &c, Handle module, ReturnSlot &out)
         return;
     make_str(c, U"environ", name);
     dict_store(c, dict, roots.root(name.value()), environment, out);
+    if (failed(out))
+        return;
+    // Only advertise interfaces that the Python-visible functions implement.
+    make_str(c, U"HAVE_FCHDIR", value);
+    auto fchdir_capability = roots.root(value.value());
+    make_str(c, U"HAVE_FSTATAT", value);
+    Value capabilities[] = {fchdir_capability.get(c), roots.root(value.value()).get(c)};
+    make_list(c, capabilities, value);
+    make_str(c, U"_have_functions", name);
+    dict_store(c, dict, roots.root(name.value()), roots.root(value.value()), out);
     if (failed(out))
         return;
     const std::pair<const char *, int> constants[] = {

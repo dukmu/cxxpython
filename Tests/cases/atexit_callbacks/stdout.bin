@@ -1,0 +1,10 @@
+True
+2
+['second:two', 'first:one']
+0
+2
+['second:two', 'first:one', 'keep']
+hook ValueError Exception ignored in atexit callback bad
+['second:two', 'first:one', 'keep', 'after:error']
+not callable
+0

@@ -15,6 +15,17 @@ bool property_check(Attachment &context, Value value, ReturnSlot &out)
     type_error(context, U"property descriptor requires a property", out);
     return false;
 }
+void native_self(Attachment &context, Value value, ReturnSlot &out)
+{
+    const auto &function = context.payload<NativeFunctionObject>(value);
+    if (function.bound_self)
+        out.ok(*function.bound_self);
+    else if (function.binding == NativeFunctionBinding::Function)
+        out.ok(context.builtin(CoreObject::None));
+    else
+        raise_error(context, CoreObject::AttributeErrorType,
+                    U"unbound method descriptor has no __self__", out);
+}
 void property_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     if (!context.has_layout<TypeObject>(args[0]) ||
@@ -671,6 +682,10 @@ void install_attribute_descriptors(Attachment &context, std::span<const Handle> 
                   U"__func__", method_function, nullptr);
     install_field(context, descriptor_type, string_type, at(CoreObject::BoundMethodType),
                   U"__self__", method_receiver, nullptr);
+    install_field(context, descriptor_type, string_type, at(CoreObject::NativeFunctionType),
+                  U"__self__", native_self, nullptr);
+    install_field(context, descriptor_type, string_type, at(CoreObject::BaseExceptionType),
+                  U"__dict__", instance_dict_get, instance_dict_set);
     install_field(context, descriptor_type, string_type, at(CoreObject::StaticMethodType),
                   U"__func__", static_function, nullptr);
     install_field(context, descriptor_type, string_type, at(CoreObject::StaticMethodType),

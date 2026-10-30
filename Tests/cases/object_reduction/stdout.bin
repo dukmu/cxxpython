@@ -1,0 +1,11 @@
+None
+{'x': 3} True
+True True {'x': 3} None None
+True
+({'z': 6}, {'x': 4, '_Slotted__private': 5})
+({'z': 6}, {'x': 4, '_Slotted__private': 5})
+True True ('custom', 7)
+custom reduce
+[1, 2] None
+None [('a', 1)]
+True True

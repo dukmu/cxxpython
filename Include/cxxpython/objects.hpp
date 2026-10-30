@@ -305,13 +305,15 @@ struct NativeFunctionObject {
     const std::vector<Value> captures;
     const std::optional<Value> sequence_owner;
     const NativeFunctionBinding binding;
+    const std::optional<Value> bound_self;
     NativeFunctionObject(InitialType head, std::string name_in, SignatureLayout signature_in,
                          NativeEntry entry_in, std::vector<Value> captures_in,
                          std::optional<Value> sequence = {},
-                         NativeFunctionBinding binding_in = NativeFunctionBinding::Function)
+                         NativeFunctionBinding binding_in = NativeFunctionBinding::Function,
+                         std::optional<Value> self_in = {})
         : header(head), name(std::move(name_in)), signature(std::move(signature_in)),
           entry(entry_in), captures(std::move(captures_in)), sequence_owner(sequence),
-          binding(binding_in)
+          binding(binding_in), bound_self(self_in)
     {}
     void trace(Tracer &tracer) const noexcept;
     std::size_t external_bytes() const noexcept;
@@ -454,6 +456,7 @@ struct DictBinding {
     std::uint64_t identity = 0;
 };
 ResultView dict_store_binding(Attachment &, Handle, Handle, Handle, DictBinding &, ReturnSlot &);
+ResultView dict_lookup_binding(Attachment &, Handle, Handle, DictBinding &, ReturnSlot &);
 bool dict_erase_binding(Attachment &, Handle dictionary, DictBinding, Handle expected);
 void discard_name_table(Attachment &context, Value dictionary);
 std::int64_t name_hash(Attachment &, const std::u32string &);
@@ -559,6 +562,7 @@ void get_native_member(Attachment &context, Value descriptor, std::optional<Valu
 void allocate_function(Attachment &context, Handle type, std::string name,
                        SignatureLayout signature, NativeEntry entry, std::vector<Value> captures,
                        ReturnSlot &out, std::optional<Value> sequence_owner = {},
-                       NativeFunctionBinding binding = NativeFunctionBinding::Descriptor);
+                       NativeFunctionBinding binding = NativeFunctionBinding::Descriptor,
+                       std::optional<Value> bound_self = {});
 } // namespace detail
 } // namespace cxxpython::core

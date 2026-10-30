@@ -1,0 +1,11 @@
+utf-8 strict False
+'a中'
+'\n'
+'b\n'
+'\n'
+'b\nc\nend'
+'a中\n'
+True
+3
+b'\xe4\xb8\xad\r\nx'
+True

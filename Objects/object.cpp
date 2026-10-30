@@ -79,6 +79,8 @@ void NativeFunctionObject::trace(Tracer &tracer) const noexcept
     signature.trace(tracer);
     if (sequence_owner)
         tracer.visit(*sequence_owner);
+    if (bound_self)
+        tracer.visit(*bound_self);
     for (auto value : captures)
         tracer.visit(value);
 }
@@ -177,15 +179,15 @@ namespace detail {
 void allocate_function(Attachment &context, Handle type, std::string name,
                        SignatureLayout signature, NativeEntry entry, std::vector<Value> captures,
                        ReturnSlot &out, std::optional<Value> sequence_owner,
-                       NativeFunctionBinding binding)
+                       NativeFunctionBinding binding, std::optional<Value> bound_self)
 {
     out.reset(context);
     signature.validate();
     if (!entry)
         throw std::invalid_argument("native function requires an entrypoint");
-    context.allocate_instance<NativeFunctionObject>(type, out, std::move(name),
-                                                    std::move(signature), entry,
-                                                    std::move(captures), sequence_owner, binding);
+    context.allocate_instance<NativeFunctionObject>(
+        type, out, std::move(name), std::move(signature), entry, std::move(captures),
+        sequence_owner, binding, bound_self);
 }
 } // namespace detail
 

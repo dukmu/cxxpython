@@ -1,6 +1,7 @@
 #include "cxxpython/bytearrayobject.hpp"
 #include "cxxpython/memoryobject.hpp"
 #include "cxxpython/protocol.hpp"
+#include "internal/bytesmethods.hpp"
 #include "internal/codecs.hpp"
 
 #include <algorithm>
@@ -631,6 +632,7 @@ void hex(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
 } // namespace
 void detail::install_bytes(Attachment &c, std::span<const Handle> core)
 {
+    install_bytes_methods(c, core);
     RootScope roots(c);
     auto at = [&](CoreObject id) { return core[static_cast<std::size_t>(id)]; };
     SignatureLayout match_signature;

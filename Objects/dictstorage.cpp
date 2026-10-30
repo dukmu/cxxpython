@@ -497,10 +497,10 @@ ResultView access_dictionary(Attachment &context, Handle dictionary, Handle key,
         }
         std::list<DictObject::Entry> removed;
         auto finish = [&](auto at) {
+            if (binding)
+                *binding = {at->hash, at->identity};
             if (operation == DictOperation::Store) {
                 at->value = value->get(context);
-                if (binding)
-                    *binding = {at->hash, at->identity};
                 out.ok(context.builtin(CoreObject::None));
             } else {
                 out.ok(at->value);
@@ -604,6 +604,12 @@ ResultView access_dictionary(Attachment &context, Handle dictionary, Handle key,
 ResultView dict_lookup(Attachment &context, Handle dictionary, Handle key, ReturnSlot &out)
 {
     return access_dictionary(context, dictionary, key, {}, DictOperation::Lookup, out);
+}
+ResultView detail::dict_lookup_binding(Attachment &context, Handle dictionary, Handle key,
+                                       DictBinding &binding, ReturnSlot &out)
+{
+    return access_dictionary(context, dictionary, key, {}, DictOperation::Lookup, out, {},
+                             &binding);
 }
 ResultView dict_store(Attachment &context, Handle dictionary, Handle key, Handle value,
                       ReturnSlot &out)

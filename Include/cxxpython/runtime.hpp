@@ -588,6 +588,9 @@ class Attachment final {
     void bootstrap();
     void bootstrap_core();
     bool core_ready() const;
+    // The interpreter, not a replaceable module namespace, owns pending exit callbacks.
+    void load_exit_callbacks(ReturnSlot &);
+    void publish_exit_callbacks(Handle candidate, ReturnSlot &);
     Value builtin(CoreObject object) const;
     std::uint64_t type_epoch() const;
     void invalidate_types();

@@ -1,0 +1,16 @@
+import posix
+
+posix.mkdir('dir')
+fd = posix.open('dir', posix.O_RDONLY)
+file = posix.open('dir/file', posix.O_CREAT | posix.O_WRONLY | posix.O_EXCL, 0o600)
+posix.write(file, b'abc')
+posix.close(file)
+posix.symlink('file', 'dir/link')
+print(posix.stat('link', dir_fd=fd).st_size)
+print(posix.stat('link', dir_fd=fd, follow_symlinks=False).st_size)
+print(posix.lstat('link', dir_fd=fd).st_size)
+print(posix.stat(fd).st_ino == posix.stat('dir').st_ino)
+posix.close(fd)
+posix.unlink('dir/link')
+posix.unlink('dir/file')
+posix.rmdir('dir')

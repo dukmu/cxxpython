@@ -577,6 +577,10 @@ void type_ready(Attachment &context, Handle type, std::optional<Handle> source)
         DictView dictionary(context, source->get(context));
         copy_dictionary_entries(context, *payload.dictionary, dictionary.entries());
     }
+    if (context.core_ready() && !name_lookup(context, *payload.dictionary, U"__doc__")) {
+        make_str(context, U"__doc__", text);
+        name_store(context, *payload.dictionary, text.value(), context.builtin(CoreObject::None));
+    }
     if (name_lookup(context, *payload.dictionary, U"__eq__") &&
         !name_lookup(context, *payload.dictionary, U"__hash__")) {
         make_str(context, U"__hash__", text);

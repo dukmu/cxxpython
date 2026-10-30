@@ -2,6 +2,7 @@
 #include "cxxpython/protocol.hpp"
 #include "cxxpython/weakrefobject.hpp"
 #include "internal/abc.hpp"
+#include "internal/atexitmodule.hpp"
 #include "internal/binascii.hpp"
 #include "internal/codecregistry.hpp"
 #include "internal/collectionsmodule.hpp"
@@ -216,11 +217,28 @@ void detail::register_definition(Attachment &context, std::u32string name,
     }
 }
 
+std::vector<std::u32string> detail::builtin_names(Attachment &context)
+{
+    std::vector<std::u32string> names;
+    auto &state = context.imports();
+    {
+        NativeWait parked(context);
+        std::lock_guard lock(state.mutex);
+        for (const auto &[name, definition] : state.definitions)
+            if (std::holds_alternative<ModuleInitializer>(definition->loader) ||
+                (std::holds_alternative<std::shared_ptr<const NativeModule>>(definition->loader) &&
+                 !std::get<std::shared_ptr<const NativeModule>>(definition->loader)->library))
+                names.push_back(name);
+    }
+    return names;
+}
+
 detail::ImportState::ImportState()
 {
     for (auto [name, initializer] : {std::pair{U"builtins", builtin_init},
                                      {U"sys", sys_init},
                                      {U"gc", detail::initialize_gc},
+                                     {U"atexit", detail::initialize_atexit},
                                      {U"_codecs", detail::initialize_codecs},
                                      {U"_struct", detail::initialize_struct},
                                      {U"_hashlib", detail::initialize_hashlib},
@@ -760,7 +778,15 @@ ResultView import_name(Attachment &context, Handle name, Handle globals, Handle 
     do {
         end = absolute.find(U'.', begin);
         const auto prefix = absolute.substr(0, end);
-        if (parent) {
+        make_str(context, prefix, key);
+        dict_lookup(context, roots.root(context.builtin(CoreObject::Modules)),
+                    roots.root(key.value()), item);
+        if (item.tag() == ResultTag::Raised) {
+            out.raised(item.exception());
+            return out.result();
+        }
+        const bool cached = item.tag() == ResultTag::Ok;
+        if (parent && !cached) {
             make_str(context, U"__path__", key);
             get_attribute(context, *parent, roots.root(key.value()), out);
             if (is_error(context, out, CoreObject::AttributeErrorType)) {
@@ -778,7 +804,7 @@ ResultView import_name(Attachment &context, Handle name, Handle globals, Handle 
         if (out.tag() == ResultTag::Raised)
             return out.result();
         const auto current = roots.root(out.value());
-        if (parent) {
+        if (parent && !cached) {
             make_str(context,
                      absolute.substr(begin, end == std::u32string::npos ? end : end - begin), key);
             set_attribute(context, *parent, roots.root(key.value()), current, item);

@@ -72,6 +72,8 @@ no native cache duplicates Python classes or module namespaces. Reload preserves
 the existing module/dictionary and does not remove it on body failure. Modern
 finder/loader and path-hook routing, including dynamically refreshed namespace
 paths, live in Python; the old native file-search policy has been deleted.
+Completed sys.modules aliases, including os.path, are resolved before requiring
+the parent to be a package; alias hits do not republish a new parent attribute.
 Warnings/metadata/resources, directory caches, bytecode caches, encoding and
 installed path configuration remain gates. Temporary CPython adaptations and
 their closure conditions are recorded in `doc/cpython_compatibility.md`.
@@ -79,7 +81,11 @@ their closure conditions are recorded in `doc/cpython_compatibility.md`.
 ## Objects And Lifetime
 
 `Objects/typeobject.cpp` owns type layout/readiness, C3 and immutable type views;
-`Objects/typeconstruction.cpp` owns Python class-construction hooks.
+`Objects/typeconstruction.cpp` owns Python class-construction hooks. Runtime and
+core types receive missing default documentation metadata at their respective
+readiness/bootstrap boundaries. Descriptor __set_name__ failures preserve the
+original exception and add the CPython 3.12 context note rather than wrapping it
+in RuntimeError; enum is not special-cased in class creation.
 `Objects/descrobject.cpp` and `Objects/call.cpp` implement descriptors, attribute
 lookup, argument binding and the shared call boundary. `Objects/abstract.cpp`
 dispatches typed object protocols. `Objects/longobject.cpp` provides int/bool
@@ -90,7 +96,9 @@ Float literals share the native conversion helper; the compiler freezes native
 binary64 constants into normal managed objects. Integer true division rounds
 exact ratios in longobject rather than narrowing both operands first.
 Power/shift/bitwise dispatch uses the same ordinary/reflected/in-place protocol
-boundary. `Objects/complexobject.cpp` owns immutable binary64 complex values,
+boundary. Integer bit_length/bit_count use the existing arbitrary-precision
+magnitude; bin/oct/hex use the normal index protocol at the builtin boundary.
+`Objects/complexobject.cpp` owns immutable binary64 complex values,
 construction and mixed arithmetic. Imaginary literals freeze those same values;
 complex formatting shares the numeric format parser rather than a second one.
 `Objects/representation.cpp` provides other value representation/hash
@@ -124,6 +132,11 @@ bytearray storage. The storage's export count forbids resizing, not same-size
 writes. Release atomically drops both the traced edge and native token; native
 token destruction never accesses a potentially dead managed exporter. Buffer
 consumers copy bytes under short storage locks before callbacks or native waits.
+`Objects/bytesmethods.cpp` shares bytes/bytearray search, partition, strip and
+split algorithms, index/buffer conversion and family-correct result construction.
+It consumes existing safe snapshots rather than retaining unleased raw storage
+across callbacks; this is not a path-specific implementation or a claim of the
+complete bytes API/mutation matrix.
 `Objects/enumobject.cpp` owns reversed/list-reverse iterators, enumerate, zip and
 map. Child iterators/callables are traced; ordinary protocol callbacks do not run
 under storage locks. Compound callback sequences are not advertised as atomic.
@@ -169,17 +182,35 @@ their complete strong graphs, and a second mark checks resurrection. Immutable
 type/MRO snapshots supply instance finalizers. `Objects/weakrefobject.cpp` owns
 weak reference protocols; `Objects/weakproxyobject.cpp` forwards proxy operations
 through rooted referents. `Modules/_weakref.cpp` exposes that native capability.
+Its _remove_dead_weakref uses a rooted dictionary binding and conditional deletion
+so a dead weakref cannot remove a concurrently replaced entry. Lib/weakref.py and
+Lib/_weakrefset.py retain complete upstream mapping/set, WeakMethod and finalize
+policy; weak-target clearing remains tied to this tracing collector, not RC timing.
 `Python/errors.cpp` owns exception/unraisable hook dispatch, including callbacks
 from GC and generator close. `Modules/gcmodule.cpp` exposes collector controls.
 `Objects/exceptions.cpp` owns errno-based OSError construction and traced native
-error fields. `Modules/posixmodule.cpp` supplies real descriptor, directory,
+error fields, including characters_written. BaseException has an ordinary traced
+instance dictionary; add_note uses rooted reads and conditional first-list
+publication for ordinary attributes while preserving custom attribute protocols.
+`Objects/reduction.cpp` supplies object reduction/state hooks over ordinary
+attributes, dictionaries, slots and iterators, using the unchanged Lib/copyreg.py
+helpers. Native layouts retain explicit reconstruction restrictions; neither the
+copyreg source nor these hooks provide a complete pickle implementation.
+BoundMethod construction, equality/hash and NativeFunction __self__ metadata live
+at the existing call/descriptor/representation boundaries, not in weakref or enum.
+`Modules/posixmodule.cpp` supplies real descriptor, directory,
 filesystem-status and process/environment primitives, with blocking host work
 parked. Its stat_result is a validated immutable tuple subtype with readonly
 native tail fields; native layout planning does not enable Python tuple slots.
 OS environment operations share a short process-wide host mutex because the
 underlying environment itself is process-wide. External embedding code must
-coordinate its own concurrent environment mutations. Full os/_io policy and
-resource-owning file objects remain separate library delivery work.
+coordinate its own concurrent environment mutations. stat/lstat dir_fd,
+stat follow_symlinks/file descriptors and chdir/fchdir use actual POSIX calls;
+the advertised capability list includes only implemented variants.
+Lib/os.py, genericpath.py and posixpath.py retain upstream environment/path policy.
+Filesystem encoding is currently UTF-8/surrogateescape, not a completed locale or
+installed-runtime configuration system. Other POSIX APIs, Windows portability and
+the complete os/pathlib policy/error matrices remain separate delivery work.
 
 `Modules/_io/` now separates stream responsibilities. `iobase.cpp` supplies
 ordinary context/iteration/line and raw-stream defaults; `fileio.cpp` owns POSIX
@@ -191,10 +222,45 @@ callbacks run outside locks, and their failure still closes owned resources.
 Native writable-buffer exports root their exporter and release the export at
 scope exit, including exceptional exits, instead of creating GC-delayed views.
 Memory-stream capacity is prepared outside locks; geometric growth avoids copying
-the entire stream on every append. `Modules/_iomodule.cpp` exposes these actual
-capabilities. The former bootstrap stdio bridge moved unchanged to
-`Modules/_io/stdio.cpp`; buffered/text streams and the complete `Lib/io.py` closure
-are not replaced by a fake Python facade.
+the entire stream on every append.
+
+`Modules/_io/bufferedio.cpp` supplies BufferedReader/Writer/Random/RWPair with
+actual raw-stream callbacks, input/output buffers, partial/nonblocking writes,
+position reconciliation, detach and close. `Modules/_io/textio.cpp` supplies
+IncrementalNewlineDecoder and TextIOWrapper, using registered incremental codecs,
+pending decoded text, newline state and byte/decoder snapshots for tell/seek
+replay cookies. Managed stream/codec edges are traced. Per-object operation claims
+retain stream ownership across callbacks; state mutexes protect claim transitions,
+not Python execution, and contending threads park through NativeWait. Same-thread
+reentrancy is rejected rather than deadlocking or acquiring an interpreter lock.
+
+`Modules/_io/open.cpp` owns native stream-chain construction for builtins.open and
+_io.open: FileIO, the appropriate buffered type and optional TextIOWrapper. Mode/
+option validation and failure cleanup use normal calls and exception chaining.
+The builtin resolves the real _io implementation, whose captured types retain
+the construction dependencies. `Modules/_iomodule.cpp` publishes the actual types;
+the complete upstream Lib/io.py supplies the Python facade and ABC registration.
+These components do not replace sys.stdin/stdout/stderr yet: those still use the
+temporary bridge in `Modules/_io/stdio.cpp`. UTF-8 defaults, input, locale/stdio
+configuration, warnings, TextIOWrapper.reconfigure and complete stream protocol/
+diagnostic matrices remain work, not implied by the existing stream hierarchy.
+
+`Modules/atexitmodule.cpp` owns an Interpreter-rooted traced callback registry.
+Prepared callback records and short local commits separate mutation from Python
+equality and invocation. A per-registry recursive run claim coordinates runners;
+waiters park, and callback errors use unraisable reporting. Module collection or
+reload does not own the registry lifetime. `Modules/main.cpp` invokes callbacks
+after its normal script/interactive execution path; upstream weakref.finalize
+registers through this real atexit API. This is not complete process/interpreter
+shutdown: thread joins, standard-stream flushing, final GC/module teardown and
+embedding/abnormal-exit ordering remain separate contracts.
+
+The eight complete, unchanged CPython 3.12.14 additions are Lib/io.py, os.py,
+genericpath.py, posixpath.py, enum.py, weakref.py, _weakrefset.py and copyreg.py.
+They preserve upstream syntax and error paths. Enum/flag policy remains in Python;
+generic type, method, integer and exception dependencies belong in Objects/.
+Source completeness is not full module compatibility; the adaptation ledger
+records the remaining library and product acceptance boundaries.
 
 `Modules/_abc.cpp` backs the unmodified pinned `Lib/abc.py`. Per-module invalidation
 epochs and traced weak sets supply registry/positive/negative caches; Python
@@ -301,6 +367,9 @@ library. Python-visible contracts use `Tests/cases/*/test.py`, with optional
 `stdin.bin` for process input and exact stdout/stderr/status comparisons through
 `Tests/python/test_cases.py`, without
 compiling C++ wrappers. Native tests cover contracts inaccessible from Python.
+`Tests/nogil_cases/*/test.py` uses the same driver for explicit shared-heap
+contracts that differ from the fixed GIL reference, currently at-most-once
+concurrent atexit dispatch. It is a separate CTest, not a reference-test exclusion.
 `Tools/benchmarks/runtime.cpp` runs the current runtime;
 `Tools/benchmarks/record.py` retains raw runs and generates comparison tables.
 

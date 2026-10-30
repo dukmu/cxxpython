@@ -1,5 +1,78 @@
 # Development Status
 
+## 2026-10-31 Native Buffered/Text I/O And Python OS, Enum, Weakref Closures
+
+Prepended without rewriting earlier entries. Previous stable node: b2e7642.
+Four terra workers owned disjoint enum/bytes, POSIX, binary-buffer and text/exit
+capabilities; parent integration completed open, reduction, exception/method
+protocols, import aliases and the Interpreter-owned exit root. No sol/astra,
+host-Python guest execution or interpreter-wide execution mutex was introduced.
+The active generated-frontend/unified-import/library/product goal and remaining
+Plan 2 N4-N6/M0-M9 gates stay unfinished.
+
+- Added complete, unchanged pinned CPython 3.12.14 io.py, os.py, genericpath.py,
+  posixpath.py, enum.py, weakref.py, _weakrefset.py and copyreg.py. Explicit byte
+  comparisons pass for all eight; the retained PSF license applies. Their lazy
+  dependencies and error branches were not removed. Upstream-derived executable
+  tests cover actual filesystem/environment/path, enum/flag/type hooks, weak
+  mappings/sets/methods/finalize and reduction behavior, not import-name facades.
+- Split real _io buffering, newline/text decoding and stream-chain construction
+  into bufferedio.cpp, textio.cpp and open.cpp. Buffered reader/writer/random/pair
+  use actual raw protocols and nonblocking progress; text wrappers use incremental
+  codecs, newline translation and decoder replay cookies, including UTF-16 and
+  BOM-aware append. Builtin open is io.open's actual implementation, with rooted
+  captured construction types and resource cleanup/chaining on failure. Stream
+  claims are per-object, with GC-aware waits and no mutex held across Python.
+- POSIX adds descriptor/stat-at/chdir capabilities actually advertised to os.
+  Native bytes methods, bit_length/bit_count, bin/oct/hex, missing type docs,
+  exception dictionaries/notes and bound-method construction/equality/hash are
+  general protocols, not os/enum/weakref special cases. Object reduction uses
+  ordinary constructor/state hooks, dict/slot reads and copyreg helpers. Cached
+  sys.modules aliases such as os.path resolve before requiring package __path__.
+- Atexit callback state has its own precise Interpreter root, independent of
+  sys.modules or module collection/reload. Prepared registration, rooted equality
+  snapshots and short commits preserve callback ownership. Reentrant per-state
+  runner claims and pop-before-call provide at-most-once parallel dispatch.
+  Callback failures use unraisable reporting; normal CLI exit invokes callbacks.
+  This supplies weakref.finalize's real dependency, not full runtime shutdown.
+- Integration exposed competing itertools.count calls during parallel finalize
+  registration: they now park locally rather than reject another OS thread; the
+  fast integer path reserves and releases before boxing/GC callbacks. A later
+  79/80 observation was a fixture lifetime bug: worker completion was signalled
+  while its last item could still be rooted. The fixture now deletes that local
+  before collection/completion; the full 80-callback assertion remains and passes
+  ten consecutive normal runs and the sanitizer runs. Initial logs are retained.
+- All 228 portable fixture paths are covered by product and fixed reference:
+  reference 227/227 plus the later method fixture; normal 227 passing paths plus
+  the corrected finalizer fixture above. Final strict ASan/UBSan/LSan passes one
+  complete 228/228 batch. Normal affected native contracts pass 238/238 and the
+  source/generator/syntax/constructor/product differential batch passes 12/12.
+  Strict ASan/UBSan/LSan native contracts pass 238/238. TSan native contracts pass
+  137/137; ten focused new shared-heap/IO/lifetime scripts pass 10/10.
+- Concurrent private atexit._run_exitfuncs repeats a callback in the pinned GIL
+  reference under the retained controlled interleaving. The stronger at-most-once
+  contract lives in Tests/nogil_cases, using the same test.py/stdin-data driver,
+  not a skipped or weakened reference case. Its normal, strict-ASan and TSan runs
+  pass. Normal exhaustive bootstrap/promotion OOM shards plus that contract pass
+  17/17 with unchanged assertions and limits. All 16 exhaustive OOM shards also
+  pass strict ASan/UBSan/LSan in 386.77 seconds total, with each shard below its
+  unchanged limit. Final clang-format checks pass.
+- Source completeness is not full compatibility: standard sys streams are still
+  the temporary bootstrap bridge; input, stdio configuration/flushing, thread
+  joins/shutdown, warnings, full text/reinitialization/error matrices, remaining
+  POSIX APIs and full upstream library corpora remain. Next work is the copy
+  closure's real native-container reconstruction protocols, then standard streams/
+  input, async-with/contextlib and typing/regex closures. Readline/curses, actual
+  bytecode dis and tracing-GC inspection/statistics remain explicit REPL goals.
+  No unrelated performance resampling or hand-filled measurement table was added;
+  absolute performance acceptance remains open. Separate next-node copy work and
+  the user's temporary_plan.md/test2.py changes are excluded from this node.
+
+Artifacts, failures, final build/test output and binary hashes are retained under
+.cache/platform-io-enum-* (the reference divergence is
+.cache/platform-io-atexit-reference-divergence.log). New executable fixtures use
+test.py; the sole stdin.bin in Tests/cases is actual input for script_stdin.
+
 ## 2026-10-31 Parallel Collection And Callable Library Closure
 
 Prepended without changing earlier history. Previous stable node: e9cabf4.

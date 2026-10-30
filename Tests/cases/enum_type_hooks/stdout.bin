@@ -1,0 +1,4 @@
+[('prepare', 'Example'), ('new', 'Example'), ('set_name', 'FIRST', 1), ('set_name', 'SECOND', 2), ('init_subclass', 'Example', 1, 2)]
+1 2
+ValueError broken descriptor
+["Error calling __set_name__ on 'Broken' instance 'item' in 'Failure'"]

@@ -1,7 +1,9 @@
 #include "cxxpython/execution.hpp"
 #include "cxxpython/floatobject.hpp"
 #include "cxxpython/unionobject.hpp"
+#include "internal/ioopen.hpp"
 #include "internal/listsort.hpp"
+#include "internal/long.hpp"
 
 #include <cmath>
 #include <limits>
@@ -12,6 +14,30 @@ bool type_object(Attachment &context, Value value)
 {
     return context.has_layout<TypeObject>(value) &&
            is_subtype(context, context.type_of(value), context.type_type());
+}
+template <unsigned Bits>
+void builtin_radix(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(c);
+    ReturnSlot converted(c);
+    index(c, roots.root(args[0]), converted);
+    if (converted.tag() == ResultTag::Raised) {
+        out.raised(converted.exception());
+        return;
+    }
+    auto value = detail::integer_value(c.payload<IntObject>(converted.value()));
+    const bool negative = value < 0;
+    if (negative)
+        value = -value;
+    std::vector<unsigned char> digits;
+    boost::multiprecision::export_bits(value, std::back_inserter(digits), Bits, true);
+    std::u32string text = negative ? U"-0" : U"0";
+    text += Bits == 1 ? U'b' : Bits == 3 ? U'o' : U'x';
+    if (digits.empty())
+        text += U'0';
+    for (const auto digit : digits)
+        text += U"0123456789abcdef"[digit];
+    make_str(c, std::move(text), out);
 }
 bool failed(const ReturnSlot &out)
 {
@@ -654,6 +680,9 @@ void install_class_builtins(Attachment &context, std::span<const Handle> core, V
     install("id", U"id", ascii_signature, builtin_id);
     install("chr", U"chr", ascii_signature, builtin_chr);
     install("ord", U"ord", ascii_signature, builtin_ord);
+    install("bin", U"bin", ascii_signature, builtin_radix<1>);
+    install("oct", U"oct", ascii_signature, builtin_radix<3>);
+    install("hex", U"hex", ascii_signature, builtin_radix<4>);
     install("callable", U"callable", ascii_signature, builtin_callable);
     install("all", U"all", ascii_signature, builtin_all_any<false>);
     install("any", U"any", ascii_signature, builtin_all_any<true>);
@@ -694,6 +723,7 @@ void install_class_builtins(Attachment &context, std::span<const Handle> core, V
         {U"value", ParameterKind::PositionalOnly},
         {U"format_spec", ParameterKind::PositionalOnly, empty_spec.get(context)}};
     install("format", U"format", format_signature, builtin_format);
+    install_open_builtin(context, core, mapping);
 }
 } // namespace detail
 } // namespace cxxpython::core

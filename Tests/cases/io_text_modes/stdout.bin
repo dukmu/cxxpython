@@ -1,0 +1,13 @@
+True False True
+'ab'
+'c\n'
+'c\ndef'
+UnsupportedOperation
+True
+False True
+2
+b'\xff\xfea\x00b\x00'
+6
+UnsupportedOperation
+b'\xff\xfec\x00b\x00'
+utf-16 strict

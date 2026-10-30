@@ -457,7 +457,7 @@ TEST_F(CoreConstruction, SetNameSnapshotsSurviveNamespaceMutationBeforeInitSubcl
               (std::vector<Value>{cls.get(context), token.get(context)}));
 }
 
-TEST_F(CoreConstruction, SetNameFailureIsChainedAndStopsClassInitialization)
+TEST_F(CoreConstruction, SetNameFailurePropagatesWithNoteAndStopsClassInitialization)
 {
     auto descriptor_type = type("Naming");
     auto space = dictionary();
@@ -473,12 +473,19 @@ TEST_F(CoreConstruction, SetNameFailureIsChainedAndStopsClassInitialization)
     ReturnSlot cause(context), linked(context);
     context.load(out.result().exception(), error.cause, cause);
     context.load(out.result().exception(), error.context, linked);
-    ASSERT_EQ(cause.result().tag(), ResultTag::Ok);
-    EXPECT_EQ(linked.result().value(), cause.result().value());
-    EXPECT_TRUE(error.suppress_context.load());
-    EXPECT_EQ(context.type_of(cause.result().value()),
-              context.builtin(CoreObject::RuntimeErrorType));
-    EXPECT_NE(cause.result().value(), out.result().exception());
+    EXPECT_EQ(cause.result().tag(), ResultTag::Empty);
+    EXPECT_EQ(linked.result().tag(), ResultTag::Empty);
+    EXPECT_FALSE(error.suppress_context.load());
+    auto exception = roots.root(out.result().exception());
+    ReturnSlot notes(context);
+    get_attribute(context, exception, text(U"__notes__"), notes);
+    ASSERT_EQ(notes.tag(), ResultTag::Ok);
+    auto values = roots.root(notes.value());
+    ASSERT_EQ(detail::list_size(context, values), 1U);
+    detail::list_item(context, values, 0, notes);
+    ASSERT_EQ(notes.tag(), ResultTag::Ok);
+    EXPECT_EQ(context.payload<StrObject>(notes.value()).value,
+              U"Error calling __set_name__ on 'Naming' instance 'field' in 'Failed'");
 }
 
 TEST_F(CoreConstruction, InitSubclassErrorsPropagateAndDefaultRejectsKeywords)

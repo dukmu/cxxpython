@@ -1,0 +1,5 @@
+True True True
+False None ['called']
+True True ('detached',) {} False
+['called']
+False ['called', 'cycle']

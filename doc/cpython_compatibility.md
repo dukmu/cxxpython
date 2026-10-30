@@ -49,7 +49,7 @@ The canonical builtins module/dictionary, namespace lookup and core bootstrap ar
 present. Base slices now include print, bytes/bytearray, complex, set/frozenset,
 super, namespace/reflection, exec/eval compilation/execution, sorting, reverse
 iteration, enumerate/zip/map and common aggregate builtins. Complete Python
-3.12 builtins are not: open/input, filter and other remaining
+3.12 builtins are not: input, filter and other remaining
 iterators, compiler flags/modes and constructors/protocol matrices are still work.
 Complete their native dependencies and fixed-reference tests before copying
 dependent libraries wholesale. `__builtin__` is not the Python 3 module name;
@@ -64,8 +64,8 @@ the target is `builtins` and the `__builtins__` execution namespace.
   table without bypassing hash/equality callbacks or adding another lifetime
   authority. Operation-specific set/dict fast paths, iterable early termination,
   native subclasses, reflected operators and mutation failures have focused and
-  fixed-reference tests. Weakrefs are integrated; pickle and generic aliases
-  remain dependencies;
+  fixed-reference tests. Weakrefs and generic aliases are integrated; pickle
+  remains a dependency;
   this is not completion of all common type/library integration or performance
   acceptance. Iteration order is not the reference's private table layout.
 - Generators adapt pinned genobject.c and PEP 380/479 behavior to the existing
@@ -77,12 +77,12 @@ the target is `builtins` and the `__builtins__` execution namespace.
   queue; delegated close-attribute lookup errors use sys.unraisablehook. The execution claim
   also covers throw argument preparation, so gi_running is already true inside
   a custom exception constructor. These edges need explicit compatibility work,
-  not a declaration of complete genobject.c parity. Async generators
-  and the complete frame/code introspection API remain dependencies, not claimed
-  generator completion.
+  not a declaration of complete genobject.c parity. Async generators now have
+  the separate implemented slice below; their shutdown/finalizer hooks and the
+  complete frame/code introspection API remain work.
 - Native coroutines now reuse Frame claims/delegation for async def and await,
   with distinct coroutine and await-wrapper types, return/throw/close and
-  cross-thread suspension handoff. Async generators, async for/with and the
+  cross-thread suspension handoff. Async for/with and the
   never-awaited warning policy remain unfinished; no fake asyncio is provided.
 - Complex construction/mixed arithmetic/hash, imaginary literals and numeric
   formatting adapt the pinned native contracts. Bytearray construction, mutation,
@@ -115,13 +115,13 @@ the target is `builtins` and the `__builtins__` execution namespace.
   and real SystemExit. Host input/diagnostics are bootstrap bridges, not full
   sys.stdin.readline, readline/history, signals, environment/isolation
   or installed-runtime compatibility. No host CPython executes guest code.
-- Bootstrap sys._StandardTextIO is an explicit temporary native stream type,
-  using borrowed descriptors and UTF-8 unbuffered writes. Replace this bootstrap
-  layer with the real _io/Lib io closure after mutable buffers, raw file resources,
-  incremental codecs and configuration exist. Do not claim it is TextIOWrapper or
-  copy a fake Python io facade around it. print itself follows current sys.stdout
+- Bootstrap sys._StandardTextIO remains an explicit temporary native stream type,
+  using borrowed descriptors and UTF-8 unbuffered writes. Real buffered/text
+  streams and open now exist, but sys.stdin/stdout/stderr have not been migrated
+  to them. They are not TextIOWrapper instances. print follows current sys.stdout
   and ordinary file.write/flush callbacks; closed-pipe handling does not install a
-  process-global signal handler. Input/open and full stream configuration remain.
+  process-global signal handler. Input, configured standard-stream construction
+  and complete shutdown flushing remain work.
 - sys.excepthook/unraisablehook use real stderr and exception chains. _weakref.ref,
   Python __del__ and gc collection controls use tracing-GC lifetime rather than
   reference-count timing. Weak callbacks retain their strong callback edge after
@@ -138,8 +138,10 @@ the target is `builtins` and the `__builtins__` execution namespace.
 - Native posix exposes descriptor I/O, cwd/listdir, path mutations, stat/lstat/
   fstat, readlink, process IDs and environment primitives. Its readonly stat_result
   uses native tuple fields; OSError carries errno/filename and specific subclasses.
-  dir_fd/follow_symlinks variants, complete stat-result reflection/pickle and the
-  Python os/pathlib/io closures are not claimed by this native slice.
+  stat/lstat accept dir_fd, stat accepts follow_symlinks and file descriptors,
+  and chdir/fchdir are present. Only implemented capabilities are advertised to
+  os through _have_functions. Other *at variants, complete stat-result reflection/
+  pickle, process/fork facilities and the pathlib closure remain work.
 
 ## Buffers, Unicode And Independent Libraries
 
@@ -165,6 +167,15 @@ the target is `builtins` and the `__builtins__` execution namespace.
   destruction, while live views trace exporters. Bytearray resizing is forbidden
   while exported. Multidimensional/native-format casts, generic exporters and
   the complete memoryview reflection/released-hash matrix are not complete.
+- Bytes/bytearray find/rfind/index/rindex/count, partition/rpartition,
+  strip/lstrip/rstrip and split/rsplit share native algorithms in
+  Objects/bytesmethods.cpp. Bounds use index conversion, buffer needles use the
+  existing buffer snapshot API, and results preserve the bytes/bytearray family,
+  not arbitrary subclasses. These methods are not path-specific substitutions.
+  Callback mutation fixtures cover bytearray growth/in-place writes and buffer
+  precedence; shrinking/concurrent mutation, remaining bytes methods, exact
+  diagnostics and worst-case search complexity still need broader acceptance.
+  No raw exported pointer is retained across Python callbacks by these methods.
 - `Lib/struct.py` copies the complete upstream facade. `_struct` supplies compiled
   Struct layouts, packing/unpacking, offset/buffer operations and export-retaining
   iterators. Native alignment/endian, integer widths, half/float/double and s/p
@@ -243,9 +254,11 @@ the target is `builtins` and the `__builtins__` execution namespace.
   ordinary dictionaries and conditional deletion; failed bootstrap restores the
   prior graph. Class/static wrapper initialization, reinitialization, wrapped
   metadata and atomic callable reads now support the actual abc implementation.
-  Bound methods forward missing attributes to the wrapped function. Full method
-  reflection, comparison and the distinct CPython native-callable type matrix
-  remain broader type-compatibility work.
+  Bound methods forward missing attributes to the wrapped function and now have
+  actual construction, equality and hashing. Native constructor functions expose
+  their owning type as __self__; native free functions and unbound descriptors
+  retain their different binding behavior. Full method reflection and the distinct
+  CPython native-callable type matrix remain broader type-compatibility work.
   Python wrapper instances are mutable; native image wrappers reject callable
   reinitialization, preserving builtin immutability. They still use this runtime's
   wrapper representation rather than CPython's separate native descriptor types.
@@ -256,18 +269,29 @@ the target is `builtins` and the `__builtins__` execution namespace.
   native readinto exports release immediately on return. StringIO implements
   Unicode positions and the five newline modes. Prepared storage growth and
   per-object synchronization preserve shared-heap GC/parallel access.
-- This is not completion of `io`: buffered reader/writer/random/pair, text
-  wrappers/decoder cookies, full pickling/reinitialization/diagnostic matrices,
-  warning policy and installed stream configuration remain. The existing
-  bootstrap sys streams still live in `_io/stdio.cpp`; no fake `Lib/io.py`, open
-  builtin or host-Python stream is installed to bypass those dependencies.
+- `_io` also supplies BufferedReader/BufferedWriter/BufferedRandom/
+  BufferedRWPair, IncrementalNewlineDecoder and TextIOWrapper. Buffering,
+  partial/nonblocking writes, readinto/read1/peek, seeking, detach and close use
+  actual raw-stream protocols. Text streams use the codec registry, incremental
+  state, newline translation and decoder-replay tell/seek cookies, not Unicode
+  character offsets presented as file positions. Per-stream execution claims
+  serialize that stream's state, reject same-thread reentrancy and park waiters;
+  Python callbacks run without the state mutex. This is not an interpreter lock.
+- Builtins.open and _io.open build the FileIO -> buffered -> optional text chain,
+  validate modes/options and close constructed resources on later failure.
+  Lib/io.py is now the complete upstream facade, not a bootstrap replacement.
+  Text defaults/text_encoding currently choose UTF-8 rather than full locale/
+  UTF-8-mode configuration. reconfigure, complete text truncation, nonblocking/
+  iteration-cookie, custom-codec and invalid-input matrices, warnings and installed
+  standard streams remain acceptance work; existence of text cookies does not
+  assert CPython-private cookie encoding compatibility.
 - `_thread` implements allocate_lock/LockType, blocking/nonblocking/timed acquire,
   cross-thread release, context management, identifiers, start_new_thread and
   exit. Waiting uses NativeWait; launched Python executes in the same Interpreter
   and shared heap. Startup uses Transfer admission, not a detached borrowed
   Interpreter reference. Locks and interpreter leases retain only their actual
   lifecycle. Python failures are reported, not silently discarded.
-  RLock/local, signals/interrupt_main, thread sentinels/count/stack configuration,
+  Thread-local storage, signals/interrupt_main, thread sentinels/count/stack configuration,
   threading joins and product shutdown coordination remain delivery work.
 - `_abc` reload preserves its private data type and epoch state; `_thread` reload
   preserves lock type identity. Existing classes/functions and instances continue
@@ -285,8 +309,9 @@ REPL/product configuration and requested library dependency closures remain in P
   optional. Product fixtures derived from upstream tests exercise recursive and
   bounded repr, namedtuple, Counter, OrderedDict, ChainMap, UserDict/UserList/
   UserString, wrappers, partial/reduce/comparison helpers, LRU/cache and cached
-  properties. Full upstream unittest suites and functools.singledispatch's
-  weakref/typing closure are not delivered merely by successful imports.
+  properties. The weakref dependency is now present; full upstream unittest
+  suites and functools.singledispatch's typing closure are not delivered merely
+  by successful imports.
 - Native itertools supplies chain, repeat, islice, starmap, pairwise, predicate
   iterators, compress, accumulate, batched, count, cycle, product, permutations,
   both combination families, tee and groupby. Mutable iterator state has an
@@ -320,6 +345,67 @@ REPL/product configuration and requested library dependency closures remain in P
   runtime's storage/accounting rather than invented CPython byte sizes. Frame
   helpers inspect only the calling thread's rooted frame chain; unrestricted
   cross-thread frame-local inspection remains unsupported.
+
+## I/O, OS, Enum And Weakref Source Closure
+
+The following eight added files are complete, byte-for-byte copies of the fixed
+CPython 3.12.14 Lib sources, under the retained PSF license. Their syntax, lazy
+imports and failure branches have not been removed to make bootstrap succeed:
+
+- `Lib/io.py`: Python stream ABC registration/facade over the real _io types.
+- `Lib/os.py`: POSIX platform selection, environment, PathLike and filesystem policy.
+- `Lib/genericpath.py`: shared Python path/status policy.
+- `Lib/posixpath.py`: POSIX string/bytes path algorithms and the os.path alias.
+- `Lib/enum.py`: Enum/IntEnum/StrEnum/Flag/IntFlag, auto and Python metaclass policy.
+- `Lib/weakref.py`: weak mappings, WeakMethod and finalize over native weak targets.
+- `Lib/_weakrefset.py`: Python weak-set/iteration policy.
+- `Lib/copyreg.py`: reduction helpers, dispatch and extension registries.
+
+Full source retention is not full module compatibility. The implementation and
+remaining acceptance boundaries are:
+
+- I/O and product: real open/raw/buffered/text construction and resource cleanup
+  have targeted stream/mode/newline/cookie/error fixtures. Bootstrap standard
+  streams, input, locale/configuration, warnings, reconfigure and full I/O
+  protocol/error matrices remain.
+- OS and paths: POSIX syscalls, UTF-8/surrogateescape filesystem conversion and
+  upstream environment/path policy are present. Cached sys.modules aliases such
+  as os.path do not require a package __path__. Full POSIX capability/error
+  coverage, filesystem configuration, Windows/other platforms, process/fork and
+  dependent pathlib/glob closures remain.
+- Enum and type hooks: upstream enum policy uses runtime/core default type docs,
+  int.bit_length/bit_count, bin/oct/hex and the original __set_name__ exception
+  plus its CPython 3.12 note. The full upstream enum corpus and remaining mixed-
+  type/descriptor/formatting/diagnostic cases remain; enum and typing are not
+  declared complete.
+- Weak containers/finalizers: tracing-GC weak targets/proxies, conditional
+  _remove_dead_weakref deletion, upstream WeakMethod/finalize and actual atexit
+  are present. Conditional deletion cannot erase a replacement binding. Full
+  upstream coverage, compound Python-policy concurrency acceptance and coordinated
+  interpreter shutdown remain; collection timing is not CPython RC timing.
+- Reduction/copyreg: object.__reduce__/__reduce_ex__/__getstate__, getnewargs
+  hooks, dict/slot state and list/dict iterators use traced roots and actual
+  copyreg helpers. The full pickle engine/library closure, all native-layout
+  reducers, reconstruction/protocol/diagnostic coverage and serialization
+  compatibility remain.
+- Exceptions and methods: mutable exception dictionaries, add_note/__notes__,
+  BlockingIOError.characters_written and bound-method construction/equality/hash
+  are present. Full exception/native-callable reflection and invalid-input
+  coverage remain; default core docs do not supply every upstream builtin
+  docstring.
+- Exit callbacks: Interpreter-rooted atexit register/unregister/clear/run state,
+  LIFO dispatch, callback exception reporting and CLI post-execution invocation
+  supply weakref.finalize's real dependency. Thread joins/admission shutdown,
+  complete stream flushing, final GC/module teardown and embedding/abnormal-exit
+  lifecycle integration remain.
+
+Modules/atexitmodule.cpp adapts the pinned callback semantics, not Python object
+reference-count shutdown. Registration/deletion use short local commits; equality
+and callbacks execute outside those locks. A per-state run claim coordinates
+recursive/concurrent runners with NativeWait. Interpreter state, rather than the
+module object's reachability, keeps registered callbacks alive. This does not
+complete the runtime's full shutdown protocol. The listed targeted fixtures do
+not substitute for full upstream suites or final sanitizer acceptance.
 
 ## Requested Library Delivery
 
