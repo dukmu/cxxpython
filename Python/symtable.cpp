@@ -427,6 +427,8 @@ class ScopePass final {
                         collect(node.alternative, scope);
                         collect(node.cleanup, scope);
                     } else if constexpr (std::is_same_v<T, WithStmt>) {
+                        if (node.asynchronous && !program_.scopes[scope].coroutine)
+                            error(statement->span, "'async with' outside async function");
                         for (const auto &item : node.items) {
                             expression(*item.context, scope);
                             if (item.target)

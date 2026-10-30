@@ -31,6 +31,7 @@ add_library(cxxpython_core
     Python/extension.cpp
     Modules/_impmodule.cpp
     Modules/_iomodule.cpp
+    Modules/_operator.cpp
     Modules/_io/stdio.cpp
     Modules/_io/iobase.cpp
     Modules/_io/bufferedio.cpp
@@ -100,6 +101,8 @@ add_library(cxxpython_core
     Objects/rangeobject.cpp
     Objects/iterobject.cpp
     Objects/enumobject.cpp
+    Objects/aiterobject.cpp
+    Objects/exceptiongroup.cpp
     Objects/abstract.cpp
     Objects/representation.cpp
     Objects/reduction.cpp

@@ -1246,9 +1246,8 @@ class Adapter {
             break;
         }
         case Rule::with_stmt: {
-            if (has(n, U"async"))
-                unsupported(n);
             WithStmt s;
+            s.asynchronous = has(n, U"async");
             for (auto p : r)
                 if (p->rule == Rule::with_item) {
                     auto value = find(*p, Rule::expression);

@@ -10,6 +10,7 @@
 #include "internal/hashmodule.hpp"
 #include "internal/iomodule.hpp"
 #include "internal/itertoolsmodule.hpp"
+#include "internal/operatormodule.hpp"
 #include "internal/posixmodule.hpp"
 #include "internal/stdio.hpp"
 #include "internal/structmodule.hpp"
@@ -114,10 +115,8 @@ void sys_init(Attachment &context, Handle module, ReturnSlot &out)
         return;
     RootScope roots(context);
     ReturnSlot temporary(context);
-    make_str(context, U"", temporary);
-    const auto current = roots.root(temporary.value());
     make_str(context, detail::decode_filename(SourceBuffer("", CXXPYTHON_STDLIB_DIR)), temporary);
-    std::array paths{current.get(context), temporary.value()};
+    const std::array paths{temporary.value()};
     make_list(context, paths, temporary);
     if (store_name(context, dictionary, U"path", temporary.value(), out) == ResultTag::Raised)
         return;
@@ -129,8 +128,6 @@ void sys_init(Attachment &context, Handle module, ReturnSlot &out)
     context.allocate_instance<DictObject>(roots.root(context.builtin(CoreObject::DictType)),
                                           temporary);
     store_name(context, dictionary, U"path_importer_cache", temporary.value(), out);
-    if (out.tag() != ResultTag::Raised)
-        detail::initialize_stdio(context, module, out);
     if (out.tag() != ResultTag::Raised)
         detail::initialize_sys_hooks(context, module, out);
 }
@@ -244,6 +241,7 @@ detail::ImportState::ImportState()
                                      {U"_hashlib", detail::initialize_hashlib},
                                      {U"_blake2", detail::initialize_blake2},
                                      {U"_io", detail::initialize_io},
+                                     {U"_operator", detail::initialize_operator},
                                      {U"_thread", detail::initialize_thread},
                                      {U"_abc", detail::initialize_abc},
                                      {U"itertools", detail::initialize_itertools},
@@ -475,7 +473,8 @@ ResultView load_module(Attachment &context, const std::u32string &name, ReturnSl
         {
             NativeWait parked(context);
             std::lock_guard lock(state.mutex);
-            native_boot = state.bootstrap != ImportState::Bootstrap::Ready;
+            native_boot = state.bootstrap == ImportState::Bootstrap::Cold ||
+                          state.bootstrap == ImportState::Bootstrap::LoadingPolicy;
         }
         std::shared_ptr<const ModuleDefinition> definition;
         std::optional<Handle> spec;
@@ -615,11 +614,12 @@ ResultView initialize_imports(Attachment &context, ReturnSlot &out)
         NativeWait parked(context);
         std::unique_lock lock(state.mutex);
         state.changed.wait(lock, [&] {
-            return state.bootstrap != ImportState::Bootstrap::Loading ||
+            return state.bootstrap == ImportState::Bootstrap::Cold ||
+                   state.bootstrap == ImportState::Bootstrap::Ready ||
                    state.bootstrap_owner == std::this_thread::get_id();
         });
         if (state.bootstrap == ImportState::Bootstrap::Cold) {
-            state.bootstrap = ImportState::Bootstrap::Loading;
+            state.bootstrap = ImportState::Bootstrap::LoadingPolicy;
             state.bootstrap_owner = std::this_thread::get_id();
             initializing = true;
         }
@@ -638,10 +638,15 @@ ResultView initialize_imports(Attachment &context, ReturnSlot &out)
     try {
         auto bootstrap = [&] {
             RootScope roots(context);
+            std::optional<Handle> sys;
             for (const auto name : {U"builtins", U"sys", U"_imp", U"importlib._bootstrap"}) {
                 load_module(context, name, out);
                 if (out.tag() == ResultTag::Raised)
                     return;
+                if (std::u32string_view(name) == U"sys") {
+                    sys = roots.root(out.value());
+                    context.set_sys_dictionary(roots.root(module_dict(context, out.value())));
+                }
             }
             // A failed boot preserves successful dependencies. Reuse their
             // classes on retry, then promote seed metadata through Python policy.
@@ -658,8 +663,34 @@ ResultView initialize_imports(Attachment &context, ReturnSlot &out)
             if (out.tag() == ResultTag::Raised)
                 return;
             load_module(context, U"importlib", out);
-            if (out.tag() != ResultTag::Raised)
-                out.ok(context.builtin(CoreObject::None));
+            if (out.tag() == ResultTag::Raised)
+                return;
+            {
+                NativeWait parked(context);
+                std::lock_guard lock(state.mutex);
+                state.bootstrap = ImportState::Bootstrap::LoadingStreams;
+            }
+            detail::initialize_stdio(context, *sys, out);
+            if (out.tag() == ResultTag::Raised)
+                return;
+            // Startup codecs and streams use the configured library, before user path[0].
+            ReturnSlot path(context), key(context), method(context), current(context);
+            detail::get_sys_attribute(context, U"path", path);
+            if (path.tag() == ResultTag::Raised) {
+                out.raised(path.exception());
+                return;
+            }
+            const auto search = roots.root(path.value());
+            make_str(context, U"insert", key);
+            get_attribute(context, search, roots.root(key.value()), method);
+            if (method.tag() == ResultTag::Raised) {
+                out.raised(method.exception());
+                return;
+            }
+            const auto insert = roots.root(method.value());
+            make_str(context, U"", current);
+            const std::array args{context.builtin(CoreObject::IntZero), current.value()};
+            call(context, insert, {args}, out);
         };
         bootstrap();
     } catch (const std::bad_alloc &) {

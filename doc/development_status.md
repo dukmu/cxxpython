@@ -1,5 +1,74 @@
 # Development Status
 
+## 2026-10-31 Real Standard Streams, Async Context Management And Contextlib
+
+Prepended after the e0de728 stable node, without rewriting previous evidence.
+Four terra workers supplied async protocols, input/exception inspection, exception
+groups and text buffering; parent integration replaced the temporary streams,
+completed startup/REPL/flushing and original-system-namespace ownership. No
+sol/astra, interpreter execution mutex or host-Python guest execution was used.
+The full active frontend/import/library/product goal is not marked complete.
+
+- Deleted the _StandardTextIO implementation. Standard streams are actual
+  TextIOWrapper/buffered/FileIO chains borrowing descriptors, with POSIX UTF-8
+  defaults, appropriate error handlers and terminal/stderr line buffering. Cold
+  bootstrap installs Python import policy before constructing streams, and adds
+  user path[0] only afterward. A cwd io.py or encodings package cannot shadow
+  startup dependencies. Missing descriptors produce None; startup failure still
+  produces a diagnostic before Python stderr exists.
+- Interpreter state precisely roots the original sys dictionary independently
+  of sys.modules replacement/deletion. print, input, display and error hooks use
+  its live attributes; a fresh sys module does not become a second authority.
+  sys.exception()/exc_info() observe active handled state and current traceback,
+  including mutation, nested calls/handlers and suspended generators/coroutines.
+  CLI stdin source and REPL lines now use Python-visible streams. Silent
+  post-execution flushing and final flushing are separate phases; final failure
+  returns 120. Emergency native diagnostics/banner, locale/configuration,
+  readline/TTY input, signals and full shutdown remain explicit dependencies.
+- TextIOWrapper now buffers encoded output independently from its binary stream,
+  with write-through, line buffering and read/position/detach/close barriers.
+  Pending data detaches before callbacks, preventing duplicate retry writes.
+  The common IOBase finalizer treats failed closed inspection as unusable and
+  marks ordinary finalization, avoiding spurious detached-wrapper close errors.
+  Existing per-stream claims and GC-aware waits remain, not a global IO lock.
+- Async with lowers through the existing With region, Frame, await delegation
+  and unwind, including exception suppression, nonlocal exits and cross-thread
+  suspension. aiter/anext use real special protocols; the default wrapper has
+  precise edges and an atomic execution claim. BaseExceptionGroup/ExceptionGroup
+  reuse native exception storage with readonly message/child slots, validation,
+  derive/split/subgroup and metadata/notes preservation. ExceptionGroup keeps
+  the reference's mutable heap-type behavior. Full except*, nested group
+  diagnostics, serialization, async for and async shutdown hooks remain work.
+- Lib/contextlib.py is copied byte-for-byte from retained CPython 3.12.14, under
+  the retained PSF license. Tests exercise real synchronous/asynchronous generator
+  managers/decorators, both exit stacks, closing/aclosing, nullcontext, redirectors,
+  chdir and group suppression. General index/iteration/attribute/unpack diagnostics
+  are fixed at native boundaries, not in Lib. _operator supplies the actual index
+  kernel; the other operator functions remain in unchanged upstream Python.
+- Added 22 portable test.py fixtures, including real CRLF/non-UTF-8 stdin.bin
+  input and exact stdout/stderr/exit status. Git attributes preserve fixture bytes.
+  Moved two runnable print scripts out of native tests; retained native-only
+  forced-GC/lazy-bootstrap and bytecode-verifier contracts. Ordinary product and
+  strict ASan/UBSan/LSan each pass all 257 scripts; the fixed reference passes all
+  22 additions. The product-entry driver passes 12 tests including PTY and startup
+  failures; the two new startup cases also pass the fixed reference.
+- Normal affected native contracts pass 182/182 plus 33/33 type/lifecycle/OOM
+  checks. Strict ASan/UBSan/LSan passes 182/182 and the no-GIL exit fixture, then
+  all 16 exhaustive bootstrap/promotion failure shards in 394.36 seconds, within
+  unchanged per-test limits. TSan native contracts pass 34/34. Its first script
+  batch passes eight and times out on two contextlib cases at their original
+  30-second limit; both pass isolated at that same limit after concurrent batch
+  load ends. Initial and final logs remain in .cache/streams-async-*. No sanitizer
+  was disabled, timeout raised or assertion removed. Format-check, staged diff
+  checks and upstream byte comparison pass; binary/source hashes are retained.
+  No unrelated performance campaign was repeated.
+- Next dependencies remain the full REPL's readline editing/history/completion,
+  curses terminal restoration, real-VM dis/opcode metadata and tracing-GC
+  inspection/statistics/callbacks, alongside remaining syntax and actual library
+  closures such as typing, regex and complete runpy. These requirements are in
+  Plan 2 section 0.12, not claims of completed modules. The user's temporary_plan.md
+  deletion and untracked root test2.py are excluded from this stable point.
+
 ## 2026-10-31 Copy Policy And Native Reconstruction
 
 Prepended after committing and pushing aa1905c, without rewriting its evidence.

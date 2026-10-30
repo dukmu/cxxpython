@@ -1,0 +1,11 @@
+binary output
+stdin _io TextIOWrapper True True
+<stdin> r True surrogateescape False
+BufferedReader <stdin> True False False
+stdout _io TextIOWrapper True True
+<stdout> w True surrogateescape False
+BufferedWriter <stdout> False True False
+stderr _io TextIOWrapper True True
+<stderr> w True backslashreplace False
+BufferedWriter <stderr> False True True
+buffered final line

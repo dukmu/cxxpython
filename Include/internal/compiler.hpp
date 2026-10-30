@@ -184,6 +184,7 @@ struct WithItem {
 struct WithStmt {
     std::vector<WithItem> items;
     Suite body;
+    bool asynchronous = false;
 };
 struct DeclareStmt {
     bool nonlocal;
@@ -240,6 +241,7 @@ struct FlowBlock {
 struct FlowRegion {
     RegionKind kind;
     std::optional<std::size_t> continue_target, break_target, normal_target;
+    bool asynchronous = false;
 };
 struct FunctionGraph {
     std::vector<FlowBlock> blocks;

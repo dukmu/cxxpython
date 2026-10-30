@@ -1,0 +1,79 @@
+hierarchy True True False
+construction ordinary (2 sub-exceptions) one (1 sub-exception) base (2 sub-exceptions)
+repr ExceptionGroup('repr', [ValueError('value')])
+readonly set message AttributeError
+readonly delete message AttributeError
+readonly set exceptions AttributeError
+readonly delete exceptions AttributeError
+reinit ('changed', [TypeError('type')]) ordinary (2 sub-exceptions)
+base child rejected TypeError
+mixed child rejected TypeError
+sequence callback LookupError
+class callback LookupError
+missing arguments TypeError
+one argument TypeError
+extra arguments TypeError
+bad message TypeError
+not sequence TypeError
+set sequence TypeError
+dict sequence TypeError
+iterator sequence TypeError
+empty children ValueError
+non exception ValueError
+exception class ValueError
+base exception TypeError
+keywords TypeError
+keyword only TypeError
+invalid new type TypeError
+empty derive ValueError
+split ('ExceptionGroup', 'root', (('ExceptionGroup', 'inner', (('ValueError', ('value',)),)),)) ('BaseExceptionGroup', 'root', (('ExceptionGroup', 'inner', (('TypeError', ('type',)),)), ('GeneratorExit', ('stop',)), ('KeyError', ('key',))))
+tuple match ('ExceptionGroup', 'root', (('ExceptionGroup', 'inner', (('ValueError', ('value',)),)), ('KeyError', ('key',))))
+base promotion ExceptionGroup BaseExceptionGroup
+predicate order ['root', 'inner', 'GeneratorExit', 'KeyError']
+predicate truth ('ExceptionGroup', 'inner', (('ValueError', ('value',)),))
+invalid condition 0 TypeError
+invalid subgroup 0 TypeError
+invalid condition 1 TypeError
+invalid subgroup 1 TypeError
+invalid condition 2 TypeError
+invalid subgroup 2 TypeError
+invalid condition 3 TypeError
+invalid subgroup 3 TypeError
+invalid condition 4 TypeError
+invalid subgroup 4 TypeError
+invalid condition 5 TypeError
+invalid subgroup 5 TypeError
+invalid condition 6 TypeError
+invalid subgroup 6 TypeError
+invalid condition 7 TypeError
+invalid subgroup 7 TypeError
+invalid condition 8 TypeError
+invalid subgroup 8 TypeError
+invalid condition 9 TypeError
+invalid subgroup 9 TypeError
+predicate exception LookupError
+predicate truth exception LookupError
+missing method argument TypeError
+extra method argument TypeError
+keyword method argument TypeError
+missing method argument TypeError
+extra method argument TypeError
+keyword method argument TypeError
+missing method argument TypeError
+extra method argument TypeError
+keyword method argument TypeError
+derive override 17 17 ('Derived', 'custom', (('ValueError', ('value',)),)) ('Derived', 'custom', (('TypeError', ('type',)),))
+invalid derive split TypeError
+invalid derive subgroup TypeError
+derive exception LookupError
+metadata ['root note'] ['root note', 'matched only'] ['root note']
+split suppress context False True True
+notes ['tuple note'] ['tuple note']
+notes ['a', 'b'] ['a', 'b']
+notes None None
+notes None None
+notes lookup exception LookupError
+notes setter exception LookupError
+notes sequence exception LookupError
+derive no metadata root True
+generic alias True

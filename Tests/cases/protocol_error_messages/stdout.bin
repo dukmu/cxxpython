@@ -1,0 +1,13 @@
+'Item' object has no attribute 'missing'
+type object 'Item' has no attribute 'missing'
+'str' object cannot be interpreted as an integer
+'NoneType' object cannot be interpreted as an integer
+'Item' object cannot be interpreted as an integer
+'int' object is not iterable
+cannot unpack non-iterable int object
+'NoneType' object is not iterable
+cannot unpack non-iterable NoneType object
+'Item' object is not iterable
+cannot unpack non-iterable Item object
+user iterator failure
+cannot unpack non-iterable DeletesIterator object

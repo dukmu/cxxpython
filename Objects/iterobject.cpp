@@ -21,6 +21,16 @@ ResultView get_iter(Attachment &context, Handle value, ReturnSlot &out)
                 return out.result();
             }
         }
+        if (slot.state == SlotState::Missing || slot.state == SlotState::Disabled) {
+            const auto view = TypeView(context, context.type_of(self));
+            const auto name = view.name();
+            const auto text = std::holds_alternative<Value>(name)
+                                  ? context.payload<StrObject>(std::get<Value>(name)).value
+                                  : std::get<std::u32string>(name);
+            raise_error(context, CoreObject::TypeErrorType,
+                        U"'" + text + U"' object is not iterable", out);
+            return out.result();
+        }
         invoke_protocol(context, self, slot, {}, out);
         if (out.tag() == ResultTag::Ok) {
             auto next = resolve_protocol(context, roots.root(context.type_of(out.value())),

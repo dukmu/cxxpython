@@ -1,0 +1,44 @@
+enter a
+pause enter-a
+enter b
+pause enter-b
+body 42 42
+exit b True True True
+pause exit-b
+exit a True True True
+pause exit-a
+result 84
+enter s
+pause enter-s
+exit s False False False
+pause exit-s
+result suppressed
+enter binding
+pause enter-binding
+exit binding False False False
+pause exit-binding
+error TypeError cannot unpack non-iterable int object
+enter outer
+pause enter-outer
+enter inner
+pause enter-inner
+exit inner True True True
+pause exit-inner
+exit outer False False False
+pause exit-outer
+error ValueError exit-inner
+enter parent
+pause enter-parent
+pause failed-enter
+exit parent False False False
+pause exit-parent
+error ValueError failed-enter
+enter loop
+pause enter-loop
+exit loop True True True
+pause exit-loop
+enter loop
+pause enter-loop
+exit loop True True True
+pause exit-loop
+result looped

@@ -34,6 +34,8 @@ constexpr std::array definitions{
     ProtocolDefinition{U"__imod__", 1, ProtocolResult::Any},
     ProtocolDefinition{U"__enter__", 0, ProtocolResult::Any},
     ProtocolDefinition{U"__exit__", 3, ProtocolResult::Any},
+    ProtocolDefinition{U"__aenter__", 0, ProtocolResult::Any},
+    ProtocolDefinition{U"__aexit__", 3, ProtocolResult::Any},
     ProtocolDefinition{U"__pos__", 0, ProtocolResult::Any},
     ProtocolDefinition{U"__neg__", 0, ProtocolResult::Any},
     ProtocolDefinition{U"__invert__", 0, ProtocolResult::Any},
@@ -356,6 +358,15 @@ ResultView index(Attachment &context, Handle value, ReturnSlot &out)
             return;
         }
         auto slot = resolve(context, self, Protocol::Index, roots);
+        if (slot.state == SlotState::Missing || slot.state == SlotState::Disabled) {
+            const auto view = TypeView(context, context.type_of(self));
+            const auto name = view.name();
+            const auto text = std::holds_alternative<Value>(name)
+                                  ? context.payload<StrObject>(std::get<Value>(name)).value
+                                  : std::get<std::u32string>(name);
+            type_error(context, U"'" + text + U"' object cannot be interpreted as an integer", out);
+            return;
+        }
         ReturnSlot result(context);
         invoke_protocol(context, self, slot, {}, result);
         if (raised(result)) {

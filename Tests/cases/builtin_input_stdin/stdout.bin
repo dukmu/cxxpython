@@ -1,0 +1,5 @@
+first> 'first\r'
+'second\n'
+'third\udcff'
+last> EOFError EOF when reading a line True
+False False False

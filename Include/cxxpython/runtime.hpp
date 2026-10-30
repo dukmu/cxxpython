@@ -44,6 +44,8 @@ enum class CoreObject : std::size_t {
     SystemExitType,
     GeneratorExitType,
     ExceptionType,
+    BaseExceptionGroupType,
+    ExceptionGroupType,
     AssertionErrorType,
     TypeErrorType,
     AttributeErrorType,
@@ -61,6 +63,7 @@ enum class CoreObject : std::size_t {
     IndexErrorType,
     KeyErrorType,
     StopIterationType,
+    EOFErrorType,
     NameErrorType,
     UnboundLocalErrorType,
     ImportErrorType,
@@ -158,6 +161,7 @@ enum class CoreObject : std::size_t {
     WeakProxyType,
     CallableWeakProxyType,
     ReferenceErrorType,
+    AnextAwaitableType,
     None,
     NotImplemented,
     Ellipsis,
@@ -591,6 +595,8 @@ class Attachment final {
     // The interpreter, not a replaceable module namespace, owns pending exit callbacks.
     void load_exit_callbacks(ReturnSlot &);
     void publish_exit_callbacks(Handle candidate, ReturnSlot &);
+    void load_sys_dictionary(ReturnSlot &);
+    void set_sys_dictionary(Handle dictionary);
     Value builtin(CoreObject object) const;
     std::uint64_t type_epoch() const;
     void invalidate_types();

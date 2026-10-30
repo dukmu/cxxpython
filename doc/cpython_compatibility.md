@@ -49,7 +49,7 @@ The canonical builtins module/dictionary, namespace lookup and core bootstrap ar
 present. Base slices now include print, bytes/bytearray, complex, set/frozenset,
 super, namespace/reflection, exec/eval compilation/execution, sorting, reverse
 iteration, enumerate/zip/map and common aggregate builtins. Complete Python
-3.12 builtins are not: input, filter and other remaining
+3.12 builtins are not: filter and other remaining
 iterators, compiler flags/modes and constructors/protocol matrices are still work.
 Complete their native dependencies and fixed-reference tests before copying
 dependent libraries wholesale. `__builtin__` is not the Python 3 module name;
@@ -82,7 +82,10 @@ the target is `builtins` and the `__builtins__` execution namespace.
   complete frame/code introspection API remain work.
 - Native coroutines now reuse Frame claims/delegation for async def and await,
   with distinct coroutine and await-wrapper types, return/throw/close and
-  cross-thread suspension handoff. Async for/with and the
+  cross-thread suspension handoff. Async with uses the same Frame/unwind path,
+  awaiting both entry and cleanup, including exceptions and nonlocal exits.
+  aiter/anext use actual special-method lookup; the default-bearing anext wrapper
+  has precise edges and a per-object execution claim. Async for and the
   never-awaited warning policy remain unfinished; no fake asyncio is provided.
 - Complex construction/mixed arithmetic/hash, imaginary literals and numeric
   formatting adapt the pinned native contracts. Bytearray construction, mutation,
@@ -112,16 +115,26 @@ the target is `builtins` and the `__builtins__` execution namespace.
   Restore omitted upstream helpers/APIs once those dependencies land.
 - Modules/main.cpp and Python/pythonrun.cpp provide the experimental product
   entry/REPL, with a thin Programs entry. Single mode uses live sys.displayhook
-  and real SystemExit. Host input/diagnostics are bootstrap bridges, not full
-  sys.stdin.readline, readline/history, signals, environment/isolation
-  or installed-runtime compatibility. No host CPython executes guest code.
-- Bootstrap sys._StandardTextIO remains an explicit temporary native stream type,
-  using borrowed descriptors and UTF-8 unbuffered writes. Real buffered/text
-  streams and open now exist, but sys.stdin/stdout/stderr have not been migrated
-  to them. They are not TextIOWrapper instances. print follows current sys.stdout
-  and ordinary file.write/flush callbacks; closed-pipe handling does not install a
-  process-global signal handler. Input, configured standard-stream construction
-  and complete shutdown flushing remain work.
+  and real SystemExit; source input and REPL lines use actual sys.stdin methods,
+  including replacement streams. Execution and finalization flush through Python
+  protocols; final flush failure returns 120. Emergency native diagnostics/banner
+  remain host bridges. Readline/history, signals, environment/isolation and
+  installed-runtime compatibility remain work. No host CPython executes guest code.
+- The temporary sys._StandardTextIO implementation is deleted. Standard streams
+  are real TextIOWrapper instances over buffered FileIO, borrowing descriptors
+  with closefd=False. POSIX defaults are UTF-8, surrogateescape for stdin/stdout
+  and backslashreplace for stderr, with terminal/stderr line buffering. Missing
+  descriptors become None. Configured stdlib loading precedes user path[0], so
+  cwd io.py/encodings do not replace startup dependencies. Locale/environment
+  configuration, reconfigure and the complete shutdown sequence remain work.
+  print and input use the Interpreter's original sys dictionary, even after
+  sys.modules['sys'] is replaced/deleted. Input follows ordinary prompt, flush,
+  readline, EOF and error behavior; TTY/readline and audit paths are unfinished.
+- sys.exception()/exc_info() inspect the active handled exception, including
+  its currently synchronized traceback rather than a frozen raise-time copy.
+  Nested handlers/calls, finally, generators and coroutine handoff have differential
+  tests. The original sys dictionary is a precise Interpreter root, not a second
+  module registry; reimported sys remains a distinct module without stdio state.
 - sys.excepthook/unraisablehook use real stderr and exception chains. _weakref.ref,
   Python __del__ and gc collection controls use tracing-GC lifetime rather than
   reference-count timing. Weak callbacks retain their strong callback edge after
@@ -135,6 +148,10 @@ the target is `builtins` and the `__builtins__` execution namespace.
   retaining their optional native accelerators and real Python fallback. The
   bisect upstream corpus and heapq doctests run through the product. Full upstream
   unittest suites still depend on unfinished unittest/collections/etc.
+- Native _operator supplies the actual index kernel needed for special-method
+  lookup, exact-int normalization and error behavior. Other operator functions
+  remain in the unchanged upstream Python implementation; this is not a complete
+  _operator accelerator backend.
 - Native posix exposes descriptor I/O, cwd/listdir, path mutations, stat/lstat/
   fstat, readlink, process IDs and environment primitives. Its readonly stat_result
   uses native tuple fields; OSError carries errno/filename and specific subclasses.
@@ -231,7 +248,7 @@ the target is `builtins` and the `__builtins__` execution namespace.
   and reuse the existing VM Frame/unwind. asend/athrow/aclose requests preserve
   their generator-running claim across await suspension and reject competitors.
   Tests transfer a suspended request between OS threads in one shared heap while
-  collecting. Async for/with, asynchronous finalizer hooks, event-loop shutdown
+  collecting. Async for, asynchronous finalizer hooks, event-loop shutdown
   and the full upstream async-generator matrix remain explicit gates.
 - binascii supplies base64, hexadecimal, uu, quoted-printable and CRC32/CRC-HQX
   conversions based on the pinned native algorithms. The module consumes shared
@@ -396,7 +413,7 @@ remaining acceptance boundaries are:
 - Exit callbacks: Interpreter-rooted atexit register/unregister/clear/run state,
   LIFO dispatch, callback exception reporting and CLI post-execution invocation
   supply weakref.finalize's real dependency. Thread joins/admission shutdown,
-  complete stream flushing, final GC/module teardown and embedding/abnormal-exit
+  final GC/module teardown and embedding/abnormal-exit
   lifecycle integration remain.
 
 Modules/atexitmodule.cpp adapts the pinned callback semantics, not Python object
@@ -420,6 +437,20 @@ bytearray state callbacks precede its data snapshot, matching the reference.
 This is not a pickle engine or full upstream copy/pickle acceptance. Remaining
 native resource/iterator reducers, weakref compound-policy concurrency and full
 serialization/diagnostic matrices stay separate gates.
+
+## Context Management And Exception Groups
+
+`Lib/contextlib.py` is the complete, unchanged pinned source. Its ordinary and
+asynchronous generator managers/decorators, ExitStack/AsyncExitStack, closing/
+aclosing, nullcontext, redirectors, chdir and suppress run against real runtime
+protocols. Native BaseExceptionGroup/ExceptionGroup supply construction, readonly
+message/exceptions, derive/subgroup/split and metadata/notes preservation; custom
+derive and error paths remain observable. ExceptionGroup keeps the reference's
+mutable heap-type behavior, unlike immutable BaseExceptionGroup. Async with uses
+the existing Frame's awaited cleanup, including cancellation, suppression,
+return/break/continue and cross-thread suspension handoff. Full upstream suites,
+except* compiler lowering, group tree diagnostics and serialization remain work;
+contextlib import alone is not their acceptance evidence.
 
 ## Requested Library Delivery
 

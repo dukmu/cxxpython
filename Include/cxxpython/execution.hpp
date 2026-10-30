@@ -30,6 +30,7 @@ enum class Opcode : std::uint8_t {
     LoadException,
     ExceptionMatch,
     PrepareWith,
+    PrepareAsyncWith,
     EnterWith,
     WithExit,
     WithResult,
@@ -382,7 +383,7 @@ class CodeBuilder final {
     void call(std::uint32_t positional, std::span<const std::u32string> keywords = {},
               SourcePosition source = {});
     void name_dict(std::span<const std::u32string> names, SourcePosition source = {});
-    Region region(RegionKind kind);
+    Region region(RegionKind kind, bool asynchronous = false);
     Region loop(Label continue_target, Label break_target);
     void enter(Region region, SourcePosition source = {});
     void leave(Region region, SourcePosition source = {});
@@ -412,6 +413,7 @@ class CodeBuilder final {
     struct RegionSpec {
         RegionLayout layout;
         bool entered = false, closed = false, handler_started = false, complete = false;
+        bool asynchronous = false;
         std::optional<Label> continue_target, break_target, normal_target;
     };
     std::vector<RegionSpec> regions_;

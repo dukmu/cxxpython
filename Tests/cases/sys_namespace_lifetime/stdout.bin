@@ -1,0 +1,8 @@
+fresh (True, True)
+input answer
+stdout "original print\noriginal prompt: 'original display'\n'replacement display'\n"
+display [17]
+stderr 'ValueError: original exception\nValueError: replacement exception\nValueError: default unraisable\nValueError: default unraisable\n'
+unraisable 1 cleanup
+missing ['lost sys.stdin', 'lost sys.stdout'] []
+excepthook ValueError terminal

@@ -51,6 +51,30 @@ class MainTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(result.stdout, argv0 + "\n42\n")
 
+    def test_standard_stream_bootstrap_uses_the_configured_library(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "io.py").write_text("raise RuntimeError('shadowed io')\n")
+            (root / "encodings").mkdir()
+            (root / "encodings" / "__init__.py").write_text(
+                "raise RuntimeError('shadowed encodings')\n")
+            result = self.execute("-c", "import sys; print(type(sys.stdin).__name__)",
+                                  cwd=directory)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout, "TextIOWrapper\n")
+
+    @unittest.skipIf(os.name != "posix", "directory descriptors require POSIX")
+    def test_stream_startup_failure_has_a_diagnostic(self):
+        with tempfile.TemporaryDirectory() as directory:
+            descriptor = os.open(directory, os.O_RDONLY)
+            try:
+                result = subprocess.run([self.binary, "-c", "pass"], stdin=descriptor,
+                                        capture_output=True, text=True, timeout=20)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertTrue(result.stderr)
+            finally:
+                os.close(descriptor)
+
     def test_script_import_and_metadata(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

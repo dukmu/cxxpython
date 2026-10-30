@@ -1,0 +1,56 @@
+aiter identity True
+collected [0, 1, 2]
+default collection [0, 1]
+generator [None, 23]
+none default None
+tuple default (1, 2)
+raw result True
+no eager await check anext_awaitable
+aiter missing TypeError
+aiter wrong result TypeError
+aiter callback LookupError
+instance aiter ignored TypeError
+instance anext ignored TypeError
+anext missing TypeError
+synchronous exhaustion StopAsyncIteration
+deferred invalid awaitable TypeError
+aiter no arguments TypeError
+aiter extra argument TypeError
+aiter keyword TypeError
+anext no arguments TypeError
+anext extra argument TypeError
+anext keyword TypeError
+invalid await iterator TypeError
+wrapper identity True True
+manual next next
+manual send sent
+throw args 2 True injected
+manual throw throw
+close args ()
+manual close close
+close args (1, 2)
+manual close args close
+fresh await iterator 5
+exhausted next returned ('default',)
+exhausted send returned ('default',)
+exhausted throw returned ('default',)
+exhausted close returned ('default',)
+failed next ValueError
+failed send ValueError
+failed throw ValueError
+failed close ValueError
+ordinary StopIteration returned original
+await conversion not suppressed Exhausted
+method lookup converted returned lookup default
+one shot 0
+reuse RuntimeError
+close coroutine None
+closed reuse RuntimeError
+throw initial handoff
+throw into coroutine returned 51
+close initial handoff
+close cleanup
+close suspended None
+suspended close reuse RuntimeError
+thread initial handoff
+thread result [['retained default']]

@@ -1,0 +1,65 @@
+mixed count 5
+mixed before b'binary\n'
+mixed after b'binary\ntext\n' [('write', 7), ('write', 5), ('flush',)]
+binary layer before False b''
+binary layer after False b'binary\ntext\n'
+binary layer before True b''
+binary layer after True b'text\nbinary\n'
+through b'ab' [('write', 1), ('write', 1)]
+through flush [('write', 1), ('write', 1), ('flush',)]
+line before None []
+line after b'a\rb\n' [('write', 2), ('flush',), ('write', 2), ('flush',)]
+line before '' []
+line after b'a\rb\n' [('write', 2), ('flush',), ('write', 2), ('flush',)]
+line before '\r' []
+line after b'a\rb\r' [('write', 2), ('flush',), ('write', 2), ('flush',)]
+line before '\r\n' []
+line after b'a\rb\r\n' [('write', 2), ('flush',), ('write', 3), ('flush',)]
+threshold before []
+threshold after [('write', 8192), ('write', 8193), ('write', 1), ('write', 8192)] 24578
+threshold flush [('write', 8192), ('write', 8193), ('write', 1), ('write', 8192), ('flush',)]
+empty 0 []
+empty flush [('write', 0), ('flush',)]
+barrier read '' b'abc' [('write', 3)]
+barrier readline '' b'abc' [('write', 3)]
+barrier seek 0 b'abc' [('write', 3), ('flush',)]
+barrier tell 3 b'abc' [('write', 3), ('flush',)]
+barrier detach True b'abc' [('write', 3), ('flush',)]
+barrier close None b'abc' [('write', 3), ('flush',), ('close',)]
+read data '23' b'AB23' [('write', 2)]
+failure queued flush 3 []
+failure write failed [('write', 3)] False
+still attached True
+retry b'' [('write', 3), ('flush',)]
+failure queued read 3 []
+failure write failed [('write', 3)] False
+still attached True
+retry b'' [('write', 3), ('flush',)]
+failure queued readline 3 []
+failure write failed [('write', 3)] False
+still attached True
+retry b'' [('write', 3), ('flush',)]
+failure queued seek 3 []
+failure write failed [('write', 3)] False
+still attached True
+retry b'' [('write', 3), ('flush',)]
+failure queued tell 3 []
+failure write failed [('write', 3)] False
+still attached True
+retry b'' [('write', 3), ('flush',)]
+failure queued detach 3 []
+failure write failed [('write', 3)] False
+still attached True
+retry b'' [('write', 3), ('flush',)]
+failure queued close 3 []
+failure write failed [('write', 3), ('close',)] True
+through failure write failed [('write', 3)]
+through retry b'' [('write', 3), ('flush',)]
+large failure write failed [('write', 6)]
+large retry b'' [('write', 6), ('flush',)]
+flush failure flush failed b'good' [('write', 4), ('flush',)]
+flush retry b'good' [('write', 4), ('flush',), ('flush',)]
+interrupted b'retry interrupted' [('write', 17), ('write', 17), ('flush',)]
+not EINTR without errno [('write', 8)]
+not EINTR retry b'' [('write', 8), ('flush',)]
+close failure close failed write failed True [('write', 3), ('close',)]

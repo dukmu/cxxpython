@@ -13,9 +13,11 @@
 #include "cxxpython/superobject.hpp"
 #include "cxxpython/unionobject.hpp"
 #include "cxxpython/weakrefobject.hpp"
+#include "internal/aiterobject.hpp"
 #include "internal/builtinexec.hpp"
 #include "internal/codecs.hpp"
 #include "internal/errors.hpp"
+#include "internal/exceptiongroup.hpp"
 #include "internal/exceptions.hpp"
 #include "internal/fileio.hpp"
 #include "internal/hashmodule.hpp"
@@ -56,6 +58,8 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
         std::vector<Handle> bases;
         if (base)
             bases.push_back(*base);
+        if (id == CoreObject::ExceptionGroupType)
+            bases.push_back(at(CoreObject::ExceptionType));
         TypeSpec spec{name, bases};
         spec.module = U"builtins";
         if (id == CoreObject::FunctionType || id == CoreObject::ModuleType ||
@@ -67,6 +71,8 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
             spec.slots = std::vector<std::u32string>{U"value"};
         if (id == CoreObject::SystemExitType)
             spec.slots = std::vector<std::u32string>{U"code"};
+        if (id == CoreObject::BaseExceptionGroupType)
+            spec.slots = std::vector<std::u32string>{U"exceptions", U"message"};
         if (id == CoreObject::OSErrorType)
             spec.slots = std::vector<std::u32string>{U"errno", U"strerror", U"filename",
                                                      U"filename2", U"characters_written"};
@@ -96,6 +102,10 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
            at(CoreObject::BaseExceptionType));
     define(CoreObject::ExceptionType, "Exception", LayoutDescriptor::of<ExceptionObject>(),
            at(CoreObject::BaseExceptionType));
+    define(CoreObject::BaseExceptionGroupType, "BaseExceptionGroup",
+           LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::BaseExceptionType));
+    define(CoreObject::ExceptionGroupType, "ExceptionGroup",
+           LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::BaseExceptionGroupType));
     define(CoreObject::AssertionErrorType, "AssertionError",
            LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::ExceptionType));
     define(CoreObject::TypeErrorType, "TypeError", LayoutDescriptor::of<ExceptionObject>(),
@@ -129,6 +139,8 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     define(CoreObject::KeyErrorType, "KeyError", LayoutDescriptor::of<ExceptionObject>(),
            at(CoreObject::LookupErrorType));
     define(CoreObject::StopIterationType, "StopIteration", LayoutDescriptor::of<ExceptionObject>(),
+           at(CoreObject::ExceptionType));
+    define(CoreObject::EOFErrorType, "EOFError", LayoutDescriptor::of<ExceptionObject>(),
            at(CoreObject::ExceptionType));
     define(CoreObject::NameErrorType, "NameError", LayoutDescriptor::of<ExceptionObject>(),
            at(CoreObject::ExceptionType));
@@ -300,6 +312,8 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
            LayoutDescriptor::of<WeakRefObject>());
     define(CoreObject::ReferenceErrorType, "ReferenceError",
            LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::ExceptionType));
+    define(CoreObject::AnextAwaitableType, "anext_awaitable",
+           LayoutDescriptor::of<AnextAwaitableObject>());
     for (auto id :
          {CoreObject::FunctionType, CoreObject::ModuleType, CoreObject::CodeType,
           CoreObject::GeneratorType, CoreObject::CoroutineType, CoreObject::SetType,
@@ -397,6 +411,7 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     install_execution(context, core);
     install_generators(context, core);
     install_async_generators(context, core);
+    install_async_iteration(context, core);
     install_namespace(context, core);
     install_genericalias(context, core);
     install_union(context, core);
@@ -404,6 +419,7 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     install_weakproxies(context, core);
     install_error_types(context, core);
     install_exception_runtime(context, core);
+    install_exception_groups(context, core);
     install_system_exit(context, core);
     install_os_errors(context, core);
     install_ranges(context, core);
@@ -440,6 +456,7 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
         context.payload<TypeObject>(core[i]).state = TypeState::Ready;
     }
     context.payload<TypeObject>(at(CoreObject::UnsupportedOperationType)).immutable = false;
+    context.payload<TypeObject>(at(CoreObject::ExceptionGroupType)).immutable = false;
     for (auto type : {context.object_type(), context.type_type()})
         context.payload<TypeObject>(type).state = TypeState::Ready;
     for (auto id : {CoreObject::NoneType,
@@ -486,6 +503,7 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                     CoreObject::AsyncGenASendType,
                     CoreObject::AsyncGenAThrowType,
                     CoreObject::AsyncGenWrappedValueType,
+                    CoreObject::AnextAwaitableType,
                     CoreObject::UnionType,
                     CoreObject::GenericAliasIteratorType,
                     CoreObject::SetIteratorType,
@@ -561,6 +579,8 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                     CoreObject::SystemExitType,
                     CoreObject::GeneratorExitType,
                     CoreObject::ExceptionType,
+                    CoreObject::BaseExceptionGroupType,
+                    CoreObject::ExceptionGroupType,
                     CoreObject::AssertionErrorType,
                     CoreObject::TypeErrorType,
                     CoreObject::AttributeErrorType,
@@ -580,6 +600,7 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                     CoreObject::IndexErrorType,
                     CoreObject::KeyErrorType,
                     CoreObject::StopIterationType,
+                    CoreObject::EOFErrorType,
                     CoreObject::StopAsyncIterationType,
                     CoreObject::RangeType,
                     CoreObject::SliceType,

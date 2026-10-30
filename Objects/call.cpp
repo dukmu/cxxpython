@@ -493,7 +493,16 @@ void get_default(Attachment &context, Handle object, Handle name, bool type_look
                       out);
         return;
     }
-    raise_error(context, CoreObject::AttributeErrorType, U"attribute not found: " + text, out);
+    const auto metadata = TypeView(context, type_lookup ? value : type);
+    const auto owner_name = metadata.name();
+    const auto label = std::holds_alternative<Value>(owner_name)
+                           ? context.payload<StrObject>(std::get<Value>(owner_name)).value
+                           : std::get<std::u32string>(owner_name);
+    raise_error(context, CoreObject::AttributeErrorType,
+                (type_lookup ? U"type object '" : U"'") + label +
+                    (type_lookup ? U"' has no attribute '" : U"' object has no attribute '") +
+                    text + U"'",
+                out);
 }
 
 void change_default(Attachment &context, Handle object, Handle name, std::optional<Handle> value,

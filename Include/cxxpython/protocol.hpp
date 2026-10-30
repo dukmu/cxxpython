@@ -34,6 +34,8 @@ enum class Protocol : std::size_t {
     IMod,
     Enter,
     Exit,
+    AEnter,
+    AExit,
     Pos,
     Neg,
     Invert,

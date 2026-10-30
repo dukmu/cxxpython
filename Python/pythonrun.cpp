@@ -1,5 +1,8 @@
 #include "internal/pythonrun.hpp"
 #include "internal/errors.hpp"
+#include "internal/iomodule.hpp"
+#include "internal/stdio.hpp"
+#include "internal/sysmodule.hpp"
 
 #include "cxxpython/import.hpp"
 #include "cxxpython/parser.hpp"
@@ -145,21 +148,37 @@ int run_interactive(Attachment &context, Handle globals, Handle sys, bool prompt
                 report_exception(context, value.tag() == ResultTag::Raised ? value.exception()
                                                                            : result.exception());
             else {
-                const auto prompt = source_utf8(context.payload<StrObject>(result.value()).value);
-                NativeWait wait(context);
-                std::cerr << prompt << std::flush;
+                const auto prompt = iteration.root(result.value());
+                get_sys_attribute(context, U"stderr", value);
+                if (value.tag() == ResultTag::Raised)
+                    return report_exception(context, value.exception());
+                const auto stream = iteration.root(value.value());
+                const Value argument = prompt.get(context);
+                if (!io_call(context, stream, U"write", {&argument, 1}, result) ||
+                    !io_call(context, stream, U"flush", {}, result))
+                    return report_exception(context, result.exception());
             }
         }
         std::string line;
-        bool read;
-        {
-            NativeWait wait(context);
-            read = static_cast<bool>(std::getline(std::cin, line));
+        get_sys_attribute(context, U"stdin", value);
+        if (value.tag() == ResultTag::Raised)
+            return report_exception(context, value.exception());
+        if (!io_call(context, iteration.root(value.value()), U"readline", {}, result))
+            return report_exception(context, result.exception());
+        if (!context.has_layout<StrObject>(result.value())) {
+            raise_error(context, CoreObject::TypeErrorType, U"stdin.readline() returned non-string",
+                        result);
+            return report_exception(context, result.exception());
         }
+        line = source_utf8(context.payload<StrObject>(result.value()).value);
+        const bool read = !line.empty();
         if (!read && pending.empty())
             return 0;
-        if (read)
-            pending += line + '\n';
+        if (read) {
+            pending += line;
+            if (line.back() != '\n')
+                pending += '\n';
+        }
         if (read) {
             try {
                 syntax::parse(pending, syntax::InputMode::Interactive, true);
@@ -183,6 +202,7 @@ int run_interactive(Attachment &context, Handle globals, Handle sys, bool prompt
         } catch (const SourceError &error) {
             report_source_error(error);
         }
+        flush_stdio(context, StdioFlush::AfterExecution);
         pending.clear();
         if (!read)
             return 0;

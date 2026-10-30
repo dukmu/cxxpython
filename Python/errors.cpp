@@ -2,9 +2,9 @@
 // PSF license: doc/licenses/python-3.12.14.txt.
 #include "internal/errors.hpp"
 
-#include "cxxpython/import.hpp"
 #include "cxxpython/protocol.hpp"
 #include "internal/pythonrun.hpp"
+#include "internal/sysmodule.hpp"
 
 #include <array>
 #include <cstdio>
@@ -257,22 +257,18 @@ void raw_fallback(Attachment &ctx, Handle exception) noexcept
     }
 }
 
-bool stream_for(Attachment &ctx, Handle sys, ReturnSlot &out)
+bool stream_for(Attachment &ctx, ReturnSlot &out)
 {
-    attribute(ctx, sys, U"stderr", out);
-    if (failed(out) && is_subtype(ctx, ctx.type_of(out.exception()),
-                                  ctx.builtin(CoreObject::AttributeErrorType))) {
-        out.ok(ctx.builtin(CoreObject::None));
-    }
+    get_sys_attribute(ctx, U"stderr", out);
     return !failed(out);
 }
 
-bool unraisable_default(Attachment &ctx, Handle sys, Handle exception, Handle trace, Handle message,
+bool unraisable_default(Attachment &ctx, Handle exception, Handle trace, Handle message,
                         Handle object, ReturnSlot &out)
 {
     RootScope roots(ctx);
     ReturnSlot stream(ctx), text(ctx);
-    if (!stream_for(ctx, sys, stream)) {
+    if (!stream_for(ctx, stream)) {
         out.raised(stream.exception());
         return false;
     }
@@ -320,18 +316,17 @@ void default_unraisable(Attachment &ctx, Handle fn, std::span<const Value> args,
     RootScope roots(ctx);
     auto value = roots.root(args[0]);
     const auto &captures = ctx.payload<NativeFunctionObject>(fn).captures;
-    if (ctx.type_of(value) != captures[1]) {
+    if (ctx.type_of(value) != captures[0]) {
         raise_error(ctx, CoreObject::TypeErrorType,
                     U"sys.unraisablehook argument type must be UnraisableHookArgs", out);
         return;
     }
-    auto sys = roots.root(captures[0]);
     const auto fields = ctx.payload<TupleObject>(value).items;
-    unraisable_default(ctx, sys, roots.root(fields[1]), roots.root(fields[2]),
-                       roots.root(fields[3]), roots.root(fields[4]), out);
+    unraisable_default(ctx, roots.root(fields[1]), roots.root(fields[2]), roots.root(fields[3]),
+                       roots.root(fields[4]), out);
 }
 
-void default_excepthook(Attachment &ctx, Handle fn, std::span<const Value> args, ReturnSlot &out)
+void default_excepthook(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto exception = roots.root(args[1]);
@@ -342,9 +337,8 @@ void default_excepthook(Attachment &ctx, Handle fn, std::span<const Value> args,
         raise_error(ctx, CoreObject::TypeErrorType, U"invalid exception or traceback", out);
         return;
     }
-    auto sys = roots.root(ctx.payload<NativeFunctionObject>(fn).captures[0]);
     ReturnSlot stream(ctx);
-    if (!stream_for(ctx, sys, stream)) {
+    if (!stream_for(ctx, stream)) {
         out.raised(stream.exception());
         return;
     }
@@ -398,7 +392,7 @@ void install_error_hooks(Attachment &ctx, Handle sys, ReturnSlot &out)
     auto type = roots.root(ctx.builtin(CoreObject::UnraisableHookArgsType));
     SignatureLayout one;
     one.parameters = {{U"unraisable", ParameterKind::PositionalOnly}};
-    const std::array captures{sys.get(ctx), type.get(ctx)};
+    const std::array captures{type.get(ctx)};
     make_native_function(ctx, "unraisablehook", one, default_unraisable, captures, out,
                          NativeFunctionBinding::Function);
     if (failed(out))
@@ -414,8 +408,7 @@ void install_error_hooks(Attachment &ctx, Handle sys, ReturnSlot &out)
     three.parameters = {{U"exctype", ParameterKind::PositionalOnly},
                         {U"value", ParameterKind::PositionalOnly},
                         {U"traceback", ParameterKind::PositionalOnly}};
-    const std::array sys_capture{sys.get(ctx)};
-    make_native_function(ctx, "excepthook", three, default_excepthook, sys_capture, out,
+    make_native_function(ctx, "excepthook", three, default_excepthook, {}, out,
                          NativeFunctionBinding::Function);
     if (failed(out))
         return;
@@ -435,13 +428,7 @@ void write_unraisable(Attachment &ctx, Handle exception, std::optional<Handle> o
         auto obj = roots.root(object ? object->get(ctx) : ctx.builtin(CoreObject::None));
         auto msg = roots.root(err_msg ? err_msg->get(ctx) : ctx.builtin(CoreObject::None));
         auto trace = traceback_of(ctx, error, roots);
-        ReturnSlot sys(ctx), hook(ctx), result(ctx);
-        import_module(ctx, U"sys", sys);
-        if (failed(sys)) {
-            raw_fallback(ctx, error);
-            return;
-        }
-        auto module = roots.root(sys.value());
+        ReturnSlot hook(ctx), result(ctx);
         std::vector<Value> fields{ctx.type_of(error), error.get(ctx), trace.get(ctx), msg.get(ctx),
                                   obj.get(ctx)};
         ctx.allocate_instance<TupleObject>(
@@ -451,9 +438,9 @@ void write_unraisable(Attachment &ctx, Handle exception, std::optional<Handle> o
             return;
         }
         auto arguments = roots.root(result.value());
-        attribute(ctx, module, U"unraisablehook", hook);
+        get_sys_attribute(ctx, U"unraisablehook", hook);
         if (failed(hook) || hook.value() == ctx.builtin(CoreObject::None)) {
-            unraisable_default(ctx, module, error, trace, msg, obj, result);
+            unraisable_default(ctx, error, trace, msg, obj, result);
             return;
         }
         auto callable = roots.root(hook.value());
@@ -465,7 +452,7 @@ void write_unraisable(Attachment &ctx, Handle exception, std::optional<Handle> o
         auto hook_trace = traceback_of(ctx, hook_error, roots);
         make_str(ctx, U"Exception ignored in sys.unraisablehook", result);
         auto message = roots.root(failed(result) ? ctx.builtin(CoreObject::None) : result.value());
-        unraisable_default(ctx, module, hook_error, hook_trace, message, callable, result);
+        unraisable_default(ctx, hook_error, hook_trace, message, callable, result);
     } catch (const std::bad_alloc &) {
         raw_fallback(ctx, exception);
     }
@@ -476,14 +463,8 @@ void display_exception(Attachment &ctx, Handle exception)
     RootScope roots(ctx);
     auto error = roots.root(exception.get(ctx));
     auto trace = traceback_of(ctx, error, roots);
-    ReturnSlot sys(ctx), hook(ctx), result(ctx);
-    import_module(ctx, U"sys", sys);
-    if (failed(sys)) {
-        report_exception_fallback(ctx, error.get(ctx));
-        return;
-    }
-    auto module = roots.root(sys.value());
-    attribute(ctx, module, U"excepthook", hook);
+    ReturnSlot hook(ctx), result(ctx);
+    get_sys_attribute(ctx, U"excepthook", hook);
     if (!failed(hook)) {
         const std::array args{ctx.type_of(error), error.get(ctx), trace.get(ctx)};
         call(ctx, roots.root(hook.value()), {args, {}}, result);
@@ -492,7 +473,7 @@ void display_exception(Attachment &ctx, Handle exception)
         auto hook_error = roots.root(result.exception());
         auto hook_trace = traceback_of(ctx, hook_error, roots);
         ReturnSlot stream(ctx), output(ctx);
-        if (stream_for(ctx, module, stream) && stream.value() != ctx.builtin(CoreObject::None)) {
+        if (stream_for(ctx, stream) && stream.value() != ctx.builtin(CoreObject::None)) {
             auto file = roots.root(stream.value());
             if (write(ctx, file, U"Error in sys.excepthook:\n", output) &&
                 print_exception(ctx, file, hook_error, hook_trace, output) &&

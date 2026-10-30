@@ -1,0 +1,6 @@
+value 42
+events ['enter', 'caught', 'exit']
+decorator 6 8 ['enter', 'caught', 'exit', 'enter', 3, 'exit', 'enter', 4, 'exit']
+propagated failure ['decorator enter', 'LookupError']
+invalid generator generator didn't yield
+invalid generator generator didn't stop

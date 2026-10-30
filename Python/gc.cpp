@@ -462,6 +462,7 @@ struct State {
         for (auto *object : core)
             mark(object);
         mark(exit_callbacks);
+        mark(sys_dictionary);
         auto trace_work = [&] {
             while (worklist) {
                 Allocation *allocation = worklist;
@@ -603,6 +604,7 @@ struct State {
     ObjectHeader *type_type = nullptr;
     std::array<ObjectHeader *, detail::core_count> core{};
     ObjectHeader *exit_callbacks = nullptr;
+    ObjectHeader *sys_dictionary = nullptr;
     bool core_published = false;
     std::atomic<std::uint64_t> type_epoch{0}, exception_epoch{0};
     CallExecutor call_executor = nullptr;
@@ -1504,6 +1506,19 @@ void Attachment::publish_exit_callbacks(Handle candidate, ReturnSlot &out)
     if (!state_->exit_callbacks)
         state_->exit_callbacks = value.object();
     out.ok(Value(*state_->exit_callbacks));
+}
+void Attachment::load_sys_dictionary(ReturnSlot &out)
+{
+    out.reset(*this);
+    std::lock_guard gate(state_->coordinator);
+    if (state_->sys_dictionary)
+        out.ok(Value(*state_->sys_dictionary));
+}
+void Attachment::set_sys_dictionary(Handle dictionary)
+{
+    const auto value = dictionary.get(*this);
+    std::lock_guard gate(state_->coordinator);
+    state_->sys_dictionary = value.object();
 }
 std::uint64_t Attachment::publication_epoch(PublicationDomain domain) const
 {

@@ -1,0 +1,5 @@
+entered a
+before close ['enter a', 'enter b']
+after close ['enter a', 'enter b', 'exit b', 'callback', 'exit a']
+suppression ['suppress ValueError', 'none']
+invalid context TypeError

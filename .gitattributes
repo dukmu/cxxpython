@@ -1,0 +1,3 @@
+# Fixture bytes must not undergo checkout/checkin newline conversion.
+Tests/**/*.bin -text
+Tests/**/stdin.bin binary

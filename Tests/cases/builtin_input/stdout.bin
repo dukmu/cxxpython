@@ -1,0 +1,9 @@
+'hello\r' ['err.flush', 'prompt.str', 'out.write:question? ', 'out.flush', 'readline']
+'plain' 'plain'
+'\n' ''
+b'bytes\n' b'bytes'
+b'\r\n' b'\r'
+b'' EOFError: EOF when reading a line
+'' EOFError: EOF when reading a line
+42 TypeError: object.readline() returned non-string
+('first', 'second', 'one: ')

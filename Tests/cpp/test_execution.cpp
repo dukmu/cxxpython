@@ -443,6 +443,49 @@ TEST_F(CoreExecution, AwaitOpcodeRequiresCoroutineCodeAndOneResumptionSlot)
     EXPECT_EQ(effect.pushes, 1U);
 }
 
+TEST_F(CoreExecution, AsyncWithVerifiesAwaitedCleanupStackAndOperandDomain)
+{
+    const auto effect = instruction_effect({Opcode::PrepareAsyncWith, 0});
+    EXPECT_EQ(effect.inputs, 1U);
+    EXPECT_EQ(effect.pops, 1U);
+    EXPECT_EQ(effect.pushes, 2U);
+    EXPECT_TRUE(opcode_definition(Opcode::PrepareAsyncWith).may_raise);
+    EXPECT_TRUE(opcode_definition(Opcode::PrepareAsyncWith).safepoint);
+    CodeBuilder underflow(context);
+    underflow.emit(Opcode::PrepareAsyncWith);
+    invalid(underflow, CodeErrorKind::StackUnderflow);
+    CodeBuilder operand(context);
+    operand.emit(Opcode::PrepareAsyncWith, 1);
+    invalid(operand, CodeErrorKind::Operand);
+    CodeSpec spec;
+    spec.coroutine = true;
+    CodeBuilder valid(context, spec);
+    const auto region = valid.region(RegionKind::With, true);
+    valid.emit(Opcode::LoadConst, valid.constant(builtin(CoreObject::None)));
+    valid.enter(region);
+    valid.emit(Opcode::PopTop);
+    valid.leave(region);
+    valid.emit(Opcode::LoadConst, valid.constant(builtin(CoreObject::None)));
+    valid.emit(Opcode::Return);
+    const auto program = code(valid);
+    EXPECT_EQ(context.payload<CodeObject>(program).program.max_stack(), 5U);
+    const auto listing = disassemble(context, program);
+    EXPECT_NE(listing.find("PREPARE_ASYNC_WITH"), std::string::npos);
+    const auto entering = listing.find("GET_AWAITABLE");
+    ASSERT_NE(entering, std::string::npos);
+    EXPECT_NE(listing.find("GET_AWAITABLE", entering + 1), std::string::npos);
+    CodeBuilder ordinary(context);
+    const auto invalid_region = ordinary.region(RegionKind::With, true);
+    ordinary.emit(Opcode::LoadConst, ordinary.constant(builtin(CoreObject::None)));
+    ordinary.enter(invalid_region);
+    ordinary.emit(Opcode::PopTop);
+    ordinary.leave(invalid_region);
+    ordinary.emit(Opcode::LoadConst, ordinary.constant(builtin(CoreObject::None)));
+    ordinary.emit(Opcode::Return);
+    invalid(ordinary, CodeErrorKind::Operand);
+    EXPECT_THROW(ordinary.region(RegionKind::Finally, true), CodeValidationError);
+}
+
 TEST_F(CoreExecution, IterationAndUnpackOpcodesVerifyBothBranchStackEffects)
 {
     CodeBuilder empty(context);

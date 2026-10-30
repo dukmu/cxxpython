@@ -870,6 +870,24 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 ReturnSlot iterator(context);
                 get_iter(context, roots.root(data.operands[data.sp - 1]), iterator);
                 if (raised(iterator)) {
+                    // Match ceval.c's non-iterable unpack diagnostic without replaying __iter__.
+                    if (is_subtype(context, context.type_of(iterator.exception()),
+                                   context.builtin(CoreObject::TypeErrorType))) {
+                        const auto type = roots.root(context.type_of(data.operands[data.sp - 1]));
+                        const auto iter = resolve_protocol(context, type, Protocol::Iter, roots);
+                        const auto item = resolve_protocol(context, type, Protocol::GetItem, roots);
+                        if (iter.state == SlotState::Missing && item.state == SlotState::Missing) {
+                            const auto metadata = TypeView(context, type);
+                            const auto name = metadata.name();
+                            const auto text =
+                                std::holds_alternative<Value>(name)
+                                    ? context.payload<StrObject>(std::get<Value>(name)).value
+                                    : std::get<std::u32string>(name);
+                            raise_error(context, CoreObject::TypeErrorType,
+                                        U"cannot unpack non-iterable " + text + U" object",
+                                        iterator);
+                        }
+                    }
                     activation.raising(iterator.exception());
                     break;
                 }
@@ -1358,16 +1376,20 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
             case Opcode::EnterRegion:
                 data.regions.push_back({{operand, RegionPhase::Protected}, data.sp, {}});
                 break;
-            case Opcode::PrepareWith: {
+            case Opcode::PrepareWith:
+            case Opcode::PrepareAsyncWith: {
                 RootScope roots(context);
                 auto manager = roots.root(data.operands[data.sp - 1]);
                 ReturnSlot enter(context);
-                with_method(context, manager, Protocol::Enter, enter);
+                const bool asynchronous = opcode == Opcode::PrepareAsyncWith;
+                with_method(context, manager, asynchronous ? Protocol::AEnter : Protocol::Enter,
+                            enter);
                 if (raised(enter)) {
                     activation.raising(enter.exception());
                     break;
                 }
-                with_method(context, manager, Protocol::Exit, result);
+                with_method(context, manager, asynchronous ? Protocol::AExit : Protocol::Exit,
+                            result);
                 if (raised(result)) {
                     activation.raising(result.exception());
                     break;

@@ -1,0 +1,7 @@
+resource True
+closed
+body propagated
+redirected 'outer True\ninner\n' 'error\n'
+restored True True
+null value
+unsuppressed not ignored

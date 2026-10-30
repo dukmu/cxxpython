@@ -1,0 +1,6 @@
+entered a
+before close ['enter a']
+after close ['enter a', 'sync', 'callback b', 'exit a']
+suppressed True suppress ValueError
+aclosing True
+aexit None closed

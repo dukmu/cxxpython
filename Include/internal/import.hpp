@@ -42,7 +42,7 @@ struct ImportState {
     std::map<std::thread::id, std::shared_ptr<ModuleLoad>> waiting;
     // Library destructors may block. Keep a pin until State destruction, outside GC.
     std::list<std::shared_ptr<const NativeLibrary>> libraries;
-    enum class Bootstrap { Cold, Loading, Ready };
+    enum class Bootstrap { Cold, LoadingPolicy, LoadingStreams, Ready };
     Bootstrap bootstrap = Bootstrap::Cold;
     std::thread::id bootstrap_owner;
 };

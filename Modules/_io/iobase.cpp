@@ -136,7 +136,20 @@ void finalize(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
     if (!receiver(c, a[0], out))
         return;
     RootScope roots(c);
-    io_call(c, roots.root(a[0]), U"close", {}, out);
+    const auto self = roots.root(a[0]);
+    ReturnSlot name(c), status(c), changed(c);
+    make_str(c, U"closed", name);
+    get_attribute(c, self, roots.root(name.value()), status);
+    if (status.tag() != ResultTag::Raised)
+        truth(c, roots.root(status.value()), status);
+    if (status.tag() == ResultTag::Raised || status.value() == c.builtin(CoreObject::True)) {
+        out.ok(c.builtin(CoreObject::None));
+        return;
+    }
+    make_str(c, U"_finalizing", name);
+    set_attribute(c, self, roots.root(name.value()), roots.root(c.builtin(CoreObject::True)),
+                  changed);
+    io_call(c, self, U"close", {}, out);
 }
 template <bool Enter> void context(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
 {

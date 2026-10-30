@@ -1,0 +1,14 @@
+stdin none RuntimeError: lost sys.stdin
+stdin missing RuntimeError: lost sys.stdin
+stdout none RuntimeError: lost sys.stdout
+stdout missing RuntimeError: lost sys.stdout
+stderr none RuntimeError: lost sys.stderr
+stderr missing RuntimeError: lost sys.stderr
+write ValueError: write failed
+str ValueError: str failed
+missing write first AttributeError: 'NoWrite' object has no attribute 'write'
+read ValueError: read failed
+fileno conversion TypeError: 'str' object cannot be interpreted as an integer
+fileno failure ValueError: read failed
+two arguments TypeError
+keyword TypeError

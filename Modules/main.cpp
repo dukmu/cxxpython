@@ -3,7 +3,10 @@
 #include "cxxpython/import.hpp"
 #include "internal/atexitmodule.hpp"
 #include "internal/compiler.hpp"
+#include "internal/iomodule.hpp"
 #include "internal/pythonrun.hpp"
+#include "internal/stdio.hpp"
+#include "internal/sysmodule.hpp"
 
 #include <array>
 #include <filesystem>
@@ -129,8 +132,8 @@ int pymain(int argc, char **argv)
         if (parsed != 0)
             return parsed < 0 ? 0 : parsed;
         const bool tty = stdin_is_tty();
-        const bool repl_only =
-            options.mode == Mode::Stdin && !options.explicit_stdin && tty && !options.expression;
+        const bool repl_only = options.mode == Mode::Stdin && !options.explicit_stdin &&
+                               (tty || options.interactive) && !options.expression;
         Interpreter interpreter;
         Attachment context(interpreter);
         context.bootstrap_core();
@@ -256,8 +259,19 @@ int pymain(int argc, char **argv)
                         text = read_stream(file);
                 } else {
                     filename = "<stdin>";
-                    NativeWait wait(context);
-                    text = read_stream(std::cin);
+                    ReturnSlot input(context);
+                    get_sys_attribute(context, U"stdin", input);
+                    if (input.tag() == ResultTag::Raised)
+                        status = report_exception(context, input.exception());
+                    else if (!io_call(context, roots.root(input.value()), U"read", {}, out))
+                        status = report_exception(context, out.exception());
+                    else if (context.has_layout<StrObject>(out.value()))
+                        text = source_utf8(context.payload<StrObject>(out.value()).value);
+                    else {
+                        raise_error(context, CoreObject::TypeErrorType,
+                                    U"stdin.read() returned non-string", out);
+                        status = report_exception(context, out.exception());
+                    }
                 }
                 if (!status) {
                     SourceUnit source(SourceBuffer(std::move(text), filename));
@@ -274,20 +288,33 @@ int pymain(int argc, char **argv)
                 if (out.tag() == ResultTag::Raised)
                     status = report_exception(context, out.exception());
                 else {
-                    const auto text = source_utf8(context.payload<StrObject>(out.value()).value);
-                    NativeWait wait(context);
-                    std::cout << text << '\n';
+                    ReturnSlot text(context), output(context);
+                    make_str(context, context.payload<StrObject>(out.value()).value + U"\n", text);
+                    const auto rendered = roots.root(text.value());
+                    get_sys_attribute(context, U"stdout", output);
+                    if (output.tag() == ResultTag::Raised)
+                        status = report_exception(context, output.exception());
+                    else {
+                        const Value value = rendered.get(context);
+                        if (!io_call(context, roots.root(output.value()), U"write", {&value, 1},
+                                     out))
+                            status = report_exception(context, out.exception());
+                    }
                 }
             }
         } catch (const SourceError &error) {
             status = report_source_error(error);
         }
+        if (!repl_only && (options.mode == Mode::File || options.mode == Mode::Stdin))
+            flush_stdio(context, StdioFlush::AfterExecution);
         if (repl_only || options.interactive)
             status = run_interactive(context, globals, sys, tty || options.interactive,
                                      tty && !options.quiet && repl_only);
         run_exitfuncs(context, out);
         if (out.tag() == ResultTag::Raised)
             return report_exception(context, out.exception());
+        if (!flush_stdio(context))
+            return 120;
         return status;
     } catch (const SourceError &error) {
         return report_source_error(error);

@@ -122,26 +122,36 @@ runtime errors; each input releases its temporary roots. NativeWait surrounds
 host input waits. CLI path[0] changes preserve the configured library path.
 The adapted runpy slice locates module/package __main__ through real importlib
 and executes in the canonical __main__ dictionary. It is not the complete public
-runpy module. Host getline/diagnostic bridges, missing readline/history, signal
-interruption, custom stdin/excepthook policy and installed/isolated path configuration
+runpy module. Both stdin source execution and interactive line reads use the real
+Python-visible sys.stdin, not host getline. Missing readline/history, signal
+interruption, emergency native diagnostics and installed/isolated path configuration
 remain product/I/O gates. Legacy --eval remains an explicit test-only CLI extension.
 
 print uses the dynamically selected sys.stdout or explicit file, str/write in
-observable order, sep/end validation and optional flush. The bootstrap standard
-streams are native sys._StandardTextIO objects, not modules or a claim of full
-_io.TextIOWrapper compatibility. They borrow standard descriptors, use operation
-leases for close/write coordination, and park only around host operations without
-holding internal mutexes during blocking writes. SIGPIPE is scoped to the writing
-thread rather than changing the embedding host's process-wide disposition.
-These remain unbuffered UTF-8 bootstrap streams in Modules/_io/stdio.cpp; input,
-real standard-stream installation/configuration and the remaining errno/platform
-matrix are gates. The separate IOBase/FileIO, BytesIO/StringIO, buffered binary
-streams and TextIOWrapper now back unchanged pinned Lib/io.py and builtin open.
+observable order, sep/end validation and optional flush. input follows ordinary
+prompt/write/flush/readline and EOFError behavior, using the same original sys
+namespace as print and hooks. That namespace is a precise Interpreter-owned root,
+independent of sys.modules replacement or deletion; it is not a second module
+table. sys.exception()/exc_info() read the active handled exception and its current
+synchronized traceback, including across Frame suspension and nested calls.
+Standard streams are actual TextIOWrapper/buffered/FileIO chains created after
+import policy installation; the old _StandardTextIO type is removed. Descriptors
+are borrowed with closefd=False; absent descriptors produce None. POSIX defaults
+are UTF-8, surrogateescape for input/output and backslashreplace for stderr, with
+terminal/stderr line buffering. SIGPIPE remains scoped to the writing thread.
+Silent post-execution flushing precedes atexit; final stdout/stderr flush failures
+produce exit 120 with ordinary unraisable reporting. Readline/TTY input, locale/
+environment configuration, audit and the remaining platform/shutdown matrix are
+gates. IOBase/FileIO, BytesIO/StringIO, buffered binary streams and TextIOWrapper
+also back unchanged pinned Lib/io.py and builtin open.
 File operations use descriptor leases and NativeWait, not a lock held across
 blocking syscalls. Buffered/text streams claim only their own operation state;
 competing threads park, same-thread incompatible reentry raises, and Python
 callbacks run without internal mutexes. Decoder-state replay cookies preserve
-logical text positions independently of raw descriptor offsets. Complete codec,
+logical text positions independently of raw descriptor offsets. Encoded pending
+text obeys write-through, line buffering and explicit operation barriers, distinct
+from writes through the binary buffer. Failed pending output is not duplicated by
+a later flush. Complete codec,
 warning, subclass and configuration matrices are not implied by this slice.
 
 The unchanged pinned abc.py uses real _abc weak registries and epoch-tagged
@@ -290,7 +300,11 @@ does not compile the file. Code instances may differ across get_code calls;
 their type is the same canonical runtime Code type.
 
 Cold bootstrap loads builtins/sys/_imp and the Python seed through the same module
-transactions, then installs their real metadata and loads importlib. Concurrent
+transactions, then installs their real metadata and loads importlib. A separate
+stream-loading phase admits the owner's installed finder/loader protocol while
+ordinary callers still wait. Initial sys.path contains the configured stdlib;
+user path[0] is inserted only after codecs and real standard streams are ready.
+Concurrent
 callers park only until that one-time bootstrap finishes; module body execution
 afterward remains independently leased. Failed bootstrap resets its host state
 and preserves successful dependencies for retry without recreating their classes.
@@ -560,6 +574,23 @@ the existing YIELD_FROM delegation and does not box its suspension. Async reques
 objects own their generator and input arguments through precise tracing. Their
 generator's running claim survives await suspension; no execution-wide lock or
 event-loop implementation is used as a substitute for OS-thread safety.
+
+PREPARE_ASYNC_WITH has the same one-input/two-output preparation effect as
+PREPARE_WITH, may raise and is a safepoint. The existing With region retains an
+asynchronous flag; entry and every cleanup path await through the normal
+GET_AWAITABLE/YIELD_FROM continuation. Verification checks operand domains,
+coroutine flags, stack joins and the exact awaited cleanup template. No native
+stack local carries a cleanup reason across suspension. aiter/anext use class
+special-method lookup; the default wrapper traces both operands and rejects
+concurrent/reentrant execution using its own atomic claim, not a GIL.
+
+BaseExceptionGroup and ExceptionGroup use the existing exception storage plus
+readonly message/child slots. Construction validates children and group families;
+derive/subgroup/split retain ordered structure and normal metadata/notes rules.
+ExceptionGroup is a mutable heap type, while BaseExceptionGroup is immutable.
+Unchanged pinned contextlib.py exercises synchronous/asynchronous managers and
+stacks plus group suppression. except* lowering, nested group diagnostics and
+complete serialization remain separate gates.
 
 Several threads may call the same Function/Code/closure. Individual shared Cell
 edges are synchronized; compound nonlocal += is not implicitly atomic.

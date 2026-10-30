@@ -1,0 +1,9 @@
+entered 42
+suppressed True ['enter', 'caught', 'exit']
+normal 7 False ['enter', 'caught', 'exit', 'enter', 'exit']
+null async value None
+decorator 4 6
+decorator error failure ['enter', 'call 0', 'exit']
+empty generator didn't yield
+first 1
+twice generator didn't stop

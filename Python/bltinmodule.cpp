@@ -1,9 +1,11 @@
 #include "cxxpython/execution.hpp"
 #include "cxxpython/floatobject.hpp"
 #include "cxxpython/unionobject.hpp"
+#include "internal/aiterobject.hpp"
 #include "internal/ioopen.hpp"
 #include "internal/listsort.hpp"
 #include "internal/long.hpp"
+#include "internal/sysmodule.hpp"
 
 #include <cmath>
 #include <limits>
@@ -42,6 +44,117 @@ void builtin_radix(Attachment &c, Handle, std::span<const Value> args, ReturnSlo
 bool failed(const ReturnSlot &out)
 {
     return out.tag() == ResultTag::Raised;
+}
+void builtin_input(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(context);
+    auto arguments = roots.root(args[0]);
+    const auto &items = context.payload<TupleObject>(arguments).items;
+    if (items.size() > 1) {
+        raise_error(context, CoreObject::TypeErrorType, U"input expected at most 1 argument", out);
+        return;
+    }
+    ReturnSlot key(context), stdin_slot(context), stdout_slot(context), stderr_slot(context),
+        method(context), result(context), text(context);
+    auto stream = [&](std::u32string_view name, ReturnSlot &slot) {
+        detail::get_sys_attribute(context, name, slot);
+        if (failed(slot)) {
+            out.raised(slot.exception());
+            return false;
+        }
+        if (slot.value() == context.builtin(CoreObject::None)) {
+            raise_error(context, CoreObject::RuntimeErrorType, U"lost sys." + std::u32string(name),
+                        out);
+            return false;
+        }
+        return true;
+    };
+    if (!stream(U"stdin", stdin_slot) || !stream(U"stdout", stdout_slot) ||
+        !stream(U"stderr", stderr_slot))
+        return;
+    const auto fin = roots.root(stdin_slot.value());
+    const auto fout = roots.root(stdout_slot.value());
+    const auto ferr = roots.root(stderr_slot.value());
+    auto get_method = [&](Handle object, std::u32string name) {
+        make_str(context, std::move(name), key);
+        get_attribute(context, object, roots.root(key.value()), method);
+    };
+    auto flush = [&](Handle object) {
+        get_method(object, U"flush");
+        if (!failed(method))
+            call(context, roots.root(method.value()), {{}, {}}, result);
+    };
+    flush(ferr);
+    get_method(fin, U"fileno");
+    if (!failed(method)) {
+        call(context, roots.root(method.value()), {{}, {}}, result);
+        if (!failed(result)) {
+            index(context, roots.root(result.value()), text);
+            if (failed(text)) {
+                out.raised(text.exception());
+                return;
+            }
+            const auto value = detail::integer_value(context.payload<IntObject>(text.value()));
+            if (value < std::numeric_limits<long>::min() ||
+                value > std::numeric_limits<long>::max()) {
+                raise_error(context, CoreObject::OverflowErrorType,
+                            U"Python int too large to convert to C long", out);
+                return;
+            }
+        }
+    }
+    if (!items.empty()) {
+        get_method(fout, U"write");
+        if (failed(method)) {
+            out.raised(method.exception());
+            return;
+        }
+        str(context, roots.root(items[0]), text);
+        if (failed(text)) {
+            out.raised(text.exception());
+            return;
+        }
+        const Value value[] = {text.value()};
+        call(context, roots.root(method.value()), {value, {}}, result);
+        if (failed(result)) {
+            out.raised(result.exception());
+            return;
+        }
+    }
+    flush(fout);
+    get_method(fin, U"readline");
+    if (failed(method)) {
+        out.raised(method.exception());
+        return;
+    }
+    call(context, roots.root(method.value()), {{}, {}}, result);
+    if (failed(result)) {
+        out.raised(result.exception());
+        return;
+    }
+    const auto line = roots.root(result.value());
+    if (context.has_layout<StrObject>(line.get(context)) &&
+        is_subtype(context, context.type_of(line.get(context)),
+                   context.builtin(CoreObject::StrType))) {
+        const auto &value = context.payload<StrObject>(line).value;
+        if (value.empty())
+            raise_error(context, CoreObject::EOFErrorType, U"EOF when reading a line", out);
+        else if (value.back() == U'\n')
+            make_str(context, value.substr(0, value.size() - 1), out);
+        else
+            out.ok(line.get(context));
+    } else if (is_bytes(context, line.get(context))) {
+        const auto &value = context.payload<BytesObject>(line).value;
+        if (value.empty())
+            raise_error(context, CoreObject::EOFErrorType, U"EOF when reading a line", out);
+        else if (value.back() == '\n')
+            make_bytes(context, value.substr(0, value.size() - 1), out);
+        else
+            out.ok(line.get(context));
+    } else {
+        raise_error(context, CoreObject::TypeErrorType, U"object.readline() returned non-string",
+                    out);
+    }
 }
 void builtin_abs(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
@@ -658,6 +771,12 @@ void install_class_builtins(Attachment &context, std::span<const Handle> core, V
                                              name, std::move(key));
         name_store(context, mapping, name.value(), function.value());
     };
+    SignatureLayout async_iteration;
+    async_iteration.parameters = {{U"async_iterable", ParameterKind::PositionalOnly}};
+    install("aiter", U"aiter", async_iteration, builtin_aiter);
+    async_iteration.parameters[0].name = U"aiterator";
+    async_iteration.varargs = U"default";
+    install("anext", U"anext", async_iteration, builtin_anext);
     SignatureLayout attributes;
     attributes.parameters = {{U"object", ParameterKind::PositionalOnly},
                              {U"name", ParameterKind::PositionalOnly}};
@@ -684,6 +803,9 @@ void install_class_builtins(Attachment &context, std::span<const Handle> core, V
     install("oct", U"oct", ascii_signature, builtin_radix<3>);
     install("hex", U"hex", ascii_signature, builtin_radix<4>);
     install("callable", U"callable", ascii_signature, builtin_callable);
+    SignatureLayout input_signature;
+    input_signature.varargs = U"args";
+    install("input", U"input", input_signature, builtin_input);
     install("all", U"all", ascii_signature, builtin_all_any<false>);
     install("any", U"any", ascii_signature, builtin_all_any<true>);
     SignatureLayout pair_signature;

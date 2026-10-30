@@ -234,7 +234,10 @@ actual raw-stream callbacks, input/output buffers, partial/nonblocking writes,
 position reconciliation, detach and close. `Modules/_io/textio.cpp` supplies
 IncrementalNewlineDecoder and TextIOWrapper, using registered incremental codecs,
 pending decoded text, newline state and byte/decoder snapshots for tell/seek
-replay cookies. Managed stream/codec edges are traced. Per-object operation claims
+replay cookies. Encoded output has its own pending buffer: write-through, line
+buffering and flush/read/position/detach/close barriers preserve text-versus-binary
+ordering. Pending bytes detach before callbacks, so failed writes are not silently
+replayed. Managed stream/codec edges are traced. Per-object operation claims
 retain stream ownership across callbacks; state mutexes protect claim transitions,
 not Python execution, and contending threads park through NativeWait. Same-thread
 reentrancy is rejected rather than deadlocking or acquiring an interpreter lock.
@@ -245,10 +248,18 @@ option validation and failure cleanup use normal calls and exception chaining.
 The builtin resolves the real _io implementation, whose captured types retain
 the construction dependencies. `Modules/_iomodule.cpp` publishes the actual types;
 the complete upstream Lib/io.py supplies the Python facade and ABC registration.
-These components do not replace sys.stdin/stdout/stderr yet: those still use the
-temporary bridge in `Modules/_io/stdio.cpp`. UTF-8 defaults, input, locale/stdio
-configuration, warnings, TextIOWrapper.reconfigure and complete stream protocol/
-diagnostic matrices remain work, not implied by the existing stream hierarchy.
+`Modules/_io/stdio.cpp` constructs sys.stdin/stdout/stderr using these real types,
+with borrowed FileIO descriptors and POSIX UTF-8 defaults; the temporary native
+stream type is deleted. Cold import bootstrap has explicit policy and stream
+phases: configured stdlib search precedes user path[0], and the installed Python
+finders handle stream dependencies before ordinary callers are admitted. The
+original sys dictionary has a precise Interpreter root independent of module
+table replacement. Input, print, display and exception hooks resolve its live
+attributes; a fresh reimported sys module does not redefine interpreter stdio.
+The CLI and REPL read through those Python streams and flush after execution and
+at finalization. Locale/environment configuration, readline/history, signals,
+warnings, TextIOWrapper.reconfigure and complete stream protocol/diagnostic
+matrices remain work, not implied by the existing stream hierarchy.
 
 `Modules/atexitmodule.cpp` owns an Interpreter-rooted traced callback registry.
 Prepared callback records and short local commits separate mutation from Python
@@ -337,8 +348,19 @@ suspension. Objects/asyncgenobject.cpp owns asend/athrow/aclose request objects.
 A per-request execution claim protects its writer-owned state; a per-generator
 atomic claim spans inner await suspension and rejects competing requests without
 holding a mutex. Completion, rejection and native exception unwind release the
-claim. Async-generator finalizer hooks, event-loop shutdown, async for/with and
-never-awaited warning policy remain explicit dependencies.
+claim. Async with retains a flag in the existing control region and lowers entry
+and cleanup through GET_AWAITABLE/YIELD_FROM; no second Frame or cleanup scheduler
+is introduced. Objects/aiterobject.cpp supplies aiter/anext and the traced,
+execution-claimed default-bearing wrapper. Async-generator finalizer hooks,
+event-loop shutdown, async for and never-awaited warning policy remain explicit
+dependencies.
+
+`Objects/exceptiongroup.cpp` extends the existing exception layout with message
+and child slots. Native constructors, derive/subgroup/split and metadata copying
+support unchanged upstream `Lib/contextlib.py`, including group suppression.
+The Python library also supplies synchronous/asynchronous generators, stacks,
+decorators and resource helpers. Native group APIs do not imply except* compiler
+support, complete nested diagnostic formatting or pickle support.
 
 `Objects/funcobject.cpp` owns Function traversal and metadata descriptors; the VM
 owns construction and call binding, not a second metadata dictionary. Independently

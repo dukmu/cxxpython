@@ -32,6 +32,8 @@ constexpr std::array definitions{
     OpcodeDefinition{"LOAD_EXCEPTION", 0, 0, 1, OperandDomain::None, FlowKind::Next, false, false},
     OpcodeDefinition{"EXCEPTION_MATCH", 2, 2, 1, OperandDomain::None, FlowKind::Next, true, true},
     OpcodeDefinition{"PREPARE_WITH", 1, 1, 2, OperandDomain::None, FlowKind::Next, true, true},
+    OpcodeDefinition{"PREPARE_ASYNC_WITH", 1, 1, 2, OperandDomain::None, FlowKind::Next, true,
+                     true},
     OpcodeDefinition{"ENTER_WITH", 2, 0, 0, OperandDomain::Region, FlowKind::Next, false, false},
     OpcodeDefinition{"WITH_EXIT", 0, 0, 4, OperandDomain::Region, FlowKind::Next, false, false},
     OpcodeDefinition{"WITH_RESULT", 1, 1, 0, OperandDomain::Region, FlowKind::Next, true, true},
@@ -312,13 +314,17 @@ std::size_t verify(const CodeSpec &spec, std::span<const Instruction> instructio
                     region.enter_pc);
         if (region.kind == RegionKind::With) {
             const auto start = static_cast<std::size_t>(region.handler_pc);
-            if (start + 3 >= instructions.size() || region.end_handler_pc != start + 3 ||
+            const bool asynchronous = start + 2 < instructions.size() &&
+                                      instructions[start + 2].opcode == Opcode::GetAwaitable;
+            const auto result = start + (asynchronous ? 4 : 2);
+            if (result + 1 >= instructions.size() || region.end_handler_pc != result + 1 ||
                 instructions[start].opcode != Opcode::WithExit ||
                 instructions[start].operand != id ||
                 instructions[start + 1].opcode != Opcode::Call ||
-                instructions[start + 2].opcode != Opcode::WithResult ||
-                instructions[start + 2].operand != id ||
-                instructions[start + 3].opcode != Opcode::EndHandler ||
+                (asynchronous && instructions[start + 3].opcode != Opcode::YieldFrom) ||
+                instructions[result].opcode != Opcode::WithResult ||
+                instructions[result].operand != id ||
+                instructions[result + 1].opcode != Opcode::EndHandler ||
                 calls[instructions[start + 1].operand].positional != 3 ||
                 calls[instructions[start + 1].operand].keywords)
                 invalid(CodeErrorKind::RegionStructure, "invalid with cleanup template",
@@ -723,14 +729,17 @@ CodeBuilder::RegionSpec &CodeBuilder::require_region(Region region)
         invalid(CodeErrorKind::RegionBounds, "foreign or unknown region");
     return regions_[region.index];
 }
-CodeBuilder::Region CodeBuilder::region(RegionKind kind)
+CodeBuilder::Region CodeBuilder::region(RegionKind kind, bool asynchronous)
 {
     if (kind < RegionKind::Loop || kind > RegionKind::With)
         invalid(CodeErrorKind::RegionStructure, "unknown region kind");
+    if (asynchronous && kind != RegionKind::With)
+        invalid(CodeErrorKind::RegionStructure, "async region must be with");
     if (regions_.size() >= std::numeric_limits<std::uint32_t>::max())
         invalid(CodeErrorKind::SizeLimit, "too many regions");
     RegionSpec spec;
     spec.layout.kind = kind;
+    spec.asynchronous = asynchronous;
     regions_.push_back(spec);
     return {this, static_cast<std::uint32_t>(regions_.size() - 1)};
 }
@@ -754,8 +763,12 @@ void CodeBuilder::enter(Region id, SourcePosition source)
     const auto count = instructions_.size(), sites = calls_.size();
     try {
         if (region.layout.kind == RegionKind::With) {
-            emit(Opcode::PrepareWith, 0, source);
+            emit(region.asynchronous ? Opcode::PrepareAsyncWith : Opcode::PrepareWith, 0, source);
             call(0, {}, source);
+            if (region.asynchronous) {
+                emit(Opcode::GetAwaitable, 0, source);
+                emit(Opcode::YieldFrom, 0, source);
+            }
         }
         region.layout.enter_pc = static_cast<std::uint32_t>(instructions_.size());
         emit(region.layout.kind == RegionKind::With ? Opcode::EnterWith : Opcode::EnterRegion,
@@ -791,6 +804,10 @@ void CodeBuilder::leave(Region id, SourcePosition source)
             handler(id);
             emit(Opcode::WithExit, id.index, source);
             call(3, {}, source);
+            if (region.asynchronous) {
+                emit(Opcode::GetAwaitable, 0, source);
+                emit(Opcode::YieldFrom, 0, source);
+            }
             emit(Opcode::WithResult, id.index, source);
             end_handler(id);
         }

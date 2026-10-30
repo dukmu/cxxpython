@@ -412,9 +412,12 @@ void initialize_textio(Attachment &c, Handle module, ReturnSlot &out)
 #include "cxxpython/import.hpp"
 #include "internal/codecregistry.hpp"
 
+#include <cerrno>
+
 namespace cxxpython::core {
 namespace text_wrapper {
 struct Stream {
+    static constexpr std::size_t chunk_size = 8192;
     ObjectHeader header;
     AtomicGcEdge buffer, decoder, encoder, encoding, errors, snapshot;
     std::mutex mutex;
@@ -429,6 +432,8 @@ struct Stream {
     int newline = 0;
     std::u32string pending;
     std::size_t used = 0;
+    std::string encoded_pending;
+    bool has_encoded_pending = false;
     Stream(InitialType type, Value none)
         : header(type), buffer(none), decoder(none), encoder(none), encoding(none), errors(none),
           snapshot(none)
@@ -441,6 +446,10 @@ struct Stream {
         t.visit(encoding);
         t.visit(errors);
         t.visit(snapshot);
+    }
+    std::size_t external_bytes() const noexcept
+    {
+        return pending.capacity() * sizeof(char32_t) + encoded_pending.capacity();
     }
 };
 
@@ -523,6 +532,58 @@ bool method(Attachment &c, Handle obj, const char32_t *name, std::span<const Val
             ReturnSlot &out)
 {
     return detail::io_call(c, obj, name, args, out);
+}
+void account(Attachment &c, Handle self, const Stream &s)
+{
+    c.account_external(self, s.external_bytes());
+}
+// Like CPython's _textiowrapper_writeflush, this drains only the text layer.
+bool writeflush(Attachment &c, Handle self, Stream &s, ReturnSlot &out)
+{
+    if (!s.has_encoded_pending)
+        return true;
+    RootScope roots(c);
+    auto buffer = edge(c, self, s.buffer, roots);
+    ReturnSlot bytes(c), result(c);
+    make_bytes(c, s.encoded_pending, bytes);
+    if (bytes.tag() == ResultTag::Raised) {
+        out.raised(bytes.exception());
+        return false;
+    }
+    auto data = roots.root(bytes.value());
+    // A failing write may have consumed bytes. Never retry this batch implicitly.
+    s.has_encoded_pending = false;
+    s.encoded_pending.clear();
+    if (s.encoded_pending.capacity() > Stream::chunk_size)
+        std::string{}.swap(s.encoded_pending);
+    account(c, self, s);
+    Value argument = data.get(c);
+    while (!method(c, buffer, U"write", {&argument, 1}, result)) {
+        RootScope retry_roots(c);
+        auto error = retry_roots.root(result.exception());
+        ReturnSlot error_number(c);
+        bool interrupted = false;
+        if (is_subtype(c, c.type_of(error.get(c)), c.builtin(CoreObject::OSErrorType)) &&
+            attribute(c, error, U"errno", error_number) &&
+            c.has_layout<IntObject>(error_number.value())) {
+            const auto &number = c.payload<IntObject>(error_number.value());
+            interrupted = !number.large && number.small == EINTR;
+        }
+        if (!interrupted) {
+            out.raised(result.exception());
+            return false;
+        }
+        c.poll();
+    }
+    return true;
+}
+bool flush_buffer(Attachment &c, Handle self, Stream &s, ReturnSlot &out)
+{
+    if (!writeflush(c, self, s, out))
+        return false;
+    RootScope roots(c);
+    auto buffer = edge(c, self, s.buffer, roots);
+    return method(c, buffer, U"flush", {}, out);
 }
 bool usable(Attachment &c, Stream &s, ReturnSlot &out)
 {
@@ -735,6 +796,8 @@ void init(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
     s.line_buffering = line;
     s.write_through = through;
     s.pending.clear();
+    s.encoded_pending.clear();
+    s.has_encoded_pending = false;
     s.used = 0;
     s.eof = false;
     s.detached = false;
@@ -744,6 +807,7 @@ void init(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
     s.can_read = can_read;
     s.can_write = can_write;
     s.have_snapshot = false;
+    account(c, self, s);
     out.ok(c.builtin(CoreObject::None));
 }
 
@@ -769,7 +833,7 @@ bool fill(Attachment &c, Handle self, Stream &s, ReturnSlot &out)
         s.have_snapshot = true;
     }
     ReturnSlot size(c), data(c), result(c);
-    make_int(c, 8192, size);
+    make_int(c, Stream::chunk_size, size);
     Value n = size.value();
     if (!method(c, buffer, s.has_read1 ? U"read1" : U"read", {&n, 1}, data)) {
         out.raised(data.exception());
@@ -797,7 +861,7 @@ bool fill(Attachment &c, Handle self, Stream &s, ReturnSlot &out)
     s.eof = eof;
     s.snapshot_eof = eof;
     s.snapshot_feed = static_cast<std::int64_t>(count);
-    c.account_external(self, s.pending.capacity() * sizeof(char32_t));
+    account(c, self, s);
     return true;
 }
 template <bool line> void read(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
@@ -819,6 +883,8 @@ template <bool line> void read(Attachment &c, Handle, std::span<const Value> a, 
     }
     auto buffer = edge(c, self, s.buffer, r);
     if (is_closed(c, buffer, out))
+        return;
+    if (!writeflush(c, self, s, out))
         return;
     std::u32string result;
     while (limit < 0 || result.size() < static_cast<std::uint64_t>(limit)) {
@@ -914,11 +980,15 @@ void write(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
         raise_error(c, CoreObject::TypeErrorType, U"encoder should return bytes", out);
         return;
     }
-    arg = bytes.get(c);
-    if (!method(c, buffer, U"write", {&arg, 1}, result)) {
-        out.raised(result.exception());
+    const auto &data = c.payload<BytesObject>(bytes).value;
+    if (data.size() >= Stream::chunk_size && !writeflush(c, self, s, out))
         return;
-    }
+    s.encoded_pending.append(data);
+    s.has_encoded_pending = true;
+    account(c, self, s);
+    if ((s.encoded_pending.size() >= Stream::chunk_size || s.write_through || flush_line) &&
+        !writeflush(c, self, s, out))
+        return;
     if (flush_line && !method(c, buffer, U"flush", {}, result)) {
         out.raised(result.exception());
         return;
@@ -948,7 +1018,9 @@ void action(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
     auto buffer = edge(c, self, s.buffer, r);
     ReturnSlot result(c);
     if constexpr (operation == 0) {
-        if (!method(c, buffer, U"flush", {}, result)) {
+        if (is_closed(c, buffer, out))
+            return;
+        if (!flush_buffer(c, self, s, result)) {
             out.raised(result.exception());
             return;
         }
@@ -968,19 +1040,24 @@ void action(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
             out.ok(c.builtin(CoreObject::None));
             return;
         }
-        bool flush_ok = method(c, buffer, U"flush", {}, flushed);
+        bool flush_ok = flush_buffer(c, self, s, flushed);
         bool close_ok = method(c, buffer, U"close", {}, result);
+        if (!close_ok) {
+            if (!flush_ok && result.exception() != flushed.exception())
+                c.store(result.exception(), c.payload<ExceptionObject>(result.exception()).context,
+                        flushed.exception());
+            out.raised(result.exception());
+            return;
+        }
         if (!flush_ok) {
             out.raised(flushed.exception());
             return;
         }
-        if (!close_ok) {
-            out.raised(result.exception());
-            return;
-        }
         out.ok(c.builtin(CoreObject::None));
     } else {
-        if (!method(c, buffer, U"flush", {}, result)) {
+        if (is_closed(c, buffer, out))
+            return;
+        if (!flush_buffer(c, self, s, result)) {
             out.raised(result.exception());
             return;
         }
@@ -1088,7 +1165,7 @@ void tell(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
     if (is_closed(c, buffer, out))
         return;
     ReturnSlot flush(c);
-    if (!method(c, buffer, U"flush", {}, flush)) {
+    if (!flush_buffer(c, self, s, flush)) {
         out.raised(flush.exception());
         return;
     }
@@ -1232,7 +1309,7 @@ void seek(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
         return;
     }
     ReturnSlot result(c);
-    if (!method(c, buffer, U"flush", {}, result)) {
+    if (!flush_buffer(c, self, s, result)) {
         out.raised(result.exception());
         return;
     }
@@ -1305,7 +1382,7 @@ void seek(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
             return;
         }
         s.pending = c.payload<StrObject>(text).value;
-        c.account_external(self, s.pending.capacity() * sizeof(char32_t));
+        account(c, self, s);
         s.used = static_cast<std::size_t>(skip);
         s.eof = eof != 0;
         s.snapshot_pos = pos;

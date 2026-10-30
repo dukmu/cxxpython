@@ -3,7 +3,6 @@
 #include "internal/sysmodule.hpp"
 
 #include "cxxpython/execution.hpp"
-#include "cxxpython/import.hpp"
 #include "cxxpython/moduleobject.hpp"
 #include "cxxpython/namespaceobject.hpp"
 #include "cxxpython/protocol.hpp"
@@ -25,6 +24,31 @@ template <bool Errors>
 void filesystem_encoding(Attachment &ctx, Handle, std::span<const Value>, ReturnSlot &out)
 {
     make_str(ctx, Errors ? U"surrogateescape" : U"utf-8", out);
+}
+
+void sys_exception(Attachment &ctx, Handle, std::span<const Value>, ReturnSlot &out)
+{
+    out.ok(ctx.handled_exception().value_or(ctx.builtin(CoreObject::None)));
+}
+
+void sys_exc_info(Attachment &ctx, Handle, std::span<const Value>, ReturnSlot &out)
+{
+    RootScope roots(ctx);
+    const auto none = ctx.builtin(CoreObject::None);
+    const auto exception = roots.root(ctx.handled_exception().value_or(none));
+    const bool active = exception.get(ctx) != none;
+    const auto type = roots.root(active ? ctx.type_of(exception) : none);
+    ReturnSlot traceback(ctx);
+    if (active) {
+        ctx.load(exception.get(ctx), ctx.payload<ExceptionObject>(exception).traceback, traceback);
+        if (failed(traceback)) {
+            out.raised(traceback.exception());
+            return;
+        }
+    }
+    const auto trace = roots.root(traceback.tag() == ResultTag::Ok ? traceback.value() : none);
+    const std::array values{type.get(ctx), exception.get(ctx), trace.get(ctx)};
+    cxxpython::core::make_tuple(ctx, values, out);
 }
 
 void system_exit_init(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
@@ -286,15 +310,11 @@ void sys_displayhook(Attachment &ctx, Handle, std::span<const Value> args, Retur
     }
     RootScope roots(ctx);
     auto value = roots.root(args[0]);
-    ReturnSlot sys(ctx), stream(ctx), method(ctx), text(ctx), result(ctx);
+    ReturnSlot stream(ctx), method(ctx), text(ctx), result(ctx);
     if (!set_last(ctx, roots.root(ctx.builtin(CoreObject::None)), out))
         return;
-    import_module(ctx, U"sys", sys);
-    if (failed(sys)) {
-        out.raised(sys.exception());
-        return;
-    }
-    if (!attribute(ctx, roots.root(sys.value()), U"stdout", stream)) {
+    get_sys_attribute(ctx, U"stdout", stream);
+    if (failed(stream)) {
         out.raised(stream.exception());
         return;
     }
@@ -339,6 +359,35 @@ void sys_displayhook(Attachment &ctx, Handle, std::span<const Value> args, Retur
 }
 } // namespace
 
+void get_sys_attribute(Attachment &ctx, std::u32string_view name, ReturnSlot &out)
+{
+    RootScope roots(ctx);
+    ReturnSlot dictionary(ctx), key(ctx);
+    ctx.load_sys_dictionary(dictionary);
+    if (dictionary.tag() == ResultTag::Empty) {
+        initialize_imports(ctx, out);
+        if (failed(out))
+            return;
+        ctx.load_sys_dictionary(dictionary);
+    }
+    if (failed(dictionary)) {
+        out.raised(dictionary.exception());
+        return;
+    }
+    if (dictionary.tag() != ResultTag::Empty) {
+        const auto sysdict = roots.root(dictionary.value());
+        make_str(ctx, std::u32string(name), key);
+        if (failed(key)) {
+            out.raised(key.exception());
+            return;
+        }
+        dict_lookup(ctx, sysdict, roots.root(key.value()), out);
+        if (out.tag() != ResultTag::Empty)
+            return;
+    }
+    raise_error(ctx, CoreObject::RuntimeErrorType, U"lost sys." + std::u32string(name), out);
+}
+
 void install_system_exit(Attachment &ctx, std::span<const Handle> core)
 {
     auto owner = core[static_cast<std::size_t>(CoreObject::SystemExitType)];
@@ -373,6 +422,14 @@ void initialize_sys_hooks(Attachment &ctx, Handle sys, ReturnSlot &out)
     make_native_function(ctx, "getfilesystemencodeerrors", {}, filesystem_encoding<true>, {},
                          function, NativeFunctionBinding::Function);
     if (!store(U"getfilesystemencodeerrors"))
+        return;
+    make_native_function(ctx, "exception", {}, sys_exception, {}, function,
+                         NativeFunctionBinding::Function);
+    if (!store(U"exception"))
+        return;
+    make_native_function(ctx, "exc_info", {}, sys_exc_info, {}, function,
+                         NativeFunctionBinding::Function);
+    if (!store(U"exc_info"))
         return;
     SignatureLayout exit_signature;
     exit_signature.parameters = {
@@ -465,13 +522,9 @@ void initialize_sys_hooks(Attachment &ctx, Handle sys, ReturnSlot &out)
 void display_value(Attachment &ctx, Handle value, ReturnSlot &out)
 {
     RootScope roots(ctx);
-    ReturnSlot sys(ctx), hook(ctx);
-    import_module(ctx, U"sys", sys);
-    if (failed(sys)) {
-        out.raised(sys.exception());
-        return;
-    }
-    if (!attribute(ctx, roots.root(sys.value()), U"displayhook", hook)) {
+    ReturnSlot hook(ctx);
+    get_sys_attribute(ctx, U"displayhook", hook);
+    if (failed(hook)) {
         out.raised(hook.exception());
         return;
     }

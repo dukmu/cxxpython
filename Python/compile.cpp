@@ -753,6 +753,8 @@ class GraphPass final {
                         for (const auto &item : node.items) {
                             expression(*item.context);
                             managers.push_back(region(RegionKind::With, item.context->span));
+                            program_.graphs[scope_].regions[managers.back()].asynchronous =
+                                node.asynchronous;
                             if (item.target)
                                 store(*item.target);
                             else
@@ -1070,7 +1072,7 @@ void SourceUnit::freeze(Attachment &context, ReturnSlot &out) const
                 regions.push_back(region.kind == RegionKind::Loop
                                       ? builder.loop(labels[*region.continue_target],
                                                      labels[*region.break_target])
-                                      : builder.region(region.kind));
+                                      : builder.region(region.kind, region.asynchronous));
             for (auto i : graph.order) {
                 const auto &block = graph.blocks[i];
                 if (block.handler)

@@ -1,0 +1,8 @@
+ordinary propagated ordinary
+all suppressed
+multiple suppressed
+partial ('ExceptionGroup', 'root', (('ExceptionGroup', 'inner', (('KeyError', ('two',)),)),))
+base suppressed
+base partial ('BaseExceptionGroup', 'mixed', (('GeneratorExit', ('stop',)),))
+base partial ('ExceptionGroup', 'mixed', (('KeyError', ('key',)),))
+whole group suppressed
