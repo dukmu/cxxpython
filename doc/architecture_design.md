@@ -6,9 +6,13 @@ Historical designs are in `archive/`; Plan 2 remains the full delivery objective
 
 ## Source To Execution
 
-`Programs/cxxpython.cpp` handles host arguments, file reads and diagnostic/output
-copying. It enters the runtime through SourceUnit/RunRequest, not a second parser
-or VM. There is one executable, `cxxpython`, linked to `cxxpython_core`.
+`Programs/cxxpython.cpp` is the thin process entry. `Modules/main.cpp` owns host
+arguments, source selection and interpreter setup. `Python/pythonrun.cpp` owns
+interactive driving and diagnostics; `Modules/sysmodule.cpp` supplies native
+displayhook/exit capabilities. Scripts, stdin, -c, -m and REPL enter through the
+same SourceUnit/RunRequest, not a second parser or VM. The actual module/package
+execution policy is adapted Python code in `Lib/runpy.py`. There is one executable,
+`cxxpython`, linked to `cxxpython_core`.
 
 `Parser/tokenizer.cpp` and the automatically generated
 `Parser/generated_parser.cpp` form a standalone UTF-8 Python 3.12 syntax library.
@@ -106,6 +110,10 @@ package paths and CLI argv use that real container, not host-only arrays.
 sequence owners perform conversions before their rooted snapshots/local commits.
 `Objects/formatobject.cpp` supplies the common format/ascii protocol boundary;
 f-string lowering uses it rather than an alternate string-conversion path.
+`Objects/stringformat.cpp` parses percent/brace interpolation and dispatches
+conversions and fields through those ordinary protocols. `Objects/unicodeobject.cpp`
+owns the added Unicode prefix/suffix methods; codec kernels remain separate in
+`Objects/unicodecodecs.cpp`.
 Generated Unicode tables retain their generator/source provenance. The immutable
 XID ranges are reused by the standalone tokenizer; its normalization and licensed
 character-name tables remain native parser data, not Python objects or imports.

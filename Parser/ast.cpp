@@ -1055,9 +1055,10 @@ class Adapter {
     Suite suite(const Node &n)
     {
         Suite result;
-        if (n.rule == Rule::file || n.rule == Rule::statements || n.rule == Rule::statement ||
-            n.rule == Rule::simple_stmts || n.rule == Rule::compound_stmt ||
-            n.rule == Rule::block) {
+        if (n.rule == Rule::file || n.rule == Rule::interactive ||
+            n.rule == Rule::statement_newline || n.rule == Rule::statements ||
+            n.rule == Rule::statement || n.rule == Rule::simple_stmts ||
+            n.rule == Rule::compound_stmt || n.rule == Rule::block) {
             for (auto p : rules(n)) {
                 auto s = suite(*p);
                 for (auto &item : s)
@@ -1342,7 +1343,9 @@ Suite parse_source(const SourceBuffer &source, InputMode mode)
 {
     try {
         auto tree = syntax::parse(source.text(), mode == InputMode::Eval ? syntax::InputMode::Eval
-                                                                         : syntax::InputMode::File);
+                                                 : mode == InputMode::Single
+                                                     ? syntax::InputMode::Interactive
+                                                     : syntax::InputMode::File);
         return Adapter(source, std::move(tree)).run(mode);
     } catch (const syntax::Error &error) {
         SourceErrorKind kind = SourceErrorKind::Syntax;
@@ -1357,6 +1360,7 @@ Suite parse_source(const SourceBuffer &source, InputMode mode)
             kind = SourceErrorKind::Encoding;
             break;
         case syntax::ErrorKind::Syntax:
+        case syntax::ErrorKind::Incomplete:
             break;
         }
         throw SourceError(source, {error.span.begin, error.span.end}, error.what(), kind);

@@ -7008,8 +7008,8 @@ return {};
 }
 };
 } // namespace
-Tree parse(std::string_view source, InputMode mode) {
-GeneratedParser parser(tokenize(source));
+Tree parse(std::string_view source, InputMode mode, bool allow_incomplete) {
+GeneratedParser parser(tokenize(source, mode, allow_incomplete), allow_incomplete);
 auto root = parser.start(mode);
 return parser.finish(std::move(root));
 }

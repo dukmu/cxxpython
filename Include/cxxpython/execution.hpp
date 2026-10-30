@@ -81,6 +81,7 @@ enum class Opcode : std::uint8_t {
     BuildSet,
     SetAdd,
     SetUpdate,
+    PrintExpr,
     Count,
 };
 enum class OperandDomain {

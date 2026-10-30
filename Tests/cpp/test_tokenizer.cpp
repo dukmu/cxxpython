@@ -73,4 +73,61 @@ TEST(Tokenizer, ContinuationLinesDoNotCreateIndentation)
         EXPECT_EQ(indents, source[0] == 'd' ? 1u : 0u);
     }
 }
+
+TEST(InteractiveSyntax, CompletenessAndErrors)
+{
+    for (const char *source :
+         {"", "# comment\n", "\n", "x\n", "x; y\n", "if x:\n    if y:\n        pass\n\n",
+          "for x in y:\n    pass\n\n", "try:\n    pass\nexcept:\n    pass\n\n", "x = (\n  1\n)\n",
+          "x = '''a\nb'''\n", "x = 1 + \\\n  2\n"}) {
+        SCOPED_TRACE(source);
+        EXPECT_NO_THROW(parse(source, InputMode::Interactive, true));
+    }
+    for (const char *source :
+         {"if x:\n", "if x:\n    pass\n", "if x:\n    if y:\n        pass\n",
+          "for x in y:\n    pass\n", "try:\n    pass\n", "x = (\n", "x = '''a\n", "x = 1 + \\\n"}) {
+        SCOPED_TRACE(source);
+        try {
+            parse(source, InputMode::Interactive, true);
+            ADD_FAILURE() << "expected incomplete input";
+        } catch (const Error &error) {
+            EXPECT_EQ(error.kind, ErrorKind::Incomplete);
+        }
+    }
+    for (const char *source : {"x=\n", "x+\n", "x = 'abc\n", "if x:\n  pass\n pass\n"}) {
+        SCOPED_TRACE(source);
+        try {
+            parse(source, InputMode::Interactive, true);
+            ADD_FAILURE() << "expected syntax error";
+        } catch (const Error &error) {
+            EXPECT_NE(error.kind, ErrorKind::Incomplete);
+        }
+    }
+    EXPECT_NO_THROW(parse("if x:\n    pass\n", InputMode::Interactive));
+}
+
+TEST(InteractiveSyntax, UnterminatedStringsAtEof)
+{
+    for (const char *source :
+         {"x = '''text", "x = '''text\\", "x = r'''text\\", "x = f'''text\\"}) {
+        SCOPED_TRACE(source);
+        for (bool allow_incomplete : {false, true}) {
+            try {
+                parse(source, InputMode::Interactive, allow_incomplete);
+                ADD_FAILURE() << "expected unterminated string error";
+            } catch (const Error &error) {
+                EXPECT_EQ(error.kind, allow_incomplete ? ErrorKind::Incomplete : ErrorKind::Syntax);
+            }
+        }
+    }
+    for (const char *source : {"x = 'text\\", "x = f'text\\"}) {
+        SCOPED_TRACE(source);
+        try {
+            parse(source, InputMode::Interactive, true);
+            ADD_FAILURE() << "expected unterminated string error";
+        } catch (const Error &error) {
+            EXPECT_EQ(error.kind, ErrorKind::Syntax);
+        }
+    }
+}
 } // namespace

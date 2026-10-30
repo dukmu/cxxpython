@@ -7,6 +7,9 @@
 #include "internal/builtinexec.hpp"
 #include "internal/codecs.hpp"
 #include "internal/stdio.hpp"
+#include "internal/stringformat.hpp"
+#include "internal/sysmodule.hpp"
+#include "internal/unicodeobject.hpp"
 
 #include <algorithm>
 
@@ -43,6 +46,8 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
             spec.slots = std::vector<std::u32string>{U"name", U"path", U"msg", U"name_from"};
         if (id == CoreObject::StopIterationType)
             spec.slots = std::vector<std::u32string>{U"value"};
+        if (id == CoreObject::SystemExitType)
+            spec.slots = std::vector<std::u32string>{U"code"};
         if (id == CoreObject::UnicodeEncodeErrorType || id == CoreObject::UnicodeDecodeErrorType)
             spec.slots =
                 std::vector<std::u32string>{U"encoding", U"object", U"start", U"end", U"reason"};
@@ -63,6 +68,8 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
            LayoutDescriptor::of<NoneObject>());
     define(CoreObject::EllipsisType, "ellipsis", LayoutDescriptor::of<NoneObject>());
     define(CoreObject::BaseExceptionType, "BaseException", LayoutDescriptor::of<ExceptionObject>());
+    define(CoreObject::SystemExitType, "SystemExit", LayoutDescriptor::of<ExceptionObject>(),
+           at(CoreObject::BaseExceptionType));
     define(CoreObject::ExceptionType, "Exception", LayoutDescriptor::of<ExceptionObject>(),
            at(CoreObject::BaseExceptionType));
     define(CoreObject::AssertionErrorType, "AssertionError",
@@ -242,8 +249,11 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     install_sets(context, core);
     install_value_protocols(context, core);
     install_format(context, core);
+    install_string_format(context, core);
+    install_unicode_methods(context, core);
     install_execution(context, core);
     install_exception_runtime(context, core);
+    install_system_exit(context, core);
     install_ranges(context, core);
     install_slices(context, core);
     install_iteration(context, core);
@@ -303,6 +313,7 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                     CoreObject::BoolType,
                     CoreObject::FloatType,
                     CoreObject::BaseExceptionType,
+                    CoreObject::SystemExitType,
                     CoreObject::ExceptionType,
                     CoreObject::AssertionErrorType,
                     CoreObject::TypeErrorType,

@@ -69,9 +69,25 @@ the target is `builtins` and the `__builtins__` execution namespace.
 - Builtin compile/eval/exec reuse the existing compiler and VM. Ordinary module
   names now emit namespace instructions, matching separate globals/locals
   behavior; explicit global still emits global instructions. Current valid slices
-  are exec/eval, zero flags and non-positive optimization. Single/AST/future flags,
+  are exec/eval/single, zero flags and non-positive optimization. AST/future flags,
   closure execution, path-like filenames and complete diagnostics are not done.
   Complete them in the compiler rather than making Lib permanently avoid them.
+- Native Unicode interpolation/prefix methods now close actual library dependencies
+  instead of rewriting runpy's messages. Percent interpolation, str.format field/
+  conversion/nested-spec behavior and startswith/endswith use ordinary typed
+  protocols and callback error paths. Complete Unicode APIs and exact malformed
+  diagnostic matrices remain broader acceptance work.
+- `Lib/runpy.py` copies the pinned _run_code, _get_module_details,
+  _run_module_as_main and _get_main_module_details flows. It deliberately omits
+  public run_module/run_path and their helpers until temporary-module/filesystem/
+  io/os closures are complete. The warnings branch retains its lazy import;
+  warnings/RuntimeWarning integration is still a dependency, not a deleted branch.
+  Restore omitted upstream helpers/APIs once those dependencies land.
+- Modules/main.cpp and Python/pythonrun.cpp provide the experimental product
+  entry/REPL, with a thin Programs entry. Single mode uses live sys.displayhook
+  and real SystemExit. Host input/diagnostics are bootstrap bridges, not full
+  sys.stdin.readline/sys.excepthook, readline/history, signals, environment/isolation
+  or installed-runtime compatibility. No host CPython executes guest code.
 - Bootstrap sys._StandardTextIO is an explicit temporary native stream type,
   using borrowed descriptors and UTF-8 unbuffered writes. Replace this bootstrap
   layer with the real _io/Lib io closure after mutable buffers, raw file resources,
@@ -81,5 +97,5 @@ the target is `builtins` and the `__builtins__` execution namespace.
   process-global signal handler. Input/open and full stream configuration remain.
 
 The configured source-tree stdlib path is development configuration, not final
-installation, isolation, environment or embedding acceptance. Full stdio, runpy,
--m, REPL and the requested standard-library dependency closures remain in Plan 2.
+installation, isolation, environment or embedding acceptance. Full stdio/runpy,
+REPL/product configuration and requested library dependency closures remain in Plan 2.

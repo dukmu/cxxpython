@@ -144,8 +144,8 @@ class Generator:
                           f'return {self.choice(rule.rhs, name)};', '});']
             lines += ['}']
         lines += ['};', '} // namespace',
-                  'Tree parse(std::string_view source, InputMode mode) {',
-                  'GeneratedParser parser(tokenize(source));',
+                  'Tree parse(std::string_view source, InputMode mode, bool allow_incomplete) {',
+                  'GeneratedParser parser(tokenize(source, mode, allow_incomplete), allow_incomplete);',
                   'auto root = parser.start(mode);',
                   'return parser.finish(std::move(root));', '}',
                   '} // namespace cxxpython::syntax', '']
@@ -173,7 +173,7 @@ def main():
         if args.check:
             if not path.exists() or path.read_text() != content:
                 raise SystemExit(f'{path.relative_to(ROOT)} is stale; run regen-parser')
-        else:
+        elif not path.exists() or path.read_text() != content:
             path.write_text(content)
     print(f'{len(grammar.rules)} grammar rules; generated artifacts ' + ('verified' if args.check else 'written'))
 

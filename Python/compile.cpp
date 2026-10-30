@@ -588,7 +588,9 @@ class GraphPass final {
                     using T = std::decay_t<decltype(node)>;
                     if constexpr (std::is_same_v<T, ExprStmt>) {
                         expression(*node.value);
-                        emit(Opcode::PopTop, span);
+                        emit(scope_ == 0 && program_.mode == InputMode::Single ? Opcode::PrintExpr
+                                                                               : Opcode::PopTop,
+                             span);
                     } else if constexpr (std::is_same_v<T, AssignStmt>) {
                         expression(*node.value);
                         for (std::size_t i = 0; i < node.targets.size(); ++i) {
@@ -883,7 +885,7 @@ class GraphPass final {
         select(block());
         loops_.clear();
         first_statement_ = nullptr;
-        if (!body.empty())
+        if (!body.empty() && !(scope == 0 && program_.mode == InputMode::Single))
             if (const auto *expression = std::get_if<ExprStmt>(&body.front()->node))
                 if (const auto *literal = std::get_if<Literal>(&expression->value->node);
                     literal && literal->kind == Literal::Kind::String) {

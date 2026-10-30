@@ -38,6 +38,7 @@ enum class CoreObject : std::size_t {
     NotImplementedType,
     EllipsisType,
     BaseExceptionType,
+    SystemExitType,
     ExceptionType,
     AssertionErrorType,
     TypeErrorType,

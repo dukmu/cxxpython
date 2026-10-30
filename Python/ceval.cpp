@@ -2,6 +2,7 @@
 #include "cxxpython/import.hpp"
 #include "cxxpython/setobject.hpp"
 #include "internal/setobject.hpp"
+#include "internal/sysmodule.hpp"
 
 #include <algorithm>
 #include <charconv>
@@ -791,6 +792,15 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 data.operands[--data.sp] = context.builtin(CoreObject::None);
                 for (auto i = values.size(); i-- > 0;)
                     data.operands[data.sp++] = values[i];
+                break;
+            }
+            case Opcode::PrintExpr: {
+                RootScope roots(context);
+                detail::display_value(context, roots.root(data.operands[data.sp - 1]), result);
+                if (raised(result))
+                    activation.raising(result.exception());
+                else
+                    data.trim_stack(context, data.sp - 1);
                 break;
             }
             case Opcode::BuildMap: {

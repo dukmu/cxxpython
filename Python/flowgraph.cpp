@@ -87,6 +87,7 @@ constexpr std::array definitions{
     OpcodeDefinition{"BUILD_SET", 0, 0, 1, OperandDomain::Count, FlowKind::Next, true, true},
     OpcodeDefinition{"SET_ADD", 2, 1, 0, OperandDomain::None, FlowKind::Next, true, true},
     OpcodeDefinition{"SET_UPDATE", 2, 1, 0, OperandDomain::None, FlowKind::Next, true, true},
+    OpcodeDefinition{"PRINT_EXPR", 1, 1, 0, OperandDomain::None, FlowKind::Next, true, true},
 };
 static_assert(definitions.size() == static_cast<std::size_t>(Opcode::Count));
 [[noreturn]] void invalid(CodeErrorKind kind, const char *message,

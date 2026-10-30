@@ -352,6 +352,14 @@ TEST_F(CoreExecution, SourceLoweringOpcodesHaveVerifiedOperandsAndStackInputs)
         EXPECT_TRUE(opcode_definition(opcode).may_raise);
         EXPECT_TRUE(opcode_definition(opcode).safepoint);
     }
+    CodeBuilder display(context);
+    display.emit(Opcode::PrintExpr);
+    invalid(display, CodeErrorKind::StackUnderflow);
+    const auto display_effect = instruction_effect({Opcode::PrintExpr, 0});
+    EXPECT_EQ(display_effect.inputs, 1U);
+    EXPECT_EQ(display_effect.pops, 1U);
+    EXPECT_EQ(display_effect.pushes, 0U);
+    EXPECT_EQ(opcode_definition(Opcode::PrintExpr).name, "PRINT_EXPR");
     for (auto opcode : {Opcode::LoadAttr, Opcode::StoreAttr, Opcode::DeleteAttr}) {
         CodeBuilder attribute(context);
         attribute.emit(opcode);

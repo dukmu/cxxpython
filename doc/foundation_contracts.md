@@ -99,9 +99,30 @@ fast locals and Cells remain execution authority, not the reflection dictionary.
 
 compile/eval/exec support the exec/eval source and Code path through SourceUnit,
 VerifiedCode and RunRequest. Separate locals mappings execute namespace bytecode;
-explicit global declarations still access globals. Single/AST/future flags,
+explicit global declarations still access globals. AST/future flags,
 positive optimize, closure execution and the remaining compiler API matrix are
 not complete and are explicitly rejected, not silently ignored.
+
+The single input mode uses the generated interactive grammar. PRINT_EXPR consumes
+one value, dispatches through the current sys.displayhook and produces no value;
+it can call Python/allocate/raise and uses the common verifier/disassembler. Only
+interactive module-level expression statements display: nested function/class
+bodies retain their normal behavior, and a leading string is not a module docstring.
+The default hook uses real sys.stdout, clears/restores builtins._ and follows the
+UnicodeEncodeError backslashreplace buffer/text paths. SystemExit is a direct
+BaseException subtype with a traced code field; sys.exit preserves tuple argument
+identity, including tuple subclasses, during native exception normalization.
+
+The process entry accepts scripts, -c, -m, stdin, -i/-q and help/version options.
+REPL input uses typed incomplete-input probing in the same tokenizer/PEG parser,
+then compiles single mode into the normal VM. Namespace state survives syntax and
+runtime errors; each input releases its temporary roots. NativeWait surrounds
+host input waits. CLI path[0] changes preserve the configured library path.
+The adapted runpy slice locates module/package __main__ through real importlib
+and executes in the canonical __main__ dictionary. It is not the complete public
+runpy module. Host getline/diagnostic bridges, missing readline/history, signal
+interruption, custom stdin/excepthook policy and installed/isolated path configuration
+remain product/I/O gates. Legacy --eval remains an explicit test-only CLI extension.
 
 print uses the dynamically selected sys.stdout or explicit file, str/write in
 observable order, sep/end validation and optional flush. The bootstrap standard

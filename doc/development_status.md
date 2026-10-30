@@ -1,5 +1,65 @@
 # Development Status
 
+## 2026-10-30 Interactive Execution And Product Entry
+
+Prepended without changing earlier records. Previous stable node: aad2d75, already
+pushed. The full frontend/import/library/N4-N6/M0-M9 goal remains active; this
+entrypoint slice does not complete I/O, configuration, the standard library or
+release acceptance.
+
+- Programs/cxxpython.cpp is now a thin entry. Modules/main.cpp owns option parsing,
+  one Interpreter, source selection, argv/path setup and script/-c/-m/stdin/-i/-q
+  routing. Python/pythonrun.cpp owns REPL driving and diagnostics; native sys
+  hooks live in Modules/sysmodule.cpp. Host input waits use NativeWait, and each
+  interactive input releases its temporary roots. No interpreter-wide lock or
+  separate interactive execution engine was added.
+- The generated parser/tokenizer now distinguish complete, incomplete and invalid
+  interactive input, including blank-line suite termination, delimiters, triple
+  strings and continuations. File/eval defaults are preserved. The generator,
+  not hand editing, supplies the changed parser constructor/entry plumbing; all
+  244 rule definitions remain. SourceUnit/compile support single mode, with
+  verified PRINT_EXPR stack/exception metadata and normal VM callback dispatch.
+  Module-level interactive expressions display without changing __doc__; nested
+  functions/classes retain ordinary statement behavior.
+- sys.displayhook/__displayhook__ use real stdout, normal repr/write callbacks,
+  builtins._ publication and upstream UnicodeEncodeError backslashreplace paths
+  through a binary buffer or text writer. Live hook replacement and failures are
+  tested. Real SystemExit derives directly from BaseException; its code field is
+  traced. Native sys.exit normalization preserves the supplied tuple identity,
+  including subclasses, and links handled exception context without Python RC.
+- Lib/runpy.py adapts the pinned CPython _run_code/module-discovery/as-main flows.
+  Module/package execution uses actual importlib specs/loaders and the canonical
+  __main__ dictionary. It preserves package/error branches rather than moving
+  policy into C++. The public run_module/run_path helpers and warning integration
+  remain dependencies in the adaptation ledger, not names-only APIs.
+- Closed real runpy dependencies with general Unicode percent interpolation,
+  str.format field/conversion/nested-spec behavior and startswith/endswith. They
+  use ordinary numeric/format/index/item/attribute protocols, precise roots and
+  callback error paths, not runpy-specific string substitutions. Tests cover
+  numeric/star percent forms, subclass/index behavior and failed receivers.
+- Product tests exposed CLI path replacement losing the configured standard
+  library. Setup now changes only path[0], retains the configured Lib path and
+  preserves real script/module argv and main metadata. Relative __file__ is
+  absolute while argv keeps its original spelling. Legacy --eval is still an
+  explicitly reserved test diagnostic, not a silently claimed CPython option.
+- Final normal CTest passes 519/519. Before the last localized sys.exit tuple-
+  identity correction, affected ASan/UBSan/LSan passes 31/31 (including both core
+  allocation-failure enumerations), and TSan passes 29/29 with only those two
+  established exclusions. Final sys/runpy/single affected reruns pass 7/7 under
+  each sanitizer. Final normal and strict-ASan products pass all 10 CLI/PTY tests
+  and all six fixed-CPython single/string/exit differential cases. Formatting and
+  all generated grammar checks pass; no sanitizer diagnostic or new exclusion.
+- Evidence is retained under .cache/entry-*: full normal and affected native logs,
+  copied sanitizer output, final product/PTY logs and differential JSON containing
+  actual executable hashes. All operation handles were confirmed terminal before
+  replacing binaries or reporting success. No CPU benchmark rerun or manually
+  filled performance/support table was added.
+- Remaining product gates include readline/history, signal interruption, custom
+  stdin/excepthook policy, full _io/encoding, environment/isolation, installation
+  and embedding configuration. Remaining language/types, library closures and
+  N4-N6/M0-M9 acceptance are unchanged. User changes to temporary_plan.md and
+  test2.py are excluded from this stable-point commit.
+
 ## 2026-10-30 Set/Frozenset And Responsibility-Based Source Split
 
 Prepended without rewriting earlier entries. Previous stable node: 24892b2.

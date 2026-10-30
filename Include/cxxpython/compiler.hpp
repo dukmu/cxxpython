@@ -36,7 +36,7 @@ class SourceError final : public std::invalid_argument {
     const std::string filename, source_line;
     const std::uint32_t offset, end_offset;
 };
-enum class InputMode { Exec, Eval };
+enum class InputMode { Exec, Eval, Single };
 enum class ScopeKind { Module, Function, Class };
 enum class NameClass { Local, Namespace, GlobalExplicit, GlobalImplicit, Free, Cell };
 struct SymbolInfo {

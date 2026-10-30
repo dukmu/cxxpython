@@ -2,6 +2,7 @@
 #include "cxxpython/protocol.hpp"
 #include "internal/compiler.hpp"
 #include "internal/stdio.hpp"
+#include "internal/sysmodule.hpp"
 
 #include <filesystem>
 
@@ -118,6 +119,8 @@ void sys_init(Attachment &context, Handle module, ReturnSlot &out)
     store_name(context, dictionary, U"path_importer_cache", temporary.value(), out);
     if (out.tag() != ResultTag::Raised)
         detail::initialize_stdio(context, module, out);
+    if (out.tag() != ResultTag::Raised)
+        detail::initialize_sys_hooks(context, module, out);
 }
 void main_init(Attachment &context, Handle module, ReturnSlot &out)
 {

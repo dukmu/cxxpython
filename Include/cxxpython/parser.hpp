@@ -14,7 +14,7 @@ namespace cxxpython::syntax {
 struct Span {
     std::size_t begin = 0, end = 0;
 };
-enum class ErrorKind { Syntax, Indentation, Tab, Encoding };
+enum class ErrorKind { Syntax, Indentation, Tab, Encoding, Incomplete };
 class Error : public std::runtime_error {
   public:
     Error(Span span, std::string message, ErrorKind kind = ErrorKind::Syntax)
@@ -42,8 +42,10 @@ struct Tree {
     NodePtr root;
 };
 enum class InputMode { File, Eval, Interactive, FunctionType };
-std::vector<Token> tokenize(std::string_view source);
+std::vector<Token> tokenize(std::string_view source, InputMode mode = InputMode::File,
+                            bool allow_incomplete = false);
 std::u32string normalize_identifier(std::u32string_view text);
 std::optional<char32_t> unicode_name(std::u32string_view name);
-Tree parse(std::string_view source, InputMode mode = InputMode::File);
+Tree parse(std::string_view source, InputMode mode = InputMode::File,
+           bool allow_incomplete = false);
 } // namespace cxxpython::syntax

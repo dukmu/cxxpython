@@ -10,7 +10,9 @@ namespace cxxpython::syntax {
 // Native per-parse state. The generated rules never access the Python heap.
 class ParserBase {
   public:
-    explicit ParserBase(std::vector<Token> tokens) : tokens_(std::move(tokens)) {}
+    explicit ParserBase(std::vector<Token> tokens, bool allow_incomplete = false)
+        : tokens_(std::move(tokens)), allow_incomplete_(allow_incomplete)
+    {}
     virtual ~ParserBase() = default;
     Tree finish(NodePtr root)
     {
@@ -26,6 +28,8 @@ class ParserBase {
     [[noreturn]] void error() const
     {
         const auto at = std::min(farthest_, tokens_.size() - 1);
+        if (allow_incomplete_ && tokens_[at].kind == TokenKind::ENDMARKER)
+            throw Error(tokens_[at].span, "incomplete input", ErrorKind::Incomplete);
         if (expected_indent_ || tokens_[at].kind == TokenKind::INDENT)
             throw Error(tokens_[at].span,
                         expected_indent_ ? "expected an indented block" : "unexpected indent",
@@ -244,5 +248,6 @@ class ParserBase {
     std::unordered_map<Key, Memo, KeyHash> memo_;
     std::size_t farthest_ = 0, depth_ = 0;
     bool expected_indent_ = false;
+    bool allow_incomplete_ = false;
 };
 } // namespace cxxpython::syntax

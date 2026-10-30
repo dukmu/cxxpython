@@ -266,6 +266,35 @@ class SourceDifferential(unittest.TestCase):
             with self.subTest(expression=expression):
                 self.check_program(source, expression)
 
+    def test_interactive_and_string_library_foundations(self):
+        cases = [
+            ("import sys\nevents = []\nsys.displayhook = lambda value: events.append(value)\n"
+             "__doc__ = 'unchanged'\nexec(compile(\"'shown'; None; 42\", '<single>', 'single'))",
+             "events, __doc__"),
+            ("events = []\nclass Value:\n"
+             "    def __format__(self, spec):\n        events.append(spec)\n        return 'custom'\n"
+             "result = '{name!r}: {0:{width}d} {1:foo}'.format(42, Value(), name='x', width=5)",
+             "result, events, '{} {:{}}'.format(1, 2, 3), '{{{0}}}'.format('x')"),
+            ("", "'%s %r %a' % ('x', 'y', '\\u4f60'), "
+             "'%(name)s:%(value)04d' % {'name': 'x', 'value': 42}, "
+             "'%+08d|%#08x|%.5d|%*.*f|%c' % (42, 42, -42, -8, 2, 1.25, 65)"),
+            ("class S(str):\n    def __str__(self): return 'not the payload'\n"
+             "class Index:\n    def __index__(self): return 1\n"
+             "s = S('abc')", "s.startswith('b', Index()), s.endswith(('x', 'bc')), "
+             "s.startswith(('a', 42)), s.startswith('', 4), "
+             "s.endswith('', -2**100, 2**100), 'abc'.startswith('a', None, None)"),
+            ("errors = []\nfor code in [None, (), (1,), (1, 2), 'bye']:\n"
+             "    try:\n        __import__('sys').exit(code)\n"
+             "    except SystemExit as e:\n        errors.append((e.args, e.code))",
+             "errors, issubclass(SystemExit, BaseException), issubclass(SystemExit, Exception)"),
+            ("import sys\nclass Tuple(tuple): pass\ncode = Tuple((1, 2))\n"
+             "try:\n    sys.exit(code)\nexcept SystemExit as error:\n"
+             "    result = (error.args is code, error.code is code)", "result"),
+        ]
+        for source, expression in cases:
+            with self.subTest(expression=expression):
+                self.check_program(source, expression)
+
     def test_print_closed_pipe_is_a_python_error(self):
         if not Path('/proc/self/fd/0').exists():
             self.skipTest('Linux descriptor fixture')

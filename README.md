@@ -19,8 +19,26 @@ or CMake's pinned GoogleTest download.
 cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCXXPYTHON_BUILD_BENCHMARKS=ON
 cmake --build build -j 4
 ctest --test-dir build --output-on-failure -j 4
-build/cxxpython -c 'def f(x): return x + 1' --eval 'f(41)'
+build/cxxpython -c 'print(40 + 2)'
 ```
+
+## Run Python
+
+```sh
+build/cxxpython                         # terminal REPL
+build/cxxpython script.py argument
+build/cxxpython -m package argument     # module or package __main__
+build/cxxpython -i -c 'value = 40'       # inspect the same namespace
+printf 'print(42)\n' | build/cxxpython   # stdin script
+build/cxxpython --help
+```
+
+The REPL supports multiline input, expression display through `sys.displayhook`,
+`_`, exception recovery and `sys.exit`. It uses the same compiler, VM and
+`__main__` namespace as scripts. This remains an experimental entrypoint:
+readline/history, signal interruption, complete stream/configuration behavior,
+installation/isolation and the public `runpy.run_module/run_path` APIs are pending.
+`--eval` remains a reserved test diagnostic; it is not a CPython command-line flag.
 
 Set `-DCXXPYTHON_REFERENCE_PYTHON=/path/to/python3.12.14` to use the fixed semantic
 reference. The default host interpreter is only a smoke reference.
@@ -38,11 +56,12 @@ Run benchmarks after builds and other CPU-heavy work have finished.
 ## Layout
 
 - `Include/cxxpython/`: current runtime, object, compiler and execution headers.
-- `Include/internal/`: compiler-private AST/scope/CFG structures.
+- `Include/internal/`: compiler-private IR and internal subsystem interfaces.
 - `Objects/`: values, types, descriptors, calling and object protocols.
 - `Parser/`: independent source decoding, tokenizing and parsing.
 - `Python/`: heap/GC/thread state, compilation, verification and VM execution.
 - `Programs/`: the single `cxxpython` host entry point.
+- `Modules/`: native capabilities and CLI orchestration; Python library policy stays in `Lib/`.
 - `Lib/`: reserved for the interpreter's Python standard library.
 - `Tests/python/`: host-side Python test drivers and fixed-reference differential tests.
 - `Tests/cpp/`: native runtime/GC/concurrency/semantic contract tests.

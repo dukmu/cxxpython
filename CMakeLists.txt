@@ -21,6 +21,7 @@ endif()
 add_library(cxxpython_core
     Python/gc.cpp
     Python/pylifecycle.cpp
+    Python/pythonrun.cpp
     Python/compile.cpp
     Python/bltinmodule.cpp
     Python/builtinexec.cpp
@@ -28,6 +29,8 @@ add_library(cxxpython_core
     Python/extension.cpp
     Modules/_impmodule.cpp
     Modules/_iomodule.cpp
+    Modules/main.cpp
+    Modules/sysmodule.cpp
     Python/symtable.cpp
     Python/flowgraph.cpp
     Python/ceval.cpp
@@ -42,6 +45,8 @@ add_library(cxxpython_core
     Objects/listobject.cpp
     Objects/sliceobject.cpp
     Objects/formatobject.cpp
+    Objects/stringformat.cpp
+    Objects/unicodeobject.cpp
     Objects/bytesobject.cpp
     Objects/unicodecodecs.cpp
     Objects/superobject.cpp
@@ -144,6 +149,11 @@ if(BUILD_TESTING)
         Tests/cpp/test_set.cpp
         Tests/cpp/test_set_operations.cpp
         Tests/cpp/test_set_concurrency.cpp
+        Tests/cpp/test_runpy.cpp
+        Tests/cpp/test_sys.cpp
+        Tests/cpp/test_interactive.cpp
+        Tests/cpp/test_stringformat.cpp
+        Tests/cpp/test_unicode_methods.cpp
         Tests/cpp/test_builtin_functions.cpp
         Tests/cpp/test_builtin_exec.cpp
         Tests/cpp/test_stdio.cpp
@@ -183,6 +193,9 @@ if(BUILD_TESTING)
         ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_source.py
         --binary $<TARGET_FILE:cxxpython> --reference ${CXXPYTHON_REFERENCE_PYTHON})
     set_tests_properties(Source.Differential PROPERTIES TIMEOUT 60)
+    add_test(NAME Main.Entry COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_main.py $<TARGET_FILE:cxxpython>)
+    set_tests_properties(Main.Entry PROPERTIES TIMEOUT 90)
     add_test(NAME Syntax.Differential COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_syntax.py
         --binary $<TARGET_FILE:cxxpython> --reference ${CXXPYTHON_REFERENCE_PYTHON})

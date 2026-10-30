@@ -107,6 +107,9 @@ class Scanner {
     std::vector<char> brackets;
     bool line_start = true;
     bool line_has_token = false;
+    InputMode mode;
+    bool allow_incomplete;
+    bool interactive_blank = false;
 
     char peek(std::size_t n = 0) const
     {
@@ -242,11 +245,12 @@ class Scanner {
     {
         return peek() == quote && (!triple || (peek(1) == quote && peek(2) == quote));
     }
-    void escape(bool raw, bool bytes, bool formatted)
+    void escape(bool raw, bool bytes, bool formatted, bool triple)
     {
         auto start = pos++;
         if (pos == source.size())
-            fail(start, "unterminated string literal");
+            fail(start, "unterminated string literal",
+                 triple && allow_incomplete ? ErrorKind::Incomplete : ErrorKind::Syntax);
         char c = peek();
         if (bytes && static_cast<unsigned char>(c) >= 128)
             fail(start, "bytes can only contain ASCII literal characters");
@@ -315,13 +319,14 @@ class Scanner {
             if (bytes && static_cast<unsigned char>(peek()) >= 128)
                 fail(start, "bytes can only contain ASCII literal characters");
             if (peek() == '\\') {
-                escape(raw, bytes, false);
+                escape(raw, bytes, false, triple);
                 continue;
             }
             ++pos;
         }
         if (pos == source.size())
-            fail(start, "unterminated string literal");
+            fail(start, "unterminated string literal",
+                 triple && allow_incomplete ? ErrorKind::Incomplete : ErrorKind::Syntax);
         pos += triple ? 3 : 1;
         emit(TokenKind::STRING, start, pos);
     }
@@ -364,12 +369,13 @@ class Scanner {
                 continue;
             }
             if (peek() == '\\') {
-                escape(raw, false, true);
+                escape(raw, false, true, triple);
                 continue;
             }
             ++pos;
         }
-        fail(start, "unterminated f-string literal");
+        fail(start, "unterminated f-string literal",
+             triple && allow_incomplete ? ErrorKind::Incomplete : ErrorKind::Syntax);
     }
     void replacement(char quote, bool triple, bool raw)
     {
@@ -403,7 +409,8 @@ class Scanner {
             }
             scan_one(true);
         }
-        fail(pos, "unterminated f-string replacement field");
+        fail(pos, "unterminated f-string replacement field",
+             triple && allow_incomplete ? ErrorKind::Incomplete : ErrorKind::Syntax);
     }
     void number()
     {
@@ -498,16 +505,28 @@ class Scanner {
             if (!expression && brackets.empty() && line_has_token) {
                 emit(TokenKind::NEWLINE, start, pos);
                 line_has_token = false;
+            } else if (!expression && brackets.empty() && mode == InputMode::Interactive &&
+                       interactive_blank) {
+                while (indents.size() > 1) {
+                    indents.pop_back();
+                    emit(TokenKind::DEDENT, start, start);
+                }
+                emit(TokenKind::NEWLINE, start, pos);
             }
+            interactive_blank = false;
             return;
         }
         if (peek() == '\\') {
             auto start = pos++;
+            if (!peek() && allow_incomplete)
+                fail(start, "unexpected EOF after line continuation character",
+                     ErrorKind::Incomplete);
             if (peek() != '\n' && peek() != '\r')
                 fail(start, "unexpected character after line continuation character");
             newline();
             if (pos == source.size())
-                fail(start, "unexpected EOF after line continuation character");
+                fail(start, "unexpected EOF after line continuation character",
+                     allow_incomplete ? ErrorKind::Incomplete : ErrorKind::Syntax);
             line_start = false;
             return;
         }
@@ -615,7 +634,9 @@ class Scanner {
     }
 
   public:
-    explicit Scanner(std::string_view input) : source(input) {}
+    explicit Scanner(std::string_view input, InputMode input_mode, bool incomplete)
+        : source(input), mode(input_mode), allow_incomplete(incomplete)
+    {}
     std::vector<Token> run()
     {
         for (std::size_t i = 0; i < source.size();) {
@@ -625,22 +646,28 @@ class Scanner {
         }
         while (pos < source.size()) {
             if (line_start) {
-                if (brackets.empty())
+                if (brackets.empty()) {
+                    auto start = pos;
                     indentation();
-                else
+                    interactive_blank = pos == start && (peek() == '\n' || peek() == '\r');
+                } else
                     line_start = false;
             }
             if (pos < source.size())
                 scan_one(false);
         }
         if (!brackets.empty())
-            fail(pos, "unclosed delimiter");
+            fail(pos, "unclosed delimiter",
+                 allow_incomplete ? ErrorKind::Incomplete : ErrorKind::Syntax);
         if (line_has_token)
             emit(TokenKind::NEWLINE, pos, pos);
-        while (indents.size() > 1) {
+        while (indents.size() > 1 && !(mode == InputMode::Interactive && allow_incomplete)) {
             indents.pop_back();
             emit(TokenKind::DEDENT, pos, pos);
         }
+        if (mode == InputMode::Interactive && !allow_incomplete && !tokens.empty() &&
+            tokens.back().kind == TokenKind::DEDENT)
+            emit(TokenKind::NEWLINE, pos, pos);
         emit(TokenKind::ENDMARKER, pos, pos);
         return std::move(tokens);
     }
@@ -652,8 +679,8 @@ std::u32string normalize_identifier(std::u32string_view input)
     return normalize(input);
 }
 
-std::vector<Token> tokenize(std::string_view source)
+std::vector<Token> tokenize(std::string_view source, InputMode mode, bool allow_incomplete)
 {
-    return Scanner(source).run();
+    return Scanner(source, mode, allow_incomplete).run();
 }
 } // namespace cxxpython::syntax

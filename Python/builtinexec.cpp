@@ -181,13 +181,16 @@ void compile_builtin(Attachment &context, Handle, std::span<const Value> args, R
         return;
     }
     const auto &mode = context.payload<StrObject>(args[2]).value;
-    if (mode != U"exec" && mode != U"eval") {
+    if (mode != U"exec" && mode != U"eval" && mode != U"single") {
         raise_error(context, CoreObject::ValueErrorType,
-                    U"compile(): only exec and eval modes are supported", out);
+                    U"compile(): mode must be exec, eval or single", out);
         return;
     }
     freeze_source(context, args[0], source_utf8(context.payload<StrObject>(args[1]).value),
-                  mode == U"eval" ? InputMode::Eval : InputMode::Exec, out);
+                  mode == U"eval"     ? InputMode::Eval
+                  : mode == U"single" ? InputMode::Single
+                                      : InputMode::Exec,
+                  out);
 }
 
 template <bool Eval>
