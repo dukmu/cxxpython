@@ -49,7 +49,7 @@ The canonical builtins module/dictionary, namespace lookup and core bootstrap ar
 present. Base slices now include print, bytes/bytearray, complex, set/frozenset,
 super, namespace/reflection, exec/eval compilation/execution, sorting, reverse
 iteration, enumerate/zip/map and common aggregate builtins. Complete Python
-3.12 builtins are not: open/input, memoryview, filter and other remaining
+3.12 builtins are not: open/input, filter and other remaining
 iterators, compiler flags/modes and constructors/protocol matrices are still work.
 Complete their native dependencies and fixed-reference tests before copying
 dependent libraries wholesale. `__builtin__` is not the Python 3 module name;
@@ -58,7 +58,7 @@ the target is `builtins` and the `__builtins__` execution namespace.
 - Bytes construction and numeric/aggregate/super implementations adapt the pinned
   bytesobject.c, bltinmodule.c, longobject.c, floatobject.c and typeobject.c flows
   to typed roots and immutable snapshots. Complete bytes methods, mutable buffer
-  exports and the Unicode codec registry still need their actual dependencies.
+  APIs still need their actual dependencies beyond the buffer/codec slice below.
 - Set/frozenset adapt pinned setobject.c's construction, hashing, relation and
   algebra behavior. Private dictionary storage replaces the RC/GIL-dependent set
   table without bypassing hash/equality callbacks or adding another lifetime
@@ -87,7 +87,7 @@ the target is `builtins` and the `__builtins__` execution namespace.
 - Complex construction/mixed arithmetic/hash, imaginary literals and numeric
   formatting adapt the pinned native contracts. Bytearray construction, mutation,
   slices, iteration and decoding use native synchronized storage, not a bytes
-  alias. Complete exported buffers/memoryview and all bytes-family methods remain.
+  alias. Complete buffer formats/exporters and all bytes-family methods remain.
 - Stable sorting and reversed/enumerate/zip/map close real Python library
   dependencies. List sorting roots detached data and detects callback mutation;
   no storage lock surrounds callbacks. These operations do not claim whole-call
@@ -139,6 +139,49 @@ the target is `builtins` and the `__builtins__` execution namespace.
   uses native tuple fields; OSError carries errno/filename and specific subclasses.
   dir_fd/follow_symlinks variants, complete stat-result reflection/pickle and the
   Python os/pathlib/io closures are not claimed by this native slice.
+
+## Buffers, Unicode And Independent Libraries
+
+- `Lib/codecs.py` and the selected `Lib/encodings` modules copy the pinned
+  upstream files. They retain CodecInfo, incremental/stream classes, alias lookup,
+  Python search callbacks and custom errors. The initial closure includes UTF-8,
+  UTF-8-SIG, UTF-16/32 and endian variants, ASCII, Latin-1 and 71 table-only
+  single-byte encodings. Other multibyte, compression, IDNA and transformation
+  codecs remain dependencies, not modules installed solely to pass import.
+- `_codecs` uses a per-Interpreter traced registry, not CPython's RC-owned cache.
+  Search/error callbacks run without the registry lock. Unregister invalidates
+  cache publication by generation, including an in-flight search result. Native
+  kernels retain incomplete streaming suffixes, validate custom handler results,
+  permit exception.object replacement and implement standard named errors.
+  UnicodeTranslateError and its complete public handler matrix remain work.
+- `Objects/unicodetype_db.h` is copied unchanged from CPython 3.12.14's generated
+  Unicode 15 database under the retained PSF license. Character predicates and
+  case/casefold mappings use that table; namereplace reuses the existing native
+  compressed names. Full str API/diagnostic coverage remains a separate gate.
+- memoryview supports actual bytes/bytearray aliasing, readonly/release/context
+  management, byte-strided slices, B/b/c casts, indexed/slice writes and metadata.
+  Export tokens keep native storage alive without accessing managed objects at
+  destruction, while live views trace exporters. Bytearray resizing is forbidden
+  while exported. Multidimensional/native-format casts, generic exporters and
+  the complete memoryview reflection/released-hash matrix are not complete.
+- `Lib/struct.py` copies the complete upstream facade. `_struct` supplies compiled
+  Struct layouts, packing/unpacking, offset/buffer operations and export-retaining
+  iterators. Native alignment/endian, integer widths, half/float/double and s/p
+  formats have fixed-reference tests. The full upstream invalid-format,
+  reinitialization/subclass and error-message matrices remain acceptance work.
+- `Lib/hashlib.py` copies the complete upstream policy. `_hashlib` supplies real
+  OpenSSL 3 EVP digest/copy/update, SHAKE, PBKDF2 and scrypt; `_blake2` exports
+  canonical types using the pinned portable C kernels, with keyed/salted/personal
+  and tree parameters. Their original CC0 notices and full license are retained.
+  Shared state uses per-object native locks and NativeWait, not a GIL. Optional
+  provider aliases/security configurations, file_digest's I/O dependency and
+  full upstream test/error matrices remain; importing hashlib is not completion
+  of all these APIs or cryptographic validation/certification.
+- Native free functions now remain unbound when stored in Python classes;
+  descriptor-native methods still bind receivers. This distinction belongs at
+  the common call boundary, not in modified Lib aliases. The existing host
+  make_native_function default remains descriptor-capable; builtin-function
+  __get__ reflection is not yet identical to CPython's distinct native types.
 
 The configured source-tree stdlib path is development configuration, not final
 installation, isolation, environment or embedding acceptance. Full stdio/runpy,

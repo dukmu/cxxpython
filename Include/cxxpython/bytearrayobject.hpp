@@ -8,11 +8,12 @@ struct ByteArrayObject {
         std::mutex mutex;
         std::string bytes;
         std::size_t version = 0;
+        std::atomic<std::size_t> exports{0};
     };
     ObjectHeader header;
-    const std::unique_ptr<Storage> contents;
+    const std::shared_ptr<Storage> contents;
     explicit ByteArrayObject(InitialType head, std::string data = {})
-        : header(head), contents(std::make_unique<Storage>())
+        : header(head), contents(std::make_shared<Storage>())
     {
         contents->bytes = std::move(data);
     }

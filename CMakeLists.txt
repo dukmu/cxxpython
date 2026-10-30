@@ -12,6 +12,7 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
 find_package(Threads REQUIRED)
+find_package(OpenSSL 3.0 REQUIRED COMPONENTS Crypto)
 add_subdirectory(Parser)
 find_path(BOOST_MULTIPRECISION_INCLUDE_DIR boost/multiprecision/cpp_int.hpp)
 if(NOT BOOST_MULTIPRECISION_INCLUDE_DIR)
@@ -34,6 +35,11 @@ add_library(cxxpython_core
     Modules/sysmodule.cpp
     Modules/gcmodule.cpp
     Modules/_weakref.cpp
+    Modules/_codecsmodule.cpp
+    Modules/_struct.cpp
+    Modules/_hashopenssl.cpp
+    Modules/_blake2/impl/blake2b-ref.c
+    Modules/_blake2/impl/blake2s-ref.c
     Modules/posixmodule.cpp
     Python/symtable.cpp
     Python/flowgraph.cpp
@@ -66,6 +72,7 @@ add_library(cxxpython_core
     Objects/floatobject.cpp
     Objects/complexobject.cpp
     Objects/bytearrayobject.cpp
+    Objects/memoryobject.cpp
     Objects/exceptions.cpp
     Objects/rangeobject.cpp
     Objects/iterobject.cpp
@@ -78,6 +85,7 @@ target_include_directories(cxxpython_core SYSTEM PRIVATE ${BOOST_MULTIPRECISION_
 set(CXXPYTHON_STDLIB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Lib" CACHE PATH "Python standard library source directory")
 target_compile_definitions(cxxpython_core PRIVATE CXXPYTHON_STDLIB_DIR="${CXXPYTHON_STDLIB_DIR}")
 target_link_libraries(cxxpython_core PUBLIC cxxpython_parser Threads::Threads ${CMAKE_DL_LIBS})
+target_link_libraries(cxxpython_core PRIVATE OpenSSL::Crypto)
 target_compile_options(cxxpython_core PRIVATE -Wall -Wextra -Wpedantic -Werror)
 
 add_executable(cxxpython Programs/cxxpython.cpp)
@@ -155,6 +163,8 @@ if(BUILD_TESTING)
         Tests/cpp/test_constructors.cpp
         Tests/cpp/test_bytes.cpp
         Tests/cpp/test_codecs.cpp
+        Tests/cpp/test_codecs_parallel.cpp
+        Tests/cpp/test_buffers_parallel.cpp
         Tests/cpp/test_super.cpp
         Tests/cpp/test_set.cpp
         Tests/cpp/test_set_operations.cpp

@@ -296,6 +296,7 @@ struct CallArgsView {
 using NativeEntry = void (*)(Attachment &, Handle function, std::span<const Value>, ReturnSlot &);
 enum class NativeSlotKind { Ordinary, Sequence };
 
+enum class NativeFunctionBinding { Function, Descriptor };
 struct NativeFunctionObject {
     ObjectHeader header;
     const std::string name;
@@ -303,11 +304,14 @@ struct NativeFunctionObject {
     const NativeEntry entry;
     const std::vector<Value> captures;
     const std::optional<Value> sequence_owner;
+    const NativeFunctionBinding binding;
     NativeFunctionObject(InitialType head, std::string name_in, SignatureLayout signature_in,
                          NativeEntry entry_in, std::vector<Value> captures_in,
-                         std::optional<Value> sequence = {})
+                         std::optional<Value> sequence = {},
+                         NativeFunctionBinding binding_in = NativeFunctionBinding::Function)
         : header(head), name(std::move(name_in)), signature(std::move(signature_in)),
-          entry(entry_in), captures(std::move(captures_in)), sequence_owner(sequence)
+          entry(entry_in), captures(std::move(captures_in)), sequence_owner(sequence),
+          binding(binding_in)
     {}
     void trace(Tracer &tracer) const noexcept;
     std::size_t external_bytes() const noexcept;
@@ -417,7 +421,8 @@ std::string int_decimal(Attachment &context, Value value);
 void copy_int(Attachment &context, Value value, ReturnSlot &out);
 void make_tuple(Attachment &context, std::span<const Value> values, ReturnSlot &out);
 void make_native_function(Attachment &context, std::string name, SignatureLayout signature,
-                          NativeEntry entry, std::span<const Value> captures, ReturnSlot &out);
+                          NativeEntry entry, std::span<const Value> captures, ReturnSlot &out,
+                          NativeFunctionBinding binding = NativeFunctionBinding::Descriptor);
 void make_method_descriptor(Attachment &context, Handle owner, Handle function, ReturnSlot &out);
 void raise_error(Attachment &context, CoreObject type, std::u32string message, ReturnSlot &out);
 void validate_exception(Attachment &context, Value exception);
@@ -545,6 +550,7 @@ void get_native_member(Attachment &context, Value descriptor, std::optional<Valu
                        ReturnSlot &out);
 void allocate_function(Attachment &context, Handle type, std::string name,
                        SignatureLayout signature, NativeEntry entry, std::vector<Value> captures,
-                       ReturnSlot &out, std::optional<Value> sequence_owner = {});
+                       ReturnSlot &out, std::optional<Value> sequence_owner = {},
+                       NativeFunctionBinding binding = NativeFunctionBinding::Descriptor);
 } // namespace detail
 } // namespace cxxpython::core

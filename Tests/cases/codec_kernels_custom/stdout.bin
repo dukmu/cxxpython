@@ -1,0 +1,3 @@
+('a!z', 2)
+(b'a\xffz', 3)
+position out of bounds

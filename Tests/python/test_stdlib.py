@@ -35,7 +35,27 @@ def main():
     if result.returncode:
         print(f'heapq.merge doctests: exit {result.returncode}')
         failures += 1
-    print(f'{checks} upstream heapq doctest examples; {failures} failures')
+
+    module = ast.parse((root / 'Lib/hashlib.py').read_text())
+    doc = next(node.value.value for node in module.body
+               if isinstance(node, ast.Assign)
+               and any(isinstance(target, ast.Name) and target.id == '__doc__'
+                       for target in node.targets))
+    examples = doctest.DocTestParser().get_examples(doc)
+    source = ''
+    expected = b''
+    for example in examples:
+        source += f'exec(compile({example.source!r}, "<hashlib doctest>", "single"))\n'
+        expected += example.want.encode()
+        checks += 1
+    result = subprocess.run([str(binary)], input=source.encode(), capture_output=True,
+                            cwd=root, timeout=30)
+    failures += not compare('hashlib doctests/stdout', expected, result.stdout)
+    failures += not compare('hashlib doctests/stderr', b'', result.stderr)
+    if result.returncode:
+        print(f'hashlib doctests: exit {result.returncode}')
+        failures += 1
+    print(f'{checks} upstream stdlib doctest examples; {failures} failures')
     return bool(failures)
 
 

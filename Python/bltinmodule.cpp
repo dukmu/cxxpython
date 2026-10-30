@@ -27,6 +27,11 @@ void builtin_abs(Attachment &context, Handle, std::span<const Value> args, Retur
     }
     detail::invoke_special(context, value, roots.root(*method), {{}, {}}, out);
 }
+void builtin_id(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    make_int(context, static_cast<std::int64_t>(reinterpret_cast<std::uintptr_t>(args[0].object())),
+             out);
+}
 void builtin_chr(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
@@ -659,6 +664,7 @@ void install_class_builtins(Attachment &context, std::span<const Handle> core, V
     ascii_signature.parameters = {{U"object", ParameterKind::PositionalOnly}};
     install("ascii", U"ascii", ascii_signature, builtin_ascii);
     install("abs", U"abs", ascii_signature, builtin_abs);
+    install("id", U"id", ascii_signature, builtin_id);
     install("chr", U"chr", ascii_signature, builtin_chr);
     install("ord", U"ord", ascii_signature, builtin_ord);
     install("callable", U"callable", ascii_signature, builtin_callable);

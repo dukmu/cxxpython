@@ -1,0 +1,16 @@
+fffffffefffffffffffdfffffffffffffffffffffffcffffffffffffffff
+(-1, 255, -2, 65535, -3, 4294967295, -4, 18446744073709551615)
+6101787900000361626300
+(b'a', True, b'xy\x00\x00', b'abc')
+3e00c0100000400c000000000000
+(1.5, -2.25, 3.5)
+>hB 3 fffe07
+(-2, 7)
+2e2efffd092e2e2e
+(-3, 9)
+[(1,), (2,)]
+[(1, 2), (3, 4)]
+error
+error
+error
+error

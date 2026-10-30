@@ -615,7 +615,8 @@ void initialize_posix(Attachment &c, Handle module, ReturnSlot &out)
     auto mode_default = roots.root(mode.value());
     auto install = [&](const char *key, SignatureLayout sig, NativeEntry function,
                        std::vector<Value> captures = {}) {
-        make_native_function(c, key, std::move(sig), function, captures, value);
+        make_native_function(c, key, std::move(sig), function, captures, value,
+                             NativeFunctionBinding::Function);
         make_str(c, std::u32string(key, key + std::strlen(key)), name);
         dict_store(c, dict, roots.root(name.value()), roots.root(value.value()), out);
         return !failed(out);

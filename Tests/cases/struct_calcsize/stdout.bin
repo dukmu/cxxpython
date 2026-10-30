@@ -1,0 +1,17 @@
+ 0
+i 4
+3i 12
+@ci 8
+=ci 5
+<ci 5
+>ci 5
+!ci 5
+@b0i 4
+0s 0
+12p 12
+@nNP 24
+efd 16
+error bad char in struct format
+error bad char in struct format
+error repeat count given without format specifier
+error bad char in struct format

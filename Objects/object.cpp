@@ -149,7 +149,8 @@ void raise_error(Attachment &context, CoreObject type, std::u32string message, R
     }
 }
 void make_native_function(Attachment &context, std::string name, SignatureLayout signature,
-                          NativeEntry entry, std::span<const Value> captures, ReturnSlot &out)
+                          NativeEntry entry, std::span<const Value> captures, ReturnSlot &out,
+                          NativeFunctionBinding binding)
 {
     RootScope roots(context);
     for (const auto &parameter : signature.parameters)
@@ -159,7 +160,7 @@ void make_native_function(Attachment &context, std::string name, SignatureLayout
         roots.root(capture);
     auto type = roots.root(context.builtin(CoreObject::NativeFunctionType));
     detail::allocate_function(context, type, std::move(name), std::move(signature), entry,
-                              {captures.begin(), captures.end()}, out);
+                              {captures.begin(), captures.end()}, out, {}, binding);
 }
 void make_method_descriptor(Attachment &context, Handle owner, Handle function, ReturnSlot &out)
 {
@@ -175,7 +176,8 @@ void make_method_descriptor(Attachment &context, Handle owner, Handle function, 
 namespace detail {
 void allocate_function(Attachment &context, Handle type, std::string name,
                        SignatureLayout signature, NativeEntry entry, std::vector<Value> captures,
-                       ReturnSlot &out, std::optional<Value> sequence_owner)
+                       ReturnSlot &out, std::optional<Value> sequence_owner,
+                       NativeFunctionBinding binding)
 {
     out.reset(context);
     signature.validate();
@@ -183,7 +185,7 @@ void allocate_function(Attachment &context, Handle type, std::string name,
         throw std::invalid_argument("native function requires an entrypoint");
     context.allocate_instance<NativeFunctionObject>(type, out, std::move(name),
                                                     std::move(signature), entry,
-                                                    std::move(captures), sequence_owner);
+                                                    std::move(captures), sequence_owner, binding);
 }
 } // namespace detail
 

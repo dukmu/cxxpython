@@ -399,7 +399,8 @@ void install_error_hooks(Attachment &ctx, Handle sys, ReturnSlot &out)
     SignatureLayout one;
     one.parameters = {{U"unraisable", ParameterKind::PositionalOnly}};
     const std::array captures{sys.get(ctx), type.get(ctx)};
-    make_native_function(ctx, "unraisablehook", one, default_unraisable, captures, out);
+    make_native_function(ctx, "unraisablehook", one, default_unraisable, captures, out,
+                         NativeFunctionBinding::Function);
     if (failed(out))
         return;
     auto hook = roots.root(out.value());
@@ -414,7 +415,8 @@ void install_error_hooks(Attachment &ctx, Handle sys, ReturnSlot &out)
                         {U"value", ParameterKind::PositionalOnly},
                         {U"traceback", ParameterKind::PositionalOnly}};
     const std::array sys_capture{sys.get(ctx)};
-    make_native_function(ctx, "excepthook", three, default_excepthook, sys_capture, out);
+    make_native_function(ctx, "excepthook", three, default_excepthook, sys_capture, out,
+                         NativeFunctionBinding::Function);
     if (failed(out))
         return;
     hook = roots.root(out.value());

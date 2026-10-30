@@ -29,6 +29,6 @@ host faults and shared-heap native thread control.
 
 `stdlib_cpython_bisect` retains CPython's original precomputed test dataset and
 checks its bounded searches. `Tests/python/test_stdlib.py` also executes upstream
-heapq doctest examples through the product's normal single-mode compiler. These
+heapq and hashlib doctest examples through the product's normal single-mode compiler. These
 are real upstream tests/data, not a substitute declaration that the complete
 unittest/test dependency closure already works.

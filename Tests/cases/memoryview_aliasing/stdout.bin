@@ -1,0 +1,10 @@
+True False B 1 1
+b'ace' [97, 99, 101] 616365 (3,) (2,)
+3 False False False
+bytearray(b'abXdef') b'abXdef'
+bytearray(b'1b2d3f') b'1b2d3f'
+True b'Z23'
+readonly
+shape mismatch
+b'Z23'
+bytearray(b'Zb2d3f!')

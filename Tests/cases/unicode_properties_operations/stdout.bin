@@ -1,0 +1,28 @@
+'' True False False False False False False
+'abc123' True True False False False False False
+'\xe9' False True True False False False False
+'\u4e2d' False True True False False False False
+'\xb2' False True False False False True True
+'\xbd' False True False False False False True
+'\u0661' False True False False True True True
+'\u2003' False False False True False False False
+'\x1c' True False False True False False False
+'\ud800' False False False False False False False
+'stra\xdfe' 'STRASSE' 'strasse'
+'i\u0307' '\u0130' 'i\u0307'
+'\u03bf\u03c2' '\u039f\u03a3' '\u03bf\u03c3'
+'\u03bf\u03c3\u03b1' '\u039f\u03a3\u0391' '\u03bf\u03c3\u03b1'
+'\u03bf\u03c2\u0301' '\u039f\u03a3\u0301' '\u03bf\u03c3\u0301'
+'\ufb03' 'FFI' 'ffi'
+'\u01f0' 'J\u030c' 'j\u030c'
+'-' '' ''
+'-a-bc' 'XYbc' 'abc'
+'-a-aa' 'XYXYXY' 'aaa'
+'hi' hello helloxy xyhello
+('a', '--', 'b--c') ('a--b', '--', 'c') ('abc', '', '') ('', '', 'abc')
+['a', 'b', 'c', 'd', 'e', 'f']
+['a\r\n', 'b\r', 'c\n', 'd\x85', 'e\u2028', 'f\u2029']
+[] [''] ['x']
+ValueError
+TypeError
+TypeError

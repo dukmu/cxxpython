@@ -118,6 +118,12 @@ prepared short commits restore the list on failure. `sorted` uses the same
 implementation. `Objects/bytearrayobject.cpp` owns mutable byte sequences with
 short versioned commits and rooted iterator reads. Scalar reads/writes and tail
 pop do not copy the whole buffer; append uses prepared amortized growth.
+`Objects/memoryobject.cpp` supplies aliasing byte-oriented memoryviews. Each live
+view traces its exporter and shares a native export token retaining the actual
+bytearray storage. The storage's export count forbids resizing, not same-size
+writes. Release atomically drops both the traced edge and native token; native
+token destruction never accesses a potentially dead managed exporter. Buffer
+consumers copy bytes under short storage locks before callbacks or native waits.
 `Objects/enumobject.cpp` owns reversed/list-reverse iterators, enumerate, zip and
 map. Child iterators/callables are traced; ordinary protocol callbacks do not run
 under storage locks. Compound callback sequences are not advertised as atomic.
@@ -132,6 +138,21 @@ owns the added Unicode prefix/suffix methods; codec kernels remain separate in
 Generated Unicode tables retain their generator/source provenance. The immutable
 XID ranges are reused by the standalone tokenizer; its normalization and licensed
 character-name tables remain native parser data, not Python objects or imports.
+Unicode properties/case mappings use the pinned CPython Unicode 15 database;
+namereplace reuses the existing compressed character-name data, not a second table.
+`Modules/_codecsmodule.cpp` owns a per-Interpreter traced codec registry with
+short local commits and generation-checked cache publication. Search functions
+and error handlers run through normal calls outside registry locks; lazy import
+loads the real `Lib/encodings` policy. `Objects/unicodecodecs.cpp` owns UTF,
+ASCII, Latin-1 and charmap kernels, streaming boundaries and error dispatch.
+`Lib/codecs.py` retains upstream incremental and stream policy.
+`Modules/_struct.cpp` owns immutable compiled binary layouts and synchronized
+buffer operations; `Lib/struct.py` remains the upstream facade.
+`Modules/_hashopenssl.cpp` supplies OpenSSL EVP hashes, PBKDF2 and scrypt, plus
+portable upstream BLAKE2 kernels in `Modules/_blake2/impl`. Hash objects use
+per-state native locks, with attachments parked during native work. Digest/copy
+snapshots do not consume the original state. `Lib/hashlib.py` retains upstream
+algorithm selection and policy. These modules add no interpreter execution lock.
 `Objects/moduleobject.cpp` uses the ordinary instance dictionary as the module
 namespace, including descriptor lookup and module-level __getattr__. Module
 payloads add no second dictionary or lifetime manager. The CLI now executes in

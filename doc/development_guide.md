@@ -17,6 +17,9 @@ The current targets include `cxxpython_parser`, `cxxpython_core`, `cxxpython`,
 `test_parser`, `test_runtime`, the native `parser_probe` development tool and
 optional `bench_runtime`. There is no legacy build option or alternate CLI. A system GTest
 is used when available; otherwise CMake fetches the pinned source archive.
+OpenSSL 3 development headers and libcrypto are required for native hashlib
+capabilities. Portable BLAKE2 kernels are vendored from the pinned CPython tree;
+their CC0 license is retained in `doc/licenses/blake2-CC0-1.0.txt`.
 Set `BOOST_MULTIPRECISION_INCLUDE_DIR` when Boost headers are not on the compiler
 search path. `CXXPYTHON_STDLIB_DIR` defaults to the repository's `Lib/`; the source
 bootstrap reads this directory, which must remain available to the executable.
@@ -51,7 +54,7 @@ cmake --build build --target format-check
 ```
 
 The format targets cover project C++ headers, implementation, tests and benchmark
-sources. CTest runs the same dry-run check. Generated parser/grammar headers, Unicode `.inc` data and
+sources. CTest runs the same dry-run check. Generated parser/grammar headers, Unicode tables and
 third-party source are excluded; change their generator rather than hand-edit
 data. Python drivers follow ordinary Python formatting.
 

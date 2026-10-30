@@ -1,4 +1,5 @@
 #include "cxxpython/bytearrayobject.hpp"
+#include "cxxpython/memoryobject.hpp"
 #include "cxxpython/protocol.hpp"
 #include "internal/codecs.hpp"
 
@@ -29,6 +30,68 @@ bool receiver(Attachment &c, Value value, ReturnSlot &out)
 bool failed(const ReturnSlot &out)
 {
     return out.tag() == ResultTag::Raised;
+}
+bool match_bound(Attachment &c, Handle value, std::int64_t &number, ReturnSlot &out)
+{
+    if (value.get(c) == c.builtin(CoreObject::None))
+        return true;
+    ReturnSlot converted(c);
+    index(c, value, converted);
+    if (failed(converted)) {
+        out.raised(converted.exception());
+        return false;
+    }
+    if (!int_fits_signed(c, converted.value(), number))
+        number = int_sign(c, converted.value()) < 0 ? std::numeric_limits<std::int64_t>::min()
+                                                    : std::numeric_limits<std::int64_t>::max();
+    return true;
+}
+template <CoreObject Type, bool Suffix>
+void tailmatch(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(c);
+    const auto self = roots.root(args[0]), candidates = roots.root(args[1]);
+    if (!is_subtype(c, c.type_of(self), c.builtin(Type))) {
+        raise_error(c, CoreObject::TypeErrorType,
+                    U"bytes descriptor requires a compatible receiver", out);
+        return;
+    }
+    std::int64_t first = 0, last = std::numeric_limits<std::int64_t>::max();
+    if (!match_bound(c, roots.root(args[2]), first, out) ||
+        !match_bound(c, roots.root(args[3]), last, out))
+        return;
+    std::string data;
+    if (!detail::buffer_bytes(c, self, data, out))
+        return;
+    const auto length = static_cast<std::int64_t>(data.size());
+    if (first < 0)
+        first = std::max<std::int64_t>(0, first + length);
+    last = last < 0 ? std::max<std::int64_t>(0, last + length) : std::min(last, length);
+    auto match = [&](Value value) {
+        std::string part;
+        if (!detail::buffer_bytes(c, roots.root(value), part, out)) {
+            if (!failed(out))
+                raise_error(c, CoreObject::TypeErrorType, U"a bytes-like object is required", out);
+            return false;
+        }
+        if (first > last || first > length || part.size() > static_cast<std::size_t>(last - first))
+            return false;
+        const auto position =
+            Suffix ? static_cast<std::size_t>(last) - part.size() : static_cast<std::size_t>(first);
+        return data.compare(position, part.size(), part) == 0;
+    };
+    bool found = false;
+    if (c.has_layout<TupleObject>(candidates.get(c)) &&
+        is_subtype(c, c.type_of(candidates), c.builtin(CoreObject::TupleType))) {
+        for (auto value : c.payload<TupleObject>(candidates).items) {
+            found = match(value);
+            if (failed(out) || found)
+                break;
+        }
+    } else
+        found = match(candidates.get(c));
+    if (!failed(out))
+        out.ok(c.builtin(found ? CoreObject::True : CoreObject::False));
 }
 bool parse_arguments(Attachment &c, Value positional, Value named,
                      std::span<const std::u32string_view> names,
@@ -123,6 +186,12 @@ void create(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
     }
     if (is_bytearray(c, source.get(c))) {
         finish(detail::bytearray_snapshot(c, source));
+        return;
+    }
+    if (c.has_layout<MemoryViewObject>(source.get(c))) {
+        std::string data;
+        if (detail::buffer_bytes(c, source, data, out, false))
+            finish(std::move(data));
         return;
     }
     if (c.has_layout<StrObject>(source.get(c))) {
@@ -564,6 +633,20 @@ void detail::install_bytes(Attachment &c, std::span<const Handle> core)
 {
     RootScope roots(c);
     auto at = [&](CoreObject id) { return core[static_cast<std::size_t>(id)]; };
+    SignatureLayout match_signature;
+    match_signature.parameters = {
+        {U"self", ParameterKind::PositionalOnly},
+        {U"prefix", ParameterKind::PositionalOnly},
+        {U"start", ParameterKind::PositionalOnly, at(CoreObject::IntZero).get(c)},
+        {U"end", ParameterKind::PositionalOnly, at(CoreObject::None).get(c)}};
+    install_native_attribute(c, core, at(CoreObject::BytesType), U"startswith", match_signature,
+                             tailmatch<CoreObject::BytesType, false>);
+    install_native_attribute(c, core, at(CoreObject::BytesType), U"endswith", match_signature,
+                             tailmatch<CoreObject::BytesType, true>);
+    install_native_attribute(c, core, at(CoreObject::ByteArrayType), U"startswith", match_signature,
+                             tailmatch<CoreObject::ByteArrayType, false>);
+    install_native_attribute(c, core, at(CoreObject::ByteArrayType), U"endswith", match_signature,
+                             tailmatch<CoreObject::ByteArrayType, true>);
     SignatureLayout unary;
     unary.parameters = {{U"self", ParameterKind::PositionalOnly}};
     auto pair = unary;

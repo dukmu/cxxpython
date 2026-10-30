@@ -312,7 +312,9 @@ void invoke_special_impl(Attachment &context, Handle self, Handle target, CallAr
     const auto receiver = self.get(context);
     const auto descriptor = target.get(context);
     const auto type = context.type_of(descriptor);
-    if (type == context.builtin(CoreObject::NativeFunctionType) ||
+    if ((type == context.builtin(CoreObject::NativeFunctionType) &&
+         context.payload<NativeFunctionObject>(descriptor).binding ==
+             NativeFunctionBinding::Descriptor) ||
         type == context.builtin(CoreObject::FunctionType))
         invoke(context, target, args, receiver, out, preparation);
     else {
@@ -604,6 +606,12 @@ void attribute_del(Attachment &context, Handle fn, std::span<const Value> args, 
 void bind_native_callable(Attachment &context, Value callable, std::optional<Value> receiver,
                           ReturnSlot &out)
 {
+    if (context.type_of(callable) == context.builtin(CoreObject::NativeFunctionType) &&
+        context.payload<NativeFunctionObject>(callable).binding ==
+            NativeFunctionBinding::Function) {
+        out.ok(callable);
+        return;
+    }
     if (!receiver) {
         out.ok(callable);
         return;

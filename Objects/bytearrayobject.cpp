@@ -1,4 +1,5 @@
 #include "cxxpython/bytearrayobject.hpp"
+#include "cxxpython/memoryobject.hpp"
 #include "cxxpython/protocol.hpp"
 #include "internal/codecs.hpp"
 
@@ -53,36 +54,50 @@ Snapshot snapshot(Attachment &c, Handle self)
         c.poll();
     }
 }
-bool commit(Attachment &c, Handle self, Snapshot &old, std::string &replacement)
+enum class Commit { Retry, Done, Exported };
+Commit commit(Attachment &c, Handle self, Snapshot &old, std::string &replacement)
 {
     auto &s = *c.payload<ByteArrayObject>(self).contents;
     return locked(c, s, [&] {
         if (s.version != old.version)
-            return false;
+            return Commit::Retry;
+        if (s.bytes.size() != replacement.size() && s.exports.load())
+            return Commit::Exported;
         s.bytes.swap(replacement);
         ++s.version;
         c.account_external(self, sizeof(ByteArrayObject::Storage) + s.bytes.capacity() + 1);
-        return true;
+        return Commit::Done;
     });
 }
-template <class F> void mutate(Attachment &c, Handle self, F &&f)
+template <class F> bool mutate(Attachment &c, Handle self, F &&f, ReturnSlot &out)
 {
     for (;;) {
         auto old = snapshot(c, self);
         auto data = old.data;
         f(data);
-        if (commit(c, self, old, data))
-            return;
+        auto result = commit(c, self, old, data);
+        if (result == Commit::Done)
+            return true;
+        if (result == Commit::Exported) {
+            raise_error(c, CoreObject::BufferErrorType,
+                        U"Existing exports of data: object cannot be re-sized", out);
+            return false;
+        }
         c.poll();
     }
 }
-void append_data(Attachment &c, Handle self, std::string_view extra)
+bool append_data(Attachment &c, Handle self, std::string_view extra, ReturnSlot &out)
 {
     auto &s = *c.payload<ByteArrayObject>(self).contents;
     std::string prepared;
     for (;;) {
         std::size_t needed = 0;
+        bool exported = false;
         if (locked(c, s, [&] {
+                if (!extra.empty() && s.exports.load()) {
+                    exported = true;
+                    return true;
+                }
                 if (extra.size() > s.bytes.max_size() - s.bytes.size())
                     throw std::bad_alloc();
                 needed = s.bytes.size() + extra.size();
@@ -101,8 +116,14 @@ void append_data(Attachment &c, Handle self, std::string_view extra)
                 ++s.version;
                 c.account_external(self, sizeof(ByteArrayObject::Storage) + s.bytes.capacity() + 1);
                 return true;
-            }))
-            return;
+            })) {
+            if (exported) {
+                raise_error(c, CoreObject::BufferErrorType,
+                            U"Existing exports of data: object cannot be re-sized", out);
+                return false;
+            }
+            return true;
+        }
         prepared.reserve(needed);
         c.poll();
     }
@@ -138,22 +159,16 @@ bool byte_value(Attachment &c, Handle value, char &byte, ReturnSlot &out)
     byte = static_cast<char>(n);
     return true;
 }
-bool buffer(Attachment &c, Handle value, std::string &data)
+bool buffer(Attachment &c, Handle value, std::string &data, ReturnSlot &out)
 {
-    if (is_bytearray(c, value.get(c))) {
-        data = snapshot(c, value).data;
-        return true;
-    }
-    if (is_bytes(c, value.get(c))) {
-        data = c.payload<BytesObject>(value).value;
-        return true;
-    }
-    return false;
+    return detail::buffer_bytes(c, value, data, out, false);
 }
 bool iterable(Attachment &c, Handle source, std::string &data, ReturnSlot &out)
 {
-    if (buffer(c, source, data))
+    if (buffer(c, source, data, out))
         return true;
+    if (failed(out))
+        return false;
     RootScope roots(c);
     ReturnSlot iter(c), item(c);
     get_iter(c, source, iter);
@@ -233,7 +248,9 @@ void initialize(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &
     if ((values[1] && !text_argument(c, *values[1], out)) ||
         (values[2] && !text_argument(c, *values[2], out)))
         return;
-    mutate(c, self, [](std::string &target) { target.clear(); });
+    if (!mutate(
+            c, self, [](std::string &target) { target.clear(); }, out))
+        return;
     std::string data;
     if (!values[0]) {
         if (values[1] || values[2]) {
@@ -272,7 +289,9 @@ void initialize(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &
         } else if (!iterable(c, source, data, out))
             return;
     }
-    mutate(c, self, [&](std::string &target) { target = data; });
+    if (!mutate(
+            c, self, [&](std::string &target) { target = data; }, out))
+        return;
     out.ok(c.builtin(CoreObject::None));
 }
 void representation(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
@@ -411,7 +430,13 @@ template <ItemOp Op> void item(Attachment &c, Handle, std::span<const Value> arg
                         data.resize(write);
                     }
                 }
-                if (commit(c, self, old, data)) {
+                auto result = commit(c, self, old, data);
+                if (result == Commit::Exported) {
+                    raise_error(c, CoreObject::BufferErrorType,
+                                U"Existing exports of data: object cannot be re-sized", out);
+                    return;
+                }
+                if (result == Commit::Done) {
                     out.ok(c.builtin(CoreObject::None));
                     return;
                 }
@@ -430,6 +455,7 @@ template <ItemOp Op> void item(Attachment &c, Handle, std::span<const Value> arg
     for (;;) {
         std::size_t selected = 0, version = 0;
         unsigned char value = 0;
+        bool exported = false;
         const bool valid = locked(c, storage, [&] {
             auto pos = position;
             if (pos < 0)
@@ -443,11 +469,20 @@ template <ItemOp Op> void item(Attachment &c, Handle, std::span<const Value> arg
                 storage.bytes[selected] = byte;
                 ++storage.version;
             } else if constexpr (Op == ItemOp::Delete) {
+                if (storage.exports.load()) {
+                    exported = true;
+                    return true;
+                }
                 storage.bytes.erase(selected, 1);
                 ++storage.version;
             }
             return true;
         });
+        if (exported) {
+            raise_error(c, CoreObject::BufferErrorType,
+                        U"Existing exports of data: object cannot be re-sized", out);
+            return;
+        }
         if (!valid) {
             raise_error(c, CoreObject::IndexErrorType, U"bytearray index out of range", out);
             return;
@@ -459,6 +494,10 @@ template <ItemOp Op> void item(Attachment &c, Handle, std::span<const Value> arg
                 if (!locked(c, storage, [&] {
                         if (storage.version != version)
                             return false;
+                        if (storage.exports.load()) {
+                            exported = true;
+                            return true;
+                        }
                         storage.bytes.erase(selected, 1);
                         ++storage.version;
                         return true;
@@ -466,6 +505,9 @@ template <ItemOp Op> void item(Attachment &c, Handle, std::span<const Value> arg
                     c.poll();
                     continue;
                 }
+                if (exported)
+                    raise_error(c, CoreObject::BufferErrorType,
+                                U"Existing exports of data: object cannot be re-sized", out);
             }
             return;
         } else {
@@ -483,7 +525,8 @@ void append(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
     char b;
     if (!byte_value(c, roots.root(args[1]), b, out))
         return;
-    append_data(c, self, std::string_view(&b, 1));
+    if (!append_data(c, self, std::string_view(&b, 1), out))
+        return;
     out.ok(c.builtin(CoreObject::None));
 }
 void extend(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
@@ -495,7 +538,8 @@ void extend(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
     std::string data;
     if (!iterable(c, roots.root(args[1]), data, out))
         return;
-    append_data(c, self, data);
+    if (!append_data(c, self, data, out))
+        return;
     out.ok(c.builtin(CoreObject::None));
 }
 void insert(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
@@ -509,12 +553,16 @@ void insert(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
     if (!integer(c, roots.root(args[1]), pos, out, CoreObject::OverflowErrorType, true) ||
         !byte_value(c, roots.root(args[2]), b, out))
         return;
-    mutate(c, self, [&](std::string &data) {
-        auto at = pos;
-        if (at < 0)
-            at = std::max<std::int64_t>(0, at + static_cast<std::int64_t>(data.size()));
-        data.insert(std::min<std::size_t>(static_cast<std::size_t>(at), data.size()), 1, b);
-    });
+    if (!mutate(
+            c, self,
+            [&](std::string &data) {
+                auto at = pos;
+                if (at < 0)
+                    at = std::max<std::int64_t>(0, at + static_cast<std::int64_t>(data.size()));
+                data.insert(std::min<std::size_t>(static_cast<std::size_t>(at), data.size()), 1, b);
+            },
+            out))
+        return;
     out.ok(c.builtin(CoreObject::None));
 }
 void remove(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
@@ -535,7 +583,13 @@ void remove(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
             return;
         }
         data.erase(pos, 1);
-        if (commit(c, self, old, data)) {
+        auto result = commit(c, self, old, data);
+        if (result == Commit::Exported) {
+            raise_error(c, CoreObject::BufferErrorType,
+                        U"Existing exports of data: object cannot be re-sized", out);
+            return;
+        }
+        if (result == Commit::Done) {
             out.ok(c.builtin(CoreObject::None));
             return;
         }
@@ -554,20 +608,32 @@ void simple(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
     else if constexpr (Operation == 0) {
         auto &storage = *c.payload<ByteArrayObject>(self).contents;
         std::string old;
-        locked(c, storage, [&] {
+        bool exported = locked(c, storage, [&] {
+            if (!storage.bytes.empty() && storage.exports.load())
+                return true;
             old.swap(storage.bytes);
             ++storage.version;
             c.account_external(self,
                                sizeof(ByteArrayObject::Storage) + storage.bytes.capacity() + 1);
+            return false;
         });
+        if (exported) {
+            raise_error(c, CoreObject::BufferErrorType,
+                        U"Existing exports of data: object cannot be re-sized", out);
+            return;
+        }
         out.ok(c.builtin(CoreObject::None));
     } else {
-        mutate(c, self, [](std::string &data) {
-            if constexpr (Operation == 0)
-                data.clear();
-            else
-                std::reverse(data.begin(), data.end());
-        });
+        if (!mutate(
+                c, self,
+                [](std::string &data) {
+                    if constexpr (Operation == 0)
+                        data.clear();
+                    else
+                        std::reverse(data.begin(), data.end());
+                },
+                out))
+            return;
         out.ok(c.builtin(CoreObject::None));
     }
 }
@@ -579,13 +645,16 @@ void add(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
     RootScope roots(c);
     auto self = roots.root(args[0]);
     std::string other;
-    if (!buffer(c, roots.root(args[1]), other)) {
+    if (!buffer(c, roots.root(args[1]), other, out)) {
+        if (failed(out))
+            return;
         raise_error(c, CoreObject::TypeErrorType,
                     U"can't concat non-bytes-like object to bytearray", out);
         return;
     }
     if constexpr (Inplace) {
-        append_data(c, self, other);
+        if (!append_data(c, self, other, out))
+            return;
         out.ok(self.get(c));
     } else {
         auto data = snapshot(c, self).data;
@@ -616,7 +685,8 @@ void repeat(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
             data += source;
     };
     if constexpr (Inplace) {
-        mutate(c, self, operation);
+        if (!mutate(c, self, operation, out))
+            return;
         out.ok(self.get(c));
     } else {
         auto data = snapshot(c, self).data;
@@ -631,7 +701,9 @@ void contains(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &ou
     RootScope roots(c);
     auto self = roots.root(args[0]), value = roots.root(args[1]);
     std::string needle;
-    if (!buffer(c, value, needle)) {
+    if (!buffer(c, value, needle, out)) {
+        if (failed(out))
+            return;
         char b;
         if (!byte_value(c, value, b, out))
             return;
@@ -648,7 +720,9 @@ void compare(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out
     RootScope roots(c);
     auto self = roots.root(args[0]);
     std::string other;
-    if (!buffer(c, roots.root(args[1]), other)) {
+    if (!buffer(c, roots.root(args[1]), other, out)) {
+        if (failed(out))
+            return;
         out.ok(c.builtin(CoreObject::NotImplemented));
         return;
     }

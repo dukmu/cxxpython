@@ -1,0 +1,7 @@
+('\\N{LATIN SMALL LETTER E WITH ACUTE}\\N{GRINNING FACE}', 2)
+('\\N{HANGUL SYLLABLE GA}\\N{CJK UNIFIED IDEOGRAPH-4E00}', 2)
+('\\ud800\\uffff\\x00', 3)
+True
+exception required
+exception required
+b'?x?' [(0, 2), (3, 4)]

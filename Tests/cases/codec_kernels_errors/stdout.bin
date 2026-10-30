@@ -1,0 +1,9 @@
+(b'a&#233;z', 3)
+(b'a\x00\\\x00u\x00d\x008\x000\x000\x00z\x00', 3)
+('�', 4)
+('a\udcffz', 3)
+(b'\xff', 1)
+UnicodeEncodeError 1 2 ordinal not in range(128)
+(b'a!z', 3)
+UnicodeDecodeError 2 4 illegal encoding
+('A!', 4)

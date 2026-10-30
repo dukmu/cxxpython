@@ -1,0 +1,19 @@
+utf-8 utf-8 4 True True
+UTF_8 utf-8 4 True True
+us-ascii ascii 4 True True
+latin1 iso8859-1 4 True True
+utf-16 utf-16 4 True True
+utf-32 utf-32 4 True True
+cp1252 cp1252 4 True True
+True
+A_B...cd
+example-codec b'ABC' abc
+b'ABC' abc
+True ['example_codec']
+unregistered
+True
+bad<bad>
+b'bad<bad>'
+2
+(b'abc', 3)
+(b'abc', 3) ('abc', 3)

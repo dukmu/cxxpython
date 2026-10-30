@@ -1,0 +1,9 @@
+False True True False
+True True
+True True True
+True True
+bytearray(b'ace') bytearray(b'ace')
+noncontiguous
+writable
+unhashable exporter
+True False True True

@@ -1,6 +1,7 @@
 #include "cxxpython/parser.hpp"
 
 #include <array>
+#include <cstdio>
 #include <optional>
 #include <string>
 
@@ -86,6 +87,49 @@ std::optional<char32_t> hangul(std::string_view text)
     return static_cast<char32_t>(0xac00 + (chosen[0] * 21 + chosen[1]) * 28 + chosen[2]);
 }
 } // namespace
+std::optional<std::string> unicode_character_name(char32_t code)
+{
+    if (code > 0x10ffff)
+        return {};
+    if (code >= 0xac00 && code <= 0xd7a3) {
+        constexpr std::string_view leading[] = {"G", "GG", "N", "D",  "DD", "R", "M",
+                                                "B", "BB", "S", "SS", "",   "J", "JJ",
+                                                "C", "K",  "T", "P",  "H"};
+        constexpr std::string_view vowel[] = {"A",   "AE", "YA", "YAE", "EO", "E",  "YEO",
+                                              "YE",  "O",  "WA", "WAE", "OE", "YO", "U",
+                                              "WEO", "WE", "WI", "YU",  "EU", "YI", "I"};
+        constexpr std::string_view trailing[] = {
+            "",   "G",  "GG", "GS", "N",  "NJ", "NH", "D",  "L", "LG", "LM", "LB", "LS", "LT",
+            "LP", "LH", "M",  "B",  "BS", "S",  "SS", "NG", "J", "C",  "K",  "T",  "P",  "H"};
+        const auto syllable = code - 0xac00;
+        return std::string("HANGUL SYLLABLE ") + std::string(leading[syllable / (21 * 28)]) +
+               std::string(vowel[(syllable / 28) % 21]) + std::string(trailing[syllable % 28]);
+    }
+    if (ideograph(code)) {
+        char hex[9];
+        std::snprintf(hex, sizeof(hex), "%04X", static_cast<unsigned>(code));
+        return std::string("CJK UNIFIED IDEOGRAPH-") + hex;
+    }
+    auto offset = phrasebook_offset1[code >> phrasebook_shift];
+    std::size_t at =
+        phrasebook_offset2[(offset << phrasebook_shift) + (code & ((1 << phrasebook_shift) - 1))];
+    if (!at)
+        return {};
+    std::string result;
+    for (;;) {
+        unsigned word = phrasebook[at++];
+        if (word >= phrasebook_short)
+            word = ((word - phrasebook_short) << 8) + phrasebook[at++];
+        if (!result.empty())
+            result += ' ';
+        const auto *text = lexicon + lexicon_offset[word];
+        while (*text < 128)
+            result += static_cast<char>(*text++);
+        if (*text == 128)
+            return result;
+        result += static_cast<char>(*text & 127);
+    }
+}
 std::optional<char32_t> unicode_name(std::u32string_view text)
 {
     if (text.empty() || text.size() > NAME_MAXLEN)

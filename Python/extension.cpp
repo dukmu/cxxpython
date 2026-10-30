@@ -360,7 +360,7 @@ void exec_extension(Attachment &actor, const std::shared_ptr<const NativeModule>
         }
         const std::array captures{binding.value()};
         make_native_function(actor, source_utf8(method.name), std::move(signature), bound_method,
-                             captures, function);
+                             captures, function, NativeFunctionBinding::Function);
         make_str(actor, method.name, key);
         dict_store(actor, roots.root(module_dict(actor, module.get(actor))),
                    roots.root(key.value()), roots.root(function.value()), out);

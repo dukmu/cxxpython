@@ -1,0 +1,24 @@
+utf8 True True b''
+True
+True
+utf-8-sig True True b''
+True
+True
+utf16 True True b''
+True
+True
+utf-16-le True True b''
+True
+True
+utf-16-be True True b''
+True
+True
+utf32 True True b''
+True
+True
+utf-32-le True True b''
+True
+True
+utf-32-be True True b''
+True
+True

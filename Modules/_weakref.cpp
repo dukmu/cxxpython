@@ -44,10 +44,12 @@ void detail::initialize_weakref(Attachment &c, Handle module, ReturnSlot &out)
         return;
     SignatureLayout unary;
     unary.parameters = {{U"object", ParameterKind::PositionalOnly}};
-    make_native_function(c, "getweakrefcount", unary, getweakrefcount, {}, function);
+    make_native_function(c, "getweakrefcount", unary, getweakrefcount, {}, function,
+                         NativeFunctionBinding::Function);
     if (!publish(U"getweakrefcount", roots.root(function.value())))
         return;
-    make_native_function(c, "getweakrefs", unary, getweakrefs, {}, function);
+    make_native_function(c, "getweakrefs", unary, getweakrefs, {}, function,
+                         NativeFunctionBinding::Function);
     if (!publish(U"getweakrefs", roots.root(function.value())))
         return;
     out.ok(c.builtin(CoreObject::None));

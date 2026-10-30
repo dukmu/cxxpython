@@ -45,7 +45,7 @@ void initialize_gc(Attachment &context, Handle module, ReturnSlot &out)
     auto install = [&](const char32_t *key, SignatureLayout signature, NativeEntry entry) {
         const std::u32string_view text(key);
         make_native_function(context, std::string(text.begin(), text.end()), std::move(signature),
-                             entry, {}, function);
+                             entry, {}, function, NativeFunctionBinding::Function);
         make_str(context, key, name);
         dict_store(context, dictionary, roots.root(name.value()), roots.root(function.value()),
                    out);

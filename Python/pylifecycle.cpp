@@ -2,6 +2,7 @@
 #include "cxxpython/complexobject.hpp"
 #include "cxxpython/floatobject.hpp"
 #include "cxxpython/genobject.hpp"
+#include "cxxpython/memoryobject.hpp"
 #include "cxxpython/moduleobject.hpp"
 #include "cxxpython/objects.hpp"
 #include "cxxpython/protocol.hpp"
@@ -12,9 +13,11 @@
 #include "internal/codecs.hpp"
 #include "internal/errors.hpp"
 #include "internal/exceptions.hpp"
+#include "internal/hashmodule.hpp"
 #include "internal/reversed.hpp"
 #include "internal/stdio.hpp"
 #include "internal/stringformat.hpp"
+#include "internal/structmodule.hpp"
 #include "internal/sysmodule.hpp"
 #include "internal/unicodeobject.hpp"
 
@@ -216,6 +219,22 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     define(CoreObject::EnumerateType, "enumerate", LayoutDescriptor::of<EnumObject>());
     define(CoreObject::ZipType, "zip", LayoutDescriptor::of<MultiIteratorObject>());
     define(CoreObject::MapType, "map", LayoutDescriptor::of<MultiIteratorObject>());
+    define(CoreObject::SystemErrorType, "SystemError", LayoutDescriptor::of<ExceptionObject>(),
+           at(CoreObject::ExceptionType));
+    define(CoreObject::BufferErrorType, "BufferError", LayoutDescriptor::of<ExceptionObject>(),
+           at(CoreObject::ExceptionType));
+    define(CoreObject::MemoryViewType, "memoryview", LayoutDescriptor::of<MemoryViewObject>());
+    define(CoreObject::MemoryViewIteratorType, "memory_iterator",
+           LayoutDescriptor::of<SequenceIteratorObject>());
+    define(CoreObject::StructType, "Struct", LayoutDescriptor::of<StructObject>());
+    define(CoreObject::StructIteratorType, "unpack_iterator",
+           LayoutDescriptor::of<StructIteratorObject>());
+    define(CoreObject::StructErrorType, "error", LayoutDescriptor::of<ExceptionObject>(),
+           at(CoreObject::ExceptionType));
+    define(CoreObject::HashType, "HASH", LayoutDescriptor::of<HashObject>());
+    define(CoreObject::HashXofType, "HASHXOF", LayoutDescriptor::of<HashObject>());
+    define(CoreObject::Blake2bType, "blake2b", LayoutDescriptor::of<HashObject>());
+    define(CoreObject::Blake2sType, "blake2s", LayoutDescriptor::of<HashObject>());
     for (auto id : {CoreObject::FunctionType, CoreObject::ModuleType, CoreObject::CodeType,
                     CoreObject::GeneratorType, CoreObject::CoroutineType, CoreObject::SetType,
                     CoreObject::FrozenSetType})
@@ -296,6 +315,9 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     install_lists(context, core);
     install_bytes(context, core);
     install_bytearrays(context, core);
+    install_memoryviews(context, core);
+    install_struct(context, core);
+    install_hashes(context, core);
     install_codecs(context, core);
     install_super(context, core);
     install_sets(context, core);
@@ -352,6 +374,13 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                     CoreObject::BytesIteratorType,
                     CoreObject::ByteArrayIteratorType,
                     CoreObject::ListReverseIteratorType,
+                    CoreObject::MemoryViewType,
+                    CoreObject::MemoryViewIteratorType,
+                    CoreObject::StructIteratorType,
+                    CoreObject::HashType,
+                    CoreObject::HashXofType,
+                    CoreObject::Blake2bType,
+                    CoreObject::Blake2sType,
                     CoreObject::CoroutineType,
                     CoreObject::CoroutineWrapperType,
                     CoreObject::SetIteratorType,
@@ -361,6 +390,17 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     context.allocate_instance<StrObject>(at(CoreObject::StrType), text, U"weakref");
     name_store(context, *context.payload<TypeObject>(at(CoreObject::WeakRefType)).dictionary,
                module_key.get(context), text.value());
+    for (auto [id, module] : {std::pair{CoreObject::StructType, U"_struct"},
+                              {CoreObject::StructIteratorType, U"_struct"},
+                              {CoreObject::StructErrorType, U"struct"},
+                              {CoreObject::HashType, U"_hashlib"},
+                              {CoreObject::HashXofType, U"_hashlib"},
+                              {CoreObject::Blake2bType, U"_blake2"},
+                              {CoreObject::Blake2sType, U"_blake2"}}) {
+        context.allocate_instance<StrObject>(at(CoreObject::StrType), text, module);
+        name_store(context, *context.payload<TypeObject>(at(id)).dictionary,
+                   module_key.get(context), text.value());
+    }
 
     auto &builtins = *outputs[static_cast<std::size_t>(CoreObject::Builtins)];
     context.allocate_instance<DictObject>(at(CoreObject::DictType), builtins);
@@ -380,6 +420,9 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                     CoreObject::FloatType,
                     CoreObject::ComplexType,
                     CoreObject::ByteArrayType,
+                    CoreObject::MemoryViewType,
+                    CoreObject::BufferErrorType,
+                    CoreObject::SystemErrorType,
                     CoreObject::ReversedType,
                     CoreObject::EnumerateType,
                     CoreObject::ZipType,

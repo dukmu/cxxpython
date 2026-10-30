@@ -1,5 +1,65 @@
 # Development Status
 
+## 2026-10-30 Parallel Codec, Buffer, Struct And Hashlib Closures
+
+Prepended without rewriting earlier records. Previous stable node: 70feda3,
+already committed and pushed. Five terra implementation branches covered codec
+kernels, Unicode methods, memoryviews, struct and hashlib; two bounded follow-up
+branches supplied upstream doctests and native shared-heap buffer/hash tests.
+No sol/astra agents, host-Python guest execution or new global execution lock.
+The full service goal and Plan 2 library/N4-N6 scope remain active, not complete.
+
+- Copied complete pinned CPython 3.12.14 Lib/codecs.py, struct.py and hashlib.py.
+  Added the real encodings package policy, UTF-8/SIG, UTF-16/32/endian, ASCII,
+  Latin-1 and 71 table-only single-byte encodings. Unchanged Python tables/policy
+  use native capabilities rather than C++ replacements for entire libraries.
+- _codecs owns a per-Interpreter traced registry and short local commits.
+  Callback snapshots own roots; searches/errors run outside locks. Generation
+  checks prevent stale publication after unregister. Native kernels implement
+  streaming/BOM/surrogate/charmap behavior and custom exception/result handling.
+  Standard errors include namereplace using the existing compressed name data.
+  Unicode predicates/casefold/case mappings use the copied Unicode 15 database;
+  replace/strip/partition/splitlines and bytes tail matching close real Lib needs.
+- Added actual bytes/bytearray memoryviews: aliasing, strided slices, B/b/c casts,
+  mutable writes, readonly/release/context management and exporter identity.
+  Live views trace exporters; shared native tokens retain bytearray storage and
+  forbid resizing without touching dead managed owners during destruction.
+  Short per-storage commits allow same-size concurrent writes. bytes/bytearray,
+  codecs, struct and hashlib consume the same buffer snapshot helper.
+- _struct compiles immutable native layouts and implements Struct, pack/unpack,
+  offset/buffer operations and export-retaining iterators. _hashlib uses OpenSSL
+  3 EVP hashes/SHAKE, PBKDF2 and scrypt; _blake2 exports canonical native types
+  backed by pinned portable C kernels, including keyed/salted/tree parameters.
+  Hash updates/copies/snapshots use per-state locks with NativeWait. Native EVP
+  ownership is RAII across managed allocation failure; usedforsecurity follows
+  normal truth conversion and propagates callback exceptions.
+- Distinguished native free functions from binding descriptors at the shared
+  call boundary. Upstream encodings' class-level aliases now work without Lib
+  edits; existing native methods keep receiver binding. Added actual builtin id
+  and required sys platform/byteorder/maxsize/maxunicode metadata.
+- Final product and fixed CPython both pass all 74 byte-exact stdin/stdout/status
+  fixtures, including every copied single-byte table and hash/scrypt vectors.
+  Eight upstream heapq/hashlib doctest examples pass. Retained normal affected
+  tests pass 75/75; final codec/Unicode tests pass 5/5, three registry/buffer/hash
+  shared-heap tests pass, and bootstrap allocation rollback passes unchanged.
+- ASan/UBSan/LeakSanitizer affected native tests pass 80/80; strict product cases
+  pass 74/74 and upstream doctests pass. TSan affected tests pass 17/17, including
+  simultaneous Active OS threads sharing memoryview, bytearray, hash state and
+  codec callbacks during GC. Vendored C kernels are instrumented too. Sandbox
+  LSan discovery failures are retained; final discovery/tests ran outside the
+  ptrace constraint, without disabling leak detection. Formatting and all 244
+  generated grammar-rule checks pass. Raw output, build logs and binary hashes
+  are retained under .cache/stdlib-closures-*. All operation handles terminated
+  before commit. No unrelated performance sweep or hand-filled benchmark table.
+- Updated architecture, dependency/provenance and compatibility documentation;
+  retained PSF and portable BLAKE2 CC0 notices/licenses. Complete memoryview
+  formats/exporters, UnicodeTranslateError, other codec families, full upstream
+  test matrices and I/O-dependent hashlib.file_digest remain explicit gates.
+  Next closures are real _io/file resources and abc/types/class-reflection
+  dependencies, then Python collections/contextlib/enum and the remaining
+  requested libraries. Existing performance gates are not waived by these
+  library passes. User changes to temporary_plan.md and test2.py are excluded.
+
 ## 2026-10-30 Native Types, Coroutine Syntax And Real Library Dependencies
 
 Prepended without rewriting earlier records. Previous stable node: 46fac07,

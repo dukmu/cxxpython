@@ -1,9 +1,12 @@
 #include "internal/import.hpp"
 #include "cxxpython/protocol.hpp"
 #include "cxxpython/weakrefobject.hpp"
+#include "internal/codecregistry.hpp"
 #include "internal/compiler.hpp"
+#include "internal/hashmodule.hpp"
 #include "internal/posixmodule.hpp"
 #include "internal/stdio.hpp"
+#include "internal/structmodule.hpp"
 #include "internal/sysmodule.hpp"
 
 #include <filesystem>
@@ -212,6 +215,10 @@ detail::ImportState::ImportState()
     for (auto [name, initializer] : {std::pair{U"builtins", builtin_init},
                                      {U"sys", sys_init},
                                      {U"gc", detail::initialize_gc},
+                                     {U"_codecs", detail::initialize_codecs},
+                                     {U"_struct", detail::initialize_struct},
+                                     {U"_hashlib", detail::initialize_hashlib},
+                                     {U"_blake2", detail::initialize_blake2},
                                      {U"posix", detail::initialize_posix},
                                      {U"_weakref", detail::initialize_weakref},
                                      {U"__main__", main_init},

@@ -8,6 +8,9 @@
 #include "internal/codecs.hpp"
 #include "internal/errors.hpp"
 
+#include <bit>
+#include <limits>
+
 namespace cxxpython::core::detail {
 namespace {
 bool failed(const ReturnSlot &out)
@@ -218,16 +221,36 @@ void initialize_sys_hooks(Attachment &ctx, Handle sys, ReturnSlot &out)
     SignatureLayout exit_signature;
     exit_signature.parameters = {
         {U"status", ParameterKind::PositionalOnly, ctx.builtin(CoreObject::None)}};
-    make_native_function(ctx, "exit", exit_signature, sys_exit, {}, function);
+    make_native_function(ctx, "exit", exit_signature, sys_exit, {}, function,
+                         NativeFunctionBinding::Function);
     if (!store(U"exit"))
         return;
     SignatureLayout display_signature;
     display_signature.parameters = {{U"value", ParameterKind::PositionalOnly}};
-    make_native_function(ctx, "displayhook", display_signature, sys_displayhook, {}, function);
+    make_native_function(ctx, "displayhook", display_signature, sys_displayhook, {}, function,
+                         NativeFunctionBinding::Function);
     if (!store(U"displayhook") || !store(U"__displayhook__"))
         return;
     make_str(ctx, U"", function);
     if (!store(U"executable"))
+        return;
+    make_str(ctx, std::endian::native == std::endian::little ? U"little" : U"big", function);
+    if (!store(U"byteorder"))
+        return;
+#if defined(__linux__)
+    make_str(ctx, U"linux", function);
+#elif defined(__APPLE__)
+    make_str(ctx, U"darwin", function);
+#else
+    make_str(ctx, U"unknown", function);
+#endif
+    if (!store(U"platform"))
+        return;
+    make_int(ctx, std::numeric_limits<std::ptrdiff_t>::max(), function);
+    if (!store(U"maxsize"))
+        return;
+    make_int(ctx, 0x10ffff, function);
+    if (!store(U"maxunicode"))
         return;
     install_error_hooks(ctx, sys, out);
 }

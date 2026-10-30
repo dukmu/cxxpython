@@ -350,8 +350,8 @@ void loader_arguments(Attachment &context, const std::u32string &name,
         if (file || (!memory && entry != loader_entry<LoaderOperation::Execute>))
             temporary.ok(context.builtin(CoreObject::None));
         else
-            make_native_function(context, "loader operation", signature, entry, captures,
-                                 temporary);
+            make_native_function(context, "loader operation", signature, entry, captures, temporary,
+                                 NativeFunctionBinding::Function);
         append();
     }
     make_int(context, file ? 0 : memory ? 1 : 2, temporary);
@@ -375,7 +375,8 @@ void initialize_imp(Attachment &context, Handle module, ReturnSlot &out)
     ReturnSlot function(context), key(context);
     auto install = [&](const char *name, const char32_t *label, SignatureLayout signature,
                        NativeEntry entry) {
-        make_native_function(context, name, std::move(signature), entry, {}, function);
+        make_native_function(context, name, std::move(signature), entry, {}, function,
+                             NativeFunctionBinding::Function);
         make_str(context, label, key);
         dict_store(context, roots.root(module_dict(context, module.get(context))),
                    roots.root(key.value()), roots.root(function.value()), out);

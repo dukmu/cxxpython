@@ -46,6 +46,7 @@ std::vector<Token> tokenize(std::string_view source, InputMode mode = InputMode:
                             bool allow_incomplete = false);
 std::u32string normalize_identifier(std::u32string_view text);
 std::optional<char32_t> unicode_name(std::u32string_view name);
+std::optional<std::string> unicode_character_name(char32_t codepoint);
 Tree parse(std::string_view source, InputMode mode = InputMode::File,
            bool allow_incomplete = false);
 } // namespace cxxpython::syntax
