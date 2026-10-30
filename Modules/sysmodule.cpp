@@ -4,6 +4,7 @@
 
 #include "cxxpython/import.hpp"
 #include "cxxpython/moduleobject.hpp"
+#include "cxxpython/namespaceobject.hpp"
 #include "cxxpython/protocol.hpp"
 #include "internal/codecs.hpp"
 #include "internal/errors.hpp"
@@ -251,6 +252,28 @@ void initialize_sys_hooks(Attachment &ctx, Handle sys, ReturnSlot &out)
         return;
     make_int(ctx, 0x10ffff, function);
     if (!store(U"maxunicode"))
+        return;
+    call(ctx, roots.root(ctx.builtin(CoreObject::SimpleNamespaceType)), {}, function);
+    if (failed(function)) {
+        out.raised(function.exception());
+        return;
+    }
+    auto implementation = roots.root(function.value());
+    if (!store(U"implementation"))
+        return;
+    ReturnSlot implementation_dict(ctx), value(ctx);
+    ctx.load(implementation.get(ctx), *ctx.instance_dictionary(implementation.get(ctx)),
+             implementation_dict);
+    auto metadata = roots.root(implementation_dict.value());
+    make_str(ctx, U"name", key);
+    make_str(ctx, U"cxxpython", value);
+    dict_store(ctx, metadata, roots.root(key.value()), roots.root(value.value()), out);
+    if (failed(out))
+        return;
+    make_str(ctx, U"cache_tag", key);
+    dict_store(ctx, metadata, roots.root(key.value()), roots.root(ctx.builtin(CoreObject::None)),
+               out);
+    if (failed(out))
         return;
     install_error_hooks(ctx, sys, out);
 }

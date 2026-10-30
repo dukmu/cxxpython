@@ -1,0 +1,7 @@
+False True (<class 'int'>, <class 'str'>)
+*tuple[int, str] False list
+generic_alias_iterator True
+*tuple[int, str]
+exhausted
+tuple[int]
+tuple[int, str]

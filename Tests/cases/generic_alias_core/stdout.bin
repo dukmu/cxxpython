@@ -1,0 +1,9 @@
+list[int] True True ()
+True True True
+tuple[()] dict[str, list[int]]
+True
+TypeError isinstance() argument 2 cannot be a parameterized generic
+TypeError issubclass() argument 2 cannot be a parameterized generic
+True True True
+True 7 True
+[1, 2]

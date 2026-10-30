@@ -38,6 +38,7 @@ add_library(cxxpython_core
     Modules/_io/stringio.cpp
     Modules/_threadmodule.cpp
     Modules/_abc.cpp
+    Modules/binascii.cpp
     Modules/main.cpp
     Modules/sysmodule.cpp
     Modules/gcmodule.cpp
@@ -68,6 +69,10 @@ add_library(cxxpython_core
     Objects/unicodecodecs.cpp
     Objects/superobject.cpp
     Objects/genobject.cpp
+    Objects/asyncgenobject.cpp
+    Objects/namespaceobject.cpp
+    Objects/genericaliasobject.cpp
+    Objects/unionobject.cpp
     Objects/weakrefobject.cpp
     Objects/setobject.cpp
     Objects/setoperations.cpp

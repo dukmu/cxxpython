@@ -1,0 +1,11 @@
+Error Leading padding not allowed
+Error Only base64 data is allowed
+Error Discontinuous padding not allowed
+Error Excess data after padding
+Error Invalid base64-encoded string: number of data characters (1) cannot be 1 more than a multiple of 4
+Error Incorrect padding
+Error Invalid base64-encoded string: number of data characters (5) cannot be 1 more than a multiple of 4
+Error Odd-length string
+Error Non-hexadecimal digit found
+ValueError string argument should contain only ASCII characters
+True

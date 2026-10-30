@@ -1,0 +1,9 @@
+['default', 'kwdefault', 'a', 'args', 'c', 'kw', 'return']
+{'a': 'a', 'args': 'args', 'c': 'c', 'kw': 'kw', 'return': 'return'}
+('closure', 1, 2, (3,), 4, {'d': 5})
+True
+{} True
+{}
+TypeError
+{'_C__x': 'class', 'return': 'class'}
+{'value': 'parent', 'return': 'parent'}

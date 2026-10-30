@@ -1,0 +1,4 @@
+list[str] | int
+nested-args (<class 'str'>, <class 'bytes'>)
+list[tuple[str, bytes]] | int
+ValueError prepare failed

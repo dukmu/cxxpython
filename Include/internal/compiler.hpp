@@ -139,6 +139,7 @@ struct FunctionStmt {
     std::u32string binding;
     std::vector<ExprPtr> decorators;
     std::vector<ParameterSpec> parameters;
+    std::vector<std::pair<std::u32string, ExprPtr>> annotations;
     std::optional<std::u32string> varargs, varkwargs;
     Suite body;
     std::size_t scope = 0;

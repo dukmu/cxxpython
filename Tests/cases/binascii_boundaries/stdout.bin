@@ -1,0 +1,26 @@
+TypeError argument should be bytes, buffer or ASCII string, not 'int'
+ValueError string argument should contain only ASCII characters
+TypeError a bytes-like object is required, not 'str'
+b'616263'
+b'6162:63'
+ValueError sep must be length 1.
+TypeError sep must be str or bytes.
+OverflowError Python int too large to convert to C int
+899311407
+929234843
+65535
+b'\x00'
+Error Excess data after padding
+b'616263'
+b'a b'
+TypeError argument should be bytes, buffer or ASCII string, not 'memoryview'
+BufferError memoryview: underlying buffer is not C-contiguous
+TypeError
+TypeError
+TypeError
+TypeError
+TypeError
+TypeError object of type 'module' has no len()
+OverflowError Python int too large to convert to C int
+907981633
+20810

@@ -1,0 +1,23 @@
+b' \n' True
+b'`\n' True
+b'!80  \n' True
+b'!80``\n' True
+b'"86( \n' True
+b'"86(`\n' True
+b'#86)C\n' True
+b'#86)C\n' True
+b'#  #_\n' True
+b'#``#_\n' True
+b"M>'AX>'AX>'AX>'AX>'AX>'AX>'AX>'AX>'AX>'AX>'AX>'AX>'AX>'AX>'AX\n" True
+b"M>'AX>'AX>'AX>'AX>'AX>'AX>'AX>'AX>'AX>'AX>'AX>'AX>'AX>'AX>'AX\n" True
+b'' b'\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00\x00'
+b'!' b'\x00'
+b'!\n' b'\x00'
+b'!@' b'\x80'
+b'!@!' b'\x80'
+b' ` \r\n' b''
+b'!@bad' Error Illegal char
+b'!\x00' Error Illegal char
+Error At most 45 bytes at once
+True False
+binascii Incomplete

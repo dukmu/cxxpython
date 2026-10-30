@@ -1,0 +1,9 @@
+dict[T, list[S]] True
+dict[int, list[str]] ()
+True
+TypeError list[int] is not a generic class
+TypeError Too few arguments for dict[T, list[S]]; actual 1, expected 2
+TypeError Too many arguments for dict[T, list[S]]; actual 3, expected 2
+prepare (<class 'int'>, <class 'str'>)
+subst <class 'int'>
+list[int]

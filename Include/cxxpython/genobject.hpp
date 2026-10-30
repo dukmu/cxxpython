@@ -8,6 +8,9 @@ struct GeneratorObject {
     AtomicGcEdge frame;
     const Value code;
     AtomicGcEdge name, qualname;
+    // Held by an async-generator request across suspension in an inner await.
+    std::atomic<bool> async_running{false};
+    std::atomic<bool> async_closed{false};
     GeneratorObject(InitialType type, Value frame, Value code, Value name, Value qualname)
         : header(type), frame(frame), code(code), name(name), qualname(qualname)
     {}

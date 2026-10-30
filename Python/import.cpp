@@ -2,6 +2,7 @@
 #include "cxxpython/protocol.hpp"
 #include "cxxpython/weakrefobject.hpp"
 #include "internal/abc.hpp"
+#include "internal/binascii.hpp"
 #include "internal/codecregistry.hpp"
 #include "internal/compiler.hpp"
 #include "internal/hashmodule.hpp"
@@ -225,6 +226,7 @@ detail::ImportState::ImportState()
                                      {U"_io", detail::initialize_io},
                                      {U"_thread", detail::initialize_thread},
                                      {U"_abc", detail::initialize_abc},
+                                     {U"binascii", detail::install_binascii},
                                      {U"posix", detail::initialize_posix},
                                      {U"_weakref", detail::initialize_weakref},
                                      {U"__main__", main_init},

@@ -1,4 +1,6 @@
+#include "cxxpython/genericaliasobject.hpp"
 #include "cxxpython/protocol.hpp"
+#include "cxxpython/unionobject.hpp"
 
 #include <algorithm>
 
@@ -796,6 +798,17 @@ void object_subclasshook(Attachment &context, Handle, std::span<const Value>, Re
 {
     out.ok(context.builtin(CoreObject::NotImplemented));
 }
+void class_getitem(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(context);
+    make_generic_alias(context, roots.root(args[0]), roots.root(args[1]), out);
+}
+template <bool reverse>
+void type_union(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(context);
+    make_union(context, roots.root(args[reverse ? 1 : 0]), roots.root(args[reverse ? 0 : 1]), out);
+}
 } // namespace
 namespace detail {
 void install_construction(Attachment &context, std::span<const Handle> core)
@@ -845,6 +858,13 @@ void install_construction(Attachment &context, std::span<const Handle> core)
         {U"name_from", ParameterKind::KeywordOnly, at(CoreObject::None).get(context)});
     install(at(CoreObject::ImportErrorType), U"__init__", import_error, import_error_init);
     install(type, U"__call__", variadic, type_call);
+    SignatureLayout union_signature;
+    union_signature.parameters = {{U"self", ParameterKind::PositionalOnly},
+                                  {U"other", ParameterKind::PositionalOnly}};
+    install(type, U"__or__", union_signature, type_union<false>);
+    install(type, U"__ror__", union_signature, type_union<true>);
+    install(at(CoreObject::GenericAliasType), U"__or__", union_signature, type_union<false>);
+    install(at(CoreObject::GenericAliasType), U"__ror__", union_signature, type_union<true>);
     install(type, U"__init__", variadic, type_init);
     install(type, U"__prepare__", variadic, type_prepare, Binding::Class);
     install(at(CoreObject::StrType), U"__new__", variadic, string_new, Binding::Static);
@@ -852,6 +872,12 @@ void install_construction(Attachment &context, std::span<const Handle> core)
     sequence.parameters = {{U"cls", ParameterKind::PositionalOnly}};
     sequence.varargs = U"args";
     install(at(CoreObject::TupleType), U"__new__", sequence, tuple_new, Binding::Static);
+    SignatureLayout generic;
+    generic.parameters = {{U"cls", ParameterKind::PositionalOnly},
+                          {U"item", ParameterKind::PositionalOnly}};
+    for (auto id : {CoreObject::ListType, CoreObject::TupleType, CoreObject::DictType,
+                    CoreObject::SetType, CoreObject::FrozenSetType})
+        install(at(id), U"__class_getitem__", generic, class_getitem, Binding::Class);
     SignatureLayout definition;
     definition.parameters = {{U"cls", ParameterKind::PositionalOnly},
                              {U"name", ParameterKind::PositionalOnly},

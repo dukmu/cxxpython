@@ -85,6 +85,7 @@ enum class Opcode : std::uint8_t {
     GetAwaitable,
     YieldValue,
     YieldFrom,
+    AsyncYieldValue,
     Count,
 };
 enum class OperandDomain {
@@ -110,7 +111,8 @@ enum class FunctionFlags : std::uint32_t {
     None = 0,
     Defaults = 1,
     KeywordDefaults = 2,
-    Closure = 4
+    Closure = 4,
+    Annotations = 8
 };
 enum class FlowKind { Next, Jump, Branch, Stop, Leave, EndHandler, LoopControl, IterBranch };
 enum class RegionKind { Loop, Except, Finally, With };
@@ -422,11 +424,13 @@ struct FunctionObject {
     const Value code, globals, builtins;
     const std::optional<Value> defaults, kwdefaults, closure;
     const Value name, qualname;
+    AtomicGcEdge annotations;
     FunctionObject(InitialType head, Value code, Value globals, std::optional<Value> defaults,
                    std::optional<Value> kwdefaults, Value name, Value qualname, Value builtins,
-                   std::optional<Value> closure)
+                   std::optional<Value> closure, std::optional<Value> annotations_in = {})
         : header(head), code(code), globals(globals), builtins(builtins), defaults(defaults),
-          kwdefaults(kwdefaults), closure(closure), name(name), qualname(qualname)
+          kwdefaults(kwdefaults), closure(closure), name(name), qualname(qualname),
+          annotations(annotations_in)
     {}
     void trace(Tracer &tracer) const noexcept;
 };
@@ -436,6 +440,7 @@ struct FunctionSpec {
     // Host execution environment; source/loader policy selects this mapping.
     std::optional<Handle> builtins = {};
     std::optional<Handle> closure = {};
+    std::optional<Handle> annotations = {};
 };
 enum class FrameState { Created, Running, Suspended, Completed };
 struct TracebackObject {

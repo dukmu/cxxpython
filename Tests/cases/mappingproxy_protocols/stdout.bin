@@ -1,0 +1,9 @@
+mappingproxy(Mapping()) 2 ['a', 'b'] 1
+None 7 True False
+['a', 'b'] [1, 2] [('a', 1), ('b', 2)] {'a': 1, 'b': 2}
+3 3 True
+missing:other
+TypeError
+TypeError
+TypeError
+b

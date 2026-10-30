@@ -183,6 +183,51 @@ the target is `builtins` and the `__builtins__` execution namespace.
   make_native_function default remains descriptor-capable; builtin-function
   __get__ reflection is not yet identical to CPython's distinct native types.
 
+## Type, Collection And Binary Conversion Closures
+
+- `Lib/types.py`, `_collections_abc.py` and `collections/abc.py` are unchanged
+  pinned CPython 3.12.14 sources. Actual type aliases, dynamic class preparation,
+  abstract collection registration, sequence/set mixins and wrapped mappings
+  execute here. This is not a claim that the complete collections package,
+  typing, unittest or every types constructor/helper is available. In particular
+  types.coroutine's functools/Code.replace dependencies, mutable function code
+  metadata and the distinct CPython native-callable descriptor matrix remain.
+- Native SimpleNamespace owns the ordinary traced instance-dictionary tail;
+  kwargs construction, subclassing, repr/recursion, comparison and reduction use
+  actual Python protocols. Its dictionary descriptor's exact reflection still
+  follows this runtime's getset representation rather than CPython's member type.
+  sys.implementation is a real instance with name='cxxpython' and cache_tag=None;
+  bytecode caching is not implemented. Full version/hexversion/platform metadata
+  remains a sys compatibility requirement, not invented CPython release data.
+- Class subscripting honors metaclass __getitem__ before __class_getitem__.
+  GenericAlias implements real origin/args/parameters, substitution preparation
+  and unpacking hooks, starred iterators, MRO entries, construction and origin
+  attribute forwarding. UnionType implements flattening, argument order,
+  equality/hash, substitution and checking short-circuits. Parameter discovery
+  publishes rooted immutable tuples; custom callback failures propagate. These
+  protocols do not provide the still-missing native TypeVar/typing closure.
+- mappingproxy is constructible over actual mappings, not just exact dicts.
+  Reads, length, iteration, views/get/copy, comparison and repr delegate to the
+  underlying object, including dict subclass overrides. It remains readonly but
+  live. Complete mappingproxy operator and diagnostic matrices remain work.
+- Ordinary function parameter and return annotations evaluate in the defining
+  scope after defaults and before closure publication. __annotations__ is a
+  traced atomic dictionary edge supporting lazy empty values, replacement, None
+  reset and deletion. Variable annotations and postponed/future evaluation are
+  not yet delivered. No upstream annotation was stripped to import these files.
+- Native async generators distinguish user yields from inner await suspension
+  and reuse the existing VM Frame/unwind. asend/athrow/aclose requests preserve
+  their generator-running claim across await suspension and reject competitors.
+  Tests transfer a suspended request between OS threads in one shared heap while
+  collecting. Async for/with, asynchronous finalizer hooks, event-loop shutdown
+  and the full upstream async-generator matrix remain explicit gates.
+- binascii supplies base64, hexadecimal, uu, quoted-printable and CRC32/CRC-HQX
+  conversions based on the pinned native algorithms. The module consumes shared
+  buffer snapshots and canonical Error/Incomplete types; Python-facing binding
+  errors remain Python exceptions. Complete native exception mutability and
+  argument diagnostic matrices, and the re-dependent Python base64 policy layer,
+  are not declared complete. No host codec process or fake re import is used.
+
 ## Native I/O, ABC And Thread Foundations
 
 - `Lib/abc.py` is the unchanged pinned CPython 3.12.14 implementation. `_abc`

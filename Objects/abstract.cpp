@@ -1,3 +1,4 @@
+#include "cxxpython/genericaliasobject.hpp"
 #include "cxxpython/protocol.hpp"
 
 namespace cxxpython::core {
@@ -437,6 +438,14 @@ ResultView length(Attachment &context, Handle value, ReturnSlot &out)
         auto self = roots.root(value.get(context));
         out.reset(context);
         auto slot = resolve(context, self, Protocol::Len, roots);
+        if (slot.state == SlotState::Missing) {
+            auto name = TypeView(context, context.type_of(self)).name();
+            auto text = std::holds_alternative<Value>(name)
+                            ? context.payload<StrObject>(std::get<Value>(name)).value
+                            : std::get<std::u32string>(name);
+            type_error(context, U"object of type '" + text + U"' has no len()", out);
+            return;
+        }
         ReturnSlot result(context);
         invoke_protocol(context, self, slot, {}, result);
         if (raised(result)) {
@@ -649,6 +658,27 @@ ResultView get_item(Attachment &context, Handle value, Handle key, ReturnSlot &o
         const auto item = roots.root(key.get(context));
         auto slot = resolve(context, self, Protocol::GetItem, roots);
         std::array args{item.get(context)};
+        if (slot.state == SlotState::Missing &&
+            is_subtype(context, context.type_of(self), context.type_type())) {
+            if (self.get(context) == context.type_type()) {
+                make_generic_alias(context, self, item, out);
+                return;
+            }
+            ReturnSlot name(context), method(context);
+            make_str(context, U"__class_getitem__", name);
+            get_attribute(context, self, roots.root(name.value()), method);
+            if (method.tag() == ResultTag::Ok &&
+                method.value() != context.builtin(CoreObject::None)) {
+                call(context, roots.root(method.value()), {args}, out);
+                return;
+            }
+            if (method.tag() == ResultTag::Raised &&
+                !is_subtype(context, context.type_of(method.exception()),
+                            context.builtin(CoreObject::AttributeErrorType))) {
+                out.raised(method.exception());
+                return;
+            }
+        }
         invoke_protocol(context, self, slot, args, out);
     });
 }

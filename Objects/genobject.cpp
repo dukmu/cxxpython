@@ -421,6 +421,11 @@ void wrapper_resume(Attachment &ctx, Handle, std::span<const Value> args, Return
 } // namespace
 void GeneratorObject::finalize(Attachment &context, Handle self, ReturnSlot &out)
 {
+    // Async-generator finalizer hooks and event-loop shutdown are not installed yet.
+    if (context.type_of(self) == context.builtin(CoreObject::AsyncGeneratorType)) {
+        out.ok(context.builtin(CoreObject::None));
+        return;
+    }
     resume(context, self.get(context), Operation::Close, {}, out);
 }
 } // namespace cxxpython::core
@@ -441,12 +446,14 @@ void make_generator(Attachment &context, Handle frame, ReturnSlot &out)
         context.payload<FunctionObject>(context.payload<FrameObject>(rooted_frame).function);
     const auto name = roots.root(metadata.name);
     const auto qualname = roots.root(metadata.qualname);
-    context.allocate_instance<GeneratorObject>(
-        roots.root(context.builtin(context.payload<CodeObject>(code).program.is_coroutine()
-                                       ? CoreObject::CoroutineType
-                                       : CoreObject::GeneratorType)),
-        out, rooted_frame.get(context), code.get(context), name.get(context),
-        qualname.get(context));
+    const auto &program = context.payload<CodeObject>(code).program;
+    const auto type =
+        program.is_coroutine()
+            ? (program.is_generator() ? CoreObject::AsyncGeneratorType : CoreObject::CoroutineType)
+            : CoreObject::GeneratorType;
+    context.allocate_instance<GeneratorObject>(roots.root(context.builtin(type)), out,
+                                               rooted_frame.get(context), code.get(context),
+                                               name.get(context), qualname.get(context));
 }
 
 void get_awaitable(Attachment &context, Handle value, ReturnSlot &out)

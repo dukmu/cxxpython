@@ -1,13 +1,17 @@
+#include "cxxpython/asyncgenobject.hpp"
 #include "cxxpython/bytearrayobject.hpp"
 #include "cxxpython/complexobject.hpp"
 #include "cxxpython/floatobject.hpp"
+#include "cxxpython/genericaliasobject.hpp"
 #include "cxxpython/genobject.hpp"
 #include "cxxpython/memoryobject.hpp"
 #include "cxxpython/moduleobject.hpp"
+#include "cxxpython/namespaceobject.hpp"
 #include "cxxpython/objects.hpp"
 #include "cxxpython/protocol.hpp"
 #include "cxxpython/setobject.hpp"
 #include "cxxpython/superobject.hpp"
+#include "cxxpython/unionobject.hpp"
 #include "cxxpython/weakrefobject.hpp"
 #include "internal/builtinexec.hpp"
 #include "internal/codecs.hpp"
@@ -53,7 +57,8 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
             bases.push_back(*base);
         TypeSpec spec{name, bases};
         spec.module = U"builtins";
-        if (id == CoreObject::FunctionType || id == CoreObject::ModuleType)
+        if (id == CoreObject::FunctionType || id == CoreObject::ModuleType ||
+            id == CoreObject::SimpleNamespaceType)
             spec.slots = std::vector<std::u32string>{U"__dict__"};
         if (id == CoreObject::ImportErrorType)
             spec.slots = std::vector<std::u32string>{U"name", U"path", U"msg", U"name_from"};
@@ -267,9 +272,32 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     }
     define(CoreObject::NotImplementedErrorType, "NotImplementedError",
            LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::RuntimeErrorType));
-    for (auto id : {CoreObject::FunctionType, CoreObject::ModuleType, CoreObject::CodeType,
-                    CoreObject::GeneratorType, CoreObject::CoroutineType, CoreObject::SetType,
-                    CoreObject::FrozenSetType})
+    define(CoreObject::SimpleNamespaceType, "SimpleNamespace",
+           LayoutDescriptor::of<NamespaceObject>());
+    context.payload<TypeObject>(at(CoreObject::SimpleNamespaceType)).allow_weakrefs = false;
+    define(CoreObject::GenericAliasType, "GenericAlias",
+           LayoutDescriptor::of<GenericAliasObject>());
+    define(CoreObject::AsyncGeneratorType, "async_generator",
+           LayoutDescriptor::of<GeneratorObject>());
+    define(CoreObject::AsyncGenASendType, "async_generator_asend",
+           LayoutDescriptor::of<AsyncGenRequestObject>());
+    define(CoreObject::AsyncGenAThrowType, "async_generator_athrow",
+           LayoutDescriptor::of<AsyncGenRequestObject>());
+    define(CoreObject::AsyncGenWrappedValueType, "async_generator_wrapped_value",
+           LayoutDescriptor::of<AsyncGenWrappedValueObject>());
+    define(CoreObject::StopAsyncIterationType, "StopAsyncIteration",
+           LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::ExceptionType));
+    define(CoreObject::GenericAliasIteratorType, "generic_alias_iterator",
+           LayoutDescriptor::of<GenericAliasIteratorObject>());
+    define(CoreObject::UnionType, "UnionType", LayoutDescriptor::of<UnionObject>());
+    define(CoreObject::BinasciiErrorType, "Error", LayoutDescriptor::of<ExceptionObject>(),
+           at(CoreObject::ValueErrorType));
+    define(CoreObject::BinasciiIncompleteType, "Incomplete",
+           LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::ExceptionType));
+    for (auto id :
+         {CoreObject::FunctionType, CoreObject::ModuleType, CoreObject::CodeType,
+          CoreObject::GeneratorType, CoreObject::CoroutineType, CoreObject::SetType,
+          CoreObject::FrozenSetType, CoreObject::GenericAliasType, CoreObject::AsyncGeneratorType})
         context.payload<TypeObject>(at(id)).instance_layout.fields.weakrefs = true;
     for (auto id :
          {CoreObject::TupleType, CoreObject::BytesType, CoreObject::IntType, CoreObject::BoolType})
@@ -362,6 +390,10 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     install_unicode_methods(context, core);
     install_execution(context, core);
     install_generators(context, core);
+    install_async_generators(context, core);
+    install_namespace(context, core);
+    install_genericalias(context, core);
+    install_union(context, core);
     install_weakrefs(context, core);
     install_error_types(context, core);
     install_exception_runtime(context, core);
@@ -418,6 +450,12 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                     CoreObject::Blake2sType,
                     CoreObject::CoroutineType,
                     CoreObject::CoroutineWrapperType,
+                    CoreObject::AsyncGeneratorType,
+                    CoreObject::AsyncGenASendType,
+                    CoreObject::AsyncGenAThrowType,
+                    CoreObject::AsyncGenWrappedValueType,
+                    CoreObject::UnionType,
+                    CoreObject::GenericAliasIteratorType,
                     CoreObject::SetIteratorType,
                     CoreObject::GeneratorType})
         context.payload<TypeObject>(at(id)).subclassable = false;
@@ -433,6 +471,17 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                               {CoreObject::Blake2bType, U"_blake2"},
                               {CoreObject::Blake2sType, U"_blake2"}}) {
         context.allocate_instance<StrObject>(at(CoreObject::StrType), text, module);
+        name_store(context, *context.payload<TypeObject>(at(id)).dictionary,
+                   module_key.get(context), text.value());
+    }
+    for (auto id :
+         {CoreObject::SimpleNamespaceType, CoreObject::GenericAliasType, CoreObject::UnionType}) {
+        context.allocate_instance<StrObject>(at(CoreObject::StrType), text, U"types");
+        name_store(context, *context.payload<TypeObject>(at(id)).dictionary,
+                   module_key.get(context), text.value());
+    }
+    for (auto id : {CoreObject::BinasciiErrorType, CoreObject::BinasciiIncompleteType}) {
+        context.allocate_instance<StrObject>(at(CoreObject::StrType), text, U"binascii");
         name_store(context, *context.payload<TypeObject>(at(id)).dictionary,
                    module_key.get(context), text.value());
     }
@@ -494,6 +543,7 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                     CoreObject::IndexErrorType,
                     CoreObject::KeyErrorType,
                     CoreObject::StopIterationType,
+                    CoreObject::StopAsyncIterationType,
                     CoreObject::RangeType,
                     CoreObject::SliceType,
                     CoreObject::BytesType,

@@ -1,0 +1,19 @@
+b'' b''
+b'' b''
+b'Zg==' b'f'
+b'66' b'f'
+b'Zm8=' b'fo'
+b'666f' b'fo'
+b'Zm9v' b'foo'
+b'666f6f' b'foo'
+b'Zm9vYmFy' b'foobar'
+b'666f6f626172' b'foobar'
+b'AH+A/w==' b'\x00\x7f\x80\xff'
+b'007f80ff' b'\x00\x7f\x80\xff'
+b'YWJj\n'
+b'foo'
+b'6162:6364:6566'
+b'6162-6364-6566'
+3421780262 12739
+4294967295 65535
+True

@@ -941,8 +941,6 @@ class Adapter {
                 p = find(n, Rule::lambda_param);
             if (!p)
                 unsupported(n);
-            if (find(*p, Rule::annotation))
-                unsupported(*p);
             const Node *name = nullptr;
             for (auto child : children(*p))
                 if (child->rule == Rule::Token && token(*child).kind == TokenKind::NAME) {
@@ -951,6 +949,12 @@ class Adapter {
                 }
             if (!name)
                 unsupported(n);
+            if (auto annotation = find(*p, Rule::annotation)) {
+                const auto value = rules(*annotation);
+                if (value.size() != 1)
+                    unsupported(*annotation);
+                fn.annotations.emplace_back(identifier(*name), expression(*value[0]));
+            }
             ExprPtr value;
             if (auto def = find(n, Rule::default_)) {
                 auto dr = rules(*def);
@@ -972,6 +976,8 @@ class Adapter {
             FunctionStmt temp;
             parameters(*p, temp, kind);
             fn.varkwargs = temp.parameters.at(0).name;
+            for (auto &annotation : temp.annotations)
+                fn.annotations.push_back(std::move(annotation));
             return;
         }
         default:
@@ -991,6 +997,8 @@ class Adapter {
                     FunctionStmt temp;
                     parameters(*p, temp, kind);
                     fn.varargs = temp.parameters.at(0).name;
+                    for (auto &annotation : temp.annotations)
+                        fn.annotations.push_back(std::move(annotation));
                     after_star = false;
                     continue;
                 }
@@ -1317,13 +1325,22 @@ class Adapter {
             return s;
         }
         case Rule::function_def_raw: {
-            if (has(n, U"->") || find(n, Rule::type_params))
+            if (find(n, Rule::type_params))
                 unsupported(n);
             FunctionStmt f;
             f.coroutine = has(n, U"async");
             f.name = definition_name(n, U"def");
             if (auto p = find(n, Rule::params))
                 parameters(*p, f);
+            if (has(n, U"->")) {
+                const auto values = rules(n);
+                const auto value = std::find_if(values.begin(), values.end(), [](auto item) {
+                    return item->rule == Rule::expression;
+                });
+                if (value == values.end())
+                    unsupported(n);
+                f.annotations.emplace_back(U"return", expression(**value));
+            }
             validate_parameters(n, f);
             auto block = find(n, Rule::block);
             if (!block)

@@ -1,5 +1,82 @@
 # Development Status
 
+## 2026-10-31 Parallel Type, Collection And Binary Conversion Closures
+
+Prepended without rewriting earlier records. Previous node: edb159a, committed
+and pushed during this work. Four reused terra workers owned disjoint standard-
+library/type/kernel tasks; parent integration completed compiler/VM entry points,
+class subscripting, sys metadata and general wrapped-mapping behavior. No
+sol/astra agents, host-Python guest execution or execution-wide mutex was added.
+The full service goal and remaining Plan 2 N4-N6/M0-M9 acceptance remain active.
+
+- Copied unchanged CPython 3.12.14 Lib/types.py, _collections_abc.py and the
+  collections.abc facade. Actual imports and upstream-derived alias, class,
+  mapping, sequence and set tests execute in the product. Native SimpleNamespace
+  uses the existing precise instance-dictionary tail, not a second mutable
+  namespace implementation. sys.implementation publishes that real type with
+  name='cxxpython' and cache_tag=None; full version metadata is still missing.
+- Implemented GenericAlias and UnionType ownership, metadata, argument order,
+  equality/hash, substitution/preparation/unpacking hooks and checking semantics.
+  Aliases support MRO entries, origin attribute forwarding, construction and
+  starred iterators. Immutable parameter tuples use rooted compare-exchange
+  publication. Ordinary class subscription preserves metaclass __getitem__
+  precedence and __class_getitem__ binding, including builtin collection aliases.
+- Function parameter and return annotations evaluate in their defining scope
+  after defaults and travel through MAKE_FUNCTION flag 8. The verifier accounts
+  for that stack input; __annotations__ is a traced atomic edge with lazy empty
+  dictionary publication, replacement and reset. No annotation was deleted from
+  upstream source. Variable annotations and future/postponed evaluation remain.
+- Added genuine native async generators and asend/athrow/aclose request objects.
+  ASYNC_YIELD_VALUE boxes user yields separately from inner await suspension and
+  has verified flags, stack effect and disassembly. Existing Frames/unwind perform
+  execution; atomic per-request/per-generator claims reject competitors and
+  support OS-thread handoff during GC without holding a Python execution lock.
+  Async-generator finalizer hooks, event-loop shutdown and async for/with remain.
+- binascii now supplies base64, hexadecimal, uu, quoted-printable and CRC32/HQX
+  conversions over existing buffer snapshots, with canonical Error/Incomplete
+  types. Mappingproxy construction accepts actual mappings; lookup, length,
+  iteration, method forwarding, comparison and repr preserve underlying Python
+  callbacks, including dict-subclass behavior and callbacks that collect.
+  These are general object protocols, not library-specific source substitutions.
+- Frozen normal product/reference fixtures pass 131/131: the complete 129-case
+  batch plus two explicit OS-thread/GC handoff and shared-type-cache cases.
+  Strict ASan/UBSan/LeakSanitizer runs the complete 131-case batch successfully;
+  affected CTest checks pass 131/131. Normal affected checks pass 131/131, native
+  CoreSource checks 36/36, and Source/Syntax/Generators differential suites pass.
+  Existing upstream doctests and the configured fixed-reference CTest also pass.
+  TSan affected checks pass 38/38 and eight focused Python type/annotation/async
+  generator/mapping cases pass. All generated grammar artifacts (244 rules) and
+  final formatting checks pass. No sanitizer or leak check was disabled.
+- Split each existing exhaustive OOM test into eight modulo-disjoint quota
+  shards. Their union retains every previous quota and every rollback/retry
+  assertion; this is not sampling or a larger timeout. Normal and strict-ASan
+  CTest both pass all 16 shards with unchanged per-test limits. Earlier serial
+  timeouts remain in the previous node's evidence. Initial integration failures
+  exposed pre-publication helper calls, tuple-helper ADL and mixed incremental
+  objects; explicit image handles, qualified helpers and a frozen-header clean
+  build resolved them. The fixed CPython binascii extension was put in its actual
+  build import directory, rather than changing a product library or test golden.
+- Logs, initial failures, final operation results and binary hashes remain under
+  .cache/library-closures-*. No unrelated performance campaign or hand-filled
+  measurement table was added. Architecture and compatibility notes distinguish
+  these slices from complete types/collections/typing, native descriptor and
+  exception matrices, full io/threading, standard-library policy and product
+  shutdown. Next dependencies remain the real collections/functools/itertools,
+  buffered/text I/O and os closures, then enum/contextlib and the requested
+  higher libraries. User temporary_plan.md/test2.py changes remain excluded.
+
+## 2026-10-31 Completion Of The Previous Sanitizer OOM Run
+
+The unchanged edb159a sanitizer binary completed both exhaustive allocation-
+failure enumerations with strict ASan/UBSan/LeakSanitizer enabled: bootstrap
+passed in 246384 ms and promotion passed in 236477 ms, with all original rollback
+and retry assertions intact. The authoritative operation ended with exit 0.
+Raw output is .cache/native-io-abc-thread-asan-allocation-direct.log. The earlier
+CTest 120-second timeout failures remain retained; its configuration was not
+changed, and passing direct assertions is not a claim that its timing gate passed.
+edb159a has been committed and pushed. New library/annotation/async-generator
+work is a separate, still unverified integration; the full goal remains active.
+
 ## 2026-10-31 Native I/O, ABC And Shared-Heap Thread Launch
 
 Prepended without rewriting earlier records. Previous stable node: baf3897,

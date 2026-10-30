@@ -1,0 +1,20 @@
+True values False True
+value 1
+received 7
+suspend pause
+running True True
+RuntimeError anext(): asynchronous generator is already running
+value 9
+running False
+value caught
+finally
+exhausted
+frame True
+value 1
+finally
+value None
+exhausted
+value 1
+RuntimeError cannot reuse already awaited __anext__()/asend()
+finally
+value None

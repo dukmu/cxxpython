@@ -1,5 +1,6 @@
 #include "cxxpython/execution.hpp"
 #include "cxxpython/floatobject.hpp"
+#include "cxxpython/unionobject.hpp"
 #include "internal/listsort.hpp"
 
 #include <cmath>
@@ -348,6 +349,14 @@ void class_check(Attachment &context, Handle subject, Handle candidate, bool ins
         return;
     }
     const auto cls = candidate.get(context);
+    if (context.has_layout<UnionObject>(cls) &&
+        context.type_of(cls) == context.builtin(CoreObject::UnionType)) {
+        if (instance)
+            union_instancecheck(context, subject, candidate, out);
+        else
+            union_subclasscheck(context, subject, candidate, out);
+        return;
+    }
     if (instance && context.type_of(subject) == cls) {
         out.ok(context.builtin(CoreObject::True));
         return;

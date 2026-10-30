@@ -1,0 +1,13 @@
+list[T] | dict[T, S] | int
+True True
+list[str] | dict[str, float] | int
+()
+True
+TypeError Too few arguments for list[T] | dict[T, S] | int; actual 1, expected 2
+TypeError Too many arguments for list[T] | dict[T, S] | int; actual 3, expected 2
+TypeError int | str is not a generic class
+prepare (<class 'str'>, <class 'bytes'>)
+prepare (<class 'str'>,)
+subst <class 'str'>
+list[str] | int
+ValueError substitution failed

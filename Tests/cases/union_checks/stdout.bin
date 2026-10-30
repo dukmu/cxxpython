@@ -1,0 +1,16 @@
+True
+TypeError isinstance() argument 2 cannot be a parameterized generic
+False
+True
+True
+TypeError issubclass() argument 2 cannot be a parameterized generic
+False
+True
+True True
+instance-hook
+True
+subclass-hook
+True
+True
+True
+ValueError class lookup failed

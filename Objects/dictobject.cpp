@@ -56,10 +56,53 @@ void proxy_getitem(Attachment &context, Handle, std::span<const Value> args, Ret
         return;
     RootScope roots(context);
     auto key = roots.root(args[1]);
-    dict_lookup(context, roots.root(context.payload<MappingProxyObject>(args[0]).mapping), key,
-                out);
-    if (out.tag() == ResultTag::Empty)
-        missing_key(context, key, out);
+    get_item(context, roots.root(context.payload<MappingProxyObject>(args[0]).mapping), key, out);
+}
+void proxy_forward(Attachment &context, std::span<const Value> args, const char32_t *name,
+                   ReturnSlot &out)
+{
+    RootScope roots(context);
+    auto source = roots.root(context.payload<MappingProxyObject>(args[0]).mapping);
+    ReturnSlot key(context), method(context);
+    make_str(context, name, key);
+    get_attribute(context, source, roots.root(key.value()), method);
+    if (failed(method)) {
+        out.raised(method.exception());
+        return;
+    }
+    call(context, roots.root(method.value()), {args.subspan(1)}, out);
+}
+void proxy_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(context);
+    auto type = roots.root(args[0]), source = roots.root(args[1]);
+    if (type.get(context) != context.builtin(CoreObject::MappingProxyType)) {
+        raise_error(context, CoreObject::TypeErrorType, U"mappingproxy requires its native type",
+                    out);
+        return;
+    }
+    const auto source_type = context.type_of(source);
+    const auto slot = resolve_protocol(context, roots.root(source_type), Protocol::GetItem, roots);
+    if (slot.state == SlotState::Missing ||
+        is_subtype(context, source_type, context.builtin(CoreObject::ListType)) ||
+        is_subtype(context, source_type, context.builtin(CoreObject::TupleType))) {
+        raise_error(context, CoreObject::TypeErrorType,
+                    U"mappingproxy() argument must be a mapping", out);
+        return;
+    }
+    context.allocate_instance<MappingProxyObject>(type, out, source.get(context));
+}
+template <CompareOp op>
+void proxy_compare(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!proxy(context, args[0], out))
+        return;
+    RootScope roots(context);
+    auto left = roots.root(context.payload<MappingProxyObject>(args[0]).mapping);
+    auto right = roots.root(args[1]);
+    if (context.has_layout<MappingProxyObject>(right.get(context)))
+        right = roots.root(context.payload<MappingProxyObject>(right).mapping);
+    rich_compare(context, left, right, op, out);
 }
 void setitem(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
@@ -97,6 +140,10 @@ void get(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &o
 {
     if (!receiver<Proxy>(context, args[0], out))
         return;
+    if constexpr (Proxy) {
+        proxy_forward(context, args, U"get", out);
+        return;
+    }
     RootScope roots(context);
     dict_lookup(context, roots.root(mapping<Proxy>(context, args[0])), roots.root(args[1]), out);
     if (out.tag() == ResultTag::Empty)
@@ -141,6 +188,11 @@ void contains(Attachment &context, Handle, std::span<const Value> args, ReturnSl
     if (!receiver<Proxy>(context, args[0], out))
         return;
     RootScope roots(context);
+    if constexpr (Proxy) {
+        rich_compare(context, roots.root(args[1]), roots.root(mapping<Proxy>(context, args[0])),
+                     CompareOp::In, out);
+        return;
+    }
     dict_lookup(context, roots.root(mapping<Proxy>(context, args[0])), roots.root(args[1]), out);
     if (!failed(out))
         out.ok(context.builtin(out.tag() == ResultTag::Ok ? CoreObject::True : CoreObject::False));
@@ -150,6 +202,10 @@ void copy(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &
 {
     if (!receiver<Proxy>(context, args[0], out))
         return;
+    if constexpr (Proxy) {
+        proxy_forward(context, args, U"copy", out);
+        return;
+    }
     RootScope roots(context);
     DictView view(context, mapping<Proxy>(context, args[0]));
     context.allocate_instance<DictObject>(roots.root(context.builtin(CoreObject::DictType)), out);
@@ -325,6 +381,10 @@ void iterator(Attachment &context, Handle, std::span<const Value> args, ReturnSl
     if (!receiver<Proxy>(context, args[0], out))
         return;
     RootScope roots(context);
+    if constexpr (Proxy) {
+        get_iter(context, roots.root(mapping<Proxy>(context, args[0])), out);
+        return;
+    }
     detail::make_dict_iterator(context, roots.root(mapping<Proxy>(context, args[0])),
                                DictViewKind::Keys, out);
 }
@@ -333,6 +393,14 @@ void view(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &
 {
     if (!receiver<Proxy>(context, args[0], out))
         return;
+    if constexpr (Proxy) {
+        proxy_forward(context, args,
+                      Kind == DictViewKind::Keys     ? U"keys"
+                      : Kind == DictViewKind::Values ? U"values"
+                                                     : U"items",
+                      out);
+        return;
+    }
     RootScope roots(context);
     const auto type =
         roots.root(context.builtin(Kind == DictViewKind::Keys     ? CoreObject::DictKeysType
@@ -366,9 +434,8 @@ void proxy_length(Attachment &context, Handle, std::span<const Value> args, Retu
 {
     if (!proxy(context, args[0], out))
         return;
-    make_int(context,
-             detail::dictionary_size(context, context.payload<MappingProxyObject>(args[0]).mapping),
-             out);
+    RootScope roots(context);
+    length(context, roots.root(context.payload<MappingProxyObject>(args[0]).mapping), out);
 }
 void next(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
@@ -538,6 +605,21 @@ void detail::install_dictionaries(Attachment &context, std::span<const Handle> c
     install(CoreObject::DictType, U"update", variadic, update);
     install(CoreObject::DictType, U"__iter__", unary, iterator<false>);
     install(CoreObject::MappingProxyType, U"__getitem__", pair, proxy_getitem);
+    auto proxy_constructor = pair;
+    proxy_constructor.parameters[1].name = U"mapping";
+    install(CoreObject::MappingProxyType, U"__new__", proxy_constructor, proxy_new);
+    auto proxy_dictionary = *TypeView(context, at(CoreObject::MappingProxyType)).dictionary();
+    auto proxy_factory = roots.root(*name_lookup(context, proxy_dictionary, U"__new__"));
+    context.allocate_instance<StaticMethodObject>(at(CoreObject::StaticMethodType), wrapper,
+                                                  proxy_factory.get(context));
+    context.allocate_instance<StrObject>(at(CoreObject::StrType), key, U"__new__");
+    name_store(context, proxy_dictionary, key.value(), wrapper.value());
+    install(CoreObject::MappingProxyType, U"__eq__", pair, proxy_compare<CompareOp::Eq>);
+    install(CoreObject::MappingProxyType, U"__ne__", pair, proxy_compare<CompareOp::Ne>);
+    install(CoreObject::MappingProxyType, U"__lt__", pair, proxy_compare<CompareOp::Lt>);
+    install(CoreObject::MappingProxyType, U"__le__", pair, proxy_compare<CompareOp::Le>);
+    install(CoreObject::MappingProxyType, U"__gt__", pair, proxy_compare<CompareOp::Gt>);
+    install(CoreObject::MappingProxyType, U"__ge__", pair, proxy_compare<CompareOp::Ge>);
     install(CoreObject::MappingProxyType, U"__contains__", pair, contains<true>);
     install(CoreObject::MappingProxyType, U"__len__", unary, proxy_length);
     install(CoreObject::MappingProxyType, U"__iter__", unary, iterator<true>);

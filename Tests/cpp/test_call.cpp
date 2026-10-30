@@ -90,7 +90,12 @@ class CoreCalls : public testing::Test {
     }
 };
 
-TEST(CoreBootstrap, FailureAtEveryManagedAllocationRollsBackAndRetries)
+class CoreBootstrapAllocationFailures : public testing::TestWithParam<std::size_t> {
+  public:
+    static constexpr std::size_t shards = 8;
+};
+
+TEST_P(CoreBootstrapAllocationFailures, FailureAtEveryManagedAllocationRollsBackAndRetries)
 {
     // Determine the production bootstrap's allocation count without freezing
     // an incidental number into its API.
@@ -98,7 +103,7 @@ TEST(CoreBootstrap, FailureAtEveryManagedAllocationRollsBackAndRetries)
     Attachment baseline(reference);
     baseline.bootstrap_core();
     const auto allocations = baseline.stats().objects - 2;
-    for (std::size_t limit = 0; limit < allocations; ++limit) {
+    for (std::size_t limit = GetParam(); limit < allocations; limit += shards) {
         Interpreter interpreter;
         Attachment context(interpreter);
         context.bootstrap();
@@ -117,6 +122,9 @@ TEST(CoreBootstrap, FailureAtEveryManagedAllocationRollsBackAndRetries)
         EXPECT_TRUE(context.core_ready());
     }
 }
+
+INSTANTIATE_TEST_SUITE_P(CoreBootstrap, CoreBootstrapAllocationFailures,
+                         testing::Range(std::size_t{0}, CoreBootstrapAllocationFailures::shards));
 
 TEST_F(CoreCalls, NativeReturnAndExceptionUseCallerRoots)
 {

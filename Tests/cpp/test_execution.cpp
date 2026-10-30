@@ -80,7 +80,7 @@ TEST_F(CoreExecution, VerificationRejectsEmptyUnknownAndUnexpectedOperands)
     domain.emit(Opcode::Binary, 255);
     invalid(domain, CodeErrorKind::Operand);
     CodeBuilder flags(context);
-    flags.emit(Opcode::MakeFunction, 8);
+    flags.emit(Opcode::MakeFunction, 16);
     invalid(flags, CodeErrorKind::Operand);
     CodeBuilder function(context);
     function.emit(Opcode::MakeFunction, 3);
@@ -253,6 +253,10 @@ TEST_F(CoreExecution, ClosureOperandsAndLayoutsAreVerifiedBeforePublication)
     EXPECT_EQ(effect.inputs, 4U);
     EXPECT_EQ(effect.pops, 4U);
     EXPECT_EQ(effect.pushes, 1U);
+    const auto annotated = instruction_effect({Opcode::MakeFunction, 15});
+    EXPECT_EQ(annotated.inputs, 5U);
+    EXPECT_EQ(annotated.pops, 5U);
+    EXPECT_EQ(annotated.pushes, 1U);
 }
 
 TEST_F(CoreExecution, FunctionClosureShapeAndCellAllocationFailuresUseNormalResultPaths)
@@ -373,12 +377,13 @@ TEST_F(CoreExecution, SourceLoweringOpcodesHaveVerifiedOperandsAndStackInputs)
 
 TEST_F(CoreExecution, YieldOpcodesRequireGeneratorCodeAndVerifiedResumptionSlots)
 {
-    for (auto opcode : {Opcode::YieldValue, Opcode::YieldFrom}) {
+    for (auto opcode : {Opcode::YieldValue, Opcode::YieldFrom, Opcode::AsyncYieldValue}) {
         CodeBuilder ordinary(context);
         ordinary.emit(opcode);
         invalid(ordinary, CodeErrorKind::Operand);
         CodeSpec spec;
         spec.generator = true;
+        spec.coroutine = opcode == Opcode::AsyncYieldValue;
         CodeBuilder underflow(context, spec);
         underflow.emit(opcode);
         invalid(underflow, CodeErrorKind::StackUnderflow);

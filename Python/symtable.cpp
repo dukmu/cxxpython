@@ -178,10 +178,8 @@ class ScopePass final {
                         error(value.span, "'yield' outside function");
                     if (comprehensions_[scope] && !node.implicit)
                         error(value.span, "'yield' inside comprehension");
-                    if (program_.scopes[scope].coroutine)
-                        throw SourceError(program_.source, value.span,
-                                          "async generator execution is not available yet",
-                                          SourceErrorKind::Capability);
+                    if (program_.scopes[scope].coroutine && node.delegated)
+                        error(value.span, "'yield from' inside async function");
                     program_.scopes[scope].generator = true;
                     if (node.value)
                         expression(*node.value, scope);
@@ -313,7 +311,11 @@ class ScopePass final {
         for (const auto &parameter : node.parameters)
             if (parameter.default_value)
                 expression(*parameter.default_value, scope);
+        for (const auto &annotation : node.annotations)
+            expression(*annotation.second, scope);
         node.scope = add(ScopeKind::Function, node.name, qualified(node.name, scope), scope, span);
+        for (auto &annotation : node.annotations)
+            annotation.first = mangle(std::move(annotation.first), node.scope);
         program_.scopes[node.scope].coroutine = node.coroutine;
         comprehensions_[node.scope] = node.comprehension;
         if (node.comprehension)

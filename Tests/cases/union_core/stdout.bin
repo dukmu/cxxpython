@@ -1,0 +1,16 @@
+types UnionType
+int | str int | str (<class 'int'>, <class 'str'>) ()
+True int | None None | int
+True
+int | str | float int | str | float
+True True
+True False False
+True True
+True
+list[int] | None None | list[int]
+True
+True True
+sample.Example | int
+TypeError
+AttributeError
+TypeError

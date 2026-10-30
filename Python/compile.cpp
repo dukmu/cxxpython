@@ -160,7 +160,18 @@ class GraphPass final {
             emit(Opcode::BuildNameDict, span);
             current().instructions.back().keywords = keywords;
         }
-        make_function(node.scope, span, (defaults ? 1 : 0) | (!keywords.empty() ? 2 : 0));
+        std::vector<std::u32string> annotations;
+        for (const auto &annotation : node.annotations) {
+            expression(*annotation.second);
+            annotations.push_back(annotation.first);
+        }
+        if (!annotations.empty()) {
+            emit(Opcode::BuildNameDict, span);
+            current().instructions.back().keywords = std::move(annotations);
+        }
+        make_function(node.scope, span,
+                      (defaults ? 1 : 0) | (!keywords.empty() ? 2 : 0) |
+                          (!node.annotations.empty() ? 8 : 0));
     }
     void sequence(const std::vector<ExprPtr> &items, Span span, bool tuple)
     {
@@ -326,7 +337,10 @@ class GraphPass final {
                         none(value.span);
                     if (node.delegated)
                         emit(Opcode::GetIter, value.span);
-                    emit(node.delegated ? Opcode::YieldFrom : Opcode::YieldValue, value.span);
+                    emit(node.delegated                      ? Opcode::YieldFrom
+                         : program_.scopes[scope_].coroutine ? Opcode::AsyncYieldValue
+                                                             : Opcode::YieldValue,
+                         value.span);
                 } else if constexpr (std::is_same_v<T, AwaitExpr>) {
                     expression(*node.value);
                     emit(Opcode::GetAwaitable, value.span);
@@ -705,6 +719,9 @@ class GraphPass final {
                         jump(done, span);
                         select(done);
                     } else if constexpr (std::is_same_v<T, ReturnStmt>) {
+                        if (node.value && program_.scopes[scope_].coroutine &&
+                            program_.scopes[scope_].generator)
+                            error(span, "'return' with value in async generator");
                         if (program_.scopes[scope_].kind != ScopeKind::Function &&
                             program_.mode != InputMode::Eval)
                             error(span, "'return' outside function");

@@ -1,0 +1,4 @@
+['a', 'b', 'r', 'a', 'c', 'a', 'd', 'a', 'b', 'r', 'a'] ['a', 'r', 'b', 'a', 'd', 'a', 'c', 'a', 'r', 'b', 'a']
+True False 5
+0 3 7
+ValueError 

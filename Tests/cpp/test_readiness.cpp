@@ -93,7 +93,12 @@ TEST(CoreReadiness, ExistingMetaclassGraphsArePromotedWithoutReconstructingTypes
     EXPECT_EQ(context.type_of(out.result().value()), old_cls);
 }
 
-TEST(CoreReadiness, EveryBootstrapAndPromotionAllocationCanFailAndRetry)
+class CorePromotionAllocationFailures : public testing::TestWithParam<std::size_t> {
+  public:
+    static constexpr std::size_t shards = 8;
+};
+
+TEST_P(CorePromotionAllocationFailures, EveryBootstrapAndPromotionAllocationCanFailAndRetry)
 {
     std::size_t allocations;
     {
@@ -106,7 +111,7 @@ TEST(CoreReadiness, EveryBootstrapAndPromotionAllocationCanFailAndRetry)
         context.bootstrap_core();
         allocations = context.stats().objects - before;
     }
-    for (std::size_t quota = 0; quota < allocations; ++quota) {
+    for (std::size_t quota = GetParam(); quota < allocations; quota += shards) {
         Interpreter interpreter({.collect_every_allocation = true});
         Attachment context(interpreter);
         context.bootstrap();
@@ -139,6 +144,9 @@ TEST(CoreReadiness, EveryBootstrapAndPromotionAllocationCanFailAndRetry)
                   U"existing_module");
     }
 }
+
+INSTANTIATE_TEST_SUITE_P(CoreReadiness, CorePromotionAllocationFailures,
+                         testing::Range(std::size_t{0}, CorePromotionAllocationFailures::shards));
 
 TEST(CoreReadiness, ManagedNamespacesCannotBeSilentlyIgnoredBeforeB3)
 {

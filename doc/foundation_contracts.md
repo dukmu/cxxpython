@@ -493,10 +493,23 @@ do not. Function/Cell cycles use ordinary tracing, not reference counting.
 LOAD_DEREF performs one rooted atomic read; STORE_DEREF stores the still-traced
 input; DELETE_DEREF performs one exchange, not check-then-clear. Empty local Cells
 raise UnboundLocalError, free Cells raise NameError. LOAD_CLOSURE captures Cell
-identity even when unbound. MAKE_FUNCTION consumes defaults, kwdefaults, closure
-tuple and Code in that order when flags 1/2/4 are present. Shape errors use Python
+identity even when unbound. MAKE_FUNCTION consumes defaults, kwdefaults, an
+annotation dictionary, closure tuple and Code in that order when flags 1/2/8/4
+are present. Shape errors use Python
 TypeError/ValueError. co_varnames, co_cellvars, co_freevars and __closure__ expose
 actual managed metadata; runtime closure creation reuses the scope's Code.
+Function parameter/return annotations evaluate in the defining scope, retain
+private-name mangling, and publish through a traced atomic __annotations__ edge.
+Lazy empty dictionaries, replacement, None reset and deletion share that edge.
+Postponed/future and variable annotations remain separate language gates.
+
+ASYNC_YIELD_VALUE has the same one-slot resumption effect as YIELD_VALUE, may
+allocate/raise and is a safepoint. Verification requires both generator and
+coroutine code flags. It boxes only user async yield values; an inner await uses
+the existing YIELD_FROM delegation and does not box its suspension. Async request
+objects own their generator and input arguments through precise tracing. Their
+generator's running claim survives await suspension; no execution-wide lock or
+event-loop implementation is used as a substitute for OS-thread safety.
 
 Several threads may call the same Function/Code/closure. Individual shared Cell
 edges are synchronized; compound nonlocal += is not implicitly atomic.

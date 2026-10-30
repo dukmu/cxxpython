@@ -1,3 +1,4 @@
+#include "cxxpython/asyncgenobject.hpp"
 #include "cxxpython/execution.hpp"
 #include "cxxpython/genobject.hpp"
 #include "cxxpython/import.hpp"
@@ -20,6 +21,7 @@ void FunctionObject::trace(Tracer &tracer) const noexcept
         tracer.visit(*kwdefaults);
     if (closure)
         tracer.visit(*closure);
+    tracer.visit(annotations);
 }
 namespace detail {
 class FrameActivation final {
@@ -811,6 +813,8 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 spec.builtins = roots.root(parent.builtins);
                 if (operand & static_cast<std::uint32_t>(FunctionFlags::Closure))
                     spec.closure = roots.root(data.operands[--cursor]);
+                if (operand & static_cast<std::uint32_t>(FunctionFlags::Annotations))
+                    spec.annotations = roots.root(data.operands[--cursor]);
                 if (operand & static_cast<std::uint32_t>(FunctionFlags::KeywordDefaults))
                     spec.kwdefaults = roots.root(data.operands[--cursor]);
                 if (operand & static_cast<std::uint32_t>(FunctionFlags::Defaults))
@@ -1461,6 +1465,14 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                     data.operands[data.sp - 1] = result.value();
                 break;
             }
+            case Opcode::AsyncYieldValue: {
+                RootScope roots(context);
+                context.allocate_instance<AsyncGenWrappedValueObject>(
+                    roots.root(context.builtin(CoreObject::AsyncGenWrappedValueType)), result,
+                    data.operands[data.sp - 1]);
+                data.operands[data.sp - 1] = result.value();
+                [[fallthrough]];
+            }
             case Opcode::YieldValue:
                 out.ok(data.operands[data.sp - 1]);
                 data.operands[data.sp - 1] = context.builtin(CoreObject::None);
@@ -1581,6 +1593,38 @@ void function_keywords(Attachment &c, Value value, ReturnSlot &out)
 {
     out.ok(c.payload<FunctionObject>(value).kwdefaults.value_or(c.builtin(CoreObject::None)));
 }
+void function_annotations(Attachment &context, Value value, ReturnSlot &out)
+{
+    auto &edge = context.payload<FunctionObject>(value).annotations;
+    context.load(value, edge, out);
+    if (out.tag() == ResultTag::Ok)
+        return;
+    RootScope roots(context);
+    ReturnSlot candidate(context);
+    context.allocate_instance<DictObject>(roots.root(context.builtin(CoreObject::DictType)),
+                                          candidate);
+    for (;;) {
+        if (context.compare_exchange(value, edge, {}, candidate.value())) {
+            out.ok(candidate.value());
+            return;
+        }
+        context.load(value, edge, out);
+        if (out.tag() == ResultTag::Ok)
+            return;
+    }
+}
+void function_annotations_set(Attachment &context, Value receiver, std::optional<Value> value,
+                              ReturnSlot &out)
+{
+    if (value && *value == context.builtin(CoreObject::None))
+        value.reset();
+    if (value && !context.has_layout<DictObject>(*value)) {
+        type_error(context, U"__annotations__ must be set to a dict object", out);
+        return;
+    }
+    context.store(receiver, context.payload<FunctionObject>(receiver).annotations, value);
+    out.ok(context.builtin(CoreObject::None));
+}
 void frame_code(Attachment &c, Value value, ReturnSlot &out)
 {
     out.ok(c.payload<FrameObject>(value).code);
@@ -1643,11 +1687,13 @@ void make_function(Attachment &context, const FunctionSpec &spec, ReturnSlot &ou
     auto globals = roots.root(spec.globals.get(context));
     auto builtins = roots.root(spec.builtins ? spec.builtins->get(context)
                                              : context.builtin(CoreObject::Builtins));
-    std::optional<Value> defaults, keywords, closure;
+    std::optional<Value> defaults, keywords, closure, annotations;
     if (spec.defaults)
         defaults = roots.root(spec.defaults->get(context)).get(context);
     if (spec.kwdefaults)
         keywords = roots.root(spec.kwdefaults->get(context)).get(context);
+    if (spec.annotations)
+        annotations = roots.root(spec.annotations->get(context)).get(context);
     if (spec.closure) {
         const auto value = roots.root(spec.closure->get(context)).get(context);
         if (value != context.builtin(CoreObject::None))
@@ -1662,7 +1708,8 @@ void make_function(Attachment &context, const FunctionSpec &spec, ReturnSlot &ou
     if (!kind<DictObject, CoreObject::DictType>(context, globals.get(context)) ||
         !kind<DictObject, CoreObject::DictType>(context, builtins.get(context)) ||
         (defaults && !kind<TupleObject, CoreObject::TupleType>(context, *defaults)) ||
-        (keywords && !kind<DictObject, CoreObject::DictType>(context, *keywords))) {
+        (keywords && !kind<DictObject, CoreObject::DictType>(context, *keywords)) ||
+        (annotations && !kind<DictObject, CoreObject::DictType>(context, *annotations))) {
         type_error(context,
                    U"function requires globals/builtins dicts, defaults tuple and optional "
                    U"kwdefaults dict",
@@ -1694,7 +1741,7 @@ void make_function(Attachment &context, const FunctionSpec &spec, ReturnSlot &ou
     context.allocate_instance<FunctionObject>(roots.root(context.builtin(CoreObject::FunctionType)),
                                               out, code.get(context), globals.get(context),
                                               defaults, keywords, program.name, program.qualname,
-                                              builtins.get(context), closure);
+                                              builtins.get(context), closure, annotations);
 }
 namespace detail {
 void frame_locals(Attachment &context, Handle frame, ReturnSlot &out)
@@ -1790,11 +1837,12 @@ LayoutDescriptor execution_layout(CoreObject type)
 void install_execution(Attachment &context, std::span<const Handle> core)
 {
     auto at = [&](CoreObject id) { return core[static_cast<std::size_t>(id)]; };
-    auto field = [&](CoreObject kind, std::u32string name, NativeGetter getter) {
+    auto field = [&](CoreObject kind, std::u32string name, NativeGetter getter,
+                     NativeSetter setter = nullptr) {
         RootScope roots(context);
         ReturnSlot out(context);
         context.allocate_instance<GetSetDescriptorObject>(at(CoreObject::GetSetDescriptorType), out,
-                                                          at(kind).get(context), getter, nullptr);
+                                                          at(kind).get(context), getter, setter);
         auto descriptor = roots.root(out.value());
         context.allocate_instance<StrObject>(at(CoreObject::StrType), out, std::move(name));
         name_store(context, *TypeView(context, at(kind)).dictionary(), out.value(),
@@ -1819,6 +1867,8 @@ void install_execution(Attachment &context, std::span<const Handle> core)
     field(CoreObject::FunctionType, U"__doc__", function_doc);
     field(CoreObject::FunctionType, U"__defaults__", function_defaults);
     field(CoreObject::FunctionType, U"__kwdefaults__", function_keywords);
+    field(CoreObject::FunctionType, U"__annotations__", function_annotations,
+          function_annotations_set);
     field(CoreObject::FrameType, U"f_code", frame_code);
     field(CoreObject::FrameType, U"f_back", frame_back);
     field(CoreObject::FrameType, U"f_globals", frame_globals);

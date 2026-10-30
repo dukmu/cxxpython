@@ -1,0 +1,6 @@
+StopIteration 1
+RuntimeError async generator raised StopAsyncIteration
+cause StopAsyncIteration bad
+StopIteration 1
+RuntimeError async generator ignored GeneratorExit
+StopAsyncIteration 

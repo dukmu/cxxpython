@@ -401,6 +401,16 @@ void dictionary_repr(Attachment &context, Handle, std::span<const Value> args, R
         type_error(context, out);
         return;
     }
+    if (is_proxy) {
+        ReturnSlot text(context);
+        repr(context, roots.root(context.payload<MappingProxyObject>(self).mapping), text);
+        if (text.tag() == ResultTag::Raised)
+            out.raised(text.exception());
+        else
+            make_str(context,
+                     U"mappingproxy(" + context.payload<StrObject>(text.value()).value + U")", out);
+        return;
+    }
     ReprGuard recursion(context, self);
     if (!recursion.entered) {
         make_str(context, U"{...}", out);

@@ -248,16 +248,32 @@ suspension. The next owner acquire-claims it, including on another OS thread.
 Borrowed caller exception state is detached at suspension; generator-owned
 handlers and cleanup continuations persist. Public back/delegate edges are
 rooted atomic reads, not unprotected reads of live operand storage. Explicit
-close and automatic GC close use ordinary GeneratorExit/unwind. Coroutine/async
-execution, shutdown phases and unrestricted cross-thread frame-local snapshots
-remain work; a C++ destructor does not execute Python cleanup.
+close and automatic GC close use ordinary GeneratorExit/unwind. Shutdown phases
+and unrestricted cross-thread frame-local snapshots remain work; a C++ destructor
+does not execute Python cleanup.
 Native coroutine calls create the same suspended Frame shape with a distinct
 coroutine type/code flag. GET_AWAITABLE validates the ordinary __await__ protocol;
 the existing delegation and unwind paths perform suspension, send/throw/close and
 return-value propagation. Await wrappers retain their coroutine owner. Coroutine
 Frames use the same cross-thread Running claim and exception-state handoff as
-generators, not an event loop or a serial executor. Async generators/async
-for/async with and never-awaited warning policy remain explicit dependencies.
+generators, not an event loop or a serial executor. Async generators additionally
+use ASYNC_YIELD_VALUE to distinguish a yielded Python value from an inner await
+suspension. Objects/asyncgenobject.cpp owns asend/athrow/aclose request objects.
+A per-request execution claim protects its writer-owned state; a per-generator
+atomic claim spans inner await suspension and rejects competing requests without
+holding a mutex. Completion, rejection and native exception unwind release the
+claim. Async-generator finalizer hooks, event-loop shutdown, async for/with and
+never-awaited warning policy remain explicit dependencies.
+
+Function annotations are evaluated in the defining scope after defaults and
+carried by MAKE_FUNCTION's annotation flag. Their mutable dictionary edge uses
+rooted atomic reads, stores and lazy compare-exchange publication; it is not a
+second namespace entry with conflicting authority. Generic aliases and unions
+hold immutable rooted argument tuples and atomically publish immutable parameter
+tuples. Class subscripting prefers metaclass __getitem__, then the ordinary
+__class_getitem__ protocol. NamespaceObject reuses the existing traced instance
+dictionary tail, and mappingproxy delegates to the wrapped mapping's real
+protocols rather than assuming that every mapping has a DictObject payload.
 
 ## Tests And Tooling
 

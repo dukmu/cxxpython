@@ -91,6 +91,7 @@ constexpr std::array definitions{
     OpcodeDefinition{"GET_AWAITABLE", 1, 1, 1, OperandDomain::None, FlowKind::Next, true, true},
     OpcodeDefinition{"YIELD_VALUE", 1, 1, 1, OperandDomain::None, FlowKind::Next, true, true},
     OpcodeDefinition{"YIELD_FROM", 1, 1, 1, OperandDomain::None, FlowKind::Next, true, true},
+    OpcodeDefinition{"ASYNC_YIELD_VALUE", 1, 1, 1, OperandDomain::None, FlowKind::Next, true, true},
 };
 static_assert(definitions.size() == static_cast<std::size_t>(Opcode::Count));
 [[noreturn]] void invalid(CodeErrorKind kind, const char *message,
@@ -124,8 +125,6 @@ std::size_t verify(const CodeSpec &spec, std::span<const Instruction> instructio
         invalid(CodeErrorKind::SourcePosition, "first line must be positive");
     if ((spec.generator || spec.coroutine) && spec.kind != CodeKind::Function)
         invalid(CodeErrorKind::Signature, "only function code can be a generator");
-    if (spec.generator && spec.coroutine)
-        invalid(CodeErrorKind::Signature, "async generator code requires its own protocol");
     if (spec.kind < CodeKind::Function || spec.kind > CodeKind::ClassBody ||
         (spec.kind != CodeKind::Function &&
          (!spec.locals.empty() || !spec.signature.parameters.empty() || spec.signature.varargs ||
@@ -171,11 +170,13 @@ std::size_t verify(const CodeSpec &spec, std::span<const Instruction> instructio
                     "free variable must be distinct from locals and other cells");
     for (std::size_t pc = 0; pc < instructions.size(); ++pc) {
         const auto [opcode, operand] = instructions[pc];
-        if ((opcode == Opcode::YieldValue && !spec.generator) ||
+        if ((opcode == Opcode::YieldValue && (!spec.generator || spec.coroutine)) ||
             (opcode == Opcode::YieldFrom && !spec.generator && !spec.coroutine))
             invalid(CodeErrorKind::Operand, "yield requires generator code", pc);
         if (opcode == Opcode::GetAwaitable && !spec.coroutine)
             invalid(CodeErrorKind::Operand, "await requires coroutine code", pc);
+        if (opcode == Opcode::AsyncYieldValue && (!spec.generator || !spec.coroutine))
+            invalid(CodeErrorKind::Operand, "async yield requires async generator code", pc);
         if (static_cast<std::size_t>(opcode) >= definitions.size())
             invalid(CodeErrorKind::UnknownOpcode, "unknown opcode", pc);
         const auto &definition = opcode_definition(opcode);
@@ -213,7 +214,7 @@ std::size_t verify(const CodeSpec &spec, std::span<const Instruction> instructio
                 invalid(CodeErrorKind::NameBounds, "name index out of bounds", pc);
             break;
         case OperandDomain::FunctionFlags:
-            if (operand & ~7U)
+            if (operand & ~15U)
                 invalid(CodeErrorKind::Operand, "invalid function creation flags", pc);
             break;
         case OperandDomain::Target:
@@ -473,7 +474,7 @@ StackEffect instruction_effect(Instruction instruction, std::span<const CallLayo
                                ? calls[instruction.operand].argument_count()
                            : definition.operand == OperandDomain::Count ? instruction.operand
                                                                         : 0;
-    if (definition.operand == OperandDomain::FunctionFlags && (instruction.operand & ~7U))
+    if (definition.operand == OperandDomain::FunctionFlags && (instruction.operand & ~15U))
         invalid(CodeErrorKind::Operand, "invalid function creation flags");
     const auto defaults =
         definition.operand == OperandDomain::FunctionFlags ? std::popcount(instruction.operand) : 0;
