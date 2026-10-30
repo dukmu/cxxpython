@@ -80,6 +80,27 @@ TEST_F(Extensions, DynamicDiscoveryCachingAndFromImport)
     check("import _example\nimport _example as again\nfrom _example import answer, add",
           "_example is again, answer(), add(20, 22)", "(True, 42, 42)");
 }
+TEST_F(Extensions, MethodInstallationUsesExistingNamespaceKeyEquality)
+{
+    check(R"(import builtins as b
+import sys
+class AliasKey:
+    def __hash__(self):
+        return hash('answer')
+    def __eq__(self, other):
+        return other == 'answer'
+key = AliasKey()
+b.__dict__[key] = None
+del sys.modules['builtins']
+)",
+          "b.__dict__[key] is None", "True");
+    auto definition = *CxxPy_Module_v1();
+    definition.name = "builtins";
+    ReturnSlot out(context);
+    register_c_module(context, definition, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    check("from builtins import answer", "answer(), b.__dict__[key] is answer", "(42, True)");
+}
 
 TEST_F(Extensions, ErrorsArityAndIndexConversion)
 {

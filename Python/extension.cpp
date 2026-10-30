@@ -80,13 +80,16 @@ Result api_call(CxxPyContext *context, Result failed, F &&operation) noexcept
 CxxPyHandle builtin(CxxPyContext *context, const char *name)
 {
     return api_call<CxxPyHandle>(context, nullptr, [&] {
-        const auto value = detail::name_lookup(
-            context->actor, context->actor.builtin(CoreObject::Builtins), text(name));
-        if (!value) {
+        ReturnSlot key(context->actor), result(context->actor);
+        make_str(context->actor, text(name), key);
+        dict_lookup(context->actor,
+                    context->roots.root(context->actor.builtin(CoreObject::Builtins)),
+                    context->roots.root(key.value()), result);
+        if (result.tag() == ResultTag::Empty) {
             failure(*context, CoreObject::NameErrorType, U"native builtin not found");
             return CxxPyHandle{};
         }
-        return context->hold(*value);
+        return context->publish(result);
     });
 }
 CxxPyHandle from_int(CxxPyContext *context, std::int64_t number)
@@ -359,8 +362,10 @@ void exec_extension(Attachment &actor, const std::shared_ptr<const NativeModule>
         make_native_function(actor, source_utf8(method.name), std::move(signature), bound_method,
                              captures, function);
         make_str(actor, method.name, key);
-        detail::name_store(actor, module_dict(actor, module.get(actor)), key.value(),
-                           function.value());
+        dict_store(actor, roots.root(module_dict(actor, module.get(actor))),
+                   roots.root(key.value()), roots.root(function.value()), out);
+        if (out.tag() == ResultTag::Raised)
+            return;
     }
     execute(actor, definition->exec, module, {}, out);
 }

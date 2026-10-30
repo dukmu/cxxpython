@@ -144,6 +144,144 @@ TEST_F(Imports, FailureDoesNotEraseAUserReplacement)
     ASSERT_EQ(out.tag(), ResultTag::Ok);
     EXPECT_EQ(out.value(), context.builtin(CoreObject::True));
 }
+TEST_F(Imports, PublicModulesLookupUsesCustomKeyEqualityAndPropagatesErrors)
+{
+    source(U"cached_target", "value = 42\n");
+    source(U"error_target", "value = 42\n");
+    ReturnSlot out(context);
+    import_module(context, U"__main__", out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    auto globals = roots.root(module_dict(context, out.value()));
+    SourceUnit setup(SourceBuffer(R"(import sys
+class CacheKey:
+    def __init__(self, name, fail):
+        self.name = name
+        self.fail = fail
+    def __hash__(self):
+        return hash(self.name)
+    def __eq__(self, other):
+        if self.fail:
+            raise ValueError('cache equality')
+        return self.name == other
+sys.modules[CacheKey('cached_target', False)] = True
+sys.modules[CacheKey('error_target', True)] = False
+)"));
+    run(context, {&setup, globals}, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    context.collect();
+    import_module(context, U"cached_target", out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(out.value(), context.builtin(CoreObject::True));
+    import_module(context, U"error_target", out);
+    ASSERT_EQ(out.tag(), ResultTag::Raised);
+    EXPECT_EQ(context.type_of(out.exception()), context.builtin(CoreObject::ValueErrorType));
+}
+TEST_F(Imports, NoneInPublicModulesStopsInitialization)
+{
+    source(U"blocked_target", "raise ValueError('initialized')\n");
+    ReturnSlot out(context), key(context);
+    make_str(context, U"blocked_target", key);
+    auto name = roots.root(key.value());
+    auto modules = roots.root(context.builtin(CoreObject::Modules));
+    dict_store(context, modules, name, roots.root(context.builtin(CoreObject::None)), out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    context.collect();
+    import_module(context, U"blocked_target", out);
+    ASSERT_EQ(out.tag(), ResultTag::Raised);
+    EXPECT_EQ(context.type_of(out.exception()),
+              context.builtin(CoreObject::ModuleNotFoundErrorType));
+    dict_lookup(context, modules, name, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(out.value(), context.builtin(CoreObject::None));
+}
+TEST_F(Imports, EqualKeyPublicationRollsBackAtZeroQuotaWithoutAnotherCallback)
+{
+    ReturnSlot out(context);
+    import_module(context, U"__main__", out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    const auto main = roots.root(out.value());
+    const auto globals = roots.root(module_dict(context, main.get(context)));
+    SourceUnit setup(SourceBuffer(R"(import sys
+class CacheKey:
+    calls = 0
+    def __hash__(self):
+        return hash('unstable_cache')
+    def __eq__(self, other):
+        self.calls = self.calls + 1
+        return self.calls > 1
+key = CacheKey()
+sys.modules[key] = False
+)"));
+    run(context, {&setup, globals}, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    const auto key = roots.root(attribute(main, U"key"));
+    register_native_module(
+        context, U"unstable_cache", +[](Attachment &actor, Handle, ReturnSlot &result) {
+            actor.set_allocation_limit(0);
+            result.raised(actor.builtin(CoreObject::MemoryError));
+        });
+    import_module(context, U"unstable_cache", out);
+    context.set_allocation_limit(std::numeric_limits<std::size_t>::max());
+    ASSERT_EQ(out.tag(), ResultTag::Raised);
+    EXPECT_EQ(out.exception(), context.builtin(CoreObject::MemoryError));
+    context.collect();
+    EXPECT_EQ(int_decimal(context, attribute(key, U"calls")), "2");
+    dict_lookup(context, roots.root(context.builtin(CoreObject::Modules)), key, out);
+    EXPECT_EQ(out.tag(), ResultTag::Empty);
+}
+TEST_F(Imports, EmptyNativeInitializerRaisesAndRemovesItsPublication)
+{
+    register_native_module(
+        context, U"empty_initializer", +[](Attachment &, Handle, ReturnSlot &) {});
+    ReturnSlot out(context);
+    import_module(context, U"empty_initializer", out);
+    ASSERT_EQ(out.tag(), ResultTag::Raised);
+    EXPECT_EQ(context.type_of(out.exception()), context.builtin(CoreObject::RuntimeErrorType));
+    EXPECT_FALSE(
+        detail::name_lookup(context, context.builtin(CoreObject::Modules), U"empty_initializer"));
+}
+TEST_F(Imports, DeletingPublicModulesEntryReexecutesSource)
+{
+    source(U"repeat_target", "import __main__\n__main__.runs = __main__.runs + 1\n");
+    ReturnSlot out(context);
+    import_module(context, U"__main__", out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    auto main = roots.root(out.value());
+    auto globals = roots.root(module_dict(context, main.get(context)));
+    SourceUnit setup(SourceBuffer("runs = 0\n"));
+    run(context, {&setup, globals}, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    import_module(context, U"repeat_target", out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    auto first = roots.root(out.value());
+    SourceUnit remove(SourceBuffer("import sys\ndel sys.modules['repeat_target']\n"));
+    run(context, {&remove, globals}, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    context.collect();
+    import_module(context, U"repeat_target", out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_NE(out.value(), first.get(context));
+    EXPECT_EQ(int_decimal(context, attribute(main, U"runs")), "2");
+}
+TEST_F(Imports, FailedSourcePreservesPythonDeleteAndReinsertReplacement)
+{
+    source(U"replacement_target", "import sys\ndel sys.modules['replacement_target']\n"
+                                  "sys.modules['replacement_target'] = True\n"
+                                  "raise ValueError('failed')\n");
+    ReturnSlot out(context), key(context);
+    import_module(context, U"replacement_target", out);
+    ASSERT_EQ(out.tag(), ResultTag::Raised);
+    EXPECT_EQ(context.type_of(out.exception()), context.builtin(CoreObject::ValueErrorType));
+    context.collect();
+    make_str(context, U"replacement_target", key);
+    dict_lookup(context, roots.root(context.builtin(CoreObject::Modules)), roots.root(key.value()),
+                out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(out.value(), context.builtin(CoreObject::True));
+    import_module(context, U"replacement_target", out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(out.value(), context.builtin(CoreObject::True));
+}
 TEST_F(Imports, RollbackAtZeroQuotaPreservesModulesLoadedDuringInitialization)
 {
     source(U"survivor", "value = 42\n");

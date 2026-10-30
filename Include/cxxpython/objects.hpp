@@ -363,8 +363,12 @@ constexpr auto core_count = static_cast<std::size_t>(CoreObject::Count);
 void build_core_objects(Attachment &context, std::span<ReturnSlot *const> outputs);
 std::optional<Value> name_lookup(Attachment &context, Value dictionary, const std::u32string &name);
 void name_store(Attachment &context, Value dictionary, Value name, Value value);
-bool name_erase_if(Attachment &context, Value dictionary, const std::u32string &name,
-                   Value expected);
+struct DictBinding {
+    std::int64_t hash = 0;
+    std::uint64_t identity = 0;
+};
+ResultView dict_store_binding(Attachment &, Handle, Handle, Handle, DictBinding &, ReturnSlot &);
+bool dict_erase_binding(Attachment &, Handle dictionary, DictBinding, Handle expected);
 void discard_name_table(Attachment &context, Value dictionary);
 std::int64_t name_hash(Attachment &, const std::u32string &);
 void install_dictionaries(Attachment &, std::span<const Handle>);

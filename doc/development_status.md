@@ -1,5 +1,90 @@
 # Development Status
 
+## 2026-10-30 Benchmark Cadence Correction
+
+The user rejected repeated full-suite performance runs for routine semantic fixes.
+Existing completed samples remain retained, but stable commits no longer trigger
+automatic CPU benchmark reruns. Reuse baselines and measure only affected hot
+paths, new workloads or concrete regressions; full performance acceptance remains
+a separate gate. Recorded this rule in AGENTS.md. No further samples are needed
+for the public-import mapping fix below.
+
+## 2026-10-30 Public Import Mapping: Final Native Publisher Verification
+
+Follow-up to the entry below, preserved unchanged. Final integration review found
+one additional writer: C extension methods were installed after module publication,
+so their namespace was not private. That write now uses dict_store and preserves
+Raised. A deterministic test reinitializes builtins in its already shared namespace
+and confirms a method replaces an existing equal key instead of adding a duplicate
+binding. The experimental C ABI surface/version is unchanged.
+
+The final binaries pass normal CTest 409/409, ASan/UBSan/LSan 404/404 native and
+TSan 402/402 native, with only the established two bootstrap-allocation tests
+excluded from TSan. Final executable/ASan source differential passes 14 groups,
+constructors 6 groups and dictionaries 16 cases against fixed CPython 3.12.14.
+The earlier 408/403/401 totals below describe the preceding integration state,
+not a substitute for these final checks. Final logs are .cache/import-mapping-final-*.
+
+Retained the earlier import-public-mapping-idle raw captures, then rebuilt Release
+and captured three post-verification idle runs as import-public-mapping-final-idle.
+The recorder regenerated all comparison tables; no samples were deleted or table
+rows hand-filled. Absolute CPython performance remains an open acceptance gate.
+The module-stage goal remains active: real ModuleSpec/loader metadata, mutable
+paths and reload/bootstrap policy are still pending. User file changes remain
+outside this stable-point commit.
+
+## 2026-10-30 Unified Import Uses The Public Mapping Protocol
+
+Prepended without changing earlier records. Previous stable node: 4327e20.
+This closes the remaining name-index-only import/module path identified in the
+preceding migration. The full module/unified-import goal remains active.
+
+- Cache hits, partial-cycle reads, publication and final result reads now use
+  the actual Modules dictionary's hash/equality protocol. Custom equal keys are
+  observed and callback exceptions stay Raised rather than becoming a cache
+  miss or triggering another initializer. No additional module cache or global
+  execution lock was introduced.
+- The existing entry identity now forms a small host-only hash/generation token
+  returned by publication. Failed initialization conditionally erases that entry
+  only while it still holds the original module. Rollback never allocates or
+  replays Python hash/equality, and preserves replacement values or a newer
+  deleted/reinserted binding. Removed the superseded name-only conditional erase.
+  A zero-quota test publishes through a custom equal key and proves rollback
+  makes no further equality callback.
+- Migrated file-search and relative/from-import metadata reads, module
+  initialization/repr/__getattr__, RunRequest's __builtins__, VM __import__ and
+  __build_class__, star-import writes and function import-locals refresh through
+  the same dictionary boundary. The C ABI builtin reader also uses that path.
+  Direct name writes left in these files construct private new mappings or the
+  bootstrap image; there is no name-only read of the public module table.
+- Clear the initializer's result slot before entering source/native code. An
+  empty native initializer now raises RuntimeError and removes its publication
+  instead of inheriting the preceding dictionary operation's successful result.
+- Added six native regressions for custom cache keys/errors, None entries,
+  deletion/reexecution with distinct module identity, Python replacement after
+  failure, zero-quota equal-key rollback and empty native results. Four new
+  executable differential cases exercise aliased builtin import/class hooks,
+  module __getattr__ and sys.modules. Terra independently wrote four native
+  cases; main integrated them and added the remaining production/tests. No agent
+  remains running.
+- Final normal CTest passes 408/408, including 403 native tests and all five
+  driver/tool/format checks. ASan/UBSan/LSan passes 403/403 native; TSan passes
+  401/401, excluding only the established two bootstrap allocation enumerations
+  also covered by normal/ASan. Final ASan source differential passes 14 groups,
+  constructors 6 groups and dict 16 cases against fixed CPython 3.12.14.
+  Refreshed the retained source differential JSON; logs/builds remain in .cache/.
+- After all exact build/test handles finished, captured three idle Release runs
+  as import-public-mapping-idle with the existing recorder. Raw runs are retained
+  and comparison tables are generated, not hand-filled. This is regression
+  evidence, not a CPython absolute-performance acceptance claim.
+- Remaining dependencies include real ModuleSpec/loader metadata and Python
+  bootstrap policy, mutable path/argv, namespace path refresh and reload, plus
+  their required Base language/object capabilities. General cross-thread Frame
+  observation and implicit special-method custom-key lookup remain separate
+  foundation gates. Do not replace these missing capabilities with placeholder
+  library modules or mark the full service goal complete from this passing slice.
+  User temporary_plan.md deletion and untracked test2.py remain excluded.
+
 ## 2026-10-30 Source-Comment Migration: Dictionaries And Namespaces
 
 Prepended without rewriting the audit or earlier history. Previous stable node:

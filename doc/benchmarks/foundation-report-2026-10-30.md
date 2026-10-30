@@ -756,6 +756,528 @@ Storage/native delivery probes do not establish Python VM parallelism. RSS is th
 | file-import-syntax-idle-cpython | parallel_source_workers | 2 | wall_ns | ms | 3 | 6.913 | 6.822 | 7.564 |
 | file-import-syntax-idle-cpython | parallel_source_workers | 4 | process_cpu_ns | ms | 3 | 6.307 | 6.093 | 6.451 |
 | file-import-syntax-idle-cpython | parallel_source_workers | 4 | wall_ns | ms | 3 | 6.865 | 6.640 | 7.007 |
+| import-public-mapping-final-idle | cleanup_iterations | - | active_region_bytes | bytes | 3 | 32.000 | 32.000 | 32.000 |
+| import-public-mapping-final-idle | cleanup_iterations | - | cleanup_continuation_bytes | bytes | 3 | 48.000 | 48.000 | 48.000 |
+| import-public-mapping-final-idle | cleanup_iterations | - | cleanup_function_ns | ms | 3 | 14.943 | 13.264 | 15.321 |
+| import-public-mapping-final-idle | function_iterations | - | frame_prefix_bytes | bytes | 3 | 288.000 | 288.000 | 288.000 |
+| import-public-mapping-final-idle | function_iterations | - | verified_function_ns | ms | 3 | 12.523 | 10.570 | 13.922 |
+| import-public-mapping-final-idle | hash_iterations | - | string_hash_ns | ms | 3 | 51.275 | 43.096 | 51.907 |
+| import-public-mapping-final-idle | hash_iterations | - | tuple_repr_ns | ms | 3 | 13.604 | 12.782 | 14.919 |
+| import-public-mapping-final-idle | int_iterations | - | big_int_mul_ns | ms | 3 | 5.414 | 5.182 | 6.187 |
+| import-public-mapping-final-idle | int_iterations | - | int_add_ns | ms | 3 | 47.060 | 44.148 | 51.204 |
+| import-public-mapping-final-idle | int_iterations | - | int_object_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| import-public-mapping-final-idle | iterations | - | allocation_and_auto_gc_ns | ms | 3 | 4.989 | 4.152 | 5.073 |
+| import-public-mapping-final-idle | iterations | - | handle_bytes | bytes | 3 | 32.000 | 32.000 | 32.000 |
+| import-public-mapping-final-idle | iterations | - | header_bytes | bytes | 3 | 8.000 | 8.000 | 8.000 |
+| import-public-mapping-final-idle | iterations | - | last_gc_pause_ns | ms | 3 | 0.001 | 0.000 | 0.002 |
+| import-public-mapping-final-idle | iterations | - | live_bytes | bytes | 3 | 0.000 | 0.000 | 0.000 |
+| import-public-mapping-final-idle | iterations | - | node_bytes | bytes | 3 | 16.000 | 16.000 | 16.000 |
+| import-public-mapping-final-idle | iterations | - | recorded_metadata_bytes | bytes | 3 | 3360.000 | 3360.000 | 3360.000 |
+| import-public-mapping-final-idle | iterations | - | root_register_release_ns | ms | 3 | 2.357 | 2.256 | 3.005 |
+| import-public-mapping-final-idle | native_call_iterations | - | core_live_bytes | bytes | 3 | 194737.000 | 194737.000 | 194737.000 |
+| import-public-mapping-final-idle | native_call_iterations | - | core_metadata_bytes | bytes | 3 | 159792.000 | 159792.000 | 159792.000 |
+| import-public-mapping-final-idle | native_call_iterations | - | core_reserved_bytes | bytes | 3 | 452232.000 | 452232.000 | 452232.000 |
+| import-public-mapping-final-idle | native_call_iterations | - | lookup_bind_call_ns | ms | 3 | 18.333 | 16.501 | 20.542 |
+| import-public-mapping-final-idle | native_call_iterations | - | native_call_ns | ms | 3 | 9.323 | 9.108 | 10.495 |
+| import-public-mapping-final-idle | parallel_class_workers | 1 | finish_live_bytes | bytes | 3 | 202561.000 | 202561.000 | 202561.000 |
+| import-public-mapping-final-idle | parallel_class_workers | 1 | finish_metadata_bytes | bytes | 3 | 248560.000 | 248560.000 | 248560.000 |
+| import-public-mapping-final-idle | parallel_class_workers | 1 | finish_reserved_bytes | bytes | 3 | 608480.000 | 608480.000 | 608480.000 |
+| import-public-mapping-final-idle | parallel_class_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.029 | 0.023 | 0.111 |
+| import-public-mapping-final-idle | parallel_class_workers | 1 | max_rendezvous_ns | ms | 3 | 0.001 | 0.001 | 0.002 |
+| import-public-mapping-final-idle | parallel_class_workers | 1 | process_cpu_ns | ms | 3 | 399.932 | 379.489 | 419.557 |
+| import-public-mapping-final-idle | parallel_class_workers | 1 | source_freeze_run_ns | ms | 3 | 0.148 | 0.136 | 0.201 |
+| import-public-mapping-final-idle | parallel_class_workers | 1 | wall_ns | ms | 3 | 433.248 | 411.108 | 454.545 |
+| import-public-mapping-final-idle | parallel_class_workers | 2 | finish_live_bytes | bytes | 3 | 328585.000 | 316585.000 | 340585.000 |
+| import-public-mapping-final-idle | parallel_class_workers | 2 | finish_metadata_bytes | bytes | 3 | 304864.000 | 304864.000 | 304864.000 |
+| import-public-mapping-final-idle | parallel_class_workers | 2 | finish_reserved_bytes | bytes | 3 | 804944.000 | 804944.000 | 804944.000 |
+| import-public-mapping-final-idle | parallel_class_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.090 | 0.064 | 0.103 |
+| import-public-mapping-final-idle | parallel_class_workers | 2 | max_rendezvous_ns | ms | 3 | 0.200 | 0.153 | 0.285 |
+| import-public-mapping-final-idle | parallel_class_workers | 2 | process_cpu_ns | ms | 3 | 430.511 | 422.208 | 506.022 |
+| import-public-mapping-final-idle | parallel_class_workers | 2 | source_freeze_run_ns | ms | 3 | 0.110 | 0.102 | 0.123 |
+| import-public-mapping-final-idle | parallel_class_workers | 2 | wall_ns | ms | 3 | 250.016 | 243.918 | 294.795 |
+| import-public-mapping-final-idle | parallel_class_workers | 4 | finish_live_bytes | bytes | 3 | 305249.000 | 270449.000 | 350401.000 |
+| import-public-mapping-final-idle | parallel_class_workers | 4 | finish_metadata_bytes | bytes | 3 | 405376.000 | 376928.000 | 447136.000 |
+| import-public-mapping-final-idle | parallel_class_workers | 4 | finish_reserved_bytes | bytes | 3 | 969440.000 | 965464.000 | 1092304.000 |
+| import-public-mapping-final-idle | parallel_class_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.076 | 0.067 | 0.100 |
+| import-public-mapping-final-idle | parallel_class_workers | 4 | max_rendezvous_ns | ms | 3 | 1.106 | 1.000 | 1.220 |
+| import-public-mapping-final-idle | parallel_class_workers | 4 | process_cpu_ns | ms | 3 | 555.253 | 543.237 | 647.567 |
+| import-public-mapping-final-idle | parallel_class_workers | 4 | source_freeze_run_ns | ms | 3 | 0.119 | 0.118 | 0.135 |
+| import-public-mapping-final-idle | parallel_class_workers | 4 | wall_ns | ms | 3 | 206.956 | 194.601 | 237.926 |
+| import-public-mapping-final-idle | parallel_closure_workers | 1 | finish_live_bytes | bytes | 3 | 220897.000 | 220897.000 | 220897.000 |
+| import-public-mapping-final-idle | parallel_closure_workers | 1 | finish_metadata_bytes | bytes | 3 | 203696.000 | 203696.000 | 203696.000 |
+| import-public-mapping-final-idle | parallel_closure_workers | 1 | finish_reserved_bytes | bytes | 3 | 530216.000 | 530216.000 | 530216.000 |
+| import-public-mapping-final-idle | parallel_closure_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.075 | 0.043 | 0.188 |
+| import-public-mapping-final-idle | parallel_closure_workers | 1 | max_rendezvous_ns | ms | 3 | 0.002 | 0.002 | 0.002 |
+| import-public-mapping-final-idle | parallel_closure_workers | 1 | process_cpu_ns | ms | 3 | 204.015 | 202.673 | 294.905 |
+| import-public-mapping-final-idle | parallel_closure_workers | 1 | source_freeze_run_ns | ms | 3 | 0.119 | 0.073 | 0.120 |
+| import-public-mapping-final-idle | parallel_closure_workers | 1 | wall_ns | ms | 3 | 221.003 | 219.577 | 319.643 |
+| import-public-mapping-final-idle | parallel_closure_workers | 2 | finish_live_bytes | bytes | 3 | 374633.000 | 367217.000 | 382697.000 |
+| import-public-mapping-final-idle | parallel_closure_workers | 2 | finish_metadata_bytes | bytes | 3 | 433984.000 | 433984.000 | 471552.000 |
+| import-public-mapping-final-idle | parallel_closure_workers | 2 | finish_reserved_bytes | bytes | 3 | 928072.000 | 928072.000 | 993720.000 |
+| import-public-mapping-final-idle | parallel_closure_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.103 | 0.080 | 0.255 |
+| import-public-mapping-final-idle | parallel_closure_workers | 2 | max_rendezvous_ns | ms | 3 | 0.192 | 0.078 | 0.206 |
+| import-public-mapping-final-idle | parallel_closure_workers | 2 | process_cpu_ns | ms | 3 | 205.521 | 202.606 | 278.992 |
+| import-public-mapping-final-idle | parallel_closure_workers | 2 | source_freeze_run_ns | ms | 3 | 0.080 | 0.060 | 0.096 |
+| import-public-mapping-final-idle | parallel_closure_workers | 2 | wall_ns | ms | 3 | 115.551 | 114.858 | 156.146 |
+| import-public-mapping-final-idle | parallel_closure_workers | 4 | finish_live_bytes | bytes | 3 | 259145.000 | 247193.000 | 276737.000 |
+| import-public-mapping-final-idle | parallel_closure_workers | 4 | finish_metadata_bytes | bytes | 3 | 367584.000 | 367584.000 | 367584.000 |
+| import-public-mapping-final-idle | parallel_closure_workers | 4 | finish_reserved_bytes | bytes | 3 | 796776.000 | 796776.000 | 796776.000 |
+| import-public-mapping-final-idle | parallel_closure_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.148 | 0.094 | 0.175 |
+| import-public-mapping-final-idle | parallel_closure_workers | 4 | max_rendezvous_ns | ms | 3 | 0.681 | 0.397 | 0.934 |
+| import-public-mapping-final-idle | parallel_closure_workers | 4 | process_cpu_ns | ms | 3 | 258.606 | 250.943 | 332.372 |
+| import-public-mapping-final-idle | parallel_closure_workers | 4 | source_freeze_run_ns | ms | 3 | 0.070 | 0.066 | 0.080 |
+| import-public-mapping-final-idle | parallel_closure_workers | 4 | wall_ns | ms | 3 | 81.685 | 79.882 | 107.155 |
+| import-public-mapping-final-idle | parallel_exception_workers | 1 | finish_live_bytes | bytes | 3 | 346309.000 | 346309.000 | 346309.000 |
+| import-public-mapping-final-idle | parallel_exception_workers | 1 | finish_metadata_bytes | bytes | 3 | 401552.000 | 401552.000 | 401552.000 |
+| import-public-mapping-final-idle | parallel_exception_workers | 1 | finish_reserved_bytes | bytes | 3 | 887848.000 | 887848.000 | 887848.000 |
+| import-public-mapping-final-idle | parallel_exception_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.080 | 0.067 | 0.189 |
+| import-public-mapping-final-idle | parallel_exception_workers | 1 | max_rendezvous_ns | ms | 3 | 0.001 | 0.001 | 0.001 |
+| import-public-mapping-final-idle | parallel_exception_workers | 1 | process_cpu_ns | ms | 3 | 329.506 | 299.381 | 391.426 |
+| import-public-mapping-final-idle | parallel_exception_workers | 1 | source_freeze_run_ns | ms | 3 | 0.074 | 0.068 | 0.079 |
+| import-public-mapping-final-idle | parallel_exception_workers | 1 | wall_ns | ms | 3 | 356.946 | 324.383 | 424.028 |
+| import-public-mapping-final-idle | parallel_exception_workers | 2 | finish_live_bytes | bytes | 3 | 258837.000 | 256765.000 | 264621.000 |
+| import-public-mapping-final-idle | parallel_exception_workers | 2 | finish_metadata_bytes | bytes | 3 | 298944.000 | 298944.000 | 315936.000 |
+| import-public-mapping-final-idle | parallel_exception_workers | 2 | finish_reserved_bytes | bytes | 3 | 690888.000 | 690888.000 | 728440.000 |
+| import-public-mapping-final-idle | parallel_exception_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.050 | 0.046 | 0.151 |
+| import-public-mapping-final-idle | parallel_exception_workers | 2 | max_rendezvous_ns | ms | 3 | 0.119 | 0.119 | 0.194 |
+| import-public-mapping-final-idle | parallel_exception_workers | 2 | process_cpu_ns | ms | 3 | 327.684 | 317.752 | 411.095 |
+| import-public-mapping-final-idle | parallel_exception_workers | 2 | source_freeze_run_ns | ms | 3 | 0.069 | 0.056 | 0.074 |
+| import-public-mapping-final-idle | parallel_exception_workers | 2 | wall_ns | ms | 3 | 184.510 | 176.647 | 229.827 |
+| import-public-mapping-final-idle | parallel_exception_workers | 4 | finish_live_bytes | bytes | 3 | 225877.000 | 207245.000 | 228637.000 |
+| import-public-mapping-final-idle | parallel_exception_workers | 4 | finish_metadata_bytes | bytes | 3 | 347360.000 | 347360.000 | 354112.000 |
+| import-public-mapping-final-idle | parallel_exception_workers | 4 | finish_reserved_bytes | bytes | 3 | 756536.000 | 756536.000 | 773120.000 |
+| import-public-mapping-final-idle | parallel_exception_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.090 | 0.084 | 0.125 |
+| import-public-mapping-final-idle | parallel_exception_workers | 4 | max_rendezvous_ns | ms | 3 | 1.159 | 1.040 | 1.184 |
+| import-public-mapping-final-idle | parallel_exception_workers | 4 | process_cpu_ns | ms | 3 | 416.593 | 413.288 | 432.835 |
+| import-public-mapping-final-idle | parallel_exception_workers | 4 | source_freeze_run_ns | ms | 3 | 0.065 | 0.063 | 0.073 |
+| import-public-mapping-final-idle | parallel_exception_workers | 4 | wall_ns | ms | 3 | 128.054 | 127.518 | 135.628 |
+| import-public-mapping-final-idle | parallel_float_workers | 1 | finish_live_bytes | bytes | 3 | 234341.000 | 234341.000 | 234341.000 |
+| import-public-mapping-final-idle | parallel_float_workers | 1 | finish_metadata_bytes | bytes | 3 | 261360.000 | 261360.000 | 261360.000 |
+| import-public-mapping-final-idle | parallel_float_workers | 1 | finish_reserved_bytes | bytes | 3 | 621080.000 | 621080.000 | 621080.000 |
+| import-public-mapping-final-idle | parallel_float_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.047 | 0.041 | 0.080 |
+| import-public-mapping-final-idle | parallel_float_workers | 1 | max_rendezvous_ns | ms | 3 | 0.001 | 0.001 | 0.002 |
+| import-public-mapping-final-idle | parallel_float_workers | 1 | process_cpu_ns | ms | 3 | 197.481 | 196.522 | 231.509 |
+| import-public-mapping-final-idle | parallel_float_workers | 1 | source_freeze_run_ns | ms | 3 | 0.056 | 0.053 | 0.057 |
+| import-public-mapping-final-idle | parallel_float_workers | 1 | wall_ns | ms | 3 | 213.964 | 212.874 | 250.795 |
+| import-public-mapping-final-idle | parallel_float_workers | 2 | finish_live_bytes | bytes | 3 | 357021.000 | 349741.000 | 362733.000 |
+| import-public-mapping-final-idle | parallel_float_workers | 2 | finish_metadata_bytes | bytes | 3 | 568032.000 | 530464.000 | 568032.000 |
+| import-public-mapping-final-idle | parallel_float_workers | 2 | finish_reserved_bytes | bytes | 3 | 1109800.000 | 1044152.000 | 1109800.000 |
+| import-public-mapping-final-idle | parallel_float_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.227 | 0.155 | 0.292 |
+| import-public-mapping-final-idle | parallel_float_workers | 2 | max_rendezvous_ns | ms | 3 | 0.161 | 0.068 | 0.582 |
+| import-public-mapping-final-idle | parallel_float_workers | 2 | process_cpu_ns | ms | 3 | 267.194 | 222.289 | 311.824 |
+| import-public-mapping-final-idle | parallel_float_workers | 2 | source_freeze_run_ns | ms | 3 | 0.048 | 0.048 | 0.052 |
+| import-public-mapping-final-idle | parallel_float_workers | 2 | wall_ns | ms | 3 | 150.126 | 124.665 | 172.843 |
+| import-public-mapping-final-idle | parallel_float_workers | 4 | finish_live_bytes | bytes | 3 | 206861.000 | 200397.000 | 217629.000 |
+| import-public-mapping-final-idle | parallel_float_workers | 4 | finish_metadata_bytes | bytes | 3 | 390336.000 | 390336.000 | 447456.000 |
+| import-public-mapping-final-idle | parallel_float_workers | 4 | finish_reserved_bytes | bytes | 3 | 818024.000 | 818024.000 | 912856.000 |
+| import-public-mapping-final-idle | parallel_float_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.130 | 0.110 | 0.190 |
+| import-public-mapping-final-idle | parallel_float_workers | 4 | max_rendezvous_ns | ms | 3 | 0.588 | 0.391 | 1.296 |
+| import-public-mapping-final-idle | parallel_float_workers | 4 | process_cpu_ns | ms | 3 | 287.916 | 266.139 | 297.380 |
+| import-public-mapping-final-idle | parallel_float_workers | 4 | source_freeze_run_ns | ms | 3 | 0.057 | 0.050 | 0.057 |
+| import-public-mapping-final-idle | parallel_float_workers | 4 | wall_ns | ms | 3 | 94.555 | 83.079 | 96.942 |
+| import-public-mapping-final-idle | parallel_for_workers | 1 | finish_live_bytes | bytes | 3 | 264861.000 | 264861.000 | 264861.000 |
+| import-public-mapping-final-idle | parallel_for_workers | 1 | finish_metadata_bytes | bytes | 3 | 283280.000 | 283280.000 | 283280.000 |
+| import-public-mapping-final-idle | parallel_for_workers | 1 | finish_reserved_bytes | bytes | 3 | 669920.000 | 669920.000 | 669920.000 |
+| import-public-mapping-final-idle | parallel_for_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.086 | 0.053 | 0.087 |
+| import-public-mapping-final-idle | parallel_for_workers | 1 | max_rendezvous_ns | ms | 3 | 0.001 | 0.001 | 0.002 |
+| import-public-mapping-final-idle | parallel_for_workers | 1 | process_cpu_ns | ms | 3 | 120.305 | 114.999 | 159.908 |
+| import-public-mapping-final-idle | parallel_for_workers | 1 | source_freeze_run_ns | ms | 3 | 0.060 | 0.059 | 0.061 |
+| import-public-mapping-final-idle | parallel_for_workers | 1 | wall_ns | ms | 3 | 130.338 | 124.566 | 173.275 |
+| import-public-mapping-final-idle | parallel_for_workers | 2 | finish_live_bytes | bytes | 3 | 384101.000 | 383765.000 | 384125.000 |
+| import-public-mapping-final-idle | parallel_for_workers | 2 | finish_metadata_bytes | bytes | 3 | 445728.000 | 445728.000 | 483296.000 |
+| import-public-mapping-final-idle | parallel_for_workers | 2 | finish_reserved_bytes | bytes | 3 | 949096.000 | 949096.000 | 1014744.000 |
+| import-public-mapping-final-idle | parallel_for_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.106 | 0.103 | 0.148 |
+| import-public-mapping-final-idle | parallel_for_workers | 2 | max_rendezvous_ns | ms | 3 | 0.212 | 0.158 | 0.250 |
+| import-public-mapping-final-idle | parallel_for_workers | 2 | process_cpu_ns | ms | 3 | 124.669 | 119.936 | 202.636 |
+| import-public-mapping-final-idle | parallel_for_workers | 2 | source_freeze_run_ns | ms | 3 | 0.047 | 0.047 | 0.081 |
+| import-public-mapping-final-idle | parallel_for_workers | 2 | wall_ns | ms | 3 | 70.171 | 68.037 | 116.046 |
+| import-public-mapping-final-idle | parallel_for_workers | 4 | finish_live_bytes | bytes | 3 | 288013.000 | 262701.000 | 304853.000 |
+| import-public-mapping-final-idle | parallel_for_workers | 4 | finish_metadata_bytes | bytes | 3 | 412256.000 | 383904.000 | 425760.000 |
+| import-public-mapping-final-idle | parallel_for_workers | 4 | finish_reserved_bytes | bytes | 3 | 866864.000 | 822016.000 | 900032.000 |
+| import-public-mapping-final-idle | parallel_for_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.119 | 0.103 | 0.203 |
+| import-public-mapping-final-idle | parallel_for_workers | 4 | max_rendezvous_ns | ms | 3 | 0.369 | 0.318 | 0.913 |
+| import-public-mapping-final-idle | parallel_for_workers | 4 | process_cpu_ns | ms | 3 | 155.341 | 149.139 | 237.487 |
+| import-public-mapping-final-idle | parallel_for_workers | 4 | source_freeze_run_ns | ms | 3 | 0.051 | 0.050 | 0.060 |
+| import-public-mapping-final-idle | parallel_for_workers | 4 | wall_ns | ms | 3 | 50.823 | 49.677 | 84.477 |
+| import-public-mapping-final-idle | parallel_source_workers | 1 | finish_live_bytes | bytes | 3 | 278669.000 | 278669.000 | 278669.000 |
+| import-public-mapping-final-idle | parallel_source_workers | 1 | finish_metadata_bytes | bytes | 3 | 275984.000 | 275984.000 | 275984.000 |
+| import-public-mapping-final-idle | parallel_source_workers | 1 | finish_reserved_bytes | bytes | 3 | 657304.000 | 657304.000 | 657304.000 |
+| import-public-mapping-final-idle | parallel_source_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.048 | 0.047 | 0.182 |
+| import-public-mapping-final-idle | parallel_source_workers | 1 | max_rendezvous_ns | ms | 3 | 0.002 | 0.002 | 0.002 |
+| import-public-mapping-final-idle | parallel_source_workers | 1 | process_cpu_ns | ms | 3 | 190.527 | 172.540 | 276.653 |
+| import-public-mapping-final-idle | parallel_source_workers | 1 | source_freeze_run_ns | ms | 3 | 0.054 | 0.052 | 0.062 |
+| import-public-mapping-final-idle | parallel_source_workers | 1 | wall_ns | ms | 3 | 206.423 | 186.940 | 300.310 |
+| import-public-mapping-final-idle | parallel_source_workers | 2 | finish_live_bytes | bytes | 3 | 223589.000 | 213781.000 | 224789.000 |
+| import-public-mapping-final-idle | parallel_source_workers | 2 | finish_metadata_bytes | bytes | 3 | 243296.000 | 242784.000 | 280352.000 |
+| import-public-mapping-final-idle | parallel_source_workers | 2 | finish_reserved_bytes | bytes | 3 | 595624.000 | 591656.000 | 657304.000 |
+| import-public-mapping-final-idle | parallel_source_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.073 | 0.065 | 0.147 |
+| import-public-mapping-final-idle | parallel_source_workers | 2 | max_rendezvous_ns | ms | 3 | 0.256 | 0.125 | 0.575 |
+| import-public-mapping-final-idle | parallel_source_workers | 2 | process_cpu_ns | ms | 3 | 198.578 | 181.475 | 431.280 |
+| import-public-mapping-final-idle | parallel_source_workers | 2 | source_freeze_run_ns | ms | 3 | 0.045 | 0.043 | 0.086 |
+| import-public-mapping-final-idle | parallel_source_workers | 2 | wall_ns | ms | 3 | 112.044 | 101.923 | 240.081 |
+| import-public-mapping-final-idle | parallel_source_workers | 4 | finish_live_bytes | bytes | 3 | 283493.000 | 260189.000 | 327805.000 |
+| import-public-mapping-final-idle | parallel_source_workers | 4 | finish_metadata_bytes | bytes | 3 | 439360.000 | 401792.000 | 477440.000 |
+| import-public-mapping-final-idle | parallel_source_workers | 4 | finish_reserved_bytes | bytes | 3 | 919896.000 | 854248.000 | 989512.000 |
+| import-public-mapping-final-idle | parallel_source_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.122 | 0.117 | 0.204 |
+| import-public-mapping-final-idle | parallel_source_workers | 4 | max_rendezvous_ns | ms | 3 | 0.396 | 0.254 | 0.804 |
+| import-public-mapping-final-idle | parallel_source_workers | 4 | process_cpu_ns | ms | 3 | 262.497 | 226.328 | 446.609 |
+| import-public-mapping-final-idle | parallel_source_workers | 4 | source_freeze_run_ns | ms | 3 | 0.054 | 0.045 | 0.075 |
+| import-public-mapping-final-idle | parallel_source_workers | 4 | wall_ns | ms | 3 | 87.022 | 74.566 | 197.563 |
+| import-public-mapping-final-idle | parallel_storage_workers | 1 | finish_live_bytes | bytes | 3 | 42720.000 | 42720.000 | 42720.000 |
+| import-public-mapping-final-idle | parallel_storage_workers | 1 | finish_metadata_bytes | bytes | 3 | 97040.000 | 97040.000 | 97040.000 |
+| import-public-mapping-final-idle | parallel_storage_workers | 1 | finish_reserved_bytes | bytes | 3 | 135504.000 | 135504.000 | 135504.000 |
+| import-public-mapping-final-idle | parallel_storage_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.016 | 0.016 | 0.017 |
+| import-public-mapping-final-idle | parallel_storage_workers | 1 | max_rendezvous_ns | ms | 3 | 0.000 | 0.000 | 0.001 |
+| import-public-mapping-final-idle | parallel_storage_workers | 1 | process_cpu_ns | ms | 3 | 2.586 | 2.393 | 2.843 |
+| import-public-mapping-final-idle | parallel_storage_workers | 1 | wall_ns | ms | 3 | 2.855 | 2.655 | 3.100 |
+| import-public-mapping-final-idle | parallel_storage_workers | 2 | finish_live_bytes | bytes | 3 | 6816.000 | 3664.000 | 12112.000 |
+| import-public-mapping-final-idle | parallel_storage_workers | 2 | finish_metadata_bytes | bytes | 3 | 59392.000 | 59392.000 | 100352.000 |
+| import-public-mapping-final-idle | parallel_storage_workers | 2 | finish_reserved_bytes | bytes | 3 | 74064.000 | 74064.000 | 135504.000 |
+| import-public-mapping-final-idle | parallel_storage_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.005 | 0.004 | 0.007 |
+| import-public-mapping-final-idle | parallel_storage_workers | 2 | max_rendezvous_ns | ms | 3 | 0.068 | 0.007 | 0.071 |
+| import-public-mapping-final-idle | parallel_storage_workers | 2 | process_cpu_ns | ms | 3 | 2.676 | 2.506 | 2.965 |
+| import-public-mapping-final-idle | parallel_storage_workers | 2 | wall_ns | ms | 3 | 1.914 | 1.761 | 2.275 |
+| import-public-mapping-final-idle | parallel_storage_workers | 4 | finish_live_bytes | bytes | 3 | 47728.000 | 3008.000 | 66000.000 |
+| import-public-mapping-final-idle | parallel_storage_workers | 4 | finish_metadata_bytes | bytes | 3 | 241248.000 | 194592.000 | 285056.000 |
+| import-public-mapping-final-idle | parallel_storage_workers | 4 | finish_reserved_bytes | bytes | 3 | 336656.000 | 266800.000 | 402304.000 |
+| import-public-mapping-final-idle | parallel_storage_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.026 | 0.024 | 0.048 |
+| import-public-mapping-final-idle | parallel_storage_workers | 4 | max_rendezvous_ns | ms | 3 | 0.196 | 0.158 | 0.253 |
+| import-public-mapping-final-idle | parallel_storage_workers | 4 | process_cpu_ns | ms | 3 | 3.983 | 3.564 | 5.556 |
+| import-public-mapping-final-idle | parallel_storage_workers | 4 | wall_ns | ms | 3 | 2.918 | 2.694 | 4.264 |
+| import-public-mapping-final-idle | parallel_vm_workers | 1 | finish_live_bytes | bytes | 3 | 304053.000 | 304053.000 | 304053.000 |
+| import-public-mapping-final-idle | parallel_vm_workers | 1 | finish_metadata_bytes | bytes | 3 | 313456.000 | 313456.000 | 313456.000 |
+| import-public-mapping-final-idle | parallel_vm_workers | 1 | finish_reserved_bytes | bytes | 3 | 722952.000 | 722952.000 | 722952.000 |
+| import-public-mapping-final-idle | parallel_vm_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.059 | 0.047 | 0.083 |
+| import-public-mapping-final-idle | parallel_vm_workers | 1 | max_rendezvous_ns | ms | 3 | 0.001 | 0.001 | 0.003 |
+| import-public-mapping-final-idle | parallel_vm_workers | 1 | process_cpu_ns | ms | 3 | 156.993 | 152.569 | 171.601 |
+| import-public-mapping-final-idle | parallel_vm_workers | 1 | source_freeze_run_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| import-public-mapping-final-idle | parallel_vm_workers | 1 | wall_ns | ms | 3 | 170.048 | 165.270 | 185.901 |
+| import-public-mapping-final-idle | parallel_vm_workers | 2 | finish_live_bytes | bytes | 3 | 257565.000 | 250893.000 | 270429.000 |
+| import-public-mapping-final-idle | parallel_vm_workers | 2 | finish_metadata_bytes | bytes | 3 | 280672.000 | 280672.000 | 318240.000 |
+| import-public-mapping-final-idle | parallel_vm_workers | 2 | finish_reserved_bytes | bytes | 3 | 661272.000 | 661272.000 | 726920.000 |
+| import-public-mapping-final-idle | parallel_vm_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.085 | 0.061 | 0.125 |
+| import-public-mapping-final-idle | parallel_vm_workers | 2 | max_rendezvous_ns | ms | 3 | 0.094 | 0.088 | 0.201 |
+| import-public-mapping-final-idle | parallel_vm_workers | 2 | process_cpu_ns | ms | 3 | 197.943 | 158.227 | 213.779 |
+| import-public-mapping-final-idle | parallel_vm_workers | 2 | source_freeze_run_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| import-public-mapping-final-idle | parallel_vm_workers | 2 | wall_ns | ms | 3 | 110.178 | 88.855 | 119.153 |
+| import-public-mapping-final-idle | parallel_vm_workers | 4 | finish_live_bytes | bytes | 3 | 350445.000 | 341493.000 | 358773.000 |
+| import-public-mapping-final-idle | parallel_vm_workers | 4 | finish_metadata_bytes | bytes | 3 | 514112.000 | 477056.000 | 514112.000 |
+| import-public-mapping-final-idle | parallel_vm_workers | 4 | finish_reserved_bytes | bytes | 3 | 1051192.000 | 989512.000 | 1051192.000 |
+| import-public-mapping-final-idle | parallel_vm_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.159 | 0.120 | 0.166 |
+| import-public-mapping-final-idle | parallel_vm_workers | 4 | max_rendezvous_ns | ms | 3 | 0.743 | 0.530 | 0.995 |
+| import-public-mapping-final-idle | parallel_vm_workers | 4 | process_cpu_ns | ms | 3 | 251.386 | 198.831 | 254.652 |
+| import-public-mapping-final-idle | parallel_vm_workers | 4 | source_freeze_run_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| import-public-mapping-final-idle | parallel_vm_workers | 4 | wall_ns | ms | 3 | 83.618 | 67.580 | 84.466 |
+| import-public-mapping-final-idle | process_peak_rss_kib | - | process_peak_rss_kib | KiB | 3 | 7812.000 | 7772.000 | 8112.000 |
+| import-public-mapping-final-idle | scheduled_iterations | - | scheduled_function_ns | ms | 3 | 18.034 | 15.937 | 18.291 |
+| import-public-mapping-final-idle | shared_edge_iterations | - | cell_object_bytes | bytes | 3 | 16.000 | 16.000 | 16.000 |
+| import-public-mapping-final-idle | shared_edge_iterations | - | rooted_cell_read_ns | ms | 3 | 1.333 | 1.223 | 1.361 |
+| import-public-mapping-final-idle | shared_edge_iterations | - | rooted_cell_store_read_ns | ms | 3 | 3.117 | 3.051 | 3.414 |
+| import-public-mapping-final-idle | slot_iterations | - | generic_prefix_bytes | bytes | 3 | 8.000 | 8.000 | 8.000 |
+| import-public-mapping-final-idle | slot_iterations | - | slot_instance_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| import-public-mapping-final-idle | slot_iterations | - | slot_set_get_ns | ms | 3 | 30.784 | 29.015 | 34.048 |
+| import-public-mapping-final-idle | source_parse_scope_cfg_ns | - | source_bytes | bytes | 3 | 92.000 | 92.000 | 92.000 |
+| import-public-mapping-final-idle | source_parse_scope_cfg_ns | - | source_parse_scope_cfg_ns | ms | 3 | 0.046 | 0.041 | 0.055 |
+| import-public-mapping-final-idle | transfer_iterations | - | transfer_roundtrip_ns | ms | 3 | 0.787 | 0.717 | 0.935 |
+| import-public-mapping-final-idle | transfer_iterations | - | transfer_token_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| import-public-mapping-final-idle | with_iterations | - | with_function_ns | ms | 3 | 23.760 | 21.531 | 25.180 |
+| import-public-mapping-final-idle-cpython | parallel_class_workers | 1 | process_cpu_ns | ms | 3 | 9.420 | 8.808 | 9.461 |
+| import-public-mapping-final-idle-cpython | parallel_class_workers | 1 | wall_ns | ms | 3 | 10.226 | 9.546 | 10.248 |
+| import-public-mapping-final-idle-cpython | parallel_class_workers | 2 | process_cpu_ns | ms | 3 | 9.361 | 8.831 | 9.593 |
+| import-public-mapping-final-idle-cpython | parallel_class_workers | 2 | wall_ns | ms | 3 | 10.166 | 9.621 | 10.414 |
+| import-public-mapping-final-idle-cpython | parallel_class_workers | 4 | process_cpu_ns | ms | 3 | 9.198 | 8.884 | 9.376 |
+| import-public-mapping-final-idle-cpython | parallel_class_workers | 4 | wall_ns | ms | 3 | 9.981 | 9.630 | 10.302 |
+| import-public-mapping-final-idle-cpython | parallel_closure_workers | 1 | process_cpu_ns | ms | 3 | 6.983 | 6.477 | 7.197 |
+| import-public-mapping-final-idle-cpython | parallel_closure_workers | 1 | wall_ns | ms | 3 | 7.589 | 7.033 | 7.796 |
+| import-public-mapping-final-idle-cpython | parallel_closure_workers | 2 | process_cpu_ns | ms | 3 | 6.468 | 6.403 | 6.799 |
+| import-public-mapping-final-idle-cpython | parallel_closure_workers | 2 | wall_ns | ms | 3 | 7.027 | 6.955 | 7.415 |
+| import-public-mapping-final-idle-cpython | parallel_closure_workers | 4 | process_cpu_ns | ms | 3 | 6.532 | 6.141 | 6.736 |
+| import-public-mapping-final-idle-cpython | parallel_closure_workers | 4 | wall_ns | ms | 3 | 7.001 | 6.758 | 7.251 |
+| import-public-mapping-final-idle-cpython | parallel_exception_workers | 1 | process_cpu_ns | ms | 3 | 7.911 | 7.504 | 8.009 |
+| import-public-mapping-final-idle-cpython | parallel_exception_workers | 1 | wall_ns | ms | 3 | 8.701 | 8.131 | 10.656 |
+| import-public-mapping-final-idle-cpython | parallel_exception_workers | 2 | process_cpu_ns | ms | 3 | 7.588 | 7.251 | 7.675 |
+| import-public-mapping-final-idle-cpython | parallel_exception_workers | 2 | wall_ns | ms | 3 | 8.206 | 7.880 | 8.333 |
+| import-public-mapping-final-idle-cpython | parallel_exception_workers | 4 | process_cpu_ns | ms | 3 | 7.680 | 7.050 | 7.917 |
+| import-public-mapping-final-idle-cpython | parallel_exception_workers | 4 | wall_ns | ms | 3 | 8.409 | 7.662 | 8.527 |
+| import-public-mapping-final-idle-cpython | parallel_float_workers | 1 | process_cpu_ns | ms | 3 | 6.273 | 5.790 | 6.539 |
+| import-public-mapping-final-idle-cpython | parallel_float_workers | 1 | wall_ns | ms | 3 | 6.805 | 6.317 | 7.125 |
+| import-public-mapping-final-idle-cpython | parallel_float_workers | 2 | process_cpu_ns | ms | 3 | 6.243 | 5.895 | 6.253 |
+| import-public-mapping-final-idle-cpython | parallel_float_workers | 2 | wall_ns | ms | 3 | 6.782 | 6.409 | 6.822 |
+| import-public-mapping-final-idle-cpython | parallel_float_workers | 4 | process_cpu_ns | ms | 3 | 6.286 | 6.159 | 6.328 |
+| import-public-mapping-final-idle-cpython | parallel_float_workers | 4 | wall_ns | ms | 3 | 6.817 | 6.663 | 6.946 |
+| import-public-mapping-final-idle-cpython | parallel_for_workers | 1 | process_cpu_ns | ms | 3 | 5.050 | 4.824 | 5.392 |
+| import-public-mapping-final-idle-cpython | parallel_for_workers | 1 | wall_ns | ms | 3 | 5.474 | 5.235 | 5.853 |
+| import-public-mapping-final-idle-cpython | parallel_for_workers | 2 | process_cpu_ns | ms | 3 | 5.269 | 4.715 | 5.457 |
+| import-public-mapping-final-idle-cpython | parallel_for_workers | 2 | wall_ns | ms | 3 | 5.655 | 5.174 | 5.897 |
+| import-public-mapping-final-idle-cpython | parallel_for_workers | 4 | process_cpu_ns | ms | 3 | 5.006 | 4.612 | 5.078 |
+| import-public-mapping-final-idle-cpython | parallel_for_workers | 4 | wall_ns | ms | 3 | 5.442 | 5.058 | 5.565 |
+| import-public-mapping-final-idle-cpython | parallel_source_workers | 1 | process_cpu_ns | ms | 3 | 6.867 | 6.733 | 7.305 |
+| import-public-mapping-final-idle-cpython | parallel_source_workers | 1 | wall_ns | ms | 3 | 7.432 | 7.290 | 7.921 |
+| import-public-mapping-final-idle-cpython | parallel_source_workers | 2 | process_cpu_ns | ms | 3 | 7.316 | 6.796 | 7.515 |
+| import-public-mapping-final-idle-cpython | parallel_source_workers | 2 | wall_ns | ms | 3 | 7.946 | 7.546 | 8.155 |
+| import-public-mapping-final-idle-cpython | parallel_source_workers | 4 | process_cpu_ns | ms | 3 | 6.437 | 6.362 | 6.787 |
+| import-public-mapping-final-idle-cpython | parallel_source_workers | 4 | wall_ns | ms | 3 | 7.031 | 6.989 | 7.330 |
+| import-public-mapping-idle | cleanup_iterations | - | active_region_bytes | bytes | 3 | 32.000 | 32.000 | 32.000 |
+| import-public-mapping-idle | cleanup_iterations | - | cleanup_continuation_bytes | bytes | 3 | 48.000 | 48.000 | 48.000 |
+| import-public-mapping-idle | cleanup_iterations | - | cleanup_function_ns | ms | 3 | 13.342 | 13.295 | 14.549 |
+| import-public-mapping-idle | function_iterations | - | frame_prefix_bytes | bytes | 3 | 288.000 | 288.000 | 288.000 |
+| import-public-mapping-idle | function_iterations | - | verified_function_ns | ms | 3 | 10.857 | 10.278 | 11.959 |
+| import-public-mapping-idle | hash_iterations | - | string_hash_ns | ms | 3 | 50.514 | 50.454 | 54.331 |
+| import-public-mapping-idle | hash_iterations | - | tuple_repr_ns | ms | 3 | 13.077 | 12.843 | 16.785 |
+| import-public-mapping-idle | int_iterations | - | big_int_mul_ns | ms | 3 | 5.534 | 5.135 | 5.576 |
+| import-public-mapping-idle | int_iterations | - | int_add_ns | ms | 3 | 44.843 | 42.020 | 45.914 |
+| import-public-mapping-idle | int_iterations | - | int_object_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| import-public-mapping-idle | iterations | - | allocation_and_auto_gc_ns | ms | 3 | 4.234 | 4.117 | 4.277 |
+| import-public-mapping-idle | iterations | - | handle_bytes | bytes | 3 | 32.000 | 32.000 | 32.000 |
+| import-public-mapping-idle | iterations | - | header_bytes | bytes | 3 | 8.000 | 8.000 | 8.000 |
+| import-public-mapping-idle | iterations | - | last_gc_pause_ns | ms | 3 | 0.001 | 0.000 | 0.001 |
+| import-public-mapping-idle | iterations | - | live_bytes | bytes | 3 | 0.000 | 0.000 | 0.000 |
+| import-public-mapping-idle | iterations | - | node_bytes | bytes | 3 | 16.000 | 16.000 | 16.000 |
+| import-public-mapping-idle | iterations | - | recorded_metadata_bytes | bytes | 3 | 3360.000 | 3360.000 | 3360.000 |
+| import-public-mapping-idle | iterations | - | root_register_release_ns | ms | 3 | 2.246 | 2.246 | 2.303 |
+| import-public-mapping-idle | native_call_iterations | - | core_live_bytes | bytes | 3 | 194737.000 | 194737.000 | 194737.000 |
+| import-public-mapping-idle | native_call_iterations | - | core_metadata_bytes | bytes | 3 | 159792.000 | 159792.000 | 159792.000 |
+| import-public-mapping-idle | native_call_iterations | - | core_reserved_bytes | bytes | 3 | 452232.000 | 452232.000 | 452232.000 |
+| import-public-mapping-idle | native_call_iterations | - | lookup_bind_call_ns | ms | 3 | 19.805 | 16.827 | 20.715 |
+| import-public-mapping-idle | native_call_iterations | - | native_call_ns | ms | 3 | 9.274 | 9.099 | 9.737 |
+| import-public-mapping-idle | parallel_class_workers | 1 | finish_live_bytes | bytes | 3 | 202561.000 | 202561.000 | 202561.000 |
+| import-public-mapping-idle | parallel_class_workers | 1 | finish_metadata_bytes | bytes | 3 | 248560.000 | 248560.000 | 248560.000 |
+| import-public-mapping-idle | parallel_class_workers | 1 | finish_reserved_bytes | bytes | 3 | 608480.000 | 608480.000 | 608480.000 |
+| import-public-mapping-idle | parallel_class_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.028 | 0.022 | 0.031 |
+| import-public-mapping-idle | parallel_class_workers | 1 | max_rendezvous_ns | ms | 3 | 0.001 | 0.001 | 0.001 |
+| import-public-mapping-idle | parallel_class_workers | 1 | process_cpu_ns | ms | 3 | 383.196 | 376.955 | 400.165 |
+| import-public-mapping-idle | parallel_class_workers | 1 | source_freeze_run_ns | ms | 3 | 0.151 | 0.133 | 0.213 |
+| import-public-mapping-idle | parallel_class_workers | 1 | wall_ns | ms | 3 | 415.131 | 408.360 | 433.471 |
+| import-public-mapping-idle | parallel_class_workers | 2 | finish_live_bytes | bytes | 3 | 313385.000 | 306985.000 | 373385.000 |
+| import-public-mapping-idle | parallel_class_workers | 2 | finish_metadata_bytes | bytes | 3 | 304864.000 | 276416.000 | 304864.000 |
+| import-public-mapping-idle | parallel_class_workers | 2 | finish_reserved_bytes | bytes | 3 | 804944.000 | 804944.000 | 808920.000 |
+| import-public-mapping-idle | parallel_class_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.064 | 0.044 | 0.083 |
+| import-public-mapping-idle | parallel_class_workers | 2 | max_rendezvous_ns | ms | 3 | 0.212 | 0.167 | 1.092 |
+| import-public-mapping-idle | parallel_class_workers | 2 | process_cpu_ns | ms | 3 | 431.406 | 426.073 | 438.281 |
+| import-public-mapping-idle | parallel_class_workers | 2 | source_freeze_run_ns | ms | 3 | 0.105 | 0.104 | 0.128 |
+| import-public-mapping-idle | parallel_class_workers | 2 | wall_ns | ms | 3 | 249.034 | 247.062 | 257.705 |
+| import-public-mapping-idle | parallel_class_workers | 4 | finish_live_bytes | bytes | 3 | 212233.000 | 209433.000 | 348401.000 |
+| import-public-mapping-idle | parallel_class_workers | 4 | finish_metadata_bytes | bytes | 3 | 384192.000 | 349088.000 | 412032.000 |
+| import-public-mapping-idle | parallel_class_workers | 4 | finish_reserved_bytes | bytes | 3 | 870832.000 | 809400.000 | 1030872.000 |
+| import-public-mapping-idle | parallel_class_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.083 | 0.079 | 0.089 |
+| import-public-mapping-idle | parallel_class_workers | 4 | max_rendezvous_ns | ms | 3 | 1.236 | 1.089 | 1.315 |
+| import-public-mapping-idle | parallel_class_workers | 4 | process_cpu_ns | ms | 3 | 566.954 | 539.536 | 569.180 |
+| import-public-mapping-idle | parallel_class_workers | 4 | source_freeze_run_ns | ms | 3 | 0.113 | 0.112 | 0.130 |
+| import-public-mapping-idle | parallel_class_workers | 4 | wall_ns | ms | 3 | 203.807 | 194.073 | 207.626 |
+| import-public-mapping-idle | parallel_closure_workers | 1 | finish_live_bytes | bytes | 3 | 220897.000 | 220897.000 | 220897.000 |
+| import-public-mapping-idle | parallel_closure_workers | 1 | finish_metadata_bytes | bytes | 3 | 203696.000 | 203696.000 | 203696.000 |
+| import-public-mapping-idle | parallel_closure_workers | 1 | finish_reserved_bytes | bytes | 3 | 530216.000 | 530216.000 | 530216.000 |
+| import-public-mapping-idle | parallel_closure_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.031 | 0.026 | 0.033 |
+| import-public-mapping-idle | parallel_closure_workers | 1 | max_rendezvous_ns | ms | 3 | 0.001 | 0.001 | 0.001 |
+| import-public-mapping-idle | parallel_closure_workers | 1 | process_cpu_ns | ms | 3 | 178.231 | 169.779 | 179.632 |
+| import-public-mapping-idle | parallel_closure_workers | 1 | source_freeze_run_ns | ms | 3 | 0.076 | 0.074 | 0.076 |
+| import-public-mapping-idle | parallel_closure_workers | 1 | wall_ns | ms | 3 | 193.071 | 183.944 | 194.589 |
+| import-public-mapping-idle | parallel_closure_workers | 2 | finish_live_bytes | bytes | 3 | 373657.000 | 363161.000 | 382961.000 |
+| import-public-mapping-idle | parallel_closure_workers | 2 | finish_metadata_bytes | bytes | 3 | 471040.000 | 433984.000 | 471552.000 |
+| import-public-mapping-idle | parallel_closure_workers | 2 | finish_reserved_bytes | bytes | 3 | 989752.000 | 928072.000 | 993720.000 |
+| import-public-mapping-idle | parallel_closure_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.093 | 0.071 | 0.117 |
+| import-public-mapping-idle | parallel_closure_workers | 2 | max_rendezvous_ns | ms | 3 | 0.164 | 0.082 | 0.431 |
+| import-public-mapping-idle | parallel_closure_workers | 2 | process_cpu_ns | ms | 3 | 200.884 | 191.363 | 202.116 |
+| import-public-mapping-idle | parallel_closure_workers | 2 | source_freeze_run_ns | ms | 3 | 0.060 | 0.060 | 0.061 |
+| import-public-mapping-idle | parallel_closure_workers | 2 | wall_ns | ms | 3 | 113.847 | 108.020 | 116.004 |
+| import-public-mapping-idle | parallel_closure_workers | 4 | finish_live_bytes | bytes | 3 | 255097.000 | 241681.000 | 263665.000 |
+| import-public-mapping-idle | parallel_closure_workers | 4 | finish_metadata_bytes | bytes | 3 | 404640.000 | 367072.000 | 404640.000 |
+| import-public-mapping-idle | parallel_closure_workers | 4 | finish_reserved_bytes | bytes | 3 | 858456.000 | 792808.000 | 858456.000 |
+| import-public-mapping-idle | parallel_closure_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.090 | 0.083 | 0.254 |
+| import-public-mapping-idle | parallel_closure_workers | 4 | max_rendezvous_ns | ms | 3 | 0.501 | 0.320 | 0.912 |
+| import-public-mapping-idle | parallel_closure_workers | 4 | process_cpu_ns | ms | 3 | 230.629 | 222.317 | 278.525 |
+| import-public-mapping-idle | parallel_closure_workers | 4 | source_freeze_run_ns | ms | 3 | 0.067 | 0.063 | 0.068 |
+| import-public-mapping-idle | parallel_closure_workers | 4 | wall_ns | ms | 3 | 73.623 | 70.579 | 92.941 |
+| import-public-mapping-idle | parallel_exception_workers | 1 | finish_live_bytes | bytes | 3 | 346309.000 | 346309.000 | 346309.000 |
+| import-public-mapping-idle | parallel_exception_workers | 1 | finish_metadata_bytes | bytes | 3 | 401552.000 | 401552.000 | 401552.000 |
+| import-public-mapping-idle | parallel_exception_workers | 1 | finish_reserved_bytes | bytes | 3 | 887848.000 | 887848.000 | 887848.000 |
+| import-public-mapping-idle | parallel_exception_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.076 | 0.064 | 0.101 |
+| import-public-mapping-idle | parallel_exception_workers | 1 | max_rendezvous_ns | ms | 3 | 0.001 | 0.001 | 0.010 |
+| import-public-mapping-idle | parallel_exception_workers | 1 | process_cpu_ns | ms | 3 | 293.611 | 283.656 | 296.651 |
+| import-public-mapping-idle | parallel_exception_workers | 1 | source_freeze_run_ns | ms | 3 | 0.072 | 0.066 | 0.082 |
+| import-public-mapping-idle | parallel_exception_workers | 1 | wall_ns | ms | 3 | 318.068 | 307.306 | 321.534 |
+| import-public-mapping-idle | parallel_exception_workers | 2 | finish_live_bytes | bytes | 3 | 266373.000 | 262869.000 | 268933.000 |
+| import-public-mapping-idle | parallel_exception_workers | 2 | finish_metadata_bytes | bytes | 3 | 336512.000 | 315936.000 | 336512.000 |
+| import-public-mapping-idle | parallel_exception_workers | 2 | finish_reserved_bytes | bytes | 3 | 756536.000 | 728440.000 | 756536.000 |
+| import-public-mapping-idle | parallel_exception_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.072 | 0.049 | 0.183 |
+| import-public-mapping-idle | parallel_exception_workers | 2 | max_rendezvous_ns | ms | 3 | 0.043 | 0.036 | 0.276 |
+| import-public-mapping-idle | parallel_exception_workers | 2 | process_cpu_ns | ms | 3 | 319.551 | 318.638 | 355.854 |
+| import-public-mapping-idle | parallel_exception_workers | 2 | source_freeze_run_ns | ms | 3 | 0.056 | 0.055 | 0.105 |
+| import-public-mapping-idle | parallel_exception_workers | 2 | wall_ns | ms | 3 | 177.991 | 177.734 | 199.907 |
+| import-public-mapping-idle | parallel_exception_workers | 4 | finish_live_bytes | bytes | 3 | 223037.000 | 212797.000 | 226621.000 |
+| import-public-mapping-idle | parallel_exception_workers | 4 | finish_metadata_bytes | bytes | 3 | 347360.000 | 347360.000 | 347360.000 |
+| import-public-mapping-idle | parallel_exception_workers | 4 | finish_reserved_bytes | bytes | 3 | 756536.000 | 756536.000 | 756536.000 |
+| import-public-mapping-idle | parallel_exception_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.116 | 0.069 | 0.132 |
+| import-public-mapping-idle | parallel_exception_workers | 4 | max_rendezvous_ns | ms | 3 | 0.423 | 0.295 | 0.734 |
+| import-public-mapping-idle | parallel_exception_workers | 4 | process_cpu_ns | ms | 3 | 399.322 | 383.496 | 413.543 |
+| import-public-mapping-idle | parallel_exception_workers | 4 | source_freeze_run_ns | ms | 3 | 0.065 | 0.063 | 0.065 |
+| import-public-mapping-idle | parallel_exception_workers | 4 | wall_ns | ms | 3 | 124.866 | 121.768 | 127.133 |
+| import-public-mapping-idle | parallel_float_workers | 1 | finish_live_bytes | bytes | 3 | 234341.000 | 234341.000 | 234341.000 |
+| import-public-mapping-idle | parallel_float_workers | 1 | finish_metadata_bytes | bytes | 3 | 261360.000 | 261360.000 | 261360.000 |
+| import-public-mapping-idle | parallel_float_workers | 1 | finish_reserved_bytes | bytes | 3 | 621080.000 | 621080.000 | 621080.000 |
+| import-public-mapping-idle | parallel_float_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.052 | 0.038 | 0.066 |
+| import-public-mapping-idle | parallel_float_workers | 1 | max_rendezvous_ns | ms | 3 | 0.001 | 0.001 | 0.001 |
+| import-public-mapping-idle | parallel_float_workers | 1 | process_cpu_ns | ms | 3 | 244.781 | 215.226 | 252.558 |
+| import-public-mapping-idle | parallel_float_workers | 1 | source_freeze_run_ns | ms | 3 | 0.058 | 0.055 | 0.065 |
+| import-public-mapping-idle | parallel_float_workers | 1 | wall_ns | ms | 3 | 265.180 | 233.146 | 273.576 |
+| import-public-mapping-idle | parallel_float_workers | 2 | finish_live_bytes | bytes | 3 | 352653.000 | 351589.000 | 363405.000 |
+| import-public-mapping-idle | parallel_float_workers | 2 | finish_metadata_bytes | bytes | 3 | 568032.000 | 530464.000 | 568032.000 |
+| import-public-mapping-idle | parallel_float_workers | 2 | finish_reserved_bytes | bytes | 3 | 1109800.000 | 1044152.000 | 1109800.000 |
+| import-public-mapping-idle | parallel_float_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.109 | 0.094 | 0.111 |
+| import-public-mapping-idle | parallel_float_workers | 2 | max_rendezvous_ns | ms | 3 | 0.171 | 0.106 | 0.242 |
+| import-public-mapping-idle | parallel_float_workers | 2 | process_cpu_ns | ms | 3 | 229.692 | 226.587 | 261.786 |
+| import-public-mapping-idle | parallel_float_workers | 2 | source_freeze_run_ns | ms | 3 | 0.048 | 0.048 | 0.051 |
+| import-public-mapping-idle | parallel_float_workers | 2 | wall_ns | ms | 3 | 128.480 | 125.817 | 145.834 |
+| import-public-mapping-idle | parallel_float_workers | 4 | finish_live_bytes | bytes | 3 | 219829.000 | 215349.000 | 230493.000 |
+| import-public-mapping-idle | parallel_float_workers | 4 | finish_metadata_bytes | bytes | 3 | 390336.000 | 390336.000 | 390336.000 |
+| import-public-mapping-idle | parallel_float_workers | 4 | finish_reserved_bytes | bytes | 3 | 818024.000 | 818024.000 | 818024.000 |
+| import-public-mapping-idle | parallel_float_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.102 | 0.094 | 0.122 |
+| import-public-mapping-idle | parallel_float_workers | 4 | max_rendezvous_ns | ms | 3 | 0.352 | 0.258 | 0.907 |
+| import-public-mapping-idle | parallel_float_workers | 4 | process_cpu_ns | ms | 3 | 270.397 | 267.959 | 272.377 |
+| import-public-mapping-idle | parallel_float_workers | 4 | source_freeze_run_ns | ms | 3 | 0.052 | 0.052 | 0.054 |
+| import-public-mapping-idle | parallel_float_workers | 4 | wall_ns | ms | 3 | 87.141 | 82.971 | 89.336 |
+| import-public-mapping-idle | parallel_for_workers | 1 | finish_live_bytes | bytes | 3 | 264861.000 | 264861.000 | 264861.000 |
+| import-public-mapping-idle | parallel_for_workers | 1 | finish_metadata_bytes | bytes | 3 | 283280.000 | 283280.000 | 283280.000 |
+| import-public-mapping-idle | parallel_for_workers | 1 | finish_reserved_bytes | bytes | 3 | 669920.000 | 669920.000 | 669920.000 |
+| import-public-mapping-idle | parallel_for_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.039 | 0.036 | 0.043 |
+| import-public-mapping-idle | parallel_for_workers | 1 | max_rendezvous_ns | ms | 3 | 0.001 | 0.001 | 0.002 |
+| import-public-mapping-idle | parallel_for_workers | 1 | process_cpu_ns | ms | 3 | 123.488 | 112.123 | 124.965 |
+| import-public-mapping-idle | parallel_for_workers | 1 | source_freeze_run_ns | ms | 3 | 0.054 | 0.053 | 0.059 |
+| import-public-mapping-idle | parallel_for_workers | 1 | wall_ns | ms | 3 | 133.745 | 121.454 | 135.391 |
+| import-public-mapping-idle | parallel_for_workers | 2 | finish_live_bytes | bytes | 3 | 389069.000 | 376925.000 | 392069.000 |
+| import-public-mapping-idle | parallel_for_workers | 2 | finish_metadata_bytes | bytes | 3 | 483296.000 | 483296.000 | 483296.000 |
+| import-public-mapping-idle | parallel_for_workers | 2 | finish_reserved_bytes | bytes | 3 | 1014744.000 | 1014744.000 | 1014744.000 |
+| import-public-mapping-idle | parallel_for_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.085 | 0.068 | 0.114 |
+| import-public-mapping-idle | parallel_for_workers | 2 | max_rendezvous_ns | ms | 3 | 0.171 | 0.090 | 0.231 |
+| import-public-mapping-idle | parallel_for_workers | 2 | process_cpu_ns | ms | 3 | 119.206 | 118.765 | 131.389 |
+| import-public-mapping-idle | parallel_for_workers | 2 | source_freeze_run_ns | ms | 3 | 0.047 | 0.046 | 0.049 |
+| import-public-mapping-idle | parallel_for_workers | 2 | wall_ns | ms | 3 | 68.059 | 68.018 | 75.679 |
+| import-public-mapping-idle | parallel_for_workers | 4 | finish_live_bytes | bytes | 3 | 283853.000 | 279317.000 | 294589.000 |
+| import-public-mapping-idle | parallel_for_workers | 4 | finish_metadata_bytes | bytes | 3 | 425760.000 | 419008.000 | 456576.000 |
+| import-public-mapping-idle | parallel_for_workers | 4 | finish_reserved_bytes | bytes | 3 | 900032.000 | 883448.000 | 949096.000 |
+| import-public-mapping-idle | parallel_for_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.120 | 0.105 | 0.130 |
+| import-public-mapping-idle | parallel_for_workers | 4 | max_rendezvous_ns | ms | 3 | 0.444 | 0.343 | 0.633 |
+| import-public-mapping-idle | parallel_for_workers | 4 | process_cpu_ns | ms | 3 | 162.804 | 147.590 | 163.628 |
+| import-public-mapping-idle | parallel_for_workers | 4 | source_freeze_run_ns | ms | 3 | 0.049 | 0.049 | 0.056 |
+| import-public-mapping-idle | parallel_for_workers | 4 | wall_ns | ms | 3 | 54.701 | 47.464 | 55.394 |
+| import-public-mapping-idle | parallel_source_workers | 1 | finish_live_bytes | bytes | 3 | 278669.000 | 278669.000 | 278669.000 |
+| import-public-mapping-idle | parallel_source_workers | 1 | finish_metadata_bytes | bytes | 3 | 275984.000 | 275984.000 | 275984.000 |
+| import-public-mapping-idle | parallel_source_workers | 1 | finish_reserved_bytes | bytes | 3 | 657304.000 | 657304.000 | 657304.000 |
+| import-public-mapping-idle | parallel_source_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.080 | 0.042 | 0.090 |
+| import-public-mapping-idle | parallel_source_workers | 1 | max_rendezvous_ns | ms | 3 | 0.002 | 0.001 | 0.008 |
+| import-public-mapping-idle | parallel_source_workers | 1 | process_cpu_ns | ms | 3 | 169.566 | 167.445 | 198.563 |
+| import-public-mapping-idle | parallel_source_workers | 1 | source_freeze_run_ns | ms | 3 | 0.054 | 0.052 | 0.068 |
+| import-public-mapping-idle | parallel_source_workers | 1 | wall_ns | ms | 3 | 183.702 | 181.383 | 215.095 |
+| import-public-mapping-idle | parallel_source_workers | 2 | finish_live_bytes | bytes | 3 | 223229.000 | 218525.000 | 233669.000 |
+| import-public-mapping-idle | parallel_source_workers | 2 | finish_metadata_bytes | bytes | 3 | 242784.000 | 242784.000 | 280352.000 |
+| import-public-mapping-idle | parallel_source_workers | 2 | finish_reserved_bytes | bytes | 3 | 591656.000 | 591656.000 | 657304.000 |
+| import-public-mapping-idle | parallel_source_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.095 | 0.069 | 0.144 |
+| import-public-mapping-idle | parallel_source_workers | 2 | max_rendezvous_ns | ms | 3 | 0.101 | 0.066 | 0.133 |
+| import-public-mapping-idle | parallel_source_workers | 2 | process_cpu_ns | ms | 3 | 194.543 | 177.707 | 214.628 |
+| import-public-mapping-idle | parallel_source_workers | 2 | source_freeze_run_ns | ms | 3 | 0.044 | 0.044 | 0.045 |
+| import-public-mapping-idle | parallel_source_workers | 2 | wall_ns | ms | 3 | 108.333 | 99.778 | 119.993 |
+| import-public-mapping-idle | parallel_source_workers | 4 | finish_live_bytes | bytes | 3 | 274677.000 | 252861.000 | 277061.000 |
+| import-public-mapping-idle | parallel_source_workers | 4 | finish_metadata_bytes | bytes | 3 | 365248.000 | 365248.000 | 401792.000 |
+| import-public-mapping-idle | parallel_source_workers | 4 | finish_reserved_bytes | bytes | 3 | 796536.000 | 796536.000 | 854248.000 |
+| import-public-mapping-idle | parallel_source_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.117 | 0.101 | 0.120 |
+| import-public-mapping-idle | parallel_source_workers | 4 | max_rendezvous_ns | ms | 3 | 1.223 | 0.233 | 1.372 |
+| import-public-mapping-idle | parallel_source_workers | 4 | process_cpu_ns | ms | 3 | 238.400 | 220.828 | 257.274 |
+| import-public-mapping-idle | parallel_source_workers | 4 | source_freeze_run_ns | ms | 3 | 0.056 | 0.050 | 0.061 |
+| import-public-mapping-idle | parallel_source_workers | 4 | wall_ns | ms | 3 | 74.753 | 72.931 | 80.761 |
+| import-public-mapping-idle | parallel_storage_workers | 1 | finish_live_bytes | bytes | 3 | 42720.000 | 42720.000 | 42720.000 |
+| import-public-mapping-idle | parallel_storage_workers | 1 | finish_metadata_bytes | bytes | 3 | 97040.000 | 97040.000 | 97040.000 |
+| import-public-mapping-idle | parallel_storage_workers | 1 | finish_reserved_bytes | bytes | 3 | 135504.000 | 135504.000 | 135504.000 |
+| import-public-mapping-idle | parallel_storage_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.018 | 0.015 | 0.073 |
+| import-public-mapping-idle | parallel_storage_workers | 1 | max_rendezvous_ns | ms | 3 | 0.000 | 0.000 | 0.001 |
+| import-public-mapping-idle | parallel_storage_workers | 1 | process_cpu_ns | ms | 3 | 2.548 | 2.173 | 2.712 |
+| import-public-mapping-idle | parallel_storage_workers | 1 | wall_ns | ms | 3 | 2.774 | 2.410 | 2.993 |
+| import-public-mapping-idle | parallel_storage_workers | 2 | finish_live_bytes | bytes | 3 | 11024.000 | 5216.000 | 15824.000 |
+| import-public-mapping-idle | parallel_storage_workers | 2 | finish_metadata_bytes | bytes | 3 | 100352.000 | 100352.000 | 100352.000 |
+| import-public-mapping-idle | parallel_storage_workers | 2 | finish_reserved_bytes | bytes | 3 | 135504.000 | 135504.000 | 135504.000 |
+| import-public-mapping-idle | parallel_storage_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.006 | 0.005 | 0.009 |
+| import-public-mapping-idle | parallel_storage_workers | 2 | max_rendezvous_ns | ms | 3 | 0.058 | 0.033 | 0.061 |
+| import-public-mapping-idle | parallel_storage_workers | 2 | process_cpu_ns | ms | 3 | 2.706 | 2.630 | 2.726 |
+| import-public-mapping-idle | parallel_storage_workers | 2 | wall_ns | ms | 3 | 1.976 | 1.930 | 2.004 |
+| import-public-mapping-idle | parallel_storage_workers | 4 | finish_live_bytes | bytes | 3 | 59856.000 | 41984.000 | 62736.000 |
+| import-public-mapping-idle | parallel_storage_workers | 4 | finish_metadata_bytes | bytes | 3 | 244096.000 | 238400.000 | 282208.000 |
+| import-public-mapping-idle | parallel_storage_workers | 4 | finish_reserved_bytes | bytes | 3 | 340864.000 | 332448.000 | 398096.000 |
+| import-public-mapping-idle | parallel_storage_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.030 | 0.021 | 0.112 |
+| import-public-mapping-idle | parallel_storage_workers | 4 | max_rendezvous_ns | ms | 3 | 0.107 | 0.094 | 1.083 |
+| import-public-mapping-idle | parallel_storage_workers | 4 | process_cpu_ns | ms | 3 | 3.820 | 3.200 | 4.727 |
+| import-public-mapping-idle | parallel_storage_workers | 4 | wall_ns | ms | 3 | 2.481 | 2.333 | 4.260 |
+| import-public-mapping-idle | parallel_vm_workers | 1 | finish_live_bytes | bytes | 3 | 304053.000 | 304053.000 | 304053.000 |
+| import-public-mapping-idle | parallel_vm_workers | 1 | finish_metadata_bytes | bytes | 3 | 313456.000 | 313456.000 | 313456.000 |
+| import-public-mapping-idle | parallel_vm_workers | 1 | finish_reserved_bytes | bytes | 3 | 722952.000 | 722952.000 | 722952.000 |
+| import-public-mapping-idle | parallel_vm_workers | 1 | last_mark_sweep_ns | ms | 3 | 0.054 | 0.044 | 0.054 |
+| import-public-mapping-idle | parallel_vm_workers | 1 | max_rendezvous_ns | ms | 3 | 0.001 | 0.001 | 0.001 |
+| import-public-mapping-idle | parallel_vm_workers | 1 | process_cpu_ns | ms | 3 | 150.882 | 149.681 | 153.841 |
+| import-public-mapping-idle | parallel_vm_workers | 1 | source_freeze_run_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| import-public-mapping-idle | parallel_vm_workers | 1 | wall_ns | ms | 3 | 163.457 | 162.166 | 166.606 |
+| import-public-mapping-idle | parallel_vm_workers | 2 | finish_live_bytes | bytes | 3 | 260877.000 | 259173.000 | 261093.000 |
+| import-public-mapping-idle | parallel_vm_workers | 2 | finish_metadata_bytes | bytes | 3 | 317728.000 | 280672.000 | 317728.000 |
+| import-public-mapping-idle | parallel_vm_workers | 2 | finish_reserved_bytes | bytes | 3 | 722952.000 | 661272.000 | 722952.000 |
+| import-public-mapping-idle | parallel_vm_workers | 2 | last_mark_sweep_ns | ms | 3 | 0.075 | 0.069 | 0.077 |
+| import-public-mapping-idle | parallel_vm_workers | 2 | max_rendezvous_ns | ms | 3 | 0.159 | 0.097 | 0.220 |
+| import-public-mapping-idle | parallel_vm_workers | 2 | process_cpu_ns | ms | 3 | 173.067 | 164.754 | 173.616 |
+| import-public-mapping-idle | parallel_vm_workers | 2 | source_freeze_run_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| import-public-mapping-idle | parallel_vm_workers | 2 | wall_ns | ms | 3 | 98.089 | 92.249 | 98.116 |
+| import-public-mapping-idle | parallel_vm_workers | 4 | finish_live_bytes | bytes | 3 | 341325.000 | 339213.000 | 342957.000 |
+| import-public-mapping-idle | parallel_vm_workers | 4 | finish_metadata_bytes | bytes | 3 | 477056.000 | 477056.000 | 514112.000 |
+| import-public-mapping-idle | parallel_vm_workers | 4 | finish_reserved_bytes | bytes | 3 | 989512.000 | 989512.000 | 1051192.000 |
+| import-public-mapping-idle | parallel_vm_workers | 4 | last_mark_sweep_ns | ms | 3 | 0.139 | 0.108 | 0.158 |
+| import-public-mapping-idle | parallel_vm_workers | 4 | max_rendezvous_ns | ms | 3 | 0.591 | 0.501 | 0.606 |
+| import-public-mapping-idle | parallel_vm_workers | 4 | process_cpu_ns | ms | 3 | 203.597 | 196.339 | 226.343 |
+| import-public-mapping-idle | parallel_vm_workers | 4 | source_freeze_run_ns | ms | 3 | 0.000 | 0.000 | 0.000 |
+| import-public-mapping-idle | parallel_vm_workers | 4 | wall_ns | ms | 3 | 69.169 | 65.573 | 78.245 |
+| import-public-mapping-idle | process_peak_rss_kib | - | process_peak_rss_kib | KiB | 3 | 9220.000 | 8068.000 | 9764.000 |
+| import-public-mapping-idle | scheduled_iterations | - | scheduled_function_ns | ms | 3 | 16.192 | 16.159 | 18.444 |
+| import-public-mapping-idle | shared_edge_iterations | - | cell_object_bytes | bytes | 3 | 16.000 | 16.000 | 16.000 |
+| import-public-mapping-idle | shared_edge_iterations | - | rooted_cell_read_ns | ms | 3 | 1.127 | 1.118 | 1.170 |
+| import-public-mapping-idle | shared_edge_iterations | - | rooted_cell_store_read_ns | ms | 3 | 3.013 | 2.758 | 3.217 |
+| import-public-mapping-idle | slot_iterations | - | generic_prefix_bytes | bytes | 3 | 8.000 | 8.000 | 8.000 |
+| import-public-mapping-idle | slot_iterations | - | slot_instance_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| import-public-mapping-idle | slot_iterations | - | slot_set_get_ns | ms | 3 | 31.837 | 28.754 | 36.541 |
+| import-public-mapping-idle | source_parse_scope_cfg_ns | - | source_bytes | bytes | 3 | 92.000 | 92.000 | 92.000 |
+| import-public-mapping-idle | source_parse_scope_cfg_ns | - | source_parse_scope_cfg_ns | ms | 3 | 0.051 | 0.042 | 0.052 |
+| import-public-mapping-idle | transfer_iterations | - | transfer_roundtrip_ns | ms | 3 | 0.664 | 0.658 | 0.675 |
+| import-public-mapping-idle | transfer_iterations | - | transfer_token_bytes | bytes | 3 | 24.000 | 24.000 | 24.000 |
+| import-public-mapping-idle | with_iterations | - | with_function_ns | ms | 3 | 20.830 | 20.460 | 29.768 |
+| import-public-mapping-idle-cpython | parallel_class_workers | 1 | process_cpu_ns | ms | 3 | 9.261 | 9.073 | 9.649 |
+| import-public-mapping-idle-cpython | parallel_class_workers | 1 | wall_ns | ms | 3 | 10.069 | 9.865 | 10.511 |
+| import-public-mapping-idle-cpython | parallel_class_workers | 2 | process_cpu_ns | ms | 3 | 9.898 | 8.919 | 11.046 |
+| import-public-mapping-idle-cpython | parallel_class_workers | 2 | wall_ns | ms | 3 | 10.722 | 9.661 | 11.969 |
+| import-public-mapping-idle-cpython | parallel_class_workers | 4 | process_cpu_ns | ms | 3 | 8.914 | 8.845 | 9.418 |
+| import-public-mapping-idle-cpython | parallel_class_workers | 4 | wall_ns | ms | 3 | 9.708 | 9.615 | 10.266 |
+| import-public-mapping-idle-cpython | parallel_closure_workers | 1 | process_cpu_ns | ms | 3 | 6.639 | 6.593 | 6.782 |
+| import-public-mapping-idle-cpython | parallel_closure_workers | 1 | wall_ns | ms | 3 | 7.192 | 7.175 | 7.349 |
+| import-public-mapping-idle-cpython | parallel_closure_workers | 2 | process_cpu_ns | ms | 3 | 6.363 | 6.314 | 6.370 |
+| import-public-mapping-idle-cpython | parallel_closure_workers | 2 | wall_ns | ms | 3 | 6.889 | 6.884 | 6.918 |
+| import-public-mapping-idle-cpython | parallel_closure_workers | 4 | process_cpu_ns | ms | 3 | 6.079 | 5.935 | 6.085 |
+| import-public-mapping-idle-cpython | parallel_closure_workers | 4 | wall_ns | ms | 3 | 6.614 | 6.498 | 6.687 |
+| import-public-mapping-idle-cpython | parallel_exception_workers | 1 | process_cpu_ns | ms | 3 | 7.660 | 7.517 | 7.819 |
+| import-public-mapping-idle-cpython | parallel_exception_workers | 1 | wall_ns | ms | 3 | 8.295 | 8.190 | 8.471 |
+| import-public-mapping-idle-cpython | parallel_exception_workers | 2 | process_cpu_ns | ms | 3 | 7.596 | 7.574 | 7.812 |
+| import-public-mapping-idle-cpython | parallel_exception_workers | 2 | wall_ns | ms | 3 | 8.247 | 8.202 | 8.483 |
+| import-public-mapping-idle-cpython | parallel_exception_workers | 4 | process_cpu_ns | ms | 3 | 7.489 | 7.363 | 7.932 |
+| import-public-mapping-idle-cpython | parallel_exception_workers | 4 | wall_ns | ms | 3 | 8.217 | 8.057 | 8.596 |
+| import-public-mapping-idle-cpython | parallel_float_workers | 1 | process_cpu_ns | ms | 3 | 6.019 | 5.963 | 6.209 |
+| import-public-mapping-idle-cpython | parallel_float_workers | 1 | wall_ns | ms | 3 | 6.523 | 6.474 | 6.766 |
+| import-public-mapping-idle-cpython | parallel_float_workers | 2 | process_cpu_ns | ms | 3 | 5.991 | 5.956 | 6.172 |
+| import-public-mapping-idle-cpython | parallel_float_workers | 2 | wall_ns | ms | 3 | 6.515 | 6.439 | 6.696 |
+| import-public-mapping-idle-cpython | parallel_float_workers | 4 | process_cpu_ns | ms | 3 | 6.221 | 6.038 | 6.239 |
+| import-public-mapping-idle-cpython | parallel_float_workers | 4 | wall_ns | ms | 3 | 6.765 | 6.605 | 6.871 |
+| import-public-mapping-idle-cpython | parallel_for_workers | 1 | process_cpu_ns | ms | 3 | 4.872 | 4.744 | 4.891 |
+| import-public-mapping-idle-cpython | parallel_for_workers | 1 | wall_ns | ms | 3 | 5.328 | 5.147 | 5.338 |
+| import-public-mapping-idle-cpython | parallel_for_workers | 2 | process_cpu_ns | ms | 3 | 4.850 | 4.619 | 4.989 |
+| import-public-mapping-idle-cpython | parallel_for_workers | 2 | wall_ns | ms | 3 | 5.310 | 5.050 | 5.419 |
+| import-public-mapping-idle-cpython | parallel_for_workers | 4 | process_cpu_ns | ms | 3 | 4.965 | 4.747 | 5.218 |
+| import-public-mapping-idle-cpython | parallel_for_workers | 4 | wall_ns | ms | 3 | 5.446 | 5.275 | 5.694 |
+| import-public-mapping-idle-cpython | parallel_source_workers | 1 | process_cpu_ns | ms | 3 | 6.790 | 6.646 | 6.918 |
+| import-public-mapping-idle-cpython | parallel_source_workers | 1 | wall_ns | ms | 3 | 7.401 | 7.231 | 7.496 |
+| import-public-mapping-idle-cpython | parallel_source_workers | 2 | process_cpu_ns | ms | 3 | 6.710 | 6.407 | 6.741 |
+| import-public-mapping-idle-cpython | parallel_source_workers | 2 | wall_ns | ms | 3 | 7.271 | 6.970 | 7.297 |
+| import-public-mapping-idle-cpython | parallel_source_workers | 4 | process_cpu_ns | ms | 3 | 6.316 | 6.288 | 6.870 |
+| import-public-mapping-idle-cpython | parallel_source_workers | 4 | wall_ns | ms | 3 | 6.951 | 6.849 | 7.438 |
 | l1-float-operators | cleanup_iterations | - | active_region_bytes | bytes | 3 | 32.000 | 32.000 | 32.000 |
 | l1-float-operators | cleanup_iterations | - | cleanup_continuation_bytes | bytes | 3 | 48.000 | 48.000 | 48.000 |
 | l1-float-operators | cleanup_iterations | - | cleanup_function_ns | ms | 3 | 17.037 | 16.820 | 18.269 |
@@ -1393,6 +1915,90 @@ Derived from median wall/process CPU times. CPU/wall is not a speedup; 1-worker 
 | file-import-syntax-idle-cpython | parallel_source_workers | 1 | 7.307 | 0.919 | 1.000 | 1.000 |
 | file-import-syntax-idle-cpython | parallel_source_workers | 2 | 6.913 | 0.920 | 1.057 | 0.528 |
 | file-import-syntax-idle-cpython | parallel_source_workers | 4 | 6.865 | 0.919 | 1.064 | 0.266 |
+| import-public-mapping-final-idle | parallel_class_workers | 1 | 433.248 | 0.923 | 1.000 | 1.000 |
+| import-public-mapping-final-idle | parallel_class_workers | 2 | 250.016 | 1.722 | 1.733 | 0.866 |
+| import-public-mapping-final-idle | parallel_class_workers | 4 | 206.956 | 2.683 | 2.093 | 0.523 |
+| import-public-mapping-final-idle | parallel_closure_workers | 1 | 221.003 | 0.923 | 1.000 | 1.000 |
+| import-public-mapping-final-idle | parallel_closure_workers | 2 | 115.551 | 1.779 | 1.913 | 0.956 |
+| import-public-mapping-final-idle | parallel_closure_workers | 4 | 81.685 | 3.166 | 2.706 | 0.676 |
+| import-public-mapping-final-idle | parallel_exception_workers | 1 | 356.946 | 0.923 | 1.000 | 1.000 |
+| import-public-mapping-final-idle | parallel_exception_workers | 2 | 184.510 | 1.776 | 1.935 | 0.967 |
+| import-public-mapping-final-idle | parallel_exception_workers | 4 | 128.054 | 3.253 | 2.787 | 0.697 |
+| import-public-mapping-final-idle | parallel_float_workers | 1 | 213.964 | 0.923 | 1.000 | 1.000 |
+| import-public-mapping-final-idle | parallel_float_workers | 2 | 150.126 | 1.780 | 1.425 | 0.713 |
+| import-public-mapping-final-idle | parallel_float_workers | 4 | 94.555 | 3.045 | 2.263 | 0.566 |
+| import-public-mapping-final-idle | parallel_for_workers | 1 | 130.338 | 0.923 | 1.000 | 1.000 |
+| import-public-mapping-final-idle | parallel_for_workers | 2 | 70.171 | 1.777 | 1.857 | 0.929 |
+| import-public-mapping-final-idle | parallel_for_workers | 4 | 50.823 | 3.056 | 2.565 | 0.641 |
+| import-public-mapping-final-idle | parallel_source_workers | 1 | 206.423 | 0.923 | 1.000 | 1.000 |
+| import-public-mapping-final-idle | parallel_source_workers | 2 | 112.044 | 1.772 | 1.842 | 0.921 |
+| import-public-mapping-final-idle | parallel_source_workers | 4 | 87.022 | 3.016 | 2.372 | 0.593 |
+| import-public-mapping-final-idle | parallel_storage_workers | 1 | 2.855 | 0.906 | 1.000 | 1.000 |
+| import-public-mapping-final-idle | parallel_storage_workers | 2 | 1.914 | 1.398 | 1.492 | 0.746 |
+| import-public-mapping-final-idle | parallel_storage_workers | 4 | 2.918 | 1.365 | 0.979 | 0.245 |
+| import-public-mapping-final-idle | parallel_vm_workers | 1 | 170.048 | 0.923 | 1.000 | 1.000 |
+| import-public-mapping-final-idle | parallel_vm_workers | 2 | 110.178 | 1.797 | 1.543 | 0.772 |
+| import-public-mapping-final-idle | parallel_vm_workers | 4 | 83.618 | 3.006 | 2.034 | 0.508 |
+| import-public-mapping-final-idle-cpython | parallel_class_workers | 1 | 10.226 | 0.921 | 1.000 | 1.000 |
+| import-public-mapping-final-idle-cpython | parallel_class_workers | 2 | 10.166 | 0.921 | 1.006 | 0.503 |
+| import-public-mapping-final-idle-cpython | parallel_class_workers | 4 | 9.981 | 0.922 | 1.025 | 0.256 |
+| import-public-mapping-final-idle-cpython | parallel_closure_workers | 1 | 7.589 | 0.920 | 1.000 | 1.000 |
+| import-public-mapping-final-idle-cpython | parallel_closure_workers | 2 | 7.027 | 0.921 | 1.080 | 0.540 |
+| import-public-mapping-final-idle-cpython | parallel_closure_workers | 4 | 7.001 | 0.933 | 1.084 | 0.271 |
+| import-public-mapping-final-idle-cpython | parallel_exception_workers | 1 | 8.701 | 0.909 | 1.000 | 1.000 |
+| import-public-mapping-final-idle-cpython | parallel_exception_workers | 2 | 8.206 | 0.925 | 1.060 | 0.530 |
+| import-public-mapping-final-idle-cpython | parallel_exception_workers | 4 | 8.409 | 0.913 | 1.035 | 0.259 |
+| import-public-mapping-final-idle-cpython | parallel_float_workers | 1 | 6.805 | 0.922 | 1.000 | 1.000 |
+| import-public-mapping-final-idle-cpython | parallel_float_workers | 2 | 6.782 | 0.921 | 1.003 | 0.502 |
+| import-public-mapping-final-idle-cpython | parallel_float_workers | 4 | 6.817 | 0.922 | 0.998 | 0.250 |
+| import-public-mapping-final-idle-cpython | parallel_for_workers | 1 | 5.474 | 0.923 | 1.000 | 1.000 |
+| import-public-mapping-final-idle-cpython | parallel_for_workers | 2 | 5.655 | 0.932 | 0.968 | 0.484 |
+| import-public-mapping-final-idle-cpython | parallel_for_workers | 4 | 5.442 | 0.920 | 1.006 | 0.251 |
+| import-public-mapping-final-idle-cpython | parallel_source_workers | 1 | 7.432 | 0.924 | 1.000 | 1.000 |
+| import-public-mapping-final-idle-cpython | parallel_source_workers | 2 | 7.946 | 0.921 | 0.935 | 0.468 |
+| import-public-mapping-final-idle-cpython | parallel_source_workers | 4 | 7.031 | 0.916 | 1.057 | 0.264 |
+| import-public-mapping-idle | parallel_class_workers | 1 | 415.131 | 0.923 | 1.000 | 1.000 |
+| import-public-mapping-idle | parallel_class_workers | 2 | 249.034 | 1.732 | 1.667 | 0.833 |
+| import-public-mapping-idle | parallel_class_workers | 4 | 203.807 | 2.782 | 2.037 | 0.509 |
+| import-public-mapping-idle | parallel_closure_workers | 1 | 193.071 | 0.923 | 1.000 | 1.000 |
+| import-public-mapping-idle | parallel_closure_workers | 2 | 113.847 | 1.765 | 1.696 | 0.848 |
+| import-public-mapping-idle | parallel_closure_workers | 4 | 73.623 | 3.133 | 2.622 | 0.656 |
+| import-public-mapping-idle | parallel_exception_workers | 1 | 318.068 | 0.923 | 1.000 | 1.000 |
+| import-public-mapping-idle | parallel_exception_workers | 2 | 177.991 | 1.795 | 1.787 | 0.893 |
+| import-public-mapping-idle | parallel_exception_workers | 4 | 124.866 | 3.198 | 2.547 | 0.637 |
+| import-public-mapping-idle | parallel_float_workers | 1 | 265.180 | 0.923 | 1.000 | 1.000 |
+| import-public-mapping-idle | parallel_float_workers | 2 | 128.480 | 1.788 | 2.064 | 1.032 |
+| import-public-mapping-idle | parallel_float_workers | 4 | 87.141 | 3.103 | 3.043 | 0.761 |
+| import-public-mapping-idle | parallel_for_workers | 1 | 133.745 | 0.923 | 1.000 | 1.000 |
+| import-public-mapping-idle | parallel_for_workers | 2 | 68.059 | 1.752 | 1.965 | 0.983 |
+| import-public-mapping-idle | parallel_for_workers | 4 | 54.701 | 2.976 | 2.445 | 0.611 |
+| import-public-mapping-idle | parallel_source_workers | 1 | 183.702 | 0.923 | 1.000 | 1.000 |
+| import-public-mapping-idle | parallel_source_workers | 2 | 108.333 | 1.796 | 1.696 | 0.848 |
+| import-public-mapping-idle | parallel_source_workers | 4 | 74.753 | 3.189 | 2.457 | 0.614 |
+| import-public-mapping-idle | parallel_storage_workers | 1 | 2.774 | 0.919 | 1.000 | 1.000 |
+| import-public-mapping-idle | parallel_storage_workers | 2 | 1.976 | 1.369 | 1.403 | 0.702 |
+| import-public-mapping-idle | parallel_storage_workers | 4 | 2.481 | 1.540 | 1.118 | 0.279 |
+| import-public-mapping-idle | parallel_vm_workers | 1 | 163.457 | 0.923 | 1.000 | 1.000 |
+| import-public-mapping-idle | parallel_vm_workers | 2 | 98.089 | 1.764 | 1.666 | 0.833 |
+| import-public-mapping-idle | parallel_vm_workers | 4 | 69.169 | 2.943 | 2.363 | 0.591 |
+| import-public-mapping-idle-cpython | parallel_class_workers | 1 | 10.069 | 0.920 | 1.000 | 1.000 |
+| import-public-mapping-idle-cpython | parallel_class_workers | 2 | 10.722 | 0.923 | 0.939 | 0.470 |
+| import-public-mapping-idle-cpython | parallel_class_workers | 4 | 9.708 | 0.918 | 1.037 | 0.259 |
+| import-public-mapping-idle-cpython | parallel_closure_workers | 1 | 7.192 | 0.923 | 1.000 | 1.000 |
+| import-public-mapping-idle-cpython | parallel_closure_workers | 2 | 6.889 | 0.924 | 1.044 | 0.522 |
+| import-public-mapping-idle-cpython | parallel_closure_workers | 4 | 6.614 | 0.919 | 1.087 | 0.272 |
+| import-public-mapping-idle-cpython | parallel_exception_workers | 1 | 8.295 | 0.923 | 1.000 | 1.000 |
+| import-public-mapping-idle-cpython | parallel_exception_workers | 2 | 8.247 | 0.921 | 1.006 | 0.503 |
+| import-public-mapping-idle-cpython | parallel_exception_workers | 4 | 8.217 | 0.911 | 1.009 | 0.252 |
+| import-public-mapping-idle-cpython | parallel_float_workers | 1 | 6.523 | 0.923 | 1.000 | 1.000 |
+| import-public-mapping-idle-cpython | parallel_float_workers | 2 | 6.515 | 0.920 | 1.001 | 0.501 |
+| import-public-mapping-idle-cpython | parallel_float_workers | 4 | 6.765 | 0.919 | 0.964 | 0.241 |
+| import-public-mapping-idle-cpython | parallel_for_workers | 1 | 5.328 | 0.914 | 1.000 | 1.000 |
+| import-public-mapping-idle-cpython | parallel_for_workers | 2 | 5.310 | 0.913 | 1.003 | 0.502 |
+| import-public-mapping-idle-cpython | parallel_for_workers | 4 | 5.446 | 0.912 | 0.978 | 0.245 |
+| import-public-mapping-idle-cpython | parallel_source_workers | 1 | 7.401 | 0.917 | 1.000 | 1.000 |
+| import-public-mapping-idle-cpython | parallel_source_workers | 2 | 7.271 | 0.923 | 1.018 | 0.509 |
+| import-public-mapping-idle-cpython | parallel_source_workers | 4 | 6.951 | 0.909 | 1.065 | 0.266 |
 | l1-float-operators | parallel_class_workers | 1 | 460.123 | 1.004 | 1.000 | 1.000 |
 | l1-float-operators | parallel_class_workers | 2 | 251.646 | 1.911 | 1.828 | 0.914 |
 | l1-float-operators | parallel_class_workers | 4 | 183.485 | 2.889 | 2.508 | 0.627 |
@@ -1520,6 +2126,42 @@ The CPython probe executes the source kernel captured from the C++ benchmark, wi
 | file-import-syntax-idle | parallel_source_workers | 1 | 267.382 | 7.307 | 36.595 |
 | file-import-syntax-idle | parallel_source_workers | 2 | 150.177 | 6.913 | 21.723 |
 | file-import-syntax-idle | parallel_source_workers | 4 | 102.686 | 6.865 | 14.957 |
+| import-public-mapping-final-idle | parallel_class_workers | 1 | 433.248 | 10.226 | 42.366 |
+| import-public-mapping-final-idle | parallel_class_workers | 2 | 250.016 | 10.166 | 24.593 |
+| import-public-mapping-final-idle | parallel_class_workers | 4 | 206.956 | 9.981 | 20.735 |
+| import-public-mapping-final-idle | parallel_closure_workers | 1 | 221.003 | 7.589 | 29.120 |
+| import-public-mapping-final-idle | parallel_closure_workers | 2 | 115.551 | 7.027 | 16.445 |
+| import-public-mapping-final-idle | parallel_closure_workers | 4 | 81.685 | 7.001 | 11.668 |
+| import-public-mapping-final-idle | parallel_exception_workers | 1 | 356.946 | 8.701 | 41.024 |
+| import-public-mapping-final-idle | parallel_exception_workers | 2 | 184.510 | 8.206 | 22.485 |
+| import-public-mapping-final-idle | parallel_exception_workers | 4 | 128.054 | 8.409 | 15.229 |
+| import-public-mapping-final-idle | parallel_float_workers | 1 | 213.964 | 6.805 | 31.440 |
+| import-public-mapping-final-idle | parallel_float_workers | 2 | 150.126 | 6.782 | 22.136 |
+| import-public-mapping-final-idle | parallel_float_workers | 4 | 94.555 | 6.817 | 13.871 |
+| import-public-mapping-final-idle | parallel_for_workers | 1 | 130.338 | 5.474 | 23.811 |
+| import-public-mapping-final-idle | parallel_for_workers | 2 | 70.171 | 5.655 | 12.408 |
+| import-public-mapping-final-idle | parallel_for_workers | 4 | 50.823 | 5.442 | 9.338 |
+| import-public-mapping-final-idle | parallel_source_workers | 1 | 206.423 | 7.432 | 27.776 |
+| import-public-mapping-final-idle | parallel_source_workers | 2 | 112.044 | 7.946 | 14.101 |
+| import-public-mapping-final-idle | parallel_source_workers | 4 | 87.022 | 7.031 | 12.378 |
+| import-public-mapping-idle | parallel_class_workers | 1 | 415.131 | 10.069 | 41.230 |
+| import-public-mapping-idle | parallel_class_workers | 2 | 249.034 | 10.722 | 23.226 |
+| import-public-mapping-idle | parallel_class_workers | 4 | 203.807 | 9.708 | 20.994 |
+| import-public-mapping-idle | parallel_closure_workers | 1 | 193.071 | 7.192 | 26.847 |
+| import-public-mapping-idle | parallel_closure_workers | 2 | 113.847 | 6.889 | 16.527 |
+| import-public-mapping-idle | parallel_closure_workers | 4 | 73.623 | 6.614 | 11.131 |
+| import-public-mapping-idle | parallel_exception_workers | 1 | 318.068 | 8.295 | 38.345 |
+| import-public-mapping-idle | parallel_exception_workers | 2 | 177.991 | 8.247 | 21.582 |
+| import-public-mapping-idle | parallel_exception_workers | 4 | 124.866 | 8.217 | 15.196 |
+| import-public-mapping-idle | parallel_float_workers | 1 | 265.180 | 6.523 | 40.653 |
+| import-public-mapping-idle | parallel_float_workers | 2 | 128.480 | 6.515 | 19.721 |
+| import-public-mapping-idle | parallel_float_workers | 4 | 87.141 | 6.765 | 12.881 |
+| import-public-mapping-idle | parallel_for_workers | 1 | 133.745 | 5.328 | 25.101 |
+| import-public-mapping-idle | parallel_for_workers | 2 | 68.059 | 5.310 | 12.817 |
+| import-public-mapping-idle | parallel_for_workers | 4 | 54.701 | 5.446 | 10.044 |
+| import-public-mapping-idle | parallel_source_workers | 1 | 183.702 | 7.401 | 24.820 |
+| import-public-mapping-idle | parallel_source_workers | 2 | 108.333 | 7.271 | 14.900 |
+| import-public-mapping-idle | parallel_source_workers | 4 | 74.753 | 6.951 | 10.754 |
 | l1-float-operators | parallel_class_workers | 1 | 460.123 | 8.687 | 52.970 |
 | l1-float-operators | parallel_class_workers | 2 | 251.646 | 8.673 | 29.016 |
 | l1-float-operators | parallel_class_workers | 4 | 183.485 | 8.635 | 21.249 |

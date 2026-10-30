@@ -13,14 +13,25 @@ using detail::ImportState;
 using detail::ModuleDefinition;
 using detail::ModuleLoad;
 
-void store_name(Attachment &context, Value dictionary, std::u32string name, Value value)
+ResultTag lookup_name(Attachment &context, Value dictionary, std::u32string name, ReturnSlot &out)
+{
+    RootScope roots(context);
+    const auto mapping = roots.root(dictionary);
+    ReturnSlot key(context);
+    make_str(context, std::move(name), key);
+    dict_lookup(context, mapping, roots.root(key.value()), out);
+    return out.tag();
+}
+ResultTag store_name(Attachment &context, Value dictionary, std::u32string name, Value value,
+                     ReturnSlot &out)
 {
     RootScope roots(context);
     roots.root(dictionary);
     roots.root(value);
     ReturnSlot key(context);
     make_str(context, std::move(name), key);
-    detail::name_store(context, dictionary, key.value(), value);
+    dict_store(context, roots.root(dictionary), roots.root(key.value()), roots.root(value), out);
+    return out.tag();
 }
 void missing(Attachment &context, const std::u32string &name, ReturnSlot &out)
 {
@@ -87,24 +98,29 @@ void builtin_init(Attachment &context, Handle, ReturnSlot &out)
 void sys_init(Attachment &context, Handle module, ReturnSlot &out)
 {
     auto dictionary = module_dict(context, module.get(context));
-    store_name(context, dictionary, U"modules", context.builtin(CoreObject::Modules));
+    if (store_name(context, dictionary, U"modules", context.builtin(CoreObject::Modules), out) ==
+        ResultTag::Raised)
+        return;
     RootScope roots(context);
     ReturnSlot temporary(context);
     make_str(context, U"", temporary);
     std::array paths{temporary.value()};
     cxxpython::core::make_tuple(context, paths, temporary);
-    store_name(context, dictionary, U"path", temporary.value());
-    store_name(context, dictionary, U"argv", context.builtin(CoreObject::EmptyTuple));
-    out.ok(context.builtin(CoreObject::None));
+    if (store_name(context, dictionary, U"path", temporary.value(), out) == ResultTag::Raised)
+        return;
+    store_name(context, dictionary, U"argv", context.builtin(CoreObject::EmptyTuple), out);
 }
 void main_init(Attachment &context, Handle module, ReturnSlot &out)
 {
-    store_name(context, module_dict(context, module.get(context)), U"__package__",
-               context.builtin(CoreObject::None));
+    if (store_name(context, module_dict(context, module.get(context)), U"__package__",
+                   context.builtin(CoreObject::None), out) == ResultTag::Raised)
+        return;
     import_module(context, U"builtins", out);
     if (out.tag() == ResultTag::Raised)
         return;
-    store_name(context, module_dict(context, module.get(context)), U"__builtins__", out.value());
+    if (store_name(context, module_dict(context, module.get(context)), U"__builtins__", out.value(),
+                   out) == ResultTag::Raised)
+        return;
     import_module(context, U"sys", out);
     if (out.tag() != ResultTag::Raised)
         out.ok(context.builtin(CoreObject::None));
@@ -126,21 +142,22 @@ std::shared_ptr<const ModuleDefinition> find_file(Attachment &context, const std
     RootScope roots(context);
     const auto dot = name.rfind(U'.');
     const auto owner_name = dot == std::u32string::npos ? U"sys" : name.substr(0, dot);
-    auto owner = detail::name_lookup(context, context.builtin(CoreObject::Modules), owner_name);
-    if (!owner && dot == std::u32string::npos) {
+    lookup_name(context, context.builtin(CoreObject::Modules), owner_name, out);
+    if (out.tag() == ResultTag::Raised)
+        return nullptr;
+    if (out.tag() == ResultTag::Empty && dot == std::u32string::npos) {
         import_module(context, U"sys", out);
         if (out.tag() == ResultTag::Raised)
             return nullptr;
-        owner = out.value();
     }
-    if (!owner || !is_module(context, *owner))
+    if (out.tag() == ResultTag::Empty || !is_module(context, out.value()))
         return nullptr;
-    const auto module = roots.root(*owner);
-    auto path = detail::name_lookup(context, module_dict(context, module.get(context)),
-                                    dot == std::u32string::npos ? U"path" : U"__path__");
-    if (!path)
+    const auto module = roots.root(out.value());
+    lookup_name(context, module_dict(context, module.get(context)),
+                dot == std::u32string::npos ? U"path" : U"__path__", out);
+    if (out.tag() != ResultTag::Ok)
         return nullptr;
-    const auto rooted_path = roots.root(*path);
+    const auto rooted_path = roots.root(out.value());
     ReturnSlot item(context);
     get_iter(context, rooted_path, item);
     if (item.tag() == ResultTag::Raised) {
@@ -318,6 +335,9 @@ ResultView import_module(Attachment &context, const std::u32string &name, Return
             raise_error(context, CoreObject::ValueErrorType, U"Empty module name", out);
             return out.result();
         }
+        ReturnSlot key(context);
+        make_str(context, name, key);
+        const auto module_key = roots.root(key.value());
         std::map<std::u32string, std::shared_ptr<ModuleLoad>> prepared;
         const auto record = std::make_shared<ModuleLoad>();
         prepared.emplace(name, record);
@@ -358,19 +378,17 @@ ResultView import_module(Attachment &context, const std::u32string &name, Return
                 break;
         }
         if (partial) {
-            auto value = detail::name_lookup(context, modules.get(context), name);
-            if (value && *value != context.builtin(CoreObject::None))
-                out.ok(*value);
-            else
+            dict_lookup(context, modules, module_key, out);
+            if (out.tag() == ResultTag::Empty ||
+                (out.tag() == ResultTag::Ok && out.value() == context.builtin(CoreObject::None)))
                 missing(context, name, out);
             return out.result();
         }
         LoadLease lease(context, name, record);
-        if (auto cached = detail::name_lookup(context, modules.get(context), name)) {
-            if (*cached == context.builtin(CoreObject::None))
+        dict_lookup(context, modules, module_key, out);
+        if (out.tag() != ResultTag::Empty) {
+            if (out.tag() == ResultTag::Ok && out.value() == context.builtin(CoreObject::None))
                 missing(context, name, out);
-            else
-                out.ok(*cached);
             return out.result();
         }
         auto definition = find_definition(context, name);
@@ -387,20 +405,23 @@ ResultView import_module(Attachment &context, const std::u32string &name, Return
                     name == U"builtins"
                         ? std::optional<Handle>{roots.root(context.builtin(CoreObject::Builtins))}
                         : std::optional<Handle>{});
+        if (out.tag() == ResultTag::Raised)
+            return out.result();
         const auto module = roots.root(out.value());
         const auto dictionary = roots.root(module_dict(context, module.get(context)));
-        ReturnSlot temporary(context), key(context);
-        make_str(context, name, key);
-        const auto module_key = roots.root(key.value());
+        ReturnSlot temporary(context);
         const auto dot = name.rfind(U'.');
         make_str(context,
                  definition->package           ? name
                  : dot == std::u32string::npos ? U""
                                                : name.substr(0, dot),
                  temporary);
-        store_name(context, dictionary.get(context), U"__package__", temporary.value());
-        store_name(context, dictionary.get(context), U"__builtins__",
-                   context.builtin(CoreObject::Builtins));
+        if (store_name(context, dictionary.get(context), U"__package__", temporary.value(), out) ==
+            ResultTag::Raised)
+            return out.result();
+        if (store_name(context, dictionary.get(context), U"__builtins__",
+                       context.builtin(CoreObject::Builtins), out) == ResultTag::Raised)
+            return out.result();
         if (definition->package) {
             std::vector<Value> paths;
             for (const auto &path : definition->paths) {
@@ -408,15 +429,22 @@ ResultView import_module(Attachment &context, const std::u32string &name, Return
                 paths.push_back(roots.root(temporary.value()).get(context));
             }
             cxxpython::core::make_tuple(context, paths, temporary);
-            store_name(context, dictionary.get(context), U"__path__", temporary.value());
+            if (store_name(context, dictionary.get(context), U"__path__", temporary.value(), out) ==
+                ResultTag::Raised)
+                return out.result();
         }
         if (!definition->origin.empty() && definition->origin != "built-in") {
             make_str(context, detail::decode_filename(SourceBuffer("", definition->origin)),
                      temporary);
-            store_name(context, dictionary.get(context), U"__file__", temporary.value());
+            if (store_name(context, dictionary.get(context), U"__file__", temporary.value(), out) ==
+                ResultTag::Raised)
+                return out.result();
         }
-        detail::name_store(context, modules.get(context), module_key.get(context),
-                           module.get(context));
+        detail::DictBinding binding;
+        detail::dict_store_binding(context, modules, module_key, module, binding, out);
+        if (out.tag() == ResultTag::Raised)
+            return out.result();
+        out.reset(context);
         try {
             if (auto source = std::get_if<std::shared_ptr<const SourceUnit>>(&definition->loader))
                 run(context, {source->get(), dictionary}, out);
@@ -435,19 +463,18 @@ ResultView import_module(Attachment &context, const std::u32string &name, Return
                                 U"module initializer must return None", out);
             }
         } catch (...) {
-            detail::name_erase_if(context, modules.get(context), name, module.get(context));
+            detail::dict_erase_binding(context, modules, binding, module);
             throw;
         }
         if (out.tag() == ResultTag::Raised) {
-            detail::name_erase_if(context, modules.get(context), name, module.get(context));
+            detail::dict_erase_binding(context, modules, binding, module);
             return out.result();
         }
-        const auto published = detail::name_lookup(context, modules.get(context), name);
-        if (!published) {
+        dict_lookup(context, modules, module_key, out);
+        if (out.tag() == ResultTag::Empty) {
             raise_error(context, CoreObject::KeyErrorType, name, out);
             return out.result();
         }
-        out.ok(*published);
     } catch (const std::bad_alloc &) {
         out.raised(context.builtin(CoreObject::MemoryError));
     }
@@ -490,19 +517,29 @@ ResultView import_name(Attachment &context, Handle name, Handle globals, Handle 
                         U"relative import requires package globals", out);
             return out.result();
         }
-        auto package = detail::name_lookup(context, globals.get(context), U"__package__");
-        const bool fallback = !package || *package == context.builtin(CoreObject::None);
+        lookup_name(context, globals.get(context), U"__package__", out);
+        if (out.tag() == ResultTag::Raised)
+            return out.result();
+        const bool fallback =
+            out.tag() == ResultTag::Empty || out.value() == context.builtin(CoreObject::None);
         if (fallback)
-            package = detail::name_lookup(context, globals.get(context), U"__name__");
-        if (!package || !context.has_layout<StrObject>(*package)) {
+            lookup_name(context, globals.get(context), U"__name__", out);
+        if (out.tag() == ResultTag::Raised)
+            return out.result();
+        if (out.tag() != ResultTag::Ok || !context.has_layout<StrObject>(out.value())) {
             raise_error(context, CoreObject::ImportErrorType,
                         U"relative import has no known parent package", out);
             return out.result();
         }
-        base = context.payload<StrObject>(*package).value;
-        if (fallback && !detail::name_lookup(context, globals.get(context), U"__path__")) {
-            const auto dot = base.rfind(U'.');
-            base.resize(dot == std::u32string::npos ? 0 : dot);
+        base = context.payload<StrObject>(out.value()).value;
+        if (fallback) {
+            lookup_name(context, globals.get(context), U"__path__", out);
+            if (out.tag() == ResultTag::Raised)
+                return out.result();
+            if (out.tag() == ResultTag::Empty) {
+                const auto dot = base.rfind(U'.');
+                base.resize(dot == std::u32string::npos ? 0 : dot);
+            }
         }
         for (std::int64_t i = 1; i < relative; ++i) {
             const auto dot = base.rfind(U'.');
@@ -531,11 +568,17 @@ ResultView import_name(Attachment &context, Handle name, Handle globals, Handle 
     do {
         end = absolute.find(U'.', begin);
         const auto prefix = absolute.substr(0, end);
-        if (parent && (!is_module(context, parent->get(context)) ||
-                       !detail::name_lookup(context, module_dict(context, parent->get(context)),
-                                            U"__path__"))) {
-            missing(context, absolute, out);
-            return out.result();
+        if (parent) {
+            if (is_module(context, parent->get(context)))
+                lookup_name(context, module_dict(context, parent->get(context)), U"__path__", out);
+            else
+                out.reset(context);
+            if (out.tag() == ResultTag::Raised)
+                return out.result();
+            if (out.tag() == ResultTag::Empty) {
+                missing(context, absolute, out);
+                return out.result();
+            }
         }
         import_module(context, prefix, out);
         if (out.tag() == ResultTag::Raised)
@@ -565,8 +608,13 @@ ResultView import_name(Attachment &context, Handle name, Handle globals, Handle 
         out.ok(top->get(context));
         return out.result();
     }
-    if (is_module(context, result.get(context)) &&
-        detail::name_lookup(context, module_dict(context, result.get(context)), U"__path__")) {
+    if (is_module(context, result.get(context)))
+        lookup_name(context, module_dict(context, result.get(context)), U"__path__", out);
+    else
+        out.reset(context);
+    if (out.tag() == ResultTag::Raised)
+        return out.result();
+    if (out.tag() == ResultTag::Ok) {
         get_iter(context, fromlist, item);
         if (item.tag() == ResultTag::Raised) {
             out.raised(item.exception());
@@ -642,15 +690,14 @@ ResultView import_from(Attachment &context, Handle module, Handle name, ReturnSl
     get_attribute(context, module, name, out);
     if (is_error(context, out, CoreObject::AttributeErrorType)) {
         if (is_module(context, module.get(context))) {
-            const auto package = detail::name_lookup(
-                context, module_dict(context, module.get(context)), U"__name__");
-            if (package && context.has_layout<StrObject>(*package)) {
-                const auto cached =
-                    detail::name_lookup(context, context.builtin(CoreObject::Modules),
-                                        context.payload<StrObject>(*package).value + U"." +
-                                            context.payload<StrObject>(name).value);
-                if (cached) {
-                    out.ok(*cached);
+            lookup_name(context, module_dict(context, module.get(context)), U"__name__", out);
+            if (out.tag() == ResultTag::Raised)
+                return out.result();
+            if (out.tag() == ResultTag::Ok && context.has_layout<StrObject>(out.value())) {
+                const auto full = context.payload<StrObject>(out.value()).value + U"." +
+                                  context.payload<StrObject>(name).value;
+                lookup_name(context, context.builtin(CoreObject::Modules), full, out);
+                if (out.tag() != ResultTag::Empty) {
                     return out.result();
                 }
             }
@@ -673,8 +720,7 @@ void set_import_path(Attachment &context, std::span<const std::string> paths, Re
         values.push_back(roots.root(out.value()).get(context));
     }
     cxxpython::core::make_tuple(context, values, out);
-    store_name(context, module_dict(context, module.get(context)), U"path", out.value());
-    out.ok(context.builtin(CoreObject::None));
+    store_name(context, module_dict(context, module.get(context)), U"path", out.value(), out);
 }
 void detail::install_import_builtins(Attachment &context, std::span<const Handle> core,
                                      Value mapping)

@@ -52,8 +52,13 @@ Only a module's initializing owner may finish its lease. Same-thread cycles may
 observe its published partial namespace; different modules may execute in
 parallel. Waiters park through NativeWait, with initialization dependency cycles
 detected before waiting. No registry lock spans Python, allocation/GC or I/O.
-Failure removes an entry only if it still names that initialization's module;
-user replacements must survive. C/C++ extension ABI and Python import policy
+Cache reads and publication use the ordinary hash/equality-aware dictionary
+operations, including custom keys and Python exceptions. Publication returns an
+internal hash/entry-generation token, not a Python reference or second registry.
+Failure removes only that entry generation if it still names the original module;
+replacement values and deleted/reinserted bindings survive. Conditional removal
+does not allocate or invoke equality/hash, including at zero allocation quota.
+C/C++ extension ABI and Python import policy
 remain distinct from CPython binary compatibility, per Plan 2 section 11.2.
 
 Current inputs are registered immutable SourceUnits, filesystem source/packages,
@@ -87,6 +92,9 @@ IMPORT_STAR consumes one object and writes the module namespace (1 -> 0).
 The first two have a name-index operand; star has none and is module-code only.
 All can raise/call Python, keep inputs traced until success, and use ordinary
 unwinding. ImportName reads __import__ from actual builtins, never globals.
+Builtin hook reads, RunRequest's __builtins__, module metadata/__getattr__ and
+relative/from-import cache fallbacks use the same mapping protocol, preserving
+Raised instead of treating a callback error as a missing name.
 Hooks receive the actual module/class mapping or a lazy Frame-owned function
 locals snapshot refreshed from fast locals/Cells; this snapshot is not execution
 state. Star honors __all__ with indexed sequence access or snapshots public
@@ -122,8 +130,10 @@ and stay exhausted. Shared iterator cursors use the owner's short commit.
 Type namespaces retain immutable snapshot/CAS publication, including explicit
 attribute reads/updates with custom equal keys. Python mappingproxy is read-only
 and reflects later publications; copy returns an ordinary independent dict.
-Implicit special-method/canonical import metadata lookups still use native name
-helpers, so arbitrary key aliases there are not a completed compatibility gate.
+Implicit special-method type lookups still use native name helpers, so arbitrary
+key aliases there are not a completed compatibility gate. Remaining canonical
+writes in the import/VM setup paths initialize newly private/bootstrap mappings;
+they do not read an alternative public module registry.
 fromkeys/popitem/union/reversed, view set operations, list/set and remaining source
 container syntax are still pending; this slice does not complete M3.
 

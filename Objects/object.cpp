@@ -467,21 +467,20 @@ bool name_erase(Attachment &context, Value dictionary, const std::u32string &nam
         return true;
     });
 }
-bool name_erase_if(Attachment &context, Value dictionary, const std::u32string &text,
-                   Value expected)
+bool dict_erase_binding(Attachment &context, Handle dictionary, DictBinding binding,
+                        Handle expected)
 {
-    auto &data = *context.payload<DictObject>(dictionary).contents;
+    const auto target = dictionary.get(context), value = expected.get(context);
+    auto &data = *context.payload<DictObject>(target).contents;
     std::list<DictObject::Entry> entries;
     return namespace_locked(context, data, [&] {
-        const auto found = data.index.find(text);
-        const auto value =
-            found == data.index.end() ? std::optional<Value>{} : found->second->value;
-        if (value != expected)
-            return false;
-        if (found != data.index.end()) {
-            remove_entry(context, dictionary, data, found->second, entries);
-        }
-        return true;
+        const auto [begin, end] = data.hashes.equal_range(binding.hash);
+        for (auto at = begin; at != end; ++at)
+            if (at->second->identity == binding.identity && at->second->value == value) {
+                remove_entry(context, target, data, at->second, entries);
+                return true;
+            }
+        return false;
     });
 }
 void discard_name_table(Attachment &context, Value dictionary)
@@ -854,9 +853,12 @@ namespace {
 enum class DictOperation { Lookup, Store, Erase, SetDefault };
 ResultView access_dictionary(Attachment &context, Handle dictionary, Handle key,
                              std::optional<Handle> value, DictOperation operation, ReturnSlot &out,
-                             std::optional<std::int64_t> cached_hash = {})
+                             std::optional<std::int64_t> cached_hash = {},
+                             detail::DictBinding *binding = nullptr)
 {
     out.check_caller(context);
+    if (binding)
+        *binding = {};
     RootScope roots(context);
     dictionary = roots.root(dictionary.get(context));
     key = roots.root(key.get(context));
@@ -891,6 +893,8 @@ ResultView access_dictionary(Attachment &context, Handle dictionary, Handle key,
         context.load(dictionary.get(context),
                      context.payload<DictObject>(dictionary).namespace_owner, owner);
         if (owner.tag() == ResultTag::Ok && TypeView(context, owner.value()).snapshot()) {
+            if (binding)
+                throw std::logic_error("binding tokens require an ordinary dictionary");
             if (operation != DictOperation::Lookup &&
                 context.payload<TypeObject>(owner.value()).immutable) {
                 raise_error(context, CoreObject::TypeErrorType, U"cannot modify immutable type",
@@ -964,6 +968,8 @@ ResultView access_dictionary(Attachment &context, Handle dictionary, Handle key,
         auto finish = [&](auto at) {
             if (operation == DictOperation::Store) {
                 at->value = value->get(context);
+                if (binding)
+                    *binding = {at->hash, at->identity};
                 out.ok(context.builtin(CoreObject::None));
             } else {
                 out.ok(at->value);
@@ -1047,6 +1053,8 @@ ResultView access_dictionary(Attachment &context, Handle dictionary, Handle key,
                         operation == DictOperation::SetDefault) {
                         detail::insert_entry(context, dictionary.get(context), data, prepared,
                                              name_node, hash_node);
+                        if (binding)
+                            *binding = {data.names.back().hash, data.names.back().identity};
                         out.ok(operation == DictOperation::SetDefault
                                    ? value->get(context)
                                    : context.builtin(CoreObject::None));
@@ -1070,6 +1078,12 @@ ResultView dict_store(Attachment &context, Handle dictionary, Handle key, Handle
                       ReturnSlot &out)
 {
     return access_dictionary(context, dictionary, key, value, DictOperation::Store, out);
+}
+ResultView detail::dict_store_binding(Attachment &context, Handle dictionary, Handle key,
+                                      Handle value, DictBinding &binding, ReturnSlot &out)
+{
+    return access_dictionary(context, dictionary, key, value, DictOperation::Store, out, {},
+                             &binding);
 }
 ResultView dict_erase(Attachment &context, Handle dictionary, Handle key, ReturnSlot &out)
 {

@@ -54,6 +54,9 @@ compiler, VM, and extension platform implemented in a C/C++ mix.
   of `doc/development_status.md`; do not rewrite earlier entries.
 - Generate measurement tables with `Tools/benchmarks/record.py`
   from retained raw runs. Do not hand-copy benchmark rows or derived speedups.
+- Do not rerun the full performance suite for every stable commit. Reuse retained
+  baselines; measure affected hot paths, new workloads or concrete regressions.
+  Correctness-only changes need relevant regression tests, not unrelated CPU probes.
 - The user authorizes timely stable-point commits after verification. Commit
   completed vertical slices promptly, excluding unrelated user changes.
 

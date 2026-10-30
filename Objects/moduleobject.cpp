@@ -25,7 +25,7 @@ bool receiver(Attachment &context, Value value, ReturnSlot &out)
     raise_error(context, CoreObject::TypeErrorType, U"module descriptor requires a module", out);
     return false;
 }
-void initialize(Attachment &context, Handle module, Handle name, Value doc)
+void initialize(Attachment &context, Handle module, Handle name, Value doc, ReturnSlot &out)
 {
     RootScope roots(context);
     auto dictionary = roots.root(module_dict(context, module.get(context)));
@@ -37,7 +37,9 @@ void initialize(Attachment &context, Handle module, Handle name, Value doc)
                                 {U"__loader__", context.builtin(CoreObject::None)},
                                 {U"__spec__", context.builtin(CoreObject::None)}}) {
         make_str(context, label, key);
-        detail::name_store(context, dictionary.get(context), key.value(), value);
+        dict_store(context, dictionary, roots.root(key.value()), roots.root(value), out);
+        if (out.tag() == ResultTag::Raised)
+            return;
     }
 }
 void module_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
@@ -69,17 +71,21 @@ void module_init(Attachment &context, Handle, std::span<const Value> args, Retur
         return;
     }
     RootScope roots(context);
-    initialize(context, roots.root(args[0]), roots.root(args[1]), args[2]);
-    out.ok(context.builtin(CoreObject::None));
+    initialize(context, roots.root(args[0]), roots.root(args[1]), args[2], out);
 }
 void module_repr(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(context, args[0], out))
         return;
-    auto name = detail::name_lookup(context, module_dict(context, args[0]), U"__name__");
+    RootScope roots(context);
+    const auto mapping = roots.root(module_dict(context, args[0]));
+    make_str(context, U"__name__", out);
+    dict_lookup(context, mapping, roots.root(out.value()), out);
+    if (out.tag() == ResultTag::Raised)
+        return;
     std::u32string text = U"<module '?'>";
-    if (name && context.has_layout<StrObject>(*name))
-        text = U"<module '" + context.payload<StrObject>(*name).value + U"'>";
+    if (out.tag() == ResultTag::Ok && context.has_layout<StrObject>(out.value()))
+        text = U"<module '" + context.payload<StrObject>(out.value()).value + U"'>";
     make_str(context, std::move(text), out);
 }
 void module_getattr(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
@@ -97,13 +103,16 @@ void module_getattr(Attachment &context, Handle, std::span<const Value> args, Re
         !is_subtype(context, context.type_of(out.exception()),
                     context.builtin(CoreObject::AttributeErrorType)))
         return;
-    auto callback =
-        detail::name_lookup(context, module_dict(context, self.get(context)), U"__getattr__");
-    if (!callback) {
+    make_str(context, U"__getattr__", out);
+    dict_lookup(context, roots.root(module_dict(context, self.get(context))),
+                roots.root(out.value()), out);
+    if (out.tag() == ResultTag::Raised)
+        return;
+    if (out.tag() == ResultTag::Empty) {
         raise_error(context, CoreObject::AttributeErrorType, U"module attribute not found", out);
         return;
     }
-    auto function = roots.root(*callback);
+    auto function = roots.root(out.value());
     std::array values{name.get(context)};
     call(context, function, {values, {}}, out);
 }
@@ -131,8 +140,10 @@ void make_module(Attachment &context, std::u32string name, ReturnSlot &out,
     context.store(module.get(context), *context.instance_dictionary(module.get(context)),
                   dictionary->get(context));
     make_str(context, std::move(name), temporary);
-    initialize(context, module, roots.root(temporary.value()), context.builtin(CoreObject::None));
-    out.ok(module.get(context));
+    initialize(context, module, roots.root(temporary.value()), context.builtin(CoreObject::None),
+               out);
+    if (out.tag() != ResultTag::Raised)
+        out.ok(module.get(context));
 }
 
 namespace detail {

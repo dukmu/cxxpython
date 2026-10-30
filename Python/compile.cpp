@@ -906,9 +906,16 @@ ResultView run(Attachment &context, const RunRequest &request, ReturnSlot &out)
         }
         auto builtins = roots.root(input_builtins ? input_builtins->get(context)
                                                   : context.builtin(CoreObject::Builtins));
-        if (!input_builtins)
-            if (auto supplied = detail::name_lookup(context, globals.get(context), U"__builtins__"))
-                builtins = roots.root(*supplied);
+        ReturnSlot builtin_key(context), supplied(context);
+        make_str(context, U"__builtins__", builtin_key);
+        const auto key = roots.root(builtin_key.value());
+        dict_lookup(context, globals, key, supplied);
+        if (supplied.tag() == ResultTag::Raised) {
+            out.raised(supplied.exception());
+            return out.result();
+        }
+        if (!input_builtins && supplied.tag() == ResultTag::Ok)
+            builtins = roots.root(supplied.value());
         if (is_module(context, builtins.get(context)))
             builtins = roots.root(module_dict(context, builtins.get(context)));
         if (!dictionary(builtins.get(context))) {
@@ -916,10 +923,10 @@ ResultView run(Attachment &context, const RunRequest &request, ReturnSlot &out)
                         U"RunRequest requires globals/builtins name dictionaries", out);
             return out.result();
         }
-        if (!detail::name_lookup(context, globals.get(context), U"__builtins__")) {
-            make_str(context, U"__builtins__", temporary);
-            detail::name_store(context, globals.get(context), temporary.value(),
-                               builtins.get(context));
+        if (supplied.tag() == ResultTag::Empty) {
+            dict_store(context, globals, key, builtins, out);
+            if (out.tag() == ResultTag::Raised)
+                return out.result();
         }
         if (!input_globals) {
             make_str(context, U"__name__", temporary);

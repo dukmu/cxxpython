@@ -671,6 +671,10 @@ class SourceDifferential(unittest.TestCase):
         self.assertIn("SyntaxError", actual.stderr)
 
     def test_import_statements_and_custom_hook(self):
+        alias_key = ("class AliasKey:\n"
+                     "    def __init__(self, name):\n        self.name = name\n"
+                     "    def __hash__(self):\n        return hash(self.name)\n"
+                     "    def __eq__(self, other):\n        return self.name == other\n")
         cases = [
             ("import sys, builtins as b\nfrom sys import (modules as table,)",
              "sys.__name__, b.int is int, table is sys.modules"),
@@ -698,6 +702,23 @@ class SourceDifferential(unittest.TestCase):
              "def hook(name, globals, locals, fromlist, level):\n    return Returned()\n"
              "builtins.__import__ = hook\ntry:\n    from chosen import *\n"
              "finally:\n    builtins.__import__ = old", "value"),
+            ("import builtins\n" + alias_key +
+             "key = AliasKey('__import__')\nold = builtins.__import__\n"
+             "del builtins.__dict__['__import__']\nbuiltins.__dict__[key] = old\n"
+             "try:\n    import sys\nfinally:\n    del builtins.__dict__[key]\n"
+             "    builtins.__dict__['__import__'] = old", "sys.__name__"),
+            ("import builtins\n" + alias_key +
+             "key = AliasKey('__build_class__')\nold = builtins.__build_class__\n"
+             "del builtins.__dict__['__build_class__']\nbuiltins.__dict__[key] = old\n"
+             "try:\n    class Created:\n        value = 42\n"
+             "finally:\n    del builtins.__dict__[key]\n"
+             "    builtins.__dict__['__build_class__'] = old", "Created.value"),
+            ("import __main__ as main\n" + alias_key +
+             "def fallback(name):\n    return 42\n"
+             "main.__dict__[AliasKey('__getattr__')] = fallback\nseen = main.absent", "seen"),
+            ("import sys\n" + alias_key +
+             "sys.modules[AliasKey('cached_public_module')] = sys\n"
+             "import cached_public_module as cached", "cached is sys"),
         ]
         for source, expression in cases:
             with self.subTest(expression=expression):

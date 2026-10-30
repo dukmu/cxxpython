@@ -1,10 +1,10 @@
 {
-  "captured_at": "2026-10-30T03:27:08.692967+00:00",
+  "captured_at": "2026-10-30T05:11:57.954466+00:00",
   "reference_version": "Python 3.12.14",
   "provenance": {
     "binary": {
       "path": "/home/shefrin/repo/cxxpython/build/cxxpython",
-      "sha256": "1400563898154ae8cd844de7214b54cded1049737d41baff286b2fc05098cdd5"
+      "sha256": "966907e739286754119751e6a09e447f2a177cb8efcff43c23a86845869fa006"
     },
     "reference": {
       "path": "/home/shefrin/repo/cxxpython/.cache/cpython31214-build/python",
@@ -1768,7 +1768,7 @@
     {
       "command": [
         "build/cxxpython",
-        "/tmp/tmpt5yktpq4/source.py",
+        "/tmp/tmp7js_sda2/source.py",
         "--eval",
         "f(41)"
       ],
@@ -1779,20 +1779,20 @@
     {
       "command": [
         "build/cxxpython",
-        "/tmp/tmpt5yktpq4/source.py",
+        "/tmp/tmp7js_sda2/source.py",
         "--eval",
         "value, __file__"
       ],
-      "stdout": "(42, '/tmp/tmpt5yktpq4/source.py')\n",
+      "stdout": "(42, '/tmp/tmp7js_sda2/source.py')\n",
       "stderr": "",
       "exit_code": 0
     },
     {
       "command": [
         ".cache/cpython31214-build/python",
-        "/tmp/tmpt5yktpq4/source.py"
+        "/tmp/tmp7js_sda2/source.py"
       ],
-      "stdout": "(42, '/tmp/tmpt5yktpq4/source.py')\n",
+      "stdout": "(42, '/tmp/tmp7js_sda2/source.py')\n",
       "stderr": "",
       "exit_code": 0
     },
@@ -1810,11 +1810,11 @@
       "command": [
         "build/cxxpython",
         "-c",
-        "import sys\nsys.path = ('/tmp/tmpde6pgkgy', '/tmp/tmpde6pgkgy/one', '/tmp/tmpde6pgkgy/two')\nimport pkg.child as alias\nfrom pkg.child import *\nimport pkg.child",
+        "import sys\nsys.path = ('/tmp/tmp_jvngq7v', '/tmp/tmp_jvngq7v/one', '/tmp/tmp_jvngq7v/two')\nimport pkg.child as alias\nfrom pkg.child import *\nimport pkg.child",
         "--eval",
         "answer, alias is pkg.child, pkg.value, alias.__package__, alias.__file__"
       ],
-      "stdout": "(42, True, 10, 'pkg', '/tmp/tmpde6pgkgy/pkg/child.py')\n",
+      "stdout": "(42, True, 10, 'pkg', '/tmp/tmp_jvngq7v/pkg/child.py')\n",
       "stderr": "",
       "exit_code": 0
     },
@@ -1822,9 +1822,9 @@
       "command": [
         ".cache/cpython31214-build/python",
         "-c",
-        "import sys\nsys.path = ('/tmp/tmpde6pgkgy', '/tmp/tmpde6pgkgy/one', '/tmp/tmpde6pgkgy/two')\nimport pkg.child as alias\nfrom pkg.child import *\nimport pkg.child\nprint(repr((answer, alias is pkg.child, pkg.value, alias.__package__, alias.__file__)))"
+        "import sys\nsys.path = ('/tmp/tmp_jvngq7v', '/tmp/tmp_jvngq7v/one', '/tmp/tmp_jvngq7v/two')\nimport pkg.child as alias\nfrom pkg.child import *\nimport pkg.child\nprint(repr((answer, alias is pkg.child, pkg.value, alias.__package__, alias.__file__)))"
       ],
-      "stdout": "(42, True, 10, 'pkg', '/tmp/tmpde6pgkgy/pkg/child.py')\n",
+      "stdout": "(42, True, 10, 'pkg', '/tmp/tmp_jvngq7v/pkg/child.py')\n",
       "stderr": "",
       "exit_code": 0
     },
@@ -1832,7 +1832,7 @@
       "command": [
         "build/cxxpython",
         "-c",
-        "import sys\nsys.path = ('/tmp/tmpde6pgkgy', '/tmp/tmpde6pgkgy/one', '/tmp/tmpde6pgkgy/two')\nimport left, right",
+        "import sys\nsys.path = ('/tmp/tmp_jvngq7v', '/tmp/tmp_jvngq7v/one', '/tmp/tmp_jvngq7v/two')\nimport left, right",
         "--eval",
         "left.answer, right.first"
       ],
@@ -1844,7 +1844,7 @@
       "command": [
         ".cache/cpython31214-build/python",
         "-c",
-        "import sys\nsys.path = ('/tmp/tmpde6pgkgy', '/tmp/tmpde6pgkgy/one', '/tmp/tmpde6pgkgy/two')\nimport left, right\nprint(repr((left.answer, right.first)))"
+        "import sys\nsys.path = ('/tmp/tmp_jvngq7v', '/tmp/tmp_jvngq7v/one', '/tmp/tmp_jvngq7v/two')\nimport left, right\nprint(repr((left.answer, right.first)))"
       ],
       "stdout": "(42, 1)\n",
       "stderr": "",
@@ -1854,7 +1854,7 @@
       "command": [
         "build/cxxpython",
         "-c",
-        "import sys\nsys.path = ('/tmp/tmpde6pgkgy', '/tmp/tmpde6pgkgy/one', '/tmp/tmpde6pgkgy/two')\nimport ns.a, ns.b\nns.__path__ = ('/tmp/tmpde6pgkgy/other',)\nfrom ns import extra",
+        "import sys\nsys.path = ('/tmp/tmp_jvngq7v', '/tmp/tmp_jvngq7v/one', '/tmp/tmp_jvngq7v/two')\nimport ns.a, ns.b\nns.__path__ = ('/tmp/tmp_jvngq7v/other',)\nfrom ns import extra",
         "--eval",
         "ns.a.value, ns.b.value, extra.value"
       ],
@@ -1866,7 +1866,7 @@
       "command": [
         ".cache/cpython31214-build/python",
         "-c",
-        "import sys\nsys.path = ('/tmp/tmpde6pgkgy', '/tmp/tmpde6pgkgy/one', '/tmp/tmpde6pgkgy/two')\nimport ns.a, ns.b\nns.__path__ = ('/tmp/tmpde6pgkgy/other',)\nfrom ns import extra\nprint(repr((ns.a.value, ns.b.value, extra.value)))"
+        "import sys\nsys.path = ('/tmp/tmp_jvngq7v', '/tmp/tmp_jvngq7v/one', '/tmp/tmp_jvngq7v/two')\nimport ns.a, ns.b\nns.__path__ = ('/tmp/tmp_jvngq7v/other',)\nfrom ns import extra\nprint(repr((ns.a.value, ns.b.value, extra.value)))"
       ],
       "stdout": "(1, 2, 8)\n",
       "stderr": "",
@@ -1876,7 +1876,7 @@
       "command": [
         "build/cxxpython",
         "-c",
-        "import sys\nsys.path = ('/tmp/tmpde6pgkgy', '/tmp/tmpde6pgkgy/one', '/tmp/tmpde6pgkgy/two')\ntry:\n    import bad\nexcept SyntaxError:\n    syntax = True\ntry:\n    from fails import value\nexcept ModuleNotFoundError as error:\n    dependency = error.name",
+        "import sys\nsys.path = ('/tmp/tmp_jvngq7v', '/tmp/tmp_jvngq7v/one', '/tmp/tmp_jvngq7v/two')\ntry:\n    import bad\nexcept SyntaxError:\n    syntax = True\ntry:\n    from fails import value\nexcept ModuleNotFoundError as error:\n    dependency = error.name",
         "--eval",
         "syntax, dependency"
       ],
@@ -1888,7 +1888,7 @@
       "command": [
         ".cache/cpython31214-build/python",
         "-c",
-        "import sys\nsys.path = ('/tmp/tmpde6pgkgy', '/tmp/tmpde6pgkgy/one', '/tmp/tmpde6pgkgy/two')\ntry:\n    import bad\nexcept SyntaxError:\n    syntax = True\ntry:\n    from fails import value\nexcept ModuleNotFoundError as error:\n    dependency = error.name\nprint(repr((syntax, dependency)))"
+        "import sys\nsys.path = ('/tmp/tmp_jvngq7v', '/tmp/tmp_jvngq7v/one', '/tmp/tmp_jvngq7v/two')\ntry:\n    import bad\nexcept SyntaxError:\n    syntax = True\ntry:\n    from fails import value\nexcept ModuleNotFoundError as error:\n    dependency = error.name\nprint(repr((syntax, dependency)))"
       ],
       "stdout": "(True, 'missing_dependency_for_test')\n",
       "stderr": "",
@@ -2023,6 +2023,94 @@
         "import builtins\nold = builtins.__import__\nclass Names:\n    def keys(self):\n        return iter(('value',))\nclass Returned:\n    __dict__ = Names()\n    value = 42\ndef hook(name, globals, locals, fromlist, level):\n    return Returned()\nbuiltins.__import__ = hook\ntry:\n    from chosen import *\nfinally:\n    builtins.__import__ = old\nprint(repr((value)))"
       ],
       "stdout": "42\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "import builtins\nclass AliasKey:\n    def __init__(self, name):\n        self.name = name\n    def __hash__(self):\n        return hash(self.name)\n    def __eq__(self, other):\n        return self.name == other\nkey = AliasKey('__import__')\nold = builtins.__import__\ndel builtins.__dict__['__import__']\nbuiltins.__dict__[key] = old\ntry:\n    import sys\nfinally:\n    del builtins.__dict__[key]\n    builtins.__dict__['__import__'] = old",
+        "--eval",
+        "sys.__name__"
+      ],
+      "stdout": "'sys'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "import builtins\nclass AliasKey:\n    def __init__(self, name):\n        self.name = name\n    def __hash__(self):\n        return hash(self.name)\n    def __eq__(self, other):\n        return self.name == other\nkey = AliasKey('__import__')\nold = builtins.__import__\ndel builtins.__dict__['__import__']\nbuiltins.__dict__[key] = old\ntry:\n    import sys\nfinally:\n    del builtins.__dict__[key]\n    builtins.__dict__['__import__'] = old\nprint(repr((sys.__name__)))"
+      ],
+      "stdout": "'sys'\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "import builtins\nclass AliasKey:\n    def __init__(self, name):\n        self.name = name\n    def __hash__(self):\n        return hash(self.name)\n    def __eq__(self, other):\n        return self.name == other\nkey = AliasKey('__build_class__')\nold = builtins.__build_class__\ndel builtins.__dict__['__build_class__']\nbuiltins.__dict__[key] = old\ntry:\n    class Created:\n        value = 42\nfinally:\n    del builtins.__dict__[key]\n    builtins.__dict__['__build_class__'] = old",
+        "--eval",
+        "Created.value"
+      ],
+      "stdout": "42\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "import builtins\nclass AliasKey:\n    def __init__(self, name):\n        self.name = name\n    def __hash__(self):\n        return hash(self.name)\n    def __eq__(self, other):\n        return self.name == other\nkey = AliasKey('__build_class__')\nold = builtins.__build_class__\ndel builtins.__dict__['__build_class__']\nbuiltins.__dict__[key] = old\ntry:\n    class Created:\n        value = 42\nfinally:\n    del builtins.__dict__[key]\n    builtins.__dict__['__build_class__'] = old\nprint(repr((Created.value)))"
+      ],
+      "stdout": "42\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "import __main__ as main\nclass AliasKey:\n    def __init__(self, name):\n        self.name = name\n    def __hash__(self):\n        return hash(self.name)\n    def __eq__(self, other):\n        return self.name == other\ndef fallback(name):\n    return 42\nmain.__dict__[AliasKey('__getattr__')] = fallback\nseen = main.absent",
+        "--eval",
+        "seen"
+      ],
+      "stdout": "42\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "import __main__ as main\nclass AliasKey:\n    def __init__(self, name):\n        self.name = name\n    def __hash__(self):\n        return hash(self.name)\n    def __eq__(self, other):\n        return self.name == other\ndef fallback(name):\n    return 42\nmain.__dict__[AliasKey('__getattr__')] = fallback\nseen = main.absent\nprint(repr((seen)))"
+      ],
+      "stdout": "42\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "build/cxxpython",
+        "-c",
+        "import sys\nclass AliasKey:\n    def __init__(self, name):\n        self.name = name\n    def __hash__(self):\n        return hash(self.name)\n    def __eq__(self, other):\n        return self.name == other\nsys.modules[AliasKey('cached_public_module')] = sys\nimport cached_public_module as cached",
+        "--eval",
+        "cached is sys"
+      ],
+      "stdout": "True\n",
+      "stderr": "",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        ".cache/cpython31214-build/python",
+        "-c",
+        "import sys\nclass AliasKey:\n    def __init__(self, name):\n        self.name = name\n    def __hash__(self):\n        return hash(self.name)\n    def __eq__(self, other):\n        return self.name == other\nsys.modules[AliasKey('cached_public_module')] = sys\nimport cached_public_module as cached\nprint(repr((cached is sys)))"
+      ],
+      "stdout": "True\n",
       "stderr": "",
       "exit_code": 0
     },

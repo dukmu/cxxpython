@@ -273,7 +273,11 @@ void import_locals(Attachment &context, FrameObject &frame, const CodeObject &co
     auto store = [&](const std::u32string &name, Value item) {
         const auto rooted = roots.root(item);
         make_str(context, name, key);
-        detail::name_store(context, mapping.get(context), key.value(), rooted.get(context));
+        dict_store(context, mapping, roots.root(key.value()), rooted, out);
+    };
+    auto erase = [&](const std::u32string &name) {
+        make_str(context, name, key);
+        dict_erase(context, mapping, roots.root(key.value()), out);
     };
     const auto cell_locals = code.program.cell_locals();
     for (std::size_t i = 0; i < frame.locals.size(); ++i) {
@@ -287,7 +291,9 @@ void import_locals(Attachment &context, FrameObject &frame, const CodeObject &co
         if (item)
             store(name, *item);
         else
-            detail::name_erase(context, mapping.get(context), name);
+            erase(name);
+        if (raised(out))
+            return;
     }
     for (std::size_t i = cell_locals.size(); i < frame.cells.size(); ++i) {
         read_cell(context, frame.cells[i], value);
@@ -295,7 +301,9 @@ void import_locals(Attachment &context, FrameObject &frame, const CodeObject &co
         if (value.tag() != ResultTag::Empty)
             store(name, value.value());
         else
-            detail::name_erase(context, mapping.get(context), name);
+            erase(name);
+        if (raised(out))
+            return;
     }
     out.ok(mapping.get(context));
 }
@@ -386,12 +394,11 @@ void import_star(Attachment &context, Handle from, Handle mapping, ReturnSlot &o
                 return;
             }
             if (context.type_of(mapping) == context.builtin(CoreObject::DictType))
-                detail::name_store(context, mapping.get(context), name.get(context), value.value());
-            else {
+                dict_store(context, mapping, name, iteration.root(value.value()), out);
+            else
                 set_item(context, mapping, name, iteration.root(value.value()), out);
-                if (raised(out))
-                    return;
-            }
+            if (raised(out))
+                return;
         }
         if (i == std::numeric_limits<std::int64_t>::max()) {
             raise_error(context, CoreObject::OverflowErrorType, U"too many import * names", out);
@@ -486,16 +493,22 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
             case Opcode::ImportName: {
                 RootScope roots(context);
                 const auto &function = context.payload<FunctionObject>(data.function);
-                const auto importer =
-                    detail::name_lookup(context, function.builtins, U"__import__");
-                if (!importer) {
+                make_str(context, U"__import__", result);
+                namespace_lookup(context, function.builtins,
+                                 roots.root(result.value()).get(context), result);
+                if (result.tag() == ResultTag::Empty)
                     raise_error(context, CoreObject::ImportErrorType, U"__import__ not found",
                                 result);
+                if (raised(result)) {
                     activation.raising(result.exception());
                     break;
                 }
-                const auto callable = roots.root(*importer);
+                const auto callable = roots.root(result.value());
                 import_locals(context, data, code, result);
+                if (raised(result)) {
+                    activation.raising(result.exception());
+                    break;
+                }
                 const std::array arguments{context.payload<TupleObject>(code.names).items[operand],
                                            function.globals, result.value(),
                                            data.operands[data.sp - 1], data.operands[data.sp - 2]};
@@ -530,16 +543,18 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 break;
             }
             case Opcode::LoadBuildClass: {
+                RootScope roots(context);
                 const auto &function = context.payload<FunctionObject>(data.function);
-                const auto value =
-                    detail::name_lookup(context, function.builtins, U"__build_class__");
-                if (value)
-                    data.operands[data.sp++] = *value;
-                else {
+                make_str(context, U"__build_class__", result);
+                namespace_lookup(context, function.builtins,
+                                 roots.root(result.value()).get(context), result);
+                if (result.tag() == ResultTag::Empty)
                     raise_error(context, CoreObject::NameErrorType, U"__build_class__ not found",
                                 result);
+                if (raised(result))
                     activation.raising(result.exception());
-                }
+                else
+                    data.operands[data.sp++] = result.value();
                 break;
             }
             case Opcode::LoadName:
