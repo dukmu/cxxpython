@@ -20,8 +20,9 @@ struct NativeModule {
     std::shared_ptr<const NativeLibrary> library;
 };
 struct ModuleDefinition {
+    enum class File { Source };
     std::variant<std::shared_ptr<const SourceUnit>, ModuleInitializer,
-                 std::shared_ptr<const NativeModule>>
+                 std::shared_ptr<const NativeModule>, File, std::monostate>
         loader;
     bool package = false;
     std::string origin;
@@ -40,7 +41,17 @@ struct ImportState {
     std::map<std::thread::id, std::shared_ptr<ModuleLoad>> waiting;
     // Library destructors may block. Keep a pin until State destruction, outside GC.
     std::list<std::shared_ptr<const NativeLibrary>> libraries;
+    enum class Bootstrap { Cold, Loading, Ready };
+    Bootstrap bootstrap = Bootstrap::Cold;
+    std::thread::id bootstrap_owner;
 };
+void initialize_imp(Attachment &, Handle, ReturnSlot &);
+void loader_arguments(Attachment &, const std::u32string &,
+                      const std::shared_ptr<const ModuleDefinition> &, ReturnSlot &);
+void execute_definition(Attachment &, const std::shared_ptr<const ModuleDefinition> &, Handle,
+                        ReturnSlot &);
+std::shared_ptr<const SourceUnit> definition_source(Attachment &, const ModuleDefinition &,
+                                                    ReturnSlot &);
 void register_definition(Attachment &, std::u32string, std::shared_ptr<const ModuleDefinition>);
 std::shared_ptr<const NativeModule> load_extension(Attachment &, const std::string &,
                                                    const std::u32string &, ReturnSlot &);

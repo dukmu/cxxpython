@@ -24,6 +24,7 @@ add_library(cxxpython_core
     Python/bltinmodule.cpp
     Python/import.cpp
     Python/extension.cpp
+    Modules/_impmodule.cpp
     Python/symtable.cpp
     Python/flowgraph.cpp
     Python/ceval.cpp
@@ -50,6 +51,8 @@ add_library(cxxpython_core
 )
 target_include_directories(cxxpython_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/Include)
 target_include_directories(cxxpython_core SYSTEM PRIVATE ${BOOST_MULTIPRECISION_INCLUDE_DIR})
+set(CXXPYTHON_STDLIB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Lib" CACHE PATH "Python standard library source directory")
+target_compile_definitions(cxxpython_core PRIVATE CXXPYTHON_STDLIB_DIR="${CXXPYTHON_STDLIB_DIR}")
 target_link_libraries(cxxpython_core PUBLIC cxxpython_parser Threads::Threads ${CMAKE_DL_LIBS})
 target_compile_options(cxxpython_core PRIVATE -Wall -Wextra -Wpedantic -Werror)
 
@@ -66,7 +69,7 @@ endif()
 
 find_program(CLANG_FORMAT_EXECUTABLE NAMES clang-format-14 clang-format REQUIRED)
 file(GLOB_RECURSE FORMAT_SOURCES CONFIGURE_DEPENDS
-    Include/*.hpp Include/*.h Objects/*.cpp Parser/*.cpp Python/*.cpp Programs/*.cpp
+    Include/*.hpp Include/*.h Objects/*.cpp Parser/*.cpp Python/*.cpp Modules/*.cpp Programs/*.cpp
     Tests/cpp/*.cpp Tests/extensions/*.c Tools/benchmarks/*.cpp Tools/parser/*.cpp)
 list(REMOVE_ITEM FORMAT_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/Parser/generated_parser.cpp

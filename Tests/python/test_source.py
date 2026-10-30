@@ -81,6 +81,32 @@ class SourceDifferential(unittest.TestCase):
             self.assertIn(error, actual.stderr)
             self.assertIn(error, expected.stderr)
 
+    def test_python_importlib_policy(self):
+        cases = [
+            ("from importlib.machinery import ModuleSpec\n"
+             "a = ModuleSpec('pkg.child', None, origin='memory')\n"
+             "b = ModuleSpec('pkg.child', None, origin='memory')",
+             "a == b, a.parent, a.has_location, a.cached, repr(a)"),
+            ("from importlib.machinery import ModuleSpec\n"
+             "from importlib.util import module_from_spec\nimport sys\n"
+             "s = ModuleSpec('fresh.child', None, origin='memory')\n"
+             "s.has_location = True\ns.cached = 'custom'\nm = module_from_spec(s)",
+             "m.__name__, m.__package__, m.__file__, m.__cached__, "
+             "m.__spec__ is s, 'fresh.child' in sys.modules"),
+            ("from importlib.machinery import ModuleSpec\n"
+             "from importlib.util import module_from_spec\n"
+             "s = ModuleSpec('pkg', None, is_package=True)\nm = module_from_spec(s)",
+             "s.parent, m.__path__ is s.submodule_search_locations, s.has_location"),
+            ("import importlib\nimport sys\n"
+             "a = importlib.import_module('importlib.util')\n"
+             "b = importlib.import_module('.util', 'importlib')",
+             "a is b, a is sys.modules['importlib.util'], a.__package__, "
+             "a.__loader__ is a.__spec__.loader"),
+        ]
+        for source, expression in cases:
+            with self.subTest(expression=expression):
+                self.check_program(source, expression)
+
     def test_iteration_unpacking_and_exception_workflows(self):
         cases = [
             ("", "(), (1,), (1, 2), ((1, 2), 3)"),

@@ -25,6 +25,67 @@ class Constructors : public testing::Test {
     }
 };
 
+TEST_F(Constructors, ClassChecksRespectHooksTuplesAndClassAttribute)
+{
+    RootScope roots(context);
+    ReturnSlot out(context);
+    context.allocate_instance<DictObject>(roots.root(context.builtin(CoreObject::DictType)), out);
+    const auto globals = roots.root(out.value());
+    SourceUnit source(SourceBuffer(R"(class Base:
+    pass
+class Child(Base):
+    pass
+class Proxy:
+    @property
+    def __class__(self):
+        return Child
+class BrokenProxy:
+    @property
+    def __class__(self):
+        raise ValueError('class')
+class Meta(type):
+    def __instancecheck__(self, obj):
+        return 42
+    def __subclasscheck__(self, obj):
+        return []
+class Checked(metaclass=Meta):
+    pass
+class RaisingMeta(type):
+    def __instancecheck__(self, obj):
+        raise ValueError('instance')
+    def __subclasscheck__(self, obj):
+        raise ValueError('subclass')
+class Raising(metaclass=RaisingMeta):
+    pass
+)"));
+    run(context, {&source, globals}, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    for (const auto *expression :
+         {"isinstance(Child(), Base)", "issubclass(Child, Base)", "isinstance(Proxy(), Base)",
+          "isinstance(1, (str, (int, 1)))", "issubclass(Child, (str, (Base, 1)))",
+          "isinstance(1, Checked)", "not issubclass(Child, Checked)"}) {
+        SCOPED_TRACE(expression);
+        SourceUnit unit(SourceBuffer(expression), InputMode::Eval);
+        run(context, {&unit, globals}, out);
+        ASSERT_EQ(out.tag(), ResultTag::Ok);
+        EXPECT_EQ(out.value(), context.builtin(CoreObject::True));
+    }
+    for (const auto &[expression, error] : {
+             std::pair{"isinstance(1, (str, 1, int))", CoreObject::TypeErrorType},
+             {"issubclass(Child, (str, 1, Base))", CoreObject::TypeErrorType},
+             {"issubclass(1, Base)", CoreObject::TypeErrorType},
+             {"isinstance(1, Raising)", CoreObject::ValueErrorType},
+             {"issubclass(Child, Raising)", CoreObject::ValueErrorType},
+             {"isinstance(BrokenProxy(), Base)", CoreObject::ValueErrorType},
+         }) {
+        SCOPED_TRACE(expression);
+        SourceUnit unit(SourceBuffer(expression), InputMode::Eval);
+        run(context, {&unit, globals}, out);
+        ASSERT_EQ(out.tag(), ResultTag::Raised);
+        EXPECT_EQ(context.type_of(out.exception()), context.builtin(error));
+    }
+}
+
 TEST_F(Constructors, IntegerTextAndBaseSurviveCollection)
 {
     ReturnSlot out(context);

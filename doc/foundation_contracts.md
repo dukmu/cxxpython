@@ -30,6 +30,10 @@ Class definitions and decorators use the existing type/descriptor/call machinery
 with separate class namespaces, lexical forwarding and real __class__ Cells.
 Experimental int/float/tuple constructors use the same ordinary class call and
 descriptor boundary, including Python conversion callbacks and native subclasses.
+Experimental isinstance/issubclass handle runtime types, nested class tuples,
+metaclass checking hooks and isinstance's __class__ fallback through ordinary
+descriptor/call/truth protocols. Class-like __bases__ traversal and union
+classinfo are still runtime gates, not claimed by the current slice.
 Dictionary/list displays and comprehensions, conditional/lambda/named expressions,
 assert, expanded calls, power/shift/bitwise protocols, property/attribute builtins,
 Unicode identifiers and f-strings use the existing compiler/VM/protocol path.
@@ -78,8 +82,10 @@ Current inputs are registered immutable SourceUnits, filesystem source/packages,
 statically linked C++ initializers and the C extension inputs specified below.
 __import__ handles absolute/relative names, fromlist and
 __all__, and binds loaded children onto the parent. The low-level C++
-import_module entry loads one full-name transaction; it is not the
-unimplemented Python importlib API. Native callbacks must publish None or a
+import_module entry loads one full-name transaction. Python importlib.import_module
+returns the full leaf through the same transaction; reload preserves the module
+and its dictionary, including existing bindings, and retains the canonical entry
+on execution failure. Native callbacks must publish None or a
 Python exception; their code must outlive registration and every entry they
 create. This internal C++ function-pointer interface is not a dynamic C ABI.
 
@@ -119,8 +125,33 @@ reads take a rooted snapshot before filesystem waits, while other iterables reta
 their normal protocol. The CLI publishes a mutable sys.argv for script/-c and
 trailing arguments. Its existing --eval inspection option remains reserved;
 -- separates trailing Python arguments from those host options.
-Complete sys/module/reflection methods, ModuleSpec/loader objects, Python importlib
-and the remaining container matrix are still gates. Namespace-package paths are
+`Lib/importlib/_bootstrap.py` supplies the actual ModuleSpec class, source/memory/
+native/namespace loaders and module_from_spec. A small native `_imp` module owns
+source/code execution, source-file reading and transaction entrypoints; it does
+not define a parallel Python object model. File loaders reread source on
+get_source/get_code/exec_module and on reload, not at discovery. Source retrieval
+does not compile the file. Code instances may differ across get_code calls;
+their type is the same canonical runtime Code type.
+
+Cold bootstrap loads builtins/sys/_imp and the Python seed through the same module
+transactions, then installs their real metadata and loads importlib. Concurrent
+callers park only until that one-time bootstrap finishes; module body execution
+afterward remains independently leased. Failed bootstrap resets its host state
+and preserves successful dependencies for retry without recreating their classes.
+There is no native cache of Python spec/factory objects. Initializing flags are
+set before publication and cleared on success/failure with pre-rooted keys and
+values, including zero-managed-allocation cleanup.
+
+The supported spec fields include name/loader/origin/loader_state, package paths,
+parent/has_location/cached properties. Module paths and spec paths share identity;
+namespace origin and __file__ are None. No .pyc path is inferred: cached defaults
+to None (explicit assignments remain mutable). module_from_spec does not register
+the result in sys.modules. Importlib machinery/util export the implemented
+classes and helper, not a placeholder full CPython importlib API.
+
+Complete sys/module/reflection methods, general PEP 451 finders/path hooks,
+Python-defined loader discovery and the remaining container matrix are still
+gates. Namespace-package paths are
 currently mutable static list snapshots, not full PEP 420 paths. Auto-refresh after a namespace
 parent search path changes, path hooks and bytecode caches remain pending.
 This node therefore does not complete the active module-stage goal.

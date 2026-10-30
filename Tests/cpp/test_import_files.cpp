@@ -159,8 +159,10 @@ TEST_F(FileImports, NamespacePortionsAndIterablePathReassignment)
     const auto package = roots.root(out.value());
     auto package_path = roots.root(attribute(package, U"__path__"));
     EXPECT_EQ(detail::list_size(context, package_path), 2u);
-    EXPECT_FALSE(
-        detail::name_lookup(context, module_dict(context, package.get(context)), U"__file__"));
+    EXPECT_EQ(attribute(package, U"__file__"), context.builtin(CoreObject::None));
+    const auto spec = roots.root(attribute(package, U"__spec__"));
+    EXPECT_EQ(attribute(spec, U"origin"), context.builtin(CoreObject::None));
+    EXPECT_EQ(attribute(spec, U"submodule_search_locations"), package_path.get(context));
     import_module(context, U"ns.second", out);
     ASSERT_EQ(out.tag(), ResultTag::Ok);
     EXPECT_EQ(int_decimal(context, attribute(roots.root(out.value()), U"value")), "2");
@@ -178,6 +180,71 @@ TEST_F(FileImports, NamespacePortionsAndIterablePathReassignment)
     import_module(context, U"ns.third", out);
     ASSERT_EQ(out.tag(), ResultTag::Ok);
     EXPECT_EQ(int_decimal(context, attribute(roots.root(out.value()), U"value")), "3");
+}
+
+TEST_F(FileImports, LoaderRereadsSourceAndReloadRetainsNamespaceOnSuccessAndFailure)
+{
+    write("reloadable.py", "value = 1\nold = 42\n");
+    ReturnSlot out(context);
+    import_module(context, U"reloadable", out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    const auto module = roots.root(out.value());
+    const auto dictionary = roots.root(module_dict(context, module.get(context)));
+    write("reloadable.py", "value = 2\n");
+    write("reloadable.py.alternate", "value = 9\n");
+    SourceUnit check(SourceBuffer(R"(source = __loader__.get_source(__name__)
+assert source == 'value = 2\n'
+code = __loader__.get_code(__name__)
+assert code is not None
+from importlib import machinery
+assert type(__loader__) is machinery.SourceFileLoader
+assert __loader__.is_package(__name__) is False
+independent = machinery.SourceFileLoader(__name__, __file__)
+assert independent.get_source(__name__) == source
+assert type(independent.get_code(__name__)) is type(code)
+__loader__.path = __file__ + '.alternate'
+try:
+    assert __loader__.get_source(__name__) == 'value = 9\n'
+finally:
+    __loader__.path = __file__
+)"));
+    run(context, {&check, dictionary}, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    reload_module(context, module, U"reloadable", out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(out.value(), module.get(context));
+    EXPECT_EQ(module_dict(context, module.get(context)), dictionary.get(context));
+    EXPECT_EQ(int_decimal(context, attribute(module, U"value")), "2");
+    EXPECT_EQ(int_decimal(context, attribute(module, U"old")), "42");
+    SourceUnit python_reload(SourceBuffer(R"(import importlib
+import sys
+assert importlib.reload(sys.modules[__name__]) is sys.modules[__name__]
+assert __loader__ is __spec__.loader
+assert __cached__ is None
+)"));
+    run(context, {&python_reload, dictionary}, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    write("reloadable.py", "value = 3\nraise ValueError('reload failed')\n");
+    reload_module(context, module, U"reloadable", out);
+    ASSERT_EQ(out.tag(), ResultTag::Raised);
+    EXPECT_EQ(context.type_of(out.exception()), context.builtin(CoreObject::ValueErrorType));
+    EXPECT_EQ(*detail::name_lookup(context, context.builtin(CoreObject::Modules), U"reloadable"),
+              module.get(context));
+    const auto spec = roots.root(attribute(module, U"__spec__"));
+    EXPECT_EQ(attribute(spec, U"_initializing"), context.builtin(CoreObject::False));
+    EXPECT_EQ(module_dict(context, module.get(context)), dictionary.get(context));
+    write("reloadable.py", "value = (\n");
+    SourceUnit invalid_source(
+        SourceBuffer(R"(assert __loader__.get_source(__name__) == 'value = (\n'
+try:
+    __loader__.get_code(__name__)
+except SyntaxError:
+    pass
+else:
+    raise AssertionError('invalid source compiled')
+)"));
+    run(context, {&invalid_source, dictionary}, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
 }
 
 TEST_F(FileImports, LaterConcreteModuleOverridesNamespacePortion)

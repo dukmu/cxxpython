@@ -16,8 +16,10 @@ void register_native_module(Attachment &context, std::u32string name, ModuleInit
 ResultView register_c_module(Attachment &context, const CxxPyModuleDef &definition,
                              ReturnSlot &out);
 ResultView import_module(Attachment &context, const std::u32string &name, ReturnSlot &out);
+ResultView initialize_imports(Attachment &, ReturnSlot &);
+ResultView reload_module(Attachment &, Handle, const std::u32string &, ReturnSlot &);
 ResultView import_name(Attachment &context, Handle name, Handle globals, Handle fromlist,
-                       Handle level, ReturnSlot &out);
+                       Handle level, ReturnSlot &out, bool leaf_only = false);
 ResultView import_from(Attachment &context, Handle module, Handle name, ReturnSlot &out);
 void set_import_path(Attachment &context, std::span<const std::string> paths, ReturnSlot &out);
 

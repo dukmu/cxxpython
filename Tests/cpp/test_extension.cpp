@@ -33,6 +33,9 @@ class Extensions : public testing::Test {
     void SetUp() override
     {
         context.bootstrap_core();
+        ReturnSlot out(context);
+        initialize_imports(context, out);
+        ASSERT_EQ(out.tag(), ResultTag::Ok);
     }
 
     void register_example()

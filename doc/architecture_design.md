@@ -49,14 +49,20 @@ cleanup continuations. `Python/traceback.cpp` owns traceback operations.
 base expansion, metaclass preparation, a normal class-body Frame and existing
 type construction. It is not a separate class VM or lifetime authority.
 `Python/import.cpp` owns the experimental registered/file-source/static-native
-initialization transaction and bootstrap __import__ policy. Host-only per-Interpreter
+initialization transaction and bootstrap coordination. Host-only per-Interpreter
 records coordinate owners/waiters; the managed module table is the only completed
 module authority. File lookup snapshots Python-visible search paths, then reads
 and compiles while parked. Source import statements lower through the existing
 scope/CFG passes into verified import opcodes and normal calls/unwinding.
 `Python/extension.cpp` bridges the versioned C API and POSIX dynamic libraries into
-that same transaction. ModuleSpec/importlib policy remains pending, not a separate
-runtime.
+that same transaction. `Modules/_impmodule.cpp` supplies source/code execution and
+loader callbacks; `Lib/importlib/` defines ModuleSpec, loader classes and Python
+import/reload policy. Cold bootstrap alone coordinates one owner; after boot,
+unrelated module bodies retain independent leases and execute concurrently.
+Seed modules and Python bootstrap use the same publication/rollback transaction;
+no native cache duplicates Python classes or module namespaces. Reload preserves
+the existing module/dictionary and does not remove it on body failure. Full
+finders/path hooks, namespace path refresh and bytecode caches remain gates.
 
 ## Objects And Lifetime
 

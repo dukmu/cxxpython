@@ -3,8 +3,6 @@
 #include "internal/compiler.hpp"
 
 #include <filesystem>
-#include <fstream>
-#include <iterator>
 #include <tuple>
 
 namespace cxxpython::core {
@@ -104,7 +102,9 @@ void sys_init(Attachment &context, Handle module, ReturnSlot &out)
     RootScope roots(context);
     ReturnSlot temporary(context);
     make_str(context, U"", temporary);
-    std::array paths{temporary.value()};
+    const auto current = roots.root(temporary.value());
+    make_str(context, detail::decode_filename(SourceBuffer("", CXXPYTHON_STDLIB_DIR)), temporary);
+    std::array paths{current.get(context), temporary.value()};
     make_list(context, paths, temporary);
     if (store_name(context, dictionary, U"path", temporary.value(), out) == ResultTag::Raised)
         return;
@@ -224,36 +224,17 @@ std::shared_ptr<const ModuleDefinition> find_file(Attachment &context, const std
                 native_package = is_package;
                 break;
             }
-            std::ifstream stream(selected, std::ios::binary);
-            if (!stream)
-                throw std::ios_base::failure("cannot open module source");
-            std::string text{std::istreambuf_iterator<char>(stream),
-                             std::istreambuf_iterator<char>()};
-            if (stream.bad())
-                throw std::ios_base::failure("cannot read module source");
-            if (text.starts_with("\xef\xbb\xbf"))
-                text.erase(0, 3);
             const auto origin = selected.string();
-            auto source = std::make_shared<const SourceUnit>(SourceBuffer(std::move(text), origin));
             result = std::make_shared<const ModuleDefinition>(ModuleDefinition{
-                std::move(source), is_package, origin,
+                ModuleDefinition::File::Source, is_package, origin,
                 is_package ? std::vector<std::string>{selected.parent_path().string()}
                            : std::vector<std::string>{}});
             break;
         }
         if (!result && native_path.empty() && !portions.empty()) {
-            auto source = std::make_shared<const SourceUnit>(SourceBuffer(""));
             result = std::make_shared<const ModuleDefinition>(
-                ModuleDefinition{std::move(source), true, "", std::move(portions)});
+                ModuleDefinition{std::monostate{}, true, "", std::move(portions)});
         }
-    } catch (const SourceError &error) {
-        const auto type = error.kind == SourceErrorKind::Indentation
-                              ? CoreObject::IndentationErrorType
-                          : error.kind == SourceErrorKind::Tab ? CoreObject::TabErrorType
-                                                               : CoreObject::SyntaxErrorType;
-        raise_error(context, type, detail::decode_filename(SourceBuffer("", error.what())), out);
-    } catch (const std::ios_base::failure &) {
-        raise_error(context, CoreObject::OSErrorType, U"cannot read module source", out);
     } catch (const std::filesystem::filesystem_error &) {
         raise_error(context, CoreObject::OSErrorType, U"cannot access module source", out);
     }
@@ -311,10 +292,17 @@ void detail::register_definition(Attachment &context, std::u32string name,
 
 detail::ImportState::ImportState()
 {
-    for (auto [name, initializer] :
-         {std::pair{U"builtins", builtin_init}, {U"sys", sys_init}, {U"__main__", main_init}})
+    for (auto [name, initializer] : {std::pair{U"builtins", builtin_init},
+                                     {U"sys", sys_init},
+                                     {U"__main__", main_init},
+                                     {U"_imp", detail::initialize_imp}})
         definitions.emplace(name, std::make_shared<const ModuleDefinition>(
                                       ModuleDefinition{initializer, false, "built-in", {}}));
+    const std::filesystem::path bootstrap =
+        std::filesystem::path(CXXPYTHON_STDLIB_DIR) / "importlib/_bootstrap.py";
+    definitions.emplace(U"importlib._bootstrap",
+                        std::make_shared<const ModuleDefinition>(ModuleDefinition{
+                            ModuleDefinition::File::Source, false, bootstrap.string(), {}}));
 }
 
 void register_source_module(Attachment &context, std::u32string name,
@@ -336,7 +324,65 @@ void register_native_module(Attachment &context, std::u32string name, ModuleInit
         std::make_shared<const ModuleDefinition>(ModuleDefinition{entry, false, "built-in", {}}));
 }
 
-ResultView import_module(Attachment &context, const std::u32string &name, ReturnSlot &out)
+namespace {
+// Bootstrap factories live only in the canonical Python module namespace.
+// ImportState never caches an untraced callable or a second ModuleSpec class.
+void initialize_metadata(Attachment &context, const std::u32string &name,
+                         const std::shared_ptr<const ModuleDefinition> &definition, Handle module,
+                         ReturnSlot &out)
+{
+    RootScope roots(context);
+    if (name == U"__main__") {
+        store_name(context, module_dict(context, module.get(context)), U"__spec__",
+                   context.builtin(CoreObject::None), out);
+        return;
+    }
+    lookup_name(context, context.builtin(CoreObject::Modules), U"importlib._bootstrap", out);
+    if (out.tag() == ResultTag::Raised)
+        return;
+    if (out.tag() == ResultTag::Empty) {
+        out.ok(context.builtin(CoreObject::None));
+        return;
+    }
+    if (!is_module(context, out.value())) {
+        raise_error(context, CoreObject::ImportErrorType, U"invalid import bootstrap module", out);
+        return;
+    }
+    const auto bootstrap = roots.root(out.value());
+    const auto dictionary = roots.root(module_dict(context, bootstrap.get(context)));
+    lookup_name(context, dictionary.get(context), U"_make_spec", out);
+    if (out.tag() == ResultTag::Raised)
+        return;
+    if (out.tag() == ResultTag::Empty) {
+        out.ok(context.builtin(CoreObject::None));
+        return;
+    }
+    const auto factory = roots.root(out.value());
+    detail::loader_arguments(context, name, definition, out);
+    if (out.tag() == ResultTag::Raised)
+        return;
+    const auto data = roots.root(out.value());
+    const std::array factory_args{data.get(context)};
+    call(context, factory, {factory_args, {}}, out);
+    if (out.tag() == ResultTag::Raised)
+        return;
+    const auto spec = roots.root(out.value());
+    lookup_name(context, dictionary.get(context), U"_init_module_attrs", out);
+    if (out.tag() == ResultTag::Raised)
+        return;
+    if (out.tag() == ResultTag::Empty) {
+        raise_error(context, CoreObject::ImportErrorType, U"incomplete import bootstrap", out);
+        return;
+    }
+    const std::array init_args{spec.get(context), module.get(context),
+                               context.builtin(CoreObject::True)};
+    call(context, roots.root(out.value()), {init_args, {}}, out);
+    if (out.tag() != ResultTag::Raised)
+        out.ok(spec.get(context));
+}
+
+ResultView load_module(Attachment &context, const std::u32string &name, ReturnSlot &out,
+                       std::optional<Handle> reloading = {})
 {
     out.reset(context);
     RootScope roots(context);
@@ -394,11 +440,23 @@ ResultView import_module(Attachment &context, const std::u32string &name, Return
             if (out.tag() == ResultTag::Empty ||
                 (out.tag() == ResultTag::Ok && out.value() == context.builtin(CoreObject::None)))
                 missing(context, name, out);
+            else if (reloading && out.tag() == ResultTag::Ok &&
+                     out.value() != reloading->get(context))
+                raise_error(context, CoreObject::ImportErrorType,
+                            U"module is not the canonical sys.modules entry", out);
             return out.result();
         }
         LoadLease lease(context, name, record);
         dict_lookup(context, modules, module_key, out);
-        if (out.tag() != ResultTag::Empty) {
+        if (reloading) {
+            if (out.tag() == ResultTag::Raised)
+                return out.result();
+            if (out.tag() != ResultTag::Ok || out.value() != reloading->get(context)) {
+                raise_error(context, CoreObject::ImportErrorType,
+                            U"module is not the canonical sys.modules entry", out);
+                return out.result();
+            }
+        } else if (out.tag() != ResultTag::Empty) {
             if (out.tag() == ResultTag::Ok && out.value() == context.builtin(CoreObject::None))
                 missing(context, name, out);
             return out.result();
@@ -413,10 +471,13 @@ ResultView import_module(Attachment &context, const std::u32string &name, Return
             missing(context, name, out);
             return out.result();
         }
-        make_module(context, name, out,
-                    name == U"builtins"
-                        ? std::optional<Handle>{roots.root(context.builtin(CoreObject::Builtins))}
-                        : std::optional<Handle>{});
+        if (reloading)
+            out.ok(reloading->get(context));
+        else
+            make_module(context, name, out,
+                        name == U"builtins" ? std::optional<Handle>{roots.root(
+                                                  context.builtin(CoreObject::Builtins))}
+                                            : std::optional<Handle>{});
         if (out.tag() == ResultTag::Raised)
             return out.result();
         const auto module = roots.root(out.value());
@@ -434,52 +495,65 @@ ResultView import_module(Attachment &context, const std::u32string &name, Return
         if (store_name(context, dictionary.get(context), U"__builtins__",
                        context.builtin(CoreObject::Builtins), out) == ResultTag::Raised)
             return out.result();
-        if (definition->package) {
-            std::vector<Value> paths;
-            for (const auto &path : definition->paths) {
-                make_str(context, detail::decode_filename(SourceBuffer("", path)), temporary);
-                paths.push_back(roots.root(temporary.value()).get(context));
-            }
-            make_list(context, paths, temporary);
-            if (store_name(context, dictionary.get(context), U"__path__", temporary.value(), out) ==
-                ResultTag::Raised)
+        initialize_metadata(context, name, definition, module, out);
+        if (out.tag() == ResultTag::Raised)
+            return out.result();
+        std::optional<Handle> spec_dictionary, initializing_key, executor;
+        if (out.value() != context.builtin(CoreObject::None)) {
+            const auto spec = roots.root(out.value());
+            make_str(context, U"loader", temporary);
+            get_attribute(context, spec, roots.root(temporary.value()), out);
+            if (out.tag() == ResultTag::Raised)
                 return out.result();
-        }
-        if (!definition->origin.empty() && definition->origin != "built-in") {
-            make_str(context, detail::decode_filename(SourceBuffer("", definition->origin)),
-                     temporary);
-            if (store_name(context, dictionary.get(context), U"__file__", temporary.value(), out) ==
-                ResultTag::Raised)
+            const auto loader = roots.root(out.value());
+            make_str(context, U"exec_module", temporary);
+            get_attribute(context, loader, roots.root(temporary.value()), out);
+            if (out.tag() == ResultTag::Raised)
+                return out.result();
+            executor = roots.root(out.value());
+            make_str(context, U"__dict__", temporary);
+            get_attribute(context, spec, roots.root(temporary.value()), out);
+            if (out.tag() == ResultTag::Raised)
+                return out.result();
+            spec_dictionary = roots.root(out.value());
+            make_str(context, U"_initializing", temporary);
+            initializing_key = roots.root(temporary.value());
+            dict_store(context, *spec_dictionary, *initializing_key,
+                       roots.root(context.builtin(CoreObject::True)), out);
+            if (out.tag() == ResultTag::Raised)
                 return out.result();
         }
         detail::DictBinding binding;
-        detail::dict_store_binding(context, modules, module_key, module, binding, out);
+        if (!reloading)
+            detail::dict_store_binding(context, modules, module_key, module, binding, out);
         if (out.tag() == ResultTag::Raised)
             return out.result();
+        auto finish = [&] {
+            if (spec_dictionary) {
+                ReturnSlot cleaned(context);
+                dict_store(context, *spec_dictionary, *initializing_key,
+                           roots.root(context.builtin(CoreObject::False)), cleaned);
+                if (out.tag() != ResultTag::Raised && cleaned.tag() == ResultTag::Raised)
+                    out.raised(cleaned.exception());
+            }
+        };
         out.reset(context);
         try {
-            if (auto source = std::get_if<std::shared_ptr<const SourceUnit>>(&definition->loader))
-                run(context, {source->get(), dictionary}, out);
-            else {
-                if (const auto native = std::get_if<std::shared_ptr<const detail::NativeModule>>(
-                        &definition->loader))
-                    detail::exec_extension(context, *native, module, out);
-                else
-                    std::get<ModuleInitializer>(definition->loader)(context, module, out);
-                if (out.tag() == ResultTag::Empty)
-                    raise_error(context, CoreObject::RuntimeErrorType,
-                                U"module initializer did not publish a result", out);
-                else if (out.tag() == ResultTag::Ok &&
-                         out.value() != context.builtin(CoreObject::None))
-                    raise_error(context, CoreObject::TypeErrorType,
-                                U"module initializer must return None", out);
-            }
+            if (executor) {
+                const std::array arguments{module.get(context)};
+                call(context, *executor, {arguments, {}}, out);
+            } else
+                detail::execute_definition(context, definition, module, out);
         } catch (...) {
-            detail::dict_erase_binding(context, modules, binding, module);
+            finish();
+            if (!reloading)
+                detail::dict_erase_binding(context, modules, binding, module);
             throw;
         }
+        finish();
         if (out.tag() == ResultTag::Raised) {
-            detail::dict_erase_binding(context, modules, binding, module);
+            if (!reloading)
+                detail::dict_erase_binding(context, modules, binding, module);
             return out.result();
         }
         dict_lookup(context, modules, module_key, out);
@@ -492,9 +566,96 @@ ResultView import_module(Attachment &context, const std::u32string &name, Return
     }
     return out.result();
 }
+} // namespace
+
+ResultView initialize_imports(Attachment &context, ReturnSlot &out)
+{
+    out.reset(context);
+    auto &state = context.imports();
+    bool initializing = false;
+    {
+        NativeWait parked(context);
+        std::unique_lock lock(state.mutex);
+        state.changed.wait(lock, [&] {
+            return state.bootstrap != ImportState::Bootstrap::Loading ||
+                   state.bootstrap_owner == std::this_thread::get_id();
+        });
+        if (state.bootstrap == ImportState::Bootstrap::Cold) {
+            state.bootstrap = ImportState::Bootstrap::Loading;
+            state.bootstrap_owner = std::this_thread::get_id();
+            initializing = true;
+        }
+    }
+    if (!initializing) {
+        out.ok(context.builtin(CoreObject::None));
+        return out.result();
+    }
+    auto finish = [&](bool ready) {
+        NativeWait parked(context);
+        std::lock_guard lock(state.mutex);
+        state.bootstrap = ready ? ImportState::Bootstrap::Ready : ImportState::Bootstrap::Cold;
+        state.bootstrap_owner = {};
+        state.changed.notify_all();
+    };
+    try {
+        auto bootstrap = [&] {
+            RootScope roots(context);
+            for (const auto name : {U"builtins", U"sys", U"_imp", U"importlib._bootstrap"}) {
+                load_module(context, name, out);
+                if (out.tag() == ResultTag::Raised)
+                    return;
+            }
+            // A failed boot preserves successful dependencies. Reuse their
+            // classes on retry, then promote seed metadata through Python policy.
+            for (const auto name : {U"builtins", U"sys", U"_imp", U"importlib._bootstrap"}) {
+                lookup_name(context, context.builtin(CoreObject::Modules), name, out);
+                if (out.tag() != ResultTag::Ok)
+                    return;
+                const auto module = roots.root(out.value());
+                initialize_metadata(context, name, find_definition(context, name), module, out);
+                if (out.tag() == ResultTag::Raised)
+                    return;
+            }
+            load_module(context, U"importlib", out);
+            if (out.tag() != ResultTag::Raised)
+                out.ok(context.builtin(CoreObject::None));
+        };
+        bootstrap();
+    } catch (const std::bad_alloc &) {
+        out.raised(context.builtin(CoreObject::MemoryError));
+    } catch (...) {
+        finish(false);
+        throw;
+    }
+    finish(out.tag() == ResultTag::Ok);
+    return out.result();
+}
+
+ResultView import_module(Attachment &context, const std::u32string &name, ReturnSlot &out)
+{
+    initialize_imports(context, out);
+    if (out.tag() != ResultTag::Raised)
+        load_module(context, name, out);
+    return out.result();
+}
+
+ResultView reload_module(Attachment &context, Handle module, const std::u32string &name,
+                         ReturnSlot &out)
+{
+    RootScope roots(context);
+    module = roots.root(module.get(context));
+    if (!is_module(context, module.get(context))) {
+        raise_error(context, CoreObject::TypeErrorType, U"reload requires a module", out);
+        return out.result();
+    }
+    initialize_imports(context, out);
+    if (out.tag() != ResultTag::Raised)
+        load_module(context, name, out, module);
+    return out.result();
+}
 
 ResultView import_name(Attachment &context, Handle name, Handle globals, Handle fromlist,
-                       Handle level, ReturnSlot &out)
+                       Handle level, ReturnSlot &out, bool leaf_only)
 {
     RootScope roots(context);
     name = roots.root(name.get(context));
@@ -611,6 +772,10 @@ ResultView import_name(Attachment &context, Handle name, Handle globals, Handle 
         begin = end + 1;
     } while (end != std::u32string::npos);
     const auto result = *parent;
+    if (leaf_only) {
+        out.ok(result.get(context));
+        return out.result();
+    }
     truth(context, fromlist, item);
     if (item.tag() == ResultTag::Raised) {
         out.raised(item.exception());

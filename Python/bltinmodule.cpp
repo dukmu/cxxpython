@@ -11,6 +11,93 @@ bool failed(const ReturnSlot &out)
 {
     return out.tag() == ResultTag::Raised;
 }
+void class_check(Attachment &context, Handle subject, Handle candidate, bool instance,
+                 ReturnSlot &out, unsigned depth = 0)
+{
+    RootScope roots(context);
+    if (depth > 1000) {
+        raise_error(context, CoreObject::RecursionErrorType, U"recursive class check", out);
+        return;
+    }
+    const auto cls = candidate.get(context);
+    if (instance && context.type_of(subject) == cls) {
+        out.ok(context.builtin(CoreObject::True));
+        return;
+    }
+    if (context.has_layout<TupleObject>(cls) &&
+        is_subtype(context, context.type_of(cls), context.builtin(CoreObject::TupleType))) {
+        for (auto item : context.payload<TupleObject>(cls).items) {
+            class_check(context, subject, roots.root(item), instance, out, depth + 1);
+            if (failed(out) || out.value() == context.builtin(CoreObject::True))
+                return;
+        }
+        out.ok(context.builtin(CoreObject::False));
+        return;
+    }
+    if (context.type_of(cls) != context.type_type()) {
+        auto method = detail::type_attribute(
+            context, context.type_of(cls), instance ? U"__instancecheck__" : U"__subclasscheck__");
+        if (method) {
+            const std::array args{subject.get(context)};
+            ReturnSlot result(context);
+            detail::invoke_special(context, candidate, roots.root(*method), {args, {}}, result);
+            if (failed(result)) {
+                out.raised(result.exception());
+                return;
+            }
+            truth(context, roots.root(result.value()), out);
+            return;
+        }
+    }
+    if (!type_object(context, cls)) {
+        raise_error(context, CoreObject::TypeErrorType,
+                    instance ? U"isinstance() arg 2 must be a type or tuple of types"
+                             : U"issubclass() arg 2 must be a class or tuple of classes",
+                    out);
+        return;
+    }
+    if (!instance) {
+        if (!type_object(context, subject.get(context))) {
+            raise_error(context, CoreObject::TypeErrorType, U"issubclass() arg 1 must be a class",
+                        out);
+            return;
+        }
+        out.ok(context.builtin(is_subtype(context, subject, candidate) ? CoreObject::True
+                                                                       : CoreObject::False));
+        return;
+    }
+    if (is_subtype(context, context.type_of(subject), cls)) {
+        out.ok(context.builtin(CoreObject::True));
+        return;
+    }
+    ReturnSlot name(context), actual(context);
+    make_str(context, U"__class__", name);
+    get_attribute(context, subject, roots.root(name.value()), actual);
+    if (failed(actual)) {
+        if (!is_subtype(context, context.type_of(actual.exception()),
+                        context.builtin(CoreObject::AttributeErrorType))) {
+            out.raised(actual.exception());
+            return;
+        }
+        out.ok(context.builtin(CoreObject::False));
+        return;
+    }
+    const auto actual_class = roots.root(actual.value());
+    out.ok(context.builtin(type_object(context, actual_class.get(context)) &&
+                                   is_subtype(context, actual_class, candidate)
+                               ? CoreObject::True
+                               : CoreObject::False));
+}
+void builtin_isinstance(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(context);
+    class_check(context, roots.root(args[0]), roots.root(args[1]), true, out);
+}
+void builtin_issubclass(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(context);
+    class_check(context, roots.root(args[0]), roots.root(args[1]), false, out);
+}
 void attribute_get(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
@@ -240,6 +327,11 @@ void install_class_builtins(Attachment &context, std::span<const Handle> core, V
     install("getattr", U"getattr", get, attribute_get);
     attributes.parameters.push_back({U"value", ParameterKind::PositionalOnly});
     install("setattr", U"setattr", attributes, attribute_set);
+    SignatureLayout class_signature;
+    class_signature.parameters = {{U"object", ParameterKind::PositionalOnly},
+                                  {U"classinfo", ParameterKind::PositionalOnly}};
+    install("isinstance", U"isinstance", class_signature, builtin_isinstance);
+    install("issubclass", U"issubclass", class_signature, builtin_issubclass);
     SignatureLayout ascii_signature;
     ascii_signature.parameters = {{U"object", ParameterKind::PositionalOnly}};
     install("ascii", U"ascii", ascii_signature, builtin_ascii);

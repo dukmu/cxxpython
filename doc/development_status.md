@@ -1,5 +1,67 @@
 # Development Status
 
+## 2026-10-30 Real Python Import Policy, Loaders And Reload
+
+Prepended without changing earlier records. Previous stable node: de4838c,
+which removed the handwritten parser and its dedicated tests. The active goal
+continues through the unfinished import/library/N4-N6/M0-M9 route; neither full
+runtime compatibility nor release/performance acceptance is declared complete.
+
+- Added actual Python policy in Lib/importlib: ModuleSpec, source-file/memory/
+  native/namespace loaders, module_from_spec, import_module and reload, with
+  machinery/util exports. ModuleSpec adapts fixed CPython 3.12.14 semantics and
+  retains PSF provenance. Properties, spec equality/repr, canonical class identity,
+  package/path identity and non-registering module construction have executable
+  tests and fixed-reference differential coverage. Bytecode cache paths are not
+  fabricated: cached defaults to None and remains explicitly assignable.
+- Modules/_impmodule.cpp supplies the small native source/code/initializer bridge.
+  Normal transactions invoke the real Python loader's exec_module; a test replaces
+  that method to verify the live execution route. File discovery no longer parses
+  or snapshots file bodies. Python file loaders use their current path for fresh
+  source/code/execution, including direct construction and path mutation. Invalid
+  source is retrievable without compilation; get_code reports its SyntaxError.
+  Immutable registered SourceUnits remain shared native input. Code instances may
+  differ across get_code calls, but use the same canonical Code type.
+- Cold bootstrap uses a host Cold/Loading/Ready owner state and GC-aware parked
+  waiters, releasing coordination before all Python execution. Seeds and Python
+  bootstrap use the existing publication/rollback transaction; successful
+  dependencies survive failure and are reused on retry. Python factory/classes
+  are read from the canonical module, never duplicated in an untraced native
+  cache. After bootstrap, unrelated modules retain independent concurrent leases;
+  no GIL or execution-wide mutex was introduced.
+- Module metadata is initialized by Python policy. Rooted initialization keys and
+  values support flag cleanup and publication rollback at zero managed quota.
+  Reload preserves the module/dictionary and retained bindings; body failure does
+  not erase the canonical entry. Recursive reload checks identity even while a
+  same-thread/cross-thread cycle takes the partial-module path. Tests cover native
+  loaders, namespace origin/path, body failure, OOM retry, cold concurrent boot,
+  GC and existing per-module parallel/cycle behavior.
+- Filled the actual bootstrap dependency on isinstance/issubclass through normal
+  type/descriptor/call/truth protocols, with runtime types, nested tuples,
+  metaclass hooks, exceptions and __class__ fallback tests. Class-like __bases__
+  traversal and union classinfo remain explicit runtime gates.
+- Final normal CTest passes 450/450. ASan/UBSan/LSan native suite passes 441/441;
+  after the final recursive-reload identity correction, all 41 affected
+  import/file/extension/concurrency/class-check tests pass again with strict UBSan.
+  TSan native suite passes 439/439, with only the established two allocation
+  enumerations excluded; the final binary also passes the new recursive-reload
+  regression and cross-thread import-cycle test (2/2). No new sanitizer exclusion
+  was added. Instrumented product-entry importlib policy differential passes its
+  four fixed-CPython cases. Format-check and generated-parser consistency pass.
+- Retained evidence: .cache/import-bootstrap-{final,asan,tsan}-ctest.*, final
+  sanitizer import logs, copied native sanitizer output and
+  .cache/import-bootstrap-asan-policy.{json,log}. The full sanitizer runs preceded
+  the last localized reload guard; final affected checks are recorded separately
+  instead of claiming a nonexistent final full-suite rerun. No CPU benchmark
+  samples or handwritten measurement tables were added.
+- Remaining dependency is general finder/path-hook routing, dynamic namespace
+  paths and path/install configuration, together with bytes/iteration and real
+  IO/encoding foundations needed for Python libraries. Continue the specified
+  Base-to-Full standard-library closure and N4-N6 acceptance, including runpy and
+  product entrypoints. CXXPYTHON_STDLIB_DIR is a development source path, not an
+  installed/isolated runtime layout. The user's temporary_plan.md deletion and
+  untracked test2.py remain outside this commit.
+
 ## 2026-10-30 Independent Generated Parser Replaces The Handwritten Frontend
 
 Prepended without changing earlier records. Previous stable node: d33dc7a. The

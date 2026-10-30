@@ -18,7 +18,10 @@ The current targets include `cxxpython_parser`, `cxxpython_core`, `cxxpython`,
 optional `bench_runtime`. There is no legacy build option or alternate CLI. A system GTest
 is used when available; otherwise CMake fetches the pinned source archive.
 Set `BOOST_MULTIPRECISION_INCLUDE_DIR` when Boost headers are not on the compiler
-search path. Configure sanitizers with the compiler/linker flags in a separate
+search path. `CXXPYTHON_STDLIB_DIR` defaults to the repository's `Lib/`; the source
+bootstrap reads this directory, which must remain available to the executable.
+This development setting is not a completed installed/isolated path configuration.
+Configure sanitizers with the compiler/linker flags in a separate
 build directory; never measure performance while compiling or running sanitizers.
 Use `-DCXXPYTHON_TEST_TIMEOUT=120` for instrumented debug suites; normal builds
 default to 15 seconds per native test. Preserve elapsed times and investigate

@@ -15,6 +15,9 @@ class Imports : public testing::Test {
     void SetUp() override
     {
         context.bootstrap_core();
+        ReturnSlot out(context);
+        initialize_imports(context, out);
+        ASSERT_EQ(out.tag(), ResultTag::Ok);
     }
     void source(std::u32string name, std::string text)
     {
@@ -31,6 +34,132 @@ class Imports : public testing::Test {
         return roots.root(out.value()).get(context);
     }
 };
+TEST_F(Imports, MemorySpecsUseCanonicalPolicyAndExposeInitializingAndCode)
+{
+    source(U"memory_one", "during = __spec__._initializing\nvalue = 42\ndef function(): pass\n");
+    source(U"memory_two", "value = 7\n");
+    ReturnSlot out(context);
+    import_module(context, U"memory_one", out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    const auto first = roots.root(out.value());
+    import_module(context, U"memory_two", out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    const auto second = roots.root(out.value());
+    import_module(context, U"__main__", out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    const auto globals = roots.root(module_dict(context, out.value()));
+    make_str(context, U"first", out);
+    detail::name_store(context, globals.get(context), out.value(), first.get(context));
+    make_str(context, U"second", out);
+    detail::name_store(context, globals.get(context), out.value(), second.get(context));
+    SourceUnit check(SourceBuffer(R"(from importlib import machinery
+assert type(first.__spec__) is machinery.ModuleSpec
+assert type(second.__spec__) is machinery.ModuleSpec
+assert type(first.__loader__) is machinery.MemorySourceLoader
+assert type(second.__loader__) is machinery.MemorySourceLoader
+assert first.__loader__ is first.__spec__.loader
+assert first.during is True
+assert first.__spec__._initializing is False
+code = first.__loader__.get_code('memory_one')
+assert type(code) is type(second.__loader__.get_code('memory_two'))
+assert type(code) is type(first.function.__code__)
+)"));
+    run(context, {&check, globals}, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+}
+
+TEST_F(Imports, NativeLoaderDoesNotExposeSourceOrCode)
+{
+    source(U"native_policy_check", R"(import _imp
+from importlib import machinery
+assert type(_imp.__loader__) is machinery.NativeLoader
+assert _imp.__loader__.get_source('_imp') is None
+assert _imp.__loader__.get_code('_imp') is None
+)");
+    ReturnSlot out(context);
+    import_module(context, U"native_policy_check", out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+}
+TEST_F(Imports, PythonSpecPolicyAndModuleConstructionAreRealObjects)
+{
+    source(U"through_loader", "value = 41\n");
+    source(U"spec_policy_check", R"(import sys
+import importlib
+from importlib.machinery import ModuleSpec
+from importlib.util import module_from_spec
+assert importlib._bootstrap.ModuleSpec is ModuleSpec
+a = ModuleSpec('pkg.child', None, origin='memory')
+b = ModuleSpec('pkg.child', None, origin='memory')
+assert a == b
+assert a.parent == 'pkg'
+assert a.has_location is False
+a.has_location = True
+a.cached = 'custom'
+assert a != b
+assert a.has_location is True
+assert a.cached == 'custom'
+module = module_from_spec(a)
+assert module.__name__ == 'pkg.child'
+assert module.__package__ == 'pkg'
+assert module.__spec__ is a
+assert module.__file__ == 'memory'
+assert module.__cached__ == 'custom'
+assert 'pkg.child' not in sys.modules
+p = ModuleSpec('parent', None, is_package=True)
+package = module_from_spec(p)
+assert package.__path__ is p.submodule_search_locations
+assert p.parent == 'parent'
+assert importlib.import_module('importlib.util') is sys.modules['importlib.util']
+assert importlib.import_module('.util', 'importlib') is sys.modules['importlib.util']
+loader_type = importlib._bootstrap.MemorySourceLoader
+execute = loader_type.exec_module
+def observed(self, module):
+    module.via_loader = True
+    return execute(self, module)
+loader_type.exec_module = observed
+try:
+    loaded = importlib.import_module('through_loader')
+    assert loaded.via_loader is True
+    assert loaded.value == 41
+finally:
+    loader_type.exec_module = execute
+)");
+    ReturnSlot out(context);
+    import_module(context, U"spec_policy_check", out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+}
+TEST_F(Imports, FailedBodyClearsThePublishedSpecFlag)
+{
+    source(U"failed_flag", "import sys\nsys.failed_spec = __spec__\nraise ValueError('body')\n");
+    ReturnSlot out(context);
+    import_module(context, U"failed_flag", out);
+    ASSERT_EQ(out.tag(), ResultTag::Raised);
+    EXPECT_EQ(context.type_of(out.exception()), context.builtin(CoreObject::ValueErrorType));
+    EXPECT_FALSE(
+        detail::name_lookup(context, context.builtin(CoreObject::Modules), U"failed_flag"));
+    import_module(context, U"sys", out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    const auto spec = roots.root(attribute(roots.root(out.value()), U"failed_spec"));
+    EXPECT_EQ(attribute(spec, U"_initializing"), context.builtin(CoreObject::False));
+}
+TEST_F(Imports, RecursiveReloadRejectsANoncanonicalModule)
+{
+    source(U"recursive_reload", R"(import sys
+import importlib
+fake = type(sys)(__name__)
+try:
+    importlib.reload(fake)
+except ImportError:
+    rejected = True
+else:
+    raise AssertionError('reload accepted a noncanonical module')
+assert importlib.reload(sys.modules[__name__]) is sys.modules[__name__]
+)");
+    ReturnSlot out(context);
+    import_module(context, U"recursive_reload", out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(attribute(roots.root(out.value()), U"rejected"), context.builtin(CoreObject::True));
+}
 TEST_F(Imports, SourceNamespaceAndCoreModuleIdentitiesAreAuthoritative)
 {
     source(U"example", "value = 40\ndef answer(): return value + 2\n");
@@ -313,6 +442,51 @@ struct GateObject {
     GateObject(InitialType head, ImportGate *value) : header(head), gate(value) {}
     void trace(Tracer &) const noexcept {}
 };
+TEST(ParallelImports, ColdBootstrapConcurrentAndAllocationFailureRetry)
+{
+    for (std::size_t quota : {0u, 1u, 10u, 100u, 1000u, 5000u}) {
+        SCOPED_TRACE(quota);
+        Interpreter interpreter{{.collect_every_allocation = true}};
+        Attachment owner(interpreter);
+        owner.bootstrap_core();
+        ReturnSlot out(owner);
+        owner.set_allocation_limit(quota);
+        initialize_imports(owner, out);
+        owner.set_allocation_limit(std::numeric_limits<std::size_t>::max());
+        if (out.tag() == ResultTag::Raised)
+            ASSERT_EQ(owner.type_of(out.exception()), owner.builtin(CoreObject::MemoryErrorType));
+        else
+            ASSERT_EQ(out.tag(), ResultTag::Ok);
+        owner.collect();
+        initialize_imports(owner, out);
+        ASSERT_EQ(out.tag(), ResultTag::Ok);
+    }
+    Interpreter interpreter{{.collect_every_allocation = true}};
+    Attachment owner(interpreter);
+    owner.bootstrap_core();
+    std::latch start{1};
+    std::array<std::future<bool>, 2> workers;
+    {
+        NativeWait parked(owner);
+        for (auto &worker : workers)
+            worker = std::async(std::launch::async, [&] {
+                Attachment actor(interpreter);
+                ReturnSlot out(actor);
+                {
+                    NativeWait waiting(actor);
+                    start.wait();
+                }
+                initialize_imports(actor, out);
+                if (out.tag() != ResultTag::Ok)
+                    return false;
+                actor.collect();
+                return true;
+            });
+        start.count_down();
+        for (auto &worker : workers)
+            EXPECT_TRUE(worker.get());
+    }
+}
 TEST(ParallelImports, PerModuleLeasesAndCrossThreadCyclesParkForGc)
 {
     for (int variant : {0, 1, 2}) {
