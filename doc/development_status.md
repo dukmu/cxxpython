@@ -1,5 +1,82 @@
 # Development Status
 
+## 2026-11-01 Co-Locate Dictionary Index Nodes
+
+Continues the active performance/cleanup goal after pushed 668843f. Parent owns
+the storage/header/build and performance changes; Terra supplied native membership
+and rollback tests plus expanded direct collision/clear/iterator coverage, checked
+against fixed CPython and the prechange binary, and is closed.
+
+- Reuse the existing Boost distribution's Intrusive containers instead of writing
+  another tree/rehash/allocator framework. Both balanced-tree indexes embed their
+  hooks in the insertion-order list's single stable native Node. Indexed string
+  entries need one allocation instead of three; unnamed entries need one instead
+  of two. Removal detaches hooks before freeing the owning node. Callbacks still
+  run outside short per-dictionary commits and revalidate stable identities/key
+  versions. No GIL/Python RC or new pool, lock, Python object type or library policy.
+- Snapshots copy only the unchanged plain Entry, never hooks/owning-list iterators.
+  The key owns the immutable text borrowed by a nullable native string pointer;
+  using that pointer rather than optional string_view avoids excess metadata.
+  Deleted incremental node-byte bookkeeping and derive storage accounting from
+  its actual node count. Ordinary lookup is still O(log n + collisions), not a
+  claim of CPython's amortized constant-time dictionary implementation.
+- Moved node/index/storage definitions to Include/internal/dict.hpp. Constructor,
+  destructor, traversal and size accounting live in dictstorage.cpp; public
+  objects.hpp keeps forward declarations and runtime interfaces. Boost remains
+  private to core/storage tests, with an explicit Intrusive-header configure
+  check alongside the existing Multiprecision requirement. The final private
+  layout adjustment recompiles only storage and its native test, rather than
+  all object-header users. No fallback interpreter or extension-ABI change.
+- Strict Clang 21.1.8 IPO Release passes 327 relevant native contracts including
+  16 bootstrap/promotion allocation-failure shards. ASan/UBSan/LSan and TSan each
+  pass 311 relevant native contracts; all three pass 28 direct Python scenarios.
+  The new cases verify that both indexes refer to the actual ordered node,
+  erase/clear/reinsert and GC preserve membership/lifetime, and zero-quota
+  binding rollback cannot erase a later replacement with the same value. Host
+  benchmark contracts pass all 15 tests, plus formatting/diff checks. No test
+  timeouts or budget changes; the preceding node's complete file-loader pressure
+  suite was not repeated. Evidence is .cache/dict-node-*.
+- Native allocation count and size have an explicit tradeoff. Direct
+  sys.getsizeof checks at 0/1/64/10000 keys are retained in the int/str-footprint-
+  before/after logs. Empty dictionaries report 256 -> 216 bytes; a single string
+  key 424 -> 328, and 10000 string keys 1680256 -> 1120216. Uniform nodes reserve
+  an unused name hook for numeric keys: 10000 integer keys report 960256 ->
+  1120216, approximately 16 extra accounted bytes/key at scale. These are reported
+  object/native-storage bytes, not malloc chunk overhead or RSS; no blanket memory
+  reduction claim. Private representation/ownership and the bound on this tradeoff
+  are documented rather than hidden behind a string-only benchmark.
+- Added dict_int to the existing unified worker/controller and smoke contracts:
+  size counts independent 64-key integer dictionaries, each constructed, updated,
+  partially deleted and validated by sum, with natural GC. Existing allocate and
+  matrix kernels are unchanged; their merged reports intentionally flag the full
+  worker-source difference from this catalog addition. Old evidence is retained
+  and reused, not rewritten or remeasured to silence that warning.
+- After all builds/tests stopped, measured at one/four workers, three processes,
+  one warmup and three values/process. Allocate's 100000-job medians are
+  698.262/278.539 ms versus retained 724.147/292.866. Standard pyperf reports about
+  1.05x/1.06x faster. Scaling is 2.507x, four-worker CPU/wall 2.976. Matrix N=64
+  gives 457.191/188.114 versus 448.411/185.537; neither difference is significant,
+  with scaling 2.430x and four-worker CPU/wall 3.111. No matrix improvement claim.
+- First-time dict_int measurement alternates the retained 668843f executable,
+  new executable and fixed CPython 3.12.14. Before/after medians for 512 jobs are
+  161.252/69.672 and 157.954/66.549 ms; neither change is significant. New scaling
+  is 2.374x, four-worker CPU/wall 2.812. CPython gives 2.591/3.245 ms, leaving an
+  approximately 61x one-worker gap. Absolute performance acceptance is emphatically
+  incomplete. No unrelated I/O/startup or repeated CPython campaign was run.
+- Raw/generated reports and pyperf comparisons are in .cache/benchmarks/
+  dict-node-{allocation,matrix}{,-comparison} and dict-node-integer. No hand tables.
+  A separate one-worker, 32-loop dict_int software profile retains about 1K CPU
+  samples in dict-node-integer-profile-1, including startup/warmup. Root acquisition
+  symbols account for 10.22%/1.90% self CPU, dictionary access 7.14%, VM run 5.06%,
+  layout checks 3.89% and internal protocol invocation 3.80%; malloc/free are
+  1.99%/1.36%. These are not cache-hit counters or STW wall-time fractions. Next
+  work should address complete dictionary hashing/equality and VM/protocol/root
+  handoffs using existing owned operands, not another node-packing or collector
+  framework cycle. Public independent-result, foreign/domain, callback, class
+  mutation and precise-root contracts remain gates. The performance goal stays
+  active; the full compatibility route stays paused. matrix.py is unchanged and
+  untracked.
+
 ## 2026-11-01 Share Dictionary Key Text
 
 Continues the active performance/cleanup goal after pushed e6d3625. The retained

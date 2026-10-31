@@ -1,10 +1,12 @@
 #include "cxxpython/compiler.hpp"
+#include "internal/dict.hpp"
 
 #include <gtest/gtest.h>
 
 #include <array>
 #include <future>
 #include <latch>
+#include <limits>
 #include <stdexcept>
 
 namespace {
@@ -351,7 +353,8 @@ TEST_F(CoreDict, LongNameIndexesAliasTracedKeysAndCopiesSurviveCollection)
     const auto &ordinary = *context.payload<DictObject>(dictionary.get(context)).contents;
     ASSERT_EQ(ordinary.index.size(), 1U);
     const auto &indexed = *ordinary.index.begin();
-    EXPECT_EQ(indexed.first.data(), context.payload<StrObject>(indexed.second->key).value.data());
+    ASSERT_NE(indexed.name, nullptr);
+    EXPECT_EQ(indexed.name->data(), context.payload<StrObject>(indexed.entry.key).value.data());
 
     ReturnSlot snapshot_root(context);
     {
@@ -390,5 +393,92 @@ TEST_F(CoreDict, LongNameIndexesAliasTracedKeysAndCopiesSurviveCollection)
     ASSERT_TRUE(snapshot_view.find(name).has_value());
     EXPECT_EQ(context.payload<StrObject>(*snapshot_view.find(name)).value, text);
     EXPECT_EQ(context.payload<StrObject>(snapshot_view.entries()[0].key).value, name);
+}
+
+TEST_F(CoreDict, StorageIndexesShareOrderedNodesAcrossRemovalAndCollection)
+{
+    ReturnSlot out(context);
+    context.allocate_instance<DictObject>(roots.root(context.builtin(CoreObject::DictType)), out);
+    const auto dictionary = roots.root(out.value());
+    make_str(context, U"indexed name", out);
+    const auto name = roots.root(out.value());
+    make_int(context, 42, out);
+    const auto number = roots.root(out.value());
+    const auto &storage = *context.payload<DictObject>(dictionary.get(context)).contents;
+
+    auto check_membership = [&] {
+        EXPECT_EQ(storage.hashes.size(), storage.names.size());
+        std::size_t named = 0;
+        for (const auto &node : storage.names) {
+            EXPECT_EQ(&*node.order, &node);
+            std::size_t hash_matches = 0;
+            for (const auto &indexed : storage.hashes)
+                hash_matches += &indexed == &node;
+            EXPECT_EQ(hash_matches, 1U);
+            std::size_t name_matches = 0;
+            for (const auto &indexed : storage.index)
+                name_matches += &indexed == &node;
+            EXPECT_EQ(name_matches, node.name ? 1U : 0U);
+            named += node.name != nullptr;
+        }
+        EXPECT_EQ(storage.index.size(), named);
+    };
+
+    dict_store(context, dictionary, name, number, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    dict_store(context, dictionary, number, name, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    ASSERT_EQ(storage.names.size(), 2U);
+    check_membership();
+    dict_erase(context, dictionary, name, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    context.collect();
+    ASSERT_EQ(storage.names.size(), 1U);
+    check_membership();
+    dict_store(context, dictionary, name, number, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    check_membership();
+    dict_clear(context, dictionary, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    context.collect();
+    EXPECT_TRUE(storage.names.empty());
+    check_membership();
+    dict_store(context, dictionary, name, number, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    context.collect();
+    ASSERT_EQ(storage.names.size(), 1U);
+    check_membership();
+}
+
+TEST_F(CoreDict, BindingRollbackIsNonallocatingAndPreservesReplacement)
+{
+    ReturnSlot out(context);
+    context.allocate_instance<DictObject>(roots.root(context.builtin(CoreObject::DictType)), out);
+    const auto dictionary = roots.root(out.value());
+    make_str(context, U"binding", out);
+    const auto key = roots.root(out.value());
+    make_int(context, 42, out);
+    const auto value = roots.root(out.value());
+    detail::DictBinding original;
+    detail::dict_store_binding(context, dictionary, key, value, original, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    context.set_allocation_limit(0);
+    const bool erased = detail::dict_erase_binding(context, dictionary, original, value);
+    context.set_allocation_limit(std::numeric_limits<std::size_t>::max());
+    EXPECT_TRUE(erased);
+
+    detail::DictBinding replacement;
+    detail::dict_store_binding(context, dictionary, key, value, replacement, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_NE(original.identity, replacement.identity);
+    context.set_allocation_limit(0);
+    const bool erased_replacement =
+        detail::dict_erase_binding(context, dictionary, original, value);
+    context.set_allocation_limit(std::numeric_limits<std::size_t>::max());
+    EXPECT_FALSE(erased_replacement);
+    context.collect();
+    dict_lookup(context, dictionary, key, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(out.value(), value.get(context));
 }
 } // namespace

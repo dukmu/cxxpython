@@ -1,9 +1,24 @@
 #include "cxxpython/protocol.hpp"
+#include "internal/dict.hpp"
 
 #include <algorithm>
 #include <bit>
 
 namespace cxxpython::core {
+DictObject::DictObject(InitialType head) : header(head), contents(std::make_unique<Storage>()) {}
+DictObject::~DictObject() noexcept = default;
+void DictObject::trace(Tracer &tracer) const noexcept
+{
+    tracer.visit(namespace_owner);
+    for (const auto &node : contents->names) {
+        tracer.visit(node.entry.key);
+        tracer.visit(node.entry.value);
+    }
+}
+std::size_t DictObject::external_bytes() const noexcept
+{
+    return contents->external_bytes();
+}
 namespace {
 template <class F>
 decltype(auto) namespace_locked(Attachment &context, DictObject::Storage &data, F &&operation)
@@ -48,7 +63,9 @@ DictView::DictView(Attachment &context, std::optional<Value> dictionary)
         if (namespace_locked(context, data, [&] {
                 if (data.names.size() > names_.capacity())
                     return false;
-                names_.assign(data.names.begin(), data.names.end());
+                names_.clear();
+                for (const auto &node : data.names)
+                    names_.push_back(node.entry);
                 return true;
             }))
             break;
@@ -112,51 +129,28 @@ std::int64_t name_hash(Attachment &context, const std::u32string &text)
     return result == -1 ? -2 : result;
 }
 namespace {
-std::size_t entry_bytes(bool named)
-{
-    return sizeof(DictObject::Entry) + 2 * sizeof(void *) +
-           sizeof(DictObject::HashIndex::value_type) + 4 * sizeof(void *) +
-           (named ? sizeof(DictObject::Index::value_type) + 6 * sizeof(void *) : 0);
-}
 void remove_entry(Attachment &context, Value dictionary, DictObject::Storage &data,
-                  std::list<DictObject::Entry>::iterator entry,
-                  std::list<DictObject::Entry> &removed)
+                  DictObject::Node &node, std::list<DictObject::Node> &removed)
 {
-    std::size_t bytes = entry_bytes(false);
-    if (context.has_layout<StrObject>(entry->key)) {
-        const auto &label = context.payload<StrObject>(entry->key).value;
-        auto found = data.index.find(label);
-        if (found != data.index.end() && found->second == entry) {
-            bytes = entry_bytes(true);
-            data.index.erase(found);
-        }
-    }
-    const auto [begin, end] = data.hashes.equal_range(entry->hash);
-    for (auto at = begin; at != end; ++at)
-        if (at->second == entry) {
-            data.hashes.erase(at);
-            break;
-        }
-    data.bytes -= bytes;
-    removed.splice(removed.end(), data.names, entry);
+    if (node.name_hook.is_linked())
+        data.index.erase(data.index.iterator_to(node));
+    data.hashes.erase(data.hashes.iterator_to(node));
+    removed.splice(removed.end(), data.names, node.order);
     ++data.keys_version;
     context.account_external(dictionary, data.external_bytes());
 }
 void insert_entry(Attachment &context, Value dictionary, DictObject::Storage &data,
-                  std::list<DictObject::Entry> &prepared, DictObject::Index::node_type &name,
-                  DictObject::HashIndex::node_type &hash)
+                  std::list<DictObject::Node> &prepared)
 {
     if (!data.next_identity)
         throw std::bad_alloc();
-    auto &entry = prepared.front();
-    entry.identity = data.next_identity;
-    // Both index nodes are prepared before the non-allocating commit.
-    data.hashes.insert(std::move(hash));
+    auto &node = prepared.front();
+    node.entry.identity = data.next_identity;
+    data.hashes.insert(node);
     ++data.next_identity;
-    data.bytes += entry_bytes(bool(name));
     data.names.splice(data.names.end(), prepared);
-    if (name)
-        data.index.insert(std::move(name));
+    if (node.name)
+        data.index.insert(node);
     ++data.keys_version;
     context.account_external(dictionary, data.external_bytes());
 }
@@ -173,7 +167,7 @@ std::optional<Value> name_lookup(Attachment &context, Value dictionary, const st
     auto &data = *shell.contents;
     return namespace_locked(context, data, [&]() -> std::optional<Value> {
         const auto found = data.index.find(name);
-        return found == data.index.end() ? std::optional<Value>{} : found->second->value;
+        return found == data.index.end() ? std::optional<Value>{} : found->entry.value;
     });
 }
 bool copy_name_storage(Attachment &context, std::optional<Value> source, const std::u32string &name,
@@ -242,23 +236,19 @@ void name_store(Attachment &context, Value dictionary, Value name, Value value)
             const auto found = data.index.find(text);
             if (found == data.index.end())
                 return false;
-            found->second->value = value;
+            found->entry.value = value;
             return true;
         }))
         return;
-    std::list<DictObject::Entry> prepared{{name, value, name_hash(context, text)}};
-    DictObject::Index index;
-    index.emplace(text, prepared.begin());
-    auto node = index.extract(index.begin());
-    DictObject::HashIndex hashes;
-    hashes.emplace(prepared.front().hash, prepared.begin());
-    auto hash = hashes.extract(hashes.begin());
+    std::list<DictObject::Node> prepared;
+    prepared.emplace_back(DictObject::Entry{name, value, name_hash(context, text)}, &text);
+    prepared.back().order = prepared.begin();
     namespace_locked(context, data, [&] {
         const auto found = data.index.find(text);
         if (found != data.index.end())
-            found->second->value = value;
+            found->entry.value = value;
         else {
-            insert_entry(context, dictionary, data, prepared, node, hash);
+            insert_entry(context, dictionary, data, prepared);
         }
         context.account_external(dictionary, data.external_bytes());
     });
@@ -273,12 +263,12 @@ bool name_erase(Attachment &context, Value dictionary, const std::u32string &nam
     if (owner.tag() == ResultTag::Ok && TypeView(context, owner.value()).snapshot())
         return type_namespace_change(context, owner.value(), name, {}, {});
     auto &data = *shell.contents;
-    std::list<DictObject::Entry> entries;
+    std::list<DictObject::Node> entries;
     return namespace_locked(context, data, [&] {
         const auto found = data.index.find(name);
         if (found == data.index.end())
             return false;
-        remove_entry(context, dictionary, data, found->second, entries);
+        remove_entry(context, dictionary, data, *found, entries);
         return true;
     });
 }
@@ -287,12 +277,12 @@ bool dict_erase_binding(Attachment &context, Handle dictionary, DictBinding bind
 {
     const auto target = dictionary.get(context), value = expected.get(context);
     auto &data = *context.payload<DictObject>(target).contents;
-    std::list<DictObject::Entry> entries;
+    std::list<DictObject::Node> entries;
     return namespace_locked(context, data, [&] {
         const auto [begin, end] = data.hashes.equal_range(binding.hash);
         for (auto at = begin; at != end; ++at)
-            if (at->second->identity == binding.identity && at->second->value == value) {
-                remove_entry(context, target, data, at->second, entries);
+            if (at->entry.identity == binding.identity && at->entry.value == value) {
+                remove_entry(context, target, data, *at, entries);
                 return true;
             }
         return false;
@@ -301,15 +291,14 @@ bool dict_erase_binding(Attachment &context, Handle dictionary, DictBinding bind
 void discard_name_table(Attachment &context, Value dictionary)
 {
     auto &data = *context.payload<DictObject>(dictionary).contents;
-    std::list<DictObject::Entry> entries;
-    DictObject::Index index;
-    DictObject::HashIndex hashes;
+    std::list<DictObject::Node> entries;
+    DictObject::Storage::Index index;
+    DictObject::Storage::HashIndex hashes;
     namespace_locked(context, data, [&] {
         data.names.swap(entries);
         data.index.swap(index);
         data.hashes.swap(hashes);
         ++data.keys_version;
-        data.bytes = 0;
         context.account_external(dictionary, sizeof(DictObject::Storage));
     });
 }
@@ -318,24 +307,23 @@ void copy_dictionary_entries(Attachment &context, Value destination,
 {
     RootScope roots(context);
     roots.root(destination);
-    std::list<DictObject::Entry> entries;
-    DictObject::Index names;
-    DictObject::HashIndex hashes;
+    std::list<DictObject::Node> entries;
+    DictObject::Storage::Index names;
+    DictObject::Storage::HashIndex hashes;
     std::uint64_t identity = 1;
-    std::size_t bytes = 0;
     for (auto entry : source) {
         roots.root(entry.key);
         roots.root(entry.value);
         entry.identity = identity++;
-        entries.push_back(entry);
-        const auto at = std::prev(entries.end());
-        bool named = false;
-        if (context.has_layout<StrObject>(entry.key)) {
-            const auto inserted = names.emplace(context.payload<StrObject>(entry.key).value, at);
-            named = inserted.second;
-        }
-        hashes.emplace(entry.hash, at);
-        bytes += entry_bytes(named);
+        const std::u32string *name = nullptr;
+        if (context.has_layout<StrObject>(entry.key))
+            name = &context.payload<StrObject>(entry.key).value;
+        entries.emplace_back(entry, name);
+        auto &node = entries.back();
+        node.order = std::prev(entries.end());
+        if (node.name)
+            names.insert(node);
+        hashes.insert(node);
     }
     auto &data = *context.payload<DictObject>(destination).contents;
     namespace_locked(context, data, [&] {
@@ -345,7 +333,6 @@ void copy_dictionary_entries(Attachment &context, Value destination,
         data.index.swap(names);
         data.hashes.swap(hashes);
         data.next_identity = identity;
-        data.bytes = bytes;
         ++data.keys_version;
         context.account_external(destination, data.external_bytes());
     });
@@ -481,43 +468,36 @@ ResultView access_dictionary(Attachment &context, Handle dictionary, Handle key,
                 context.poll();
             }
         }
-        std::list<DictObject::Entry> removed;
-        auto finish = [&](auto at) {
+        std::list<DictObject::Node> removed;
+        auto finish = [&](DictObject::Node &node) {
+            auto &entry = node.entry;
             if (binding)
-                *binding = {at->hash, at->identity};
+                *binding = {entry.hash, entry.identity};
             if (operation == DictOperation::Store) {
-                at->value = value->get(context);
+                entry.value = value->get(context);
                 out.ok(context.builtin(CoreObject::None));
             } else {
-                out.ok(at->value);
+                out.ok(entry.value);
                 if (operation == DictOperation::Erase)
-                    detail::remove_entry(context, dictionary.get(context), data, at, removed);
+                    detail::remove_entry(context, dictionary.get(context), data, node, removed);
             }
         };
         if (string && namespace_locked(context, data, [&] {
                 const auto found = data.index.find(*text);
                 if (found == data.index.end() ||
-                    context.type_of(found->second->key) != context.builtin(CoreObject::StrType))
+                    context.type_of(found->entry.key) != context.builtin(CoreObject::StrType))
                     return false;
-                finish(found->second);
+                finish(*found);
                 return true;
             }))
             return out.result();
         if (string && !cached_hash)
             hash_value = detail::name_hash(context, *text);
-        std::list<DictObject::Entry> prepared;
-        DictObject::Index::node_type name_node;
-        DictObject::HashIndex::node_type hash_node;
+        std::list<DictObject::Node> prepared;
         if (operation == DictOperation::Store || operation == DictOperation::SetDefault) {
-            prepared.push_back({key.get(context), value->get(context), hash_value});
-            DictObject::Index names;
-            if (string) {
-                names.emplace(*text, prepared.begin());
-                name_node = names.extract(names.begin());
-            }
-            DictObject::HashIndex hashes;
-            hashes.emplace(hash_value, prepared.begin());
-            hash_node = hashes.extract(hashes.begin());
+            prepared.emplace_back(
+                DictObject::Entry{key.get(context), value->get(context), hash_value}, text);
+            prepared.back().order = prepared.begin();
         }
         for (;;) {
             RootScope iteration(context);
@@ -533,7 +513,7 @@ ResultView access_dictionary(Attachment &context, Handle dictionary, Handle key,
                         version = data.keys_version;
                         const auto [begin, end] = data.hashes.equal_range(hash_value);
                         for (auto at = begin; at != end; ++at)
-                            candidates.push_back(*at->second);
+                            candidates.push_back(at->entry);
                         return true;
                     }))
                     break;
@@ -554,8 +534,8 @@ ResultView access_dictionary(Attachment &context, Handle dictionary, Handle key,
                 const bool committed = namespace_locked(context, data, [&] {
                     const auto [begin, end] = data.hashes.equal_range(hash_value);
                     for (auto at = begin; at != end; ++at)
-                        if (at->second->identity == entry.identity) {
-                            finish(at->second);
+                        if (at->entry.identity == entry.identity) {
+                            finish(*at);
                             return true;
                         }
                     return false;
@@ -570,10 +550,10 @@ ResultView access_dictionary(Attachment &context, Handle dictionary, Handle key,
                         return false;
                     if (operation == DictOperation::Store ||
                         operation == DictOperation::SetDefault) {
-                        detail::insert_entry(context, dictionary.get(context), data, prepared,
-                                             name_node, hash_node);
+                        detail::insert_entry(context, dictionary.get(context), data, prepared);
                         if (binding)
-                            *binding = {data.names.back().hash, data.names.back().identity};
+                            *binding = {data.names.back().entry.hash,
+                                        data.names.back().entry.identity};
                         out.ok(operation == DictOperation::SetDefault
                                    ? value->get(context)
                                    : context.builtin(CoreObject::None));
@@ -655,14 +635,14 @@ void detail::dict_popitem(Attachment &context, Handle dictionary, ReturnSlot &ke
         return;
     }
     auto &data = *shell.contents;
-    std::list<DictObject::Entry> removed;
+    std::list<DictObject::Node> removed;
     namespace_locked(context, data, [&] {
         if (data.names.empty())
             return;
-        const auto entry = std::prev(data.names.end());
-        key.ok(entry->key);
-        value.ok(entry->value);
-        remove_entry(context, dictionary.get(context), data, entry, removed);
+        auto &node = data.names.back();
+        key.ok(node.entry.key);
+        value.ok(node.entry.value);
+        remove_entry(context, dictionary.get(context), data, node, removed);
     });
 }
 ResultView detail::dict_lookup_hash(Attachment &context, Handle dictionary, Handle key,
@@ -778,8 +758,8 @@ void detail::next_dict_item(Attachment &context, Handle iterator, ReturnSlot &ou
         } else {
             if (state.version != data.keys_version) {
                 state.cursor =
-                    std::find_if(data.names.cbegin(), data.names.cend(), [&](const auto &entry) {
-                        return entry.identity > state.last_identity;
+                    std::find_if(data.names.cbegin(), data.names.cend(), [&](const auto &node) {
+                        return node.entry.identity > state.last_identity;
                     });
                 state.version = data.keys_version;
             }
@@ -791,7 +771,7 @@ void detail::next_dict_item(Attachment &context, Handle iterator, ReturnSlot &ou
                 state.invalid = changed_keys = true;
                 return;
             }
-            const auto &entry = *state.cursor++;
+            const auto &entry = (state.cursor++)->entry;
             state.last_identity = entry.identity;
             --state.remaining;
             key.ok(entry.key);

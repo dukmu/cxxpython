@@ -28,8 +28,9 @@ if(PkgConfig_FOUND)
 endif()
 add_subdirectory(Parser)
 find_path(BOOST_MULTIPRECISION_INCLUDE_DIR boost/multiprecision/cpp_int.hpp)
-if(NOT BOOST_MULTIPRECISION_INCLUDE_DIR)
-    message(FATAL_ERROR "Boost.Multiprecision headers are required; set BOOST_MULTIPRECISION_INCLUDE_DIR")
+if(NOT BOOST_MULTIPRECISION_INCLUDE_DIR OR
+        NOT EXISTS "${BOOST_MULTIPRECISION_INCLUDE_DIR}/boost/intrusive/set.hpp")
+    message(FATAL_ERROR "Boost.Multiprecision and Boost.Intrusive headers are required; set BOOST_MULTIPRECISION_INCLUDE_DIR")
 endif()
 
 add_library(cxxpython_core
@@ -297,6 +298,7 @@ if(BUILD_TESTING)
         Tests/cpp/test_compiler.cpp
         Tests/cpp/test_iteration.cpp)
     target_link_libraries(test_runtime PRIVATE cxxpython_core GTest::gtest_main test_extension_static)
+    target_include_directories(test_runtime SYSTEM PRIVATE ${BOOST_MULTIPRECISION_INCLUDE_DIR})
     add_dependencies(test_runtime test_extension_dynamic)
     target_compile_definitions(test_runtime PRIVATE
         TEST_EXTENSION_DIRECTORY="${CMAKE_CURRENT_BINARY_DIR}/extension-fixtures")

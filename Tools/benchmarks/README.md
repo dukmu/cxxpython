@@ -51,6 +51,10 @@ CPU utilization in CPU workloads are reported rather than silently removed.
 - `allocate` creates short-lived containers with automatic GC enabled. `cycles`
   creates self-cycles and explicitly collects after each complete batch; only
   this declared collector workload forces collection.
+- `dict_int` constructs, updates and deletes entries in independent 64-key integer
+  dictionaries, then validates the remaining values by sum. Size counts complete
+  dictionaries, not keys or jobs per thread. This exercises multi-entry/non-string
+  storage alongside allocate's one-string-key dictionary; natural GC stays enabled.
 - `file_io` creates/writes/reads/unlinks the same total number of files for every
   thread count. It measures filesystem/page-cache workflows, not durable storage
   or device throughput; it does not call fsync.

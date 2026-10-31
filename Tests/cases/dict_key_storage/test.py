@@ -42,6 +42,32 @@ del sys.__dict__[name]
 gc.collect()
 print(class_copy[name], module_copy[name], name in Namespace.__dict__, name in sys.__dict__)
 
+class Collision:
+    def __init__(self, number):
+        self.number = number
+    def __hash__(self):
+        return 7
+    def __eq__(self, other):
+        return self.number == other.number
+
+for cycle in range(3):
+    keys = [Collision(i) for i in range(4)]
+    collisions = {key: key.number for key in keys}
+    copied = collisions.copy()
+    iterator = iter(collisions)
+    next(iterator)
+    del collisions[keys[1]]
+    popped = collisions.pop(keys[2])
+    try:
+        next(iterator)
+    except RuntimeError:
+        invalidated = True
+    else:
+        invalidated = False
+    collisions.clear()
+    gc.collect()
+    print(cycle, popped, invalidated, len(collisions), [copied[key] for key in keys])
+
 shared = {}
 errors = []
 done = [_thread.allocate_lock(), _thread.allocate_lock()]

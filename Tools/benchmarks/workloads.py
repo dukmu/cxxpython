@@ -95,6 +95,19 @@ def _allocate(size):
     return _prepare(size, job, size)
 
 
+def _dict_int(size):
+    def job(index):
+        table = {key: key for key in range(64)}
+        for key in range(64):
+            table[key] += 1
+        for key in range(0, 64, 8):
+            del table[key]
+        return sum(table.values())
+
+    expected = sum(key + 1 for key in range(64) if key % 8)
+    return _prepare(size, job, expected * size)
+
+
 def _cycles(size):
     def job(index):
         obj = [index]
@@ -194,6 +207,7 @@ CASES = {
     'nbody': {'group': 'cpu', 'size': 4, 'description': 'pyperformance n-body algorithm, independent 200-step jobs (upstream default 20000)', 'prepare': _nbody},
     'fannkuch': {'group': 'cpu', 'size': 4, 'description': 'pyperformance fannkuch algorithm, independent n=7 jobs (upstream default n=9)', 'prepare': _fannkuch},
     'allocate': {'group': 'gc', 'size': 100000, 'description': 'Short-lived containers with natural GC', 'prepare': _allocate},
+    'dict_int': {'group': 'gc', 'size': 512, 'description': 'Independent 64-key integer dictionaries: construct, update, delete, sum; natural GC', 'prepare': _dict_int},
     'cycles': {'group': 'gc', 'size': 100000, 'description': 'Self-cycles followed by explicit gc.collect', 'prepare': _cycles},
     'file_io': {'group': 'io', 'size': 128, 'description': 'Create, write, read and unlink files in cwd; page cache, not durable storage', 'prepare': _file_io},
     'regex': {'group': 'library', 'size': 128, 'description': 'Shared compiled regex full matches', 'prepare': _regex},

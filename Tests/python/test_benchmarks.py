@@ -148,7 +148,7 @@ class BenchmarkReportTests(unittest.TestCase):
     def test_target_worker_checks_results_across_threads(self):
         worker = Path(__file__).resolve().parents[2] / 'Tools/benchmarks/workloads.py'
         with tempfile.TemporaryDirectory() as folder:
-            for case in ('allocate', 'cycles', 'file_io'):
+            for case in ('allocate', 'dict_int', 'cycles', 'file_io'):
                 command = [sys.executable, str(worker), '--case', case, '--size', '5',
                            '--workers', '2', '--loops', '1', '--warmups', '0', '--values', '1']
                 child = subprocess.run(command, cwd=folder, capture_output=True, text=True, timeout=15)

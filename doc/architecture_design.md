@@ -194,10 +194,16 @@ tracing, not the core initializer or a second hash table implementation.
 `Objects/dictstorage.cpp` owns shared dictionary/namespace storage, prepared-node
 commits, rooted snapshots and iterator cursor operations. `Objects/dictobject.cpp`
 owns public dict/mappingproxy methods and protocol registration; callbacks use
-ordinary protocols outside storage locks. Mutable and immutable name indexes use
-string views into their traced immutable keys rather than duplicate character
+ordinary protocols outside storage locks. Mutable and immutable name indexes
+borrow text from their traced immutable keys rather than duplicate character
 buffers; exact-str hits also reuse the stored entry hash. Ordered entries,
 prepared nodes, per-object commits and snapshot publication are unchanged.
+Both mutable indexes now use Boost.Intrusive hooks embedded in the owning list's
+single native node, rather than allocating two extra map nodes. Removing a node
+detaches its hooks before freeing it; snapshots still copy only lightweight
+Entry values. Include/internal/dict.hpp hides these native links, indexes and
+storage from public object headers. Constructor/destructor/traversal and byte
+accounting live beside the storage operations in dictstorage.cpp.
 `Objects/setobject.cpp` owns set and
 frozenset construction, representation/hash, lookup and element mutation;
 `Objects/setoperations.cpp` owns their bulk algebra and method/operator bindings.

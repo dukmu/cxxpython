@@ -548,17 +548,25 @@ entry store; name and hash indexes are accelerators, not second binding maps.
 Hash/equality/truth callbacks run outside its per-object commit. Matching entries
 are rooted, then revalidated by stable identity after reentry; missing-key commits
 validate the key version. Replacement, erase and conditional import rollback do
-not allocate. Both ordered indexes use preallocated nodes, including the hash
-index: O(log n + collisions) lookup rather than an allocation/rehash under lock.
+not allocate. Both ordered indexes link into the same native node owned by the
+insertion-order list. The node, including both intrusive tree hooks, is allocated
+before the commit; indexes allocate no separate nodes. Lookup remains
+O(log n + collisions), with no allocation/rehash under lock.
 This is not a claim of CPython's amortized constant-time dictionary performance.
 Native canonical-name helpers remain internal and do not invoke Python equality.
 
-Name indexes borrow string_view text from their own entry's immutable StrObject
-key, in both mutable storage and immutable snapshots. Tracing the entries owns
+Name indexes borrow their own entry's immutable StrObject text: a string pointer
+in mutable nodes, or string_view text in immutable snapshots. Tracing the entries owns
 that storage; indexes add no second managed edge or copied character allocation.
 Prepared nodes borrow the precisely rooted input key until committed. Erasure
 removes the index before unlinking its entry, and destruction does not read the
 borrowed text. External-byte accounting charges the characters to StrObject only.
+Both indexes detach before their owning list is destroyed. Native node addresses
+and list iterators stay stable across publication/swap; snapshots copy only the
+plain Entry fields, never index links. Those private storage details live in
+Include/internal/dict.hpp rather than the public object header.
+A uniform node reserves its name hook even for unnamed keys. Fewer allocations
+therefore do not imply that every dictionary's reported native size decreases.
 An exact-str index hit uses the stored entry hash without recalculating SipHash;
 misses and generic-key paths retain hashing, callback and identity revalidation.
 

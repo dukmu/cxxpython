@@ -4,7 +4,6 @@
 
 #include <array>
 #include <list>
-#include <map>
 #include <string_view>
 #include <unordered_map>
 
@@ -164,35 +163,13 @@ struct DictObject {
     };
     ObjectHeader header;
     AtomicGcEdge namespace_owner;
-    // Index text borrows immutable StrObject storage owned by the traced entry key.
-    using Index = std::map<std::u32string_view, std::list<Entry>::iterator>;
-    using HashIndex = std::multimap<std::int64_t, std::list<Entry>::iterator>;
-    struct Storage {
-        std::mutex mutex;
-        std::list<Entry> names;
-        Index index;
-        HashIndex hashes;
-        std::uint64_t next_identity = 1, keys_version = 0;
-        std::size_t bytes = 0;
-        std::size_t external_bytes() const noexcept
-        {
-            return sizeof(Storage) + bytes;
-        }
-    };
+    struct Node;
+    struct Storage;
     const NativeOwner<Storage> contents;
-    explicit DictObject(InitialType head) : header(head), contents(std::make_unique<Storage>()) {}
-    void trace(Tracer &tracer) const noexcept
-    {
-        tracer.visit(namespace_owner);
-        for (const auto &entry : contents->names) {
-            tracer.visit(entry.key);
-            tracer.visit(entry.value);
-        }
-    }
-    std::size_t external_bytes() const noexcept
-    {
-        return contents->external_bytes();
-    }
+    explicit DictObject(InitialType head);
+    ~DictObject() noexcept;
+    void trace(Tracer &tracer) const noexcept;
+    std::size_t external_bytes() const noexcept;
 };
 // Empty means an absent key; Python exceptions remain in the caller's slot.
 ResultView dict_lookup(Attachment &, Handle dictionary, Handle key, ReturnSlot &);
@@ -219,7 +196,7 @@ struct DictIteratorObject {
     const DictViewKind kind;
     AtomicGcEdge snapshot;
     // Cursor state is protected by the owning dictionary's storage mutex.
-    std::list<DictObject::Entry>::const_iterator cursor;
+    std::list<DictObject::Node>::const_iterator cursor;
     std::uint64_t version = 0, last_identity = 0;
     std::size_t expected_size = 0, remaining = 0, position = 0;
     bool invalid = false, exhausted = false;

@@ -21,8 +21,10 @@ is used when available; otherwise CMake fetches the pinned source archive.
 OpenSSL 3 development headers and libcrypto are required for native hashlib
 capabilities. Portable BLAKE2 kernels are vendored from the pinned CPython tree;
 their CC0 license is retained in `doc/licenses/blake2-CC0-1.0.txt`.
-Set `BOOST_MULTIPRECISION_INCLUDE_DIR` when Boost headers are not on the compiler
-search path. `CXXPYTHON_STDLIB_DIR` defaults to the repository's `Lib/`; the source
+Set `BOOST_MULTIPRECISION_INCLUDE_DIR` to the Boost include root when its
+Multiprecision/Intrusive headers are not on the compiler search path. Intrusive
+storage is confined to the private dictionary header and does not add a public
+Boost dependency to ordinary runtime headers. `CXXPYTHON_STDLIB_DIR` defaults to the repository's `Lib/`; the source
 bootstrap reads this directory, which must remain available to the executable.
 `CXXPYTHON_PREFIX` defaults to the repository root; sys prefix/base-prefix fields
 report this configured resource root, and sys._stdlib_dir reports the configured

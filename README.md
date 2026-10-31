@@ -11,7 +11,7 @@ APIs and the CPython performance acceptance gates remain unfinished.
 
 ## Build And Test
 
-Requirements: CMake 3.22+, C11/C++20 compilers, Threads, Boost.Multiprecision headers,
+Requirements: CMake 3.22+, C11/C++20 compilers, Threads, Boost.Multiprecision/Intrusive headers,
 clang-format 14, and host Python for test drivers. Tests use an installed GTest
 or CMake's pinned GoogleTest download.
 
