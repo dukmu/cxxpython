@@ -142,8 +142,12 @@ the correct type aliases. `Objects/abstract.cpp` resolves typed object protocols
 and their arithmetic/sequence policy. `Objects/call.cpp` owns callable and
 protocol invocation: each entry roots all inputs before result reset or callbacks;
 internal descriptor binding, callable unwrapping and native argument binding
-share that invocation-owned scope. Prepared Python calls retain copied host
-argument buffers and borrow roots from their caller's scope. Receiver validation,
+share that invocation-owned scope. ObjectOps that already own their operands
+also lend their protocol-resolution scope to invocation instead of rooting the
+same inputs again. The public protocol entry still owns borrowed inputs; both
+entries use the same epoch/receiver revalidation and descriptor dispatch.
+Prepared Python calls retain copied host argument buffers and borrow roots from
+their caller's scope. Receiver validation,
 type-epoch revalidation, recursion limits and native return validation remain on
 this same path, not a second protocol-specific executor.
 `Objects/longobject.cpp` provides int/bool

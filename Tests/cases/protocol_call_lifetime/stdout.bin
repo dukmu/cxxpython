@@ -5,3 +5,5 @@ native bound receiver: TypeError
 reflected: left+right ['add', 'radd']
 inplace fallback: left+right ['iadd', 'add', 'radd']
 integer normalization: identity and exact result type
+multiplication exception: ['bind multiply', 'multiply']
+subscript inplace: ['container', 'key', 'bind get', 'get', 'operand', 'bind inplace', 'inplace', 'bind set', 'set', 'new set']

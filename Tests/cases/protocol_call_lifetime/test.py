@@ -122,3 +122,115 @@ converted = operator.index(Integer(value))
 assert type(converted) is int and converted == value
 assert operator.index(True) == 1 and type(operator.index(True)) is int
 print('integer normalization: identity and exact result type')
+
+
+events = []
+
+
+class MultiplyDescriptor:
+    def __get__(self, instance, owner):
+        events.append('bind multiply')
+        owner.__mul__ = lambda self, other: 'new multiply'
+        gc.collect()
+
+        def multiply(other):
+            gc.collect()
+            events.append('multiply')
+            assert instance.value == 'receiver' and other.value == 'argument'
+            raise ValueError(instance.value + ':' + other.value)
+
+        return multiply
+
+
+class Multiplier(Payload):
+    __mul__ = MultiplyDescriptor()
+
+
+try:
+    Multiplier('receiver') * Payload('argument')
+    assert False
+except ValueError as error:
+    assert str(error) == 'receiver:argument'
+assert Multiplier('ignored') * Payload('ignored') == 'new multiply'
+assert events == ['bind multiply', 'multiply']
+print('multiplication exception:', events)
+
+
+events = []
+
+
+class SetDescriptor:
+    def __get__(self, instance, owner):
+        events.append('bind set')
+        owner.__setitem__ = lambda self, key, value: events.append('new set')
+        gc.collect()
+
+        def set_item(key, value):
+            gc.collect()
+            events.append('set')
+            assert instance.value == 'container'
+            assert key.value == 'key' and value.value == 'updated'
+
+        return set_item
+
+
+class GetDescriptor:
+    def __get__(self, instance, owner):
+        events.append('bind get')
+        owner.__getitem__ = lambda self, key: 'new get'
+        gc.collect()
+
+        def get_item(key):
+            gc.collect()
+            events.append('get')
+            assert instance.value == 'container' and key.value == 'key'
+            return Item('original')
+
+        return get_item
+
+
+class InplaceDescriptor:
+    def __get__(self, instance, owner):
+        events.append('bind inplace')
+        owner.__iadd__ = lambda self, other: 'new inplace'
+        gc.collect()
+
+        def inplace(other):
+            gc.collect()
+            events.append('inplace')
+            assert instance.value == 'original' and other.value == 'operand'
+            Container.__setitem__ = SetDescriptor()
+            return Payload('updated')
+
+        return inplace
+
+
+class Item(Payload):
+    __iadd__ = InplaceDescriptor()
+
+
+class Container(Payload):
+    __getitem__ = GetDescriptor()
+
+    def __setitem__(self, key, value):
+        raise AssertionError('in-place operation must replace setitem')
+
+
+def make_value(value):
+    events.append(value)
+    return Payload(value)
+
+
+def make_container():
+    events.append('container')
+    return Container('container')
+
+
+make_container()[make_value('key')] += make_value('operand')
+assert events == ['container', 'key', 'bind get', 'get', 'operand',
+                  'bind inplace', 'inplace', 'bind set', 'set']
+assert Container('ignored')[Payload('ignored')] == 'new get'
+container = Container('ignored')
+container[Payload('ignored')] = Payload('ignored')
+assert events[-1] == 'new set'
+print('subscript inplace:', events)

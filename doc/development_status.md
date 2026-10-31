@@ -1,5 +1,60 @@
 # Development Status
 
+## 2026-11-01 Shared ObjectOps Protocol Invocation Scope
+
+Continues the active performance/cleanup goal after pushed 8587150. That goal
+turn delivered the collector scan fusion; this node follows the remaining root/
+protocol costs in retained CPU profiles instead of revisiting the collector.
+Parent implemented the runtime change and acceptance; Terra extended the existing
+direct protocol fixture and is closed. No compatibility-roadmap expansion.
+
+- ObjectOps already own receiver and arguments before invoking resolved protocol
+  slots. Their internal invocation now reuses the resolution RootScope instead
+  of creating another input-root set and nested error guard. The public protocol
+  entry retains full borrowed-input rooting. Both use one implementation of
+  arity/epoch/receiver validation, descriptor retention, the existing native/
+  Python binder, recursion limits and return validation. Arithmetic/reflected/
+  in-place, comparisons, unary, truth/length, hashing/string and item protocols
+  use this shared path. No exact-number/benchmark shortcut, new class, mutable
+  cache, interpreter execution lock, unchecked payload API or GC-policy change.
+- Extended protocol_call_lifetime with collecting multiplication/item/in-place
+  descriptors that replace themselves, an exception retaining temporary operands,
+  and subscript augmented-assignment evaluation order with a replaced setter.
+  Its golden output comes from fixed CPython 3.12.14. The complete fixture and
+  fourteen related scripts pass Release, ASan/UBSan/LSan and TSan. All 201 selected
+  native call/protocol/numeric/VM/scheduling/layout/root/epoch/finalizer contracts
+  pass those builds; Release also passes all 16 bootstrap/promotion fault shards.
+  Strict Clang 21.1.8, formatting and diff checks pass. Logs are retained as
+  .cache/protocol-roots-*. Unrelated complete library suites were not rerun.
+- Before linking the changed runtime, retained the prior Release executable as
+  .cache/benchmarks/cxxpython-8587150 with its original mtime. Once all builds,
+  tests and agents stopped, the unified matrix adapter compared that image and
+  the new image using identical local source, N=64, one/four workers, three
+  independent processes, one warmup and three values per process. Runtime order
+  alternates by process round. Both calibrated to one fixed-work batch; all
+  results validate and auto-GC stays enabled. matrix.py is not modified/committed.
+- The generated matrix medians are 835.572/327.529 ms before and
+  804.562/303.861 ms after at one/four workers. Standard pyperf compare_to reports
+  mean-time ratios of 1.05x/1.08x faster. New four-worker scaling is 2.648x with
+  CPU/wall 3.402; it is not a single-thread improvement bought by serialization.
+  Raw runs, CSV, Markdown and pyperf suites are in .cache/benchmarks/
+  protocol-roots-matrix; the standard comparison is protocol-roots-matrix-pyperf.log.
+  No hand-maintained benchmark table was added.
+- Affected allocation measurements reuse the retained CPython and collector-node
+  baselines rather than rerunning them. New size-2000 medians are 22.638/12.539 ms
+  at one/four workers; these small differences still overlap variation. Raw runs
+  and generated comparisons are in .cache/benchmarks/protocol-roots-allocation
+  and protocol-roots-allocation-comparison. Existing source/CPU-accounting warnings
+  remain visible; the previously audited source difference is only unused
+  fannkuch trailing blank lines. Absolute CPython performance acceptance is unmet.
+- Separate software-event sampling at matrix N=64, one worker and eight loops
+  is retained in .cache/benchmarks/protocol-roots-matrix-profile-1. The whole
+  capture still includes preparation/warmup. Ownership checks (10.26% self),
+  layout checks, root insertion/release and admission dominate; the arithmetic
+  kernel is not primarily an STW problem. These samples guide the next broader
+  managed-access/dispatch optimization, not a justification to discard public
+  safety contracts. The active goal remains incomplete.
+
 ## 2026-11-01 Fused Collector Classification And Resource Quarantine
 
 Continues the active performance/cleanup goal after pushed 345dbb8. The preceding

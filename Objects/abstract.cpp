@@ -145,7 +145,7 @@ bool attempt(Attachment &context, Handle receiver, Handle argument, Protocol id,
     if (phase != SlotPhase::Any && sequence_slot(context, slot) != (phase == SlotPhase::Sequence))
         return false;
     std::array args{argument.get(context)};
-    invoke_protocol(context, receiver, slot, args, out);
+    detail::invoke_protocol(context, receiver, slot, args, out, roots);
     return implemented(context, out);
 }
 bool reflected_override(Attachment &context, Handle left_type, Handle right_type,
@@ -238,7 +238,7 @@ void object_ne(Attachment &context, Handle, std::span<const Value> args, ReturnS
     auto self = roots.root(args[0]);
     auto slot = resolve(context, self, Protocol::Eq, roots);
     ReturnSlot equal(context);
-    invoke_protocol(context, self, slot, args.subspan(1), equal);
+    detail::invoke_protocol(context, self, slot, args.subspan(1), equal, roots);
     if (raised(equal)) {
         out.raised(equal.exception());
         return;
@@ -349,7 +349,7 @@ ResultView index(Attachment &context, Handle value, ReturnSlot &out)
             return;
         }
         ReturnSlot result(context);
-        invoke_protocol(context, self, slot, {}, result);
+        detail::invoke_protocol(context, self, slot, {}, result, roots);
         if (raised(result)) {
             out.raised(result.exception());
             return;
@@ -374,7 +374,7 @@ ResultView hash(Attachment &context, Handle value, ReturnSlot &out)
         out.reset(context);
         auto slot = resolve(context, self, Protocol::Hash, roots);
         ReturnSlot result(context);
-        invoke_protocol(context, self, slot, {}, result);
+        detail::invoke_protocol(context, self, slot, {}, result, roots);
         if (raised(result)) {
             out.raised(result.exception());
             return;
@@ -405,7 +405,7 @@ ResultView string_operation(Attachment &context, Handle value, Protocol id, Retu
         }
         auto slot = resolve(context, self, id, roots);
         ReturnSlot result(context);
-        invoke_protocol(context, self, slot, {}, result);
+        detail::invoke_protocol(context, self, slot, {}, result, roots);
         if (raised(result)) {
             out.raised(result.exception());
             return;
@@ -444,7 +444,7 @@ ResultView length(Attachment &context, Handle value, ReturnSlot &out)
             return;
         }
         ReturnSlot result(context);
-        invoke_protocol(context, self, slot, {}, result);
+        detail::invoke_protocol(context, self, slot, {}, result, roots);
         if (raised(result)) {
             out.raised(result.exception());
             return;
@@ -480,7 +480,7 @@ ResultView truth(Attachment &context, Handle value, ReturnSlot &out)
         auto slot = resolve(context, self, Protocol::Bool, roots);
         ReturnSlot result(context);
         if (slot.state != SlotState::Missing) {
-            invoke_protocol(context, self, slot, {}, result);
+            detail::invoke_protocol(context, self, slot, {}, result, roots);
             if (raised(result)) {
                 out.raised(result.exception());
                 return;
@@ -521,7 +521,7 @@ ResultView unary(Attachment &context, Handle value, UnaryOp op, ReturnSlot &out)
         }
         constexpr std::array protocols{Protocol::Pos, Protocol::Neg, Protocol::Invert};
         auto slot = resolve(context, self, protocols.at(static_cast<std::size_t>(op)), roots);
-        invoke_protocol(context, self, slot, {}, out);
+        detail::invoke_protocol(context, self, slot, {}, out, roots);
     });
 }
 ResultView rich_compare(Attachment &context, Handle left, Handle right, CompareOp op,
@@ -542,7 +542,7 @@ ResultView rich_compare(Attachment &context, Handle left, Handle right, CompareO
             bool found = false;
             if (slot.state != SlotState::Missing) {
                 std::array args{a.get(context)};
-                invoke_protocol(context, b, slot, args, result);
+                detail::invoke_protocol(context, b, slot, args, result, roots);
                 if (raised(result)) {
                     out.raised(result.exception());
                     return;
@@ -696,7 +696,7 @@ ResultView get_item(Attachment &context, Handle value, Handle key, ReturnSlot &o
                 return;
             }
         }
-        invoke_protocol(context, self, slot, args, out);
+        detail::invoke_protocol(context, self, slot, args, out, roots);
     });
 }
 ResultView divmod(Attachment &context, Handle left, Handle right, ReturnSlot &out)
@@ -737,7 +737,7 @@ ResultView set_item(Attachment &context, Handle value, Handle key, Handle item, 
         const auto stored = roots.root(item.get(context));
         auto slot = resolve(context, self, Protocol::SetItem, roots);
         std::array args{index.get(context), stored.get(context)};
-        invoke_protocol(context, self, slot, args, out);
+        detail::invoke_protocol(context, self, slot, args, out, roots);
     });
 }
 ResultView del_item(Attachment &context, Handle value, Handle key, ReturnSlot &out)
@@ -748,7 +748,7 @@ ResultView del_item(Attachment &context, Handle value, Handle key, ReturnSlot &o
         const auto index = roots.root(key.get(context));
         auto slot = resolve(context, self, Protocol::DelItem, roots);
         std::array args{index.get(context)};
-        invoke_protocol(context, self, slot, args, out);
+        detail::invoke_protocol(context, self, slot, args, out, roots);
     });
 }
 namespace detail {

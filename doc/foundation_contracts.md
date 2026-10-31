@@ -793,6 +793,11 @@ All call shapes use the same binder and caller-owned result boundary. Complete
 positional native calls borrow spans or prefix a receiver in bounded stack
 storage, with a vector for larger arities. Defaults, keyword-only/variadic cases,
 recursion guards, callback roots and return validation remain intact.
+The internal protocol invocation entry borrows operands already owned by its
+ObjectOps caller and shares the resolution scope for binding. It does not create
+a second input-root set. Public invoke_protocol still roots caller-supplied
+receiver/arguments before resetting output. Both entries revalidate stale slots
+and retain the selected descriptor across collecting/replacing callbacks.
 
 Native sequence slot definitions retain their defining Type as a traced immutable
 edge. Arithmetic tries numeric/reflected methods before concatenation/repetition

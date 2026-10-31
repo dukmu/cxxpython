@@ -133,6 +133,10 @@ ResultView get_item(Attachment &context, Handle value, Handle key, ReturnSlot &o
 ResultView set_item(Attachment &context, Handle value, Handle key, Handle item, ReturnSlot &out);
 ResultView del_item(Attachment &context, Handle value, Handle key, ReturnSlot &out);
 namespace detail {
+// The caller owns receiver/arguments in live roots and handles allocation errors.
+// Descriptor binding and argument preparation reuse that invocation's scope.
+void invoke_protocol(Attachment &context, Handle receiver, const ResolvedSlot &slot,
+                     std::span<const Value> args, ReturnSlot &out, RootScope &roots);
 void install_format(Attachment &context, std::span<const Handle> core);
-}
+} // namespace detail
 } // namespace cxxpython::core
