@@ -39,6 +39,7 @@ class SourceError final : public std::invalid_argument {
 enum class InputMode { Exec, Eval, Single };
 enum class ScopeKind { Module, Function, Class, Annotation };
 enum class NameClass { Local, Namespace, GlobalExplicit, GlobalImplicit, Free, Cell };
+enum class AnnotationRole { None, TypeAlias, TypeVarBound, TypeVarConstraints, TypeParameters };
 struct SymbolInfo {
     std::u32string name;
     NameClass classification;
@@ -57,7 +58,7 @@ struct ScopeInfo {
     bool generator = false;
     bool coroutine = false;
     bool annotations = false;
-    bool type_alias = false;
+    AnnotationRole annotation_role = AnnotationRole::None;
     bool sees_class_namespace = false;
 };
 namespace detail {

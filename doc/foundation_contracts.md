@@ -605,8 +605,8 @@ before mangling. Temporary annotation scopes validate syntax without introducing
 runtime bindings/closures. Local variable annotations still affect symbol/function
 classification but do not evaluate or emit nested Code objects.
 
-The non-generic `type Alias = expr` path creates a traced
-TypeAliasType with a lazy evaluator and an empty parameter tuple. `_typing`
+The `type Alias = expr` path creates a traced
+TypeAliasType with a lazy evaluator and a parameter tuple. `_typing`
 exports that native type; its constructor takes a name, value and keyword-only
 type_params. Name, parameters, evaluator and module are immutable traced edges;
 the cached value is an atomic GC edge. A successful evaluation is published by
@@ -626,8 +626,29 @@ NameError.name; its writable instance slot uses normal traced storage.
 Static native types retain declared_module as immutable native metadata so a
 type-level __module__ remains available even when the namespace entry is an
 instance descriptor. Mutable types use their own namespace publication path.
-TypeVar, ParamSpec, TypeVarTuple, generic syntax and the typing closure remain
-unfinished; this implementation is not their acceptance evidence.
+Native TypeVar, ParamSpec, TypeVarTuple, ParamSpecArgs, ParamSpecKwargs and
+Generic types are exported by `_typing`. TypeVar and ParamSpec and TypeVarTuple
+instances have native dictionary and weakref storage; the ParamSpec views have
+weakref storage without an instance dictionary. The parameter types hide the
+`__dict__` descriptor while still permitting instance attributes. TypeVar's lazy
+bound and constraints evaluators are traced and their caches are atomic GC edges;
+successful values are published atomically, while exceptions are not cached.
+
+Generic functions, aliases and classes use an independent type-parameter scope
+identified by AnnotationRole. Function defaults evaluate in the outer scope;
+annotations evaluate in the parameter scope. Bounds and constraints have their
+own annotation roles, and class-local annotation scopes can read the captured
+class dictionary. The compiler emits MAKE_TYPE_VAR, MAKE_PARAM_SPEC,
+MAKE_TYPE_VAR_TUPLE, MAKE_GENERIC_BASE and SET_FUNCTION_TYPE_PARAMS for this
+path. Generic class lowering is connected, not evidence of working library
+closure or acceptance.
+
+Generic policy is delegated through actual imports of `typing`, including the
+classmethod hooks for Generic, generic base construction, non-None native
+TypeVar bounds, substitution, unions and TypeVarTuple unpacking. Import and
+policy errors propagate; no synthetic typing module is supplied. The current
+typing/re/warnings dependency chain is not closed. Reference-tested native
+constructors and generic function/alias scopes do not complete the whole gate.
 
 Variable annotations use ordinary assignment/item/attribute protocols and retain
 the reference's RHS/target/annotation order. Simple module/class names store into
@@ -648,7 +669,7 @@ claiming CPython instruction encodings. compile handles supported historical and
 annotation flags/dont_inherit; exec/eval inherit only for source strings, not
 precompiled Code. Imports do not inherit the importer's flags. REPL state retains
 future directives across input units and ordinary -i scripts. Barry comparison
-syntax, other compile modes/options, full type-parameter scopes/typing and -i
+syntax, other compile modes/options, full type-parameter scope/typing acceptance and -i
 after -m flag handoff remain separate gates.
 
 ASYNC_YIELD_VALUE has the same one-slot resumption effect as YIELD_VALUE, may

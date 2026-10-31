@@ -1,0 +1,13 @@
+alias Alias (T, U, Ts, P)
+before []
+failure ValueError
+retry <class 'int'>
+cached <class 'int'>
+failure ValueError
+retry (<class 'int'>, <class 'str'>)
+cached (<class 'int'>, <class 'str'>)
+calls ['bound', 'bound', 'constraints', 'constraints']
+value (T, U, Ts, P)
+identity True True True
+forward <class 'str'> <class 'str'>
+late <class 'str'> <class 'str'>

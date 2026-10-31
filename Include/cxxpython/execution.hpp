@@ -101,6 +101,11 @@ enum class Opcode : std::uint8_t {
     MakeTypeAlias,
     LoadFromDictOrGlobals,
     LoadFromDictOrDeref,
+    MakeTypeVar,
+    MakeParamSpec,
+    MakeTypeVarTuple,
+    SetFunctionTypeParams,
+    MakeGenericBase,
     Count,
 };
 enum class OperandDomain {

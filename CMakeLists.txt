@@ -91,6 +91,8 @@ add_library(cxxpython_core
     Objects/namespaceobject.cpp
     Objects/genericaliasobject.cpp
     Objects/typealiasobject.cpp
+    Objects/typevarobject.cpp
+    Objects/paramspecobject.cpp
     Modules/_typingmodule.cpp
     Objects/unionobject.cpp
     Objects/weakrefobject.cpp

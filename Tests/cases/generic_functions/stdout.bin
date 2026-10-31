@@ -1,0 +1,9 @@
+events ['first', 'decorator first', 'second', 'decorator second', 'outer', 'keyword', 'apply second', 'apply first']
+params (T, Ts, P)
+annotations {'x': T, 'return': T}
+call (T, 'outer', 'keyword')
+outer outer
+closure ('captured', T, 42) factory.<locals>.inner
+async (T, 7) {'x': T, 'return': T}
+private (__T,) {'x': __T, 'return': __T} (__T, 9)
+future (T,) {'x': 'T', 'y': 'list[T]', 'return': 'T'} T

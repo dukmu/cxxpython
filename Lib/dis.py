@@ -83,6 +83,7 @@ find_line_starts = findlinestarts
 def get_instructions(x, *, first_line=None, show_caches=False, adaptive=False):
     code = _get_code_object(x)
     rows = _opcode.instructions(code)
+    local_names = _opcode.local_names(code)
     targets = set(findlabels(code))
     previous = None
     delta = 0 if first_line is None else first_line - code.co_firstlineno
@@ -93,7 +94,7 @@ def get_instructions(x, *, first_line=None, show_caches=False, adaptive=False):
         if domain == "Constant":
             argval = code.co_consts[operand]
         elif domain == "Local":
-            argval = code.co_varnames[operand]
+            argval = local_names[operand]
         elif domain == "Name":
             argval = code.co_names[operand]
         elif domain == "Cell":

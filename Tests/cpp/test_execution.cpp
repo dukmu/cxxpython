@@ -1,5 +1,6 @@
 #include "cxxpython/execution.hpp"
 #include "cxxpython/typealiasobject.hpp"
+#include "cxxpython/typevarobject.hpp"
 #include "internal/exceptiongroup.hpp"
 #include "internal/patternmatching.hpp"
 
@@ -679,6 +680,12 @@ TEST_F(CoreExecution, TypeAliasOpcodesVerifyOperandsAndStackEffects)
     };
     for (const auto &contract :
          {Contract{Opcode::MakeTypeAlias, "MAKE_TYPE_ALIAS", OperandDomain::None, 3},
+          Contract{Opcode::MakeTypeVar, "MAKE_TYPE_VAR", OperandDomain::None, 3},
+          Contract{Opcode::MakeParamSpec, "MAKE_PARAM_SPEC", OperandDomain::None, 1},
+          Contract{Opcode::MakeTypeVarTuple, "MAKE_TYPE_VAR_TUPLE", OperandDomain::None, 1},
+          Contract{Opcode::SetFunctionTypeParams, "SET_FUNCTION_TYPE_PARAMS", OperandDomain::None,
+                   2},
+          Contract{Opcode::MakeGenericBase, "MAKE_GENERIC_BASE", OperandDomain::None, 1},
           Contract{Opcode::LoadFromDictOrGlobals, "LOAD_FROM_DICT_OR_GLOBALS", OperandDomain::Name,
                    1},
           Contract{Opcode::LoadFromDictOrDeref, "LOAD_FROM_DICT_OR_DEREF", OperandDomain::Cell,
@@ -723,6 +730,66 @@ TEST_F(CoreExecution, TypeAliasOpcodesVerifyOperandsAndStackEffects)
         EXPECT_NE(disassemble(context, program).find(contract.name), std::string::npos);
         EXPECT_EQ(context.payload<CodeObject>(program).program.max_stack(), contract.inputs);
     }
+}
+
+TEST_F(CoreExecution, TypeVarHelperKeepsLazyEvaluatorsAcrossAllocationFailures)
+{
+    const auto name = text(U"T");
+    const auto bound = integer(42);
+    ReturnSlot out(context);
+    const Value items[] = {bound.get(context)};
+    make_tuple(context, items, out);
+    const auto constraints = roots.root(out.value());
+    CodeBuilder bound_code(context), constraints_code(context);
+    bound_code.emit(Opcode::LoadConst, bound_code.constant(bound));
+    bound_code.emit(Opcode::Return);
+    constraints_code.emit(Opcode::LoadConst, constraints_code.constant(constraints));
+    constraints_code.emit(Opcode::Return);
+    const auto bound_function = function(code(bound_code));
+    const auto constraints_function = function(code(constraints_code));
+    const auto bound_name = text(U"__bound__");
+    const auto constraints_name = text(U"__constraints__");
+    bool succeeded = false;
+    for (std::size_t quota = 0; quota < 256; ++quota) {
+        SCOPED_TRACE(quota);
+        out.reset();
+        context.set_allocation_limit(quota);
+        bool exhausted = false;
+        try {
+            detail::make_typevar(context, name, bound_function, constraints_function, out);
+        } catch (const std::bad_alloc &) {
+            exhausted = true;
+        }
+        context.set_allocation_limit(std::numeric_limits<std::size_t>::max());
+        context.collect();
+        if (!exhausted && out.tag() == ResultTag::Ok) {
+            const auto variable = roots.root(out.value());
+            for (const auto &entry :
+                 {std::pair{bound_name, bound}, std::pair{constraints_name, constraints}}) {
+                get_attribute(context, variable, entry.first, out);
+                ASSERT_EQ(out.tag(), ResultTag::Ok);
+                EXPECT_EQ(out.value(), entry.second.get(context));
+                context.collect();
+                get_attribute(context, variable, entry.first, out);
+                ASSERT_EQ(out.tag(), ResultTag::Ok);
+                EXPECT_EQ(out.value(), entry.second.get(context));
+            }
+            succeeded = true;
+            break;
+        }
+        if (out.tag() == ResultTag::Raised) {
+            EXPECT_EQ(context.type_of(out.exception()),
+                      context.builtin(CoreObject::MemoryErrorType));
+        }
+        EXPECT_EQ(interpreter.gc_state().phase, GcPhase::Running);
+        call(context, bound_function, {}, out);
+        ASSERT_EQ(out.tag(), ResultTag::Ok);
+        EXPECT_EQ(out.value(), bound.get(context));
+        call(context, constraints_function, {}, out);
+        ASSERT_EQ(out.tag(), ResultTag::Ok);
+        EXPECT_EQ(out.value(), constraints.get(context));
+    }
+    EXPECT_TRUE(succeeded);
 }
 
 TEST_F(CoreExecution, TypeAliasHelperKeepsRootsAcrossAllocationFailures)

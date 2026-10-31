@@ -1,0 +1,22 @@
+types True True Generic
+defaults T None () False False False
+variance ~T +C -D I True
+constraints (None, <class 'int'>) True
+tuple Ts Ts Ts
+identity True False True
+reduce T Choices
+weak True True
+dict 42 example tuple
+parameters (~T,) (~T,) (Ts,)
+name TypeError
+tuple name TypeError
+one constraint TypeError
+both variances ValueError
+truth ValueError
+unknown keyword TypeError
+readonly name AttributeError
+readonly constraints AttributeError
+readonly bound AttributeError
+typevar subclass TypeError
+tuple subclass TypeError
+generic subclass type no error

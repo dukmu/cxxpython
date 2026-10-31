@@ -1,0 +1,24 @@
+defaults P <class 'NoneType'> False False False
+repr ~P +Q P.args P.kwargs
+types True True
+origin True True
+equality True True False False False
+reduce P
+weak True
+view weak True True
+constructed 'origin'.args None.kwargs True
+callbacks origin.args 17
+dict 7 example
+parameters (~P,) (~T, ~P)
+name TypeError
+truth ValueError
+unknown keyword TypeError
+readonly name AttributeError
+readonly bound AttributeError
+readonly args AttributeError
+readonly origin AttributeError
+hash args TypeError
+hash kwargs TypeError
+paramspec subclass TypeError
+args subclass TypeError
+kwargs subclass TypeError

@@ -164,7 +164,46 @@ for name, expected in (("LOAD_FROM_DICT_OR_GLOBALS", "ClassLocal"),
     assert alias_bytecode.stack_effect(found[0].offset) == 0
     assert opcode.stack_effect(found[0].opcode, found[0].arg) == 0
 
-# Generic aliases (type A[T]) remain a separate acceptance gate.
+def f[T: int, *Ts, **P](x: T) -> T:
+    pass
+
+assert len(f.__type_params__) == 3
+assert f.__type_params__[0].__bound__ is int
+assert f.__annotations__["x"] is f.__type_params__[0]
+generic_function = compile("def f[T: int, *Ts, **P](x: T) -> T:\n    pass\n",
+                           "<generic-function>", "exec")
+generic_class = compile("class C[T]:\n    pass\n", "<generic-class>", "exec")
+generic_alias = compile("type A[T] = T\n", "<generic-alias>", "exec")
+
+def code_tree(code):
+    yield code
+    for child in code.co_consts:
+        if hasattr(child, "co_name"):
+            yield from code_tree(child)
+
+function_codes = list(code_tree(generic_function))
+assert len(function_codes) > 2
+assert any(c.co_name == "f" for c in function_codes[1:])
+assert any(i.argval == ".type_params" for c in function_codes
+           for i in dis.get_instructions(c) if i.opname == "LOAD_FAST")
+genericAliasOpcode = [i for c in code_tree(generic_alias)
+                      for i in dis.get_instructions(c) if i.opname == "MAKE_TYPE_ALIAS"]
+assert len(genericAliasOpcode) == 1
+for name, effect, source in (("MAKE_TYPE_VAR", -2, generic_function),
+                             ("MAKE_PARAM_SPEC", 0, generic_function),
+                             ("MAKE_TYPE_VAR_TUPLE", 0, generic_function),
+                             ("SET_FUNCTION_TYPE_PARAMS", -1, generic_function),
+                             ("MAKE_GENERIC_BASE", 0, generic_class)):
+    found = [(c, i) for c in code_tree(source) for i in dis.get_instructions(c)
+             if i.opname == name]
+    assert len(found) == 1
+    code_object, instruction = found[0]
+    assert opcode.opmap[name] == instruction.opcode
+    assert opcode.opname[instruction.opcode] == name
+    assert opcode._domains[instruction.opcode] == "None"
+    assert opcode.stack_effect(instruction.opcode) == effect
+    assert dis.Bytecode(code_object).stack_effect(instruction.offset) == effect
+
 assert opcode.stack_effect(opcode.opmap['RERAISE'], 0) == 0
 assert opcode.stack_effect(opcode.opmap['RERAISE'], 1) == -1
 try:

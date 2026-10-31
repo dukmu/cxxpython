@@ -408,8 +408,8 @@ owns construction and call binding, not a second metadata dictionary. Independen
 assigned defaults and keyword defaults are not a multi-field transaction.
 Writable __code__ and Code.replace remain separate compatibility work.
 
-Function annotations are evaluated in the defining scope after defaults and
-carried by MAKE_FUNCTION's annotation flag. Their mutable dictionary edge uses
+Non-generic function annotations evaluate in the defining scope after defaults
+and are carried by MAKE_FUNCTION's annotation flag. Their mutable dictionary edge uses
 rooted atomic reads, stores and lazy compare-exchange publication; it is not a
 second namespace entry with conflicting authority. Future annotations instead
 use `Python/ast_unparse.cpp`, adapted from the pinned native annotation unparser,
@@ -419,14 +419,34 @@ graph and do not get a Code object. BoolExpr keeps an explicit operand vector,
 and FormattedExpr preserves format-spec presence so canonical output does not
 lose grouping or empty format specifications.
 
-Non-generic type-alias lowering creates a lazy evaluator
-in an annotation-like scope. In a class it captures __classdict__; class
-construction fills that Cell with the class dictionary, and dedicated VM reads
+Type-alias lowering creates a lazy evaluator in an annotation scope. Generic
+functions, aliases and classes additionally use a distinct AnnotationRole
+type-parameter scope: defaults remain in the outer scope, while function
+annotations and generic class bases use the inner scope. Bounds and constraints
+use separate annotation roles. In a class the relevant scopes capture
+__classdict__; construction fills that Cell with the class dictionary, and dedicated VM reads
 consult it before closure or global lookup. The native _typing.TypeAliasType
 traces its immutable inputs and atomically publishes the first successful cached
 value without serializing evaluator calls. Static native type module metadata is
-kept separately from instance descriptors named __module__. Generic type
-parameters and the typing library remain separate, unfinished dependencies.
+kept separately from instance descriptors named __module__.
+
+`Objects/typevarobject.cpp` and `Objects/paramspecobject.cpp` implement native
+TypeVar, ParamSpec, TypeVarTuple, ParamSpecArgs, ParamSpecKwargs and Generic
+surfaces exported by `_typing`. Parameter instances have dictionary and weakref
+storage, although their `__dict__` descriptor is hidden; ParamSpec views have
+weakrefs but no instance dictionary. Lazy TypeVar bound and constraints
+evaluators are traced, with atomic traced caches. The compiler and VM connect
+MAKE_TYPE_VAR, MAKE_PARAM_SPEC, MAKE_TYPE_VAR_TUPLE, MAKE_GENERIC_BASE and
+SET_FUNCTION_TYPE_PARAMS to these objects and generic definitions.
+
+Python policy remains in `typing`: Generic classmethod hooks and generic base
+creation, non-None TypeVar bound checking, substitution, unions and
+TypeVarTuple unpacking call through real imports. Missing imports and errors
+propagate, including for classmethod Generic policy; there is no fabricated
+typing fallback. Generic class compilation is connected, but the actual
+typing/re/warnings dependency closure and acceptance remain open.
+Native _opcode.local_names exposes actual VM fast-local slots to dis; those
+indices are not indices into the cell-filtered Python co_varnames tuple.
 
 Variable annotations lower through ordinary stores and SETUP_ANNOTATIONS, not a
 second VM evaluation path. Type annotation reflection reuses the own namespace's

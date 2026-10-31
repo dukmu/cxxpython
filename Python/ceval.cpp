@@ -4,6 +4,7 @@
 #include "cxxpython/import.hpp"
 #include "cxxpython/setobject.hpp"
 #include "cxxpython/typealiasobject.hpp"
+#include "cxxpython/typevarobject.hpp"
 #include "internal/aiterobject.hpp"
 #include "internal/errors.hpp"
 #include "internal/exceptiongroup.hpp"
@@ -693,6 +694,63 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                     activation.raising(result.exception());
                 else
                     data.operands[data.sp - 1] = result.value();
+                break;
+            }
+            case Opcode::MakeTypeVar: {
+                RootScope roots(context);
+                auto name = roots.root(data.operands[data.sp - 3]);
+                auto bound = roots.root(data.operands[data.sp - 2]);
+                auto constraints = roots.root(data.operands[data.sp - 1]);
+                detail::make_typevar(context, name,
+                                     bound.get(context) == context.builtin(CoreObject::None)
+                                         ? std::nullopt
+                                         : std::optional{bound},
+                                     constraints.get(context) == context.builtin(CoreObject::None)
+                                         ? std::nullopt
+                                         : std::optional{constraints},
+                                     result);
+                if (raised(result))
+                    activation.raising(result.exception());
+                else {
+                    data.operands[data.sp - 3] = result.value();
+                    data.trim_stack(context, data.sp - 2);
+                }
+                break;
+            }
+            case Opcode::MakeParamSpec:
+            case Opcode::MakeTypeVarTuple:
+            case Opcode::MakeGenericBase: {
+                RootScope roots(context);
+                auto value = roots.root(data.operands[data.sp - 1]);
+                if (opcode == Opcode::MakeParamSpec)
+                    detail::make_paramspec(context, value, result);
+                else if (opcode == Opcode::MakeTypeVarTuple)
+                    detail::make_typevartuple(context, value, result);
+                else if (!kind<TupleObject, CoreObject::TupleType>(context, value.get(context)))
+                    raise_error(context, CoreObject::TypeErrorType,
+                                U"generic parameters must be a tuple", result);
+                else
+                    detail::make_generic_base(context, value, result);
+                if (raised(result))
+                    activation.raising(result.exception());
+                else
+                    data.operands[data.sp - 1] = result.value();
+                break;
+            }
+            case Opcode::SetFunctionTypeParams: {
+                const auto function = data.operands[data.sp - 2],
+                           parameters = data.operands[data.sp - 1];
+                if (context.type_of(function) != context.builtin(CoreObject::FunctionType) ||
+                    !context.has_layout<FunctionObject>(function) ||
+                    !kind<TupleObject, CoreObject::TupleType>(context, parameters)) {
+                    raise_error(context, CoreObject::TypeErrorType,
+                                U"invalid function type parameters", result);
+                    activation.raising(result.exception());
+                } else {
+                    context.store(function, context.payload<FunctionObject>(function).type_params,
+                                  parameters);
+                    data.trim_stack(context, data.sp - 1);
+                }
                 break;
             }
             case Opcode::MakeTypeAlias: {

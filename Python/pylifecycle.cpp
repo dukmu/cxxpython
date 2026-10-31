@@ -12,6 +12,7 @@
 #include "cxxpython/setobject.hpp"
 #include "cxxpython/superobject.hpp"
 #include "cxxpython/typealiasobject.hpp"
+#include "cxxpython/typevarobject.hpp"
 #include "cxxpython/unionobject.hpp"
 #include "cxxpython/weakrefobject.hpp"
 #include "internal/aiterobject.hpp"
@@ -63,8 +64,13 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
             bases.push_back(at(CoreObject::ExceptionType));
         TypeSpec spec{name, bases};
         spec.module = U"builtins";
-        if (id == CoreObject::TypeAliasType)
+        if (id >= CoreObject::TypeAliasType && id <= CoreObject::GenericType)
             spec.module = U"typing";
+        if (id == CoreObject::TypeVarType || id == CoreObject::ParamSpecType ||
+            id == CoreObject::TypeVarTupleType)
+            spec.slots = std::vector<std::u32string>{U"__dict__", U"__weakref__"};
+        if (id == CoreObject::ParamSpecArgsType || id == CoreObject::ParamSpecKwargsType)
+            spec.slots = std::vector<std::u32string>{U"__weakref__"};
         if (id == CoreObject::FunctionType || id == CoreObject::ModuleType ||
             id == CoreObject::SimpleNamespaceType || id == CoreObject::BaseExceptionType)
             spec.slots = std::vector<std::u32string>{U"__dict__"};
@@ -328,6 +334,15 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     define(CoreObject::AnextAwaitableType, "anext_awaitable",
            LayoutDescriptor::of<AnextAwaitableObject>());
     define(CoreObject::TypeAliasType, "TypeAliasType", LayoutDescriptor::of<TypeAliasObject>());
+    define(CoreObject::TypeVarType, "TypeVar", LayoutDescriptor::of<TypeVarObject>());
+    define(CoreObject::ParamSpecType, "ParamSpec", LayoutDescriptor::of<ParamSpecObject>());
+    define(CoreObject::TypeVarTupleType, "TypeVarTuple",
+           LayoutDescriptor::of<TypeVarTupleObject>());
+    define(CoreObject::ParamSpecArgsType, "ParamSpecArgs",
+           LayoutDescriptor::of<ParamSpecAttributeObject>());
+    define(CoreObject::ParamSpecKwargsType, "ParamSpecKwargs",
+           LayoutDescriptor::of<ParamSpecAttributeObject>());
+    define(CoreObject::GenericType, "Generic", LayoutDescriptor::of<InstanceObject>());
     for (auto id :
          {CoreObject::FunctionType, CoreObject::ModuleType, CoreObject::CodeType,
           CoreObject::GeneratorType, CoreObject::CoroutineType, CoreObject::SetType,
@@ -429,6 +444,7 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     install_genericalias(context, core);
     install_union(context, core);
     install_typealias(context, core);
+    install_typevars(context, core);
     install_weakrefs(context, core);
     install_weakproxies(context, core);
     install_error_types(context, core);
@@ -471,6 +487,7 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     }
     context.payload<TypeObject>(at(CoreObject::UnsupportedOperationType)).immutable = false;
     context.payload<TypeObject>(at(CoreObject::ExceptionGroupType)).immutable = false;
+    context.payload<TypeObject>(at(CoreObject::GenericType)).immutable = false;
     for (auto type : {context.object_type(), context.type_type()})
         context.payload<TypeObject>(type).state = TypeState::Ready;
     for (auto id : {CoreObject::NoneType,
@@ -519,6 +536,11 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                     CoreObject::AsyncGenWrappedValueType,
                     CoreObject::AnextAwaitableType,
                     CoreObject::TypeAliasType,
+                    CoreObject::TypeVarType,
+                    CoreObject::ParamSpecType,
+                    CoreObject::TypeVarTupleType,
+                    CoreObject::ParamSpecArgsType,
+                    CoreObject::ParamSpecKwargsType,
                     CoreObject::UnionType,
                     CoreObject::GenericAliasIteratorType,
                     CoreObject::SetIteratorType,
@@ -527,6 +549,12 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     for (auto id : {CoreObject::WeakProxyType, CoreObject::CallableWeakProxyType})
         context.payload<TypeObject>(at(id)).subclassable = false;
     context.payload<TypeObject>(at(CoreObject::UnraisableHookArgsType)).subclassable = false;
+    context.allocate_instance<StrObject>(at(CoreObject::StrType), text, U"typing");
+    for (auto id :
+         {CoreObject::TypeVarType, CoreObject::ParamSpecType, CoreObject::TypeVarTupleType,
+          CoreObject::ParamSpecArgsType, CoreObject::ParamSpecKwargsType, CoreObject::GenericType})
+        name_store(context, *context.payload<TypeObject>(at(id)).dictionary,
+                   module_key.get(context), text.value());
     context.allocate_instance<StrObject>(at(CoreObject::StrType), text, U"weakref");
     for (auto id :
          {CoreObject::WeakRefType, CoreObject::WeakProxyType, CoreObject::CallableWeakProxyType})

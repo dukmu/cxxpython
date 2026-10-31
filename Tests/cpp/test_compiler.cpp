@@ -1109,16 +1109,13 @@ TEST(CompilerDiagnostics, ScopeAndControlFlowErrorsRemainCompileTimeErrors)
         EXPECT_THROW(SourceUnit{SourceBuffer(source)}, SourceError);
     }
 }
-TEST(CompilerDiagnostics, RecognizedUnimplementedFeaturesAreExplicitCapabilities)
+TEST(CompilerDiagnostics, TypeParameterDefinitionsProduceExecutableScopeGraphs)
 {
-    for (auto source : {"class X[T]: pass"}) {
+    for (auto source : {"class X[T]: pass", "def f[T](x: T): return x", "type X[T] = list[T]"}) {
         SCOPED_TRACE(source);
-        try {
-            SourceUnit unit{SourceBuffer(source)};
-            FAIL();
-        } catch (const SourceError &error) {
-            EXPECT_EQ(error.kind, SourceErrorKind::Capability);
-        }
+        SourceUnit unit{SourceBuffer(source)};
+        EXPECT_EQ(unit.scopes().size(), 3U);
+        EXPECT_EQ(unit.scopes()[1].annotation_role, AnnotationRole::TypeParameters);
     }
 }
 TEST(CompilerDiagnostics, SourceBufferAndCompilationLimitsDoNotUseAnotherParser)

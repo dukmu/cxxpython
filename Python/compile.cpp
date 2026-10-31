@@ -205,18 +205,22 @@ class GraphPass final {
         else
             emit(global, span, 0, text);
     }
-    void nested(std::size_t scope, const Suite &body, const FunctionStmt *definition = nullptr)
+    template <class Build> void nested_scope(Build build)
     {
         const auto parent_scope = scope_, parent_block = block_;
         auto parent_loops = std::move(loops_);
         auto parent_star_handlers = std::move(star_handlers_);
         const auto *parent_first = first_statement_;
-        function(scope, body, definition);
+        build();
         scope_ = parent_scope;
         block_ = parent_block;
         loops_ = std::move(parent_loops);
         star_handlers_ = std::move(parent_star_handlers);
         first_statement_ = parent_first;
+    }
+    void nested(std::size_t scope, const Suite &body, const FunctionStmt *definition = nullptr)
+    {
+        nested_scope([&] { function(scope, body, definition); });
     }
     void make_function(std::size_t child, Span span, std::uint32_t flags = 0)
     {
@@ -239,27 +243,42 @@ class GraphPass final {
         current().instructions.back().function = child;
         emit(Opcode::MakeFunction, span, flags | (!freevars.empty() ? 4 : 0));
     }
-    void function_value(const FunctionStmt &node, Span span)
+    std::uint32_t function_defaults(const FunctionStmt &node, Span span, bool prepared)
     {
-        nested(node.scope, node.body, &node);
         std::uint32_t defaults = 0;
         std::vector<std::u32string> keywords;
         for (const auto &parameter : node.parameters)
             if (parameter.default_value && parameter.kind != ParameterKind::KeywordOnly) {
-                expression(*parameter.default_value);
+                if (!prepared)
+                    expression(*parameter.default_value);
                 ++defaults;
             }
-        if (defaults)
-            emit(Opcode::BuildTuple, span, defaults);
+        if (defaults) {
+            if (prepared)
+                name(U".defaults", span, Opcode::LoadFast, Opcode::LoadGlobal);
+            else
+                emit(Opcode::BuildTuple, span, defaults);
+        }
         for (const auto &parameter : node.parameters)
             if (parameter.default_value && parameter.kind == ParameterKind::KeywordOnly) {
-                expression(*parameter.default_value);
+                if (!prepared)
+                    expression(*parameter.default_value);
                 keywords.push_back(parameter.name);
             }
         if (!keywords.empty()) {
-            emit(Opcode::BuildNameDict, span);
-            current().instructions.back().keywords = keywords;
+            if (prepared)
+                name(U".kwdefaults", span, Opcode::LoadFast, Opcode::LoadGlobal);
+            else {
+                emit(Opcode::BuildNameDict, span);
+                current().instructions.back().keywords = keywords;
+            }
         }
+        return (defaults ? 1 : 0) | (!keywords.empty() ? 2 : 0);
+    }
+    void function_value(const FunctionStmt &node, Span span, bool prepared = false)
+    {
+        nested(node.scope, node.body, &node);
+        const auto flags = function_defaults(node, span, prepared);
         std::vector<std::u32string> annotations;
         for (const auto &annotation : node.annotations) {
             expression(*annotation.second);
@@ -269,9 +288,60 @@ class GraphPass final {
             emit(Opcode::BuildNameDict, span);
             current().instructions.back().keywords = std::move(annotations);
         }
-        make_function(node.scope, span,
-                      (defaults ? 1 : 0) | (!keywords.empty() ? 2 : 0) |
-                          (!node.annotations.empty() ? 8 : 0));
+        make_function(node.scope, span, flags | (!node.annotations.empty() ? 8 : 0));
+    }
+    template <class Build>
+    void generic_value(const TypeParameters &parameters, Span span, Build build,
+                       const FunctionStmt *definition = nullptr)
+    {
+        nested_scope([&] {
+            start_function(parameters.scope, {});
+            if (definition) {
+                bool defaults = false, keywords = false;
+                for (const auto &parameter : definition->parameters)
+                    if (parameter.default_value)
+                        (parameter.kind == ParameterKind::KeywordOnly ? keywords : defaults) = true;
+                for (auto [name, present] :
+                     {std::pair{U".defaults", defaults}, {U".kwdefaults", keywords}})
+                    if (present)
+                        program_.graphs[scope_].signature.parameters.push_back(
+                            {name, ParameterKind::PositionalOnly});
+            }
+            for (const auto &parameter : parameters.values) {
+                literal({Literal::Kind::String, parameter.name}, parameter.span);
+                if (parameter.kind == TypeParameter::Kind::TypeVar) {
+                    if (parameter.evaluator) {
+                        nested(parameter.evaluator->scope, parameter.evaluator->body,
+                               parameter.evaluator.get());
+                        make_function(parameter.evaluator->scope, parameter.span);
+                        if (parameter.constraints) {
+                            none(parameter.span);
+                            emit(Opcode::Swap, parameter.span, 2);
+                        } else
+                            none(parameter.span);
+                    } else {
+                        none(parameter.span);
+                        none(parameter.span);
+                    }
+                    emit(Opcode::MakeTypeVar, parameter.span);
+                } else
+                    emit(parameter.kind == TypeParameter::Kind::ParamSpec
+                             ? Opcode::MakeParamSpec
+                             : Opcode::MakeTypeVarTuple,
+                         parameter.span);
+                name(parameter.binding, parameter.span, Opcode::StoreFast, Opcode::StoreGlobal);
+            }
+            for (const auto &parameter : parameters.values)
+                name(parameter.binding, parameter.span, Opcode::LoadFast, Opcode::LoadGlobal);
+            emit(Opcode::BuildTuple, span, static_cast<std::uint32_t>(parameters.values.size()));
+            name(U".type_params", span, Opcode::StoreFast, Opcode::StoreGlobal);
+            build();
+            current().exit = FlowBlock::Exit::Return;
+            current().span = span;
+        });
+        make_function(parameters.scope, span);
+        const auto defaults = definition ? function_defaults(*definition, span, false) : 0;
+        emit(Opcode::Call, span, bool(defaults & 1) + bool(defaults & 2));
     }
     void sequence(const std::vector<ExprPtr> &items, Span span, bool tuple)
     {
@@ -1144,11 +1214,21 @@ class GraphPass final {
                                                                                : Opcode::PopTop,
                              span);
                     } else if constexpr (std::is_same_v<T, TypeAliasStmt>) {
-                        nested(node.evaluator->scope, node.evaluator->body, node.evaluator.get());
-                        literal({Literal::Kind::String, node.name}, span);
-                        emit(Opcode::BuildTuple, span, 0);
-                        make_function(node.evaluator->scope, span);
-                        emit(Opcode::MakeTypeAlias, span);
+                        auto value = [&] {
+                            nested(node.evaluator->scope, node.evaluator->body,
+                                   node.evaluator.get());
+                            literal({Literal::Kind::String, node.name}, span);
+                            if (node.type_parameters.values.empty())
+                                emit(Opcode::BuildTuple, span, 0);
+                            else
+                                name(U".type_params", span, Opcode::LoadFast, Opcode::LoadGlobal);
+                            make_function(node.evaluator->scope, span);
+                            emit(Opcode::MakeTypeAlias, span);
+                        };
+                        if (node.type_parameters.values.empty())
+                            value();
+                        else
+                            generic_value(node.type_parameters, span, value);
                         name(node.binding, span, Opcode::StoreFast, Opcode::StoreGlobal);
                     } else if constexpr (std::is_same_v<T, AnnAssignStmt>)
                         annotated_assignment(node, span);
@@ -1319,7 +1399,18 @@ class GraphPass final {
                     } else if constexpr (std::is_same_v<T, FunctionStmt>) {
                         for (const auto &decorator : node.decorators)
                             expression(*decorator);
-                        function_value(node, span);
+                        if (node.type_parameters.values.empty())
+                            function_value(node, span);
+                        else
+                            generic_value(
+                                node.type_parameters, span,
+                                [&] {
+                                    function_value(node, span, true);
+                                    name(U".type_params", span, Opcode::LoadFast,
+                                         Opcode::LoadGlobal);
+                                    emit(Opcode::SetFunctionTypeParams, span);
+                                },
+                                &node);
                         for (std::size_t i = 0; i < node.decorators.size(); ++i)
                             emit(Opcode::Call, span, 1);
                         name(node.binding, span, Opcode::StoreFast, Opcode::StoreGlobal);
@@ -1399,51 +1490,65 @@ class GraphPass final {
                             }
                         }
                     } else if constexpr (std::is_same_v<T, ClassStmt>) {
-                        nested(node.scope, node.body);
                         for (const auto &decorator : node.decorators)
                             expression(*decorator);
-                        emit(Opcode::LoadBuildClass, span);
-                        make_function(node.scope, span);
-                        literal({Literal::Kind::String, node.name}, span);
-                        const bool unpack =
-                            std::any_of(node.bases.begin(), node.bases.end(),
-                                        [](const auto &base) {
-                                            return std::holds_alternative<StarredExpr>(base->node);
-                                        }) ||
-                            std::any_of(node.keywords.begin(), node.keywords.end(),
-                                        [](const auto &keyword) { return keyword.first.empty(); });
-                        if (unpack) {
-                            emit(Opcode::BuildList, span, 2);
-                            for (const auto &base : node.bases) {
-                                if (const auto *star = std::get_if<StarredExpr>(&base->node)) {
-                                    expression(*star->value);
-                                    emit(Opcode::ListExtend, base->span);
-                                } else {
-                                    expression(*base);
-                                    emit(Opcode::ListAppend, base->span);
+                        auto value = [&] {
+                            nested(node.scope, node.body);
+                            emit(Opcode::LoadBuildClass, span);
+                            make_function(node.scope, span);
+                            literal({Literal::Kind::String, node.name}, span);
+                            const bool unpack =
+                                std::any_of(node.bases.begin(), node.bases.end(),
+                                            [](const auto &base) {
+                                                return std::holds_alternative<StarredExpr>(
+                                                    base->node);
+                                            }) ||
+                                std::any_of(
+                                    node.keywords.begin(), node.keywords.end(),
+                                    [](const auto &keyword) { return keyword.first.empty(); });
+                            if (unpack || !node.type_parameters.values.empty()) {
+                                emit(Opcode::BuildList, span, 2);
+                                for (const auto &base : node.bases) {
+                                    if (const auto *star = std::get_if<StarredExpr>(&base->node)) {
+                                        expression(*star->value);
+                                        emit(Opcode::ListExtend, base->span);
+                                    } else {
+                                        expression(*base);
+                                        emit(Opcode::ListAppend, base->span);
+                                    }
                                 }
+                                if (!node.type_parameters.values.empty()) {
+                                    name(U".type_params", span, Opcode::LoadFast,
+                                         Opcode::LoadGlobal);
+                                    emit(Opcode::MakeGenericBase, span);
+                                    emit(Opcode::ListAppend, span);
+                                }
+                                emit(Opcode::ListToTuple, span);
+                                emit(Opcode::BuildMap, span);
+                                for (const auto &[name, item] : node.keywords) {
+                                    if (!name.empty())
+                                        literal({Literal::Kind::String, name}, item->span);
+                                    expression(*item);
+                                    if (!name.empty())
+                                        emit(Opcode::BuildMap, item->span, 1);
+                                    emit(Opcode::DictMerge, item->span);
+                                }
+                                emit(Opcode::CallEx, span);
+                            } else {
+                                for (const auto &base : node.bases)
+                                    expression(*base);
+                                for (const auto &keyword : node.keywords)
+                                    expression(*keyword.second);
+                                emit(Opcode::Call, span,
+                                     static_cast<std::uint32_t>(node.bases.size() + 2));
+                                for (const auto &keyword : node.keywords)
+                                    current().instructions.back().keywords.push_back(keyword.first);
                             }
-                            emit(Opcode::ListToTuple, span);
-                            emit(Opcode::BuildMap, span);
-                            for (const auto &[name, item] : node.keywords) {
-                                if (!name.empty())
-                                    literal({Literal::Kind::String, name}, item->span);
-                                expression(*item);
-                                if (!name.empty())
-                                    emit(Opcode::BuildMap, item->span, 1);
-                                emit(Opcode::DictMerge, item->span);
-                            }
-                            emit(Opcode::CallEx, span);
-                        } else {
-                            for (const auto &base : node.bases)
-                                expression(*base);
-                            for (const auto &keyword : node.keywords)
-                                expression(*keyword.second);
-                            emit(Opcode::Call, span,
-                                 static_cast<std::uint32_t>(node.bases.size() + 2));
-                            for (const auto &keyword : node.keywords)
-                                current().instructions.back().keywords.push_back(keyword.first);
-                        }
+                        };
+                        if (node.type_parameters.values.empty())
+                            value();
+                        else
+                            generic_value(node.type_parameters, span, value);
                         for (std::size_t i = 0; i < node.decorators.size(); ++i)
                             emit(Opcode::Call, span, 1);
                         name(node.binding, span, Opcode::StoreFast, Opcode::StoreGlobal);
@@ -1454,7 +1559,8 @@ class GraphPass final {
                 statement->node);
         }
     }
-    void function(std::size_t scope, const Suite &body, const FunctionStmt *definition = nullptr)
+    void start_function(std::size_t scope, const Suite &body,
+                        const FunctionStmt *definition = nullptr)
     {
         scope_ = scope;
         select(block());
@@ -1481,6 +1587,10 @@ class GraphPass final {
             emit(Opcode::StoreName, info.span, 0, U"__module__");
             literal({Literal::Kind::String, info.qualname}, info.span);
             emit(Opcode::StoreName, info.span, 0, U"__qualname__");
+            if (program_.scopes[*info.parent].annotation_role == AnnotationRole::TypeParameters) {
+                name(U".type_params", info.span, Opcode::LoadFast, Opcode::LoadGlobal);
+                emit(Opcode::StoreName, info.span, 0, U"__type_params__");
+            }
         }
         if (info.annotations && info.kind != ScopeKind::Function)
             emit(Opcode::SetupAnnotations, info.span, 0, U"__annotations__");
@@ -1490,6 +1600,11 @@ class GraphPass final {
                 emit(Opcode::StoreName, info.span, 0, U"__doc__");
             }
         }
+    }
+    void function(std::size_t scope, const Suite &body, const FunctionStmt *definition = nullptr)
+    {
+        start_function(scope, body, definition);
+        const auto &info = program_.scopes[scope];
         suite(body);
         if (current().exit == FlowBlock::Exit::Open) {
             auto cell = std::find(info.cellvars.begin(), info.cellvars.end(), U"__class__");

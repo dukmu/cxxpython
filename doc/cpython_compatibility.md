@@ -252,24 +252,45 @@ the target is `builtins` and the `__builtins__` execution namespace.
   attribute forwarding. UnionType implements flattening, argument order,
   equality/hash, substitution and checking short-circuits. Parameter discovery
   publishes rooted immutable tuples; custom callback failures propagate. These
-  protocols do not provide the still-missing native TypeVar/typing closure.
-- Non-generic `type Alias = expr` lowers through a typed AST and CFG
+  protocols do not establish the still-missing typing closure.
+- `type Alias = expr` lowers through a typed AST and CFG
   to a lazily evaluated native `_typing.TypeAliasType`; direct construction,
   alias reflection and unions are also implemented. Class-local evaluators can
   see the class namespace. Successful values are atomically cached, but parallel
   first evaluations can run more than once and failures are not cached. VM
-  missing-name errors carry NameError.name. TypeVar, ParamSpec, TypeVarTuple,
-  generic syntax and the typing library remain unfinished, and this slice has
-  not established their compatibility or acceptance. Native alias construction,
+  missing-name errors carry NameError.name. Native alias construction,
   reflection and operators adapt CPython 3.12.14 Objects/typevarobject.c under
   the retained PSF license; refcount/GIL storage is replaced by traced edges
   and rooted atomic cache publication.
+- `_typing` exposes native TypeVar, ParamSpec, TypeVarTuple, ParamSpecArgs,
+  ParamSpecKwargs and Generic. TypeVar/ParamSpec/TypeVarTuple instances support
+  attributes and weakrefs despite hiding the `__dict__` descriptor; ParamSpec
+  views support weakrefs but not instance dictionaries. TypeVar lazy bound and
+  constraints evaluators are traced and successful results use atomic traced
+  caches. Generic function, alias and class lowering uses a separate
+  AnnotationRole parameter scope: defaults evaluate outside it, annotations
+  inside it. Five VM operations create parameters and generic bases and attach
+  function parameters: MAKE_TYPE_VAR, MAKE_PARAM_SPEC, MAKE_TYPE_VAR_TUPLE,
+  MAKE_GENERIC_BASE and SET_FUNCTION_TYPE_PARAMS.
+- Generic class compilation is connected, but actual typing/re/warnings imports
+  are not closed. Generic classmethod policy and base construction delegate to
+  real `typing` imports, as do non-None native TypeVar bounds, substitution,
+  unions and TypeVarTuple unpacking. Missing imports propagate instead of using
+  fabricated typing policy. Generic function/alias slices are reference-tested,
+  not completed generic-class or typing compatibility. A real upstream typing
+  import probe reaches re/_compiler.py and fails at the missing native _sre;
+  the regex engine and warnings closure are the next library dependencies.
+  Omitted/None bounds in the public ParamSpec constructor normalize to NoneType;
+  syntax-created ParamSpecs retain the reference's None bound instead.
+- VM dis resolves fast-local names through _opcode.local_names rather than
+  indexing the cell-filtered co_varnames with the VM's internal slot number.
+  Real generic wrapper graphs exercise these otherwise sparse slot indices.
 - mappingproxy is constructible over actual mappings, not just exact dicts.
   Reads, length, iteration, views/get/copy, comparison and repr delegate to the
   underlying object, including dict subclass overrides. It remains readonly but
   live. Complete mappingproxy operator and diagnostic matrices remain work.
-- Ordinary function parameter and return annotations evaluate in the defining
-  scope after defaults and before closure publication. __annotations__ is a
+- Ordinary non-generic function annotations evaluate in the defining scope
+  after defaults and before closure publication. __annotations__ is a
   traced atomic dictionary edge supporting lazy empty values, replacement, None
   reset and deletion. Variable annotations now follow pinned compile.c/symtable.c
   rules for simple/complex targets, no-RHS effects, local binding, global/nonlocal
@@ -284,8 +305,8 @@ the target is `builtins` and the `__builtins__` execution namespace.
   REPL input preserve effective flags; precompiled Code does not inherit again.
   co_flags reports actual runtime traits. Barry comparison syntax, other compile
   modes/options, the complete upstream annotation suite, generic type-parameter
-  scopes and native TypeVar/typing remain gates. The -i after -m future-flags
-  handoff is also not delivered. No upstream annotation was stripped to import
+  scope and native TypeVar/typing acceptance remain gates. The -i after -m
+  future-flags handoff is also not delivered. No upstream annotation was stripped to import
   these files.
 - Native async generators distinguish user yields from inner await suspension
   and reuse the existing VM Frame/unwind. asend/athrow/aclose requests preserve

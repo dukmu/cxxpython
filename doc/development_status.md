@@ -1,5 +1,74 @@
 # Development Status
 
+## 2026-10-31 Native Type Parameters And Generic Definition Scopes
+
+Prepended after 1ee7661, preserving earlier entries. Parent implemented the
+native parameter layouts, constructors/policy delegation and AST/symbol/CFG/VM
+integration. An initial broad native assignment returned no patch; a narrower
+Terra task supplied ParamSpec views. Other Terra tasks supplied reference
+fixtures, IR/root tests and current contract documentation. All workers are
+closed. The full active frontend/import/library/product/N4-N6/M0-M9 goal remains
+incomplete; the generic-class/typing dependency gate is not replaced by this slice.
+
+- _typing now exports canonical TypeVar, ParamSpec, TypeVarTuple, ParamSpecArgs,
+  ParamSpecKwargs, Generic and _idfunc alongside TypeAliasType. Native behavior
+  adapts pinned CPython 3.12.14 Objects/typevarobject.c, with separate readable
+  layouts and parameter-view implementation. Names/flags/evaluator inputs are
+  immutable; TypeVar bound/constraints caches use rooted atomic GC edges.
+  Successful concurrent publication uses CAS/reload, failures remain retriable,
+  and no evaluation mutex, RC storage or new lifetime authority is introduced.
+- Parameter objects have ordinary traced attribute dictionaries and weakrefs
+  without exposing __dict__. ParamSpec views retain their origin, support
+  weakrefs but not arbitrary attributes, delegate equality to origin protocols
+  and are unhashable. Readonly fields, identity/hash, variance truth conversion,
+  repr/reduce, subclass restrictions and module metadata follow the native
+  boundary. Reference tests exposed the public ParamSpec constructor's NoneType
+  default bound, distinct from a syntax-created **P's None bound; constructor
+  binding was corrected and simplified rather than adding a sentinel.
+- Generic function, alias and class syntax lowers from the existing generated
+  CST. Typed type-parameter lists and AnnotationRole scopes replace the earlier
+  alias-only flag. Decorators/defaults stay in the defining scope; annotations
+  and class bases use the parameter scope. Defaults cross the wrapper as normal
+  arguments. Bounds/constraints have lazy evaluator scopes and can capture later
+  parameters or outer cells. Private mangling, duplicate detection, prohibited
+  nonlocal rebinding and direct yield/await/named-expression restrictions use
+  scope analysis, not parser exceptions or workload-specific treatment.
+- MAKE_TYPE_VAR, MAKE_PARAM_SPEC, MAKE_TYPE_VAR_TUPLE, SET_FUNCTION_TYPE_PARAMS
+  and MAKE_GENERIC_BASE define verified operands, stack effects, safepoints and
+  Python exception paths. Function __type_params__ uses its existing atomic edge.
+  Class lowering stores its parameter tuple and appends the actual Generic base
+  policy request; executing that request still needs the real typing library.
+  TypeAliasType.__parameters__ now unpacks real TypeVarTuple entries through
+  typing.Unpack, without rewriting Python typing policy in C++.
+- Generic wrapper disassembly exposed a preexisting sparse-local-index bug:
+  VM slots include cell-local positions whereas co_varnames filters them out.
+  Native _opcode.local_names now supplies actual VM slot names; dis keeps the
+  Python co_varnames contract instead of changing reflection to hide the bug.
+  Tests inspect real nested Code objects, not an invented co_code format.
+- Six new direct test.py fixtures have pinned-reference-generated goldens for
+  constructors, fields, weakrefs, worker handoff, generic function evaluation
+  order/closures/async/futures/private names, lazy aliases/bounds/constraints and
+  syntax restrictions. ParamSpec view repr/equality callbacks collect while
+  native operands remain rooted. Native tests cover IR and quota/root behavior,
+  not C++ wrappers around runnable Python examples. stdin.bin remains real input.
+- Ordinary acceptance passes all 301 portable fixtures, 152 affected native/
+  source/grammar/dis/terminal checks and eight bootstrap allocation-failure
+  shards. Strict ASan/UBSan/LSan passes 93 affected checks plus all six new
+  scripts. TSan also passes all 93 affected checks and the six scripts.
+  Format-check and diff whitespace checks pass. Source was frozen before the
+  final sanitizer builds; later changes only extended Python fixtures/docs.
+  Raw logs and binary hashes are retained under .cache/typevars-*.
+- A real unchanged-upstream typing import probe reaches re/_compiler.py and
+  fails at the missing native _sre module. Generic hooks/base construction,
+  non-None native bound checking, substitution, TypeVar unions and TypeVarTuple
+  unpacking deliberately call real typing policy and propagate import/errors.
+  They are not advertised as a closed library. Next work is the CPython-shaped
+  _sre engine/re and warnings dependency closure, followed by full typing and
+  generic-class/runtime matrices, remaining compile options, -i after -m flags
+  and the requested broader libraries/N4-N6/M0-M9 gates. No unrelated performance
+  suite was rerun. Origin push still awaits destination authorization; no bypass
+  was attempted. The user's test2.py and temporary_plan.md deletion stay excluded.
+
 ## 2026-10-31 Lazy Type Aliases And Executable Class Annotation Scopes
 
 Prepended after 2fdc337, preserving earlier entries. Terra implemented the native

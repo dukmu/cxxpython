@@ -193,6 +193,18 @@ struct ParameterSpec {
     ExprPtr default_value;
     Span span;
 };
+struct TypeParameter {
+    enum class Kind { TypeVar, TypeVarTuple, ParamSpec };
+    Kind kind = Kind::TypeVar;
+    std::u32string name, binding;
+    std::unique_ptr<FunctionStmt> evaluator;
+    bool constraints = false;
+    Span span;
+};
+struct TypeParameters {
+    std::vector<TypeParameter> values;
+    std::size_t scope = 0;
+};
 struct FunctionStmt {
     std::u32string name;
     std::u32string binding;
@@ -204,11 +216,13 @@ struct FunctionStmt {
     std::size_t scope = 0;
     bool comprehension = false;
     bool coroutine = false;
-    bool type_alias = false;
+    AnnotationRole annotation_role = AnnotationRole::None;
+    TypeParameters type_parameters;
 };
 struct TypeAliasStmt {
     std::u32string name, binding;
     std::unique_ptr<FunctionStmt> evaluator;
+    TypeParameters type_parameters;
 };
 struct ClassStmt {
     std::u32string name, binding;
@@ -216,6 +230,7 @@ struct ClassStmt {
     std::vector<std::pair<std::u32string, ExprPtr>> keywords;
     Suite body;
     std::size_t scope = 0;
+    TypeParameters type_parameters;
 };
 struct ReturnStmt {
     ExprPtr value;

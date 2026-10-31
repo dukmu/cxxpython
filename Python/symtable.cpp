@@ -17,7 +17,7 @@ struct Binding {
     Span first;
     bool bound = false, used = false, parameter = false, global = false, nonlocal = false;
     NameClass classification = NameClass::GlobalImplicit;
-    bool forwarded = false, annotated = false;
+    bool forwarded = false, annotated = false, type_parameter = false;
 };
 struct ScopeBindings {
     std::vector<Binding> entries;
@@ -62,7 +62,7 @@ class ScopePass final {
                     continue;
                 const auto &current = program_.scopes[scope];
                 if (current.sees_class_namespace && entry.name != U"__classdict__") {
-                    auto *class_entry = bindings_[*current.parent].find(entry.name);
+                    auto *class_entry = bindings_[*class_namespace(scope)].find(entry.name);
                     if (class_entry &&
                         (class_entry->global || (class_entry->bound && !class_entry->nonlocal))) {
                         bindings_[scope].entries[i].classification =
@@ -90,6 +90,8 @@ class ScopePass final {
                     if (candidate && candidate->global)
                         break;
                     if (candidate && candidate->bound && !candidate->nonlocal) {
+                        if (entry.nonlocal && candidate->type_parameter)
+                            error(entry.first, "nonlocal binding not allowed for type parameter");
                         owner = parent;
                         break;
                     }
@@ -114,9 +116,13 @@ class ScopePass final {
         }
         for (std::size_t scope = 0; scope < bindings_.size(); ++scope) {
             auto &info = program_.scopes[scope];
+            for (const auto &entry : bindings_[scope].entries)
+                if (entry.parameter && (entry.classification == NameClass::Local ||
+                                        entry.classification == NameClass::Cell))
+                    info.locals.push_back(entry.name);
             for (const auto &entry : bindings_[scope].entries) {
-                if (entry.classification == NameClass::Local ||
-                    entry.classification == NameClass::Cell)
+                if (!entry.parameter && (entry.classification == NameClass::Local ||
+                                         entry.classification == NameClass::Cell))
                     info.locals.push_back(entry.name);
                 if (entry.classification == NameClass::Cell && entry.parameter)
                     info.cellvars.push_back(entry.name);
@@ -170,10 +176,41 @@ class ScopePass final {
     std::u32string qualified(const std::u32string &name, std::size_t scope) const
     {
         const auto &parent = program_.scopes[scope];
+        if (parent.annotation_role == AnnotationRole::TypeParameters)
+            return qualified(name, *parent.parent);
         return parent.kind == ScopeKind::Module
                    ? name
                    : parent.qualname + (parent.kind == ScopeKind::Function ? U".<locals>." : U".") +
                          name;
+    }
+    std::optional<std::size_t> class_namespace(std::size_t scope) const
+    {
+        for (auto parent = program_.scopes[scope].parent; parent;
+             parent = program_.scopes[*parent].parent) {
+            if (program_.scopes[*parent].kind == ScopeKind::Class)
+                return parent;
+            if (program_.scopes[*parent].annotation_role != AnnotationRole::TypeParameters)
+                break;
+        }
+        return {};
+    }
+    void annotation_restriction(std::size_t scope, Span span, const char *expression)
+    {
+        switch (program_.scopes[scope].annotation_role) {
+        case AnnotationRole::None:
+            return;
+        case AnnotationRole::TypeAlias:
+            error(span, std::string(expression) + " expression cannot be used within a type alias");
+        case AnnotationRole::TypeVarBound:
+            error(span,
+                  std::string(expression) + " expression cannot be used within a TypeVar bound");
+        case AnnotationRole::TypeVarConstraints:
+            error(span, std::string(expression) +
+                            " expression cannot be used within a TypeVar constraint");
+        case AnnotationRole::TypeParameters:
+            error(span, std::string(expression) +
+                            " expression cannot be used within a type parameter scope");
+        }
     }
     void expression(Expr &value, std::size_t scope)
     {
@@ -186,8 +223,7 @@ class ScopePass final {
                     if (node.name == U"super" && program_.scopes[scope].kind == ScopeKind::Function)
                         bindings_[scope].get(U"__class__", value.span).used = true;
                 } else if constexpr (std::is_same_v<T, YieldExpr>) {
-                    if (program_.scopes[scope].type_alias)
-                        error(value.span, "yield expression cannot be used within a type alias");
+                    annotation_restriction(scope, value.span, "yield");
                     if (program_.scopes[scope].kind == ScopeKind::Annotation)
                         error(value.span, "yield expression cannot be used within an annotation");
                     if (program_.scopes[scope].kind != ScopeKind::Function)
@@ -200,8 +236,7 @@ class ScopePass final {
                     if (node.value)
                         expression(*node.value, scope);
                 } else if constexpr (std::is_same_v<T, AwaitExpr>) {
-                    if (program_.scopes[scope].type_alias)
-                        error(value.span, "await expression cannot be used within a type alias");
+                    annotation_restriction(scope, value.span, "await");
                     if (program_.scopes[scope].kind == ScopeKind::Annotation)
                         error(value.span, "await expression cannot be used within an annotation");
                     async_scope(scope, value.span, "'await' outside async function");
@@ -213,8 +248,7 @@ class ScopePass final {
                     expression(*node.body, scope);
                     expression(*node.alternative, scope);
                 } else if constexpr (std::is_same_v<T, NamedExpr>) {
-                    if (program_.scopes[scope].type_alias)
-                        error(value.span, "named expression cannot be used within a type alias");
+                    annotation_restriction(scope, value.span, "named");
                     if (program_.scopes[scope].kind == ScopeKind::Annotation)
                         error(value.span, "named expression cannot be used within an annotation");
                     if (comprehension_iterable_)
@@ -345,6 +379,35 @@ class ScopePass final {
             attribute.name = mangle(std::move(attribute.name), scope);
         }
     }
+    std::size_t type_parameters(TypeParameters &parameters, const std::u32string &name,
+                                std::size_t parent, Span span, bool class_definition = false)
+    {
+        if (parameters.values.empty())
+            return parent;
+        const auto scope_name = U"<generic parameters of " + name + U">";
+        parameters.scope =
+            add(ScopeKind::Function, scope_name, qualified(scope_name, parent), parent, span);
+        const auto scope = parameters.scope;
+        if (class_definition)
+            private_names_[scope] = name;
+        auto &info = program_.scopes[scope];
+        info.annotation_role = AnnotationRole::TypeParameters;
+        info.sees_class_namespace = class_namespace(scope).has_value();
+        if (info.sees_class_namespace)
+            bindings_[scope].get(U"__classdict__", span).used = true;
+        bindings_[scope].get(U".type_params", span).bound = true;
+        for (auto &parameter : parameters.values) {
+            parameter.binding = mangle(parameter.name, scope);
+            auto &entry = bindings_[scope].get(parameter.binding, parameter.span);
+            if (entry.bound)
+                error(parameter.span, "duplicate type parameter");
+            entry.bound = entry.type_parameter = true;
+        }
+        for (auto &parameter : parameters.values)
+            if (parameter.evaluator)
+                function(*parameter.evaluator, scope, parameter.span);
+        return scope;
+    }
     void function(FunctionStmt &node, std::size_t scope, Span span)
     {
         for (const auto &decorator : node.decorators)
@@ -352,14 +415,28 @@ class ScopePass final {
         for (const auto &parameter : node.parameters)
             if (parameter.default_value)
                 expression(*parameter.default_value, scope);
+        const auto parent = type_parameters(node.type_parameters, node.name, scope, span);
+        if (parent != scope) {
+            bool defaults = false, kwdefaults = false;
+            for (const auto &parameter : node.parameters)
+                if (parameter.default_value)
+                    (parameter.kind == ParameterKind::KeywordOnly ? kwdefaults : defaults) = true;
+            for (auto [name, present] :
+                 {std::pair{U".defaults", defaults}, {U".kwdefaults", kwdefaults}})
+                if (present) {
+                    auto &entry = bindings_[parent].get(name, span);
+                    entry.bound = entry.parameter = true;
+                }
+        }
         for (auto &item : node.annotations)
-            annotation(item.second, scope);
-        node.scope = add(ScopeKind::Function, node.name, qualified(node.name, scope), scope, span);
+            annotation(item.second, parent);
+        node.scope =
+            add(ScopeKind::Function, node.name, qualified(node.name, parent), parent, span);
         for (auto &annotation : node.annotations)
             annotation.first = mangle(std::move(annotation.first), node.scope);
         program_.scopes[node.scope].coroutine = node.coroutine;
-        program_.scopes[node.scope].type_alias = node.type_alias;
-        if (node.type_alias && program_.scopes[scope].kind == ScopeKind::Class) {
+        program_.scopes[node.scope].annotation_role = node.annotation_role;
+        if (node.annotation_role != AnnotationRole::None && class_namespace(node.scope)) {
             program_.scopes[node.scope].sees_class_namespace = true;
             bindings_[node.scope].get(U"__classdict__", span).used = true;
         }
@@ -555,7 +632,9 @@ class ScopePass final {
                             error(statement->span, "cannot assign __debug__");
                         node.binding = mangle(node.name, scope);
                         bindings_[scope].get(node.binding, statement->span).bound = true;
-                        function(*node.evaluator, scope, statement->span);
+                        const auto parent = type_parameters(node.type_parameters, node.name, scope,
+                                                            statement->span);
+                        function(*node.evaluator, parent, statement->span);
                     } else if constexpr (std::is_same_v<T, AnnAssignStmt>) {
                         if (program_.scopes[scope].kind != ScopeKind::Function)
                             program_.scopes[scope].annotations = true;
@@ -701,13 +780,17 @@ class ScopePass final {
                         bindings_[scope].get(node.binding, statement->span).bound = true;
                         for (const auto &decorator : node.decorators)
                             expression(*decorator, scope);
+                        const auto parent = type_parameters(node.type_parameters, node.name, scope,
+                                                            statement->span, true);
                         for (const auto &base : node.bases)
-                            expression(*base, scope);
+                            expression(*base, parent);
                         for (auto &item : node.keywords) {
-                            expression(*item.second, scope);
+                            expression(*item.second, parent);
                         }
                         node.scope = add(ScopeKind::Class, node.name, qualified(node.name, scope),
-                                         scope, statement->span);
+                                         parent, statement->span);
+                        if (parent != scope)
+                            bindings_[node.scope].get(U".type_params", statement->span).used = true;
                         private_names_[node.scope] = node.name;
                         collect(node.body, node.scope);
                     } else

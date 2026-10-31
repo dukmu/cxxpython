@@ -1077,6 +1077,58 @@ class Adapter {
             !std::holds_alternative<SubscriptExpr>(value.node))
             throw SourceError(source_, value.span, "invalid assignment target");
     }
+    TypeParameters type_parameters(const Node &definition)
+    {
+        TypeParameters result;
+        const auto *parameters = find(definition, Rule::type_params);
+        if (!parameters)
+            return result;
+        const auto *sequence = find(*parameters, Rule::type_param_seq);
+        if (!sequence)
+            unsupported(*parameters);
+        std::unordered_set<std::u32string> names;
+        for (auto node : rules(*sequence)) {
+            if (node->rule != Rule::type_param)
+                unsupported(*node);
+            TypeParameter parameter;
+            parameter.span = span(*node);
+            parameter.kind = has(*node, U"**")  ? TypeParameter::Kind::ParamSpec
+                             : has(*node, U"*") ? TypeParameter::Kind::TypeVarTuple
+                                                : TypeParameter::Kind::TypeVar;
+            for (auto child : children(*node))
+                if (child->rule == Rule::Token && token(*child).kind == TokenKind::NAME) {
+                    parameter.name = identifier(*child);
+                    break;
+                }
+            if (parameter.name == U"__debug__")
+                throw SourceError(source_, parameter.span, "cannot assign to __debug__");
+            if (!names.insert(parameter.name).second)
+                throw SourceError(source_, parameter.span, "duplicate type parameter");
+            const auto *bound = find(*node, Rule::type_param_bound);
+            const auto *value =
+                bound ? find(*bound, Rule::expression) : find(*node, Rule::expression);
+            if (value) {
+                auto expression_value = expression(*value);
+                parameter.constraints = std::holds_alternative<TupleExpr>(expression_value->node);
+                if (parameter.kind != TypeParameter::Kind::TypeVar)
+                    throw SourceError(
+                        source_, span(*node),
+                        std::string(parameter.constraints ? "cannot use constraints with "
+                                                          : "cannot use bound with ") +
+                            (parameter.kind == TypeParameter::Kind::ParamSpec ? "ParamSpec"
+                                                                              : "TypeVarTuple"));
+                parameter.evaluator = std::make_unique<FunctionStmt>();
+                parameter.evaluator->name = parameter.name;
+                parameter.evaluator->annotation_role = parameter.constraints
+                                                           ? AnnotationRole::TypeVarConstraints
+                                                           : AnnotationRole::TypeVarBound;
+                parameter.evaluator->body.push_back(
+                    stmt(*value, ReturnStmt{std::move(expression_value)}));
+            }
+            result.values.push_back(std::move(parameter));
+        }
+        return result;
+    }
     void parameters(const Node &n, FunctionStmt &fn,
                     ParameterKind kind = ParameterKind::PositionalOrKeyword)
     {
@@ -1348,9 +1400,8 @@ class Adapter {
             break;
         }
         case Rule::type_alias: {
-            if (find(n, Rule::type_params))
-                unsupported(n);
             TypeAliasStmt alias;
+            alias.type_parameters = type_parameters(n);
             bool first = true;
             for (auto p : c)
                 if (p->rule == Rule::Token && token(*p).kind == TokenKind::NAME) {
@@ -1363,7 +1414,7 @@ class Adapter {
                 }
             auto evaluator = std::make_unique<FunctionStmt>();
             evaluator->name = alias.name;
-            evaluator->type_alias = true;
+            evaluator->annotation_role = AnnotationRole::TypeAlias;
             evaluator->body.push_back(stmt(n, ReturnStmt{expression(*find(n, Rule::expression))}));
             alias.evaluator = std::move(evaluator);
             result.push_back(stmt(n, std::move(alias)));
@@ -1543,9 +1594,8 @@ class Adapter {
             return s;
         }
         case Rule::function_def_raw: {
-            if (find(n, Rule::type_params))
-                unsupported(n);
             FunctionStmt f;
+            f.type_parameters = type_parameters(n);
             f.coroutine = has(n, U"async");
             f.name = definition_name(n, U"def");
             if (auto p = find(n, Rule::params))
@@ -1568,9 +1618,8 @@ class Adapter {
             break;
         }
         case Rule::class_def_raw: {
-            if (find(n, Rule::type_params))
-                unsupported(n);
             ClassStmt cl;
+            cl.type_parameters = type_parameters(n);
             cl.name = definition_name(n, U"class");
             if (auto p = find(n, Rule::arguments))
                 arguments(*p, cl.bases, cl.keywords);

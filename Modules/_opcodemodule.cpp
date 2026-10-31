@@ -150,6 +150,23 @@ void code_info(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &o
     result.finish(out);
 }
 
+void local_names(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(c);
+    auto code = roots.root(args[0]);
+    if (c.type_of(code) != c.builtin(CoreObject::CodeType)) {
+        raise_error(c, CoreObject::TypeErrorType, U"expected a code object", out);
+        return;
+    }
+    std::vector<Value> names;
+    ReturnSlot name(c);
+    for (const auto &text : c.payload<CodeObject>(code).program.local_names()) {
+        make_str(c, text, name);
+        names.push_back(roots.root(name.value()).get(c));
+    }
+    make_tuple(c, std::span<const Value>(names), out);
+}
+
 void instructions(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
@@ -229,7 +246,8 @@ void initialize_opcode(Attachment &c, Handle module, ReturnSlot &out)
     };
     for (const auto &entry :
          {Entry{"metadata", metadata, 0}, Entry{"instructions", instructions, 1},
-          Entry{"code_info", code_info, 1}, Entry{"stack_effect", effect, 3}}) {
+          Entry{"code_info", code_info, 1}, Entry{"local_names", local_names, 1},
+          Entry{"stack_effect", effect, 3}}) {
         SignatureLayout signature;
         for (unsigned i = 0; i < entry.arity; ++i)
             signature.parameters.push_back(

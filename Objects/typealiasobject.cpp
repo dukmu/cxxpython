@@ -3,6 +3,7 @@
 #include "cxxpython/execution.hpp"
 #include "cxxpython/genericaliasobject.hpp"
 #include "cxxpython/protocol.hpp"
+#include "cxxpython/typevarobject.hpp"
 #include "cxxpython/unionobject.hpp"
 
 namespace cxxpython::core {
@@ -68,6 +69,14 @@ void alias_params(Attachment &c, Value self, ReturnSlot &out)
     if (receiver(c, self, out))
         out.ok(c.payload<TypeAliasObject>(self).type_params.value_or(
             c.builtin(CoreObject::EmptyTuple)));
+}
+void alias_parameters(Attachment &c, Value value, ReturnSlot &out)
+{
+    RootScope roots(c);
+    auto self = roots.root(value);
+    alias_params(c, self.get(c), out);
+    if (out.tag() == ResultTag::Ok)
+        detail::unpack_typevartuples(c, roots.root(out.value()), out);
 }
 
 void alias_module(Attachment &c, Value value, ReturnSlot &out)
@@ -192,7 +201,7 @@ void install_typealias(Attachment &c, std::span<const Handle> core)
     install_native_attribute(c, core, owner, U"__ror__", pair, alias_union<true>);
     install_native_field(c, core, owner, U"__name__", alias_name);
     install_native_field(c, core, owner, U"__type_params__", alias_params);
-    install_native_field(c, core, owner, U"__parameters__", alias_params);
+    install_native_field(c, core, owner, U"__parameters__", alias_parameters);
     install_native_field(c, core, owner, U"__module__", alias_module);
     install_native_field(c, core, owner, U"__value__", alias_value);
 }

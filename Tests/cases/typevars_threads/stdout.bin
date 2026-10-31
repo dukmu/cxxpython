@@ -1,0 +1,4 @@
+errors []
+handoff [('T', 'consumer', True), ('P', 'consumer', True), ('Ts', 'consumer', True)]
+alive [True, True, True]
+collected [True, True, True]

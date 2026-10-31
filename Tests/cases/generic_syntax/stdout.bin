@@ -1,0 +1,17 @@
+duplicate function SyntaxError
+duplicate alias SyntaxError
+private collision SyntaxError
+tuple bound SyntaxError
+paramspec bound SyntaxError
+nonlocal parameter SyntaxError
+alias walrus SyntaxError
+alias yield SyntaxError
+alias await SyntaxError
+bound walrus SyntaxError
+bound yield SyntaxError
+bound await SyntaxError
+constraints walrus SyntaxError
+alias lambda walrus ok
+alias lambda yield ok
+bound lambda walrus ok
+bound lambda yield ok
