@@ -1,0 +1,7 @@
+descriptor 'format' for 'str' objects doesn't apply to a 'int' object
+descriptor 'get' for 'dict' objects doesn't apply to a 'list' object
+descriptor 'sort' for 'list' objects doesn't apply to a 'dict' object
+unbound method str.format() needs an argument
+True
+True
+True

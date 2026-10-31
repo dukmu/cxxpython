@@ -696,6 +696,12 @@ the target is `builtins` and the `__builtins__` execution namespace.
   than class-name special cases. Index callback errors include the actual result
   type; tuple/string index and rejected-final-base diagnostics follow the pinned
   semantics. This does not imply every historical native diagnostic is complete.
+  Ordinary native method-descriptor rejection now names method/owner/receiver
+  for explicit calls and binding, with pinned-reference cases for str.format,
+  dict.get, list.sort and missing self. Native slots currently share the
+  MethodDescriptorType representation: distinct wrapper_descriptor reflection
+  and its slot-specific error wording, such as str.__mod__, remain separate
+  compatibility gates rather than a reason to special-case method names.
 - os.cpu_count returns the POSIX online logical count, or None on query failure.
   It does not report affinity/quota or add the later process_cpu_count API to the
   3.12 target. os.symlink accepts/evaluates target_is_directory on POSIX; actual

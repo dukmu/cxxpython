@@ -150,6 +150,10 @@ Freshly classified native special methods enter the shared call-depth guard and
 native binder directly, without classifying the callable again. Explicit and
 implicit method-descriptor calls share one defining-owner receiver check;
 ordinary native functions still follow descriptor binding without implicit self.
+Rejected method-descriptor calls and binding share a cold diagnostic formatter
+that names the method, owner and actual receiver, or identifies a missing self.
+Native method names retain their UTF-8 decoding and precise roots while errors
+allocate; this does not bypass receiver checks or enter the native method body.
 Prepared Python calls retain copied host argument buffers and borrow roots from
 their caller's scope. Receiver validation,
 type-epoch revalidation, recursion limits and native return validation remain on

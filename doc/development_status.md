@@ -1,5 +1,82 @@
 # Development Status
 
+## 2026-11-01 Release ThinLTO And Descriptor Diagnostics
+
+Continues the active performance/cleanup goal after pushed 5be6fbd. Parent handled
+the toolchain/build, runtime diagnostic and acceptance. Terra first reviewed
+existing extension reachability/tests, then a separate Terra task supplied the
+focused descriptor test changes and pinned-reference fixture. Both are closed.
+The complete compatibility route remains paused.
+
+- Use the standard CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE setting, with an
+  early C/C++ CheckIPOSupported failure that retains the actual diagnostic. No
+  project-specific optimization mode, visibility changes, fast-math, disabled
+  ownership checks, GIL, RC or new runtime class/module. Basic builds still do
+  not request IPO; README/development guidance documents explicit performance
+  builds, matching archivers/linkers and separate sanitizer configurations.
+- Completed the fixed Clang 21.1.8 toolchain with matching llvm-ar/llvm-ranlib
+  from the official same-version LLVM package, extracting only those tools and
+  notices rather than keeping an unused full package. The archive was removed.
+  The old build's compiler-information files retained NOTFOUND archivers despite
+  cache overrides; that failed check remains recorded. A fresh ignored
+  .cache/build-clang21-ipo avoids rewriting the old compiler metadata. Release
+  uses -O3 -DNDEBUG -flto=thin and LLD 21 with two backend jobs. Compiler,
+  dependencies and ordinary flags match the no-IPO control; linker/IPO settings
+  intentionally differ. Both final executables use identical runtime source.
+- Added the native CTest label to both discovered C++ executables, replacing
+  brittle long fixture-prefix selections when validating a whole-program build.
+  Added Extensions.ProductEntry using the existing byte-exact Python driver and
+  Tests/extensions/cases/dynamic/test.py/stdout.bin, outside CPython-reference
+  registration because this is the cxxpython C ABI. It exercises the production
+  interpreter's real dynamic getter lookup, API calls, NativeWait, exceptions,
+  sys.modules deletion/GC, retained binding and fresh module initialization.
+  The dynamic getter remains exported with IPO; the test passes on both final
+  Release builds and on the existing Debug ASan/UBSan/LSan and TSan configurations.
+- Initial all-native validation found one pre-existing stale StringFormat test
+  expectation, reproduced on the no-IPO baseline: descriptor admission already
+  preempts the formatting thunk, but its generic message lacked useful names.
+  Explicit calls and descriptor binding now share a cold formatter naming the
+  method, owner and actual receiver, or missing self. UTF-8 names use the existing
+  primitive decoder with rooted intermediates. No method-name special cases.
+  Updated the stale assertions rather than weakening their message checks.
+  New direct ordinary-descriptor cases agree exactly with fixed CPython 3.12.14;
+  a native UTF-8-name case collects on every allocation. Distinct slot-wrapper
+  types/messages remain a documented compatibility gate, not claimed complete.
+- Final IPO Release passes all 594 native tests and 30 selected Python scripts.
+  The no-IPO control passes 593 native tests in the combined run; runpy's one
+  15s timeout passes alone in 7.86s with the unchanged budget after other jobs
+  stop. Both logs remain retained. Control's three focused Python cases pass.
+  The 128 relevant diagnostic/call/root/epoch contracts and six Python scenarios
+  pass on ASan/UBSan/LSan and TSan. These are ordinary Debug sanitizer builds,
+  not sanitizer+IPO claims; prior full root-contract evidence remains retained.
+  Strict Clang, formatting and diff checks pass. Evidence is .cache/ipo-*.
+- After builds/tests stopped, alternated identical-source no-IPO and ThinLTO/LLD
+  executables, three processes, one warmup and three values/process, with natural
+  GC and validation enabled. Matrix N=64 one/four-worker medians are
+  653.816/259.388 ms versus 466.490/185.546; standard pyperf reports 1.40x/1.37x
+  faster. New scaling is 2.514x and four-worker CPU/wall is 3.267. For 100000
+  short-lived container jobs, medians are 948.850/378.528 versus 749.218/300.966;
+  pyperf reports 1.26x/1.25x faster, scaling 2.489x and four-worker CPU/wall 2.886.
+- File I/O's standard 128 create/write/read/unlink jobs give 9.945/6.518 versus
+  7.817/5.622 ms; pyperf reports 1.28x/1.14x faster. Relative I/O scaling drops
+  from 1.526x to 1.390x because the single-worker gain is larger; four-worker
+  absolute time still improves. This is filesystem/page-cache work, not durable
+  device throughput or CPU-parallel proof. Complete -c pass startup medians are
+  61.712/61.442 ms, with no significant difference. No CPython campaign was
+  repeated, and these improvements do not establish absolute CPython acceptance.
+- Raw runs, generated reports/CSV/pyperf suites are .cache/benchmarks/ipo-matrix,
+  ipo-allocation and ipo-io-startup; standard comparisons are ipo-*-pyperf.log.
+  No tables were hand-maintained. The separate sixteen-loop, one-worker software
+  profile in ipo-matrix-profile-1 still puts root acquisition at 13.99% self,
+  VM run at 10.34% and protocol invocation/cache lookup at 5.08%/4.06%. Inlining
+  changes attribution; these are remaining hotspots, not a hardware cache-hit
+  or pause-distribution measurement. Next work should reduce generic root/
+  protocol-resolution work, including repeated role classification, rather than
+  keep tuning compiler flags or add a collector framework without evidence.
+  Retired the consumed 569edee/5be6fbd executable copies, retaining their raw
+  evidence and both current Release configurations. matrix.py is unchanged/
+  untracked. The performance goal stays active.
+
 ## 2026-11-01 Reuse Root Arena Chains
 
 Continues the active performance/cleanup goal after pushed 569edee. The previous

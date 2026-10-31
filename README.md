@@ -22,6 +22,12 @@ ctest --test-dir build --output-on-failure -j 4
 build/cxxpython -c 'print(40 + 2)'
 ```
 
+For performance builds, enable the standard CMake
+`-DCMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE=ON` option in a fresh build directory.
+It requires a complete IPO-capable compiler/archive/linker toolchain; configuration
+fails with the toolchain diagnostic rather than silently disabling it. See
+[Release IPO](doc/development_guide.md#release-ipo) for Clang and test details.
+
 ## Run Python
 
 ```sh

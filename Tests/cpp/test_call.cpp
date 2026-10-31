@@ -254,6 +254,27 @@ TEST_F(CoreCalls, InstanceLookupBindsFunctionsAndClassLookupDoesNot)
     EXPECT_EQ(context.payload<StrObject>(out.result().value()).value, U"shadowed");
 }
 
+TEST_F(CoreCalls, NativeDescriptorErrorsDecodeUtf8NamesThroughCollection)
+{
+    ReturnSlot out(context);
+    SignatureLayout signature;
+    signature.parameters = {{U"self", Kind::PositionalOnly}};
+    make_native_function(context, "caf\xc3\xa9", signature, return_first, {}, out);
+    auto function = roots.root(out.value());
+    auto owner = roots.root(context.builtin(CoreObject::StrType));
+    make_method_descriptor(context, owner, function, out);
+    auto descriptor = roots.root(out.value());
+    const Value args[] = {context.builtin(CoreObject::IntOne)};
+    call(context, descriptor, {args, {}}, out);
+    expect_error(out, CoreObject::TypeErrorType);
+    ReturnSlot arguments(context);
+    context.load(out.exception(), context.payload<ExceptionObject>(out.exception()).args,
+                 arguments);
+    const auto message = context.payload<TupleObject>(arguments.value()).items[0];
+    EXPECT_EQ(context.payload<StrObject>(message).value,
+              U"descriptor 'caf\u00e9' for 'str' objects doesn't apply to a 'int' object");
+}
+
 TEST_F(CoreCalls, NativeMethodDescriptorsValidateBoundAndExplicitReceivers)
 {
     auto cls = type("Owner");

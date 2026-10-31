@@ -1,4 +1,5 @@
 #include "cxxpython/protocol.hpp"
+#include "internal/codecs.hpp"
 #include "internal/errors.hpp"
 
 #include <algorithm>
@@ -292,6 +293,40 @@ void invoke_native(Attachment &context, Handle function, const NativeFunctionObj
     validate_return(context, out);
 }
 
+[[gnu::cold, gnu::noinline]] void method_descriptor_error(Attachment &context,
+                                                          const MethodDescriptorObject &descriptor,
+                                                          std::optional<Value> receiver,
+                                                          ReturnSlot &out)
+{
+    RootScope roots(context);
+    ReturnSlot bytes(context), decoded(context);
+    make_bytes(context, context.payload<NativeFunctionObject>(descriptor.function).name, bytes);
+    if (raised(bytes)) {
+        out.raised(bytes.exception());
+        return;
+    }
+    detail::decode_primitive(context, roots.root(bytes.value()), detail::TextEncoding::Utf8,
+                             roots.root(context.builtin(CoreObject::None)), true, decoded);
+    if (raised(decoded)) {
+        out.raised(decoded.exception());
+        return;
+    }
+    const auto &name =
+        context.payload<StrObject>(context.payload<TupleObject>(decoded.value()).items[0]).value;
+    const auto owner = detail::diagnostic_type_name(context, roots.root(descriptor.owner));
+    if (!receiver) {
+        type_error(context, U"unbound method " + owner + U"." + name + U"() needs an argument",
+                   out);
+        return;
+    }
+    const auto actual =
+        detail::diagnostic_type_name(context, roots.root(context.type_of(*receiver)));
+    type_error(context,
+               U"descriptor '" + name + U"' for '" + owner + U"' objects doesn't apply to a '" +
+                   actual + U"' object",
+               out);
+}
+
 void invoke_method_descriptor(Attachment &context, Value callable, CallArgsView args,
                               std::optional<Value> receiver, ReturnSlot &out, RootScope &roots)
 {
@@ -299,7 +334,7 @@ void invoke_method_descriptor(Attachment &context, Value callable, CallArgsView 
     auto self = receiver ? receiver
                          : (args.positional.empty() ? std::optional<Value>{} : args.positional[0]);
     if (!self || !is_subtype(context, context.type_of(*self), descriptor.owner)) {
-        type_error(context, U"descriptor requires a compatible receiver", out);
+        method_descriptor_error(context, descriptor, self, out);
         return;
     }
     auto function = roots.root(descriptor.function);
@@ -659,7 +694,8 @@ void bind_native_callable(Attachment &context, Value callable, std::optional<Val
     if (context.type_of(callable) == context.builtin(CoreObject::MethodDescriptorType) &&
         !is_subtype(context, context.type_of(*receiver),
                     context.payload<MethodDescriptorObject>(callable).owner)) {
-        type_error(context, U"descriptor does not apply to this receiver", out);
+        method_descriptor_error(context, context.payload<MethodDescriptorObject>(callable),
+                                receiver, out);
         return;
     }
     RootScope roots(context);

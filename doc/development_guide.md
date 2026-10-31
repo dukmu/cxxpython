@@ -57,6 +57,44 @@ grammar and generation provenance are described in Tools/peg_generator/README.md
 Use `regen-parser` after grammar/backend changes and `parser-generated-check` to
 verify the checked-in output. Do not restore the removed handwritten parser.
 
+### Release IPO
+
+The basic build does not request interprocedural optimization. Enable it with
+CMake's standard Release property, not a separate runtime or project-specific mode:
+
+```sh
+cmake -S . -B .cache/build-ipo -DCMAKE_BUILD_TYPE=Release \
+    -DCMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE=ON \
+    -DCXXPYTHON_REFERENCE_PYTHON=/path/to/python3.12.14
+cmake --build .cache/build-ipo -j 4
+ctest --test-dir .cache/build-ipo -L native --output-on-failure -j 2
+ctest --test-dir .cache/build-ipo -R '^Extensions.ProductEntry$' --output-on-failure
+```
+
+The project runs [CheckIPOSupported](https://cmake.org/cmake/help/latest/module/CheckIPOSupported.html)
+for C and C++ before enabling the requested build; failure reports the actual
+compiler/archive/link error. Use a fresh build directory after completing or
+changing a toolchain: old CMake compiler-information files may retain missing
+archiver paths even when cache overrides are supplied.
+
+Strict Clang acceptance still uses 21.1.8 and -Werror. Clang's
+[ThinLTO](https://clang.llvm.org/docs/ThinLTO.html) needs matching llvm-ar/llvm-ranlib
+and a supporting linker. Point `CMAKE_C_COMPILER_AR`, `CMAKE_CXX_COMPILER_AR` and
+their `RANLIB` counterparts at the matching tools when necessary. For LLD, append
+`-fuse-ld=/path/to/ld.lld-21` through the Release `CMAKE_EXE_LINKER_FLAGS_RELEASE`,
+`CMAKE_MODULE_LINKER_FLAGS_RELEASE` and `CMAKE_SHARED_LINKER_FLAGS_RELEASE` settings,
+without removing the toolchain's other required flags. A constrained host can
+limit LLD backend parallelism with `-Wl,--thinlto-jobs=2`.
+Keep ordinary Debug/sanitizer configurations separate; a Release-only property
+does not turn on IPO for those configurations. Do not add fast-math, disable
+ownership checks or change object visibility to obtain a benchmark result.
+
+The `native` CTest label includes both discovered C++ test executables. The
+product-entry extension test uses the ordinary byte-exact Python fixture driver
+on `Tests/extensions/cases/`, with the built module directory supplied by CTest.
+These are cxxpython C-ABI tests, not CPython-compatible extension binaries, so
+they are separate from `Tests/cases/` and its pinned-reference registration.
+
 ## Formatting
 
 Use clang-format 14 and the repository's `.clang-format`: four-space indentation,

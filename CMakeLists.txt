@@ -11,6 +11,14 @@ set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 
+if(CMAKE_INTERPROCEDURAL_OPTIMIZATION OR CMAKE_INTERPROCEDURAL_OPTIMIZATION_RELEASE)
+    include(CheckIPOSupported)
+    check_ipo_supported(RESULT ipo_supported OUTPUT ipo_diagnostic LANGUAGES C CXX)
+    if(NOT ipo_supported)
+        message(FATAL_ERROR "IPO toolchain check failed:\n${ipo_diagnostic}")
+    endif()
+endif()
+
 find_package(Threads REQUIRED)
 find_package(OpenSSL 3.0 REQUIRED COMPONENTS Crypto)
 find_package(PkgConfig QUIET)
@@ -218,7 +226,7 @@ if(BUILD_TESTING)
     add_executable(test_parser Tests/cpp/test_parser.cpp Tests/cpp/test_tokenizer.cpp)
     target_link_libraries(test_parser PRIVATE cxxpython_parser GTest::gtest_main Threads::Threads)
     target_compile_options(test_parser PRIVATE -Wall -Wextra -Wpedantic -Werror)
-    gtest_discover_tests(test_parser PROPERTIES TIMEOUT ${CXXPYTHON_TEST_TIMEOUT})
+    gtest_discover_tests(test_parser PROPERTIES TIMEOUT ${CXXPYTHON_TEST_TIMEOUT} LABELS native)
 
     add_library(test_extension_static OBJECT Tests/extensions/example.c)
     target_include_directories(test_extension_static PRIVATE Include)
@@ -293,7 +301,7 @@ if(BUILD_TESTING)
     target_compile_definitions(test_runtime PRIVATE
         TEST_EXTENSION_DIRECTORY="${CMAKE_CURRENT_BINARY_DIR}/extension-fixtures")
     target_compile_options(test_runtime PRIVATE -Wall -Wextra -Wpedantic -Werror)
-    gtest_discover_tests(test_runtime PROPERTIES TIMEOUT ${CXXPYTHON_TEST_TIMEOUT})
+    gtest_discover_tests(test_runtime PROPERTIES TIMEOUT ${CXXPYTHON_TEST_TIMEOUT} LABELS native)
 
     find_package(Python3 COMPONENTS Interpreter REQUIRED)
     set(CXXPYTHON_REFERENCE_PYTHON "${Python3_EXECUTABLE}" CACHE FILEPATH
@@ -335,6 +343,12 @@ if(BUILD_TESTING)
         set(script_timeout ${CXXPYTHON_TEST_TIMEOUT})
     endif()
     math(EXPR script_runner_timeout "${script_timeout} + 10")
+    add_test(NAME Extensions.ProductEntry COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_cases.py
+        --binary $<TARGET_FILE:cxxpython>
+        --cases ${CMAKE_CURRENT_SOURCE_DIR}/Tests/extensions/cases --timeout ${script_timeout})
+    set_tests_properties(Extensions.ProductEntry PROPERTIES TIMEOUT ${script_runner_timeout}
+        ENVIRONMENT "CXXPYTHON_EXTENSION_FIXTURE=$<TARGET_FILE_DIR:test_extension_dynamic>")
     file(GLOB case_scripts CONFIGURE_DEPENDS
         "${CMAKE_CURRENT_SOURCE_DIR}/Tests/cases/*/test.py")
     foreach(script IN LISTS case_scripts)

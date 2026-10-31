@@ -122,9 +122,11 @@ TEST_F(StringFormat, ExplicitMethodsRejectNonStringReceiver)
     std::array args{receiver.get(context), argument.get(context)};
     ReturnSlot out(context);
     invoke(type, U"format", {args, {}}, out);
-    expect_error(out, CoreObject::TypeErrorType, U"str.format requires a str receiver");
+    expect_error(out, CoreObject::TypeErrorType,
+                 U"descriptor 'format' for 'str' objects doesn't apply to a 'int' object");
     invoke(type, U"__mod__", {args, {}}, out);
-    expect_error(out, CoreObject::TypeErrorType, U"str.__mod__ requires a str receiver");
+    expect_error(out, CoreObject::TypeErrorType,
+                 U"descriptor '__mod__' for 'str' objects doesn't apply to a 'int' object");
 }
 
 TEST_F(StringFormat, PercentIntegerTypesFlagsAndPrecision)
