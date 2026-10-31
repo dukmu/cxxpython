@@ -6,6 +6,8 @@
 #include "cxxpython/import.hpp"
 #include "cxxpython/protocol.hpp"
 #include "cxxpython/sreobject.hpp"
+#include "internal/errors.hpp"
+#include "internal/memoryformat.hpp"
 
 #include <algorithm>
 #include <array>
@@ -51,9 +53,33 @@ bool integer(Attachment &c, Handle value, std::ptrdiff_t &result, ReturnSlot &ou
 struct Subject {
     std::vector<std::uint32_t> text;
     bool bytes = false;
-    std::shared_ptr<MemoryViewExport> lease;
+    detail::BufferExport buffer;
     std::optional<std::size_t> version;
+    explicit Subject(Attachment &c) : buffer(c) {}
 };
+void subject_error(Attachment &c, Handle source, ReturnSlot &out)
+{
+    RootScope roots(c);
+    const auto name = detail::diagnostic_type_name(c, roots.root(c.type_of(source))).substr(0, 200);
+    raise_error(c, CoreObject::TypeErrorType,
+                U"expected string or bytes-like object, got '" + name + U"'", out);
+}
+void snapshot_subject(Attachment &c, Subject &subject)
+{
+    const auto &buffer = subject.buffer;
+    auto copy = [&](const std::string &data) {
+        for (std::size_t i = 0; i < buffer.length; ++i)
+            subject.text[i] = static_cast<unsigned char>(data[buffer.offset + i]);
+    };
+    if (auto storage = buffer.lease->storage) {
+        subject.version = storage_read(c, *storage, [&] {
+            if (subject.version != storage->version)
+                copy(storage->bytes);
+            return storage->version;
+        });
+    } else
+        copy(c.payload<BytesObject>(buffer.owner.value()).value);
+}
 bool read_subject(Attachment &c, Handle source, Subject &subject, ReturnSlot &out)
 {
     RootScope roots(c);
@@ -65,48 +91,22 @@ bool read_subject(Attachment &c, Handle source, Subject &subject, ReturnSlot &ou
         return true;
     }
     subject.bytes = true;
-    if (is_bytearray(c, source.get(c)))
-        subject.lease =
-            std::make_shared<MemoryViewExport>(c.payload<ByteArrayObject>(source).contents);
-    else if (c.has_layout<MemoryViewObject>(source.get(c)))
-        subject.lease = std::atomic_load_explicit(&c.payload<MemoryViewObject>(source).exported,
-                                                  std::memory_order_acquire);
-    std::string bytes;
-    for (;;) {
-        std::optional<std::size_t> before;
-        auto storage = subject.lease ? subject.lease->storage : nullptr;
-        if (storage)
-            before = storage_read(c, *storage, [&] { return storage->version; });
-        if (!detail::buffer_bytes(c, source, bytes, out)) {
-            if (out.tag() != ResultTag::Raised)
-                raise_error(c, CoreObject::TypeErrorType, U"expected string or bytes-like object",
-                            out);
-            return false;
-        }
-        if (!storage || storage_read(c, *storage, [&] { return storage->version; }) == *before) {
-            subject.version = before;
-            break;
-        }
-        c.poll();
+    if (!detail::export_buffer(c, source, subject.buffer, out) ||
+        (subject.buffer.count != 1 &&
+         subject.buffer.stride !=
+             static_cast<std::int64_t>(detail::memory_format_size(subject.buffer.format.back())))) {
+        subject_error(c, source, out);
+        return false;
     }
-    subject.text.reserve(bytes.size());
-    for (unsigned char value : bytes)
-        subject.text.push_back(value);
+    subject.text.resize(subject.buffer.length);
+    snapshot_subject(c, subject);
     return true;
 }
-bool refresh_subject(Attachment &c, Handle source, Subject &subject, ReturnSlot &out)
+void refresh_subject(Attachment &c, Subject &subject)
 {
-    if (!subject.lease || !subject.lease->storage)
-        return true;
-    auto storage = subject.lease->storage;
-    const auto version = storage_read(c, *storage, [&] { return storage->version; });
-    if (subject.version == version)
-        return true;
-    Subject replacement;
-    if (!read_subject(c, source, replacement, out))
-        return false;
-    subject = std::move(replacement);
-    return true;
+    // The held direct export survives release of the original subject wrapper.
+    if (subject.buffer.lease && subject.buffer.lease->storage)
+        snapshot_subject(c, subject);
 }
 bool compatible(Attachment &c, Handle pattern, const Subject &subject, ReturnSlot &out)
 {
@@ -211,7 +211,7 @@ void pattern_match(Attachment &c, Handle, std::span<const Value> args, ReturnSlo
 {
     RootScope roots(c);
     auto pattern = roots.root(args[0]), source = roots.root(args[1]);
-    Subject subject;
+    Subject subject(c);
     std::ptrdiff_t pos, end;
     if (!bounds(c, args, subject, pos, end, out))
         return;
@@ -223,13 +223,16 @@ void make_scanner(Attachment &c, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto pattern = roots.root(args[0]), source = roots.root(args[1]);
-    Subject subject;
+    Subject subject(c);
     std::ptrdiff_t pos, end;
     if (!bounds(c, args, subject, pos, end, out))
         return;
     c.allocate_instance<SreScannerObject>(
         roots.root(c.builtin(CoreObject::SreScannerType)), out, pattern.get(c), source.get(c), pos,
-        end, std::move(subject.lease), std::move(subject.text), subject.version);
+        end, subject.buffer.lease,
+        subject.bytes ? subject.buffer.owner.value() : c.builtin(CoreObject::None),
+        subject.bytes ? subject.buffer.exporter.value() : c.builtin(CoreObject::None),
+        subject.buffer.offset, std::move(subject.text), subject.version);
 }
 template <bool Iterator>
 void scanner(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
@@ -270,10 +273,14 @@ void scanner_next(Attachment &c, Handle, std::span<const Value> args, ReturnSlot
         return;
     }
     auto pattern = roots.root(scanner.pattern), source = roots.root(scanner.string);
-    Subject subject;
+    Subject subject(c);
     subject.text = std::move(scanner.text);
-    subject.bytes = scanner.lease != nullptr || !c.has_layout<StrObject>(scanner.string);
-    subject.lease = scanner.lease;
+    subject.bytes = scanner.lease != nullptr;
+    subject.buffer.owner.ok(scanner.buffer_owner);
+    subject.buffer.exporter.ok(scanner.buffer_exporter);
+    subject.buffer.lease = scanner.lease;
+    subject.buffer.offset = scanner.offset;
+    subject.buffer.length = subject.text.size();
     subject.version = scanner.version;
     struct Restore {
         SreScannerObject &scanner;
@@ -284,8 +291,7 @@ void scanner_next(Attachment &c, Handle, std::span<const Value> args, ReturnSlot
             scanner.version = subject.version;
         }
     } restore{scanner, subject};
-    if (!refresh_subject(c, source, subject, out))
-        return;
+    refresh_subject(c, subject);
     Captures captures;
     if (!execute(c, pattern, subject, scanner.cursor, scanner.endpos, Search, false,
                  scanner.must_advance, captures, out)) {
@@ -303,7 +309,7 @@ void scan_list(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &o
 {
     RootScope roots(c);
     auto pattern = roots.root(args[0]), source = roots.root(args[1]);
-    Subject subject;
+    Subject subject(c);
     std::ptrdiff_t pos = 0, end, limit = 0;
     if constexpr (Split) {
         if (!integer(c, roots.root(args[2]), limit, out) ||
@@ -483,7 +489,7 @@ void substitute(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &
             replacement = roots.root(out.value());
         }
     }
-    Subject subject;
+    Subject subject(c);
     if (!read_subject(c, source, subject, out) || !compatible(c, pattern, subject, out))
         return;
     const auto end = static_cast<std::ptrdiff_t>(subject.text.size());
@@ -520,8 +526,7 @@ void substitute(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &
         previous = pos = mark.second;
         advance = mark.first == mark.second;
         ++count;
-        if (!refresh_subject(c, source, subject, out))
-            return;
+        refresh_subject(c, subject);
         c.poll();
     }
     if (previous < end) {
@@ -684,8 +689,10 @@ void sre_slice(Attachment &c, Handle source, std::ptrdiff_t begin, std::ptrdiff_
         make_bytes(c, std::move(bytes), out);
     } else {
         std::string bytes;
-        if (!buffer_bytes(c, source, bytes, out))
+        if (!buffer_bytes(c, source, bytes, out)) {
+            subject_error(c, source, out);
             return;
+        }
         begin = std::min(begin, static_cast<std::ptrdiff_t>(bytes.size()));
         end = std::min(end, static_cast<std::ptrdiff_t>(bytes.size()));
         make_bytes(c, bytes.substr(begin, end - begin), out);

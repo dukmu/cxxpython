@@ -61,6 +61,18 @@ unaligned accesses. Runtime/Python callbacks execute outside storage locks.
 The complete buffer-format/exporter/PEP 688 matrix remains a requirement, not
 emulated by iterable conversion or an unrooted pointer.
 
+Native BufferExport owns separate precise roots for the underlying data and the
+actual exporter, plus a scoped native lease and immutable format/shape metadata.
+Direct exports on a memoryview increment its native export counter under a short
+per-view commit; release refuses a nonzero counter. Independent view copies do
+not count as direct parent exports. The counter's shared native lifetime permits
+lease destruction without dereferencing managed storage. PickleBuffer retains
+the original exporter and its lease, reusing that boundary for raw views, I/O and
+buffer-consuming operations; it does not create a second buffer ownership model.
+Its native _pickle module supplies the primitive, not a C++ replacement for the
+upstream Python serializer. Multidimensional/general-extension exporters remain
+part of the unfinished full buffer matrix.
+
 Native SRE patterns own immutable validated instructions and traced source/group
 metadata. Each operation has independent C scratch, bounded GC polling and full
 cleanup before propagating errors; no Python RC or execution-wide lock is used.
@@ -739,6 +751,17 @@ fallbacks, including in-place operations; __index__ runs only at the sequence
 stage. Inherited native sequence definitions retain this role, while assigning
 the same callable to an unrelated Python class uses ordinary method semantics.
 This classification belongs to the callable definition, not a VM list special case.
+
+Ordinary native type methods publish owner-bearing MethodDescriptorObjects;
+protocol lookup preserves their native/sequence role and invokes the underlying
+entry through the normal binder. Native static/class wrappers retain their own
+binding rule. Global native functions have traced atomic module-owner and module
+metadata edges. Successful native initialization associates newly exported
+functions with that actual module before completing its import lease; re-exported
+functions keep their original association. Mutable __module__ values are separate
+from the fixed module owner, not derived by scanning sys.modules. Callable
+reductions use ordinary names/getattr with precise roots, not a pickle-specific
+registry of C function addresses.
 
 ## Code, Frames And Closures
 

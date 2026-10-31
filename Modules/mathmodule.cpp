@@ -6,6 +6,7 @@
 #include "cxxpython/moduleobject.hpp"
 #include "internal/long.hpp"
 #include "internal/math_integer.hpp"
+#include "internal/math_reductions.hpp"
 
 #include <array>
 #include <cmath>
@@ -610,5 +611,7 @@ void initialize_math(Attachment &c, Handle module, ReturnSlot &out)
             return;
     }
     initialize_math_integer(c, module, out);
+    if (out.tag() != ResultTag::Raised)
+        initialize_math_reductions(c, module, out);
 }
 } // namespace cxxpython::core::detail

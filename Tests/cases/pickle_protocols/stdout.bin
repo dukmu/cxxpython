@@ -1,0 +1,8 @@
+protocol limits 4 5
+roundtrip 3 19 True
+roundtrip 4 19 True
+roundtrip 5 19 True
+roundtrip 1 19 True
+roundtrip 2 19 True
+roundtrip 0 19 True
+protocol defaults True

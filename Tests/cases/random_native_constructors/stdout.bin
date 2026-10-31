@@ -1,0 +1,28 @@
+explicit new 625 True 0.0 0 5
+new ignores arguments 625 True 0.0 0 5
+subclass new 625 True 0.0 0 5
+inherited init True
+override arguments ((1, 2), {'seed': 3})
+override does not seed 625 True 0.0 0 5
+explicit base init None True
+forwarded keywords True
+base keywords TypeError Random() takes no keyword arguments
+inherited keywords TypeError Random() takes no keyword arguments
+aliased keywords TypeError Random() takes no keyword arguments
+base arity TypeError Random() requires 0 or 1 argument
+keyword before arity TypeError Random() takes no keyword arguments
+explicit base keywords TypeError Random() takes no keyword arguments
+explicit inherited keywords TypeError Random() takes no keyword arguments
+override base arity TypeError Random() requires 0 or 1 argument
+rejection preserves state True
+changed initializer None True
+restored inherited initializer TypeError Random() takes no keyword arguments
+constructor hash True ['hash']
+new has no callbacks [] 0
+explicit init hash None True ['hash']
+default init None True 624
+constructor failure RuntimeError seed failure
+explicit init failure RuntimeError seed failure
+failed conversion preserves state True
+failure callbacks ['hash', 'broken hash', 'broken hash']
+integer subclass True

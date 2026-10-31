@@ -1,0 +1,16 @@
+empty (b'', 0) ('', 0)
+latin1 literal True
+wide and surrogates b'\\u0100\\u20ac\\ud800\\udfff\\uffff\\U00010000\\U0010ffff'
+backslashes b'\\n\\t\\x41\\123\\N{SPACE}' '\\n\\t\\x41\\123\\N{SPACE}'
+backslashes b'\\' '\\'
+backslashes b'\\\\u0041' '\\\\u0041'
+backslashes b'\\\\\\u0041' '\\\\A'
+alias raw-unicode-escape raw-unicode-escape
+alias raw_unicode_escape raw-unicode-escape
+alias RAW Unicode Escape raw-unicode-escape
+alias  raw---unicode---escape  raw-unicode-escape
+buffers True
+text input ('Ã©', 2) ('A', 6)
+unused error name (b'\\u0100\\u20ac\\ud800\\udfff\\uffff\\U00010000\\U0010ffff', 7) ('plain', 5)
+not an alias rawunicodeescape
+not an alias raw_unicode.escape

@@ -3,6 +3,7 @@
 #include "cxxpython/protocol.hpp"
 #include "internal/bytesmethods.hpp"
 #include "internal/codecs.hpp"
+#include "internal/errors.hpp"
 
 #include <algorithm>
 #include <bit>
@@ -185,16 +186,6 @@ void create(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
             finish(c.payload<BytesObject>(out.value()).value);
         return;
     }
-    if (is_bytearray(c, source.get(c))) {
-        finish(detail::bytearray_snapshot(c, source));
-        return;
-    }
-    if (c.has_layout<MemoryViewObject>(source.get(c))) {
-        std::string data;
-        if (detail::buffer_bytes(c, source, data, out, false))
-            finish(std::move(data));
-        return;
-    }
     if (c.has_layout<StrObject>(source.get(c))) {
         raise_error(c, CoreObject::TypeErrorType, U"string argument without an encoding", out);
         return;
@@ -227,12 +218,21 @@ void create(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
         }
         if (!is_subtype(c, c.type_of(out.exception()), c.builtin(CoreObject::TypeErrorType)))
             return;
+        out.reset(c);
     }
+    // bytes_new_impl handles __bytes__, strings and index conversion first;
+    // PyBytes_FromObject then tries a full buffer before iterable conversion.
+    std::string data;
+    if (detail::buffer_bytes(c, source, data, out, false)) {
+        finish(std::move(data));
+        return;
+    }
+    if (failed(out))
+        return;
     get_iter(c, source, out);
     if (failed(out))
         return;
     const auto iterator = roots.root(out.value());
-    std::string data;
     ReturnSlot item(c), number(c);
     for (;;) {
         const auto status = iter_next(c, iterator, item);
@@ -390,12 +390,33 @@ void add(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
-    if (!is_bytes(c, args[1])) {
-        raise_error(c, CoreObject::TypeErrorType, U"can only concatenate bytes-like objects", out);
+    RootScope roots(c);
+    const auto self = roots.root(args[0]), other = roots.root(args[1]);
+    std::string data, extra;
+    // CPython bytes_concat requests simple contiguous buffers, not __bytes__
+    // conversion, and replaces buffer acquisition errors with its concat error.
+    if (!detail::buffer_bytes(c, self, data, out) || !detail::buffer_bytes(c, other, extra, out)) {
+        const auto name = [&](Handle value) {
+            return detail::diagnostic_type_name(c, roots.root(c.type_of(value))).substr(0, 100);
+        };
+        raise_error(c, CoreObject::TypeErrorType,
+                    U"can't concat " + name(other) + U" to " + name(self), out);
         return;
     }
-    make_bytes(c, c.payload<BytesObject>(args[0]).value + c.payload<BytesObject>(args[1]).value,
-               out);
+    if (data.empty() && c.type_of(other) == c.builtin(CoreObject::BytesType)) {
+        out.ok(other.get(c));
+        return;
+    }
+    if (extra.empty() && c.type_of(self) == c.builtin(CoreObject::BytesType)) {
+        out.ok(self.get(c));
+        return;
+    }
+    if (extra.size() > data.max_size() - data.size()) {
+        out.raised(c.builtin(CoreObject::MemoryError));
+        return;
+    }
+    data += extra;
+    make_bytes(c, std::move(data), out);
 }
 void repeat(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
 {

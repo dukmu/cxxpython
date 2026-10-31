@@ -1,0 +1,17 @@
+4.0
+['s.iter', 's.next', 'a.float', 's.next', 'b.float', 's.next']
+5.0
+['a.float', 'b.float']
+5.0
+['p.iter', 'p.next', 'p.next', 'p.next', 'q.iter', 'q.next', 'q.next', 'q.next', 'px.float', 'qx.float', 'py.float', 'qy.float']
+23
+['p.iter', 'q.iter', 'p.next', 'q.next', 'p.next', 'q.next', 'p.next', 'q.next']
+Inputs are not the same length
+['p.iter', 'q.iter', 'p.next', 'q.next']
+LookupError conversion
+ValueError both points must have the same number of dimensions
+['before.float', 'fail.float']
+iteration
+iteration
+iteration
+iteration

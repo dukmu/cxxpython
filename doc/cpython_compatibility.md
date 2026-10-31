@@ -691,9 +691,11 @@ the target is `builtins` and the `__builtins__` execution namespace.
   ordinary special methods; int reuses its exact identity conversion for
   __trunc__/__floor__/__ceil__, including huge values and native subclass contents.
   Float exposes the same protocols with arbitrary-precision results and
-  NaN/infinity errors. Native integer work
-  owns its operands in NativeWait. Remaining math APIs include pow/atan2, scaled
-  norms/distance, accurate summation/products, isclose, erf/erfc and nextafter/ulp;
+  NaN/infinity errors. Native integer work owns its operands in NativeWait.
+  Native fsum/prod/sumprod/hypot/dist now retain accurate summation/scaling,
+  exact integer and generic numeric-protocol behavior, iterator errors and length
+  checks, with collecting callbacks and shared-worker fixtures. Remaining math
+  APIs include pow/atan2, isclose, erf/erfc and nextafter/ulp;
   complete accuracy/error/performance matrices are still acceptance gates.
 
 ## Random And Date Policy
@@ -726,6 +728,38 @@ the target is `builtins` and the `__builtins__` execution namespace.
   conversion/indexing overrides. Empty affixes, surrogates/NUL and descriptor/
   argument errors have direct fixtures; the bytes/bytearray counterparts remain
   part of the unfinished primitive-method matrix.
+
+## Pickle And Native Buffer Exports
+
+- Lib/pickle.py, _compat_pickle.py and encodings/raw_unicode_escape.py are
+  unchanged pinned 3.12.14 sources. Actual dump/load and file interfaces,
+  protocols 0-5, alias/cycle memo handling, reducers/state/newargs, persistent IDs,
+  buffer callbacks and error paths execute as Python policy. The native _pickle
+  module supplies PickleBuffer, not a fake or partial C++ serializer accelerator.
+  Full upstream suites, historical malformed-stream matrices and every native
+  object's reduction remain acceptance work.
+- PickleBuffer and memoryview use the existing native storage leases. Direct
+  exports pin the actual exporter and data owner separately; memoryview.release
+  rejects live direct exports. Raw views preserve obj identity, readonly state
+  and native-format storage; noncontiguous raw extraction raises BufferError.
+  Weakrefs and immediate release, callback/GC/I/O and shared exports have fixtures.
+  Independent view copies retain their normal parent-release behavior. Full
+  multidimensional/general-extension/PEP 688 support remains a requirement.
+- SRE operations and scanners retain the acquired exporter/data roots and lease,
+  including mutable versions after the original PickleBuffer is released. They
+  do not reacquire a released wrapper or silently freeze mutable subjects.
+- Native callables expose actual names/qualified names, module/self metadata and
+  ordinary name/getattr reductions. Module references are explicit traced atomic
+  fields associated at native initialization, not inferred from global aliases.
+  Ordinary type methods use owner-bearing descriptors; native static/class
+  wrappers unwrap a rooted read without changing their stored callable. Full
+  builtin-method type/reflection and cold initializer/reload matrices remain work.
+- raw-unicode-escape supplies the real protocol-0 dependency, including streaming,
+  incremental boundaries, errors and collecting replacement callbacks. Buffer
+  concatenation follows bytes/bytearray families rather than __bytes__ coercion;
+  constructors retain numeric/hook precedence. Float accepts actual contiguous
+  buffers and bytearray subclasses use their actual type name in repr. These fix
+  primitive seams, not pickle-specific input branches.
 
 The configured source-tree stdlib path is development configuration, not final
 installation, isolation, environment or embedding acceptance. Full stdio/runpy,

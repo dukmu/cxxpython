@@ -458,6 +458,17 @@ void initialize_codecs(Attachment &ctx, Handle module, ReturnSlot &out)
             !install((std::string(name) + "_decode").c_str(), decode_signature, decode))
             return;
     }
+    auto raw_encode_signature = unary;
+    raw_encode_signature.parameters.push_back(
+        {U"errors", ParameterKind::PositionalOnly, ctx.builtin(CoreObject::None)});
+    auto raw_decode_signature = raw_encode_signature;
+    raw_decode_signature.parameters.push_back(
+        {U"final", ParameterKind::PositionalOnly, ctx.builtin(CoreObject::True)});
+    if (!install("raw_unicode_escape_encode", raw_encode_signature,
+                 primitive<TextEncoding::RawUnicodeEscape, true>) ||
+        !install("raw_unicode_escape_decode", raw_decode_signature,
+                 primitive<TextEncoding::RawUnicodeEscape, false>))
+        return;
     auto extended_signature = encode_signature;
     extended_signature.parameters.push_back(
         {U"byteorder", ParameterKind::PositionalOnly, ctx.builtin(CoreObject::IntZero)});

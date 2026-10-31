@@ -24,6 +24,7 @@
 #ifdef CXXPYTHON_HAVE_READLINE
 #include "internal/readlinemodule.hpp"
 #endif
+#include "internal/picklemodule.hpp"
 #include "internal/posixmodule.hpp"
 #include "internal/randommodule.hpp"
 #include "internal/stdio.hpp"
@@ -269,6 +270,7 @@ detail::ImportState::ImportState()
                                      {U"_operator", detail::initialize_operator},
                                      {U"time", detail::initialize_time},
                                      {U"math", detail::initialize_math},
+                                     {U"_pickle", detail::initialize_pickle},
                                      {U"_random", detail::initialize_random},
                                      {U"_opcode", detail::initialize_opcode},
 #ifdef CXXPYTHON_HAVE_READLINE

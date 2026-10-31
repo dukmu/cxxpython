@@ -300,7 +300,11 @@ void static_get(Attachment &context, Handle, std::span<const Value> args, Return
         type_error(context, U"__get__(None, None) is invalid", out);
         return;
     }
-    context.load(args[0], context.payload<StaticMethodObject>(args[0]).callable, out);
+    const auto &wrapper = context.payload<StaticMethodObject>(args[0]);
+    context.load(args[0], wrapper.callable, out);
+    if (out.tag() == ResultTag::Ok && wrapper.native &&
+        context.has_layout<MethodDescriptorObject>(out.value()))
+        out.ok(context.payload<MethodDescriptorObject>(out.value()).function);
     if (out.tag() == ResultTag::Empty)
         raise_error(context, CoreObject::RuntimeErrorType, U"uninitialized staticmethod object",
                     out);
@@ -321,7 +325,11 @@ void class_get(Attachment &context, Handle, std::span<const Value> args, ReturnS
         owner = context.type_of(args[1]);
     RootScope roots(context);
     ReturnSlot loaded(context);
-    context.load(args[0], context.payload<ClassMethodObject>(args[0]).callable, loaded);
+    const auto &wrapper = context.payload<ClassMethodObject>(args[0]);
+    context.load(args[0], wrapper.callable, loaded);
+    if (loaded.tag() == ResultTag::Ok && wrapper.native &&
+        context.has_layout<MethodDescriptorObject>(loaded.value()))
+        loaded.ok(context.payload<MethodDescriptorObject>(loaded.value()).function);
     if (loaded.tag() == ResultTag::Empty) {
         raise_error(context, CoreObject::RuntimeErrorType, U"uninitialized classmethod object",
                     out);
@@ -344,7 +352,11 @@ void static_call(Attachment &context, Handle, std::span<const Value> args, Retur
     RootScope roots(context);
     auto named = keywords(context, args[2], roots);
     ReturnSlot loaded(context);
-    context.load(args[0], context.payload<StaticMethodObject>(args[0]).callable, loaded);
+    const auto &wrapper = context.payload<StaticMethodObject>(args[0]);
+    context.load(args[0], wrapper.callable, loaded);
+    if (loaded.tag() == ResultTag::Ok && wrapper.native &&
+        context.has_layout<MethodDescriptorObject>(loaded.value()))
+        loaded.ok(context.payload<MethodDescriptorObject>(loaded.value()).function);
     if (loaded.tag() == ResultTag::Empty) {
         raise_error(context, CoreObject::RuntimeErrorType, U"uninitialized staticmethod object",
                     out);

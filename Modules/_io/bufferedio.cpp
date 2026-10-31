@@ -448,7 +448,7 @@ void readinto(Attachment &c, Handle h, std::span<const Value> a, ReturnSlot &out
     RootScope roots(c);
     auto self = roots.root(a[0]);
     auto target = roots.root(a[1]);
-    detail::WritableBuffer buffer(c);
+    detail::BufferExport buffer(c);
     if (!detail::writable_buffer(c, target, buffer, out))
         return;
     ReturnSlot length(c), result(c);

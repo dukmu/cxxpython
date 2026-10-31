@@ -1,6 +1,8 @@
 #include "cxxpython/floatobject.hpp"
 #include "cxxpython/complexobject.hpp"
+#include "cxxpython/memoryobject.hpp"
 #include "cxxpython/protocol.hpp"
+#include "internal/errors.hpp"
 #include "internal/long.hpp"
 
 #include <charconv>
@@ -178,15 +180,35 @@ void float_new(Attachment &context, Handle, std::span<const Value> args, ReturnS
             else {
                 auto slot = resolve_protocol(context, roots.root(context.type_of(input)),
                                              Protocol::Index, roots);
-                if (slot.state == SlotState::Missing && context.has_layout<StrObject>(value) &&
-                    is_subtype(context, context.type_of(value),
-                               context.builtin(CoreObject::StrType))) {
-                    if (!detail::parse_float(context.payload<StrObject>(value).value, number)) {
-                        raise_error(context, CoreObject::ValueErrorType, U"invalid float literal",
-                                    out);
+                if (slot.state == SlotState::Missing) {
+                    std::u32string text;
+                    bool literal = context.has_layout<StrObject>(value) &&
+                                   is_subtype(context, context.type_of(value),
+                                              context.builtin(CoreObject::StrType));
+                    if (literal)
+                        text = context.payload<StrObject>(value).value;
+                    else {
+                        std::string bytes;
+                        literal = detail::buffer_bytes(context, input, bytes, out);
+                        for (unsigned char byte : bytes)
+                            text.push_back(byte);
+                    }
+                    if (literal) {
+                        if (!detail::parse_float(text, number)) {
+                            raise_error(context, CoreObject::ValueErrorType,
+                                        U"invalid float literal", out);
+                            return;
+                        }
+                        context.allocate_instance<FloatObject>(cls, out, number);
                         return;
                     }
-                    context.allocate_instance<FloatObject>(cls, out, number);
+                    type_error(context,
+                               U"float() argument must be a string or a real number, not '" +
+                                   detail::diagnostic_type_name(context,
+                                                                roots.root(context.type_of(input)))
+                                       .substr(0, 200) +
+                                   U"'",
+                               out);
                     return;
                 }
                 index(context, input, converted);

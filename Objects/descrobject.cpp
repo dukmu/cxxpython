@@ -1,3 +1,4 @@
+#include "cxxpython/moduleobject.hpp"
 #include "cxxpython/protocol.hpp"
 #include "internal/codecs.hpp"
 
@@ -22,6 +23,10 @@ void native_name(Attachment &context, Value value, ReturnSlot &out)
     const auto self = roots.root(value);
     ReturnSlot bytes(context), decoded(context);
     make_bytes(context, context.payload<NativeFunctionObject>(self).name, bytes);
+    if (bytes.tag() == ResultTag::Raised) {
+        out.raised(bytes.exception());
+        return;
+    }
     detail::decode_primitive(context, roots.root(bytes.value()), detail::TextEncoding::Utf8,
                              roots.root(context.builtin(CoreObject::None)), true, decoded);
     if (decoded.tag() == ResultTag::Raised)
@@ -34,11 +39,74 @@ void native_self(Attachment &context, Value value, ReturnSlot &out)
     const auto &function = context.payload<NativeFunctionObject>(value);
     if (function.bound_self)
         out.ok(*function.bound_self);
-    else if (function.binding == NativeFunctionBinding::Function)
-        out.ok(context.builtin(CoreObject::None));
-    else
+    else if (function.binding == NativeFunctionBinding::Function) {
+        context.load(value, function.module_owner, out);
+        if (out.tag() == ResultTag::Empty)
+            out.ok(context.builtin(CoreObject::None));
+    } else
         raise_error(context, CoreObject::AttributeErrorType,
                     U"unbound method descriptor has no __self__", out);
+}
+void qualified_native_name(Attachment &context, Handle receiver, Handle name, ReturnSlot &out)
+{
+    RootScope roots(context);
+    const auto type = roots.root(context.has_layout<TypeObject>(receiver.get(context))
+                                     ? receiver.get(context)
+                                     : context.type_of(receiver));
+    ReturnSlot key(context), qualified(context);
+    make_str(context, U"__qualname__", key);
+    if (key.tag() == ResultTag::Raised) {
+        out.raised(key.exception());
+        return;
+    }
+    get_attribute(context, type, roots.root(key.value()), qualified);
+    if (qualified.tag() == ResultTag::Raised) {
+        out.raised(qualified.exception());
+        return;
+    }
+    if (!context.has_layout<StrObject>(qualified.value()) ||
+        !is_subtype(context, context.type_of(qualified.value()),
+                    context.builtin(CoreObject::StrType))) {
+        type_error(context, U"<method>.__class__.__qualname__ is not a unicode object", out);
+        return;
+    }
+    auto text = context.payload<StrObject>(qualified.value()).value;
+    text += U".";
+    text += context.payload<StrObject>(name).value;
+    make_str(context, std::move(text), out);
+}
+void native_qualname(Attachment &context, Value value, ReturnSlot &out)
+{
+    RootScope roots(context);
+    const auto self = roots.root(value);
+    ReturnSlot name(context);
+    native_name(context, value, name);
+    if (name.tag() == ResultTag::Raised) {
+        out.raised(name.exception());
+        return;
+    }
+    const auto &function = context.payload<NativeFunctionObject>(self);
+    if (!function.bound_self || is_module(context, *function.bound_self))
+        out.ok(name.value());
+    else
+        qualified_native_name(context, roots.root(*function.bound_self), roots.root(name.value()),
+                              out);
+}
+void native_module(Attachment &context, Value receiver, ReturnSlot &out)
+{
+    context.load(receiver, context.payload<NativeFunctionObject>(receiver).module_name, out);
+    if (out.tag() == ResultTag::Empty)
+        out.ok(context.builtin(CoreObject::None));
+}
+void native_module_set(Attachment &context, Value receiver, std::optional<Value> value,
+                       ReturnSlot &out)
+{
+    context.store(receiver, context.payload<NativeFunctionObject>(receiver).module_name, value);
+    out.ok(context.builtin(CoreObject::None));
+}
+void descriptor_module(Attachment &context, Value, ReturnSlot &out)
+{
+    raise_error(context, CoreObject::AttributeErrorType, U"__module__", out);
 }
 void property_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
@@ -230,6 +298,11 @@ template <class T> void descriptor_name(Attachment &context, Value value, Return
 {
     out.ok(context.payload<T>(value).name);
 }
+template <>
+void descriptor_name<MethodDescriptorObject>(Attachment &context, Value value, ReturnSlot &out)
+{
+    native_name(context, context.payload<MethodDescriptorObject>(value).function, out);
+}
 template <class T> void descriptor_owner(Attachment &context, Value value, ReturnSlot &out)
 {
     out.ok(context.payload<T>(value).owner);
@@ -243,6 +316,8 @@ template <class T> void descriptor_qualname(Attachment &context, Value value, Re
     if (out.tag() == ResultTag::Ok)
         return;
     make_str(context, U"__qualname__", out);
+    if (out.tag() == ResultTag::Raised)
+        return;
     get_attribute(context, roots.root(field.owner), roots.root(out.value()), out);
     if (out.tag() == ResultTag::Raised)
         return;
@@ -254,8 +329,16 @@ template <class T> void descriptor_qualname(Attachment &context, Value value, Re
     }
     auto result = context.payload<StrObject>(out.value()).value;
     result += U".";
-    result += context.payload<StrObject>(field.name).value;
+    ReturnSlot name(context);
+    descriptor_name<T>(context, self.get(context), name);
+    if (name.tag() == ResultTag::Raised) {
+        out.raised(name.exception());
+        return;
+    }
+    result += context.payload<StrObject>(name.value()).value;
     make_str(context, std::move(result), out);
+    if (out.tag() == ResultTag::Raised)
+        return;
     if (!context.compare_exchange(self.get(context), field.qualname, {}, out.value()))
         context.load(self.get(context), field.qualname, out);
 }
@@ -561,17 +644,77 @@ void method_receiver(Attachment &context, Value receiver, ReturnSlot &out)
 {
     out.ok(context.payload<BoundMethodObject>(receiver).self);
 }
+void method_qualname(Attachment &context, Value receiver, ReturnSlot &out)
+{
+    RootScope roots(context);
+    const auto self = roots.root(receiver);
+    const auto &method = context.payload<BoundMethodObject>(self);
+    const auto function = roots.root(method.function);
+    const bool native = method.native;
+    ReturnSlot key(context), name(context);
+    make_str(context, native ? U"__name__" : U"__qualname__", key);
+    if (key.tag() == ResultTag::Raised) {
+        out.raised(key.exception());
+        return;
+    }
+    get_attribute(context, function, roots.root(key.value()), name);
+    if (name.tag() == ResultTag::Raised) {
+        out.raised(name.exception());
+        return;
+    }
+    if (native)
+        qualified_native_name(context, roots.root(method.self), roots.root(name.value()), out);
+    else
+        out.ok(name.value());
+}
+void method_module(Attachment &context, Value receiver, ReturnSlot &out)
+{
+    RootScope roots(context);
+    const auto &method = context.payload<BoundMethodObject>(receiver);
+    const auto function = roots.root(method.function);
+    if (method.native) {
+        context.load(receiver, method.module_name, out);
+        if (out.tag() == ResultTag::Empty)
+            out.ok(context.builtin(CoreObject::None));
+        return;
+    }
+    ReturnSlot key(context);
+    make_str(context, U"__module__", key);
+    if (key.tag() == ResultTag::Raised) {
+        out.raised(key.exception());
+        return;
+    }
+    get_attribute(context, function, roots.root(key.value()), out);
+}
+void method_module_set(Attachment &context, Value receiver, std::optional<Value> value,
+                       ReturnSlot &out)
+{
+    auto &method = context.payload<BoundMethodObject>(receiver);
+    if (!method.native) {
+        raise_error(context, CoreObject::AttributeErrorType,
+                    U"'method' object has no writable __module__", out);
+        return;
+    }
+    context.store(receiver, method.module_name, value);
+    out.ok(context.builtin(CoreObject::None));
+}
 void static_function(Attachment &context, Value receiver, ReturnSlot &out)
 {
-    context.load(receiver, context.payload<StaticMethodObject>(receiver).callable, out);
+    const auto &wrapper = context.payload<StaticMethodObject>(receiver);
+    context.load(receiver, wrapper.callable, out);
     if (out.tag() == ResultTag::Empty)
         out.ok(context.builtin(CoreObject::None));
+    else if (wrapper.native && context.has_layout<MethodDescriptorObject>(out.value()))
+        out.ok(context.payload<MethodDescriptorObject>(out.value()).function);
 }
 void class_function(Attachment &context, Value receiver, ReturnSlot &out)
 {
-    context.load(receiver, context.payload<ClassMethodObject>(receiver).callable, out);
+    const auto &wrapper = context.payload<ClassMethodObject>(receiver);
+    context.load(receiver, wrapper.callable, out);
     if (out.tag() == ResultTag::Empty)
         out.ok(context.builtin(CoreObject::None));
+    else if (wrapper.native && context.has_layout<MethodDescriptorObject>(out.value()))
+        out.ok(context.payload<MethodDescriptorObject>(out.value()).function);
 }
 void cell_contents(Attachment &context, Value receiver, ReturnSlot &out)
 {
@@ -804,6 +947,15 @@ void install_attribute_descriptors(Attachment &context, std::span<const Handle> 
                   descriptor_owner<MemberDescriptorObject>, nullptr);
     install_field(context, descriptor_type, string_type, member_type, U"__qualname__",
                   descriptor_qualname<MemberDescriptorObject>, nullptr);
+    const auto method_descriptor = at(CoreObject::MethodDescriptorType);
+    install_field(context, descriptor_type, string_type, method_descriptor, U"__name__",
+                  descriptor_name<MethodDescriptorObject>, nullptr);
+    install_field(context, descriptor_type, string_type, method_descriptor, U"__objclass__",
+                  descriptor_owner<MethodDescriptorObject>, nullptr);
+    install_field(context, descriptor_type, string_type, method_descriptor, U"__qualname__",
+                  descriptor_qualname<MethodDescriptorObject>, nullptr);
+    install_field(context, descriptor_type, string_type, method_descriptor, U"__module__",
+                  descriptor_module, nullptr);
     install_field(context, descriptor_type, string_type, property_type, U"fget",
                   property_field<&PropertyObject::getter>, nullptr);
     install_field(context, descriptor_type, string_type, property_type, U"fset",
@@ -842,10 +994,18 @@ void install_attribute_descriptors(Attachment &context, std::span<const Handle> 
                   U"__func__", method_function, nullptr);
     install_field(context, descriptor_type, string_type, at(CoreObject::BoundMethodType),
                   U"__self__", method_receiver, nullptr);
+    install_field(context, descriptor_type, string_type, at(CoreObject::BoundMethodType),
+                  U"__qualname__", method_qualname, nullptr);
+    install_field(context, descriptor_type, string_type, at(CoreObject::BoundMethodType),
+                  U"__module__", method_module, method_module_set);
     install_field(context, descriptor_type, string_type, at(CoreObject::NativeFunctionType),
                   U"__self__", native_self, nullptr);
     install_field(context, descriptor_type, string_type, at(CoreObject::NativeFunctionType),
                   U"__name__", native_name, nullptr);
+    install_field(context, descriptor_type, string_type, at(CoreObject::NativeFunctionType),
+                  U"__qualname__", native_qualname, nullptr);
+    install_field(context, descriptor_type, string_type, at(CoreObject::NativeFunctionType),
+                  U"__module__", native_module, native_module_set);
     install_field(context, descriptor_type, string_type, at(CoreObject::BaseExceptionType),
                   U"__dict__", instance_dict_get, instance_dict_set);
     install_field(context, descriptor_type, string_type, at(CoreObject::StaticMethodType),

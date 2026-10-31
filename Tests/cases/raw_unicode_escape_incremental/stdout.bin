@@ -1,0 +1,17 @@
+partial b'prefix\\' ('prefix', 6)
+final b'prefix\\' ('prefix\\', 7)
+partial b'A\\u12' ('A', 1)
+final b'A\\u12' ('A�', 5)
+partial b'A\\U0001f' ('A', 1)
+final b'A\\U0001f' ('A�', 8)
+partial b'A\\uZ' ('A�Z', 4)
+final b'A\\uZ' ('A�Z', 4)
+partial b'\\\\' ('\\\\', 2)
+final b'\\\\' ('\\\\', 2)
+partial b'\\u0041' ('A', 6)
+final b'\\u0041' ('A', 6)
+all split points 26
+buffered state (b'\\u12', 0)
+final incomplete '�'
+incremental encoder and iterator True
+stream roundtrip True

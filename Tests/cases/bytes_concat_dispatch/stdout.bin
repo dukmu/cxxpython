@@ -1,0 +1,11 @@
+reflected reflected
+inplace fallback reflected
+reflected reflected
+inplace fallback reflected
+calls ['bytes', 'bytes', 'bytearray', 'bytearray']
+buffer after reflected callback b'xy!'
+mutable after reflected callback bytearray(b'xy!')
+subtype priority bytes subclass reflected bytearray subclass reflected
+direct bypasses reflection b'xy' bytearray(b'xy')
+RuntimeError reflected failure
+RuntimeError reflected failure

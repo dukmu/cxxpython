@@ -386,10 +386,10 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     define(CoreObject::SreTemplateType, "SRE_Template", LayoutDescriptor::of<SreTemplateObject>());
     define(CoreObject::CallIteratorType, "callable_iterator",
            LayoutDescriptor::of<CallIteratorObject>());
-    for (auto id :
-         {CoreObject::FunctionType, CoreObject::ModuleType, CoreObject::CodeType,
-          CoreObject::GeneratorType, CoreObject::CoroutineType, CoreObject::SetType,
-          CoreObject::FrozenSetType, CoreObject::GenericAliasType, CoreObject::AsyncGeneratorType})
+    for (auto id : {CoreObject::FunctionType, CoreObject::ModuleType, CoreObject::CodeType,
+                    CoreObject::GeneratorType, CoreObject::CoroutineType, CoreObject::SetType,
+                    CoreObject::FrozenSetType, CoreObject::GenericAliasType,
+                    CoreObject::AsyncGeneratorType, CoreObject::MemoryViewType})
         context.payload<TypeObject>(at(id)).instance_layout.fields.weakrefs = true;
     for (auto id :
          {CoreObject::TupleType, CoreObject::BytesType, CoreObject::IntType, CoreObject::BoolType})

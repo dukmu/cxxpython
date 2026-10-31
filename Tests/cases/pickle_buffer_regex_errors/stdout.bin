@@ -1,0 +1,9 @@
+strided view TypeError expected string or bytes-like object, got 'memoryview'
+strided pickle buffer TypeError expected string or bytes-like object, got 'pickle.PickleBuffer'
+strided substitution TypeError expected string or bytes-like object, got 'pickle.PickleBuffer'
+empty strided view TypeError expected string or bytes-like object, got 'memoryview'
+released TypeError expected string or bytes-like object, got 'pickle.PickleBuffer'
+pattern kind TypeError cannot use a string pattern on a bytes-like object
+typed contiguous byte length True
+singleton or empty (0, 1)
+singleton or empty (0, 0)

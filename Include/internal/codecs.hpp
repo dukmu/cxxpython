@@ -3,7 +3,18 @@
 #include "cxxpython/objects.hpp"
 
 namespace cxxpython::core::detail {
-enum class TextEncoding { Utf8, Ascii, Latin1, Utf16, Utf16LE, Utf16BE, Utf32, Utf32LE, Utf32BE };
+enum class TextEncoding {
+    Utf8,
+    Ascii,
+    Latin1,
+    Utf16,
+    Utf16LE,
+    Utf16BE,
+    Utf32,
+    Utf32LE,
+    Utf32BE,
+    RawUnicodeEscape
+};
 void encode_primitive(Attachment &, Handle text, TextEncoding, Handle errors, ReturnSlot &);
 void decode_primitive(Attachment &, Handle bytes, TextEncoding, Handle errors, bool final,
                       ReturnSlot &);

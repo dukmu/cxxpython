@@ -1,5 +1,72 @@
 # Development Status
 
+## 2026-10-31 Pickle, Direct Buffer Leases And Callable Metadata
+
+Prepended after the independently committed Android TLS fix 62a12b7. The previous
+goal turn made progress through a72b21f; this turn continues the actual Plan 2
+Base-to-Full and N4-N6/M0-M9 scope, not completion of the full active objective.
+Terra supplied upstream pickle/codec policy, native math/codecs/sequence/callable
+work and direct fixtures. Parent implemented PickleBuffer/direct exports, module
+association, observed primitive fixes, binding cleanup and final integration.
+All workers are closed; normal shared-heap execution remains genuinely parallel.
+
+- Added unchanged pinned CPython 3.12.14 pickle.py, _compat_pickle.py and
+  encodings/raw_unicode_escape.py, checked by direct source comparisons. Actual
+  protocols 0-5, memo/alias/cycles, state/reducers/newargs, persistent IDs,
+  dump/load/file interfaces, buffer callbacks and failures execute through the
+  Python serializer. _pickle supplies the real native PickleBuffer primitive,
+  not an alternate serializer or import-only facade.
+- BufferExport owns exporter/data roots, immutable format/shape data and the
+  existing native storage lease. Direct memoryview exports use one native
+  per-view counter/short mutex so release cannot race an export commit. Token
+  destruction only touches independently owned native storage/counters, never a
+  managed exporter. Independent view copies retain their distinct semantics.
+  PickleBuffer/raw views preserve exporter identity, readonly/typed/strided
+  data, weakrefs and immediate release; no unreachable temporary managed view
+  postpones the actual lease release until GC. Memoryview weakrefs are now enabled
+  in its bootstrap layout. Raw I/O callbacks cannot release an exported target.
+- SRE operations/scanners reuse held data/exporter roots and native leases.
+  Version refresh follows that snapshot after releasing the original PickleBuffer,
+  rather than reacquiring the released wrapper or freezing mutable source data.
+  Callback/GC, scanner retention, mutation, noncontiguous and error paths have
+  direct fixed-reference fixtures.
+- Ordinary native type methods publish owner-bearing method descriptors, retaining
+  native/sequence dispatch roles. Callable names/qualified names, __module__ and
+  __self__ use actual traced references; successful native initialization binds
+  exported functions to that module, preserving reexports and explicit metadata.
+  Generic name/getattr reductions cover native functions, methods and descriptors
+  without a registry of native addresses or guessed global aliases. Initial
+  allocation-failure testing detected a lazy binding helper that rewrote native
+  class/static wrappers during reads. It was removed: reads now unwrap only their
+  rooted result, preserving stored identity and the strict live-set assertions.
+- Native fsum/prod/sumprod/hypot/dist adapt the pinned algorithms, including
+  accurate/scaled floating arithmetic, exact integers, generic numeric protocols,
+  iterator/conversion callbacks and errors. Raw-unicode-escape implements actual
+  lookup/primitive/incremental/stream behavior and collecting error callbacks.
+  Bytes/bytearray buffer concatenation and constructors retain upstream hook/
+  index/iteration precedence and result families. Native Random construction now
+  follows the observed zero-state/new/init/inheritance/keyword rules. Actual
+  integration failures also exposed float(bytes) and bytearray-subclass repr gaps;
+  these are fixed at their primitive boundaries, not special-cased for pickle.
+- Strict Clang 21.1.8 Release, ASan/UBSan/LSan and TSan builds pass. All 33 new
+  direct scenarios have passing product/reference evidence; all 12 directly
+  related existing buffer/I/O/construction/reflection scenarios pass on Release
+  and both sanitizer builds. The same 153 affected native call/descriptor/type/
+  protocol/GC/buffer/codec/weakref/extension contracts pass in all three builds.
+  Final Release also passes all 24 bootstrap/promotion and split cold-import/
+  concurrent-lease tests. Earlier failing runs are retained; only affected checks
+  were repeated after corrections. Formatting, whitespace and ASDL/244-rule
+  consistency pass. Evidence remains in .cache/pickle-* and worker logs; the
+  separate Android cross-link evidence remains in .cache/android-readline-tls/.
+  No new performance baseline, checksum system or manual measurement table was
+  added. The user deletion of temporary_plan.md remains excluded.
+- Remaining acceptance includes complete upstream pickle/native-object/state and
+  malformed-stream matrices, general/multidimensional/PEP 688 buffers, exact
+  builtin-method type/reflection and cold native-init/reload behavior, the rest
+  of math and numeric libraries, requested socket/ctypes/pdb/test capabilities,
+  full product/extension/platform gates and N6 absolute performance. The full
+  frontend/import/library/product and N4-N6/M0-M9 objective stays active.
+
 ## 2026-10-31 Android ARM Executable TLS Alignment
 
 Prepended after a72b21f without rewriting earlier entries. The user reported

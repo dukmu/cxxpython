@@ -49,7 +49,8 @@ constexpr std::size_t N = 624, M = 397;
 struct RandomState {
     std::mutex mutex;
     std::array<std::uint32_t, N> state{};
-    std::size_t index = N;
+    // PyType_GenericNew zeroes the uninitialized state, including its index.
+    std::size_t index = 0;
 };
 struct RandomObject {
     ObjectHeader header;
@@ -201,6 +202,39 @@ void seed(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
     const auto state = c.payload<RandomObject>(self).state;
     locked(c, state, [&](RandomState &instance) { seed_array(instance, key); });
     out.ok(c.builtin(CoreObject::None));
+}
+
+void initialize(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!receiver(c, args[0], out))
+        return;
+    RootScope roots(c);
+    const auto self = roots.root(args[0]);
+    const auto positional = roots.root(args[1]);
+    const auto keywords = roots.root(args[2]);
+    const auto base = roots.root(c.payload<NativeFunctionObject>(function).captures[0]);
+    const auto type = roots.root(c.type_of(self.get(c)));
+    if (dictionary_size(c, keywords.get(c)) != 0) {
+        const auto initializer = find_type_attribute(c, type.get(c), U"__init__");
+        const bool inherited =
+            initializer && (c.has_layout<MethodDescriptorObject>(initializer->value)
+                                ? c.payload<MethodDescriptorObject>(initializer->value).function
+                                : initializer->value) == function.get(c);
+        // CPython random_init rejects keywords only for the base type or a
+        // subtype whose effective tp_init is still this native initializer.
+        if (type.get(c) == base.get(c) || inherited) {
+            raise_error(c, CoreObject::TypeErrorType, U"Random() takes no keyword arguments", out);
+            return;
+        }
+    }
+    const auto count = c.payload<TupleObject>(positional).items.size();
+    if (count > 1) {
+        raise_error(c, CoreObject::TypeErrorType, U"Random() requires 0 or 1 argument", out);
+        return;
+    }
+    const std::array seed_args{self.get(c), count ? c.payload<TupleObject>(positional).items[0]
+                                                  : c.builtin(CoreObject::None)};
+    seed(c, {}, seed_args, out);
 }
 
 void random_value(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
@@ -384,7 +418,7 @@ void initialize_random(Attachment &c, Handle module, ReturnSlot &out)
     c.allocate_instance<StrObject>(core[static_cast<std::size_t>(CoreObject::StrType)], key,
                                    U"__new__");
     name_store(c, dictionary, key.value(), wrapper.value());
-    install_native_attribute(c, core, type, U"__init__", optional, seed);
+    install_native_attribute(c, core, type, U"__init__", constructor, initialize, {type.get(c)});
     install_native_attribute(c, core, type, U"seed", optional, seed);
     install_native_attribute(c, core, type, U"random", unary, random_value);
     install_native_attribute(c, core, type, U"getrandbits", binary, getrandbits);

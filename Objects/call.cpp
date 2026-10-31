@@ -316,7 +316,8 @@ void invoke_special_impl(Attachment &context, Handle self, Handle target, CallAr
     if ((type == context.builtin(CoreObject::NativeFunctionType) &&
          context.payload<NativeFunctionObject>(descriptor).binding ==
              NativeFunctionBinding::Descriptor) ||
-        type == context.builtin(CoreObject::FunctionType))
+        type == context.builtin(CoreObject::FunctionType) ||
+        type == context.builtin(CoreObject::MethodDescriptorType))
         invoke(context, target, args, receiver, out, preparation);
     else {
         ReturnSlot bound(context);
@@ -387,7 +388,7 @@ void invoke(Attachment &context, Handle target, CallArgsView args, std::optional
             type_error(context, U"descriptor requires a compatible receiver", out);
             return;
         }
-        invoke(context, roots.root(descriptor.function), args, receiver, out, preparation);
+        invoke_native(context, roots.root(descriptor.function), args, receiver, out);
         return;
     }
     auto attribute = type_attribute(context, context.type_of(callable), U"__call__");
@@ -645,7 +646,8 @@ void bind_native_callable(Attachment &context, Value callable, std::optional<Val
     }
     RootScope roots(context);
     context.allocate_instance<BoundMethodObject>(
-        roots.root(context.builtin(CoreObject::BoundMethodType)), out, callable, *receiver);
+        roots.root(context.builtin(CoreObject::BoundMethodType)), out, callable, *receiver,
+        context.type_of(callable) != context.builtin(CoreObject::FunctionType));
 }
 void function_get(Attachment &context, Handle wrapper, std::span<const Value> args, ReturnSlot &out)
 {
@@ -775,6 +777,12 @@ void install_native_attribute(Attachment &context, std::span<const Handle> core,
         NativeFunctionBinding::Descriptor,
         name == U"__new__" ? std::optional<Value>{owner.get(context)} : std::nullopt);
     auto callable = roots.root(function.value());
+    if (name != U"__new__") {
+        context.allocate_instance<MethodDescriptorObject>(at(CoreObject::MethodDescriptorType),
+                                                          function, callable.get(context),
+                                                          owner.get(context));
+        callable = roots.root(function.value());
+    }
     ReturnSlot key(context);
     context.allocate_instance<StrObject>(at(CoreObject::StrType), key, std::move(name));
     name_store(context, *TypeView(context, owner).dictionary(), key.value(), callable.get(context));

@@ -1,0 +1,12 @@
+buffer bytes 12.5
+buffer bytearray 12.5
+buffer memoryview 12.5
+buffer PickleBuffer 12.5
+precedence 4.5 7.0
+invalid literal bytes
+invalid literal bytes
+invalid literal bytearray
+invalid literal memoryview
+unsupported object
+unsupported memoryview
+released view rejected

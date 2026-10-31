@@ -2,6 +2,7 @@
 #include "cxxpython/memoryobject.hpp"
 #include "cxxpython/protocol.hpp"
 #include "internal/codecs.hpp"
+#include "internal/errors.hpp"
 
 #include <algorithm>
 #include <limits>
@@ -275,18 +276,28 @@ void initialize(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &
             return;
         }
         auto slot = resolve_protocol(c, roots.root(c.type_of(source)), Protocol::Index, roots);
+        bool counted = false;
         if (slot.state != SlotState::Missing) {
             std::int64_t count;
-            if (!integer(c, source, count, out))
-                return;
-            if (count < 0) {
-                raise_error(c, CoreObject::ValueErrorType, U"negative count", out);
-                return;
+            if (integer(c, source, count, out)) {
+                if (count < 0) {
+                    raise_error(c, CoreObject::ValueErrorType, U"negative count", out);
+                    return;
+                }
+                if (static_cast<std::uint64_t>(count) > data.max_size())
+                    throw std::bad_alloc();
+                data.resize(static_cast<std::size_t>(count), '\0');
+                counted = true;
+            } else {
+                if (!is_subtype(c, c.type_of(out.exception()),
+                                c.builtin(CoreObject::TypeErrorType)))
+                    return;
+                out.reset(c);
             }
-            if (static_cast<std::uint64_t>(count) > data.max_size())
-                throw std::bad_alloc();
-            data.resize(static_cast<std::size_t>(count), '\0');
-        } else if (!iterable(c, source, data, out))
+        }
+        // iterable() first requests a full buffer, propagating acquisition
+        // errors; unsupported objects alone fall back to iteration.
+        if (!counted && !iterable(c, source, data, out))
             return;
     }
     if (!mutate(
@@ -303,7 +314,12 @@ void representation(Attachment &c, Handle, std::span<const Value> args, ReturnSl
     char quote =
         data.find('\'') != std::string::npos && data.find('"') == std::string::npos ? '"' : '\'';
     constexpr char hex[] = "0123456789abcdef";
-    std::u32string text = U"bytearray(b";
+    TypeView type(c, c.type_of(args[0]));
+    const auto name = type.name();
+    std::u32string text = std::holds_alternative<Value>(name)
+                              ? c.payload<StrObject>(std::get<Value>(name)).value
+                              : std::get<std::u32string>(name);
+    text += U"(b";
     text += quote;
     for (unsigned char b : data) {
         if (b == '\\' || b == quote) {
@@ -643,13 +659,22 @@ void add(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
     if (!receiver(c, args[0], out))
         return;
     RootScope roots(c);
-    auto self = roots.root(args[0]);
+    auto self = roots.root(args[0]), source = roots.root(args[1]);
+    std::optional<detail::BufferExport> exported;
+    bool supported = true;
+    if constexpr (Inplace) {
+        // Keep the source export until after resizing, as bytearray_iconcat
+        // does. In particular, a nonempty self-concat cannot resize itself.
+        exported.emplace(c);
+        supported = detail::export_buffer(c, source, *exported, out);
+    }
     std::string other;
-    if (!buffer(c, roots.root(args[1]), other, out)) {
-        if (failed(out))
-            return;
+    if (!supported || !detail::buffer_bytes(c, source, other, out)) {
+        const auto name = [&](Handle value) {
+            return detail::diagnostic_type_name(c, roots.root(c.type_of(value))).substr(0, 100);
+        };
         raise_error(c, CoreObject::TypeErrorType,
-                    U"can't concat non-bytes-like object to bytearray", out);
+                    U"can't concat " + name(source) + U" to " + name(self), out);
         return;
     }
     if constexpr (Inplace) {
@@ -658,6 +683,10 @@ void add(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
         out.ok(self.get(c));
     } else {
         auto data = snapshot(c, self).data;
+        if (other.size() > data.max_size() - data.size()) {
+            out.raised(c.builtin(CoreObject::MemoryError));
+            return;
+        }
         data += other;
         make_bytearray(c, std::move(data), out);
     }

@@ -1,0 +1,16 @@
+len len len
+encode encode encode
+object.__new__ True __new__
+__new__ True
+list.append True append
+append True
+dict.fromkeys True fromkeys
+fromkeys True
+append list.append list False
+True True append True
+join str.join str False
+True True join True
+List.append
+RenamedList.append
+True target target result
+method name

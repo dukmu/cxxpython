@@ -1,0 +1,6 @@
+in band writable True
+out of band alias and readonly True
+missing buffers True
+missing buffers True
+old protocol rejected True
+released buffer rejected True

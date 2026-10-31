@@ -77,6 +77,8 @@ void SignatureLayout::trace(Tracer &tracer) const noexcept
 void NativeFunctionObject::trace(Tracer &tracer) const noexcept
 {
     signature.trace(tracer);
+    tracer.visit(module_owner);
+    tracer.visit(module_name);
     if (sequence_owner)
         tracer.visit(*sequence_owner);
     if (bound_self)

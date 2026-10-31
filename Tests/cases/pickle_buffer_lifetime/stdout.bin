@@ -1,0 +1,11 @@
+parent pinned True
+raw pins parent True
+parent pinned True
+raw pins parent True
+typed export and release 9
+noncontiguous raw rejected True
+immediate lease release bytearray(b'abcd')
+released export rejected
+released export rejected
+released export rejected
+subclass rejected

@@ -308,6 +308,22 @@ void execute_definition(Attachment &context,
     else if (out.tag() == ResultTag::Ok && out.value() != context.builtin(CoreObject::None))
         raise_error(context, CoreObject::TypeErrorType, U"module initializer must return None",
                     out);
+    if (out.tag() != ResultTag::Ok)
+        return;
+    RootScope roots(context);
+    const auto dictionary = roots.root(module_dict(context, module.get(context)));
+    const auto name = roots.root(name_lookup(context, dictionary.get(context), U"__name__")
+                                     .value_or(context.builtin(CoreObject::None)));
+    DictView exports(context, dictionary.get(context));
+    for (const auto &item : exports.entries()) {
+        if (!context.has_layout<NativeFunctionObject>(item.value))
+            continue;
+        auto &function = context.payload<NativeFunctionObject>(item.value);
+        if (function.binding != NativeFunctionBinding::Function || function.bound_self)
+            continue;
+        if (context.compare_exchange(item.value, function.module_owner, {}, module.get(context)))
+            context.compare_exchange(item.value, function.module_name, {}, name.get(context));
+    }
 }
 void loader_arguments(Attachment &context, const std::u32string &name,
                       const std::shared_ptr<const ModuleDefinition> &definition, ReturnSlot &out)

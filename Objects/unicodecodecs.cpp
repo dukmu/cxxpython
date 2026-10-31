@@ -12,7 +12,7 @@
 
 namespace cxxpython::core {
 namespace {
-enum class Encoding { Utf8, Ascii, Latin1, Utf16, Utf32, Charmap };
+enum class Encoding { Utf8, Ascii, Latin1, Utf16, Utf32, Charmap, RawUnicodeEscape };
 enum class Handler {
     Strict,
     Ignore,
@@ -75,6 +75,8 @@ bool options(Attachment &ctx, Handle encoding, Handle errors, Encoding &codec, H
              normalized == U"iso8859" || normalized == U"iso_8859_1_1987" ||
              normalized == U"iso_ir_100" || normalized == U"cp819" || normalized == U"ibm819")
         codec = Encoding::Latin1;
+    else if (normalized == U"raw_unicode_escape" && name.find(U'.') == std::u32string::npos)
+        codec = Encoding::RawUnicodeEscape;
     else {
         raise_error(ctx, CoreObject::LookupErrorType, U"unknown encoding: " + name, out);
         return false;
@@ -106,12 +108,13 @@ bool options(Attachment &ctx, Handle encoding, Handle errors, Encoding &codec, H
 
 const char32_t *codec_name(Encoding codec)
 {
-    return codec == Encoding::Utf8     ? U"utf-8"
-           : codec == Encoding::Ascii  ? U"ascii"
-           : codec == Encoding::Latin1 ? U"latin-1"
-           : codec == Encoding::Utf16  ? U"utf-16"
-           : codec == Encoding::Utf32  ? U"utf-32"
-                                       : U"charmap";
+    return codec == Encoding::Utf8               ? U"utf-8"
+           : codec == Encoding::Ascii            ? U"ascii"
+           : codec == Encoding::Latin1           ? U"latin-1"
+           : codec == Encoding::Utf16            ? U"utf-16"
+           : codec == Encoding::Utf32            ? U"utf-32"
+           : codec == Encoding::RawUnicodeEscape ? U"rawunicodeescape"
+                                                 : U"charmap";
 }
 
 // The tuple, source object and each field remain rooted across every allocation.
@@ -429,6 +432,18 @@ void detail::encode_text(Attachment &ctx, Handle text, Handle encoding, Handle e
     std::string result;
     std::u32string unused;
     auto input = ctx.payload<StrObject>(source.get(ctx)).value;
+    if (codec == Encoding::RawUnicodeEscape) {
+        // CPython 3.12.14 PyUnicode_AsRawUnicodeEscapeString; PSF license.
+        // Latin-1, including backslashes, is literal; only wider ordinals escape.
+        for (char32_t ch : input) {
+            if (ch < 0x100)
+                result.push_back(static_cast<char>(ch));
+            else
+                append_escape(result, ch);
+        }
+        make_bytes(ctx, std::move(result), out);
+        return;
+    }
     for (std::size_t i = 0;;) {
         if (i >= input.size())
             break;
@@ -517,6 +532,15 @@ void detail::decode_bytes(Attachment &ctx, Handle bytes, Handle encoding, Handle
             registry_transform(ctx, bytes, encoding, errors, false, out);
         else
             out.raised(option_result.exception());
+        return;
+    }
+    if (codec == Encoding::RawUnicodeEscape) {
+        ReturnSlot temp(ctx);
+        decode_primitive(ctx, bytes, TextEncoding::RawUnicodeEscape, errors, true, temp);
+        if (temp.tag() == ResultTag::Raised)
+            out.raised(temp.exception());
+        else
+            out.ok(ctx.payload<TupleObject>(temp.value()).items[0]);
         return;
     }
     RootScope roots(ctx);
@@ -649,6 +673,8 @@ const char32_t *primitive_name(detail::TextEncoding encoding)
         return U"ascii";
     case detail::TextEncoding::Latin1:
         return U"latin-1";
+    case detail::TextEncoding::RawUnicodeEscape:
+        return U"raw-unicode-escape";
     default:
         return nullptr;
     }
@@ -803,6 +829,11 @@ void detail::builtin_codec_error(Attachment &ctx, std::u32string_view name, Hand
     if (!encode && !decode) {
         raise_error(ctx, CoreObject::TypeErrorType, U"codec error handler requires a Unicode error",
                     out);
+        return;
+    }
+    if (decode && (name == U"xmlcharrefreplace" || name == U"namereplace")) {
+        raise_error(ctx, CoreObject::TypeErrorType,
+                    U"don't know how to handle UnicodeDecodeError in error callback", out);
         return;
     }
     RootScope roots(ctx);
@@ -1038,6 +1069,16 @@ void detail::decode_primitive(Attachment &ctx, Handle bytes, TextEncoding encodi
                               bool final, ReturnSlot &out)
 {
     RootScope input_roots(ctx);
+    if (encoding == TextEncoding::RawUnicodeEscape && string_value(ctx, bytes.get(ctx))) {
+        ReturnSlot temp(ctx);
+        encode_primitive(ctx, bytes, TextEncoding::Utf8,
+                         input_roots.root(ctx.builtin(CoreObject::None)), temp);
+        if (temp.tag() == ResultTag::Raised) {
+            out.raised(temp.exception());
+            return;
+        }
+        bytes = input_roots.root(ctx.payload<TupleObject>(temp.value()).items[0]);
+    }
     if (!is_bytes(ctx, bytes.get(ctx))) {
         std::string materialized;
         ReturnSlot temp(ctx);
@@ -1051,6 +1092,85 @@ void detail::decode_primitive(Attachment &ctx, Handle bytes, TextEncoding encodi
         }
         make_bytes(ctx, std::move(materialized), temp);
         bytes = input_roots.root(temp.value());
+    }
+    if (encoding == TextEncoding::RawUnicodeEscape) {
+        if (errors.get(ctx) != ctx.builtin(CoreObject::None) &&
+            !string_value(ctx, errors.get(ctx))) {
+            raise_error(ctx, CoreObject::TypeErrorType, U"errors must be a string", out);
+            return;
+        }
+        // Adapted from CPython 3.12.14's stateful raw Unicode escape decoder;
+        // see Objects/unicodeobject.c and doc/licenses/python-3.12.14.txt (PSF).
+        RootScope roots(ctx);
+        auto source = roots.root(bytes.get(ctx));
+        auto input = ctx.payload<BytesObject>(source).value;
+        std::u32string result;
+        std::string unused;
+        std::size_t position = 0;
+        std::size_t consumed = input.size();
+        while (position < input.size()) {
+            auto ch = static_cast<unsigned char>(input[position++]);
+            if (ch != '\\') {
+                result.push_back(ch);
+                continue;
+            }
+            const auto start = position - 1;
+            if (position == input.size()) {
+                if (!final) {
+                    consumed = start;
+                    break;
+                }
+                result.push_back(U'\\');
+                continue;
+            }
+            const auto marker = input[position++];
+            if (marker != 'u' && marker != 'U') {
+                result.push_back(U'\\');
+                result.push_back(static_cast<unsigned char>(marker));
+                continue;
+            }
+            unsigned remaining = marker == 'u' ? 4 : 8;
+            const char32_t *reason =
+                marker == 'u' ? U"truncated \\uXXXX escape" : U"truncated \\UXXXXXXXX escape";
+            char32_t ordinal = 0;
+            while (remaining && position < input.size()) {
+                const auto digit = static_cast<unsigned char>(input[position]);
+                unsigned value;
+                if (digit >= '0' && digit <= '9')
+                    value = digit - '0';
+                else if (digit >= 'a' && digit <= 'f')
+                    value = digit - 'a' + 10;
+                else if (digit >= 'A' && digit <= 'F')
+                    value = digit - 'A' + 10;
+                else
+                    break;
+                ordinal = (ordinal << 4) | value;
+                ++position;
+                --remaining;
+            }
+            if (remaining && position == input.size() && !final) {
+                consumed = start;
+                break;
+            }
+            if (!remaining) {
+                if (ordinal <= 0x10ffff) {
+                    result.push_back(ordinal);
+                    continue;
+                }
+                reason = U"\\Uxxxxxxxx out of range";
+            }
+            const auto previous_source = source.get(ctx);
+            if (!apply_codec_error(ctx, roots, false, Encoding::RawUnicodeEscape, source, errors,
+                                   start, position, reason, unused, result, position, out, -1))
+                return;
+            if (source.get(ctx) != previous_source)
+                input = ctx.payload<BytesObject>(source).value;
+        }
+        ReturnSlot temp(ctx);
+        make_str(ctx, std::move(result), temp);
+        auto value = roots.root(temp.value());
+        primitive_result(ctx, value, consumed, out);
+        return;
     }
     if (wide_encoding(encoding)) {
         RootScope roots(ctx);

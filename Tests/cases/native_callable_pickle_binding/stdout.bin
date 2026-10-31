@@ -1,0 +1,16 @@
+True
+True
+True [3]
+incompatible receiver
+incompatible receiver
+[('a', 7), ('b', 7)]
+[('a', 7)]
+258 b'ab'
+[1, 2, 3]
+{97: 98}
+{97: 98}
+True
+Python classmethod preserves descriptor validation
+[1, 2] [1, 1] (1, 2, 1, 2) aa b'aa'
+3 3 True
+reflected override

@@ -1,0 +1,36 @@
+fsum 0.0 0.0
+fsum 0.0 0.0
+fsum 1.0 1.0
+fsum 1.0 1.0
+fsum 1.0000000000000002e+16 1.0000000000000002e+16
+fsum 9007199254740991.0 9007199254740991.0
+fsum 9007199254740994.0 9007199254740994.0
+fsum 1e-100 1e-100
+fsum 8.4e-323 8.4e-323
+partials 1.3305602063564798e+292
+prod 1 362880 24.0
+exact prod True
+start True
+empty start identity True
+generic sequence product abababababab
+sumprod 0 140
+dot rounding 1.0
+dot bools 1.0
+dot cancellation 2.0
+product residual -5.551115123125783e-17
+exact dot True
+integer overflow True
+mixed fallback 0.0
+complex dot (6+7j)
+norm 0.0 0.0
+norm 0.0 0.0
+norm 5.0 5.0
+norm 2.179449471770337 2.179449471770337
+norm 5e-300 5e-300
+norm 5e+300 5e+300
+norm 2.5e-323 2.5e-323
+norm 1.4142135623730951e+308 1.4142135623730951e+308
+norm inf inf
+norm 5.744562646538029 5.744562646538029
+norm correction 1311414010.745593
+norm correction 1083100401.2914965

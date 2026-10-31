@@ -1,0 +1,21 @@
+strict b'pre\\u12' rawunicodeescape 3 7 truncated \uXXXX escape 'rawunicodeescape' codec can't decode bytes in position 3-6: truncated \uXXXX escape
+ignore 'pre' 7
+replace 'pre�' 7
+backslashreplace 'pre\\x5c\\x75\\x31\\x32' 7
+strict b'[\\u12Z4]' rawunicodeescape 1 5 truncated \uXXXX escape 'rawunicodeescape' codec can't decode bytes in position 1-4: truncated \uXXXX escape
+ignore '[Z4]' 8
+replace '[�Z4]' 8
+backslashreplace '[\\x5c\\x75\\x31\\x32Z4]' 8
+strict b'\\U00110000' rawunicodeescape 0 10 \Uxxxxxxxx out of range 'rawunicodeescape' codec can't decode bytes in position 0-9: \Uxxxxxxxx out of range
+ignore '' 10
+replace '�' 10
+backslashreplace '\\x5c\\x55\\x30\\x30\\x31\\x31\\x30\\x30\\x30\\x30' 10
+strict b'\\Uffffffff' rawunicodeescape 0 10 \Uxxxxxxxx out of range 'rawunicodeescape' codec can't decode bytes in position 0-9: \Uxxxxxxxx out of range
+ignore '' 10
+replace '�' 10
+backslashreplace '\\x5c\\x55\\x66\\x66\\x66\\x66\\x66\\x66\\x66\\x66' 10
+inapplicable surrogatepass UnicodeDecodeError
+inapplicable surrogateescape UnicodeDecodeError
+inapplicable xmlcharrefreplace TypeError
+inapplicable namereplace TypeError
+missing handler True

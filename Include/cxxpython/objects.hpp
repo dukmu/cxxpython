@@ -306,6 +306,8 @@ struct NativeFunctionObject {
     const std::optional<Value> sequence_owner;
     const NativeFunctionBinding binding;
     const std::optional<Value> bound_self;
+    // Explicit native-module association; neither edge changes call arguments.
+    AtomicGcEdge module_owner, module_name;
     NativeFunctionObject(InitialType head, std::string name_in, SignatureLayout signature_in,
                          NativeEntry entry_in, std::vector<Value> captures_in,
                          std::optional<Value> sequence = {},
@@ -322,6 +324,7 @@ struct MethodDescriptorObject {
     ObjectHeader header;
     const Value function;
     const Value owner;
+    AtomicGcEdge qualname;
     MethodDescriptorObject(InitialType head, Value function_in, Value owner_in)
         : header(head), function(function_in), owner(owner_in)
     {}
@@ -329,19 +332,23 @@ struct MethodDescriptorObject {
     {
         tracer.visit(function);
         tracer.visit(owner);
+        tracer.visit(qualname);
     }
 };
 struct BoundMethodObject {
     ObjectHeader header;
     const Value function;
     const Value self;
-    BoundMethodObject(InitialType head, Value function_in, Value self_in)
-        : header(head), function(function_in), self(self_in)
+    const bool native;
+    AtomicGcEdge module_name;
+    BoundMethodObject(InitialType head, Value function_in, Value self_in, bool native_in = false)
+        : header(head), function(function_in), self(self_in), native(native_in)
     {}
     void trace(Tracer &tracer) const noexcept
     {
         tracer.visit(function);
         tracer.visit(self);
+        tracer.visit(module_name);
     }
 };
 using NativeGetter = void (*)(Attachment &, Value, ReturnSlot &);

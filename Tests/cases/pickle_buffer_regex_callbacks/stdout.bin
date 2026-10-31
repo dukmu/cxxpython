@@ -1,0 +1,4 @@
+callback mutation and release (b'X 12 X', [(0, 2), (6, 8)])
+collecting callback workers [True, True, True] []
+callback exception replacement failed
+exception releases export True

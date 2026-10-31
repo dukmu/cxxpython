@@ -1,0 +1,8 @@
+initial (0, 2) b'ab'
+released subject refresh (6, 8) True
+group reexports original True
+scanner blocks resize
+scanner blocks exporter release
+scanner releases exporter b'_ab XY ef_!'
+immutable owner spans [(0, 3), (4, 7)]
+immutable exporter collected True

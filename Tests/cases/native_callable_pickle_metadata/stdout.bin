@@ -1,0 +1,15 @@
+builtins _codecs
+builtins _codecs
+3 b'text'
+None None
+len builtins
+{'metadata': [1, 2, 3]}
+True
+{'bound': True} None
+True
+list.append
+Python method module readonly
+qualname readonly
+qualname readonly
+qualname readonly
+qualname readonly

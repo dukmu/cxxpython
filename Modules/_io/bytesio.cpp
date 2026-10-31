@@ -227,7 +227,7 @@ void readinto(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &ou
     RootScope roots(c);
     auto self = roots.root(args[0]);
     auto target = roots.root(args[1]);
-    detail::WritableBuffer buffer(c);
+    detail::BufferExport buffer(c);
     if (!detail::writable_buffer(c, target, buffer, out))
         return;
     auto &s = c.payload<BytesIOObject>(self);

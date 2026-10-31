@@ -126,7 +126,12 @@ bool sequence_slot(Attachment &context, const ResolvedSlot &slot)
 {
     if (slot.state != SlotState::Native)
         return false;
-    const auto &function = context.payload<NativeFunctionObject>(slot.descriptor);
+    const auto descriptor = slot.descriptor.get(context);
+    const auto function_value =
+        context.type_of(descriptor) == context.builtin(CoreObject::MethodDescriptorType)
+            ? context.payload<MethodDescriptorObject>(descriptor).function
+            : descriptor;
+    const auto &function = context.payload<NativeFunctionObject>(function_value);
     return function.sequence_owner &&
            is_subtype(context, slot.owner.get(context), *function.sequence_owner);
 }
@@ -306,8 +311,10 @@ ResolvedSlot resolve_protocol(Attachment &context, Handle type, Protocol id, Roo
                 auto state = definition.none_disables &&
                                      attribute->value == context.builtin(CoreObject::None)
                                  ? SlotState::Disabled
-                             : context.type_of(attribute->value) ==
-                                     context.builtin(CoreObject::NativeFunctionType)
+                             : (context.type_of(attribute->value) ==
+                                    context.builtin(CoreObject::NativeFunctionType) ||
+                                context.type_of(attribute->value) ==
+                                    context.builtin(CoreObject::MethodDescriptorType))
                                  ? SlotState::Native
                                  : SlotState::PythonDescriptor;
                 ResolvedSlot slot{id,

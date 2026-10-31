@@ -1,0 +1,38 @@
+bytes ['bytes', 'bytes', 'bytes', 'bytes', 'bytes', 'bytes', 'bytes', 'bytes'] True
+bytearray ['bytearray', 'bytearray', 'bytearray', 'bytearray', 'bytearray', 'bytearray', 'bytearray', 'bytearray'] True
+Bytes ['bytes', 'bytes', 'bytes', 'bytes', 'bytes', 'bytes', 'bytes', 'bytes'] True
+ByteArray ['bytearray', 'bytearray', 'bytearray', 'bytearray', 'bytearray', 'bytearray', 'bytearray', 'bytearray'] True
+typed b'xabcd' bytearray(b'xabcd')
+direct b'xy' bytearray(b'xy')
+empty identities True True True True
+subclass result bytes bytes bytearray
+pickle protocol 5 bytes bytearray True
+buffer constructors bytes ['bytes', 'bytes', 'bytes', 'bytes', 'bytes'] True
+strided constructor bytes b'ac'
+buffer constructors bytearray ['bytearray', 'bytearray', 'bytearray', 'bytearray', 'bytearray'] True
+strided constructor bytearray bytearray(b'ac')
+buffer constructors Bytes ['Bytes', 'Bytes', 'Bytes', 'Bytes', 'Bytes'] True
+strided constructor Bytes b'ac'
+buffer constructors ByteArray ['ByteArray', 'ByteArray', 'ByteArray', 'ByteArray', 'ByteArray'] True
+strided constructor ByteArray ByteArray(b'ac')
+index before buffer bytes b'\x00\x00\x00' ['index']
+index failure to buffer bytes b'xy' ['index TypeError']
+bytes hook precedence bytes b'hook' ['bytes']
+index before buffer bytearray bytearray(b'\x00\x00\x00') ['index']
+index failure to buffer bytearray bytearray(b'xy') ['index TypeError']
+bytes hook precedence bytearray bytearray(b'\x00\x00\x00') ['index']
+unsupported buffer to iterable b'AB' bytearray(b'AB')
+constructor rejection bytes RuntimeError
+constructor rejection bytes TypeError
+constructor rejection bytearray RuntimeError
+constructor rejection bytearray TypeError
+text bytes hook b'text hook'
+encoding before bytes hook b'xy' bytearray(b'xy')
+released constructor bytes ValueError operation forbidden on released memoryview object
+released constructor bytes ValueError operation forbidden on released PickleBuffer object
+released constructor bytearray ValueError operation forbidden on released memoryview object
+released constructor bytearray ValueError operation forbidden on released PickleBuffer object
+released constructor Bytes ValueError operation forbidden on released memoryview object
+released constructor Bytes ValueError operation forbidden on released PickleBuffer object
+released constructor ByteArray ValueError operation forbidden on released memoryview object
+released constructor ByteArray ValueError operation forbidden on released PickleBuffer object

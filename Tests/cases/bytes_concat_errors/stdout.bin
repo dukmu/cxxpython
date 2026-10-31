@@ -1,0 +1,21 @@
+bytes TypeError can't concat int to bytes
+bytearray TypeError can't concat int to bytearray
+inplace TypeError can't concat int to bytearray
+unchanged bytearray(b'x')
+bytes TypeError can't concat str to bytes
+bytearray TypeError can't concat str to bytearray
+inplace TypeError can't concat str to bytearray
+unchanged bytearray(b'x')
+bytes TypeError can't concat list to bytes
+bytearray TypeError can't concat list to bytearray
+inplace TypeError can't concat list to bytearray
+unchanged bytearray(b'x')
+bytes TypeError can't concat memoryview to bytes
+bytearray TypeError can't concat memoryview to bytearray
+inplace TypeError can't concat memoryview to bytearray
+unchanged bytearray(b'x')
+released bytes TypeError can't concat memoryview to bytes
+released bytearray TypeError can't concat memoryview to bytearray
+released inplace TypeError can't concat memoryview to bytearray
+no bytes conversion TypeError can't concat Conversion to bytes
+no iterable conversion TypeError can't concat Conversion to bytearray

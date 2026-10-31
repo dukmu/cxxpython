@@ -1,0 +1,1 @@
+shared exporter [20, 20, 20] bytearray(b'parallel buffer!')

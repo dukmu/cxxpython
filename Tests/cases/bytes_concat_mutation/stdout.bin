@@ -1,0 +1,18 @@
+inplace Mutable True Mutable(b'xy')
+inplace Mutable True Mutable(b'xy')
+inplace Mutable True Mutable(b'xy')
+inplace Mutable True Mutable(b'xy')
+ordinary is separate bytearray False bytearray(b'x') bytearray(b'xy')
+immutable augmented bytes b'xy' b'x'
+self export BufferError bytearray(b'ab')
+source lease released bytearray(b'abc')
+self export BufferError Mutable(b'ab')
+source lease released Mutable(b'abc')
+empty self True bytearray(b'')
+empty addition while exported True
+exported resize BufferError bytearray(b'ab')
+exported resize BufferError bytearray(b'ab')
+released resize bytearray(b'abc')
+temporary export released bytearray(b'xy') bytearray(b'y!')
+picklebuffer self export BufferError bytearray(b'ab')
+picklebuffer released resize bytearray(b'abc')

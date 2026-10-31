@@ -1,0 +1,44 @@
+0 True b'text'
+b'\x00\xffbytes'
+True
+True __new__
+[1, 2, 3]
+True
+True keyword
+1 True b'text'
+b'\x00\xffbytes'
+True
+True __new__
+[1, 2, 3]
+True
+True keyword
+2 True b'text'
+b'\x00\xffbytes'
+True
+True __new__
+[1, 2, 3]
+True
+True keyword
+3 True b'text'
+b'\x00\xffbytes'
+True
+True __new__
+[1, 2, 3]
+True
+True keyword
+4 True b'text'
+b'\x00\xffbytes'
+True
+True __new__
+[1, 2, 3]
+True
+True keyword
+5 True b'text'
+b'\x00\xffbytes'
+True
+True __new__
+[1, 2, 3]
+True
+True keyword
+2 True True
+3 True True

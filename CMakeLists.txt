@@ -79,6 +79,8 @@ add_library(cxxpython_core
     Modules/signalmodule.cpp
     Modules/mathmodule.cpp
     Modules/math_integer.cpp
+    Modules/math_reductions.cpp
+    Modules/_picklemodule.cpp
     Modules/_randommodule.cpp
     Modules/time_calendar.cpp
     Python/symtable.cpp
@@ -125,6 +127,7 @@ add_library(cxxpython_core
     Objects/complexobject.cpp
     Objects/bytearrayobject.cpp
     Objects/memoryobject.cpp
+    Objects/picklebufobject.cpp
     Objects/memoryformat.cpp
     Objects/exceptions.cpp
     Objects/rangeobject.cpp

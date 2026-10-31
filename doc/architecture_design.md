@@ -188,7 +188,16 @@ without unaligned loads, sharing binary16 conversion with native struct.
 Each live view traces its exporter and shares a native export token retaining the actual
 bytearray storage. The storage's export count forbids resizing, not same-size
 writes. Release atomically drops both the traced edge and native token; native
-token destruction never accesses a potentially dead managed exporter. Buffer
+token destruction never accesses a potentially dead managed exporter. Direct
+exports additionally retain a native per-view export count: release and export
+commit through its short local mutex; native token destruction only decrements
+native counters. Independent memoryview copies still share storage without
+holding an export on their parent. A view separately traces its public obj and
+its underlying data owner, so an exported view's obj may itself be a memoryview
+without treating that managed object as a raw byte payload. Internal BufferExport
+owns both precise roots, the lease and immutable format/shape metadata; scoped
+I/O and PickleBuffer reuse this boundary. This covers the concrete native buffer
+families, not the unfinished arbitrary-extension/PEP 688 buffer API. Buffer
 consumers copy bytes under short storage locks before callbacks or native waits.
 `Objects/bytesmethods.cpp` shares bytes/bytearray search, partition, strip,
 split, ASCII case mapping, translation and translation-table construction, with index/buffer

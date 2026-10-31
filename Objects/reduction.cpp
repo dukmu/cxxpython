@@ -18,6 +18,10 @@ bool attribute(Attachment &c, Handle self, std::u32string_view name, ReturnSlot 
     RootScope roots(c);
     ReturnSlot key(c);
     make_str(c, std::u32string(name), key);
+    if (failed(key)) {
+        out.raised(key.exception());
+        return false;
+    }
     get_attribute(c, self, roots.root(key.value()), out);
     if (optional && failed(out) &&
         is_subtype(c, c.type_of(out.exception()), c.builtin(CoreObject::AttributeErrorType)))
@@ -273,6 +277,81 @@ void object_reduce_ex(Attachment &c, Handle function, std::span<const Value> arg
     }
     common_reduce(c, self, number, out);
 }
+
+// CPython 3.12.14 methodobject.c, classobject.c and descrobject.c reductions.
+// Reconstruct by the actual receiver/owner and attribute name, not by locating
+// a same-named callable in an unrelated module or class.
+void getattr_reduction(Attachment &c, Handle receiver, Handle name, ReturnSlot &out)
+{
+    RootScope roots(c);
+    ReturnSlot arguments(c);
+    const auto getattr = name_lookup(c, c.builtin(CoreObject::Builtins), U"getattr");
+    if (!getattr) {
+        raise_error(c, CoreObject::RuntimeErrorType, U"lost builtins.getattr", out);
+        return;
+    }
+    const auto reconstruct = roots.root(*getattr);
+    const Value values[] = {receiver.get(c), name.get(c)};
+    cxxpython::core::make_tuple(c, values, arguments);
+    if (failed(arguments)) {
+        out.raised(arguments.exception());
+        return;
+    }
+    const Value result[] = {reconstruct.get(c), arguments.value()};
+    cxxpython::core::make_tuple(c, result, out);
+}
+void native_reduce(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (c.type_of(args[0]) != c.builtin(CoreObject::NativeFunctionType)) {
+        raise_error(c, CoreObject::TypeErrorType, U"__reduce__ requires a native function", out);
+        return;
+    }
+    RootScope roots(c);
+    const auto self = roots.root(args[0]);
+    const auto &function = c.payload<NativeFunctionObject>(self);
+    ReturnSlot name(c);
+    if (!attribute(c, self, U"__name__", name)) {
+        out.raised(name.exception());
+        return;
+    }
+    if (!function.bound_self || is_module(c, *function.bound_self))
+        out.ok(name.value());
+    else
+        getattr_reduction(c, roots.root(*function.bound_self), roots.root(name.value()), out);
+}
+void bound_method_reduce(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (c.type_of(args[0]) != c.builtin(CoreObject::BoundMethodType)) {
+        raise_error(c, CoreObject::TypeErrorType, U"__reduce__ requires a bound method", out);
+        return;
+    }
+    RootScope roots(c);
+    const auto self = roots.root(args[0]);
+    const auto &method = c.payload<BoundMethodObject>(self);
+    const auto function = roots.root(method.function);
+    ReturnSlot name(c);
+    if (!attribute(c, function, U"__name__", name)) {
+        out.raised(name.exception());
+        return;
+    }
+    getattr_reduction(c, roots.root(method.self), roots.root(name.value()), out);
+}
+void method_descriptor_reduce(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (c.type_of(args[0]) != c.builtin(CoreObject::MethodDescriptorType)) {
+        raise_error(c, CoreObject::TypeErrorType, U"__reduce__ requires a method descriptor", out);
+        return;
+    }
+    RootScope roots(c);
+    const auto self = roots.root(args[0]);
+    ReturnSlot name(c);
+    if (!attribute(c, self, U"__name__", name)) {
+        out.raised(name.exception());
+        return;
+    }
+    getattr_reduction(c, roots.root(c.payload<MethodDescriptorObject>(self).owner),
+                      roots.root(name.value()), out);
+}
 } // namespace
 
 void install_reduction(Attachment &c, std::span<const Handle> core)
@@ -287,5 +366,13 @@ void install_reduction(Attachment &c, std::span<const Handle> core)
     auto pair = unary;
     pair.parameters.push_back({U"protocol", ParameterKind::PositionalOnly});
     install_native_attribute(c, core, type, U"__reduce_ex__", pair, object_reduce_ex, {*original});
+    install_native_attribute(c, core,
+                             core[static_cast<std::size_t>(CoreObject::NativeFunctionType)],
+                             U"__reduce__", unary, native_reduce);
+    install_native_attribute(c, core, core[static_cast<std::size_t>(CoreObject::BoundMethodType)],
+                             U"__reduce__", unary, bound_method_reduce);
+    install_native_attribute(c, core,
+                             core[static_cast<std::size_t>(CoreObject::MethodDescriptorType)],
+                             U"__reduce__", unary, method_descriptor_reduce);
 }
 } // namespace cxxpython::core::detail

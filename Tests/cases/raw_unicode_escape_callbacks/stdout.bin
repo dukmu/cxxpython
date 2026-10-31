@@ -1,0 +1,11 @@
+replacement ('A<€>Ztail', 10)
+events [('rawunicodeescape', 1, 5, 'truncated \\uXXXX escape')]
+object and offset ('A!Z', 4)
+nonfinal object ('A!Z', 4)
+incomplete object ('A!', 2)
+replacement type TypeError
+position type TypeError
+position bounds IndexError
+negative bounds IndexError
+tuple shape TypeError
+collecting workers [True, True, True] []

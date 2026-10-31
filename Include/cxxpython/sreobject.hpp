@@ -53,9 +53,10 @@ struct SreMatchObject {
 };
 struct SreScannerObject {
     ObjectHeader header;
-    const Value pattern, string;
+    const Value pattern, string, buffer_owner, buffer_exporter;
     const std::ptrdiff_t pos, endpos;
     const std::shared_ptr<MemoryViewExport> lease;
+    const std::size_t offset;
     // Only the operation holding running may access the cursor or native cache.
     std::atomic_flag running = ATOMIC_FLAG_INIT;
     std::ptrdiff_t cursor;
@@ -63,15 +64,19 @@ struct SreScannerObject {
     std::vector<std::uint32_t> text;
     std::optional<std::size_t> version;
     SreScannerObject(InitialType head, Value regex, Value source, std::ptrdiff_t begin,
-                     std::ptrdiff_t end, std::shared_ptr<MemoryViewExport> token,
-                     std::vector<std::uint32_t> data, std::optional<std::size_t> revision)
-        : header(head), pattern(regex), string(source), pos(begin), endpos(end),
-          lease(std::move(token)), cursor(begin), text(std::move(data)), version(revision)
+                     std::ptrdiff_t end, std::shared_ptr<MemoryViewExport> token, Value owner,
+                     Value exporter, std::size_t start, std::vector<std::uint32_t> data,
+                     std::optional<std::size_t> revision)
+        : header(head), pattern(regex), string(source), buffer_owner(owner),
+          buffer_exporter(exporter), pos(begin), endpos(end), lease(std::move(token)),
+          offset(start), cursor(begin), text(std::move(data)), version(revision)
     {}
     void trace(Tracer &tracer) const noexcept
     {
         tracer.visit(pattern);
         tracer.visit(string);
+        tracer.visit(buffer_owner);
+        tracer.visit(buffer_exporter);
     }
     std::size_t external_bytes() const noexcept
     {

@@ -1,0 +1,11 @@
+protocol ValueError
+callback protocol ValueError
+empty EOFError
+load protocol ValueError
+unicode input TypeError
+text file rejected True
+reduce result PicklingError
+callback exception RuntimeError
+lambda PicklingError
+memoryview TypeError
+exception hierarchy True

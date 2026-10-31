@@ -1,4 +1,5 @@
 #include "cxxpython/memoryobject.hpp"
+#include "cxxpython/picklebufobject.hpp"
 #include "cxxpython/protocol.hpp"
 #include "internal/memoryformat.hpp"
 
@@ -9,7 +10,7 @@
 
 namespace cxxpython::core {
 namespace {
-template <class F> decltype(auto) locked(Attachment &c, ByteArrayObject::Storage &s, F &&f)
+template <class State, class F> decltype(auto) locked(Attachment &c, State &s, F &&f)
 {
     for (;;) {
         std::unique_lock lock(s.mutex, std::try_to_lock);
@@ -65,9 +66,22 @@ void create_view(Attachment &c, Handle owner, std::shared_ptr<MemoryViewExport> 
                  std::string format, ReturnSlot &out)
 {
     RootScope roots(c);
+    ReturnSlot data(c);
+    data.ok(owner.get(c));
+    if (c.has_layout<MemoryViewObject>(owner.get(c))) {
+        auto &view = c.payload<MemoryViewObject>(owner);
+        if (!load_owner(c, owner, view, data, out))
+            return;
+        c.load(owner.get(c), view.data_owner, data);
+        if (data.tag() == ResultTag::Empty) {
+            raise_error(c, CoreObject::ValueErrorType,
+                        U"operation forbidden on released memoryview object", out);
+            return;
+        }
+    }
     c.allocate_instance<MemoryViewObject>(roots.root(c.builtin(CoreObject::MemoryViewType)), out,
                                           owner.get(c), std::move(token), offset, stride, length,
-                                          readonly, std::move(format));
+                                          readonly, std::move(format), data.value());
 }
 void create(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
 {
@@ -89,23 +103,13 @@ void create(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
                         v.readonly, v.format, out);
         return;
     }
-    if (is_bytes(c, source.get(c))) {
-        auto n = c.payload<BytesObject>(source).value.size();
-        create_view(c, source, std::make_shared<MemoryViewExport>(nullptr), 0, 1, n, true, "B",
-                    out);
+    detail::BufferExport buffer(c);
+    if (detail::export_buffer(c, source, buffer, out)) {
+        detail::memoryview_from_buffer(c, buffer, out);
         return;
     }
-    if (is_bytearray(c, source.get(c))) {
-        auto storage = c.payload<ByteArrayObject>(source).contents;
-        auto token = std::make_shared<MemoryViewExport>(nullptr);
-        std::size_t n = locked(c, *storage, [&] {
-            token->storage = storage;
-            ++storage->exports;
-            return storage->bytes.size();
-        });
-        create_view(c, source, std::move(token), 0, 1, n, false, "B", out);
+    if (out.tag() == ResultTag::Raised)
         return;
-    }
     raise_error(c, CoreObject::TypeErrorType, U"memoryview: a bytes-like object is required", out);
 }
 bool snapshot(Attachment &c, Handle self, std::string &data, ReturnSlot &out)
@@ -129,8 +133,12 @@ bool snapshot(Attachment &c, Handle self, std::string &data, ReturnSlot &out)
         locked(c, *token->storage, [&] { copy(token->storage->bytes); });
     else {
         ReturnSlot owner(c);
-        if (!load_owner(c, self, v, owner, out))
+        c.load(self.get(c), v.data_owner, owner);
+        if (owner.tag() == ResultTag::Empty) {
+            raise_error(c, CoreObject::ValueErrorType,
+                        U"operation forbidden on released memoryview object", out);
             return false;
+        }
         copy(c.payload<BytesObject>(owner.value()).value);
     }
     return true;
@@ -230,8 +238,12 @@ template <Op op> void item(Attachment &c, Handle, std::span<const Value> args, R
                    [&] { std::memcpy(data.data(), token->storage->bytes.data() + p, size); });
         else {
             ReturnSlot owner(c);
-            if (!load_owner(c, self, v, owner, out))
+            c.load(self.get(c), v.data_owner, owner);
+            if (owner.tag() == ResultTag::Empty) {
+                raise_error(c, CoreObject::ValueErrorType,
+                            U"operation forbidden on released memoryview object", out);
                 return;
+            }
             std::memcpy(data.data(), c.payload<BytesObject>(owner.value()).value.data() + p, size);
         }
         detail::unpack_memory_format(c, v.format.back(), data, out);
@@ -253,9 +265,25 @@ void release(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out
     RootScope roots(c);
     auto self = roots.root(args[0]);
     auto &v = c.payload<MemoryViewObject>(self);
-    c.store(self.get(c), v.owner, {});
-    std::atomic_exchange_explicit(&v.exported, std::shared_ptr<MemoryViewExport>{},
-                                  std::memory_order_acq_rel);
+    const auto exports = v.exports;
+    const auto count = locked(c, *exports, [&] {
+        const auto count = exports->count.load(std::memory_order_relaxed);
+        if (!count) {
+            c.store(self.get(c), v.owner, {});
+            c.store(self.get(c), v.data_owner, {});
+            std::atomic_exchange_explicit(&v.exported, std::shared_ptr<MemoryViewExport>{},
+                                          std::memory_order_acq_rel);
+        }
+        return count;
+    });
+    if (count) {
+        const auto number = std::to_string(count);
+        raise_error(c, CoreObject::BufferErrorType,
+                    U"memoryview has " + std::u32string(number.begin(), number.end()) +
+                        U" exported buffer" + (count == 1 ? U"" : U"s"),
+                    out);
+        return;
+    }
     out.ok(c.builtin(CoreObject::None));
 }
 void enter(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
@@ -553,8 +581,29 @@ template <Field field> void attribute(Attachment &c, Value value, ReturnSlot &ou
 }
 } // namespace
 
-bool detail::writable_buffer(Attachment &c, Handle source, WritableBuffer &result, ReturnSlot &out)
+bool detail::export_buffer(Attachment &c, Handle source, BufferExport &result, ReturnSlot &out)
 {
+    result.exporter.ok(source.get(c));
+    if (c.has_layout<PickleBufferObject>(source.get(c))) {
+        auto &buffer = c.payload<PickleBufferObject>(source);
+        const auto lease = std::atomic_load_explicit(&buffer.lease, std::memory_order_acquire);
+        c.load(source.get(c), buffer.exporter, result.exporter);
+        if (!lease || result.exporter.tag() == ResultTag::Empty) {
+            raise_error(c, CoreObject::ValueErrorType,
+                        U"operation forbidden on released PickleBuffer object", out);
+            return false;
+        }
+        RootScope roots(c);
+        return export_buffer(c, roots.root(result.exporter.value()), result, out);
+    }
+    if (is_bytes(c, source.get(c))) {
+        result.owner.ok(source.get(c));
+        result.length = c.payload<BytesObject>(source).value.size();
+        result.count = static_cast<std::int64_t>(result.length);
+        result.readonly = true;
+        result.lease = std::make_shared<MemoryViewExport>(nullptr);
+        return true;
+    }
     if (is_bytearray(c, source.get(c))) {
         result.owner.ok(source.get(c));
         auto storage = c.payload<ByteArrayObject>(source).contents;
@@ -564,31 +613,73 @@ bool detail::writable_buffer(Attachment &c, Handle source, WritableBuffer &resul
             ++storage->exports;
             return storage->bytes.size();
         });
-        result.offset = 0;
+        result.count = static_cast<std::int64_t>(result.length);
         result.lease = std::move(token);
         return true;
     }
     if (c.has_layout<MemoryViewObject>(source.get(c))) {
         auto &v = c.payload<MemoryViewObject>(source);
-        auto token = live(c, v, out);
-        if (!token)
-            return false;
-        if (!v.readonly && token->storage &&
-            (v.length <= 1 ||
-             v.stride == static_cast<std::int64_t>(memory_format_size(v.format.back())))) {
-            if (!load_owner(c, source, v, result.owner, out))
-                return false;
-            result.offset = static_cast<std::size_t>(v.offset);
-            result.length =
-                static_cast<std::size_t>(v.length) * memory_format_size(v.format.back());
-            result.lease = std::move(token);
+        result.offset = static_cast<std::size_t>(v.offset);
+        result.count = v.length;
+        result.stride = v.stride;
+        result.format = v.format;
+        result.length = static_cast<std::size_t>(v.length) * memory_format_size(v.format.back());
+        result.readonly = v.readonly;
+        auto lease = std::make_shared<MemoryViewExport>(nullptr);
+        const auto exports = v.exports;
+        if (locked(c, *exports, [&] {
+                const auto token =
+                    std::atomic_load_explicit(&v.exported, std::memory_order_acquire);
+                if (!token)
+                    return false;
+                c.load(source.get(c), v.data_owner, result.owner);
+                if (result.owner.tag() == ResultTag::Empty)
+                    return false;
+                lease->storage = token->storage;
+                if (lease->storage)
+                    ++lease->storage->exports;
+                lease->view_exports = exports;
+                ++exports->count;
+                return true;
+            })) {
+            result.lease = std::move(lease);
             return true;
         }
+        raise_error(c, CoreObject::ValueErrorType,
+                    U"operation forbidden on released memoryview object", out);
+        return false;
     }
+    return false;
+}
+void detail::memoryview_from_buffer(Attachment &c, const BufferExport &buffer, ReturnSlot &out,
+                                    bool raw)
+{
+    RootScope roots(c);
+    const auto size = memory_format_size(buffer.format.back());
+    if (raw && buffer.count > 1 && buffer.stride != static_cast<std::int64_t>(size)) {
+        raise_error(c, CoreObject::BufferErrorType,
+                    U"cannot extract raw buffer from non-contiguous buffer", out);
+        return;
+    }
+    c.allocate_instance<MemoryViewObject>(
+        roots.root(c.builtin(CoreObject::MemoryViewType)), out, buffer.exporter.value(),
+        buffer.lease, static_cast<std::int64_t>(buffer.offset), raw ? 1 : buffer.stride,
+        raw ? static_cast<std::int64_t>(buffer.length) : buffer.count, buffer.readonly,
+        raw ? std::string("B") : buffer.format, buffer.owner.value());
+}
+bool detail::writable_buffer(Attachment &c, Handle source, BufferExport &result, ReturnSlot &out)
+{
+    if (export_buffer(c, source, result, out)) {
+        if (!result.readonly && result.lease->storage &&
+            (result.count <= 1 ||
+             result.stride == static_cast<std::int64_t>(memory_format_size(result.format.back()))))
+            return true;
+    } else if (out.tag() == ResultTag::Raised)
+        return false;
     raise_error(c, CoreObject::TypeErrorType, U"a contiguous writable buffer is required", out);
     return false;
 }
-void detail::write_buffer(Attachment &c, const WritableBuffer &target, std::string_view data)
+void detail::write_buffer(Attachment &c, const BufferExport &target, std::string_view data)
 {
     if (!target.lease || data.size() > target.length)
         throw std::logic_error("write exceeds the native buffer export");
@@ -609,18 +700,29 @@ bool detail::buffer_bytes(Attachment &c, Handle source, std::string &out, Return
         out = bytearray_snapshot(c, source);
         return true;
     }
-    if (c.has_layout<MemoryViewObject>(source.get(c)) &&
-        c.type_of(source) == c.builtin(CoreObject::MemoryViewType)) {
-        auto &v = c.payload<MemoryViewObject>(source);
-        if (!live(c, v, error))
-            return false;
-        if (contiguous && v.length > 1 &&
-            v.stride != static_cast<std::int64_t>(memory_format_size(v.format.back()))) {
+    BufferExport buffer(c);
+    if (export_buffer(c, source, buffer, error)) {
+        const auto size = memory_format_size(buffer.format.back());
+        if (contiguous && buffer.count > 1 && buffer.stride != static_cast<std::int64_t>(size)) {
             raise_error(c, CoreObject::BufferErrorType, U"underlying buffer is not C-contiguous",
                         error);
             return false;
         }
-        return snapshot(c, source, out, error);
+        out.resize(buffer.length);
+        auto copy = [&](const std::string &data) {
+            auto offset = static_cast<std::int64_t>(buffer.offset);
+            for (std::int64_t i = 0; i < buffer.count; ++i) {
+                std::memcpy(out.data() + static_cast<std::size_t>(i) * size, data.data() + offset,
+                            size);
+                if (i + 1 < buffer.count)
+                    offset += buffer.stride;
+            }
+        };
+        if (buffer.lease->storage)
+            locked(c, *buffer.lease->storage, [&] { copy(buffer.lease->storage->bytes); });
+        else
+            copy(c.payload<BytesObject>(buffer.owner.value()).value);
+        return true;
     }
     return false;
 }
