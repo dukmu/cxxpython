@@ -136,10 +136,14 @@ writes. Release atomically drops both the traced edge and native token; native
 token destruction never accesses a potentially dead managed exporter. Buffer
 consumers copy bytes under short storage locks before callbacks or native waits.
 `Objects/bytesmethods.cpp` shares bytes/bytearray search, partition, strip,
-split, translation and translation-table construction, with index/buffer
+split, ASCII case mapping, translation and translation-table construction, with index/buffer
 conversion and family-correct results. str's decoding constructor uses the
 existing codec boundary; int's buffer parsing stays separate from Unicode
 digit parsing and ordinary numeric conversion protocols.
+Int byte conversion uses native bit import/export instead of repeated whole-bigint
+shifts per byte; callback operands and subclass construction use the same roots
+and result slots as other numeric protocols. Unchanged Lib/base64.py reuses these
+capabilities with binascii, struct and re.
 It consumes existing safe snapshots rather than retaining unleased raw storage
 across callbacks; this is not a path-specific implementation or a claim of the
 complete bytes API/mutation matrix.
@@ -452,11 +456,27 @@ Python policy remains in `typing`: Generic classmethod hooks and generic base
 creation, non-None TypeVar bound checking, substitution, unions and
 TypeVarTuple unpacking call through real imports. Missing imports and errors
 propagate, including for classmethod Generic policy; there is no fabricated
-typing fallback. Generic class compilation is connected, but the actual
-typing/warnings dependency closure and acceptance remain open. The actual
-upstream typing import now passes re and reaches the missing Warning hierarchy.
+typing fallback. The unchanged upstream Lib/typing.py now executes generic class
+hooks, legacy and syntax-created parameters, aliases, ParamSpec/TypeVarTuple
+substitution and get_type_hints in direct reference-tested scripts. Full upstream
+typing, protocol/inspect, serialization and concurrent policy matrices remain open.
 Native _opcode.local_names exposes actual VM fast-local slots to dis; those
 indices are not indices into the cell-filtered Python co_varnames tuple.
+
+Warning categories use the ordinary ExceptionObject layout, inheritance,
+bootstrap and builtins publication. Lib/warnings.py retains upstream Python
+filtering/registry/capture/formatting policy and its pure-Python backend; it calls
+the real rooted frame chain through sys._getframe. No new native warning engine
+or execution lock is introduced. Sys language-version metadata uses an immutable
+native tuple subtype with readonly fields, not a namespace pretending to be a
+tuple. Tuple count/index use the immutable payload and rooted normal equality
+callbacks; starred subscripts reuse the existing tuple expansion path.
+
+Lib/linecache.py is unchanged upstream source. Lib/tokenize.py preserves the
+upstream encoding detection/open/cache dependencies, with only the _tokenize
+import deferred to the function that actually needs it. Public full tokenization
+still requires that missing native interface; the compiler's standalone tokenizer
+is not silently substituted for its different public token/position contract.
 
 `Modules/_sre/engine.c` and its adapted upstream matching header keep SRE
 instruction validation, captures, assertions and backtracking in independent C.

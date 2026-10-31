@@ -7,6 +7,7 @@
 #include <boost/multiprecision/cpp_int.hpp>
 #include <boost/version.hpp>
 #include <cmath>
+#include <iterator>
 
 #if BOOST_VERSION < 107400
 #error Boost 1.74 or newer is required
@@ -433,6 +434,221 @@ void int_getnewargs(Attachment &context, Handle, std::span<const Value> args, Re
     publish(context, expanded(integer(context, self.get(context))), value);
     const std::array arguments{value.value()};
     cxxpython::core::make_tuple(context, arguments, out);
+}
+std::u32string bytes_type_name(Attachment &context, Value value)
+{
+    TypeView view(context, context.type_of(value));
+    const auto name = view.name();
+    if (const auto *text = std::get_if<std::u32string>(&name))
+        return *text;
+    return context.payload<StrObject>(std::get<Value>(name)).value;
+}
+bool byte_order(Attachment &context, Handle value, bool from, bool &little, ReturnSlot &out)
+{
+    if (!context.has_layout<StrObject>(value.get(context)) ||
+        !is_subtype(context, context.type_of(value), context.builtin(CoreObject::StrType))) {
+        const auto type = value.get(context) == context.builtin(CoreObject::None)
+                              ? U"None"
+                              : bytes_type_name(context, value.get(context));
+        raise_error(context, CoreObject::TypeErrorType,
+                    std::u32string(from ? U"from_bytes()" : U"to_bytes()") +
+                        U" argument 'byteorder' must be str, not " + type,
+                    out);
+        return false;
+    }
+    const auto &text = context.payload<StrObject>(value).value;
+    little = text == U"little";
+    if (!little && text != U"big") {
+        raise_error(context, CoreObject::ValueErrorType,
+                    U"byteorder must be either 'little' or 'big'", out);
+        return false;
+    }
+    return true;
+}
+void int_from_bytes(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(context);
+    auto cls = roots.root(args[0]);
+    auto source = roots.root(args[1]);
+    auto order = roots.root(args[2]);
+    auto sign = roots.root(args[3]);
+    ReturnSlot temp(context);
+    // Argument Clinic checks the string type before evaluating signed.
+    if (!context.has_layout<StrObject>(order.get(context)) ||
+        !is_subtype(context, context.type_of(order), context.builtin(CoreObject::StrType))) {
+        bool ignored;
+        byte_order(context, order, true, ignored, out);
+        return;
+    }
+    truth(context, sign, temp);
+    if (raised(temp)) {
+        out.raised(temp.exception());
+        return;
+    }
+    const bool is_signed = temp.value() == context.builtin(CoreObject::True);
+    bool little;
+    if (!byte_order(context, order, true, little, out))
+        return;
+    std::string data;
+    auto method = detail::type_attribute(context, context.type_of(source), U"__bytes__");
+    if (method) {
+        detail::invoke_special(context, source, roots.root(*method), {}, temp);
+        if (raised(temp)) {
+            out.raised(temp.exception());
+            return;
+        }
+        if (!is_bytes(context, temp.value())) {
+            raise_error(context, CoreObject::TypeErrorType,
+                        U"__bytes__ returned non-bytes (type " +
+                            bytes_type_name(context, temp.value()) + U")",
+                        out);
+            return;
+        }
+        data = context.payload<BytesObject>(temp.value()).value;
+    } else if (is_bytearray(context, source.get(context)) ||
+               context.has_layout<MemoryViewObject>(source.get(context)) ||
+               is_bytes(context, source.get(context))) {
+        if (!detail::buffer_bytes(context, source, data, out, false))
+            return;
+    } else {
+        if (!context.has_layout<StrObject>(source.get(context)))
+            get_iter(context, source, temp);
+        if (context.has_layout<StrObject>(source.get(context)) || raised(temp)) {
+            if (!context.has_layout<StrObject>(source.get(context)) &&
+                !is_subtype(context, context.type_of(temp.exception()),
+                            context.builtin(CoreObject::TypeErrorType))) {
+                out.raised(temp.exception());
+                return;
+            }
+            raise_error(context, CoreObject::TypeErrorType,
+                        U"cannot convert '" + bytes_type_name(context, source.get(context)) +
+                            U"' object to bytes",
+                        out);
+            return;
+        }
+        auto iterator = roots.root(temp.value());
+        ReturnSlot item(context), number(context);
+        for (;;) {
+            const auto status = iter_next(context, iterator, item);
+            if (status == NextStatus::Raised) {
+                out.raised(item.exception());
+                return;
+            }
+            if (status == NextStatus::Done)
+                break;
+            RootScope iteration(context);
+            index(context, iteration.root(item.value()), number);
+            if (raised(number)) {
+                out.raised(number.exception());
+                return;
+            }
+            std::int64_t byte;
+            if (!int_fits_signed(context, number.value(), byte) || byte < 0 || byte > 255) {
+                raise_error(context, CoreObject::ValueErrorType, U"bytes must be in range(0, 256)",
+                            out);
+                return;
+            }
+            data.push_back(static_cast<char>(byte));
+        }
+    }
+    const bool negative = is_signed && !data.empty() &&
+                          (static_cast<unsigned char>(little ? data.back() : data.front()) & 0x80);
+    if (negative)
+        for (char &byte : data)
+            byte = static_cast<char>(~static_cast<unsigned char>(byte));
+    const std::vector<unsigned char> bytes(data.begin(), data.end());
+    Integer value = 0;
+    // Boost 1.74 cannot normalize the zero-limb backend created by an empty range.
+    if (!bytes.empty())
+        boost::multiprecision::import_bits(value, bytes.begin(), bytes.end(), 8, !little);
+    if (negative)
+        value = -value - 1;
+    publish(context, std::move(value), temp);
+    if (raised(temp)) {
+        out.raised(temp.exception());
+        return;
+    }
+    if (cls.get(context) == context.builtin(CoreObject::IntType)) {
+        out.ok(temp.value());
+        return;
+    }
+    const std::array converted{temp.value()};
+    call(context, cls, {converted, {}}, out);
+}
+void int_to_bytes(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(context);
+    auto self = roots.root(args[0]);
+    auto length_arg = roots.root(args[1]);
+    auto order = roots.root(args[2]);
+    auto sign = roots.root(args[3]);
+    if (!is_int(context, self.get(context))) {
+        type_error(context, out);
+        return;
+    }
+    ReturnSlot temp(context);
+    index(context, length_arg, temp);
+    if (raised(temp)) {
+        out.raised(temp.exception());
+        return;
+    }
+    std::int64_t length;
+    if (!int_fits_signed(context, temp.value(), length) ||
+        length > std::numeric_limits<std::ptrdiff_t>::max() ||
+        length < std::numeric_limits<std::ptrdiff_t>::min()) {
+        raise_error(context, CoreObject::OverflowErrorType,
+                    U"Python int too large to convert to C ssize_t", out);
+        return;
+    }
+    if (!context.has_layout<StrObject>(order.get(context)) ||
+        !is_subtype(context, context.type_of(order), context.builtin(CoreObject::StrType))) {
+        bool ignored;
+        byte_order(context, order, false, ignored, out);
+        return;
+    }
+    truth(context, sign, temp);
+    if (raised(temp)) {
+        out.raised(temp.exception());
+        return;
+    }
+    const bool is_signed = temp.value() == context.builtin(CoreObject::True);
+    bool little;
+    if (!byte_order(context, order, false, little, out))
+        return;
+    if (length < 0) {
+        raise_error(context, CoreObject::ValueErrorType, U"length argument must be non-negative",
+                    out);
+        return;
+    }
+    Integer value = expanded(integer(context, self.get(context)));
+    const bool negative = value < 0;
+    if (negative && !is_signed) {
+        raise_error(context, CoreObject::OverflowErrorType,
+                    U"can't convert negative int to unsigned", out);
+        return;
+    }
+    if (negative)
+        value = -value - 1;
+    const auto size = static_cast<std::size_t>(length);
+    if (value != 0) {
+        const auto bits = static_cast<std::size_t>(boost::multiprecision::msb(value)) + 1;
+        const auto needed = bits / 8 + ((bits % 8 != 0 || is_signed) ? 1 : 0);
+        if (needed > size) {
+            raise_error(context, CoreObject::OverflowErrorType, U"int too big to convert", out);
+            return;
+        }
+    }
+    if (size > std::string{}.max_size()) {
+        out.raised(context.builtin(CoreObject::MemoryError));
+        return;
+    }
+    std::vector<unsigned char> bytes;
+    boost::multiprecision::export_bits(value, std::back_inserter(bytes), 8, false);
+    std::string data(size, negative ? '\xff' : '\0');
+    for (std::size_t i = 0; i < bytes.size() && i < size; ++i)
+        data[little ? i : size - i - 1] =
+            static_cast<char>(negative ? static_cast<unsigned char>(~bytes[i]) : bytes[i]);
+    make_bytes(context, std::move(data), out);
 }
 void int_hash(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
@@ -902,6 +1118,35 @@ void install_numbers(Attachment &context, std::span<const Handle> core)
     install(U"__bool__", int_bool);
     install(U"bit_length", int_bits<false>);
     install(U"bit_count", int_bits<true>);
+    {
+        RootScope roots(context);
+        ReturnSlot word(context);
+        context.allocate_instance<StrObject>(at(CoreObject::StrType), word, U"big");
+        auto big = roots.root(word.value());
+        SignatureLayout from;
+        from.parameters = {
+            {U"cls", ParameterKind::PositionalOnly},
+            {U"bytes", ParameterKind::PositionalOrKeyword},
+            {U"byteorder", ParameterKind::PositionalOrKeyword, big.get(context)},
+            {U"signed", ParameterKind::KeywordOnly, at(CoreObject::False).get(context)}};
+        install_native_attribute(context, core, at(CoreObject::IntType), U"from_bytes", from,
+                                 int_from_bytes);
+        auto dict = *TypeView(context, at(CoreObject::IntType)).dictionary();
+        auto function = roots.root(*name_lookup(context, dict, U"from_bytes"));
+        ReturnSlot wrapper(context), key(context);
+        context.allocate_instance<ClassMethodObject>(at(CoreObject::ClassMethodType), wrapper,
+                                                     function.get(context));
+        context.allocate_instance<StrObject>(at(CoreObject::StrType), key, U"from_bytes");
+        name_store(context, dict, key.value(), wrapper.value());
+        SignatureLayout to;
+        to.parameters = {
+            {U"self", ParameterKind::PositionalOnly},
+            {U"length", ParameterKind::PositionalOrKeyword, at(CoreObject::IntOne).get(context)},
+            {U"byteorder", ParameterKind::PositionalOrKeyword, big.get(context)},
+            {U"signed", ParameterKind::KeywordOnly, at(CoreObject::False).get(context)}};
+        install_native_attribute(context, core, at(CoreObject::IntType), U"to_bytes", to,
+                                 int_to_bytes);
+    }
     install(U"__int__", int_identity);
     install(U"__index__", int_identity);
     install(U"__getnewargs__", int_getnewargs);

@@ -632,15 +632,15 @@ class Adapter {
                 return make(n, SetExpr{std::move(items)}, 2);
             return make(n, TupleExpr{std::move(items)}, 2);
         }
-        case Rule::slices:
-            if (r.size() == 1 && !has(n, U","))
-                return expression(*r[0]);
-            {
-                TupleExpr t;
-                for (auto p : r)
-                    t.items.push_back(expression(*p));
-                return make(n, std::move(t), 2);
-            }
+        case Rule::slices: {
+            TupleExpr t;
+            for (auto p : r)
+                t.items.push_back(expression(*p));
+            if (t.items.size() == 1 && !has(n, U",") &&
+                !std::holds_alternative<StarredExpr>(t.items[0]->node))
+                return std::move(t.items[0]);
+            return make(n, std::move(t), 2);
+        }
         case Rule::slice:
             if (has(n, U":")) {
                 SliceExpr s;

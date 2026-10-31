@@ -1,0 +1,17 @@
+('utf-8', [b'print(1)\n'])
+('iso-8859-1', [b'# coding: latin-1\n'])
+('utf-8-sig', [b'# coding: utf-8\n'])
+('iso-8859-1', [b'#!/usr/bin/python\n', b'# coding: latin-1\n'])
+('utf-8', [])
+SyntaxError
+SyntaxError
+SyntaxError
+iso-8859-1 r ['# coding: latin-1', 'value = "é"']
+value = "é" 
+['# coding: latin-1\n', 'value = "é"\n']
+value = 12345
+ True
+True
+load virtual_source
+['first\n', 'second\n']
+True

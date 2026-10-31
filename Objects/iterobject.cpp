@@ -1,6 +1,7 @@
 #include "cxxpython/calliterobject.hpp"
 #include "cxxpython/protocol.hpp"
 
+#include <algorithm>
 #include <limits>
 
 namespace cxxpython::core {
@@ -158,6 +159,66 @@ void sequence_iter(Attachment &context, Handle, std::span<const Value> args, Ret
     RootScope roots(context);
     context.allocate_instance<SequenceIteratorObject>(roots.root(context.builtin(Iterator)), out,
                                                       args[0]);
+}
+template <bool Count>
+void tuple_search(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!sequence<TupleObject, CoreObject::TupleType>(context, args[0], out))
+        return;
+    RootScope roots(context);
+    const auto self = roots.root(args[0]), needle = roots.root(args[1]);
+    const auto &items = context.payload<TupleObject>(self).items;
+    const auto length = static_cast<std::int64_t>(items.size());
+    std::int64_t start = 0, stop = length;
+    if constexpr (!Count) {
+        const auto &bounds = context.payload<TupleObject>(args[2]).items;
+        if (bounds.size() > 2) {
+            raise_error(context, CoreObject::TypeErrorType,
+                        U"index expected at most three arguments", out);
+            return;
+        }
+        std::int64_t *positions[] = {&start, &stop};
+        ReturnSlot converted(context);
+        for (std::size_t i = 0; i < bounds.size(); ++i) {
+            index(context, roots.root(bounds[i]), converted);
+            if (converted.tag() == ResultTag::Raised) {
+                out.raised(converted.exception());
+                return;
+            }
+            auto &position = *positions[i];
+            if (!int_fits_signed(context, converted.value(), position))
+                position = int_sign(context, converted.value()) < 0
+                               ? std::numeric_limits<std::int64_t>::min()
+                               : std::numeric_limits<std::int64_t>::max();
+            if (position < 0)
+                position = std::max<std::int64_t>(0, position + length);
+        }
+        stop = std::min(stop, length);
+    }
+    std::size_t count = 0;
+    ReturnSlot equal(context);
+    for (auto i = start; i < stop; ++i) {
+        if (!(i & 1023))
+            context.poll();
+        RootScope iteration(context);
+        container_equal(context, iteration.root(items[i]), needle, equal);
+        if (equal.tag() == ResultTag::Raised) {
+            out.raised(equal.exception());
+            return;
+        }
+        if (equal.value() == context.builtin(CoreObject::True)) {
+            if constexpr (Count)
+                ++count;
+            else {
+                make_int(context, i, out);
+                return;
+            }
+        }
+    }
+    if constexpr (Count)
+        make_int(context, count, out);
+    else
+        raise_error(context, CoreObject::ValueErrorType, U"tuple.index(x): x not in tuple", out);
 }
 template <class T, CoreObject Iterator>
 void sequence_next(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
@@ -412,6 +473,13 @@ void install_iteration(Attachment &context, std::span<const Handle> core)
                              tuple_repeat, {}, NativeSlotKind::Sequence);
     install_native_attribute(context, core, at(CoreObject::TupleType), U"__rmul__", pair,
                              tuple_repeat, {}, NativeSlotKind::Sequence);
+    auto search = pair;
+    search.parameters[1].name = U"value";
+    install_native_attribute(context, core, at(CoreObject::TupleType), U"count", search,
+                             tuple_search<true>);
+    search.varargs = U"bounds";
+    install_native_attribute(context, core, at(CoreObject::TupleType), U"index", search,
+                             tuple_search<false>);
     install_native_attribute(context, core, at(CoreObject::StrType), U"__getitem__", pair,
                              sequence_item<StrObject, CoreObject::StrType>);
     install_native_attribute(

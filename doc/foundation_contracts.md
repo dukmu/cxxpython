@@ -77,6 +77,19 @@ not one atomic transaction. It is the real iter builtin's two-argument path and
 is reused by regex finditer. Full pickle/state, regex/warnings, buffer-release and
 platform performance acceptance remain requirements, not implied completion.
 
+Tuple count/index retain the immutable owner and operands across normal equality
+and index callbacks. Bounds saturate before normalization; no storage lock covers
+callbacks. Warning categories are ordinary traced ExceptionObject instances.
+Python warnings policy uses existing synchronized fields/containers and the
+current attachment's rooted frame chain, not a second exception or stack system.
+Compound filter/context mutations are not advertised as one atomic transaction
+or thread-local capture. The sys.version_info native tuple has no mutable tail,
+constructor bypass or lifetime authority separate from ordinary tracing.
+Int byte conversion snapshots buffer/iterable inputs before native bit import;
+__bytes__, element index, signed truth and subtype-constructor callbacks retain
+their precise operands. Byte output uses magnitude export and two's-complement
+inversion/sign extension without quadratic per-byte whole-integer shifts.
+
 Set/frozenset construction, displays and synchronous set comprehensions use the
 same compiler, call and object protocol paths. A SetObject owns a private traced
 dictionary table; individual membership/insertion/deletion/pop use its existing

@@ -1,0 +1,112 @@
+b'A' 65
+0 0 False   0 0
+0 0 True   0 0
+0 1 False 00 00 0 0
+0 1 True 00 00 0 0
+0 2 False 0000 0000 0 0
+0 2 True 0000 0000 0 0
+0 18 False 000000000000000000000000000000000000 000000000000000000000000000000000000 0 0
+0 18 True 000000000000000000000000000000000000 000000000000000000000000000000000000 0 0
+1 0 False OverflowError int too big to convert
+1 0 True OverflowError int too big to convert
+1 1 False 01 01 1 1
+1 1 True 01 01 1 1
+1 2 False 0001 0100 1 1
+1 2 True 0001 0100 1 1
+1 18 False 000000000000000000000000000000000001 010000000000000000000000000000000000 1 1
+1 18 True 000000000000000000000000000000000001 010000000000000000000000000000000000 1 1
+127 0 False OverflowError int too big to convert
+127 0 True OverflowError int too big to convert
+127 1 False 7f 7f 127 127
+127 1 True 7f 7f 127 127
+127 2 False 007f 7f00 127 127
+127 2 True 007f 7f00 127 127
+127 18 False 00000000000000000000000000000000007f 7f0000000000000000000000000000000000 127 127
+127 18 True 00000000000000000000000000000000007f 7f0000000000000000000000000000000000 127 127
+128 0 False OverflowError int too big to convert
+128 0 True OverflowError int too big to convert
+128 1 False 80 80 128 128
+128 1 True OverflowError int too big to convert
+128 2 False 0080 8000 128 128
+128 2 True 0080 8000 128 128
+128 18 False 000000000000000000000000000000000080 800000000000000000000000000000000000 128 128
+128 18 True 000000000000000000000000000000000080 800000000000000000000000000000000000 128 128
+255 0 False OverflowError int too big to convert
+255 0 True OverflowError int too big to convert
+255 1 False ff ff 255 255
+255 1 True OverflowError int too big to convert
+255 2 False 00ff ff00 255 255
+255 2 True 00ff ff00 255 255
+255 18 False 0000000000000000000000000000000000ff ff0000000000000000000000000000000000 255 255
+255 18 True 0000000000000000000000000000000000ff ff0000000000000000000000000000000000 255 255
+256 0 False OverflowError int too big to convert
+256 0 True OverflowError int too big to convert
+256 1 False OverflowError int too big to convert
+256 1 True OverflowError int too big to convert
+256 2 False 0100 0001 256 256
+256 2 True 0100 0001 256 256
+256 18 False 000000000000000000000000000000000100 000100000000000000000000000000000000 256 256
+256 18 True 000000000000000000000000000000000100 000100000000000000000000000000000000 256 256
+-1 0 False OverflowError can't convert negative int to unsigned
+-1 0 True   0 0
+-1 1 False OverflowError can't convert negative int to unsigned
+-1 1 True ff ff -1 -1
+-1 2 False OverflowError can't convert negative int to unsigned
+-1 2 True ffff ffff -1 -1
+-1 18 False OverflowError can't convert negative int to unsigned
+-1 18 True ffffffffffffffffffffffffffffffffffff ffffffffffffffffffffffffffffffffffff -1 -1
+-128 0 False OverflowError can't convert negative int to unsigned
+-128 0 True OverflowError int too big to convert
+-128 1 False OverflowError can't convert negative int to unsigned
+-128 1 True 80 80 -128 -128
+-128 2 False OverflowError can't convert negative int to unsigned
+-128 2 True ff80 80ff -128 -128
+-128 18 False OverflowError can't convert negative int to unsigned
+-128 18 True ffffffffffffffffffffffffffffffffff80 80ffffffffffffffffffffffffffffffffff -128 -128
+-129 0 False OverflowError can't convert negative int to unsigned
+-129 0 True OverflowError int too big to convert
+-129 1 False OverflowError can't convert negative int to unsigned
+-129 1 True OverflowError int too big to convert
+-129 2 False OverflowError can't convert negative int to unsigned
+-129 2 True ff7f 7fff -129 -129
+-129 18 False OverflowError can't convert negative int to unsigned
+-129 18 True ffffffffffffffffffffffffffffffffff7f 7fffffffffffffffffffffffffffffffffff -129 -129
+1361129467683753853853498429727072845947 0 False OverflowError int too big to convert
+1361129467683753853853498429727072845947 0 True OverflowError int too big to convert
+1361129467683753853853498429727072845947 1 False OverflowError int too big to convert
+1361129467683753853853498429727072845947 1 True OverflowError int too big to convert
+1361129467683753853853498429727072845947 2 False OverflowError int too big to convert
+1361129467683753853853498429727072845947 2 True OverflowError int too big to convert
+1361129467683753853853498429727072845947 18 False 00040000000000000000000000000000007b 7b0000000000000000000000000000000400 1361129467683753853853498429727072845947 1361129467683753853853498429727072845947
+1361129467683753853853498429727072845947 18 True 00040000000000000000000000000000007b 7b0000000000000000000000000000000400 1361129467683753853853498429727072845947 1361129467683753853853498429727072845947
+index
+bool
+0102
+bool
+bytes
+-128
+258
+index
+767
+258
+258
+259
+child 3
+Child
+-128
+ValueError length argument must be non-negative
+OverflowError Python int too large to convert to C ssize_t
+bool
+ValueError byteorder must be either 'little' or 'big'
+bool
+ValueError byteorder must be either 'little' or 'big'
+TypeError to_bytes() argument 'byteorder' must be str, not None
+TypeError from_bytes() argument 'byteorder' must be str, not None
+ValueError bytes must be in range(0, 256)
+ValueError bytes must be in range(0, 256)
+TypeError cannot convert 'str' object to bytes
+TypeError cannot convert 'int' object to bytes
+TypeError __bytes__ returned non-bytes (type int)
+RuntimeError iteration
+True
+True

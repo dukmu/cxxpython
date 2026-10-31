@@ -1,0 +1,13 @@
+sys version_info True 5
+3 12 14 final 0
+True (3, 12, 14, 'final', 0) sys.version_info(major=3, minor=12, micro=14, releaselevel='final', serial=0) True
+True True True
+5 5 0
+True True []
+TypeError
+TypeError
+TypeError
+AttributeError
+TypeError
+TypeError
+True True

@@ -1,0 +1,13 @@
+value True
+(<class 'str'>, <class 'int'>) (<class 'int'>, <class 'NoneType'>)
+True
+True 42 True
+True (<class 'str'>,)
+True 9
+(<class 'str'>,)
+True tuple[A, A]
+True (<class 'int'>,)
+((<class 'str'>, <class 'int'>),) (<class 'str'>, <class 'int'>)
+(~T, <class 'int'>) True
+True True
+42 True

@@ -56,6 +56,35 @@ template <CoreObject Type> void result_bytes(Attachment &c, std::string data, Re
         make_bytearray(c, std::move(data), out);
 }
 
+// CPython 3.12.14 Objects/bytes_methods.c: only ASCII letters are case-mapped.
+template <CoreObject Type, bool Upper>
+void change_case(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(c);
+    auto self = roots.root(args[0]);
+    if (!receiver<Type>(c, self, out))
+        return;
+    std::string data;
+    if (!bytes_arg(c, self, data, out))
+        return;
+    if constexpr (Type == CoreObject::BytesType)
+        if (data.empty() && c.type_of(self) == c.builtin(Type)) {
+            out.ok(self.get(c));
+            return;
+        }
+    for (std::size_t i = 0; i < data.size(); ++i) {
+        if (!(i & 4095))
+            c.poll();
+        auto &ch = data[i];
+        if constexpr (Upper) {
+            if (ch >= 'a' && ch <= 'z')
+                ch -= 'a' - 'A';
+        } else if (ch >= 'A' && ch <= 'Z')
+            ch += 'a' - 'A';
+    }
+    result_bytes<Type>(c, std::move(data), out);
+}
+
 template <CoreObject Type>
 void translate(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
 {
@@ -363,6 +392,14 @@ void detail::install_bytes_methods(Attachment &c, std::span<const Handle> core)
                        NativeEntry entry) {
         install_native_attribute(c, core, at(owner), name, std::move(signature), entry);
     };
+    SignatureLayout unary;
+    unary.parameters = {{U"self", ParameterKind::PositionalOnly}};
+    install(CoreObject::BytesType, U"upper", unary, change_case<CoreObject::BytesType, true>);
+    install(CoreObject::BytesType, U"lower", unary, change_case<CoreObject::BytesType, false>);
+    install(CoreObject::ByteArrayType, U"upper", unary,
+            change_case<CoreObject::ByteArrayType, true>);
+    install(CoreObject::ByteArrayType, U"lower", unary,
+            change_case<CoreObject::ByteArrayType, false>);
     SignatureLayout search_sig;
     search_sig.parameters = {
         {U"self", ParameterKind::PositionalOnly},

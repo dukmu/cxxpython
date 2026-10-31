@@ -57,8 +57,9 @@ bool FrameObject::unwind(Attachment &context)
 {
     const auto layouts = context.payload<CodeObject>(code).program.regions();
     for (;;) {
-        const auto top = regions.empty() ? std::optional<RegionToken>{} : regions.back().token;
-        if (const auto *normal = std::get_if<NormalExit>(&*reason); normal && normal->stop == top) {
+        const auto *top = regions.empty() ? nullptr : &regions.back().token;
+        if (const auto *normal = std::get_if<NormalExit>(&*reason);
+            normal && (normal->stop ? top && *normal->stop == *top : !top)) {
             pc = normal->pc;
             reason.reset();
             return true;

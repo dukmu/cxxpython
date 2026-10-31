@@ -763,9 +763,9 @@ void detail::next_dict_item(Attachment &context, Handle iterator, ReturnSlot &ou
         }
         if (view) {
             context.load(iterator.get(context), state.snapshot, snapshot);
-            const auto old = snapshot.tag() == ResultTag::Ok
-                                 ? std::optional<Value>{snapshot.value()}
-                                 : std::nullopt;
+            std::optional<Value> old;
+            if (snapshot.tag() == ResultTag::Ok)
+                old.emplace(snapshot.value());
             const auto current = view->storage();
             if (old != current) {
                 if (old) {

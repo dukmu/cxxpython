@@ -1,0 +1,34 @@
+Warning builtins True True True
+True True ('message', 42) ('message', 42) Warning('message', 42)
+True
+UserWarning builtins True True True
+True True ('message', 42) ('message', 42) UserWarning('message', 42)
+True
+DeprecationWarning builtins True True True
+True True ('message', 42) ('message', 42) DeprecationWarning('message', 42)
+True
+PendingDeprecationWarning builtins True True True
+True True ('message', 42) ('message', 42) PendingDeprecationWarning('message', 42)
+True
+SyntaxWarning builtins True True True
+True True ('message', 42) ('message', 42) SyntaxWarning('message', 42)
+True
+RuntimeWarning builtins True True True
+True True ('message', 42) ('message', 42) RuntimeWarning('message', 42)
+True
+FutureWarning builtins True True True
+True True ('message', 42) ('message', 42) FutureWarning('message', 42)
+True
+ImportWarning builtins True True True
+True True ('message', 42) ('message', 42) ImportWarning('message', 42)
+True
+UnicodeWarning builtins True True True
+True True ('message', 42) ('message', 42) UnicodeWarning('message', 42)
+True
+BytesWarning builtins True True True
+True True ('message', 42) ('message', 42) BytesWarning('message', 42)
+True
+ResourceWarning builtins True True True
+True True ('message', 42) ('message', 42) ResourceWarning('message', 42)
+True
+True ('custom',) custom

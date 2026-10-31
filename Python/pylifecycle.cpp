@@ -129,6 +129,28 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
            at(CoreObject::BaseExceptionType));
     define(CoreObject::ExceptionType, "Exception", LayoutDescriptor::of<ExceptionObject>(),
            at(CoreObject::BaseExceptionType));
+    define(CoreObject::WarningType, "Warning", LayoutDescriptor::of<ExceptionObject>(),
+           at(CoreObject::ExceptionType));
+    define(CoreObject::UserWarningType, "UserWarning", LayoutDescriptor::of<ExceptionObject>(),
+           at(CoreObject::WarningType));
+    define(CoreObject::DeprecationWarningType, "DeprecationWarning",
+           LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::WarningType));
+    define(CoreObject::PendingDeprecationWarningType, "PendingDeprecationWarning",
+           LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::WarningType));
+    define(CoreObject::SyntaxWarningType, "SyntaxWarning", LayoutDescriptor::of<ExceptionObject>(),
+           at(CoreObject::WarningType));
+    define(CoreObject::RuntimeWarningType, "RuntimeWarning",
+           LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::WarningType));
+    define(CoreObject::FutureWarningType, "FutureWarning", LayoutDescriptor::of<ExceptionObject>(),
+           at(CoreObject::WarningType));
+    define(CoreObject::ImportWarningType, "ImportWarning", LayoutDescriptor::of<ExceptionObject>(),
+           at(CoreObject::WarningType));
+    define(CoreObject::UnicodeWarningType, "UnicodeWarning",
+           LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::WarningType));
+    define(CoreObject::BytesWarningType, "BytesWarning", LayoutDescriptor::of<ExceptionObject>(),
+           at(CoreObject::WarningType));
+    define(CoreObject::ResourceWarningType, "ResourceWarning",
+           LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::WarningType));
     define(CoreObject::BaseExceptionGroupType, "BaseExceptionGroup",
            LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::BaseExceptionType));
     define(CoreObject::ExceptionGroupType, "ExceptionGroup",
@@ -650,6 +672,17 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                     CoreObject::SystemExitType,
                     CoreObject::GeneratorExitType,
                     CoreObject::ExceptionType,
+                    CoreObject::WarningType,
+                    CoreObject::UserWarningType,
+                    CoreObject::DeprecationWarningType,
+                    CoreObject::PendingDeprecationWarningType,
+                    CoreObject::SyntaxWarningType,
+                    CoreObject::RuntimeWarningType,
+                    CoreObject::FutureWarningType,
+                    CoreObject::ImportWarningType,
+                    CoreObject::UnicodeWarningType,
+                    CoreObject::BytesWarningType,
+                    CoreObject::ResourceWarningType,
                     CoreObject::BaseExceptionGroupType,
                     CoreObject::ExceptionGroupType,
                     CoreObject::AssertionErrorType,

@@ -1,5 +1,73 @@
 # Development Status
 
+## 2026-10-31 Upstream Warnings, Typing And Base64 Dependency Closure
+
+Prepended after 4f317ac, preserving earlier entries. Terra supplied the native
+Warning hierarchy, warning-policy/stack fixtures, starred-subscript adapter and
+fixtures, unchanged Base64 library/fixtures, and integer byte conversion. Parent
+implemented sys metadata, integrated the unchanged Python policy libraries and
+encoding/cache helpers, implemented tuple search and byte case mapping, corrected
+bootstrap/empty-import issues, and completed shared-heap/library acceptance.
+All workers are closed. The full active frontend/import/library/product/
+N4-N6/M0-M9 goal remains active and incomplete; no whole milestone is closed here.
+
+- Warning and ten standard categories reuse ExceptionObject, ordinary inheritance,
+  bootstrap rollback and canonical builtins publication. Unchanged warnings.py
+  runs its upstream pure-Python backend for filters, regex rules, registry
+  invalidation, capture/formatting/hooks, warn_explicit and actual frame/stacklevel/
+  skip-file behavior. Backend-private registry key differences are not presented
+  as public emission differences. Native warning emission, compiler/conversion
+  warnings, CLI -W and full upstream/concurrent context-policy matrices remain.
+- sys.version_info is an immutable native TupleObject subtype with readonly
+  named fields, tuple protocols, repr/hash and constructor/subclass restrictions.
+  version/hexversion describe the fixed language baseline while identifying
+  cxxpython, not a claim of full language support or CPython ABI. warnoptions is
+  the real initially empty option list. No new metadata/lifetime framework exists.
+- Unchanged typing.py now runs its actual Generic hooks, legacy and syntax-created
+  generic classes, parameter/alias substitution, ParamSpec/TypeVarTuple, unions,
+  origin/args and get_type_hints. Four workers share classes/caches/annotation
+  evaluation while collecting; each catches failures and releases its completion
+  gate. Full typing, runtime Protocol/inspect and serialization matrices remain.
+- The actual typing path exposed missing tuple.index; general tuple count/index
+  now retain immutable owners/operands across index/equality/truth callbacks,
+  clip large bounds and preserve subclass/identity behavior. The single-star
+  subscript adapter now constructs a TupleExpr, reusing existing expansion rather
+  than rejecting Generic[*Ts] or adding a typing-specific compiler exception.
+  Script coverage includes load/store/delete order, mixed slices and GC callbacks.
+- Unchanged linecache.py reads files and loader sources through upstream cache
+  policy. tokenize.py retains the upstream encoding-cookie/BOM/open algorithms;
+  its only adaptation defers import _tokenize to the actual tokenizer function.
+  Complete public tokenize/generate_tokens still need that native interface.
+  No name-only accelerator or approximate replacement token stream was added.
+- Unchanged base64.py now runs Base16/32/32hex/64, URL/alternate alphabets,
+  ASCII85/Base85 options and legacy stream helpers. Real failures led to general
+  bytes/bytearray ASCII upper/lower and int.from_bytes/to_bytes, not edits to the
+  Python encoding algorithms. Integer conversion uses native bit import/export,
+  signed/endian/default/overflow rules, bytes/iteration/index/truth protocols and
+  subtype constructors. Tests collect during callbacks, include strided views,
+  zero lengths and larger byte round trips. Integration corrected use of public
+  make_str before core publication and Boost 1.74's empty-range import crash.
+- Release evidence retains the 320-case portable baseline and passes all twelve
+  new/extended direct test.py fixtures on the final binary, plus 86 affected
+  native/source/GC/terminal checks including eight bootstrap-failure shards.
+  Strict ASan/UBSan/LSan and TSan each pass 78 affected checks and all twelve
+  scripts. Sanitizer Debug builds now explicitly use -O1 -g with assertions,
+  frame pointers and all previous detector flags retained. This replaces the
+  preceding node's O0 profile, where import re alone consumed 27 seconds; script,
+  native and terminal limits were not increased. GCC 11 maybe-uninitialized
+  warnings were resolved by explicit optional initialization and equivalent
+  active-region comparison, not by disabling -Werror. Final frozen-source builds,
+  configs, hashes and raw passing/failure logs are retained in .cache/warnings-*.
+  Format-check and diff whitespace checks pass. Earlier valid baseline evidence
+  was reused; no unrelated performance campaign or manual measurement table ran.
+- Next dependencies are the genuine public tokenizer and ast/inspect/reflection
+  closure, then broader dataclasses/debugging/product and native time/threading/
+  I/O library work according to Plan 2. readline/curses/dis/gc REPL requirements
+  and test.py/stdin.bin input separation remain explicit active delivery scope.
+  Absolute performance and complete upstream libraries remain acceptance gaps.
+  Origin push still awaits destination authorization; no bypass was attempted.
+  User test2.py and the temporary_plan.md deletion remain excluded.
+
 ## 2026-10-31 Native SRE, Upstream Re And General Buffer Dependencies
 
 Prepended after 76a677d, preserving earlier entries. Terra supplied the native

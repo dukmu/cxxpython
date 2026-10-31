@@ -20,6 +20,93 @@ bool failed(const ReturnSlot &out)
 {
     return out.tag() == ResultTag::Raised;
 }
+template <std::size_t I> void version_field(Attachment &ctx, Value self, ReturnSlot &out)
+{
+    out.ok(ctx.payload<TupleObject>(self).items[I]);
+}
+void version_repr(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(ctx);
+    auto self = roots.root(args[0]);
+    const char32_t *names[] = {U"major", U"minor", U"micro", U"releaselevel", U"serial"};
+    std::u32string text = U"sys.version_info(";
+    ReturnSlot item(ctx);
+    for (std::size_t i = 0; i < 5; ++i) {
+        if (i)
+            text += U", ";
+        text += names[i];
+        text += U"=";
+        repr(ctx, roots.root(ctx.payload<TupleObject>(self).items[i]), item);
+        if (failed(item)) {
+            out.raised(item.exception());
+            return;
+        }
+        text += ctx.payload<StrObject>(item.value()).value;
+    }
+    text += U")";
+    make_str(ctx, std::move(text), out);
+}
+void version_new(Attachment &ctx, Handle, std::span<const Value>, ReturnSlot &out)
+{
+    raise_error(ctx, CoreObject::TypeErrorType, U"cannot create 'sys.version_info' instances", out);
+}
+void make_version_info(Attachment &ctx, ReturnSlot &out)
+{
+    RootScope roots(ctx);
+    std::vector<Handle> core;
+    for (std::size_t i = 0; i < core_count; ++i)
+        core.push_back(roots.root(ctx.builtin(static_cast<CoreObject>(i))));
+    const Handle bases[] = {roots.root(ctx.builtin(CoreObject::TupleType))};
+    TypeSpec spec{U"version_info", bases};
+    spec.module = U"sys";
+    spec.slots = std::vector<std::u32string>{};
+    ReturnSlot temporary(ctx);
+    create_native_type(ctx, NativeTypeSpec{spec, LayoutDescriptor::of<TupleObject>()}, temporary);
+    if (failed(temporary)) {
+        out.raised(temporary.exception());
+        return;
+    }
+    auto type = roots.root(temporary.value());
+    const char32_t *names[] = {U"major", U"minor", U"micro", U"releaselevel", U"serial"};
+    const NativeGetter getters[] = {version_field<0>, version_field<1>, version_field<2>,
+                                    version_field<3>, version_field<4>};
+    for (std::size_t i = 0; i < 5; ++i)
+        install_native_field(ctx, core, type, names[i], getters[i]);
+    SignatureLayout signature;
+    signature.parameters = {{U"self", ParameterKind::PositionalOnly}};
+    install_native_attribute(ctx, core, type, U"__repr__", signature, version_repr);
+    signature.parameters[0].name = U"cls";
+    signature.varargs = U"args";
+    signature.varkwargs = U"kwargs";
+    install_native_attribute(ctx, core, type, U"__new__", signature, version_new);
+    auto dictionary = roots.root(*TypeView(ctx, type).dictionary());
+    auto constructor = roots.root(*name_lookup(ctx, dictionary.get(ctx), U"__new__"));
+    ctx.allocate_instance<StaticMethodObject>(
+        core[static_cast<std::size_t>(CoreObject::StaticMethodType)], temporary,
+        constructor.get(ctx));
+    auto function = roots.root(temporary.value());
+    make_str(ctx, U"__new__", temporary);
+    name_store(ctx, dictionary.get(ctx), temporary.value(), function.get(ctx));
+    for (const auto &[name, number] :
+         {std::pair{U"n_fields", 5}, {U"n_sequence_fields", 5}, {U"n_unnamed_fields", 0}}) {
+        make_int(ctx, number, temporary);
+        auto value = roots.root(temporary.value());
+        make_str(ctx, name, temporary);
+        name_store(ctx, dictionary.get(ctx), temporary.value(), value.get(ctx));
+    }
+    ctx.payload<TypeObject>(type).subclassable = false;
+    ctx.payload<TypeObject>(type).immutable = true;
+    std::vector<Value> items;
+    for (auto number : {3, 12, 14}) {
+        make_int(ctx, number, temporary);
+        items.push_back(roots.root(temporary.value()).get(ctx));
+    }
+    make_str(ctx, U"final", temporary);
+    items.push_back(roots.root(temporary.value()).get(ctx));
+    make_int(ctx, 0, temporary);
+    items.push_back(roots.root(temporary.value()).get(ctx));
+    ctx.allocate_instance<TupleObject>(type, out, std::move(items));
+}
 template <bool Errors>
 void filesystem_encoding(Attachment &ctx, Handle, std::span<const Value>, ReturnSlot &out)
 {
@@ -494,6 +581,22 @@ void initialize_sys_hooks(Attachment &ctx, Handle sys, ReturnSlot &out)
         return;
     make_int(ctx, 0x10ffff, function);
     if (!store(U"maxunicode"))
+        return;
+    make_version_info(ctx, function);
+    if (failed(function)) {
+        out.raised(function.exception());
+        return;
+    }
+    if (!store(U"version_info"))
+        return;
+    make_str(ctx, U"3.12.14 (cxxpython)", function);
+    if (!store(U"version"))
+        return;
+    make_int(ctx, 0x030c0ef0, function);
+    if (!store(U"hexversion"))
+        return;
+    make_list(ctx, {}, function);
+    if (!store(U"warnoptions"))
         return;
     call(ctx, roots.root(ctx.builtin(CoreObject::SimpleNamespaceType)), {}, function);
     if (failed(function)) {

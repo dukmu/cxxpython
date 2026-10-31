@@ -1,0 +1,26 @@
+always [('repeat', 10), ('repeat', 10), ('repeat', 11), ('repeat', 12), ('other', 10)]
+registry False
+ignore []
+registry False
+default [('repeat', 10), ('repeat', 11), ('repeat', 12), ('other', 10)]
+registry True
+once [('repeat', 10), ('other', 10)]
+registry True
+module [('repeat', 10), ('other', 10)]
+registry True
+error UserWarning failure 0
+regex [('HELLO there', 7)]
+invalidation 2 False True
+instance True RuntimeWarning instance
+format '<format>:1: UserWarning: message\n  source_call()\n'
+showwarning '<format>:1: UserWarning: message\n  supplied()\n'
+hook [('hooked', 'UserWarning', '<hook>', 6, True, None)]
+invalid AssertionError invalid action: 'bad-action'
+invalid AssertionError message must be a string
+invalid AssertionError category must be a Warning subclass
+invalid AssertionError module must be a string
+invalid AssertionError lineno must be an int >= 0
+reenter RuntimeError True
+reuse RuntimeError True
+reexit None
+early exit RuntimeError True

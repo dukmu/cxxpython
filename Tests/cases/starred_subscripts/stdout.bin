@@ -1,0 +1,10 @@
+(1, 2)
+['target', ('items', 'one'), ('item', 'one', 0), ('item', 'one', 1), ('item', 'one', 2), ('get', (1, 2))]
+()
+['target', ('items', 'empty'), ('item', 'empty', 0), ('get', ())]
+(0, 1, slice(2, 4, 1), 5, 6)
+['target', 'first', ('items', 'a'), ('item', 'a', 0), ('item', 'a', 1), 'start', 'stop', 'step', ('items', 'b'), ('item', 'b', 0), ('item', 'b', 1), ('item', 'b', 2), ('get', (0, 1, slice(2, 4, 1), 5, 6))]
+['rhs', 'target', ('items', 'store'), ('item', 'store', 0), ('item', 'store', 1), ('item', 'store', 2), ('set', (7, 8), 9)]
+['target', ('items', 'delete'), ('item', 'delete', 0), ('item', 'delete', 1), 'last', ('del', (10, 11))]
+12
+['target', 'plain', ('get', 12)]

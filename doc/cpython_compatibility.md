@@ -276,16 +276,50 @@ the target is `builtins` and the `__builtins__` execution namespace.
   inside it. Five VM operations create parameters and generic bases and attach
   function parameters: MAKE_TYPE_VAR, MAKE_PARAM_SPEC, MAKE_TYPE_VAR_TUPLE,
   MAKE_GENERIC_BASE and SET_FUNCTION_TYPE_PARAMS.
-- Generic class compilation is connected, but actual typing/re/warnings imports
-  are not closed. Generic classmethod policy and base construction delegate to
+- Generic class compilation and actual typing/re/warnings imports now run.
+  Generic classmethod policy and base construction delegate to
   real `typing` imports, as do non-None native TypeVar bounds, substitution,
   unions and TypeVarTuple unpacking. Missing imports propagate instead of using
-  fabricated typing policy. Generic function/alias slices are reference-tested,
-  not completed generic-class or typing compatibility. A real upstream typing
-  import probe now passes re and reaches warnings.py's missing Warning hierarchy;
-  warnings and its dependency closure are the next library requirements.
+  fabricated typing policy. Unchanged Lib/typing.py now has direct reference
+  scripts for legacy/syntax generic classes, aliases, ParamSpec/TypeVarTuple,
+  origin/args and get_type_hints. This is not complete upstream typing,
+  runtime protocol/inspect, serialization or concurrent Python-policy acceptance.
   Omitted/None bounds in the public ParamSpec constructor normalize to NoneType;
   syntax-created ParamSpecs retain the reference's None bound instead.
+- Warning and the ten builtin warning categories use ordinary native exceptions.
+  Unchanged Lib/warnings.py uses its upstream pure-Python backend: filtering,
+  capture, warn/warn_explicit, regex rules, registry invalidation, formatting and
+  real frame/stacklevel/skip-file behavior have reference scripts. The two
+  upstream backends differ in private registry key layout; tests compare public
+  emission/invalidations rather than claiming C-backend internal identity.
+  Concurrent catch_warnings is not made thread-local by this port. Native warning
+  emission, parser/conversion warnings, -W options and full upstream tests remain.
+- sys.version_info is a native readonly tuple subtype, including named fields,
+  repr, comparisons/hash and constructor/subclass restrictions. version and
+  hexversion report the pinned language baseline, while version identifies
+  cxxpython explicitly; this does not claim CPython ABI or a completed language.
+  warnoptions starts as the actual empty option list; CLI -W is still a gate.
+  Tuple count/index perform normal identity/equality/index protocols with clipped
+  bounds and GC-safe callbacks, including subclasses. Single-star subscripts
+  construct tuple indexes, not an otherwise invalid standalone StarredExpr.
+- Unchanged Lib/linecache.py and the upstream Lib/tokenize.py encoding/open
+  helpers handle real files, encoding cookies/BOM/errors, cache invalidation and
+  loader sources. The sole tokenize adaptation defers import _tokenize until
+  _generate_tokens_from_c_tokenizer, preserving the actual encoding algorithms.
+  Remove that import-timing difference when the native public tokenizer lands.
+  tokenize/generate_tokens remain experimental and raise the actual missing
+  native-module import error; no fake _tokenize or approximate token stream exists.
+- Lib/base64.py is unchanged pinned source. RFC Base16/32/32hex/64, URL/alternate
+  alphabets, ASCII85/Base85 options, malformed inputs and legacy stream/bytes
+  helpers exercise the real binascii/struct/re closure. bytes/bytearray upper and
+  lower use ASCII mapping, independent snapshots and base-family results.
+  int.from_bytes/to_bytes use native arbitrary-precision bit import/export,
+  Python __bytes__/iteration/index/truth protocols, endian/sign defaults and
+  subclass construction. Signed boundaries, zero length, empty input, strided
+  memoryviews, GC inside callbacks and larger round trips have reference tests.
+  The Boost 1.74 empty-range import defect is avoided by keeping the already-zero
+  result, not by reading an invalid zero-limb backend. Full integer diagnostics,
+  generic buffer exporters and native signal interruption remain gates.
 - VM dis resolves fast-local names through _opcode.local_names rather than
   indexing the cell-filtered co_varnames with the VM's internal slot number.
   Real generic wrapper graphs exercise these otherwise sparse slot indices.
