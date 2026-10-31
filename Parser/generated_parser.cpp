@@ -263,6 +263,7 @@ NodePtr start(InputMode mode) {
 switch(mode) {
 case InputMode::File: return rule_file();
 case InputMode::Eval: return rule_eval();
+case InputMode::Single:
 case InputMode::Interactive: return rule_interactive();
 case InputMode::FunctionType: return rule_func_type();
 }
@@ -8690,17 +8691,19 @@ return {};
 }
 };
 } // namespace
-Tree parse(std::string_view source, InputMode mode, bool allow_incomplete) {
-try {
-GeneratedParser parser(tokenize(source, mode, allow_incomplete), allow_incomplete);
+Tree parse(std::string_view source, InputMode mode, ParseFlags flags) {
+const auto run = [&](bool diagnostics) {
+TokenStream stream(false, mode, flags);
+GeneratedParser parser(stream, source_tokens(stream, source, mode, flags), flags, diagnostics);
 auto root = parser.start(mode);
-return parser.finish(std::move(root));
+return parser.finish(std::move(root), mode);
+};
+try {
+return run(false);
 } catch (const Error &first) {
 if (first.kind != ErrorKind::Syntax || std::string_view(first.what()) != "invalid syntax") throw;
 try {
-GeneratedParser parser(tokenize(source, mode, allow_incomplete), allow_incomplete, true);
-auto root = parser.start(mode);
-parser.finish(std::move(root));
+run(true);
 } catch (const LiteralDiagnostic &) { throw; }
 catch (const Error &) {}
 throw;

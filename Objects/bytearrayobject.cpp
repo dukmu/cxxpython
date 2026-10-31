@@ -845,7 +845,7 @@ void detail::install_bytearrays(Attachment &c, std::span<const Handle> core)
     c.allocate_instance<StrObject>(at(CoreObject::StrType), key, U"__hash__");
     name_store(c, dictionary, key.value(), at(CoreObject::None).get(c));
     install(type, U"__init__", variadic, initialize);
-    for (auto [name, entry] : {std::pair{U"__repr__", representation},
+    for (auto [name, entry] : {std::pair{U"__repr__", &representation},
                                {U"__str__", representation},
                                {U"__len__", size},
                                {U"__iter__", iterator},
@@ -853,7 +853,7 @@ void detail::install_bytearrays(Attachment &c, std::span<const Handle> core)
                                {U"reverse", simple<1>},
                                {U"copy", simple<2>}})
         install(type, name, unary, entry);
-    for (auto [name, entry] : {std::pair{U"__getitem__", item<ItemOp::Get>},
+    for (auto [name, entry] : {std::pair{U"__getitem__", &item<ItemOp::Get>},
                                {U"__delitem__", item<ItemOp::Delete>},
                                {U"__contains__", contains},
                                {U"append", append},

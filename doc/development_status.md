@@ -1,5 +1,73 @@
 # Development Status
 
+## 2026-10-31 Strict Clang 21 And Upstream Interactive Compilation
+
+Prepended after 1188dc3 without rewriting earlier evidence. This completes the
+current compiler/console slice, not the full frontend/import/library/N4-N6/M0-M9
+goal. Terra supplied public Code positions, traceback fixtures, KeyboardInterrupt
+and Clang function-pointer deduction fixes; parent integrated lazy compilation,
+input flags, ownership portability and final acceptance. All workers are closed.
+
+- Installed the official LLVM APT Clang 21.1.8 toolchain under ignored
+  .cache/deps/clang-21.1.8, not /tmp or system directories. Release and both
+  sanitizer builds use that exact C/C++ compiler. AGENTS.md now requires it for
+  strict acceptance. The complete project builds with -Wall -Wextra -Wpedantic
+  -Werror. The SRE groupindex root now participates in the actual payload read;
+  no necessary GC root was discarded or unused-warning suppression introduced.
+  The preceding BLAKE2 deletion also passes this Clang build, superseding the
+  earlier entry's GCC-only evidence.
+- Clang exposed non-standard-layout payloads containing libstdc++ unique_ptr.
+  A single-pointer NativeOwner now owns only the affected native state, retaining
+  all header/layout assertions and precise traversal by the enclosing payload.
+  Ordinary local native ownership remains unique_ptr. Native collection and
+  throwing-constructor tests verify exact cleanup without publication or a second
+  managed lifetime mechanism. Function entries use explicit addresses where
+  Clang/libstdc++ pair deduction otherwise inferred an invalid function field.
+- Generated PEG rules now pull from the existing shared lexer on demand and cache
+  tokens for backtracking. Earlier grammar failures no longer lose to unrelated
+  later lexical failures. Source Single and real prompt Interactive modes are
+  distinct; independent 0x200/0x4000 compile flags control implied dedent and
+  incomplete input without leaking into co_flags/future inheritance. No handwritten
+  grammar, second lexer, Python policy substitute or fallback parser was added.
+- Unchanged pinned codeop.py and code.py run their actual completion/future-memory
+  and console policy. Direct fixtures retain 168 literal upstream codeop samples,
+  an independent exec/eval/single flag matrix, real stdin commands, hooks,
+  multiline buffering, SystemExit and exception/KeyboardInterrupt recovery.
+  KeyboardInterrupt is an ordinary canonical BaseException subtype. Native
+  parsing/scope/CFG work parks only after source snapshots; managed freeze and
+  Python exception publication resume Active. Four compiling/executing threads
+  plus a collecting thread pass on the same Interpreter/shared heap. This is a
+  correctness fixture, not a new CPU-parallelism or performance acceptance claim.
+- Code.co_positions/co_lines and Frame.f_lasti expose actual immutable program
+  positions and the atomic cursor. Tuple snapshot iterators retain precise roots.
+  Pinned traceback.py changes only its private position lookup from CPython
+  wordcode offsets to actual VM instruction indexes. Direct exception/console
+  fixtures and the VM metadata/UTF-8-column/GC snapshot fixture pass. Public ast,
+  unicodedata, frame.clear and full traceback/reflection compatibility remain
+  real dependencies, not name-only modules or fabricated co_code.
+- Clang Release passes the 348-case portable baseline, 60 affected native/entry/
+  bootstrap checks (including all eight failure shards), grammar corpus checks
+  and the VM positions fixture. After the final native compilation parking edit,
+  the five directly affected compile/console fixtures pass, including the new
+  compiler_parallel case. Unchanged evidence is reused rather than running the
+  whole baseline again. The independent parser's standard-library-only contract
+  and 244-rule generated-source check remain intact.
+- Fresh Clang ASan/UBSan/LSan and TSan builds each pass 66 affected native parser/
+  ownership/epoch/parallel/compiler checks, all nine new direct Python fixtures,
+  the VM positions fixture and both existing hashlib fixtures. Debug uses -O1 -g,
+  assertions and frame pointers; leak/race/error detection stays enabled and
+  existing timeouts are unchanged. Raw .cache/clang21-*-cases.log records nine
+  passes followed by a driver error from the mistaken nonexistent hashlib_core
+  selection; corrected hashlib_vectors/hashlib_parameters pass separately in
+  .cache/clang21-*-hashlib.log. No failed driver invocation is counted as a full
+  passing suite. Build/configuration and all raw acceptance logs remain in .cache/.
+- Format-check, generated-source and whitespace checks pass. No new checksum
+  system or unrelated performance campaign was introduced. The next dependency
+  is actual public AST/reflection and the remaining Base-to-Full library/product
+  closure, including readline/curses/dis/gc and full N4-N6 acceptance. User
+  test2.py and the temporary_plan.md deletion remain excluded. No denied remote
+  push was retried; the active service goal remains incomplete.
+
 ## 2026-10-31 BLAKE2 Unused Local Helpers
 
 Removed twenty-two unused clear-state/parameter-setter helpers from the two

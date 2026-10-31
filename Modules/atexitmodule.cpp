@@ -30,7 +30,7 @@ struct ExitState {
         std::thread::id runner;
         std::size_t run_depth = 0;
     };
-    const std::unique_ptr<Storage> storage;
+    const NativeOwner<Storage> storage;
     explicit ExitState(InitialType type) : header(type), storage(std::make_unique<Storage>()) {}
     void trace(Tracer &tracer) const noexcept
     {

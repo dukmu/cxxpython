@@ -1,5 +1,7 @@
 #pragma once
 
+#include "cxxpython/nativeowner.hpp"
+
 #include <array>
 #include <atomic>
 #include <cstddef>
@@ -43,6 +45,7 @@ enum class CoreObject : std::size_t {
     BaseExceptionType,
     SystemExitType,
     GeneratorExitType,
+    KeyboardInterruptType,
     ExceptionType,
     WarningType,
     UserWarningType,

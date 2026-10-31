@@ -1102,7 +1102,7 @@ void install_numbers(Attachment &context, std::span<const Handle> core)
     install(U"__rxor__", integer_extended<BinaryOp::BitXor, true>, true);
     install(U"__or__", integer_extended<BinaryOp::BitOr, false>, true);
     install(U"__ror__", integer_extended<BinaryOp::BitOr, true>, true);
-    for (auto [name, entry] : {std::pair{U"__and__", bool_bitwise<BinaryOp::BitAnd>},
+    for (auto [name, entry] : {std::pair{U"__and__", &bool_bitwise<BinaryOp::BitAnd>},
                                {U"__rand__", bool_bitwise<BinaryOp::BitAnd>},
                                {U"__xor__", bool_bitwise<BinaryOp::BitXor>},
                                {U"__rxor__", bool_bitwise<BinaryOp::BitXor>},

@@ -46,6 +46,26 @@ struct FailingNode {
     void trace(Tracer &) const noexcept {}
 };
 
+struct CountedStorage {
+    int &destroyed;
+    explicit CountedStorage(int &count) : destroyed(count) {}
+    ~CountedStorage()
+    {
+        ++destroyed;
+    }
+};
+struct OwningNode {
+    ObjectHeader header;
+    const NativeOwner<CountedStorage> storage;
+    OwningNode(InitialType head, int &destroyed, bool fail)
+        : header(head), storage(std::make_unique<CountedStorage>(destroyed))
+    {
+        if (fail)
+            throw std::bad_alloc();
+    }
+    void trace(Tracer &) const noexcept {}
+};
+
 struct alignas(4096) LargeLeaf {
     ObjectHeader header;
     std::byte payload[128 * 1024]{};
@@ -296,6 +316,28 @@ TEST(FoundationMemory, FailedConstructionDoesNotPublishOrLeak)
     EXPECT_EQ(out.result().tag(), ResultTag::Empty);
     EXPECT_EQ(context.stats().objects, 0U);
     EXPECT_EQ(context.stats().live_bytes, 0U);
+}
+
+TEST(FoundationMemory, StandardLayoutNativeOwnersReleaseOnCollectionAndConstructorFailure)
+{
+    static_assert(std::is_standard_layout_v<OwningNode>);
+    static_assert(!std::is_copy_constructible_v<NativeOwner<CountedStorage>>);
+    static_assert(!std::is_move_constructible_v<NativeOwner<CountedStorage>>);
+    Interpreter interpreter;
+    Attachment context(interpreter);
+    int destroyed = 0;
+    {
+        ReturnSlot out(context);
+        context.allocate<OwningNode>(out, destroyed, false);
+        context.collect();
+        EXPECT_EQ(destroyed, 0);
+    }
+    context.collect();
+    EXPECT_EQ(destroyed, 1);
+    ReturnSlot out(context);
+    EXPECT_THROW(context.allocate<OwningNode>(out, destroyed, true), std::bad_alloc);
+    EXPECT_EQ(destroyed, 2);
+    EXPECT_EQ(context.stats().objects, 0u);
 }
 
 TEST(FoundationMemory, LocalSpansReuseSweptSlotsAndReleaseEmptyStorage)

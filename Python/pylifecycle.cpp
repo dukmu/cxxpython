@@ -131,6 +131,8 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
            at(CoreObject::BaseExceptionType));
     define(CoreObject::GeneratorExitType, "GeneratorExit", LayoutDescriptor::of<ExceptionObject>(),
            at(CoreObject::BaseExceptionType));
+    define(CoreObject::KeyboardInterruptType, "KeyboardInterrupt",
+           LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::BaseExceptionType));
     define(CoreObject::ExceptionType, "Exception", LayoutDescriptor::of<ExceptionObject>(),
            at(CoreObject::BaseExceptionType));
     define(CoreObject::WarningType, "Warning", LayoutDescriptor::of<ExceptionObject>(),
@@ -515,7 +517,9 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                         U"instance attributes and cannot be given any.\n"},
               std::pair{context.type_type(),
                         U"type(object) -> the object's type\ntype(name, bases, dict, "
-                        U"**kwds) -> a new type"}}) {
+                        U"**kwds) -> a new type"},
+              std::pair{at(CoreObject::KeyboardInterruptType).get(context),
+                        U"Program interrupted by user."}}) {
             context.allocate_instance<StrObject>(
                 core[static_cast<std::size_t>(CoreObject::StrType)], documentation, text);
             name_store(context, *TypeView(context, type).dictionary(), name.value(),
@@ -675,6 +679,7 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                     CoreObject::BaseExceptionType,
                     CoreObject::SystemExitType,
                     CoreObject::GeneratorExitType,
+                    CoreObject::KeyboardInterruptType,
                     CoreObject::ExceptionType,
                     CoreObject::WarningType,
                     CoreObject::UserWarningType,

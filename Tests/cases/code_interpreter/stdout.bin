@@ -1,0 +1,20 @@
+prompts ['>>> ', '>>> ', '... ', '... ', '>>> ', '>>> ', '>>> ']
+messages ['test console\n', '\nKeyboardInterrupt\n', '\n', 'finished\n']
+namespace 7 7
+buffer []
+complete False
+incomplete True
+separate incomplete True
+namespace unchanged 4
+completed block False
+namespace changed 8
+runtime error False
+syntax error False
+hook events [('ValueError', ('failed',)), ('SyntaxError', ('invalid syntax', ('<input>', 1, 10, 'number = @', 1, 11)))]
+runtime hook frame <module>
+last exception SyntaxError
+SystemExit propagated (7,)
+export InteractiveInterpreter True
+export InteractiveConsole True
+export interact True
+export compile_command True

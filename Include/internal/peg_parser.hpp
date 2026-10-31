@@ -7,6 +7,9 @@
 #include <utility>
 
 namespace cxxpython::syntax {
+using TokenReader = std::function<std::optional<Token>()>;
+// Both the reader and parser borrow the stream/source for the parse call.
+TokenReader source_tokens(TokenStream &, std::string_view, InputMode, ParseFlags);
 class LiteralDiagnostic : public Error {
   public:
     using Error::Error;
@@ -14,16 +17,24 @@ class LiteralDiagnostic : public Error {
 // Native per-parse state. The generated rules never access the Python heap.
 class ParserBase {
   public:
-    explicit ParserBase(std::vector<Token> tokens, bool allow_incomplete = false,
+    explicit ParserBase(const TokenStream &stream, TokenReader reader, ParseFlags flags,
                         bool diagnostics = false)
-        : diagnostics_(diagnostics), tokens_(std::move(tokens)), allow_incomplete_(allow_incomplete)
+        : diagnostics_(diagnostics), stream_(stream), reader_(std::move(reader)),
+          allow_incomplete_(enabled(flags, ParseFlags::AllowIncompleteInput))
     {}
     virtual ~ParserBase() = default;
-    Tree finish(NodePtr root)
+    Tree finish(NodePtr root, InputMode mode)
     {
-        if (root && mark_ + 1 == tokens_.size() && tokens_[mark_].kind == TokenKind::ENDMARKER)
+        if (!root)
+            error();
+        if (mode == InputMode::Single && ensure(mark_) &&
+            tokens_[mark_].kind == TokenKind::NEWLINE &&
+            tokens_[mark_].span.begin == tokens_[mark_].span.end && ensure(mark_ + 1) &&
+            tokens_[mark_ + 1].kind == TokenKind::ENDMARKER)
             ++mark_;
-        if (!root || mark_ != tokens_.size())
+        if (ensure(mark_) && tokens_[mark_].kind == TokenKind::ENDMARKER)
+            ++mark_;
+        if (ensure(mark_))
             error();
         return {std::move(tokens_), std::move(root)};
     }
@@ -49,7 +60,7 @@ class ParserBase {
     [[noreturn]] void error() const
     {
         const auto at = std::min(farthest_, tokens_.size() - 1);
-        if (allow_incomplete_ && tokens_[at].kind == TokenKind::ENDMARKER)
+        if (allow_incomplete_ && stream_.end_of_source())
             throw Error(tokens_[at].span, "incomplete input", ErrorKind::Incomplete);
         if (expected_indent_ || tokens_[at].kind == TokenKind::INDENT)
             throw Error(tokens_[at].span,
@@ -118,7 +129,7 @@ class ParserBase {
     }
     NodePtr expect(TokenKind kind)
     {
-        if (mark_ < tokens_.size() && tokens_[mark_].kind == kind &&
+        if (ensure(mark_) && tokens_[mark_].kind == kind &&
             (kind != TokenKind::NAME || !reserved(tokens_[mark_].text))) {
             const auto begin = mark_++;
             return make(Rule::Token, 0, begin);
@@ -132,7 +143,7 @@ class ParserBase {
     }
     NodePtr expect(std::u32string_view literal)
     {
-        if (mark_ < tokens_.size() && tokens_[mark_].text == literal) {
+        if (ensure(mark_) && tokens_[mark_].text == literal) {
             const auto begin = mark_++;
             return make(Rule::Token, 0, begin);
         }
@@ -274,6 +285,19 @@ class ParserBase {
     bool diagnostics_ = false;
 
   private:
+    bool ensure(std::size_t at)
+    {
+        while (at >= tokens_.size() && !ended_) {
+            auto token = reader_();
+            if (!token)
+                ended_ = true;
+            else {
+                ended_ = token->kind == TokenKind::ENDMARKER;
+                tokens_.push_back(std::move(*token));
+            }
+        }
+        return at < tokens_.size();
+    }
     struct Key {
         std::size_t mark;
         Rule rule;
@@ -290,9 +314,12 @@ class ParserBase {
         std::size_t end;
     };
     std::vector<Token> tokens_;
+    const TokenStream &stream_;
+    TokenReader reader_;
     std::unordered_map<Key, Memo, KeyHash> memo_;
     std::size_t farthest_ = 0, depth_ = 0;
     bool expected_indent_ = false;
     bool allow_incomplete_ = false;
+    bool ended_ = false;
 };
 } // namespace cxxpython::syntax

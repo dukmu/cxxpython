@@ -1,0 +1,4 @@
+positions and line ranges match actual VM metadata
+UTF-8 byte columns and traceback instruction index match
+frame instruction position and metadata are readonly
+position snapshots survive Code collection

@@ -341,7 +341,7 @@ struct SourceProgram {
     std::vector<FunctionGraph> graphs;
     std::uint32_t future_flags = 0;
 };
-Suite parse_source(const SourceBuffer &source, InputMode mode);
+Suite parse_source(const SourceBuffer &source, InputMode mode, std::uint32_t flags);
 void analyze_scopes(SourceProgram &program, Suite &body);
 std::u32string decode_source(const SourceBuffer &source, Span span);
 std::u32string decode_filename(const SourceBuffer &source);

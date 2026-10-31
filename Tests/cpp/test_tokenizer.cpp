@@ -8,6 +8,7 @@ std::u32string normalize_identifier(std::u32string_view input);
 
 namespace {
 using namespace cxxpython::syntax;
+constexpr auto incomplete = ParseFlags::AllowIncompleteInput;
 
 TEST(ParserLiterals, RejectsMalformedStringEscapes)
 {
@@ -144,14 +145,14 @@ TEST(InteractiveSyntax, CompletenessAndErrors)
           "for x in y:\n    pass\n\n", "try:\n    pass\nexcept:\n    pass\n\n", "x = (\n  1\n)\n",
           "x = '''a\nb'''\n", "x = 1 + \\\n  2\n"}) {
         SCOPED_TRACE(source);
-        EXPECT_NO_THROW(parse(source, InputMode::Interactive, true));
+        EXPECT_NO_THROW(parse(source, InputMode::Interactive, incomplete));
     }
     for (const char *source :
          {"if x:\n", "if x:\n    pass\n", "if x:\n    if y:\n        pass\n",
           "for x in y:\n    pass\n", "try:\n    pass\n", "x = (\n", "x = '''a\n", "x = 1 + \\\n"}) {
         SCOPED_TRACE(source);
         try {
-            parse(source, InputMode::Interactive, true);
+            parse(source, InputMode::Interactive, incomplete);
             ADD_FAILURE() << "expected incomplete input";
         } catch (const Error &error) {
             EXPECT_EQ(error.kind, ErrorKind::Incomplete);
@@ -160,7 +161,7 @@ TEST(InteractiveSyntax, CompletenessAndErrors)
     for (const char *source : {"x=\n", "x+\n", "x = 'abc\n", "if x:\n  pass\n pass\n"}) {
         SCOPED_TRACE(source);
         try {
-            parse(source, InputMode::Interactive, true);
+            parse(source, InputMode::Interactive, incomplete);
             ADD_FAILURE() << "expected syntax error";
         } catch (const Error &error) {
             EXPECT_NE(error.kind, ErrorKind::Incomplete);
@@ -176,7 +177,8 @@ TEST(InteractiveSyntax, UnterminatedStringsAtEof)
         SCOPED_TRACE(source);
         for (bool allow_incomplete : {false, true}) {
             try {
-                parse(source, InputMode::Interactive, allow_incomplete);
+                parse(source, InputMode::Interactive,
+                      allow_incomplete ? incomplete : ParseFlags::None);
                 ADD_FAILURE() << "expected unterminated string error";
             } catch (const Error &error) {
                 EXPECT_EQ(error.kind, allow_incomplete ? ErrorKind::Incomplete : ErrorKind::Syntax);
@@ -186,10 +188,34 @@ TEST(InteractiveSyntax, UnterminatedStringsAtEof)
     for (const char *source : {"x = 'text\\", "x = f'text\\"}) {
         SCOPED_TRACE(source);
         try {
-            parse(source, InputMode::Interactive, true);
+            parse(source, InputMode::Interactive, incomplete);
             ADD_FAILURE() << "expected unterminated string error";
         } catch (const Error &error) {
             EXPECT_EQ(error.kind, ErrorKind::Syntax);
+        }
+    }
+}
+
+TEST(InteractiveSyntax, SourceCompilationAndPromptCompletionAreDistinct)
+{
+    const auto flags = ParseFlags::DontImplyDedent | ParseFlags::AllowIncompleteInput;
+    EXPECT_NO_THROW(parse("if True:\n pass\n", InputMode::Single, flags));
+    EXPECT_NO_THROW(parse("if True:\n pass", InputMode::Single));
+    EXPECT_NO_THROW(parse("if True: pass\n", InputMode::Single, flags));
+    EXPECT_THROW(parse("if True:\n pass", InputMode::Single, flags), Error);
+    EXPECT_THROW(parse("if True:\n pass\n", InputMode::Interactive, incomplete), Error);
+}
+
+TEST(GeneratedParser, LaterLexicalFailuresDoNotReplaceAnEarlierGrammarFailure)
+{
+    for (const char *source : {"x = (", "x = '''"}) {
+        SCOPED_TRACE(source);
+        try {
+            parse(source, InputMode::Eval, incomplete);
+            ADD_FAILURE() << "expected invalid eval syntax";
+        } catch (const Error &error) {
+            EXPECT_EQ(error.kind, ErrorKind::Syntax);
+            EXPECT_EQ(error.span.begin, 2u);
         }
     }
 }

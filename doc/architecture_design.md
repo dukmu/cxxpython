@@ -25,13 +25,22 @@ needed for explicit regeneration/checks, not normal parser builds or execution.
 
 The lexer state machine in `Parser/tokenizer.cpp` is adapted from pinned CPython
 3.12.14 `Parser/tokenizer.c`. Its caller-owned `syntax::TokenStream` is shared by
-compiler token collection and the native public-tokenizer bridge; it contains
+lazy compiler token consumption and the native public-tokenizer bridge; it contains
 native buffers, indentation/bracket/f-string state and diagnostics, not managed
 Python references. Reader, poll and warning callbacks are borrowed only during
 `next()` and cleared on return or unwind. `Parser/string_parser.cpp` handles
 literal decoding and `Parser/unicode.cpp` supplies identifier/Unicode helpers;
 neither is another grammar recognizer. Public token kinds and character columns
 are adapted separately from the compiler's UTF-8 byte spans.
+
+Generated PEG rules request tokens on demand from that same stream and retain
+an append-only token cache for backtracking. A later lexical error cannot replace
+an earlier grammar failure. Source `single` compilation and actual prompt input
+have distinct lexer modes; incomplete-input and implied-dedent flags remain
+independent. The native parser/IR phase of builtin compile parks its attachment;
+only the subsequent managed Code freeze runs Active. `Lib/codeop.py` and
+`Lib/code.py` retain upstream completion and console policy, rather than adding
+another native interactive parser.
 
 `Parser/source.cpp` owns the runtime's SourceBuffer decoding and diagnostics.
 `Parser/ast.cpp` adapts the generated CST to the existing native compiler AST;

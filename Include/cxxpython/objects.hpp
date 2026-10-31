@@ -52,7 +52,7 @@ bool is_bytes(Attachment &, Value);
 struct IntObject {
     ObjectHeader header;
     const std::int64_t small;
-    const std::unique_ptr<const detail::BigInt> large;
+    const NativeOwner<const detail::BigInt> large;
     IntObject(InitialType head, std::int64_t value);
     IntObject(InitialType head, std::unique_ptr<detail::BigInt> value);
     ~IntObject() noexcept;
@@ -82,7 +82,7 @@ struct ListObject {
         std::uint64_t mutation_epoch = 0;
     };
     ObjectHeader header;
-    const std::unique_ptr<Storage> contents;
+    const NativeOwner<Storage> contents;
     explicit ListObject(InitialType head, std::vector<Value> values = {})
         : header(head), contents(std::make_unique<Storage>())
     {
@@ -177,7 +177,7 @@ struct DictObject {
             return sizeof(Storage) + bytes;
         }
     };
-    const std::unique_ptr<Storage> contents;
+    const NativeOwner<Storage> contents;
     explicit DictObject(InitialType head) : header(head), contents(std::make_unique<Storage>()) {}
     void trace(Tracer &tracer) const noexcept
     {

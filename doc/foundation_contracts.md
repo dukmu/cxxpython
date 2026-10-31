@@ -274,6 +274,14 @@ and Warning callbacks are borrowed for one next() call and cleared on every
 exit. Direct native users must provide exclusive access to a stream; its public
 Python wrapper supplies the execution claim, not an interpreter-wide lock.
 
+The compiler's TokenReader borrows its per-parse TokenStream and source only for
+that parse. Generated PEG rules pull tokens lazily; their cache owns token text
+and spans across backtracking. A failed grammar does not scan an unrelated suffix
+just to collect all tokens. Incomplete-input classification consults the lexer's
+actual EOF state. Source Single mode is not the prompt's Interactive mode:
+DontImplyDedent and AllowIncompleteInput are independent flags, and only Single
+mode synthesizes the permitted EOF terminators for source compilation.
+
 TokenizerIter retains precisely traced reader/encoding/codec-name edges and an
 AtomicGcEdge for the managed line cache. It invokes no reader during construction
 and refills on demand during iteration, not by eagerly reading all source.
@@ -561,6 +569,15 @@ The nonmoving precise tracing collector is the sole lifetime authority. Value
 copies do not adjust Python reference counts. Constructors may allocate host
 storage but cannot run Python, collect or publish partial objects.
 
+Managed payloads retain the formal standard-layout/header-at-offset-zero
+requirement. Owned native state uses the single-pointer NativeOwner where
+std::unique_ptr's implementation would break that requirement; ordinary local
+native ownership still uses std::unique_ptr. NativeOwner only destroys native
+state and supplies no second managed lifetime authority. The containing payload
+traces any managed edges in that state. Constructor failure destroys the owner
+without publishing a partial allocation. Clang 21.1.8 acceptance retains the
+layout assertions and -Wall -Wextra -Wpedantic -Werror, not warning suppressions.
+
 RootScope owns stable cells in the attachment's thread-private arena, reusing
 each cell's existing link for scope membership/free storage. Explicit non-LIFO
 release unlinks before reuse. Handle validates interpreter, arena and generation.
@@ -764,7 +781,7 @@ Python item protocols. Type.__annotations__ consults only the class's own
 namespace, binds descriptor values and lazily publishes an empty dict through
 the existing metadata CAS path, not an independent TypeObject edge.
 
-SourceUnit accepts an explicit future-flags mask and exposes its effective mask;
+SourceUnit accepts explicit compiler flags and exposes its effective future mask;
 VerifiedCode freezes it along with actual nested/generator/coroutine/argument
 traits. co_flags uses Python bit assignments for those real traits, without
 claiming CPython instruction encodings. compile handles supported historical and
@@ -773,6 +790,14 @@ precompiled Code. Imports do not inherit the importer's flags. REPL state retain
 future directives across input units and ordinary -i scripts. Barry comparison
 syntax, other compile modes/options, full type-parameter scope/typing acceptance and -i
 after -m flag handoff remain separate gates.
+
+The parser-only flags 0x200 (DontImplyDedent) and 0x4000
+(AllowIncompleteInput) never leak into co_flags or future inheritance. Builtin
+compile snapshots source/filename before NativeWait; native SourceBuffer,
+parsing, scope analysis and CFG construction access no managed objects while
+parked. The attachment resumes before freezing Code or raising a Python source
+exception. Unchanged pinned codeop.py owns command classification and future
+flag memory; unchanged code.py owns InteractiveInterpreter/InteractiveConsole.
 
 ASYNC_YIELD_VALUE has the same one-slot resumption effect as YIELD_VALUE, may
 allocate/raise and is a safepoint. Verification requires both generator and
@@ -851,6 +876,15 @@ aware Bytecode.stack_effect accounts for actual call-site layouts; standalone
 effects must not interpret call-table indexes as arities. No CPython co_code,
 cache bytes or specialization records are fabricated. Full upstream reflection
 and control-region inspection remain work.
+
+Code.co_positions() returns one immutable tuple per real instruction;
+co_lines() merges consecutive same-line instruction ranges. Their snapshot
+iterators keep the precise owner rooted while allocating and polling. Readonly
+Frame.f_lasti uses the existing atomic instruction cursor. Lib/traceback.py
+adapts only its private position lookup from CPython wordcode offsets to these
+instruction indexes. Focused exception/console formatting works; public ast,
+unicodedata, frame.clear and the complete traceback/reflection matrix remain
+dependencies rather than fabricated metadata or empty native modules.
 
 BaseExceptionGroup and ExceptionGroup use the existing exception storage plus
 readonly message/child slots. Construction validates children and group families;

@@ -1587,15 +1587,23 @@ class Adapter {
 };
 } // namespace
 
-Suite parse_source(const SourceBuffer &source, InputMode mode)
+Suite parse_source(const SourceBuffer &source, InputMode mode, std::uint32_t flags)
 {
     try {
-        auto tree = syntax::parse(source.text(), mode == InputMode::Eval ? syntax::InputMode::Eval
-                                                 : mode == InputMode::Single
-                                                     ? syntax::InputMode::Interactive
-                                                     : syntax::InputMode::File);
+        auto options = syntax::ParseFlags::None;
+        if (flags & compile_allow_incomplete_input)
+            options = options | syntax::ParseFlags::AllowIncompleteInput;
+        if (flags & compile_dont_imply_dedent)
+            options = options | syntax::ParseFlags::DontImplyDedent;
+        auto tree = syntax::parse(source.text(),
+                                  mode == InputMode::Eval     ? syntax::InputMode::Eval
+                                  : mode == InputMode::Single ? syntax::InputMode::Single
+                                                              : syntax::InputMode::File,
+                                  options);
         return Adapter(source, std::move(tree)).run(mode);
     } catch (const syntax::Error &error) {
+        if (error.kind == syntax::ErrorKind::Incomplete)
+            throw SourceError(source, {error.span.begin, error.span.end}, "incomplete input");
         SourceErrorKind kind = SourceErrorKind::Syntax;
         switch (error.kind) {
         case syntax::ErrorKind::Indentation:

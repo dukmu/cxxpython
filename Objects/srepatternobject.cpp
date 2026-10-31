@@ -563,7 +563,7 @@ template <int Field> void pattern_field(Attachment &c, Value self, ReturnSlot &o
     if constexpr (Field == 3) {
         RootScope roots(c);
         auto owner = roots.root(self);
-        if (DictView(c, p.groupindex).entries().empty())
+        if (DictView(c, c.payload<SrePatternObject>(owner).groupindex).entries().empty())
             c.allocate_instance<DictObject>(roots.root(c.builtin(CoreObject::DictType)), out);
         else
             c.allocate_instance<MappingProxyObject>(

@@ -28,7 +28,7 @@ struct Window {
     };
     ObjectHeader header;
     AtomicGcEdge error_type;
-    const std::unique_ptr<Resource> resource;
+    const NativeOwner<Resource> resource;
     explicit Window(InitialType type, WINDOW *w, bool own, Value error)
         : header(type), error_type(error), resource(std::make_unique<Resource>(Resource{w, own}))
     {}

@@ -651,7 +651,7 @@ void detail::install_memoryviews(Attachment &c, std::span<const Handle> core)
                                             function.get(c));
     c.allocate_instance<StrObject>(at(CoreObject::StrType), key, U"__new__");
     name_store(c, dictionary, key.value(), wrapper.value());
-    for (auto [name, entry] : {std::pair{U"__len__", memory_length},
+    for (auto [name, entry] : {std::pair{U"__len__", &memory_length},
                                {U"__repr__", representation},
                                {U"__hash__", hash_value},
                                {U"__iter__", iter},

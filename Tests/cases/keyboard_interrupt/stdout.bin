@@ -1,0 +1,25 @@
+canonical True
+module 'builtins'
+name 'KeyboardInterrupt'
+doc 'Program interrupted by user.'
+bases ['BaseException']
+mro ['KeyboardInterrupt', 'BaseException', 'object']
+inheritance (True, False)
+constructed ((), '', 'KeyboardInterrupt()', True, False)
+links (None, None, None, False)
+constructed (('interrupted',), 'interrupted', "KeyboardInterrupt('interrupted')", True, False)
+links (None, None, None, False)
+constructed (('interrupted', 42), "('interrupted', 42)", "KeyboardInterrupt('interrupted', 42)", True, False)
+links (None, None, None, False)
+caught BaseException (True, 'KeyboardInterrupt', ('manual',))
+retained traceback True
+cleanup ['finally']
+raised class (True, ())
+subclass ('Interrupted', ('subclass',), False, True)
+GC args (True, (['retained'],))
+GC notes ['first note', 'multi\nline']
+live payload "['retained', 'updated']"
+assigned args (True, (['retained', 'updated'], 'replacement'))
+notes preserved ['first note', 'multi\nline']
+non-string note 'TypeError'
+instance attributes {'nested': ['retained', 'updated']}

@@ -16,7 +16,7 @@ struct FileIOObject {
         ~State();
     };
     ObjectHeader header;
-    const std::unique_ptr<State> state;
+    const NativeOwner<State> state;
     explicit FileIOObject(InitialType head) : header(head), state(std::make_unique<State>()) {}
     void trace(Tracer &) const noexcept {}
     std::size_t external_bytes() const noexcept

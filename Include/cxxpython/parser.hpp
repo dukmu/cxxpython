@@ -1,6 +1,7 @@
 #pragma once
 
 #include "cxxpython/grammar.hpp"
+#include "cxxpython/nativeowner.hpp"
 
 #include <cstddef>
 #include <functional>
@@ -16,6 +17,16 @@ struct Span {
     std::size_t begin = 0, end = 0;
 };
 enum class ErrorKind { Syntax, Indentation, Tab, Encoding, Incomplete };
+enum class InputMode { File, Eval, Single, Interactive, FunctionType };
+enum class ParseFlags : unsigned { None = 0, DontImplyDedent = 1, AllowIncompleteInput = 2 };
+constexpr ParseFlags operator|(ParseFlags left, ParseFlags right)
+{
+    return static_cast<ParseFlags>(static_cast<unsigned>(left) | static_cast<unsigned>(right));
+}
+constexpr bool enabled(ParseFlags flags, ParseFlags flag)
+{
+    return (static_cast<unsigned>(flags) & static_cast<unsigned>(flag)) != 0;
+}
 class Error : public std::runtime_error {
   public:
     Error(Span span, std::string message, ErrorKind kind = ErrorKind::Syntax)
@@ -50,18 +61,19 @@ class TokenStream {
     using ReadLine = std::function<std::string()>;
     using Poll = std::function<void()>;
     using Warning = std::function<void(const LexicalDiagnostic &)>;
-    explicit TokenStream(bool extra_tokens = false, bool interactive = false,
-                         bool allow_incomplete = false);
+    explicit TokenStream(bool extra_tokens = false, InputMode mode = InputMode::File,
+                         ParseFlags flags = ParseFlags::None);
     ~TokenStream();
     TokenStream(const TokenStream &) = delete;
     TokenStream &operator=(const TokenStream &) = delete;
     std::optional<LexicalToken> next(const ReadLine &, const Poll & = {}, const Warning & = {});
     const LexicalDiagnostic &diagnostic() const noexcept;
+    bool end_of_source() const noexcept;
     std::size_t external_bytes() const noexcept;
 
   private:
     struct Impl;
-    std::unique_ptr<Impl> impl_;
+    core::NativeOwner<Impl> impl_;
 };
 std::u32string decode_string_literal(std::u32string_view, Span);
 std::u32string decode_string_fragment(std::u32string_view, bool raw, Span);
@@ -78,12 +90,11 @@ struct Tree {
     std::vector<Token> tokens;
     NodePtr root;
 };
-enum class InputMode { File, Eval, Interactive, FunctionType };
 std::vector<Token> tokenize(std::string_view source, InputMode mode = InputMode::File,
-                            bool allow_incomplete = false);
+                            ParseFlags flags = ParseFlags::None);
 std::u32string normalize_identifier(std::u32string_view text);
 std::optional<char32_t> unicode_name(std::u32string_view name);
 std::optional<std::string> unicode_character_name(char32_t codepoint);
 Tree parse(std::string_view source, InputMode mode = InputMode::File,
-           bool allow_incomplete = false);
+           ParseFlags flags = ParseFlags::None);
 } // namespace cxxpython::syntax

@@ -759,7 +759,7 @@ void detail::install_bytes(Attachment &c, std::span<const Handle> core)
     c.allocate_instance<StrObject>(at(CoreObject::StrType), key, U"__new__");
     name_store(c, *TypeView(c, at(CoreObject::BytesType)).dictionary(), key.value(),
                wrapper.value());
-    for (auto [name, entry] : {std::pair{U"__bytes__", bytes_value},
+    for (auto [name, entry] : {std::pair{U"__bytes__", &bytes_value},
                                {U"__getnewargs__", bytes_getnewargs},
                                {U"__repr__", representation},
                                {U"__str__", representation},
@@ -767,7 +767,7 @@ void detail::install_bytes(Attachment &c, std::span<const Handle> core)
                                {U"__hash__", hash_value},
                                {U"__iter__", iterator}})
         install(at(CoreObject::BytesType), name, unary, entry);
-    for (auto [name, entry] : {std::pair{U"__eq__", compare<CompareOp::Eq>},
+    for (auto [name, entry] : {std::pair{U"__eq__", &compare<CompareOp::Eq>},
                                {U"__ne__", compare<CompareOp::Ne>},
                                {U"__lt__", compare<CompareOp::Lt>},
                                {U"__le__", compare<CompareOp::Le>},

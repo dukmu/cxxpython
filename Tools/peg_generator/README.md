@@ -23,11 +23,17 @@ library. Each parse owns its token stream, memo table and syntax tree.
 
 The lexical state machine in `Parser/tokenizer.cpp` is adapted from pinned
 CPython `Parser/tokenizer.c`, without CPython object APIs. Its incremental
-`syntax::TokenStream` serves both compiler token collection and `_tokenize`;
+`syntax::TokenStream` serves both lazy PEG token requests and `_tokenize`;
 public comment/NL/position adaptation belongs to the native module bridge.
 Literal decoding is shared in `Parser/string_parser.cpp`, not duplicated in
 the lexer. The generated grammar retains semantic literal/conversion checks
 that public lexical tokenization intentionally does not apply.
+
+The compiler caches only tokens requested by PEG lookahead/backtracking. It does
+not scan later invalid text after an earlier grammar failure. Source Single and
+actual prompt Interactive modes are distinct; DontImplyDedent and
+AllowIncompleteInput are independent parse flags, matching codeop's native
+requirements without embedding Python-library policy in the recognizer.
 
 Native parsing is bounded to 1024 active grammar calls, independently of the
 grammar's recognition coverage. This bound is lower than the earlier 4096,

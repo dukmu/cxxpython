@@ -1,0 +1,7 @@
+>>> >>> 12
+>>> ... ... >>> 20
+>>> >>> after error
+>>> >>> after interrupt
+>>> locals 10 6
+last exception KeyboardInterrupt
+buffer []

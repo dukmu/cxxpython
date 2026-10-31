@@ -63,7 +63,7 @@ struct tok_state {
     tokenizer_mode tok_mode_stack[MAXFSTRINGLEVEL]{};
     int tok_mode_stack_index = 0, tok_extra_tokens = 0, comment_newline = 0;
     int implicit_newline = 0;
-    bool allow_incomplete = false;
+    bool allow_incomplete = false, no_implicit_newline = false;
     std::size_t buffer_offset = 0, bytes_read = 0, poll_counter = 0;
     const TokenStream::ReadLine *reader = nullptr;
     const TokenStream::Poll *poll = nullptr;
@@ -473,7 +473,7 @@ static int tok_underflow(tok_state *tok)
     std::memcpy(tok->inp, line.data(), line.size());
     tok->inp += line.size();
     *tok->inp = 0;
-    tok->implicit_newline = tok->inp[-1] != '\n';
+    tok->implicit_newline = tok->inp[-1] != '\n' && !tok->no_implicit_newline;
     if (tok->implicit_newline)
         *tok->inp++ = '\n';
     *tok->inp = 0;
@@ -1781,7 +1781,7 @@ struct TokenStream::Impl {
     std::shared_ptr<const std::u32string> last_line;
     std::size_t line_revision = 0;
     std::ptrdiff_t byte_column_difference = 0;
-    Impl(bool extra, bool interactive, bool incomplete)
+    Impl(bool extra, InputMode mode, ParseFlags flags)
     {
         state.buf = static_cast<char *>(std::malloc(8192));
         if (!state.buf)
@@ -1791,21 +1791,28 @@ struct TokenStream::Impl {
         *state.buf = 0;
         state.line_start = state.multi_line_start = state.buf;
         state.tok_extra_tokens = extra;
-        state.prompt = interactive ? "" : nullptr;
-        state.allow_incomplete = incomplete;
+        state.prompt = mode == InputMode::Interactive ? "" : nullptr;
+        state.allow_incomplete = enabled(flags, ParseFlags::AllowIncompleteInput);
+        state.no_implicit_newline =
+            mode == InputMode::Single || mode == InputMode::Eval || mode == InputMode::FunctionType;
     }
     ~Impl()
     {
         std::free(state.buf);
     }
 };
-TokenStream::TokenStream(bool extra, bool interactive, bool incomplete)
-    : impl_(std::make_unique<Impl>(extra, interactive, incomplete))
+TokenStream::TokenStream(bool extra, InputMode mode, ParseFlags flags)
+    : impl_(std::make_unique<Impl>(extra, mode, flags))
 {}
 TokenStream::~TokenStream() = default;
 const LexicalDiagnostic &TokenStream::diagnostic() const noexcept
 {
     return impl_->state.diagnostic;
+}
+bool TokenStream::end_of_source() const noexcept
+{
+    const auto done = impl_->state.done;
+    return done == E_EOF || done == E_EOFS || done == E_EOLS;
 }
 std::size_t TokenStream::external_bytes() const noexcept
 {
@@ -1859,7 +1866,9 @@ std::optional<LexicalToken> TokenStream::next(const ReadLine &reader, const Poll
                 s.diagnostic.kind = ErrorKind::Tab;
             if (s.done == E_DEDENT || s.done == E_TOODEEP)
                 s.diagnostic.kind = ErrorKind::Indentation;
-            if (s.allow_incomplete && (s.done == E_EOF || s.done == E_EOFS || s.done == E_LINECONT))
+            if (s.allow_incomplete &&
+                (s.done == E_EOF || s.done == E_EOFS || s.done == E_LINECONT ||
+                 (s.no_implicit_newline && s.done == E_EOLS)))
                 s.diagnostic.kind = ErrorKind::Incomplete;
             const auto &d = s.diagnostic;
             throw Error(d.span, d.message, d.kind);
@@ -1922,31 +1931,63 @@ std::optional<LexicalToken> TokenStream::next(const ReadLine &reader, const Poll
         throw;
     }
 }
-std::vector<Token> tokenize(std::string_view source, InputMode mode, bool allow_incomplete)
+std::function<std::optional<Token>()> source_tokens(TokenStream &stream, std::string_view source,
+                                                    InputMode mode, ParseFlags flags)
 {
-    TokenStream stream(false, mode == InputMode::Interactive, allow_incomplete);
-    std::size_t offset = 0;
-    auto reader = [&]() {
-        const auto start = offset;
-        if (start == source.size())
-            return std::string{};
-        const auto newline = source.find('\n', start);
-        offset = newline == source.npos ? source.size() : newline + 1;
-        return std::string(source.substr(start, offset - start));
-    };
-    std::vector<Token> result;
-    while (auto token = stream.next(reader)) {
+    return [&, source, mode, flags, offset = std::size_t{0}, indents = std::size_t{0},
+            previous = TokenKind::ENDMARKER, tail = std::vector<Token>{},
+            tail_at = std::size_t{0}]() mutable -> std::optional<Token> {
+        if (tail_at < tail.size())
+            return std::move(tail[tail_at++]);
+        auto reader = [&]() {
+            const auto start = offset;
+            if (start == source.size())
+                return std::string{};
+            const auto newline = source.find('\n', start);
+            offset = newline == source.npos ? source.size() : newline + 1;
+            return std::string(source.substr(start, offset - start));
+        };
+        auto token = stream.next(reader);
+        if (!token)
+            return {};
         auto &value = token->token;
         value.span.begin = std::min(value.span.begin, source.size());
         value.span.end = std::min(value.span.end, source.size());
         if (value.kind == TokenKind::NEWLINE && value.span.end < source.size())
             value.span.end +=
                 source[value.span.end] == '\r' && value.span.end + 1 < source.size() ? 2 : 1;
-        if (value.kind == TokenKind::ENDMARKER && mode == InputMode::Interactive &&
-            !allow_incomplete && !result.empty() && result.back().kind == TokenKind::DEDENT)
-            result.push_back({TokenKind::NEWLINE, value.span, {}});
-        result.push_back(std::move(value));
-    }
+        if (value.kind == TokenKind::INDENT)
+            ++indents;
+        else if (value.kind == TokenKind::DEDENT)
+            --indents;
+        if (value.kind == TokenKind::ENDMARKER) {
+            if (mode == InputMode::Single) {
+                tail.push_back({TokenKind::NEWLINE, value.span, {}});
+                if (indents && !enabled(flags, ParseFlags::DontImplyDedent)) {
+                    while (indents) {
+                        tail.push_back({TokenKind::DEDENT, value.span, {}});
+                        --indents;
+                    }
+                    tail.push_back({TokenKind::NEWLINE, value.span, {}});
+                }
+            } else if (mode == InputMode::Interactive &&
+                       !enabled(flags, ParseFlags::AllowIncompleteInput) &&
+                       previous == TokenKind::DEDENT)
+                tail.push_back({TokenKind::NEWLINE, value.span, {}});
+            tail.push_back(std::move(value));
+            return std::move(tail[tail_at++]);
+        }
+        previous = value.kind;
+        return std::move(value);
+    };
+}
+std::vector<Token> tokenize(std::string_view source, InputMode mode, ParseFlags flags)
+{
+    TokenStream stream(false, mode, flags);
+    auto reader = source_tokens(stream, source, mode, flags);
+    std::vector<Token> result;
+    while (auto token = reader())
+        result.push_back(std::move(*token));
     return result;
 }
 } // namespace cxxpython::syntax

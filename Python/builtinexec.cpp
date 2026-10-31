@@ -253,8 +253,12 @@ void freeze_source(Attachment &context, Value source, std::string filename, Inpu
         text.erase(0, first == std::string::npos ? text.size() : first);
     }
     try {
-        SourceUnit unit(SourceBuffer(std::move(text), std::move(filename)), mode, flags);
-        unit.freeze(context, out);
+        std::optional<SourceUnit> unit;
+        {
+            NativeWait parked(context);
+            unit.emplace(SourceBuffer(std::move(text), std::move(filename)), mode, flags);
+        }
+        unit->freeze(context, out);
     } catch (const SourceError &error) {
         detail::raise_source_error(context, error, out);
     }
@@ -302,7 +306,9 @@ void compile_builtin(Attachment &context, Handle, std::span<const Value> args, R
         !integer_arg(context, args[5], optimize, out) ||
         !integer_arg(context, args[6], feature, out))
         return;
-    if (flags < 0 || (static_cast<std::uint64_t>(flags) & ~(supported_future_flags | 0x10ULL))) {
+    constexpr auto accepted_flags = supported_future_flags | compile_dont_imply_dedent |
+                                    compile_allow_incomplete_input | 0x10ULL;
+    if (flags < 0 || (static_cast<std::uint64_t>(flags) & ~accepted_flags)) {
         raise_error(context, CoreObject::ValueErrorType, U"compile(): unrecognised flags", out);
         return;
     }
@@ -326,7 +332,7 @@ void compile_builtin(Attachment &context, Handle, std::span<const Value> args, R
                   : mode == U"single" ? InputMode::Single
                                       : InputMode::Exec,
                   out,
-                  (static_cast<std::uint32_t>(flags) & supported_future_flags) |
+                  static_cast<std::uint32_t>(flags) |
                       (inherit.value() == context.builtin(CoreObject::False)
                            ? caller_future_flags(context)
                            : 0));

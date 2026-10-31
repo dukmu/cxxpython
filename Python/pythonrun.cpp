@@ -196,7 +196,8 @@ int run_interactive(Attachment &context, Handle globals, Handle sys, bool prompt
         }
         if (read) {
             try {
-                syntax::parse(pending, syntax::InputMode::Interactive, true);
+                syntax::parse(pending, syntax::InputMode::Interactive,
+                              syntax::ParseFlags::AllowIncompleteInput);
             } catch (const syntax::Error &error) {
                 if (error.kind == syntax::ErrorKind::Incomplete)
                     continue;

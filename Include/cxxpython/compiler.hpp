@@ -37,6 +37,8 @@ class SourceError final : public std::invalid_argument {
     const std::uint32_t offset, end_offset;
 };
 enum class InputMode { Exec, Eval, Single };
+inline constexpr std::uint32_t compile_dont_imply_dedent = 0x200;
+inline constexpr std::uint32_t compile_allow_incomplete_input = 0x4000;
 enum class ScopeKind { Module, Function, Class, Annotation };
 enum class NameClass { Local, Namespace, GlobalExplicit, GlobalImplicit, Free, Cell };
 enum class AnnotationRole { None, TypeAlias, TypeVarBound, TypeVarConstraints, TypeParameters };
@@ -68,7 +70,7 @@ struct SourceProgram;
 class SourceUnit final {
   public:
     explicit SourceUnit(SourceBuffer source, InputMode mode = InputMode::Exec,
-                        std::uint32_t future_flags = 0);
+                        std::uint32_t flags = 0);
     ~SourceUnit();
     SourceUnit(SourceUnit &&) noexcept;
     SourceUnit &operator=(SourceUnit &&) noexcept;

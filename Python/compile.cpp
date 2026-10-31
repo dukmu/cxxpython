@@ -1692,11 +1692,11 @@ void literal(Attachment &context, const Literal &value, ReturnSlot &out)
 } // namespace cxxpython::core::detail
 
 namespace cxxpython::core {
-SourceUnit::SourceUnit(SourceBuffer source, InputMode mode, std::uint32_t future_flags)
+SourceUnit::SourceUnit(SourceBuffer source, InputMode mode, std::uint32_t flags)
 {
     auto program = std::make_unique<detail::SourceProgram>(
-        detail::SourceProgram{std::move(source), mode, {}, {}, future_flags});
-    auto body = detail::parse_source(program->source, mode);
+        detail::SourceProgram{std::move(source), mode, {}, {}, flags & supported_future_flags});
+    auto body = detail::parse_source(program->source, mode, flags);
     bool prefix = true;
     for (std::size_t i = 0; i < body.size(); ++i) {
         if (!i)

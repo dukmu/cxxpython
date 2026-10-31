@@ -660,8 +660,8 @@ void detail::install_dictionaries(Attachment &context, std::span<const Handle> c
     install(CoreObject::MappingProxyType, U"get", optional, get<true>);
     install(CoreObject::MappingProxyType, U"copy", unary, copy<true>);
     for (auto [type, keys, values, items] :
-         {std::tuple{CoreObject::DictType, view<DictViewKind::Keys, false>,
-                     view<DictViewKind::Values, false>, view<DictViewKind::Items, false>},
+         {std::tuple{CoreObject::DictType, &view<DictViewKind::Keys, false>,
+                     &view<DictViewKind::Values, false>, &view<DictViewKind::Items, false>},
           {CoreObject::MappingProxyType, view<DictViewKind::Keys, true>,
            view<DictViewKind::Values, true>, view<DictViewKind::Items, true>}}) {
         install(type, U"keys", unary, keys);

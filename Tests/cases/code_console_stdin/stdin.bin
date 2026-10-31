@@ -1,0 +1,10 @@
+value = 10
+value + 2
+def twice(x):
+    return x * 2
+
+twice(value)
+1 / 0
+print('after error')
+raise KeyboardInterrupt
+print('after interrupt')

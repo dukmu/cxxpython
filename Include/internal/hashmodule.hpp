@@ -17,7 +17,7 @@ struct HashObject {
         }
     };
     ObjectHeader header;
-    const std::unique_ptr<State> state;
+    const NativeOwner<State> state;
     const std::string name;
     const int digest_size;
     const int block_size;

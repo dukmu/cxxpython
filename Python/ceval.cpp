@@ -1852,6 +1852,71 @@ void code_flags(Attachment &c, Value value, ReturnSlot &out)
 {
     make_int(c, c.payload<CodeObject>(value).program.flags(), out);
 }
+template <bool Lines>
+void code_locations(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(c);
+    auto self = roots.root(args[0]);
+    if (c.type_of(self) != c.builtin(CoreObject::CodeType) ||
+        !c.has_layout<CodeObject>(self.get(c))) {
+        type_error(c, U"code position methods require a code object", out);
+        return;
+    }
+    const auto positions = c.payload<CodeObject>(self).program.positions();
+    std::vector<Value> rows;
+    for (std::size_t start = 0; start < positions.size();) {
+        RootScope row_roots(c);
+        ReturnSlot value(c);
+        std::vector<Value> fields;
+        auto number = [&](std::optional<std::int64_t> n) {
+            if (n)
+                make_int(c, *n, value);
+            else
+                value.ok(c.builtin(CoreObject::None));
+            if (raised(value)) {
+                out.raised(value.exception());
+                return false;
+            }
+            fields.push_back(row_roots.root(value.value()).get(c));
+            return true;
+        };
+        const auto position = positions[start];
+        auto end = start + 1;
+        if constexpr (Lines) {
+            while (end < positions.size() && positions[end].line == position.line) {
+                if ((end & 4095) == 0)
+                    c.poll();
+                ++end;
+            }
+            if (!number(static_cast<std::int64_t>(start)) ||
+                !number(static_cast<std::int64_t>(end)) ||
+                !number(position.line ? std::optional<std::int64_t>{position.line} : std::nullopt))
+                return;
+        } else {
+            for (const auto n :
+                 {position.line, position.end_line, position.column, position.end_column})
+                if (!number(position.line ? std::optional<std::int64_t>{n} : std::nullopt))
+                    return;
+        }
+        cxxpython::core::make_tuple(c, fields, value);
+        if (raised(value)) {
+            out.raised(value.exception());
+            return;
+        }
+        rows.push_back(roots.root(value.value()).get(c));
+        start = end;
+        if ((start & 4095) == 0)
+            c.poll();
+    }
+    // The existing tuple iterator owns the immutable snapshot, not borrowed Code data.
+    ReturnSlot snapshot(c);
+    cxxpython::core::make_tuple(c, rows, snapshot);
+    if (raised(snapshot)) {
+        out.raised(snapshot.exception());
+        return;
+    }
+    get_iter(c, roots.root(snapshot.value()), out);
+}
 void frame_code(Attachment &c, Value value, ReturnSlot &out)
 {
     out.ok(c.payload<FrameObject>(value).code);
@@ -1878,6 +1943,14 @@ void frame_lineno(Attachment &c, Value value, ReturnSlot &out)
     auto line =
         lasti != std::numeric_limits<std::size_t>::max() ? program.positions()[lasti].line : 0;
     make_int(c, line ? line : program.first_line(), out);
+}
+void frame_lasti(Attachment &c, Value value, ReturnSlot &out)
+{
+    const auto lasti =
+        c.payload<FrameObject>(value).last_instruction.load(std::memory_order_acquire);
+    make_int(
+        c, lasti == std::numeric_limits<std::size_t>::max() ? -1 : static_cast<std::int64_t>(lasti),
+        out);
 }
 std::u32string address(Value value)
 {
@@ -2091,8 +2164,13 @@ void install_execution(Attachment &context, std::span<const Handle> core)
     field(CoreObject::FrameType, U"f_globals", frame_globals);
     field(CoreObject::FrameType, U"f_builtins", frame_builtins);
     field(CoreObject::FrameType, U"f_lineno", frame_lineno);
+    field(CoreObject::FrameType, U"f_lasti", frame_lasti);
     SignatureLayout unary;
     unary.parameters = {{U"self", ParameterKind::PositionalOnly}};
+    install_native_attribute(context, core, at(CoreObject::CodeType), U"co_positions", unary,
+                             code_locations<false>);
+    install_native_attribute(context, core, at(CoreObject::CodeType), U"co_lines", unary,
+                             code_locations<true>);
     for (auto kind : {CoreObject::CodeType, CoreObject::FrameType})
         install_native_attribute(context, core, at(kind), U"__repr__", unary, execution_repr,
                                  {at(kind).get(context)});

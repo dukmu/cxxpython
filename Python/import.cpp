@@ -243,7 +243,7 @@ std::vector<std::u32string> detail::builtin_names(Attachment &context)
 
 detail::ImportState::ImportState()
 {
-    for (auto [name, initializer] : {std::pair{U"builtins", builtin_init},
+    for (auto [name, initializer] : {std::pair{U"builtins", &builtin_init},
                                      {U"sys", sys_init},
                                      {U"gc", detail::initialize_gc},
                                      {U"atexit", detail::initialize_atexit},

@@ -260,7 +260,7 @@ void install_ranges(Attachment &context, std::span<const Handle> core)
     const auto wrapper = roots.root(temporary.value());
     context.allocate_instance<StrObject>(at(CoreObject::StrType), temporary, U"__new__");
     name_store(context, dict, temporary.value(), wrapper.get(context));
-    for (auto [name, entry] : {std::pair{U"__repr__", range_repr},
+    for (auto [name, entry] : {std::pair{U"__repr__", &range_repr},
                                {U"__str__", range_repr},
                                {U"__bool__", range_bool},
                                {U"__len__", range_len},

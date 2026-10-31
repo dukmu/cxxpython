@@ -22,7 +22,7 @@ struct DequeObject {
         std::int64_t maxlen = -1;
     };
     ObjectHeader header;
-    const std::unique_ptr<Storage> contents;
+    const NativeOwner<Storage> contents;
     explicit DequeObject(InitialType type) : header(type), contents(std::make_unique<Storage>()) {}
     void trace(Tracer &tracer) const noexcept
     {

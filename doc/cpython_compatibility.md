@@ -115,9 +115,25 @@ the target is `builtins` and the `__builtins__` execution namespace.
 - Builtin compile/eval/exec reuse the existing compiler and VM. Ordinary module
   names now emit namespace instructions, matching separate globals/locals
   behavior; explicit global still emits global instructions. Current valid slices
-  are exec/eval/single, zero flags and non-positive optimization. AST/future flags,
-  closure execution, path-like filenames and complete diagnostics are not done.
+  include exec/eval/single, supported future flags/dont_inherit and the independent
+  0x200/0x4000 codeop input flags. Parser-only flags do not become co_flags.
+  AST compilation, closure execution, path-like filenames, optimization modes
+  and complete diagnostics are not done.
   Complete them in the compiler rather than making Lib permanently avoid them.
+- `Lib/codeop.py` and `Lib/code.py` are unchanged pinned sources. The compiler
+  now consumes lexer tokens lazily, distinguishes source single-input from
+  prompt input, and preserves earlier grammar failures over later lexical ones.
+  Literal samples from upstream test_codeop.py, the independent flag/mode matrix,
+  future flag memory, real-stdin consoles, hooks and exception recovery have
+  direct product tests. KeyboardInterrupt is an ordinary canonical BaseException
+  subtype, not a console-only sentinel; OS signal delivery remains separate work.
+- `Lib/traceback.py` retains pinned formatting policy with one private adaptation:
+  `_get_code_position` indexes actual VM instructions, not CPython two-byte
+  wordcode. Code.co_positions/co_lines and readonly Frame.f_lasti expose actual
+  immutable program positions and the atomic frame cursor. Focused exception-only,
+  traceback and console cases pass. Public ast, unicodedata, frame.clear and
+  complete reflection/Unicode-caret/upstream-suite coverage remain dependencies;
+  no fake modules or fabricated co_code are introduced to hide them.
 - Native Unicode interpolation/prefix methods now close actual library dependencies
   instead of rewriting runpy's messages. Percent interpolation, str.format field/
   conversion/nested-spec behavior and startswith/endswith use ordinary typed

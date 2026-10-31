@@ -104,6 +104,9 @@ compiler, VM, and extension platform implemented in a C/C++ mix.
 
 ## Engineering Rules
 
+- Use Clang 21.1.8 for strict C/C++ `-Werror` acceptance. GCC may supplement it,
+  but a GCC-only pass does not establish the required warning-clean build.
+  Fix actual unused code without disabling warnings or discarding necessary GC roots.
 - Read existing design docs in `doc/` before implementing a subsystem.
 - Keep reusable dependencies, fixed reference interpreters, sanitizer builds and
   verification logs under ignored repository `.cache/` (ordinary build: `build/`).

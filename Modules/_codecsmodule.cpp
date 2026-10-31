@@ -31,7 +31,7 @@ struct CodecRegistry {
             return size;
         }
     };
-    const std::unique_ptr<Storage> contents;
+    const NativeOwner<Storage> contents;
     explicit CodecRegistry(InitialType head) : header(head), contents(std::make_unique<Storage>())
     {}
     void trace(Tracer &tracer) const noexcept
@@ -413,7 +413,7 @@ void initialize_codecs(Attachment &ctx, Handle module, ReturnSlot &out)
     unary.parameters = {{U"object", ParameterKind::PositionalOnly}};
     auto pair = unary;
     pair.parameters.push_back({U"handler", ParameterKind::PositionalOnly});
-    for (auto [name, entry] : {std::pair{"register", register_search},
+    for (auto [name, entry] : {std::pair{"register", &register_search},
                                {"unregister", unregister_search},
                                {"lookup", lookup},
                                {"lookup_error", lookup_error}})
