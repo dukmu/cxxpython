@@ -194,7 +194,11 @@ tracing, not the core initializer or a second hash table implementation.
 `Objects/dictstorage.cpp` owns shared dictionary/namespace storage, prepared-node
 commits, rooted snapshots and iterator cursor operations. `Objects/dictobject.cpp`
 owns public dict/mappingproxy methods and protocol registration; callbacks use
-ordinary protocols outside storage locks. `Objects/setobject.cpp` owns set and
+ordinary protocols outside storage locks. Mutable and immutable name indexes use
+string views into their traced immutable keys rather than duplicate character
+buffers; exact-str hits also reuse the stored entry hash. Ordered entries,
+prepared nodes, per-object commits and snapshot publication are unchanged.
+`Objects/setobject.cpp` owns set and
 frozenset construction, representation/hash, lookup and element mutation;
 `Objects/setoperations.cpp` owns their bulk algebra and method/operator bindings.
 Sets reuse a private dictionary table and its existing synchronization, rather

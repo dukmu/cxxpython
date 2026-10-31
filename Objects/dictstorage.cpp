@@ -5,16 +5,6 @@
 
 namespace cxxpython::core {
 namespace {
-template <class String> std::size_t string_bytes(const String &text) noexcept
-{
-    auto data = reinterpret_cast<std::uintptr_t>(text.data());
-    auto start = reinterpret_cast<std::uintptr_t>(&text);
-    return data >= start && data - start < sizeof(text)
-               ? 0
-               : (text.capacity() + 1) * sizeof(typename String::value_type);
-}
-} // namespace
-namespace {
 template <class F>
 decltype(auto) namespace_locked(Attachment &context, DictObject::Storage &data, F &&operation)
 {
@@ -103,7 +93,7 @@ std::size_t DictStorage::external_bytes() const noexcept
     if (index.bucket_count() > 1)
         bytes += index.bucket_count() * sizeof(void *);
     bytes += index.size() * sizeof(decltype(index)::value_type);
-    return bytes + index_string_bytes;
+    return bytes;
 }
 void DictStorage::trace(Tracer &tracer) const noexcept
 {
@@ -122,23 +112,22 @@ std::int64_t name_hash(Attachment &context, const std::u32string &text)
     return result == -1 ? -2 : result;
 }
 namespace {
-std::size_t entry_bytes(const DictObject::Entry &, const std::u32string *name)
+std::size_t entry_bytes(bool named)
 {
     return sizeof(DictObject::Entry) + 2 * sizeof(void *) +
            sizeof(DictObject::HashIndex::value_type) + 4 * sizeof(void *) +
-           (name ? sizeof(DictObject::Index::value_type) + 6 * sizeof(void *) + string_bytes(*name)
-                 : 0);
+           (named ? sizeof(DictObject::Index::value_type) + 6 * sizeof(void *) : 0);
 }
 void remove_entry(Attachment &context, Value dictionary, DictObject::Storage &data,
                   std::list<DictObject::Entry>::iterator entry,
                   std::list<DictObject::Entry> &removed)
 {
-    std::size_t bytes = entry_bytes(*entry, nullptr);
+    std::size_t bytes = entry_bytes(false);
     if (context.has_layout<StrObject>(entry->key)) {
         const auto &label = context.payload<StrObject>(entry->key).value;
         auto found = data.index.find(label);
         if (found != data.index.end() && found->second == entry) {
-            bytes = entry_bytes(*entry, &found->first);
+            bytes = entry_bytes(true);
             data.index.erase(found);
         }
     }
@@ -164,7 +153,7 @@ void insert_entry(Attachment &context, Value dictionary, DictObject::Storage &da
     // Both index nodes are prepared before the non-allocating commit.
     data.hashes.insert(std::move(hash));
     ++data.next_identity;
-    data.bytes += entry_bytes(entry, name ? &name.key() : nullptr);
+    data.bytes += entry_bytes(bool(name));
     data.names.splice(data.names.end(), prepared);
     if (name)
         data.index.insert(std::move(name));
@@ -221,20 +210,17 @@ void copy_dictionary_storage(Attachment &context, std::span<const DictObject::En
         roots.root(entry.value);
     }
     std::vector<DictObject::Entry> entries(source.begin(), source.end());
-    std::unordered_map<std::u32string, std::size_t> index;
-    std::size_t bytes = 0;
+    std::unordered_map<std::u32string_view, std::size_t> index;
     bool exact = true;
     for (std::size_t i = 0; i < entries.size(); ++i) {
         exact &= context.type_of(entries[i].key) == context.builtin(CoreObject::StrType);
         if (!context.has_layout<StrObject>(entries[i].key))
             continue;
-        auto [entry, inserted] = index.emplace(context.payload<StrObject>(entries[i].key).value, i);
-        (void)inserted;
-        bytes += string_bytes(entry->first);
+        index.emplace(context.payload<StrObject>(entries[i].key).value, i);
         if (i % 64 == 63)
             context.poll();
     }
-    context.allocate<DictStorage>(out, std::move(entries), std::move(index), bytes, exact);
+    context.allocate<DictStorage>(out, std::move(entries), std::move(index), exact);
 }
 void name_store(Attachment &context, Value dictionary, Value name, Value value)
 {
@@ -343,14 +329,13 @@ void copy_dictionary_entries(Attachment &context, Value destination,
         entry.identity = identity++;
         entries.push_back(entry);
         const auto at = std::prev(entries.end());
-        const std::u32string *name = nullptr;
+        bool named = false;
         if (context.has_layout<StrObject>(entry.key)) {
             const auto inserted = names.emplace(context.payload<StrObject>(entry.key).value, at);
-            if (inserted.second)
-                name = &inserted.first->first;
+            named = inserted.second;
         }
         hashes.emplace(entry.hash, at);
-        bytes += entry_bytes(entry, name);
+        bytes += entry_bytes(named);
     }
     auto &data = *context.payload<DictObject>(destination).contents;
     namespace_locked(context, data, [&] {
@@ -405,13 +390,12 @@ ResultView access_dictionary(Attachment &context, Handle dictionary, Handle key,
             return out.result();
         }
         const bool string = context.type_of(key) == context.builtin(CoreObject::StrType);
-        std::int64_t hash_value;
+        const auto *text = string ? &context.payload<StrObject>(key).value : nullptr;
+        std::int64_t hash_value = 0;
         ReturnSlot temporary(context), owner(context);
         if (cached_hash)
             hash_value = *cached_hash;
-        else if (string)
-            hash_value = detail::name_hash(context, context.payload<StrObject>(key).value);
-        else {
+        else if (!string) {
             hash(context, key, temporary);
             if (temporary.tag() == ResultTag::Raised) {
                 out.raised(temporary.exception());
@@ -420,9 +404,9 @@ ResultView access_dictionary(Attachment &context, Handle dictionary, Handle key,
             if (!int_fits_signed(context, temporary.value(), hash_value))
                 throw std::logic_error("hash protocol did not normalize its result");
         }
-        auto &data = *context.payload<DictObject>(dictionary).contents;
-        context.load(dictionary.get(context),
-                     context.payload<DictObject>(dictionary).namespace_owner, owner);
+        auto &shell = context.payload<DictObject>(dictionary);
+        auto &data = *shell.contents;
+        context.load(dictionary.get(context), shell.namespace_owner, owner);
         if (owner.tag() == ResultTag::Ok && TypeView(context, owner.value()).snapshot()) {
             if (binding)
                 throw std::logic_error("binding tokens require an ordinary dictionary");
@@ -432,6 +416,8 @@ ResultView access_dictionary(Attachment &context, Handle dictionary, Handle key,
                             out);
                 return out.result();
             }
+            if (string && !cached_hash)
+                hash_value = detail::name_hash(context, *text);
             for (;;) {
                 TypeView metadata(context, owner.value());
                 DictView snapshot(context, metadata.storage());
@@ -440,7 +426,7 @@ ResultView access_dictionary(Attachment &context, Handle dictionary, Handle key,
                 bool compare = true;
                 if (string && metadata.storage()) {
                     const auto &table = context.payload<DictStorage>(*metadata.storage());
-                    const auto at = table.index.find(context.payload<StrObject>(key).value);
+                    const auto at = table.index.find(*text);
                     if (at != table.index.end() && context.type_of(entries[at->second].key) ==
                                                        context.builtin(CoreObject::StrType)) {
                         found = at->second;
@@ -509,7 +495,7 @@ ResultView access_dictionary(Attachment &context, Handle dictionary, Handle key,
             }
         };
         if (string && namespace_locked(context, data, [&] {
-                const auto found = data.index.find(context.payload<StrObject>(key).value);
+                const auto found = data.index.find(*text);
                 if (found == data.index.end() ||
                     context.type_of(found->second->key) != context.builtin(CoreObject::StrType))
                     return false;
@@ -517,6 +503,8 @@ ResultView access_dictionary(Attachment &context, Handle dictionary, Handle key,
                 return true;
             }))
             return out.result();
+        if (string && !cached_hash)
+            hash_value = detail::name_hash(context, *text);
         std::list<DictObject::Entry> prepared;
         DictObject::Index::node_type name_node;
         DictObject::HashIndex::node_type hash_node;
@@ -524,7 +512,7 @@ ResultView access_dictionary(Attachment &context, Handle dictionary, Handle key,
             prepared.push_back({key.get(context), value->get(context), hash_value});
             DictObject::Index names;
             if (string) {
-                names.emplace(context.payload<StrObject>(key).value, prepared.begin());
+                names.emplace(*text, prepared.begin());
                 name_node = names.extract(names.begin());
             }
             DictObject::HashIndex hashes;

@@ -1,5 +1,63 @@
 # Development Status
 
+## 2026-11-01 Share Dictionary Key Text
+
+Continues the active performance/cleanup goal after pushed e6d3625. The retained
+four-worker allocation profile identified dictionary access at 9.99% self CPU
+alongside root and native allocation costs. Parent changed storage/access and
+ran acceptance; Terra supplied focused native ownership tests and a direct
+Python fixture, checked its baseline/reference behavior, and is closed.
+
+- Mutable dict name indexes and immutable namespace snapshots now borrow
+  string_view text from the immutable StrObject keys already owned by their
+  traced entries. Removed the duplicate character allocations, snapshot string-
+  byte field and old buffer-size helper; accounting no longer charges an index
+  for a second copy. The dictionary still has ordered entries and separately
+  prepared name/hash nodes. No new allocator, pool, cache, class, module, GIL or
+  reference-counting layer. Prepared nodes borrow rooted inputs; erasure removes
+  the index before unlinking its key, and snapshots retain their own key edges.
+- Ordinary exact-str index hits reuse the stored hash rather than computing
+  SipHash before lookup. Misses still hash, while non-string hash callbacks keep
+  their original order and normalization. Reuse the checked dictionary payload
+  and immutable input text within the operation. Identity/version revalidation,
+  per-object short commits, type snapshot publication and OOM rollback remain
+  unchanged; this is not a replacement of the O(log n) indexes with a hash table.
+- New native coverage verifies actual index/key buffer aliasing, copied storage
+  and snapshots surviving input-root release, clearing their original dicts and
+  collection. The direct fixture matches pinned CPython 3.12.14 and covers long
+  Unicode keys, equal-key identity, str-subclass hash/equality callbacks with GC
+  and reentry, namespace copying/deletion and shared-dictionary writers.
+- Strict Clang 21.1.8 IPO Release passes 345 relevant native contracts, including
+  the 16 bootstrap/promotion allocation-failure shards. ASan/UBSan/LSan passes
+  all 329 relevant native contracts. TSan's combined run passes 328/329; one
+  import OOM stress test reaches its 120s budget while builds/other suites compete.
+  After all other work exits, that same test passes alone in 55.07s with the
+  original budget. Both logs remain; no timeouts were widened or tests deleted.
+  All three builds pass the same 28 direct Python scenarios. ASan's initial
+  post-link gtest discovery hit the sandbox's LSan/ptrace restriction; finishing
+  that step outside the sandbox passes without disabling leak checking.
+  Formatting and diff checks pass. Evidence is .cache/dict-key-storage-*.
+- After all builds/tests stopped, measured the standard 100000-job allocate
+  workload and matrix N=64 at one/four workers, three independent processes,
+  one warmup and three values/process, with natural GC and validation. Reused
+  the preceding node's raw baseline, not a newly interleaved A/B; no CPython,
+  I/O, startup or full-suite performance campaign was repeated. Allocate medians
+  are 724.147/292.866 ms versus 737.579/303.572. Standard pyperf reports about
+  1.03x four-worker improvement and no significant single-worker difference.
+  New allocation scaling is 2.473x with four-worker CPU/wall 2.866. Matrix medians
+  are 448.411/185.537 versus 452.981/182.663; neither difference is significant.
+  New matrix scaling is 2.417x, four-worker CPU/wall 3.093 and variation 6.9%.
+- Raw runs and generated Markdown/CSV/pyperf reports/comparisons are in
+  .cache/benchmarks/dict-key-storage-{allocation,matrix}{,-comparison}; no
+  hand-maintained tables or new profiling campaign. The immediate prechange
+  executable is retained as cxxpython-e6d3625. Buffer reuse is established by the
+  native alias/lifetime test, not a hardware cache-hit claim. Separate per-entry
+  list/name/hash allocations and logarithmic lookup remain costs to address in
+  the next larger storage step, preserving prepared non-allocating commits and
+  rooted callbacks. Absolute CPython performance acceptance is still incomplete;
+  the goal stays active and the full compatibility route stays paused.
+  matrix.py is untouched and untracked.
+
 ## 2026-11-01 Reuse Protocol Lookup Metadata
 
 Continues the active performance/cleanup goal after pushed 45850de. The preceding

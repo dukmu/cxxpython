@@ -5,6 +5,7 @@
 #include <array>
 #include <list>
 #include <map>
+#include <string_view>
 #include <unordered_map>
 
 namespace cxxpython::core {
@@ -163,7 +164,8 @@ struct DictObject {
     };
     ObjectHeader header;
     AtomicGcEdge namespace_owner;
-    using Index = std::map<std::u32string, std::list<Entry>::iterator>;
+    // Index text borrows immutable StrObject storage owned by the traced entry key.
+    using Index = std::map<std::u32string_view, std::list<Entry>::iterator>;
     using HashIndex = std::multimap<std::int64_t, std::list<Entry>::iterator>;
     struct Storage {
         std::mutex mutex;
@@ -233,14 +235,13 @@ struct DictIteratorObject {
 struct DictStorage {
     ObjectHeader header;
     const std::vector<DictObject::Entry> entries;
-    const std::unordered_map<std::u32string, std::size_t> index;
-    const std::size_t index_string_bytes;
+    const std::unordered_map<std::u32string_view, std::size_t> index;
     const bool exact_string_keys;
     DictStorage(InitialType head, std::vector<DictObject::Entry> entries,
-                std::unordered_map<std::u32string, std::size_t> index, std::size_t string_bytes,
+                std::unordered_map<std::u32string_view, std::size_t> index,
                 bool exact_string_keys = true)
         : header(head), entries(std::move(entries)), index(std::move(index)),
-          index_string_bytes(string_bytes), exact_string_keys(exact_string_keys)
+          exact_string_keys(exact_string_keys)
     {}
     void trace(Tracer &tracer) const noexcept;
     std::size_t external_bytes() const noexcept;

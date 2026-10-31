@@ -328,4 +328,67 @@ equal = copied == constructed
 )",
           "len(copied), len(constructed), equal", "(1, 1, True)");
 }
+
+TEST_F(CoreDict, LongNameIndexesAliasTracedKeysAndCopiesSurviveCollection)
+{
+    const std::u32string name = U"long_dictionary_key_\u03bb_" + std::u32string(128, U'x');
+    const std::u32string text = U"long_dictionary_value_" + std::u32string(128, U'y');
+    ReturnSlot out(context);
+    context.allocate_instance<DictObject>(roots.root(context.builtin(CoreObject::DictType)), out);
+    const auto dictionary = roots.root(out.value());
+    context.allocate_instance<DictObject>(roots.root(context.builtin(CoreObject::DictType)), out);
+    const auto copy = roots.root(out.value());
+    {
+        RootScope inputs(context);
+        make_str(context, name, out);
+        const auto key = inputs.root(out.value());
+        make_str(context, text, out);
+        const auto value = inputs.root(out.value());
+        dict_store(context, dictionary, key, value, out);
+        ASSERT_EQ(out.tag(), ResultTag::Ok);
+    }
+
+    const auto &ordinary = *context.payload<DictObject>(dictionary.get(context)).contents;
+    ASSERT_EQ(ordinary.index.size(), 1U);
+    const auto &indexed = *ordinary.index.begin();
+    EXPECT_EQ(indexed.first.data(), context.payload<StrObject>(indexed.second->key).value.data());
+
+    ReturnSlot snapshot_root(context);
+    {
+        DictView view(context, dictionary.get(context));
+        ASSERT_EQ(view.entries().size(), 1U);
+        detail::copy_dictionary_entries(context, copy.get(context), view.entries());
+        const auto snapshot = view.storage();
+        ASSERT_TRUE(snapshot.has_value());
+        snapshot_root.ok(*snapshot);
+        const auto &storage = context.payload<DictStorage>(snapshot_root.value());
+        ASSERT_EQ(storage.index.size(), 1U);
+        const auto &immutable_indexed = *storage.index.begin();
+        EXPECT_EQ(
+            immutable_indexed.first.data(),
+            context.payload<StrObject>(storage.entries[immutable_indexed.second].key).value.data());
+
+        dict_clear(context, dictionary, out);
+        ASSERT_EQ(out.tag(), ResultTag::Ok);
+        context.collect();
+        ASSERT_TRUE(view.find(name).has_value());
+        EXPECT_EQ(context.payload<StrObject>(*view.find(name)).value, text);
+    }
+    context.collect();
+    {
+        DictView copy_view(context, copy.get(context));
+        ASSERT_EQ(copy_view.entries().size(), 1U);
+        EXPECT_EQ(context.payload<StrObject>(copy_view.entries()[0].key).value, name);
+        ASSERT_TRUE(copy_view.find(name).has_value());
+        EXPECT_EQ(context.payload<StrObject>(*copy_view.find(name)).value, text);
+    }
+    dict_clear(context, copy, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    context.collect();
+    DictView snapshot_view(context, snapshot_root.value());
+    ASSERT_EQ(snapshot_view.entries().size(), 1U);
+    ASSERT_TRUE(snapshot_view.find(name).has_value());
+    EXPECT_EQ(context.payload<StrObject>(*snapshot_view.find(name)).value, text);
+    EXPECT_EQ(context.payload<StrObject>(snapshot_view.entries()[0].key).value, name);
+}
 } // namespace

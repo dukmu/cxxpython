@@ -553,6 +553,15 @@ index: O(log n + collisions) lookup rather than an allocation/rehash under lock.
 This is not a claim of CPython's amortized constant-time dictionary performance.
 Native canonical-name helpers remain internal and do not invoke Python equality.
 
+Name indexes borrow string_view text from their own entry's immutable StrObject
+key, in both mutable storage and immutable snapshots. Tracing the entries owns
+that storage; indexes add no second managed edge or copied character allocation.
+Prepared nodes borrow the precisely rooted input key until committed. Erasure
+removes the index before unlinking its entry, and destruction does not read the
+borrowed text. External-byte accounting charges the characters to StrObject only.
+An exact-str index hit uses the stored entry hash without recalculating SipHash;
+misses and generic-key paths retain hashing, callback and identity revalidation.
+
 The public slice includes constructors from mappings/pairs/keywords, subscripts,
 deletion, get/setdefault/pop/clear/copy/update, __missing__, equality and recursive
 repr. Known hashes survive exact-dict copy/update/equality. Numeric equal keys
