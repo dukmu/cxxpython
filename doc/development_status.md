@@ -1,5 +1,22 @@
 # Development Status
 
+## 2026-10-31 BLAKE2 Unused Local Helpers
+
+Removed twenty-two unused clear-state/parameter-setter helpers from the two
+vendored BLAKE2 C translation units. The reachable hashing algorithms, direct
+parameter assignments, public declarations and strict compiler flags are
+unchanged. Modules/_blake2/README.md now records this small upstream difference.
+Both files pass GCC C11 -Wall -Wextra -Wpedantic -Werror compilation. No Clang
+compiler is installed in the current environment, so a Clang build is not claimed.
+The existing hashlib vectors/parameter fixtures remain the integration checks;
+this deletion does not introduce another test or validation framework.
+
+The following stage is in progress in the worktree: independent single-input
+compile flags/codeop, public Code positions and traceback/code REPL dependencies.
+Its initial upstream codeop samples exposed eager lexical-error timing, so that
+stage is not marked stable or included in this narrow build fix. User test2.py
+and the temporary_plan.md deletion remain excluded; the full goal remains active.
+
 ## 2026-10-31 Shared Native Lexer And Upstream String Libraries
 
 Prepended after 4301210, preserving earlier entries. This is a verified frontend/
