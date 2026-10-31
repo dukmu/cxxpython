@@ -6,3 +6,15 @@
 1 3
 substring not found
 2
+startswith b'a' TypeError startswith first arg must be str or a tuple of str, not bytes
+startswith 1 TypeError startswith first arg must be str or a tuple of str, not int
+startswith ('missing', b'a') TypeError tuple for startswith must only contain str, not bytes
+startswith ('a', b'a') True
+startswith () False
+startswith ('ba', 'ab') True
+endswith b'a' TypeError endswith first arg must be str or a tuple of str, not bytes
+endswith 1 TypeError endswith first arg must be str or a tuple of str, not int
+endswith ('missing', b'a') TypeError tuple for endswith must only contain str, not bytes
+endswith ('a', b'a') True
+endswith () False
+endswith ('ba', 'ab') True

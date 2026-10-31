@@ -39,6 +39,8 @@ add_library(cxxpython_core
     Modules/_iomodule.cpp
     Modules/_operator.cpp
     Modules/_opcodemodule.cpp
+    Modules/_tokenizemodule.cpp
+    Modules/_stringmodule.cpp
     Modules/_sre/engine.c
     Modules/_sre/sre.cpp
     Objects/srematchobject.cpp

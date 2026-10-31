@@ -62,6 +62,28 @@ class ParserBase {
     {
         // These upstream AST actions restrict accepted literals, not just their
         // representation. Keep the same checks without constructing Python ASTs.
+        if (rule == Rule::string)
+            (void)decode_string_literal(tokens_[begin].text, tokens_[begin].span);
+        if (rule == Rule::fstring) {
+            const bool raw = tokens_[begin].text.find_first_of(U"rR") != std::u32string::npos;
+            unsigned level = 0;
+            for (auto i = begin; i < mark_; ++i) {
+                const auto &part = tokens_[i];
+                if (part.kind == TokenKind::FSTRING_START)
+                    ++level;
+                else if (part.kind == TokenKind::FSTRING_END)
+                    --level;
+                else if (part.kind == TokenKind::FSTRING_MIDDLE && level == 1)
+                    (void)decode_string_fragment(part.text, raw, part.span);
+            }
+        }
+        if (rule == Rule::fstring_conversion) {
+            const auto &conversion = tokens_[begin + 1];
+            if (conversion.text.size() != 1 ||
+                std::u32string_view(U"sra").find(conversion.text[0]) == std::u32string_view::npos ||
+                tokens_[begin].span.end != conversion.span.begin)
+                throw Error(conversion.span, "f-string: invalid conversion character");
+        }
         if (rule == Rule::real_number || rule == Rule::imaginary_number) {
             const auto &text = tokens_[begin].text;
             const bool imaginary = !text.empty() && (text.back() == U'j' || text.back() == U'J');
@@ -212,7 +234,8 @@ class ParserBase {
                 return found->second.node;
             }
         }
-        if (++depth_ > 4096) {
+        // Bound native call frames before sanitizer-expanded frames exhaust the stack.
+        if (++depth_ > 1024) {
             --depth_;
             throw Error(tokens_[std::min(mark_, tokens_.size() - 1)].span,
                         "parser nesting limit exceeded");

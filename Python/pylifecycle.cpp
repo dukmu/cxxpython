@@ -86,6 +86,10 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
             spec.slots = std::vector<std::u32string>{U"name", U"path", U"msg", U"name_from"};
         if (id == CoreObject::NameErrorType)
             spec.slots = std::vector<std::u32string>{U"name"};
+        if (id == CoreObject::SyntaxErrorType)
+            spec.slots = std::vector<std::u32string>{
+                U"msg",  U"filename",   U"lineno",     U"offset",
+                U"text", U"end_lineno", U"end_offset", U"print_file_and_line"};
         if (id == CoreObject::StopIterationType)
             spec.slots = std::vector<std::u32string>{U"value"};
         if (id == CoreObject::SystemExitType)

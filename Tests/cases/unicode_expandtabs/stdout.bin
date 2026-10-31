@@ -1,0 +1,56 @@
+default 'abc\rab      def\ng       hi'
+eight 'abc\rab      def\ng       hi'
+four 'abc\rab  def\ng   hi'
+keyword 'abc\rab  def\ng   hi'
+CRLF 'abc\r\nab  def\ng   hi'
+unchanged CRLF 'abc\r\nab\r\ndef\ng\r\nhi'
+one-column tabs '  a\n b'
+sizes 0 'AB\rC\nD\r\n'
+sizes -1 'AB\rC\nD\r\n'
+sizes -8 'AB\rC\nD\r\n'
+sizes 1 ' A B \r C\n D\r\n '
+sizes 2 '  A B \r  C\n  D\r\n  '
+sizes 3 '   A  B  \r   C\n   D\r\n   '
+sizes 8 '        A       B       \r        C\n        D\r\n        '
+tab at stop '12345678        9'
+other whitespace 'a\x0bb\x0cc\x85d\u2028e\u2029f     g'
+unicode 'ä   Z'
+unicode '中文  Z'
+unicode '🐍   Z'
+unicode 'é  Z'
+unicode '\x00   Z'
+unicode '\ud800   Z'
+unicode reset '中   X\rä   Y\n🐍   Z'
+exact unchanged ('', True, True)
+exact unchanged ('unchanged', True, True)
+exact unchanged ('ä中🐍', True, True)
+C int maximum 'no tabs'
+C int minimum 'ab'
+bool true 'a b'
+bool false 'ab'
+subtype ('', True, False)
+subtype ('unchanged', True, False)
+subtype ('a   b', True, False)
+subtype ('中   ä', True, False)
+index callback 'a   b'
+index calls 1
+empty callback ''
+empty calls 1
+int subtype 'a   b'
+overflow ('OverflowError', 'Python int too large to convert to C int')
+overflow ('OverflowError', 'Python int too large to convert to C int')
+overflow ('OverflowError', 'Python int too large to convert to C int')
+overflow ('OverflowError', 'Python int too large to convert to C int')
+overflow callback ('OverflowError', 'Python int too large to convert to C int')
+bad size 'TypeError'
+bad size 'TypeError'
+bad size 'TypeError'
+bad size 'TypeError'
+bad index result 'TypeError'
+index failure ('ValueError', 'tabsize callback failed')
+bad receiver 'TypeError'
+too many arguments 'TypeError'
+unknown keyword 'TypeError'
+long scan (28684, True)
+large fill (16386, True)
+long unchanged True

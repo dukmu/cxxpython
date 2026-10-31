@@ -1,0 +1,116 @@
+simple 12 ['Hello there,', 'how are you', 'this fine', "day?  I'm", 'glad to hear', 'it!']
+simple 42 ['Hello there, how are you this fine day?', "I'm glad to hear it!"]
+simple 80 ["Hello there, how are you this fine day?  I'm glad to hear it!"]
+default width ["Hello there, how are you this fine day?  I'm glad to hear it!"]
+empty []
+empty []
+empty []
+empty fill ''
+tabs default ['        Test    default         tabsize.']
+tabs custom ['    Test    custom      tabsize.']
+tabs not expanded [' Test default  tabsize.']
+whitespace retained ['a\tb\nc']
+paragraph wrap ['This is a paragraph that already has line', 'breaks.  But some of its lines are much', 'longer than the others, so it needs to be', 'wrapped.  Some lines are  tabbed too.  What a', 'mess!']
+paragraph fill 'This is a paragraph that already has line\nbreaks.  But some of its lines are much\nlonger than the others, so it needs to be\nwrapped.  Some lines are  tabbed too.  What a\nmess!'
+sentence short ['A short line.  Note the single space.']
+sentence quotes ['I say, chaps!  Anyone for "tennis?"  Hmmph!']
+sentence abbreviation ['File stdio.h is nice.']
+hyphenated 40 ['this-is-a-useful-feature-for-', "reformatting-posts-from-tim-peters'ly"]
+hyphenated 41 ['this-is-a-useful-feature-for-', "reformatting-posts-from-tim-peters'ly"]
+hyphenated 42 ['this-is-a-useful-feature-for-reformatting-', "posts-from-tim-peters'ly"]
+hyphenated no long break ['this-', 'is-', 'a-', 'useful-', 'feature-', 'for-', 'reformatting-', 'posts-', 'from-', 'tim-', "peters'ly"]
+hyphen mode True ['yaba daba-', 'doo']
+hyphen mode False ['yaba', 'daba-doo']
+hyphenated numbers ['Python 1.0.0 was released on', '1994-01-26.  Python 1.0.1 was', 'released on 1994-02-15.']
+dash ['Em-dashes should be', 'written -- thus.']
+drop false [' This is a', '    ', 'sentence ', 'with     ', 'much white', 'space.']
+whitespace only []
+whitespace only retained ['   ']
+whitespace only indented ['     ']
+whitespace line retained ['abcd', '    ', 'efgh']
+whitespace line dropped ['abcd', 'efgh']
+long word ['Did you say "supercalifragilis', 'ticexpialidocious?" How *do*', 'you spell that odd word,', 'anyways?']
+long word unbroken ['Did you say', '"supercalifragilisticexpialidocious?"', 'How *do* you spell that odd', 'word, anyways?']
+long word max lines ['Did you say ', '"supercalifr', 'agilisticexp', '[...]']
+indent exceeds width ['----------', '               h', '               e', '               l', '               l', '               o']
+long hyphens (True, True) ['We used', 'enyzme 2-', 'succinyl-', '6-hydroxy-', '2,4-', 'cyclohexad', 'iene-1-', 'carboxylat', 'e', 'synthase.']
+long hyphens (True, False) ['We used', 'enyzme 2-s', 'uccinyl-6-', 'hydroxy-2,', '4-cyclohex', 'adiene-1-c', 'arboxylate', 'synthase.']
+long hyphens (False, True) ['We used', 'enyzme', '2-succinyl-6-hydroxy-2,4-cyclohexadiene-1-carboxylate', 'synthase.']
+long hyphens (False, False) ['We used', 'enyzme', '2-succinyl-6-hydroxy-2,4-cyclohexadiene-1-carboxylate', 'synthase.']
+max lines 0 ['Hello [...]']
+max lines 1 ['Hello [...]']
+max lines 2 ['Hello there,', 'how [...]']
+max lines 4 ['Hello there,', 'how are you', 'this fine', 'day? [...]']
+max lines 6 ['Hello there,', 'how are you', 'this fine', "day?  I'm", 'glad to hear', 'it!']
+custom placeholder ['Hello there,', 'how are...']
+placeholder backtrack ['Good grief', 'Python*****']
+placeholder indentation ['    Hello there,', '  [truncated]...']
+unused placeholder ["Hello there, how are you this fine day?  I'm glad to hear it!"]
+fill 'This paragraph will be filled, first\nwithout any indentation, and then with\nsome (including a hanging indent).'
+fill initial indent '     This paragraph will be filled,\nfirst without any indentation, and then\nwith some (including a hanging indent).'
+fill hanging indent '  * This paragraph will be filled, first\n    without any indentation, and then\n    with some (including a hanging\n    indent).'
+wrapper before ['yaba daba-', 'doo']
+wrapper changed hyphens ['yaba', 'daba-doo']
+wrapper changed width '> yaba daba-doo'
+dedent ''
+dedent 'Hello there.\n\n  Boo!\n'
+dedent 'Hello there.\n\nHow are ya?\nOh good.\n'
+dedent 'Foo\n  Bar\n\n Baz\n'
+dedent ' Foo\n\nBar\n'
+dedent 'hello\tthere\nhow are\tyou?'
+dedent '        hello there\n\thow are you?'
+dedent 'hello there\n  how are you?'
+dedent " \thello there\n  \thow are you?\n\tI'm fine, thanks"
+indent default '  Hi.\n  This is a test.\n  Testing.'
+indent explicit default '  Hi.\n  This is a test.\n  Testing.'
+indent all '  Hi.\n  This is a test.\n  Testing.'
+indent none 'Hi.\nThis is a test.\nTesting.'
+indent empty 'Hi.\nThis is a test.\nTesting.'
+indent default '  Hi.\n  This is a test.\n\n  Testing.'
+indent explicit default '  Hi.\n  This is a test.\n\n  Testing.'
+indent all '  Hi.\n  This is a test.\n  \n  Testing.'
+indent none 'Hi.\nThis is a test.\n\nTesting.'
+indent empty 'Hi.\nThis is a test.\n  \nTesting.'
+indent default '\n  Hi.\n  This is a test.\n  Testing.\n'
+indent explicit default '\n  Hi.\n  This is a test.\n  Testing.\n'
+indent all '  \n  Hi.\n  This is a test.\n  Testing.\n'
+indent none '\nHi.\nThis is a test.\nTesting.\n'
+indent empty '  \nHi.\nThis is a test.\nTesting.\n'
+indent default '  Hi.\r\n  This is a test.\r\n  Testing.\r\n'
+indent explicit default '  Hi.\r\n  This is a test.\r\n  Testing.\r\n'
+indent all '  Hi.\r\n  This is a test.\r\n  Testing.\r\n'
+indent none 'Hi.\r\nThis is a test.\r\nTesting.\r\n'
+indent empty 'Hi.\r\nThis is a test.\r\nTesting.\r\n'
+indent default '\n  Hi.\r\n  This is a test.\n\r\n  Testing.\r\n\n'
+indent explicit default '\n  Hi.\r\n  This is a test.\n\r\n  Testing.\r\n\n'
+indent all '  \n  Hi.\r\n  This is a test.\n  \r\n  Testing.\r\n  \n'
+indent none '\nHi.\r\nThis is a test.\n\r\nTesting.\r\n\n'
+indent empty '  \nHi.\r\nThis is a test.\n  \r\nTesting.\r\n  \n'
+indent round trips True
+shorten 18 'Hello there, [...]'
+shorten 60 "Hello there, how are you this fine day? I'm glad to hear it!"
+shorten 59 "Hello there, how are you this fine day? I'm glad to [...]"
+shorten custom 'Hello there, how$$'
+shorten spaced placeholder 'Hello there, $$'
+shorten empty ''
+shorten spaces 12 'hello world!'
+shorten spaces 11 'hello [...]'
+shorten spaces 10 '[...]'
+shorten long first word '[...]'
+shorten exact placeholder '(......)'
+umlaut ['Die', 'Empfänger-', 'Auswahl']
+umlaut hyphen ['aa ää-', 'ää']
+nonbreaking '\xa0' True ['This is a sentence', 'with non-', 'breaking\xa0space.']
+nonbreaking '\xa0' False ['This is a sentence', 'with', 'non-breaking\xa0space.']
+nonbreaking '\u202f' True ['This is a sentence', 'with non-', 'breaking\u202fspace.']
+nonbreaking '\u202f' False ['This is a sentence', 'with', 'non-breaking\u202fspace.']
+unicode code points ['中文', 'αβγ', 'é']
+unicode shorten spaces 'alpha [...]'
+bad width 0 ('ValueError', 'invalid width 0 (must be > 0)')
+bad width -1 ('ValueError', 'invalid width -1 (must be > 0)')
+bad empty width ('ValueError', 'invalid width 0 (must be > 0)')
+bad initial placeholder ('ValueError', 'placeholder too large for max width')
+bad subsequent placeholder ('ValueError', 'placeholder too large for max width')
+bad shorten placeholder ('ValueError', 'placeholder too large for max width')
+indent callback '> keep\n\nskip\n> keep too\n'
+indent callback lines ['keep\n', '\n', 'skip\n', 'keep too\n']

@@ -158,6 +158,99 @@ bool bound(Attachment &context, Handle value, std::intptr_t &number, ReturnSlot 
     return true;
 }
 
+// Adapted from CPython 3.12.14 unicode_expandtabs_impl and its C int converter.
+void expandtabs(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(context);
+    const auto self = roots.root(args[0]), tabsize_arg = roots.root(args[1]);
+    if (!is_string(context, self.get(context))) {
+        const auto name = TypeView(context, context.type_of(self)).name();
+        const auto kind = std::holds_alternative<Value>(name)
+                              ? context.payload<StrObject>(std::get<Value>(name)).value
+                              : std::get<std::u32string>(name);
+        raise_error(context, CoreObject::TypeErrorType,
+                    U"descriptor 'expandtabs' for 'str' objects doesn't apply to a '" +
+                        kind.substr(0, 100) + U"' object",
+                    out);
+        return;
+    }
+    ReturnSlot converted(context);
+    index(context, tabsize_arg, converted);
+    if (converted.tag() == ResultTag::Raised) {
+        out.raised(converted.exception());
+        return;
+    }
+    std::int64_t number;
+    if (!int_fits_signed(context, converted.value(), number) ||
+        number < std::numeric_limits<int>::min() || number > std::numeric_limits<int>::max()) {
+        raise_error(context, CoreObject::OverflowErrorType,
+                    U"Python int too large to convert to C int", out);
+        return;
+    }
+    const auto tabsize = static_cast<int>(number);
+    // The immutable payload remains alive through self across callbacks and polls.
+    const auto &text = context.payload<StrObject>(self).value;
+    constexpr auto limit = static_cast<std::size_t>(std::numeric_limits<std::intptr_t>::max());
+    std::size_t size = 0, column = 0;
+    bool found = false;
+    for (std::size_t i = 0; i < text.size(); ++i) {
+        const auto ch = text[i];
+        std::size_t increment = 1;
+        if (ch == U'\t') {
+            found = true;
+            increment = tabsize > 0 ? static_cast<std::size_t>(tabsize) - column % tabsize : 0;
+        }
+        if (size > limit - increment) {
+            raise_error(context, CoreObject::OverflowErrorType, U"new string is too long", out);
+            return;
+        }
+        size += increment;
+        column += increment;
+        if (ch == U'\n' || ch == U'\r')
+            column = 0;
+        if ((i & 4095) == 4095)
+            context.poll();
+    }
+    if (!found) {
+        if (context.type_of(self) == context.builtin(CoreObject::StrType))
+            out.ok(self.get(context));
+        else
+            make_str(context, text, out);
+        return;
+    }
+    std::u32string result;
+    if (size > result.max_size()) {
+        out.raised(context.builtin(CoreObject::MemoryError));
+        return;
+    }
+    result.reserve(size);
+    column = 0;
+    for (std::size_t i = 0; i < text.size(); ++i) {
+        const auto ch = text[i];
+        if (ch == U'\t') {
+            if (tabsize > 0) {
+                const auto increment = static_cast<std::size_t>(tabsize) - column % tabsize;
+                column += increment;
+                for (auto remaining = increment; remaining;) {
+                    const auto chunk = std::min<std::size_t>(remaining, 4096);
+                    result.append(chunk, U' ');
+                    remaining -= chunk;
+                    if (chunk == 4096)
+                        context.poll();
+                }
+            }
+        } else {
+            result.push_back(ch);
+            ++column;
+            if (ch == U'\n' || ch == U'\r')
+                column = 0;
+        }
+        if ((i & 4095) == 4095)
+            context.poll();
+    }
+    make_str(context, std::move(result), out);
+}
+
 // Adapted from CPython 3.12.14 pad, unicode_{ljust,rjust,center,zfill}_impl
 // and their Argument Clinic width/fill converters.
 enum class Padding { LeftJustify, RightJustify, Center, ZeroFill };
@@ -316,15 +409,23 @@ void tailmatch(Attachment &context, Handle, std::span<const Value> args, ReturnS
         const auto offset = Suffix ? end - static_cast<std::intptr_t>(part.size()) : start;
         return text.compare(static_cast<std::size_t>(offset), part.size(), part) == 0;
     };
+    auto invalid = [&](Value value, bool tuple) {
+        const auto name = TypeView(context, context.type_of(value)).name();
+        const auto kind = std::holds_alternative<Value>(name)
+                              ? context.payload<StrObject>(std::get<Value>(name)).value
+                              : std::get<std::u32string>(name);
+        const auto method = Suffix ? U"endswith" : U"startswith";
+        const auto message =
+            tuple ? U"tuple for " + std::u32string(method) + U" must only contain str, not "
+                  : std::u32string(method) + U" first arg must be str or a tuple of str, not ";
+        raise_error(context, CoreObject::TypeErrorType, message + kind.substr(0, 100), out);
+    };
     const auto value = candidate.get(context);
     if (context.has_layout<TupleObject>(value) &&
         is_subtype(context, context.type_of(value), context.builtin(CoreObject::TupleType))) {
         for (auto item : context.payload<TupleObject>(value).items) {
             if (!is_string(context, item)) {
-                raise_error(context, CoreObject::TypeErrorType,
-                            Suffix ? U"tuple for endswith must only contain str"
-                                   : U"tuple for startswith must only contain str",
-                            out);
+                invalid(item, true);
                 return;
             }
             if (match(item)) {
@@ -336,10 +437,7 @@ void tailmatch(Attachment &context, Handle, std::span<const Value> args, ReturnS
         return;
     }
     if (!is_string(context, value)) {
-        raise_error(context, CoreObject::TypeErrorType,
-                    Suffix ? U"endswith first arg must be str or a tuple of str"
-                           : U"startswith first arg must be str or a tuple of str",
-                    out);
+        invalid(value, false);
         return;
     }
     out.ok(context.builtin(match(value) ? CoreObject::True : CoreObject::False));
@@ -947,6 +1045,13 @@ void detail::install_unicode_methods(Attachment &context, std::span<const Handle
                              split<true>);
     SignatureLayout unary;
     unary.parameters = {{U"self", ParameterKind::PositionalOnly}};
+    ReturnSlot tabsize(context);
+    context.allocate_instance<IntObject>(at(CoreObject::IntType), tabsize, 8);
+    SignatureLayout expanded = unary;
+    expanded.parameters.push_back(
+        {U"tabsize", ParameterKind::PositionalOrKeyword, tabsize.value()});
+    install_native_attribute(context, core, at(CoreObject::StrType), U"expandtabs", expanded,
+                             expandtabs);
     ReturnSlot space(context);
     context.allocate_instance<StrObject>(at(CoreObject::StrType), space, U" ");
     const auto fill_space = roots.root(space.value());

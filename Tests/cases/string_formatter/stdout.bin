@@ -1,0 +1,14 @@
+[('a{', None, None, None), ('b}', None, None, None), (' ', 'name', '>{width}', 'r'), (' end', None, None, None)]
+(20, 0)
+  'hi' / 42
+ValueError 'cannot switch from manual field specification to automatic field numbering'
+ValueError 'Unknown conversion specifier z'
+ValueError 'Max string recursion exceeded'
+[('a', '', '', None), ('b', None, None, None)]
+1 [(True, 'foo'), (False, 2), (False, 'key')]
+('good', '', '', None)
+ValueError "Single '{' encountered in format string"
+StopIteration ''
+x (True, 'ok')
+ValueError 'Empty attribute in format string'
+StopIteration ''

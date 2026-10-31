@@ -2,6 +2,7 @@
 #include "cxxpython/compiler.hpp"
 
 #include <algorithm>
+#include <limits>
 #include <unordered_set>
 
 namespace cxxpython::core {
@@ -11,26 +12,140 @@ bool failed(const ReturnSlot &out)
     return out.tag() == ResultTag::Raised;
 }
 
+std::u32string diagnostic_text(std::string_view text);
+
 template <std::size_t Index>
 void syntax_field(Attachment &context, Value exception, ReturnSlot &out)
 {
-    ReturnSlot arguments(context);
-    context.load(exception, context.payload<ExceptionObject>(exception).args, arguments);
-    if (arguments.tag() != ResultTag::Ok || !context.has_layout<TupleObject>(arguments.value())) {
+    context.load(exception, context.instance_slot(exception, Index), out);
+    if (out.tag() == ResultTag::Empty)
         out.ok(context.builtin(CoreObject::None));
+}
+
+template <std::size_t Index>
+void set_syntax_field(Attachment &context, Value exception, std::optional<Value> value,
+                      ReturnSlot &out)
+{
+    context.store(exception, context.instance_slot(exception, Index), value);
+    out.ok(context.builtin(CoreObject::None));
+}
+
+// CPython 3.12.14 Objects/exceptions.c SyntaxError_init; tail slots are sorted by name.
+void syntax_init(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!context.has_layout<ExceptionObject>(args[0]) ||
+        !is_subtype(context, context.type_of(args[0]),
+                    context.builtin(CoreObject::SyntaxErrorType))) {
+        raise_error(context, CoreObject::TypeErrorType,
+                    U"SyntaxError.__init__ requires SyntaxError", out);
         return;
     }
-    const auto &args = context.payload<TupleObject>(arguments.value()).items;
-    if constexpr (Index == 6) {
-        out.ok(args.empty() ? context.builtin(CoreObject::None) : args[0]);
-    } else {
-        if (args.size() < 2 || !context.has_layout<TupleObject>(args[1])) {
-            out.ok(context.builtin(CoreObject::None));
+    RootScope roots(context);
+    auto self = roots.root(args[0]);
+    auto arguments = roots.root(args[1]);
+    context.store(self.get(context), context.payload<ExceptionObject>(self).args,
+                  arguments.get(context));
+    const auto &items = context.payload<TupleObject>(arguments).items;
+    const auto count = items.size();
+    if (count)
+        context.store(self.get(context), context.instance_slot(self.get(context), 4), items[0]);
+    if (count == 2) {
+        auto info = roots.root(items[1]);
+        ReturnSlot converted(context);
+        const std::array values{info.get(context)};
+        call(context, roots.root(context.builtin(CoreObject::TupleType)), {values}, converted);
+        if (failed(converted)) {
+            out.raised(converted.exception());
             return;
         }
-        const auto &location = context.payload<TupleObject>(args[1]).items;
-        out.ok(Index < location.size() ? location[Index] : context.builtin(CoreObject::None));
+        auto location = roots.root(converted.value());
+        context.store(self.get(context), context.instance_slot(self.get(context), 0), {});
+        context.store(self.get(context), context.instance_slot(self.get(context), 1), {});
+        const auto &parts = context.payload<TupleObject>(location).items;
+        if (parts.size() < 4 || parts.size() > 6) {
+            const auto prefix = parts.size() < 4 ? "function takes at least 4 arguments ("
+                                                 : "function takes at most 6 arguments (";
+            raise_error(
+                context, CoreObject::TypeErrorType,
+                diagnostic_text(std::string(prefix) + std::to_string(parts.size()) + " given)"),
+                out);
+            return;
+        }
+        constexpr std::array<std::size_t, 6> slots{2, 3, 5, 7, 0, 1};
+        for (std::size_t i = 0; i < parts.size(); ++i)
+            context.store(self.get(context), context.instance_slot(self.get(context), slots[i]),
+                          parts[i]);
+        if (parts.size() == 5) {
+            raise_error(context, CoreObject::TypeErrorType,
+                        U"end_offset must be provided when end_lineno is provided", out);
+            return;
+        }
     }
+    out.ok(context.builtin(CoreObject::None));
+}
+
+void syntax_str(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!context.has_layout<ExceptionObject>(args[0]) ||
+        !is_subtype(context, context.type_of(args[0]),
+                    context.builtin(CoreObject::SyntaxErrorType))) {
+        raise_error(context, CoreObject::TypeErrorType, U"SyntaxError.__str__ requires SyntaxError",
+                    out);
+        return;
+    }
+    RootScope roots(context);
+    auto self = roots.root(args[0]);
+    ReturnSlot field(context);
+    syntax_field<4>(context, self.get(context), field);
+    auto message = roots.root(field.value());
+    syntax_field<2>(context, self.get(context), field);
+    auto filename = roots.root(field.value());
+    syntax_field<3>(context, self.get(context), field);
+    auto lineno = roots.root(field.value());
+
+    const bool have_filename = context.has_layout<StrObject>(filename.get(context));
+    const bool have_lineno = context.type_of(lineno) == context.builtin(CoreObject::IntType);
+    std::u32string basename;
+    if (have_filename) {
+        basename = context.payload<StrObject>(filename).value;
+#ifdef _WIN32
+        const auto slash = basename.find_last_of(U'\\');
+#else
+        const auto slash = basename.find_last_of(U'/');
+#endif
+        if (slash != std::u32string::npos)
+            basename.erase(0, slash + 1);
+    }
+    std::int64_t number = -1;
+    if (have_lineno) {
+        std::int64_t converted;
+        if (int_fits_signed(context, lineno.get(context), converted) &&
+            converted >= std::numeric_limits<long>::min() &&
+            converted <= std::numeric_limits<long>::max())
+            number = converted;
+    }
+    ReturnSlot rendered(context);
+    str(context, message, rendered);
+    if (failed(rendered)) {
+        out.raised(rendered.exception());
+        return;
+    }
+    if (!have_filename && !have_lineno) {
+        out.ok(rendered.value());
+        return;
+    }
+    auto result = context.payload<StrObject>(rendered.value()).value;
+    result += U" (";
+    if (have_filename)
+        result += basename;
+    if (have_lineno) {
+        if (have_filename)
+            result += U", ";
+        result += U"line ";
+        result += diagnostic_text(std::to_string(number));
+    }
+    result += U")";
+    make_str(context, std::move(result), out);
 }
 
 std::u32string diagnostic_text(std::string_view text)
@@ -57,7 +172,8 @@ std::u32string diagnostic_text(std::string_view text)
     return result;
 }
 
-void source_error(Attachment &context, const SourceError &error, ReturnSlot &out)
+} // namespace
+void detail::raise_source_error(Attachment &context, const SourceError &error, ReturnSlot &out)
 {
     if (error.kind == SourceErrorKind::Capability) {
         raise_error(context, CoreObject::RuntimeErrorType, diagnostic_text(error.what()), out);
@@ -85,16 +201,17 @@ void source_error(Attachment &context, const SourceError &error, ReturnSlot &out
     make_str(context, diagnostic_text(error.what()), value);
     auto message = roots.root(value.value());
     const std::array args{message.get(context), location.get(context)};
-    cxxpython::core::make_tuple(context, args, value);
-    auto arguments = roots.root(value.value());
     auto kind = error.kind == SourceErrorKind::Tab           ? CoreObject::TabErrorType
                 : error.kind == SourceErrorKind::Indentation ? CoreObject::IndentationErrorType
                                                              : CoreObject::SyntaxErrorType;
-    context.allocate_instance<ExceptionObject>(roots.root(context.builtin(kind)), value,
-                                               arguments.get(context));
-    out.raised(value.value());
+    call(context, roots.root(context.builtin(kind)), {args}, value);
+    if (failed(value))
+        out.raised(value.exception());
+    else
+        out.raised(value.value());
 }
 
+namespace {
 bool source_text(Attachment &context, Value source, std::string &text, ReturnSlot &out)
 {
     if (context.has_layout<StrObject>(source))
@@ -106,8 +223,20 @@ bool source_text(Attachment &context, Value source, std::string &text, ReturnSlo
         return false;
     }
     if (text.find('\0') != std::string::npos) {
-        raise_error(context, CoreObject::SyntaxErrorType,
-                    U"source code string cannot contain null bytes", out);
+        RootScope roots(context);
+        ReturnSlot value(context);
+        make_str(context, U"source code string cannot contain null bytes", value);
+        if (failed(value)) {
+            out.raised(value.exception());
+            return false;
+        }
+        const auto message = roots.root(value.value());
+        const std::array args{message.get(context)};
+        call(context, roots.root(context.builtin(CoreObject::SyntaxErrorType)), {args}, value);
+        if (failed(value))
+            out.raised(value.exception());
+        else
+            out.raised(value.value());
         return false;
     }
     return true;
@@ -127,7 +256,7 @@ void freeze_source(Attachment &context, Value source, std::string filename, Inpu
         SourceUnit unit(SourceBuffer(std::move(text), std::move(filename)), mode, flags);
         unit.freeze(context, out);
     } catch (const SourceError &error) {
-        source_error(context, error, out);
+        detail::raise_source_error(context, error, out);
     }
 }
 std::uint32_t caller_future_flags(Attachment &context)
@@ -496,12 +625,25 @@ void detail::install_exec_builtins(Attachment &context, std::span<const Handle> 
     eval.parameters.push_back({U"closure", ParameterKind::KeywordOnly, none});
     install("exec", U"exec", std::move(eval), execute_builtin<false>);
     const auto syntax = core[static_cast<std::size_t>(CoreObject::SyntaxErrorType)];
-    install_native_field(context, core, syntax, U"filename", syntax_field<0>);
-    install_native_field(context, core, syntax, U"lineno", syntax_field<1>);
-    install_native_field(context, core, syntax, U"offset", syntax_field<2>);
-    install_native_field(context, core, syntax, U"text", syntax_field<3>);
-    install_native_field(context, core, syntax, U"end_lineno", syntax_field<4>);
-    install_native_field(context, core, syntax, U"end_offset", syntax_field<5>);
-    install_native_field(context, core, syntax, U"msg", syntax_field<6>);
+    SignatureLayout syntax_signature;
+    syntax_signature.parameters = {{U"self", ParameterKind::PositionalOnly}};
+    syntax_signature.varargs = U"args";
+    install_native_attribute(context, core, syntax, U"__init__", std::move(syntax_signature),
+                             syntax_init);
+    SignatureLayout syntax_unary;
+    syntax_unary.parameters = {{U"self", ParameterKind::PositionalOnly}};
+    install_native_attribute(context, core, syntax, U"__str__", std::move(syntax_unary),
+                             syntax_str);
+    install_native_field(context, core, syntax, U"end_lineno", syntax_field<0>,
+                         set_syntax_field<0>);
+    install_native_field(context, core, syntax, U"end_offset", syntax_field<1>,
+                         set_syntax_field<1>);
+    install_native_field(context, core, syntax, U"filename", syntax_field<2>, set_syntax_field<2>);
+    install_native_field(context, core, syntax, U"lineno", syntax_field<3>, set_syntax_field<3>);
+    install_native_field(context, core, syntax, U"msg", syntax_field<4>, set_syntax_field<4>);
+    install_native_field(context, core, syntax, U"offset", syntax_field<5>, set_syntax_field<5>);
+    install_native_field(context, core, syntax, U"print_file_and_line", syntax_field<6>,
+                         set_syntax_field<6>);
+    install_native_field(context, core, syntax, U"text", syntax_field<7>, set_syntax_field<7>);
 }
 } // namespace cxxpython::core

@@ -1,3 +1,4 @@
+#include "internal/builtinexec.hpp"
 #include "internal/compiler.hpp"
 #include "internal/import.hpp"
 
@@ -10,13 +11,6 @@ namespace {
 bool failed(ReturnSlot &out)
 {
     return out.tag() == ResultTag::Raised;
-}
-void source_error(Attachment &context, const SourceError &error, ReturnSlot &out)
-{
-    const auto type = error.kind == SourceErrorKind::Indentation ? CoreObject::IndentationErrorType
-                      : error.kind == SourceErrorKind::Tab       ? CoreObject::TabErrorType
-                                                                 : CoreObject::SyntaxErrorType;
-    raise_error(context, type, detail::decode_filename(SourceBuffer("", error.what())), out);
 }
 bool string(Attachment &context, Value value, ReturnSlot &out)
 {
@@ -41,7 +35,7 @@ std::optional<SourceBuffer> read_source(Attachment &context, const std::string &
             text.erase(0, 3);
         return SourceBuffer(std::move(text), path);
     } catch (const SourceError &error) {
-        source_error(context, error, out);
+        detail::raise_source_error(context, error, out);
         return {};
     } catch (const std::ios_base::failure &) {
         raise_error(context, CoreObject::OSErrorType, U"cannot read module source", out);
@@ -116,7 +110,7 @@ void source_to_code(Attachment &context, Handle, std::span<const Value> args, Re
         }
         unit->freeze(context, out);
     } catch (const SourceError &error) {
-        source_error(context, error, out);
+        detail::raise_source_error(context, error, out);
     }
 }
 void file_source(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
@@ -287,7 +281,7 @@ definition_source(Attachment &context, const ModuleDefinition &definition, Retur
         NativeWait parked(context);
         return std::make_shared<SourceUnit>(std::move(*buffer));
     } catch (const SourceError &error) {
-        source_error(context, error, out);
+        detail::raise_source_error(context, error, out);
     }
     return {};
 }

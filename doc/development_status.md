@@ -1,5 +1,76 @@
 # Development Status
 
+## 2026-10-31 Shared Native Lexer And Upstream String Libraries
+
+Prepended after 4301210, preserving earlier entries. This is a verified frontend/
+library slice, not completion of the active frontend/import/product/N4-N6/M0-M9
+goal. Terra supplied native string iterators, SyntaxError fields, expandtabs and
+reference fixtures; parent implemented and integrated the shared lexer, public
+tokenizer bridge, literal handling, compiler fixes and acceptance. All workers
+are closed.
+
+- Replaced the old scanner with the pinned CPython 3.12.14 lexical state machine,
+  adapted without CPython object APIs, RC, GIL or runtime dependency. Generated
+  PEG recognition remains separate from executable AST lowering. The independent
+  C++20/standard-library-only parser build and generated-source checks pass.
+  One incremental TokenStream now serves compiler collection and _tokenize;
+  no old scanner fallback or second public tokenizer exists. Literal decoding
+  moved out of AST lowering and remains separate from lexical recognition.
+- Lib/tokenize.py, Lib/string.py and Lib/textwrap.py are byte-for-byte pinned
+  upstream sources. Native mechanisms supply lazy reading, comments/NL/operator
+  adaptation, Unicode character positions, structured lexical diagnostics and
+  the two _string parsing factories. Template/Formatter/wrapping policy stays in
+  Python. General str.expandtabs closes the real textwrap dependency, including
+  Unicode columns, CR/LF resets, index callbacks, subtype results and C-int bounds.
+  General startswith/endswith errors now include the offending type.
+- Tokenizer callbacks are borrowed only for the active next() call. Inputs and
+  results remain rooted through reader/warning/codec callbacks and collection;
+  a per-iterator claim rejects recursive/overlapping mutation, not other Python
+  threads. Immutable native line snapshots and one traced managed-line cache
+  avoid converting a whole line per token. _string iterators claim monotonic
+  cursors atomically before allocating output. Long scans poll without a GIL,
+  long object lock or NoSafepoint region. Shared-heap iteration fixtures catch
+  worker errors and always release their completion gates.
+- SyntaxError fields are real synchronized, independently writable/deletable
+  traced slots, not computed views of args. Construction/reinitialization/str
+  follow the pinned implementation; compile/eval/exec and _imp share structured
+  source-error conversion. Moving validation out of lexing preserves public
+  tokenization of malformed literal escapes while compilation rejects them.
+- Sanitizers exposed late AST recursion checks and an excessive PEG native-stack
+  budget. Transparent AST productions now iterate, remaining native recursion is
+  checked before descent, and the parser budget is explicitly 1024 calls rather
+  than 4096. The existing 128-node expression limit remains. Deep valid Python
+  can therefore hit this implementation limit earlier than CPython; this is not
+  presented as complete complexity compatibility. Final boundary tests pass in
+  Release, ASan/UBSan/LSan and TSan, including controlled deep-input errors.
+- Frozen Release passes all 340 direct test.py fixtures and 27 parser/parallel/
+  bootstrap checks, including all eight allocation-failure shards. Strict ASan/
+  UBSan/LSan and TSan each pass the seventeen new/changed direct fixtures. The
+  generated tokenizer fixtures retain 181 actual upstream literal samples with
+  three reader modes, 543 token streams, split into four bounded test.py files.
+  Goldens come from pinned CPython; stdin.bin remains actual optional process
+  input. The empty Formatter exception message is printed with repr, eliminating
+  trailing golden whitespace; that output-only correction passes all three
+  binaries without another native rebuild. Formatting/staged whitespace pass.
+- The affected Release source/compiler/entry workflows also pass, and standalone
+  recognition passes the Lib corpus plus upstream syntax-error samples. Earlier
+  monolithic sanitizer Source.Differential/Syntax.Differential runs exceeded
+  their existing 60/90-second budgets; they are not counted as passes or hidden
+  by raised timeouts. Their raw logs and the fixed stack-overflow diagnostics
+  remain in .cache/tokenizer-*. Full sanitizer driver and upstream-library
+  matrices remain acceptance work; passing slices do not close the full goal.
+- Only the new public-tokenizer long-line workload was measured, with retained
+  commands, source kernel and raw runs in doc/benchmarks/tokenize-2026-10-31.
+  Tools/benchmarks/record.py generated every table. These samples do not show
+  quadratic growth, but the implementation remains substantially slower than
+  pinned CPython; absolute performance acceptance is still open. No prime-loop
+  campaign was repeated. Unnecessary added artifact/source checksum records were
+  removed; ordinary behavioral, race, memory and formatting checks remain.
+- Next are actual public ast/inspect/reflection and traceback/code/codeop/REPL
+  dependencies, then the remaining Base-to-Full libraries and N4-N6 gates.
+  readline/curses/dis/gc remain explicit delivery scope. User test2.py and the
+  temporary_plan.md deletion are excluded. No remote push bypass was attempted.
+
 ## 2026-10-31 Source Cache Fixture Output
 
 Follow-up to a791d48: the staged whitespace check identified an intentional print

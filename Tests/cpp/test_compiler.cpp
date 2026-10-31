@@ -1125,6 +1125,11 @@ TEST(CompilerDiagnostics, SourceBufferAndCompilationLimitsDoNotUseAnotherParser)
     std::string nested(1000, '-');
     nested += '1';
     EXPECT_THROW(SourceUnit{SourceBuffer(nested)}, SourceError);
+    EXPECT_NO_THROW(SourceUnit{SourceBuffer(std::string(50, '(') + "1" + std::string(50, ')'))});
+    EXPECT_THROW(SourceUnit{SourceBuffer(std::string(200, '(') + "1" + std::string(200, ')'))},
+                 SourceError);
+    EXPECT_NO_THROW(SourceUnit{SourceBuffer(std::string(100, '-') + "1")});
+    EXPECT_THROW(SourceUnit{SourceBuffer(std::string(500, '-') + "1")}, SourceError);
 }
 
 TEST_F(CoreSource, ModuleAndFunctionDocstringsAndDefaultEnvironmentAreRealObjects)

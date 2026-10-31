@@ -3,6 +3,7 @@
 #include "cxxpython/grammar.hpp"
 
 #include <cstddef>
+#include <functional>
 #include <memory>
 #include <optional>
 #include <stdexcept>
@@ -28,6 +29,42 @@ struct Token {
     Span span;
     std::u32string text;
 };
+struct LexicalToken {
+    Token token;
+    int lineno = 0, column = -1, end_lineno = 0, end_column = -1;
+    std::shared_ptr<const std::u32string> line;
+    std::size_t line_revision = 0;
+    bool implicit_newline = false, trailing = false;
+};
+struct LexicalDiagnostic {
+    ErrorKind kind = ErrorKind::Syntax;
+    Span span;
+    std::string message;
+    int lineno = 0, offset = 0, end_lineno = 0, end_offset = 0;
+    std::u32string line;
+    bool location_in_args = true, has_text = true;
+};
+// A caller-owned stream. Callbacks are borrowed only for the duration of next().
+class TokenStream {
+  public:
+    using ReadLine = std::function<std::string()>;
+    using Poll = std::function<void()>;
+    using Warning = std::function<void(const LexicalDiagnostic &)>;
+    explicit TokenStream(bool extra_tokens = false, bool interactive = false,
+                         bool allow_incomplete = false);
+    ~TokenStream();
+    TokenStream(const TokenStream &) = delete;
+    TokenStream &operator=(const TokenStream &) = delete;
+    std::optional<LexicalToken> next(const ReadLine &, const Poll & = {}, const Warning & = {});
+    const LexicalDiagnostic &diagnostic() const noexcept;
+    std::size_t external_bytes() const noexcept;
+
+  private:
+    struct Impl;
+    std::unique_ptr<Impl> impl_;
+};
+std::u32string decode_string_literal(std::u32string_view, Span);
+std::u32string decode_string_fragment(std::u32string_view, bool raw, Span);
 struct Node;
 using NodePtr = std::shared_ptr<const Node>;
 struct Node {

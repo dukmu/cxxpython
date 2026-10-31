@@ -23,6 +23,16 @@ immutable CST using per-parse memo state, not CPython AST objects. The independe
 Parser CMake entry needs only a C++ compiler and standard library. Host Python is
 needed for explicit regeneration/checks, not normal parser builds or execution.
 
+The lexer state machine in `Parser/tokenizer.cpp` is adapted from pinned CPython
+3.12.14 `Parser/tokenizer.c`. Its caller-owned `syntax::TokenStream` is shared by
+compiler token collection and the native public-tokenizer bridge; it contains
+native buffers, indentation/bracket/f-string state and diagnostics, not managed
+Python references. Reader, poll and warning callbacks are borrowed only during
+`next()` and cleared on return or unwind. `Parser/string_parser.cpp` handles
+literal decoding and `Parser/unicode.cpp` supplies identifier/Unicode helpers;
+neither is another grammar recognizer. Public token kinds and character columns
+are adapted separately from the compiler's UTF-8 byte spans.
+
 `Parser/source.cpp` owns the runtime's SourceBuffer decoding and diagnostics.
 `Parser/ast.cpp` adapts the generated CST to the existing native compiler AST;
 it does not recognize grammar or retain a handwritten parser fallback.
@@ -472,11 +482,71 @@ native tuple subtype with readonly fields, not a namespace pretending to be a
 tuple. Tuple count/index use the immutable payload and rooted normal equality
 callbacks; starred subscripts reuse the existing tuple expansion path.
 
-Lib/linecache.py is unchanged upstream source. Lib/tokenize.py preserves the
-upstream encoding detection/open/cache dependencies, with only the _tokenize
-import deferred to the function that actually needs it. Public full tokenization
-still requires that missing native interface; the compiler's standalone tokenizer
-is not silently substituted for its different public token/position contract.
+`Lib/linecache.py` and `Lib/tokenize.py` are unchanged pinned upstream source.
+The temporary deferred `_tokenize` import has been removed. Encoding-cookie/BOM
+detection, file opening, ENCODING token policy, TokenInfo/exact_type, untokenize
+and public error translation remain Python responsibilities.
+`Modules/_tokenizemodule.cpp` supplies `_tokenize.TokenizerIter` over the same
+native TokenStream as the compiler, adapting its output to the public five-field
+token tuples. `extra_tokens` selects the public comment/NL/operator behavior;
+the native compiler token stream is not exposed unchanged as the public API.
+
+TokenizerIter construction retains the reader without calling it. Each next()
+refills only when lexical progress needs more input, including multiline tokens.
+Without encoding, the reader returns str; with encoding, it returns bytes decoded
+through the actual codec boundary with replacement errors, then strictly encoded
+to the lexer's UTF-8 input. Empty input or reader StopIteration means EOF; other
+reader/codec failures propagate. The stream marks itself finished when next()
+unwinds with an error, so failure timing and retry behavior are part of the API.
+
+TokenStream publishes an immutable native line snapshot and revision. The bridge
+caches the corresponding managed string in an AtomicGcEdge and reuses it for
+tokens with the same revision, rather than decoding/boxing the entire line per
+token. The iterator traces reader, optional encoding, codec error names and that
+line edge; active calls root their inputs and results and account native stream
+storage. A per-iterator execution claim covers scanning and reader/warning
+callbacks; overlapping or recursive next() raises ValueError rather than sharing
+mutable lexical state. Separate iterators have independent streams. Lexical
+character consumption polls the attachment every 4096 steps, without a storage
+lock or long NoSafepoint; callbacks use normal Python calls, and actual blocking
+I/O retains the I/O layer's NativeWait contract. No interpreter execution lock,
+CPython reference counting or host-Python tokenization is introduced.
+
+LexicalDiagnostic carries native message, source text, start/end positions and
+exception-kind information. The bridge constructs ordinary SyntaxError,
+IndentationError or TabError instances; Lib/tokenize.py applies its upstream
+public TokenError translation. SyntaxError's writable/deletable fields are traced
+instance slots, not views recomputed from args. `Python/builtinexec.cpp` adapts
+upstream construction/str behavior and supplies the source-error conversion also
+used by `_imp` compilation. Exact diagnostics, reader/retry/warning behavior,
+line-cache scaling, shared-heap thread/GC behavior and product entry points still
+require acceptance against the pinned reference; these source changes alone do
+not establish passing tests or complete frontend/library support.
+
+`Lib/string.py` is also unchanged pinned upstream source. Template substitution,
+validation/identifier policy and Formatter argument lookup, conversion and nested
+format-spec orchestration stay in Python, using real re/collections/builtin
+dependencies. `Modules/_stringmodule.cpp` adapts the pinned
+Objects/stringlib/unicode_format.h MarkupIterator and FieldNameIterator as the
+two native `_string` factories. Their lazy iterators retain immutable traced
+source strings, parse native scalar slices and claim monotonically advancing
+atomic cursors by CAS before allocating results. Scans, including initial field
+splitting and Unicode decimal conversion, poll every 4096 steps without locks or
+Python parsing callbacks. Module-local captured native types have empty slots,
+ordinary object identity/equality/hash/repr, immutable type metadata and disabled
+direct construction/subclassing. Existing `Objects/stringformat.cpp` still owns
+str.format rendering; this step has not unified those parser implementations or
+established complete semantic parity. Missing Python-level dependencies must be
+completed, not hidden by edits to the copied string.py; full library, malformed
+input/retry and concurrent/GC acceptance remain separate gates.
+
+`Lib/textwrap.py` is unchanged upstream Python policy over the real regex and
+string protocols. General `str.expandtabs` supplies its previously missing
+dependency: upstream two-pass character-column sizing/filling, CR/LF resets,
+normal index conversion with C-int bounds, subtype/base-result behavior and
+periodic polls. The immutable source remains precisely rooted through index
+callbacks, collection and native scans. No textwrap-specific string fast path
+or Python-policy rewrite is used.
 
 `Modules/_sre/engine.c` and its adapted upstream matching header keep SRE
 instruction validation, captures, assertions and backtracking in independent C.

@@ -1,0 +1,11 @@
+Ada 42 $ $missing
+KeyError 'missing'
+Ada yes $ !
+True ['who', 'what', 'missing']
+False ['ok', 'broken']
+one
+OK $! ${broken} $
+ValueError Invalid placeholder in string: line 2, col 5
+['a', 'b']
+False
+value %

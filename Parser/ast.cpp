@@ -14,6 +14,7 @@ using syntax::TokenKind;
 class Adapter {
     const SourceBuffer &source_;
     syntax::Tree tree_;
+    std::size_t expression_depth_ = 0;
 
     Span span(const Node &n) const
     {
@@ -122,114 +123,12 @@ class Adapter {
     }
     std::u32string string_value(const Node &n, const std::u32string &text)
     {
-        std::size_t quote = text.find_first_of(U"'\"");
-        if (quote == std::u32string::npos)
-            unsupported(n);
-        bool raw = false, bytes = false;
-        for (std::size_t i = 0; i < quote; ++i) {
-            if (text[i] == U'f' || text[i] == U'F')
-                unsupported(n);
-            if (text[i] == U'b' || text[i] == U'B')
-                bytes = true;
-            if (text[i] == U'r' || text[i] == U'R')
-                raw = true;
+        try {
+            const auto where = span(n);
+            return syntax::decode_string_literal(text, {where.begin, where.end});
+        } catch (const syntax::Error &error) {
+            throw SourceError(source_, {error.span.begin, error.span.end}, error.what());
         }
-        std::size_t q = quote + 2 < text.size() && text[quote + 1] == text[quote] &&
-                                text[quote + 2] == text[quote]
-                            ? 3
-                            : 1;
-        std::u32string out;
-        for (std::size_t i = quote + q; i + q < text.size(); ++i) {
-            char32_t ch = text[i];
-            if (ch != U'\\' || raw || i + 1 + q >= text.size()) {
-                out.push_back(ch);
-                continue;
-            }
-            ch = text[++i];
-            if (bytes && (ch == U'u' || ch == U'U' || ch == U'N')) {
-                out.push_back(U'\\');
-                out.push_back(ch);
-                continue;
-            }
-            switch (ch) {
-            case U'\n':
-                break;
-            case U'n':
-                out.push_back(U'\n');
-                break;
-            case U'r':
-                out.push_back(U'\r');
-                break;
-            case U't':
-                out.push_back(U'\t');
-                break;
-            case U'b':
-                out.push_back(U'\b');
-                break;
-            case U'f':
-                out.push_back(U'\f');
-                break;
-            case U'v':
-                out.push_back(U'\v');
-                break;
-            case U'a':
-                out.push_back(U'\a');
-                break;
-            case U'\\':
-            case U'\'':
-            case U'"':
-                out.push_back(ch);
-                break;
-            case U'N': {
-                if (i + 1 + q >= text.size() || text[++i] != U'{')
-                    throw SourceError(source_, span(n), "malformed named Unicode escape");
-                const auto begin = ++i;
-                while (i + q < text.size() && text[i] != U'}')
-                    ++i;
-                const auto value =
-                    syntax::unicode_name(std::u32string_view(text).substr(begin, i - begin));
-                if (!value)
-                    throw SourceError(source_, span(n), "unknown Unicode character name");
-                out.push_back(*value);
-                break;
-            }
-            case U'x':
-            case U'u':
-            case U'U': {
-                int count = ch == U'x' ? 2 : ch == U'u' ? 4 : 8;
-                char32_t value = 0;
-                for (int j = 0; j < count; ++j) {
-                    if (++i + q >= text.size())
-                        throw SourceError(source_, span(n), "truncated Unicode escape");
-                    auto h = text[i];
-                    int digit = h >= U'0' && h <= U'9'   ? h - U'0'
-                                : h >= U'a' && h <= U'f' ? h - U'a' + 10
-                                : h >= U'A' && h <= U'F' ? h - U'A' + 10
-                                                         : -1;
-                    if (digit < 0)
-                        throw SourceError(source_, span(n), "invalid Unicode escape");
-                    value = value * 16 + digit;
-                }
-                if (value > 0x10ffff)
-                    throw SourceError(source_, span(n), "invalid Unicode escape");
-                out.push_back(value);
-                break;
-            }
-            default:
-                if (ch >= U'0' && ch <= U'7') {
-                    char32_t value = ch - U'0';
-                    for (int j = 0; j < 2 && i + 1 + q < text.size() && text[i + 1] >= U'0' &&
-                                    text[i + 1] <= U'7';
-                         ++j)
-                        value = value * 8 + text[++i] - U'0';
-                    out.push_back(bytes ? value & 255 : value);
-                } else {
-                    out.push_back(U'\\');
-                    out.push_back(ch);
-                }
-            }
-        }
-        return out;
     }
     ExprPtr terminal(const Node &n)
     {
@@ -270,408 +169,446 @@ class Adapter {
         }
         unsupported(n);
     }
-    ExprPtr expression(const Node &n)
+    ExprPtr expression(const Node &input)
     {
-        if (n.rule == Rule::Token)
-            return terminal(n);
-        auto c = children(n);
-        auto r = rules(n);
-        switch (n.rule) {
-        case Rule::signed_number:
-        case Rule::signed_real_number: {
-            ExprPtr value;
-            if (!r.empty())
-                value = expression(*r[0]);
-            else
+        if (expression_depth_ >= 256)
+            throw SourceError(source_, span(input),
+                              "expression nesting exceeds the current compiler limit");
+        ++expression_depth_;
+        struct Exit {
+            std::size_t &depth;
+            ~Exit()
+            {
+                --depth;
+            }
+        } exit{expression_depth_};
+        const Node *current = &input;
+        // Transparent grammar productions do not consume native recursion depth.
+        for (;;) {
+            const auto &n = *current;
+            if (n.rule == Rule::Token)
+                return terminal(n);
+            auto c = children(n);
+            auto r = rules(n);
+            switch (n.rule) {
+            case Rule::signed_number:
+            case Rule::signed_real_number: {
+                ExprPtr value;
+                if (!r.empty())
+                    value = expression(*r[0]);
+                else
+                    for (auto p : c)
+                        if (p->rule == Rule::Token && token(*p).kind == TokenKind::NUMBER)
+                            value = terminal(*p);
+                if (!value)
+                    unsupported(n);
+                if (has(n, U"-"))
+                    return make(n, UnaryExpr{UnaryOp::Negative, std::move(value)}, 2);
+                return value;
+            }
+            case Rule::complex_number: {
+                auto left = expression(*r.at(0)), right = expression(*r.at(1));
+                return make(n,
+                            BinaryExpr{has(n, U"-") ? BinaryOp::Subtract : BinaryOp::Add,
+                                       std::move(left), std::move(right)},
+                            3);
+            }
+            case Rule::literal_expr:
+                if (r.empty())
+                    for (auto p : c)
+                        if (p->rule == Rule::Token)
+                            return terminal(*p);
+                break;
+            case Rule::await_primary:
+                if (has(n, U"await")) {
+                    auto value = expression(*r.at(0));
+                    const auto depth = value->depth + 1;
+                    return make(n, AwaitExpr{std::move(value)}, depth);
+                }
+                break;
+            case Rule::yield_expr: {
+                auto value = r.empty() ? nullptr : expression(*r[0]);
+                auto depth = value ? value->depth + 1 : 1;
+                return make(n, YieldExpr{std::move(value), has(n, U"from")}, depth);
+            }
+            case Rule::lambdef: {
+                auto fn = std::make_unique<FunctionStmt>();
+                fn->name = U"<lambda>";
+                if (auto p = find(n, Rule::lambda_params))
+                    parameters(*p, *fn);
+                validate_parameters(n, *fn);
+                auto body = find(n, Rule::expression);
+                if (!body)
+                    unsupported(n);
+                auto value = expression(*body);
+                auto depth = value->depth + 1;
+                fn->body.push_back(stmt(*body, ReturnStmt{std::move(value)}));
+                return make(n, LambdaExpr{std::move(fn)}, depth);
+            }
+            case Rule::listcomp:
+            case Rule::dictcomp:
+            case Rule::setcomp:
+            case Rule::genexp:
+                return comprehension(n);
+            case Rule::fstring:
+                return fstring(n);
+            case Rule::strings: {
+                JoinedStrExpr joined;
+                bool formatted = false;
+                for (auto p : r) {
+                    auto e = expression(*p);
+                    if (auto nested = std::get_if<JoinedStrExpr>(&e->node)) {
+                        formatted = true;
+                        for (auto &item : nested->items)
+                            joined.items.push_back(std::move(item));
+                    } else {
+                        auto lit = std::get_if<Literal>(&e->node);
+                        if (!lit || (lit->kind != Literal::Kind::String &&
+                                     lit->kind != Literal::Kind::Bytes))
+                            unsupported(*p);
+                        joined.items.push_back(std::move(e));
+                    }
+                }
+                if (formatted)
+                    return make(n, std::move(joined), 2);
+                std::u32string value;
+                for (auto &item : joined.items)
+                    value += std::get<Literal>(item->node).text;
+                const auto kind = joined.items.empty()
+                                      ? Literal::Kind::String
+                                      : std::get<Literal>(joined.items[0]->node).kind;
+                return make(n, Literal{kind, std::move(value)});
+            }
+            case Rule::string:
                 for (auto p : c)
-                    if (p->rule == Rule::Token && token(*p).kind == TokenKind::NUMBER)
-                        value = terminal(*p);
-            if (!value)
-                unsupported(n);
-            if (has(n, U"-"))
-                return make(n, UnaryExpr{UnaryOp::Negative, std::move(value)}, 2);
-            return value;
-        }
-        case Rule::complex_number: {
-            auto left = expression(*r.at(0)), right = expression(*r.at(1));
-            return make(n,
-                        BinaryExpr{has(n, U"-") ? BinaryOp::Subtract : BinaryOp::Add,
-                                   std::move(left), std::move(right)},
-                        3);
-        }
-        case Rule::literal_expr:
-            if (r.empty())
-                for (auto p : c)
-                    if (p->rule == Rule::Token)
+                    if (p->rule == Rule::Token && token(*p).kind == TokenKind::STRING)
                         return terminal(*p);
-            break;
-        case Rule::await_primary:
-            if (has(n, U"await")) {
-                auto value = expression(*r.at(0));
-                const auto depth = value->depth + 1;
-                return make(n, AwaitExpr{std::move(value)}, depth);
-            }
-            break;
-        case Rule::yield_expr: {
-            auto value = r.empty() ? nullptr : expression(*r[0]);
-            auto depth = value ? value->depth + 1 : 1;
-            return make(n, YieldExpr{std::move(value), has(n, U"from")}, depth);
-        }
-        case Rule::lambdef: {
-            auto fn = std::make_unique<FunctionStmt>();
-            fn->name = U"<lambda>";
-            if (auto p = find(n, Rule::lambda_params))
-                parameters(*p, *fn);
-            validate_parameters(n, *fn);
-            auto body = find(n, Rule::expression);
-            if (!body)
                 unsupported(n);
-            auto value = expression(*body);
-            auto depth = value->depth + 1;
-            fn->body.push_back(stmt(*body, ReturnStmt{std::move(value)}));
-            return make(n, LambdaExpr{std::move(fn)}, depth);
-        }
-        case Rule::listcomp:
-        case Rule::dictcomp:
-        case Rule::setcomp:
-        case Rule::genexp:
-            return comprehension(n);
-        case Rule::fstring:
-            return fstring(n);
-        case Rule::strings: {
-            JoinedStrExpr joined;
-            bool formatted = false;
-            for (auto p : r) {
-                auto e = expression(*p);
-                if (auto nested = std::get_if<JoinedStrExpr>(&e->node)) {
-                    formatted = true;
-                    for (auto &item : nested->items)
-                        joined.items.push_back(std::move(item));
-                } else {
-                    auto lit = std::get_if<Literal>(&e->node);
-                    if (!lit ||
-                        (lit->kind != Literal::Kind::String && lit->kind != Literal::Kind::Bytes))
-                        unsupported(*p);
-                    joined.items.push_back(std::move(e));
+            case Rule::real_number:
+            case Rule::imaginary_number:
+                for (auto p : c)
+                    if (p->rule == Rule::Token && token(*p).kind == TokenKind::NUMBER) {
+                        auto value = terminal(*p);
+                        const auto imaginary =
+                            std::get<Literal>(value->node).kind == Literal::Kind::Imaginary;
+                        if (imaginary != (n.rule == Rule::imaginary_number))
+                            throw SourceError(source_, span(n),
+                                              imaginary
+                                                  ? "real number required in complex literal"
+                                                  : "imaginary number required in complex literal");
+                        return value;
+                    }
+                unsupported(n);
+            case Rule::atom:
+            case Rule::name_or_attr: {
+                const Node *next = nullptr;
+                for (auto p : c)
+                    if (p->rule != Rule::Token || token(*p).kind == TokenKind::NAME ||
+                        token(*p).kind == TokenKind::NUMBER ||
+                        token(*p).kind == TokenKind::ELLIPSIS) {
+                        next = p;
+                        break;
+                    }
+                if (next) {
+                    current = next;
+                    continue;
                 }
+                unsupported(n);
             }
-            if (formatted)
-                return make(n, std::move(joined), 2);
-            std::u32string value;
-            for (auto &item : joined.items)
-                value += std::get<Literal>(item->node).text;
-            const auto kind = joined.items.empty() ? Literal::Kind::String
-                                                   : std::get<Literal>(joined.items[0]->node).kind;
-            return make(n, Literal{kind, std::move(value)});
-        }
-        case Rule::string:
-            for (auto p : c)
-                if (p->rule == Rule::Token && token(*p).kind == TokenKind::STRING)
-                    return terminal(*p);
-            unsupported(n);
-        case Rule::real_number:
-        case Rule::imaginary_number:
-            for (auto p : c)
-                if (p->rule == Rule::Token && token(*p).kind == TokenKind::NUMBER) {
-                    auto value = terminal(*p);
-                    const auto imaginary =
-                        std::get<Literal>(value->node).kind == Literal::Kind::Imaginary;
-                    if (imaginary != (n.rule == Rule::imaginary_number))
-                        throw SourceError(source_, span(n),
-                                          imaginary
-                                              ? "real number required in complex literal"
-                                              : "imaginary number required in complex literal");
-                    return value;
+            case Rule::expressions:
+            case Rule::star_expressions:
+            case Rule::star_targets:
+            case Rule::star_targets_list_seq:
+            case Rule::star_targets_tuple_seq:
+            case Rule::del_targets:
+            case Rule::star_named_expressions: {
+                if (r.size() == 1 && !has(n, U",")) {
+                    current = r[0];
+                    continue;
                 }
-            unsupported(n);
-        case Rule::atom:
-        case Rule::name_or_attr:
-            for (auto p : c)
-                if (p->rule != Rule::Token || token(*p).kind == TokenKind::NAME ||
-                    token(*p).kind == TokenKind::NUMBER || token(*p).kind == TokenKind::ELLIPSIS)
-                    return expression(*p);
-            unsupported(n);
-        case Rule::expressions:
-        case Rule::star_expressions:
-        case Rule::star_targets:
-        case Rule::star_targets_list_seq:
-        case Rule::star_targets_tuple_seq:
-        case Rule::del_targets:
-        case Rule::star_named_expressions: {
-            if (r.size() == 1 && !has(n, U","))
-                return expression(*r[0]);
-            TupleExpr tuple;
-            std::size_t depth = 1;
-            for (auto p : r) {
-                auto e = expression(*p);
-                depth = std::max(depth, e->depth + 1);
-                tuple.items.push_back(std::move(e));
+                TupleExpr tuple;
+                std::size_t depth = 1;
+                for (auto p : r) {
+                    auto e = expression(*p);
+                    depth = std::max(depth, e->depth + 1);
+                    tuple.items.push_back(std::move(e));
+                }
+                return make(n, std::move(tuple), depth);
             }
-            return make(n, std::move(tuple), depth);
-        }
-        case Rule::subject_expr: {
-            if (!has(n, U","))
-                return expression(*r.at(0));
-            TupleExpr tuple;
-            for (auto p : r) {
-                if (p->rule == Rule::star_named_expressions) {
-                    for (auto item : rules(*p))
-                        tuple.items.push_back(expression(*item));
-                } else
-                    tuple.items.push_back(expression(*p));
+            case Rule::subject_expr: {
+                if (!has(n, U",")) {
+                    current = r.at(0);
+                    continue;
+                }
+                TupleExpr tuple;
+                for (auto p : r) {
+                    if (p->rule == Rule::star_named_expressions) {
+                        for (auto item : rules(*p))
+                            tuple.items.push_back(expression(*item));
+                    } else
+                        tuple.items.push_back(expression(*p));
+                }
+                return make(n, std::move(tuple), 2);
             }
-            return make(n, std::move(tuple), 2);
-        }
-        case Rule::star_expression:
-        case Rule::star_named_expression:
-        case Rule::star_target:
-        case Rule::starred_expression:
-            if (has(n, U"*")) {
-                auto e = expression(*r.at(0));
-                auto d = e->depth + 1;
-                return make(n, StarredExpr{std::move(e)}, d);
+            case Rule::star_expression:
+            case Rule::star_named_expression:
+            case Rule::star_target:
+            case Rule::starred_expression:
+                if (has(n, U"*")) {
+                    auto e = expression(*r.at(0));
+                    auto d = e->depth + 1;
+                    return make(n, StarredExpr{std::move(e)}, d);
+                }
+                break;
+            case Rule::single_target:
+            case Rule::del_t_atom:
+                if (n.rule == Rule::del_t_atom && (has(n, U"[") || has(n, U"("))) {
+                    if (n.alternative == 1) {
+                        current = r.at(0);
+                        continue;
+                    }
+                    std::vector<ExprPtr> items;
+                    for (auto p : r)
+                        for (auto item : rules(*p))
+                            items.push_back(expression(*item));
+                    if (has(n, U"["))
+                        return make(n, ListExpr{std::move(items)}, 2);
+                    return make(n, TupleExpr{std::move(items)}, 2);
+                }
+                if (r.empty())
+                    for (auto p : c)
+                        if (p->rule == Rule::Token && token(*p).kind == TokenKind::NAME)
+                            return terminal(*p);
+                break;
+            case Rule::assignment_expression: {
+                const Node *name = nullptr;
+                for (auto p : c)
+                    if (p->rule == Rule::Token && token(*p).kind == TokenKind::NAME) {
+                        name = p;
+                        break;
+                    }
+                auto target = terminal(*name), value = expression(*r.at(0));
+                auto d = std::max(target->depth, value->depth) + 1;
+                return make(n, NamedExpr{std::move(target), std::move(value)}, d);
             }
-            break;
-        case Rule::single_target:
-        case Rule::del_t_atom:
-            if (n.rule == Rule::del_t_atom && (has(n, U"[") || has(n, U"("))) {
-                if (n.alternative == 1)
-                    return expression(*r.at(0));
+            case Rule::expression:
+                if (r.size() == 3) {
+                    auto body = expression(*r[0]), test = expression(*r[1]),
+                         alt = expression(*r[2]);
+                    auto d = std::max({body->depth, test->depth, alt->depth}) + 1;
+                    return make(
+                        n, ConditionalExpr{std::move(test), std::move(body), std::move(alt)}, d);
+                }
+                break;
+            case Rule::disjunction:
+            case Rule::conjunction:
+                if (r.size() > 1) {
+                    BoolExpr value{n.rule == Rule::conjunction, {}};
+                    std::size_t depth = 1;
+                    for (auto item : r) {
+                        auto child = expression(*item);
+                        depth = std::max(depth, child->depth + 1);
+                        value.values.push_back(std::move(child));
+                    }
+                    return make(n, std::move(value), depth);
+                }
+                break;
+            case Rule::inversion:
+            case Rule::factor:
+                if (!c.empty() && c[0]->rule == Rule::Token) {
+                    auto op = token(*c[0]).text;
+                    auto e = expression(*r.at(0));
+                    auto d = e->depth + 1;
+                    return make(n,
+                                UnaryExpr{op == U"not" ? UnaryOp::Not
+                                          : op == U"+" ? UnaryOp::Positive
+                                          : op == U"-" ? UnaryOp::Negative
+                                                       : UnaryOp::Invert,
+                                          std::move(e)},
+                                d);
+                }
+                break;
+            case Rule::bitwise_or:
+            case Rule::bitwise_xor:
+            case Rule::bitwise_and:
+            case Rule::shift_expr:
+            case Rule::sum:
+            case Rule::term:
+            case Rule::power:
+                if (r.size() == 2) {
+                    auto a = expression(*r[0]), b = expression(*r[1]);
+                    auto d = std::max(a->depth, b->depth) + 1;
+                    for (auto p : c)
+                        if (p->rule == Rule::Token)
+                            return make(
+                                n,
+                                BinaryExpr{binary(token(*p).text, n), std::move(a), std::move(b)},
+                                d);
+                }
+                break;
+            case Rule::comparison:
+                if (r.size() > 1) {
+                    CompareExpr cmp;
+                    cmp.values.push_back(expression(*r[0]));
+                    std::size_t d = cmp.values[0]->depth;
+                    for (std::size_t i = 1; i < r.size(); ++i) {
+                        auto pair = rules(*r[i]);
+                        if (pair.size() != 1)
+                            unsupported(*r[i]);
+                        const auto &p = *pair[0];
+                        auto rhs = rules(p);
+                        if (rhs.size() != 1)
+                            unsupported(p);
+                        CompareOp op;
+                        switch (p.rule) {
+                        case Rule::eq_bitwise_or:
+                            op = CompareOp::Eq;
+                            break;
+                        case Rule::noteq_bitwise_or:
+                            op = CompareOp::Ne;
+                            break;
+                        case Rule::lt_bitwise_or:
+                            op = CompareOp::Lt;
+                            break;
+                        case Rule::lte_bitwise_or:
+                            op = CompareOp::Le;
+                            break;
+                        case Rule::gt_bitwise_or:
+                            op = CompareOp::Gt;
+                            break;
+                        case Rule::gte_bitwise_or:
+                            op = CompareOp::Ge;
+                            break;
+                        case Rule::is_bitwise_or:
+                            op = CompareOp::Is;
+                            break;
+                        case Rule::isnot_bitwise_or:
+                            op = CompareOp::IsNot;
+                            break;
+                        case Rule::in_bitwise_or:
+                            op = CompareOp::In;
+                            break;
+                        case Rule::notin_bitwise_or:
+                            op = CompareOp::NotIn;
+                            break;
+                        default:
+                            unsupported(p);
+                        }
+                        cmp.ops.push_back(op);
+                        auto e = expression(*rhs[0]);
+                        d = std::max(d, e->depth);
+                        cmp.values.push_back(std::move(e));
+                    }
+                    return make(n, std::move(cmp), d + 1);
+                }
+                break;
+            case Rule::primary:
+            case Rule::attr:
+            case Rule::t_primary:
+            case Rule::single_subscript_attribute_target:
+            case Rule::target_with_star_atom:
+            case Rule::del_target:
+                if (has(n, U".")) {
+                    auto e = expression(*r.at(0));
+                    auto d = e->depth + 1;
+                    for (auto p : c)
+                        if (p->rule == Rule::Token && token(*p).kind == TokenKind::NAME)
+                            return make(n, AttributeExpr{std::move(e), identifier(*p)}, d);
+                }
+                if (has(n, U"[") && r.size() >= 2) {
+                    auto e = expression(*r[0]), key = expression(*r[1]);
+                    auto d = std::max(e->depth, key->depth) + 1;
+                    return make(n, SubscriptExpr{std::move(e), std::move(key)}, d);
+                }
+                if (r.size() == 2 && r[1]->rule == Rule::genexp) {
+                    CallExpr call;
+                    call.target = expression(*r[0]);
+                    call.positional.push_back(comprehension(*r[1]));
+                    const auto depth = std::max(call.target->depth, call.positional[0]->depth) + 1;
+                    return make(n, std::move(call), depth);
+                }
+                if (has(n, U"(")) {
+                    CallExpr call;
+                    call.target = expression(*r.at(0));
+                    if (r.size() > 1)
+                        arguments(*r[1], call.positional, call.keywords);
+                    return make(n, std::move(call), 2);
+                }
+                break;
+            case Rule::list:
+            case Rule::tuple:
+            case Rule::set:
+            case Rule::star_atom: {
+                if (n.rule == Rule::star_atom && r.empty())
+                    for (auto p : c)
+                        if (p->rule == Rule::Token && token(*p).kind == TokenKind::NAME)
+                            return terminal(*p);
+                if (n.rule == Rule::star_atom && n.alternative == 1 && r.size() == 1) {
+                    current = r[0];
+                    continue;
+                }
+                bool list = has(n, U"[");
+                if (!list && !has(n, U"(") && n.rule != Rule::set)
+                    break;
                 std::vector<ExprPtr> items;
-                for (auto p : r)
-                    for (auto item : rules(*p))
-                        items.push_back(expression(*item));
-                if (has(n, U"["))
+                for (auto p : r) {
+                    if (p->rule == Rule::star_named_expressions ||
+                        p->rule == Rule::star_targets_list_seq ||
+                        p->rule == Rule::star_targets_tuple_seq) {
+                        for (auto item : rules(*p))
+                            items.push_back(expression(*item));
+                    } else
+                        items.push_back(expression(*p));
+                }
+                if (list)
                     return make(n, ListExpr{std::move(items)}, 2);
+                if (n.rule == Rule::set)
+                    return make(n, SetExpr{std::move(items)}, 2);
                 return make(n, TupleExpr{std::move(items)}, 2);
             }
-            if (r.empty())
-                for (auto p : c)
-                    if (p->rule == Rule::Token && token(*p).kind == TokenKind::NAME)
-                        return terminal(*p);
-            break;
-        case Rule::assignment_expression: {
-            const Node *name = nullptr;
-            for (auto p : c)
-                if (p->rule == Rule::Token && token(*p).kind == TokenKind::NAME) {
-                    name = p;
-                    break;
-                }
-            auto target = terminal(*name), value = expression(*r.at(0));
-            auto d = std::max(target->depth, value->depth) + 1;
-            return make(n, NamedExpr{std::move(target), std::move(value)}, d);
-        }
-        case Rule::expression:
-            if (r.size() == 3) {
-                auto body = expression(*r[0]), test = expression(*r[1]), alt = expression(*r[2]);
-                auto d = std::max({body->depth, test->depth, alt->depth}) + 1;
-                return make(n, ConditionalExpr{std::move(test), std::move(body), std::move(alt)},
-                            d);
+            case Rule::slices: {
+                TupleExpr t;
+                for (auto p : r)
+                    t.items.push_back(expression(*p));
+                if (t.items.size() == 1 && !has(n, U",") &&
+                    !std::holds_alternative<StarredExpr>(t.items[0]->node))
+                    return std::move(t.items[0]);
+                return make(n, std::move(t), 2);
             }
-            break;
-        case Rule::disjunction:
-        case Rule::conjunction:
-            if (r.size() > 1) {
-                BoolExpr value{n.rule == Rule::conjunction, {}};
-                std::size_t depth = 1;
-                for (auto item : r) {
-                    auto child = expression(*item);
-                    depth = std::max(depth, child->depth + 1);
-                    value.values.push_back(std::move(child));
-                }
-                return make(n, std::move(value), depth);
-            }
-            break;
-        case Rule::inversion:
-        case Rule::factor:
-            if (!c.empty() && c[0]->rule == Rule::Token) {
-                auto op = token(*c[0]).text;
-                auto e = expression(*r.at(0));
-                auto d = e->depth + 1;
-                return make(n,
-                            UnaryExpr{op == U"not" ? UnaryOp::Not
-                                      : op == U"+" ? UnaryOp::Positive
-                                      : op == U"-" ? UnaryOp::Negative
-                                                   : UnaryOp::Invert,
-                                      std::move(e)},
-                            d);
-            }
-            break;
-        case Rule::bitwise_or:
-        case Rule::bitwise_xor:
-        case Rule::bitwise_and:
-        case Rule::shift_expr:
-        case Rule::sum:
-        case Rule::term:
-        case Rule::power:
-            if (r.size() == 2) {
-                auto a = expression(*r[0]), b = expression(*r[1]);
-                auto d = std::max(a->depth, b->depth) + 1;
-                for (auto p : c)
-                    if (p->rule == Rule::Token)
-                        return make(
-                            n, BinaryExpr{binary(token(*p).text, n), std::move(a), std::move(b)},
-                            d);
-            }
-            break;
-        case Rule::comparison:
-            if (r.size() > 1) {
-                CompareExpr cmp;
-                cmp.values.push_back(expression(*r[0]));
-                std::size_t d = cmp.values[0]->depth;
-                for (std::size_t i = 1; i < r.size(); ++i) {
-                    auto pair = rules(*r[i]);
-                    if (pair.size() != 1)
-                        unsupported(*r[i]);
-                    const auto &p = *pair[0];
-                    auto rhs = rules(p);
-                    if (rhs.size() != 1)
-                        unsupported(p);
-                    CompareOp op;
-                    switch (p.rule) {
-                    case Rule::eq_bitwise_or:
-                        op = CompareOp::Eq;
-                        break;
-                    case Rule::noteq_bitwise_or:
-                        op = CompareOp::Ne;
-                        break;
-                    case Rule::lt_bitwise_or:
-                        op = CompareOp::Lt;
-                        break;
-                    case Rule::lte_bitwise_or:
-                        op = CompareOp::Le;
-                        break;
-                    case Rule::gt_bitwise_or:
-                        op = CompareOp::Gt;
-                        break;
-                    case Rule::gte_bitwise_or:
-                        op = CompareOp::Ge;
-                        break;
-                    case Rule::is_bitwise_or:
-                        op = CompareOp::Is;
-                        break;
-                    case Rule::isnot_bitwise_or:
-                        op = CompareOp::IsNot;
-                        break;
-                    case Rule::in_bitwise_or:
-                        op = CompareOp::In;
-                        break;
-                    case Rule::notin_bitwise_or:
-                        op = CompareOp::NotIn;
-                        break;
-                    default:
-                        unsupported(p);
+            case Rule::slice:
+                if (has(n, U":")) {
+                    SliceExpr s;
+                    int section = 0;
+                    for (auto p : c) {
+                        if (is(*p, U":"))
+                            ++section;
+                        else if (p->rule != Rule::Token) {
+                            if (section == 0)
+                                s.start = expression(*p);
+                            else if (section == 1)
+                                s.stop = expression(*p);
+                            else
+                                s.step = expression(*p);
+                        }
                     }
-                    cmp.ops.push_back(op);
-                    auto e = expression(*rhs[0]);
-                    d = std::max(d, e->depth);
-                    cmp.values.push_back(std::move(e));
+                    return make(n, std::move(s), 2);
                 }
-                return make(n, std::move(cmp), d + 1);
-            }
-            break;
-        case Rule::primary:
-        case Rule::attr:
-        case Rule::t_primary:
-        case Rule::single_subscript_attribute_target:
-        case Rule::target_with_star_atom:
-        case Rule::del_target:
-            if (has(n, U".")) {
-                auto e = expression(*r.at(0));
-                auto d = e->depth + 1;
-                for (auto p : c)
-                    if (p->rule == Rule::Token && token(*p).kind == TokenKind::NAME)
-                        return make(n, AttributeExpr{std::move(e), identifier(*p)}, d);
-            }
-            if (has(n, U"[") && r.size() >= 2) {
-                auto e = expression(*r[0]), key = expression(*r[1]);
-                auto d = std::max(e->depth, key->depth) + 1;
-                return make(n, SubscriptExpr{std::move(e), std::move(key)}, d);
-            }
-            if (r.size() == 2 && r[1]->rule == Rule::genexp) {
-                CallExpr call;
-                call.target = expression(*r[0]);
-                call.positional.push_back(comprehension(*r[1]));
-                const auto depth = std::max(call.target->depth, call.positional[0]->depth) + 1;
-                return make(n, std::move(call), depth);
-            }
-            if (has(n, U"(")) {
-                CallExpr call;
-                call.target = expression(*r.at(0));
-                if (r.size() > 1)
-                    arguments(*r[1], call.positional, call.keywords);
-                return make(n, std::move(call), 2);
-            }
-            break;
-        case Rule::list:
-        case Rule::tuple:
-        case Rule::set:
-        case Rule::star_atom: {
-            if (n.rule == Rule::star_atom && r.empty())
-                for (auto p : c)
-                    if (p->rule == Rule::Token && token(*p).kind == TokenKind::NAME)
-                        return terminal(*p);
-            if (n.rule == Rule::star_atom && n.alternative == 1 && r.size() == 1)
-                return expression(*r[0]);
-            bool list = has(n, U"[");
-            if (!list && !has(n, U"(") && n.rule != Rule::set)
                 break;
-            std::vector<ExprPtr> items;
-            for (auto p : r) {
-                if (p->rule == Rule::star_named_expressions ||
-                    p->rule == Rule::star_targets_list_seq ||
-                    p->rule == Rule::star_targets_tuple_seq) {
-                    for (auto item : rules(*p))
-                        items.push_back(expression(*item));
-                } else
-                    items.push_back(expression(*p));
+            case Rule::dict: {
+                DictExpr dict;
+                if (!r.empty())
+                    dict_items(*r[0], dict);
+                return make(n, std::move(dict), 2);
             }
-            if (list)
-                return make(n, ListExpr{std::move(items)}, 2);
-            if (n.rule == Rule::set)
-                return make(n, SetExpr{std::move(items)}, 2);
-            return make(n, TupleExpr{std::move(items)}, 2);
-        }
-        case Rule::slices: {
-            TupleExpr t;
-            for (auto p : r)
-                t.items.push_back(expression(*p));
-            if (t.items.size() == 1 && !has(n, U",") &&
-                !std::holds_alternative<StarredExpr>(t.items[0]->node))
-                return std::move(t.items[0]);
-            return make(n, std::move(t), 2);
-        }
-        case Rule::slice:
-            if (has(n, U":")) {
-                SliceExpr s;
-                int section = 0;
-                for (auto p : c) {
-                    if (is(*p, U":"))
-                        ++section;
-                    else if (p->rule != Rule::Token) {
-                        if (section == 0)
-                            s.start = expression(*p);
-                        else if (section == 1)
-                            s.stop = expression(*p);
-                        else
-                            s.step = expression(*p);
-                    }
-                }
-                return make(n, std::move(s), 2);
+            default:
+                break;
             }
-            break;
-        case Rule::dict: {
-            DictExpr dict;
-            if (!r.empty())
-                dict_items(*r[0], dict);
-            return make(n, std::move(dict), 2);
+            if (r.size() == 1) {
+                current = r[0];
+                continue;
+            }
+            unsupported(n);
         }
-        default:
-            break;
-        }
-        if (r.size() == 1)
-            return expression(*r[0]);
-        unsupported(n);
     }
     PatternCapture pattern_target(const Node &n)
     {
@@ -874,15 +811,12 @@ class Adapter {
     }
     std::u32string fstring_text(const Node &n, bool raw)
     {
-        auto text = token(n).text;
-        std::u32string collapsed;
-        for (std::size_t i = 0; i < text.size(); ++i) {
-            collapsed.push_back(text[i]);
-            if ((text[i] == U'{' || text[i] == U'}') && i + 1 < text.size() &&
-                text[i + 1] == text[i])
-                ++i;
+        try {
+            const auto where = span(n);
+            return syntax::decode_string_fragment(token(n).text, raw, {where.begin, where.end});
+        } catch (const syntax::Error &error) {
+            throw SourceError(source_, {error.span.begin, error.span.end}, error.what());
         }
-        return string_value(n, (raw ? U"r'" : U"'") + collapsed + U"'");
     }
     std::u32string debug_text(std::size_t begin, std::size_t end, std::size_t first_token) const
     {

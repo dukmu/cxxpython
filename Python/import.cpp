@@ -22,9 +22,11 @@
 #endif
 #include "internal/posixmodule.hpp"
 #include "internal/stdio.hpp"
+#include "internal/stringmodule.hpp"
 #include "internal/structmodule.hpp"
 #include "internal/sysmodule.hpp"
 #include "internal/threadmodule.hpp"
+#include "internal/tokenizemodule.hpp"
 
 #include <filesystem>
 
@@ -262,6 +264,8 @@ detail::ImportState::ImportState()
                                      {U"_abc", detail::initialize_abc},
                                      {U"_typing", detail::initialize_typing},
                                      {U"_sre", detail::initialize_sre},
+                                     {U"_tokenize", detail::initialize_tokenize},
+                                     {U"_string", detail::initialize_string},
                                      {U"itertools", detail::initialize_itertools},
                                      {U"_collections", detail::initialize_collections},
                                      {U"binascii", detail::install_binascii},

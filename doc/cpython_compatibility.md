@@ -302,13 +302,59 @@ the target is `builtins` and the `__builtins__` execution namespace.
   Tuple count/index perform normal identity/equality/index protocols with clipped
   bounds and GC-safe callbacks, including subclasses. Single-star subscripts
   construct tuple indexes, not an otherwise invalid standalone StarredExpr.
-- Unchanged Lib/linecache.py and the upstream Lib/tokenize.py encoding/open
-  helpers handle real files, encoding cookies/BOM/errors, cache invalidation and
-  loader sources. The sole tokenize adaptation defers import _tokenize until
-  _generate_tokens_from_c_tokenizer, preserving the actual encoding algorithms.
-  Remove that import-timing difference when the native public tokenizer lands.
-  tokenize/generate_tokens remain experimental and raise the actual missing
-  native-module import error; no fake _tokenize or approximate token stream exists.
+- Lib/linecache.py and Lib/tokenize.py are unchanged pinned sources. The previous
+  deferred import _tokenize adaptation is removed, restoring upstream import
+  timing. Python retains encoding-cookie/BOM detection, open/cache/loader-source
+  policy, TokenInfo/exact_type, ENCODING emission, untokenize and public error
+  translation. Native Modules/_tokenizemodule.cpp now supplies TokenizerIter over
+  the compiler's shared syntax::TokenStream, whose state machine adapts pinned
+  Parser/tokenizer.c without CPython object APIs. The bridge adapts extra-token
+  kinds, source text and character positions rather than treating private compiler
+  tokens or byte spans as already public-compatible.
+- TokenizerIter is lazy: construction does not invoke readline; refill occurs
+  during next() as needed. The text-reader route requires str; the encoding route
+  requires bytes, decodes with the selected codec and replacement errors, then
+  supplies strict UTF-8 to the native stream. Reader StopIteration and empty input
+  signal EOF; other callback/codec errors propagate and stream unwind exhausts
+  further iteration. Per-stream immutable native line snapshots carry revisions;
+  a traced atomic managed-line cache avoids whole-line conversion for each token.
+  A per-iterator claim rejects overlapping/reentrant next(), including callbacks,
+  while independent streams remain independent. Lexer polling, rooted callbacks,
+  native storage accounting and existing I/O parking replace GIL/RC assumptions,
+  not Python-visible reader/error timing. No host interpreter is invoked.
+- SyntaxError construction and str adapt pinned Objects/exceptions.c with traced,
+  independently writable/deletable msg, filename, lineno, offset, text,
+  end_lineno, end_offset and print_file_and_line fields; changing args does not
+  recreate those fields. Compile/eval/exec and _imp source errors use the shared
+  native conversion, while the tokenizer bridge consumes LexicalDiagnostic and
+  preserves the distinction between location fields and location in args.
+  Lib/tokenize.py retains upstream SyntaxError-to-TokenError policy. Fixtures for
+  tokenize core/readers/errors/f-strings/threads and SyntaxError fields exist;
+  their presence is not a passing result. Complete upstream token/position/error
+  matrices, warnings, encoding/loader closure, concurrent reader/GC acceptance,
+  product diagnostics and measured line-cache/large-input scaling remain gates.
+- Lib/string.py is byte-for-byte pinned upstream source, with no temporary Python
+  adaptation. Template policy uses re and ChainMap; Formatter.parse/get_field
+  call the two native _string factories, while argument numbering, conversions,
+  nested specs and vformat remain Python. Modules/_stringmodule.cpp directly
+  adapts MarkupIterator/FieldNameIterator from pinned
+  Objects/stringlib/unicode_format.h. Exact str and str subtypes use their real
+  immutable payloads; Unicode decimal indexes and malformed-input advancement
+  retain the upstream parsing contract. Precise source edges and atomic cursor
+  claims with periodic polling replace RC/GIL ownership. Private captured native
+  types are immutable, non-subclassable and have no instance dictionary or public
+  construction path. The existing native str.format renderer remains separate;
+  parser unification/parity is not claimed. Formatter/Template and lazy retry
+  fixtures are reference inputs, not proof of passing product tests. Complete
+  their real dependencies and upstream/concurrent/GC/performance acceptance
+  without rewriting string.py to bypass failures.
+- Lib/textwrap.py is also unchanged pinned source. Its wrapping, dedenting,
+  indentation and shortening policy runs on the actual regex/string APIs.
+  General str.expandtabs uses upstream character-column and CR/LF rules, normal
+  index conversion and C-int overflow behavior, exact-str identity where valid
+  and base-str results for subclasses. Scans and expanded tab fills poll while
+  retaining the immutable source across collection. Selected upstream samples
+  cover these APIs; this is not a claim of the complete upstream test suite.
 - Lib/base64.py is unchanged pinned source. RFC Base16/32/32hex/64, URL/alternate
   alphabets, ASCII85/Base85 options, malformed inputs and legacy stream/bytes
   helpers exercise the real binascii/struct/re closure. bytes/bytearray upper and

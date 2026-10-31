@@ -1,0 +1,7 @@
+values [("('head', '0[1].key', '>{width}', 'r')", 1), ("('tail', None, None, None)", 1), ("('tailhead', '0[1].key', '>{width}', 'r')", 31)]
+failures []
+exhausted []
+first 7
+values [('(False, 2)', 32), ("(True, 'field')", 32)]
+failures []
+exhausted []

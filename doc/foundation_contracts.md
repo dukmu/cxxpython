@@ -255,6 +255,75 @@ handwritten parser and its dedicated parser tests have been removed; compiler,
 execution and precise-root tests remain on the new frontend. The native parser's
 generic syntax errors do not claim CPython's invalid_* second-pass wording.
 
+The native PEG recursion budget is 1024 active grammar calls. The old 4096
+budget could overflow an instrumented native stack before its own check.
+This is an explicit implementation complexity limit, not CPython's nesting
+limit or a change to the checked-in grammar. Very deeply parenthesized valid
+Python can reach it earlier than CPython. AST adaptation iterates through
+transparent grammar productions, checks its remaining native recursion before
+descent (256 calls) and retains the existing 128-node expression-depth limit.
+
+### Public Tokenization And String Parsing
+
+The current lexer adapts pinned CPython 3.12.14 Parser/tokenizer.c into the
+standard-library-only syntax::TokenStream. Compiler token collection and native
+_tokenize.TokenizerIter use that one lexical state machine. Stream buffers,
+indentation/bracket/f-string state, line snapshots and LexicalDiagnostic are
+native data; the standalone parser owns no managed references. ReadLine, Poll
+and Warning callbacks are borrowed for one next() call and cleared on every
+exit. Direct native users must provide exclusive access to a stream; its public
+Python wrapper supplies the execution claim, not an interpreter-wide lock.
+
+TokenizerIter retains precisely traced reader/encoding/codec-name edges and an
+AtomicGcEdge for the managed line cache. It invokes no reader during construction
+and refills on demand during iteration, not by eagerly reading all source.
+No-encoding readers return str; encoding readers return bytes decoded through the
+codec APIs before strict UTF-8 conversion. Reader StopIteration or empty input is
+EOF; other callback failures propagate and an exceptional stream exit finishes
+that stream. The execution claim spans lexical mutation and Python reader/warning
+calls, rejecting concurrent or recursive next() with ValueError. It does not
+serialize independent iterators. Calls retain roots across polling, allocation
+and callbacks; blocking stream operations use the existing I/O parking boundary.
+Character consumption polls every 4096 steps, not inside a lock or a long
+NoSafepoint. Native buffer storage is included in external allocation accounting.
+
+LexicalToken contains byte spans for compiler use, public row/character-column
+metadata and an immutable native line snapshot with a revision. The bridge
+converts the line once per revision and roots subsequent cached reads through
+the managed atomic edge. Token tuples own normal managed strings/positions;
+neither they nor diagnostics borrow reallocatable lexer-buffer pointers.
+extra_tokens selects the public token adaptation, including comments/NL and
+operator handling. Unchanged Lib/tokenize.py owns encoding detection, TokenInfo,
+untokenize and public error translation; the former deferred native import is
+gone. TokenStream presence is not acceptance of the complete public interface.
+
+SyntaxError, IndentationError and TabError use ordinary traced exceptions.
+SyntaxError msg/location/print_file_and_line fields have independent synchronized
+instance slots and support assignment/deletion rather than being derived from
+args on each read. Native construction/str adapt pinned Objects/exceptions.c;
+source compilation uses the shared raise_source_error conversion and the public
+tokenizer uses structured LexicalDiagnostic. Location-in-args and text-presence
+flags are distinct from the diagnostic fields. Full error wording, position,
+constructor and product-rendering matrices remain acceptance work.
+
+Unchanged Lib/string.py keeps Template and Formatter policy in Python. Native
+_string only supplies the upstream-derived formatter_parser and
+formatter_field_name_split factories. Their private module-local native types
+have empty slots, immutable metadata, no instance dictionary and no direct
+construction/subclassing. Factories capture their types through traced native
+function captures; iterators trace immutable source strings and inherit ordinary
+object identity/equality/hash/repr. Each next() parses native scalar slice/error
+records from a cursor snapshot and claims advancement with CAS before allocating
+Python output or raising the parsed error. Cursors never move backwards, so a
+lost claim retries from the newly observed position without ABA or an execution
+flag. Long scans and initial field splitting/decimal conversion poll every 4096
+steps with no mutex or NoSafepoint around parsing. Initial field conversion is
+eager; remainder parsing and its errors remain lazy. The separate str.format
+renderer has not been unified by this addition. Fixed-reference malformed-input,
+retry, dependency, shared-heap GC/thread and performance acceptance is not implied
+by copying source or adding fixtures; remaining dependencies belong in the
+runtime or their actual Python libraries, not compatibility edits to string.py.
+
 ## Experimental Module Foundation
 
 The active module/import stage remains incomplete and experimental. A module
@@ -303,8 +372,9 @@ skipping non-string entries. Package __init__.py takes precedence over .py;
 namespace directory portions are combined unless a concrete module/package wins.
 Filesystem reads and native source compilation park through NativeWait with only
 native data. Source errors become SyntaxError/IndentationError/TabError; source
-read failures become OSError, not C++ errors. Full exception constructor fields,
-errno subclasses and formatted source diagnostics remain incomplete.
+read failures become OSError, not C++ errors. SyntaxError's structured fields and
+shared source conversion are described above; full exception/errno-subclass and
+formatted product-diagnostic compatibility remain incomplete.
 Source imports/aliases/from/relative/star lower through the same scope/CFG/VM.
 IMPORT_NAME consumes level/fromlist and pushes the hook result (2 -> 1);
 IMPORT_FROM retains the module and pushes its attribute (1 -> 2);

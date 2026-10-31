@@ -21,6 +21,22 @@ Run `python3 Tools/peg_generator/generate.py` to regenerate; `--check` detects
 drift without editing. The parser library depends only on the C++ standard
 library. Each parse owns its token stream, memo table and syntax tree.
 
+The lexical state machine in `Parser/tokenizer.cpp` is adapted from pinned
+CPython `Parser/tokenizer.c`, without CPython object APIs. Its incremental
+`syntax::TokenStream` serves both compiler token collection and `_tokenize`;
+public comment/NL/position adaptation belongs to the native module bridge.
+Literal decoding is shared in `Parser/string_parser.cpp`, not duplicated in
+the lexer. The generated grammar retains semantic literal/conversion checks
+that public lexical tokenization intentionally does not apply.
+
+Native parsing is bounded to 1024 active grammar calls, independently of the
+grammar's recognition coverage. This bound is lower than the earlier 4096,
+which could exhaust sanitizer-expanded native stack frames before reporting an
+error. Highly nested valid inputs can therefore hit this implementation limit
+before CPython does. AST adaptation walks transparent productions iteratively,
+bounds remaining recursion to 256 and retains its existing 128-node expression
+depth limit. Resource-limit errors are not additional language grammar rules.
+
 The public input is UTF-8 Unicode source (the equivalent of `ast.parse(str)`).
 Decoding a file's encoding cookie belongs to the source loader, not this API.
 Independent build: `cmake -S Parser -B .cache/build-parser` followed by
