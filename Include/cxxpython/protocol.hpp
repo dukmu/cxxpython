@@ -86,6 +86,8 @@ struct ResolvedSlot {
     Handle owner;
     Handle descriptor;
     std::uint64_t epoch;
+    // Lookup metadata for numeric/sequence ordering; invocation still validates epoch/self.
+    NativeSlotKind native_kind = NativeSlotKind::Ordinary;
 };
 enum class CompareOp { Eq, Ne, Lt, Le, Gt, Ge, Is, IsNot, In, NotIn };
 enum class BinaryOp {
@@ -133,6 +135,8 @@ ResultView get_item(Attachment &context, Handle value, Handle key, ReturnSlot &o
 ResultView set_item(Attachment &context, Handle value, Handle key, Handle item, ReturnSlot &out);
 ResultView del_item(Attachment &context, Handle value, Handle key, ReturnSlot &out);
 namespace detail {
+// Borrowed input while Active; returned type/owner/descriptor roots are independent.
+ResolvedSlot resolve_protocol(Attachment &context, Value type, Protocol id, RootScope &roots);
 // The caller owns receiver/arguments in live roots and handles allocation errors.
 // Descriptor binding and argument preparation reuse that invocation's scope.
 void invoke_protocol(Attachment &context, Handle receiver, const ResolvedSlot &slot,

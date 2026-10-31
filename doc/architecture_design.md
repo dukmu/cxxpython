@@ -146,6 +146,14 @@ share that invocation-owned scope. ObjectOps that already own their operands
 also lend their protocol-resolution scope to invocation instead of rooting the
 same inputs again. The public protocol entry still owns borrowed inputs; both
 entries use the same epoch/receiver revalidation and descriptor dispatch.
+Internal protocol resolution accepts the receiver's already checked type Value
+without first creating a throwaway type Handle. The cache validates the borrowed
+Value and promotes fresh type/owner/descriptor roots; public Handle resolution
+therefore still owns independent results. Its existing epoch entry also retains
+the native definition's numeric/sequence role, including the defining-owner
+subtype rule. Hot arithmetic reads that scalar instead of projecting the same
+immutable native metadata again. Sweep clearing and namespace-epoch invalidation
+are unchanged; this is not another cache layer or a Python slot-table redesign.
 Freshly classified native special methods enter the shared call-depth guard and
 native binder directly, without classifying the callable again. Explicit and
 implicit method-descriptor calls share one defining-owner receiver check;

@@ -237,6 +237,7 @@ struct ThreadRecord {
         ObjectHeader *type = nullptr, *owner = nullptr, *descriptor = nullptr;
         Protocol protocol = Protocol::Count;
         SlotState state = SlotState::Missing;
+        NativeSlotKind native_kind = NativeSlotKind::Ordinary;
         std::uint64_t epoch = 0;
     };
     explicit ThreadRecord(std::uint64_t identity)
@@ -1916,7 +1917,12 @@ std::uint64_t Attachment::type_epoch() const
 std::optional<ResolvedSlot> Attachment::cached_protocol(Handle type, Protocol protocol,
                                                         RootScope &roots)
 {
-    const auto value = type.get(*this);
+    return cached_protocol(type.get(*this), protocol, roots);
+}
+std::optional<ResolvedSlot> Attachment::cached_protocol(Value value, Protocol protocol,
+                                                        RootScope &roots)
+{
+    require_owns(value);
     const auto epoch = type_epoch();
     const auto entry = thread_record_->protocol_entry(value, protocol);
     if ((epoch & 1) || entry.type != value.object() || entry.protocol != protocol ||
@@ -1929,7 +1935,8 @@ std::optional<ResolvedSlot> Attachment::cached_protocol(Handle type, Protocol pr
                         roots.root(value),
                         entry.owner ? roots.root(Value(*entry.owner)) : Handle{},
                         entry.descriptor ? roots.root(Value(*entry.descriptor)) : Handle{},
-                        epoch};
+                        epoch,
+                        entry.native_kind};
 }
 void Attachment::cache_protocol(const ResolvedSlot &slot)
 {
@@ -1937,8 +1944,8 @@ void Attachment::cache_protocol(const ResolvedSlot &slot)
     const auto owner = slot.state != SlotState::Missing ? slot.owner.get(*this).object() : nullptr;
     const auto descriptor =
         slot.state != SlotState::Missing ? slot.descriptor.get(*this).object() : nullptr;
-    thread_record_->protocol_entry(type, slot.protocol) = {type.object(), owner,      descriptor,
-                                                           slot.protocol, slot.state, slot.epoch};
+    thread_record_->protocol_entry(type, slot.protocol) = {
+        type.object(), owner, descriptor, slot.protocol, slot.state, slot.native_kind, slot.epoch};
 }
 void Attachment::invalidate_types()
 {

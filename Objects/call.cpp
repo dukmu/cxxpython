@@ -774,8 +774,7 @@ void detail::invoke_protocol(Attachment &context, Handle self, const ResolvedSlo
     const auto original_type = slot.type.get(context);
     auto current = slot;
     if (slot.epoch != context.type_epoch() || original_type != context.type_of(self))
-        current =
-            resolve_protocol(context, roots.root(context.type_of(self)), slot.protocol, roots);
+        current = detail::resolve_protocol(context, context.type_of(self), slot.protocol, roots);
     if (current.state != SlotState::Missing)
         current.descriptor = roots.root(current.descriptor.get(context));
     out.reset(context);

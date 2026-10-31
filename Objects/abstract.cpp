@@ -119,21 +119,12 @@ void boolean(Attachment &context, bool value, ReturnSlot &out)
 }
 ResolvedSlot resolve(Attachment &context, Handle value, Protocol id, RootScope &roots)
 {
-    return resolve_protocol(context, roots.root(context.type_of(value)), id, roots);
+    return detail::resolve_protocol(context, context.type_of(value), id, roots);
 }
 enum class SlotPhase { Any, Numeric, Sequence };
-bool sequence_slot(Attachment &context, const ResolvedSlot &slot)
+bool sequence_slot(const ResolvedSlot &slot)
 {
-    if (slot.state != SlotState::Native)
-        return false;
-    const auto descriptor = slot.descriptor.get(context);
-    const auto function_value =
-        context.type_of(descriptor) == context.builtin(CoreObject::MethodDescriptorType)
-            ? context.payload<MethodDescriptorObject>(descriptor).function
-            : descriptor;
-    const auto &function = context.payload<NativeFunctionObject>(function_value);
-    return function.sequence_owner &&
-           is_subtype(context, slot.owner.get(context), *function.sequence_owner);
+    return slot.state == SlotState::Native && slot.native_kind == NativeSlotKind::Sequence;
 }
 bool attempt(Attachment &context, Handle receiver, Handle argument, Protocol id, ReturnSlot &out,
              SlotPhase phase = SlotPhase::Any)
@@ -142,7 +133,7 @@ bool attempt(Attachment &context, Handle receiver, Handle argument, Protocol id,
     auto slot = resolve(context, receiver, id, roots);
     if (slot.state == SlotState::Missing)
         return false;
-    if (phase != SlotPhase::Any && sequence_slot(context, slot) != (phase == SlotPhase::Sequence))
+    if (phase != SlotPhase::Any && sequence_slot(slot) != (phase == SlotPhase::Sequence))
         return false;
     std::array args{argument.get(context)};
     detail::invoke_protocol(context, receiver, slot, args, out, roots);
@@ -200,8 +191,8 @@ bool binary_numeric(Attachment &context, Handle a, Handle b, BinaryOp op, Return
         if (is_subtype(context, right, left)) {
             const auto reflected = resolve(context, b, ids[1], roots);
             const auto normal = resolve(context, b, ids[0], roots);
-            if ((reflected.state != SlotState::Missing && !sequence_slot(context, reflected)) ||
-                (normal.state != SlotState::Missing && !sequence_slot(context, normal)))
+            if ((reflected.state != SlotState::Missing && !sequence_slot(reflected)) ||
+                (normal.state != SlotState::Missing && !sequence_slot(normal)))
                 right_first = reflected_override(context, left, right, ids[1], out);
             if (raised(out))
                 return true;
@@ -289,12 +280,16 @@ const ProtocolDefinition &protocol_definition(Protocol id)
 }
 ResolvedSlot resolve_protocol(Attachment &context, Handle type, Protocol id, RootScope &roots)
 {
+    return detail::resolve_protocol(context, type.get(context), id, roots);
+}
+ResolvedSlot detail::resolve_protocol(Attachment &context, Value value, Protocol id,
+                                      RootScope &roots)
+{
     const auto &definition = protocol_definition(id);
-    const auto value = type.get(context);
-    if (auto cached = context.cached_protocol(type, id, roots))
+    if (auto cached = context.cached_protocol(value, id, roots))
         return *cached;
     if (!is_subtype(context, context.type_of(value), context.type_type()) ||
-        context.payload<TypeObject>(type).state != TypeState::Ready)
+        context.payload<TypeObject>(value).state != TypeState::Ready)
         throw std::invalid_argument("protocol resolution requires a ready type");
     auto rooted_type = roots.root(value);
     for (;;) {
@@ -308,21 +303,32 @@ ResolvedSlot resolve_protocol(Attachment &context, Handle type, Protocol id, Roo
                     context.cache_protocol(slot);
                     return slot;
                 }
+                const auto attribute_type = context.type_of(attribute->value);
                 auto state = definition.none_disables &&
                                      attribute->value == context.builtin(CoreObject::None)
                                  ? SlotState::Disabled
-                             : (context.type_of(attribute->value) ==
-                                    context.builtin(CoreObject::NativeFunctionType) ||
-                                context.type_of(attribute->value) ==
-                                    context.builtin(CoreObject::MethodDescriptorType))
+                             : (attribute_type == context.builtin(CoreObject::NativeFunctionType) ||
+                                attribute_type == context.builtin(CoreObject::MethodDescriptorType))
                                  ? SlotState::Native
                                  : SlotState::PythonDescriptor;
+                auto kind = NativeSlotKind::Ordinary;
+                if (state == SlotState::Native) {
+                    const auto function_value =
+                        attribute_type == context.builtin(CoreObject::MethodDescriptorType)
+                            ? context.payload<MethodDescriptorObject>(attribute->value).function
+                            : attribute->value;
+                    const auto &function = context.payload<NativeFunctionObject>(function_value);
+                    if (function.sequence_owner &&
+                        is_subtype(context, attribute->owner, *function.sequence_owner))
+                        kind = NativeSlotKind::Sequence;
+                }
                 ResolvedSlot slot{id,
                                   state,
                                   rooted_type,
                                   roots.root(attribute->owner),
                                   roots.root(attribute->value),
-                                  epoch};
+                                  epoch,
+                                  kind};
                 context.cache_protocol(slot);
                 return slot;
             }

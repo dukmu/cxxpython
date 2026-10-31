@@ -652,6 +652,7 @@ class Attachment final {
     std::uint64_t type_epoch() const;
     void invalidate_types();
     std::optional<ResolvedSlot> cached_protocol(Handle type, Protocol protocol, RootScope &roots);
+    std::optional<ResolvedSlot> cached_protocol(Value type, Protocol protocol, RootScope &roots);
     void cache_protocol(const ResolvedSlot &slot);
     std::uint64_t publication_epoch(PublicationDomain domain) const;
     bool begin_publication(PublicationDomain domain, std::uint64_t epoch);

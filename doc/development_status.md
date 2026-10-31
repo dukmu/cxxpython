@@ -1,5 +1,79 @@
 # Development Status
 
+## 2026-11-01 Reuse Protocol Lookup Metadata
+
+Continues the active performance/cleanup goal after pushed 45850de. The preceding
+cache-cleanup turn made actual progress by deleting superseded artifacts; this
+node finishes the pending runtime change. Terra supplied the focused protocol
+tests in a disjoint file and is closed. The complete compatibility route remains
+paused, not achieved.
+
+- Internal protocol resolution now accepts a checked type Value rather than
+  first creating a temporary input Handle. Cache promotion and misses still
+  create independent result roots, including when the caller's input/result
+  scopes are identical. Attachment/domain/live admission, ready-type checks,
+  NoSafepoint restrictions, epoch revalidation and sweep clearing remain intact.
+- The existing weak, thread-private protocol entry retains NativeSlotKind,
+  derived from immutable native metadata and the lookup owner's subtype role.
+  Numeric/sequence ordering reads that scalar instead of repeatedly projecting
+  descriptor/function payloads. No new cache layer, collector policy, GIL, RC,
+  workload-specific numeric path, runtime class or module was added. Invocation
+  still validates the current epoch, receiver, binder and result contract.
+- Added three native cases for roles/invalidation, independent snapshot roots,
+  foreign/unpublished/NativeWait rejection and NoSafepoint hit promotion. A new
+  direct Python fixture covers native sequence inheritance/copying, reflected
+  operators, replacement/NotImplemented, unrelated descriptor transplants and
+  collection. Its output matches fixed CPython 3.12.14. Initial broader probing
+  also exposed a pre-existing mutable slot-installation-history difference after
+  restoring list subclass operators. Reproduced it on the old executable and
+  recorded the compatibility gate/reproduction rather than adding name patches
+  or claiming this cache implements CPython's slot-update machinery.
+- Strict Clang 21.1.8 IPO Release passes 240 relevant native contracts, including
+  all 16 bootstrap/promotion allocation-failure shards. Debug ASan/UBSan/LSan and
+  TSan each pass the 224 relevant native contracts. All three pass the same 27
+  direct Python scenarios for protocols, callbacks, numerics, sequences, roots
+  and shared-heap threads/GC. Formatting and diff checks pass. Evidence is
+  .cache/protocol-role-*. Unrelated full library suites were not repeated.
+- After builds/tests stopped, ran matrix N=64 and the standard 100000-job allocate
+  workload at one/four workers, three processes, one warmup and three values per
+  process. Reused retained cxx-thinlto baselines from the preceding node, not a
+  newly interleaved A/B. Matrix medians are 452.981/182.663 ms versus retained
+  466.490/185.546; allocate medians are 737.579/303.572 versus 749.218/300.966.
+  Standard pyperf reports no significant change in all four comparisons.
+  Matrix's four-worker variation is 11.6%, scaling is 2.480x and CPU/wall 3.151;
+  allocate scaling is 2.430x and CPU/wall 2.838. No claimed measured speedup or
+  absolute CPython acceptance. Natural GC and validation stayed enabled.
+- Raw runs and generated report/CSV/pyperf comparisons are retained under
+  .cache/benchmarks/protocol-role-{matrix,allocation}{,-comparison}. No tables
+  were maintained by hand; no CPython, I/O or startup campaign was repeated.
+  A separate sixteen-loop, four-worker software profile of current allocate
+  retained about 2K CPU samples in protocol-role-allocate-profile-4. Dictionary
+  access is 9.99% self CPU, two root-acquisition symbols are 8.12%/4.38%, and
+  native malloc/free also remain visible. Capture includes startup/warmup;
+  these are not hardware cache counters or STW wall-time fractions. Next work
+  should address dictionary storage/access and native allocation reuse across
+  complete operations, rather than keep iterating on this protocol helper or
+  introduce a collector framework without evidence. matrix.py is unchanged and
+  untracked; the full performance goal stays active.
+
+## 2026-11-01 Retire Superseded Cache Artifacts
+
+At the user's request, removed about 129 MiB of obsolete ignored cache files:
+the superseded no-IPO Release build, consumed historical perf.data captures and
+one-off benchmark worker logs/probes. Saved the no-IPO CMake configuration first.
+Retained benchmark runs.jsonl, generated reports, historical profile self/caller
+reports and acceptance logs; older entries' raw capture/build paths may now be
+absent. No earlier development entry was rewritten.
+
+Kept Clang/LLVM 21.1.8, Boost, pinned CPython source/interpreter/extensions,
+benchmark environment, Android TLS probe source, the immediate comparison
+executable, latest IPO perf capture, and all three in-use IPO/ASan/TSan builds.
+Checked active processes and build dependencies before deletion; compiler,
+archiver, reference interpreter and benchmark imports still start correctly.
+Cache usage is now about 2.0 GiB. This cleanup does not validate the pending
+protocol-cache changes or complete the active performance goal. No benchmarks
+or regression suites were repeated, and matrix.py remains untouched/untracked.
+
 ## 2026-11-01 Release ThinLTO And Descriptor Diagnostics
 
 Continues the active performance/cleanup goal after pushed 5be6fbd. Parent handled

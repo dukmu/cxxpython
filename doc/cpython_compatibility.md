@@ -702,6 +702,13 @@ the target is `builtins` and the `__builtins__` execution namespace.
   MethodDescriptorType representation: distinct wrapper_descriptor reflection
   and its slot-specific error wording, such as str.__mod__, remain separate
   compatibility gates rather than a reason to special-case method names.
+  Mutable number/sequence slot installation is also incomplete: after a list
+  subclass overrides __add__/__mul__, assigning back or deleting the override
+  does not reproduce CPython's generic numeric-dispatch history. This difference
+  was reproduced before protocol-cache optimization. Completing it requires
+  per-type slot-update semantics, not class-name/method-name patches; it remains
+  a language-compatibility gate while the current cache retains native-definition
+  roles. The retained reproduction is .cache/protocol-role-before-restore.py.
 - os.cpu_count returns the POSIX online logical count, or None on query failure.
   It does not report affinity/quota or add the later process_cpu_count API to the
   3.12 target. os.symlink accepts/evaluates target_is_directory on POSIX; actual

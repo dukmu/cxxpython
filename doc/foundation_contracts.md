@@ -820,6 +820,15 @@ stage. Inherited native sequence definitions retain this role, while assigning
 the same callable to an unrelated Python class uses ordinary method semantics.
 This classification belongs to the callable definition, not a VM list special case.
 
+ResolvedSlot retains that derived NativeSlotKind in the existing type-epoch
+snapshot/cache; it is scalar metadata, not another managed edge or cache layer.
+The lookup's defining owner controls inherited/copied sequence roles. The checked
+Value cache overload validates attachment/domain/live state before reading the
+cache, and promotion owns fresh type/owner/descriptor roots. Handle-based public
+resolution keeps result roots independent of its input Handle, including when
+both belong to the same RootScope. Internal Value resolution avoids only the
+temporary input-type root; it does not borrow the result's lifetime.
+
 Ordinary native type methods publish owner-bearing MethodDescriptorObjects;
 protocol lookup preserves their native/sequence role and invokes the underlying
 entry through the normal binder. Native static/class wrappers retain their own

@@ -79,6 +79,16 @@ class CoreProtocols : public testing::Test {
 
 class ProtocolNativeDepth : public testing::TestWithParam<bool> {};
 
+struct UnpublishedProtocolProbe {
+    ObjectHeader header;
+    UnpublishedProtocolProbe(InitialType head, Attachment &context, RootScope &roots) : header(head)
+    {
+        EXPECT_THROW(context.cached_protocol(Value(header), Protocol::Add, roots),
+                     std::logic_error);
+    }
+    void trace(Tracer &) const noexcept {}
+};
+
 TEST_P(ProtocolNativeDepth, SpecialCallsConsumeAndUnwindDepth)
 {
     HeapConfig config;
@@ -467,6 +477,119 @@ TEST_F(CoreProtocols, ThreadPrivateCacheIncludesMissingSlotsAndInvalidatesOnBase
     invoke_protocol(context, instance(cls), slot, {}, out);
     ASSERT_EQ(out.result().tag(), ResultTag::Ok);
     EXPECT_EQ(int_decimal(context, out.result().value()), "7");
+}
+
+TEST_F(CoreProtocols, SequenceNativeRoleSurvivesCacheAndTracksDescriptorChanges)
+{
+    context.set_gc_enabled(false);
+    auto list = builtin(CoreObject::ListType);
+    auto integer_type = builtin(CoreObject::IntType);
+    for (auto protocol : {Protocol::Add, Protocol::Mul}) {
+        auto slot = resolve_protocol(context, list, protocol, roots);
+        ASSERT_EQ(slot.state, SlotState::Native);
+        EXPECT_EQ(slot.native_kind, NativeSlotKind::Sequence);
+        auto cached = context.cached_protocol(list, protocol, roots);
+        ASSERT_TRUE(cached);
+        EXPECT_EQ(cached->native_kind, NativeSlotKind::Sequence);
+    }
+    auto int_add = resolve_protocol(context, integer_type, Protocol::Add, roots);
+    EXPECT_EQ(int_add.native_kind, NativeSlotKind::Ordinary);
+    auto int_cached = context.cached_protocol(integer_type, Protocol::Add, roots);
+    ASSERT_TRUE(int_cached);
+    EXPECT_EQ(int_cached->native_kind, NativeSlotKind::Ordinary);
+
+    auto add = resolve_protocol(context, list, Protocol::Add, roots).descriptor;
+    auto subclass = type({&list, 1});
+    auto unrelated = type();
+    EXPECT_EQ(resolve_protocol(context, subclass, Protocol::Add, roots).native_kind,
+              NativeSlotKind::Sequence);
+    put(subclass, U"__add__", add);
+    EXPECT_EQ(resolve_protocol(context, subclass, Protocol::Add, roots).native_kind,
+              NativeSlotKind::Sequence);
+    auto copied = context.cached_protocol(subclass, Protocol::Add, roots);
+    ASSERT_TRUE(copied);
+    EXPECT_EQ(copied->native_kind, NativeSlotKind::Sequence);
+    put(unrelated, U"__add__", add);
+    EXPECT_EQ(resolve_protocol(context, unrelated, Protocol::Add, roots).native_kind,
+              NativeSlotKind::Ordinary);
+    auto unrelated_cached = context.cached_protocol(unrelated, Protocol::Add, roots);
+    ASSERT_TRUE(unrelated_cached);
+    EXPECT_EQ(unrelated_cached->native_kind, NativeSlotKind::Ordinary);
+
+    method(subclass, U"__add__", builtin(CoreObject::NotImplemented), 1);
+    EXPECT_FALSE(context.cached_protocol(subclass, Protocol::Add, roots));
+    EXPECT_EQ(resolve_protocol(context, subclass, Protocol::Add, roots).native_kind,
+              NativeSlotKind::Ordinary);
+    auto replacement = context.cached_protocol(subclass, Protocol::Add, roots);
+    ASSERT_TRUE(replacement);
+    EXPECT_EQ(replacement->native_kind, NativeSlotKind::Ordinary);
+    put(subclass, U"__add__", add);
+    EXPECT_FALSE(context.cached_protocol(subclass, Protocol::Add, roots));
+    EXPECT_EQ(resolve_protocol(context, subclass, Protocol::Add, roots).native_kind,
+              NativeSlotKind::Sequence);
+    auto restored = context.cached_protocol(subclass, Protocol::Add, roots);
+    ASSERT_TRUE(restored);
+    EXPECT_EQ(restored->native_kind, NativeSlotKind::Sequence);
+}
+
+TEST_F(CoreProtocols, ResolvedTypeAndSnapshotHaveIndependentRootsOnMissAndHit)
+{
+    context.set_gc_enabled(false);
+    auto cls = type();
+    method(cls, U"__len__", integer(7));
+    RootScope snapshots(context);
+    auto input = snapshots.root(cls.get(context));
+    ASSERT_FALSE(context.cached_protocol(input, Protocol::Len, snapshots));
+    auto first = resolve_protocol(context, input, Protocol::Len, snapshots);
+    ASSERT_TRUE(context.cached_protocol(input, Protocol::Len, snapshots));
+    auto second = resolve_protocol(context, input, Protocol::Len, snapshots);
+    snapshots.release(input);
+    EXPECT_EQ(first.type.get(context), cls.get(context));
+    EXPECT_EQ(second.type.get(context), cls.get(context));
+    snapshots.release(first.type);
+    snapshots.release(first.owner);
+    snapshots.release(first.descriptor);
+    context.collect();
+    EXPECT_EQ(second.type.get(context), cls.get(context));
+    EXPECT_EQ(second.owner.get(context), cls.get(context));
+    ReturnSlot out(context);
+    invoke_protocol(context, instance(cls), second, {}, out);
+    ASSERT_EQ(out.result().tag(), ResultTag::Ok);
+    EXPECT_EQ(int_decimal(context, out.result().value()), "7");
+}
+
+TEST_F(CoreProtocols, ValueCacheLookupChecksOwnershipStateAndRootGrowth)
+{
+    context.set_gc_enabled(false);
+    auto cls = type();
+    method(cls, U"__len__", integer(7));
+    const auto value = cls.get(context);
+    resolve_protocol(context, cls, Protocol::Len, roots);
+    auto cached = context.cached_protocol(value, Protocol::Len, roots);
+    ASSERT_TRUE(cached);
+    const auto descriptor = cached->descriptor.get(context);
+    Interpreter other;
+    Attachment foreign(other);
+    foreign.bootstrap_core();
+    EXPECT_THROW(
+        context.cached_protocol(foreign.builtin(CoreObject::IntType), Protocol::Len, roots),
+        std::logic_error);
+    {
+        NativeWait wait(context);
+        EXPECT_THROW(context.cached_protocol(value, Protocol::Len, roots), std::logic_error);
+    }
+    {
+        NoSafepoint guard(context);
+        EXPECT_THROW(context.cached_protocol(value, Protocol::Len, roots), std::logic_error);
+        EXPECT_EQ(cls.get(context), value);
+        EXPECT_EQ(cached->type.get(context), value);
+        EXPECT_EQ(cached->descriptor.get(context), descriptor);
+    }
+    ASSERT_TRUE(context.cached_protocol(value, Protocol::Len, roots));
+    ReturnSlot out(context);
+    context.allocate<UnpublishedProtocolProbe>(out, context, roots);
+    EXPECT_EQ(out.result().tag(), ResultTag::Ok);
+    EXPECT_EQ(cls.get(context), value);
 }
 
 TEST(ProtocolCache, CachedClassesDoNotBecomePermanentRoots)

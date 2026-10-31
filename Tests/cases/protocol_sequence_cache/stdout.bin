@@ -1,0 +1,27 @@
+reflected add reflected multiply
+[1, 2] [1, 1]
+reflected add reflected multiply
+[1, 2] [1, 1]
+reflected add reflected multiply
+[1, 2] [1, 1]
+reflected add reflected multiply
+[1, 2] [1, 1]
+reflected add reflected multiply
+[1, 2] [1, 1]
+reflected add reflected multiply
+[1, 2] [1, 1]
+reflected add reflected multiply
+[1, 2] [1, 1]
+reflected add reflected multiply
+[1, 2] [1, 1]
+reflected add reflected multiply
+[1, 2] [1, 1]
+patched add patched multiply
+reflected add reflected multiply
+transplanted add: TypeError
+transplanted multiply: TypeError
+transplanted add: TypeError
+transplanted multiply: TypeError
+transplanted add: TypeError
+transplanted multiply: TypeError
+transplanted reflected calls: 0
