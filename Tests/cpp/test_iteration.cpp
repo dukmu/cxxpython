@@ -115,6 +115,56 @@ TEST_F(CoreIteration, UserProtocolsPreserveStopIterationValuesAndOtherExceptions
     EXPECT_EQ(context.type_of(out.exception()), context.builtin(CoreObject::TypeErrorType));
 }
 
+TEST_F(CoreIteration, ValueIteratorSurvivesAliasedOutputAndSeesNextReplacement)
+{
+    ReturnSlot out(context);
+    create_type(context, {U"Iterator"}, out);
+    const auto type = roots.root(out.value());
+    SignatureLayout unary;
+    unary.parameters = {{U"self", ParameterKind::PositionalOnly}};
+    make_native_function(
+        context, "self", unary,
+        [](Attachment &c, Handle, std::span<const Value> args, ReturnSlot &result) {
+            c.collect();
+            result.ok(args[0]);
+        },
+        {}, out);
+    auto self = roots.root(out.value());
+    set_attribute(context, type, text(U"__iter__"), self, out);
+    set_attribute(context, type, text(U"__next__"), self, out);
+    context.allocate_instance<InstanceObject>(type, out);
+    get_iter(context, out.value(), out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(context.type_of(out.value()), type.get(context));
+    EXPECT_EQ(iter_next(context, out.value(), out), NextStatus::Item);
+    EXPECT_EQ(context.type_of(out.value()), type.get(context));
+
+    // Keep the sole iterator root in out while changing the class and its cached slot.
+    ReturnSlot update(context);
+    make_native_function(
+        context, "stop", unary,
+        [](Attachment &c, Handle, std::span<const Value>, ReturnSlot &result) {
+            c.collect();
+            raise_error(c, CoreObject::StopIterationType, U"finished", result);
+        },
+        {}, update);
+    set_attribute(context, type, text(U"__next__"), roots.root(update.value()), update);
+    EXPECT_EQ(iter_next(context, out.value(), out), NextStatus::Done);
+    EXPECT_EQ(context.type_of(out.exception()), context.builtin(CoreObject::StopIterationType));
+
+    make_native_function(
+        context, "error", unary,
+        [](Attachment &c, Handle, std::span<const Value>, ReturnSlot &result) {
+            c.collect();
+            raise_error(c, CoreObject::ValueErrorType, U"failure", result);
+        },
+        {}, update);
+    set_attribute(context, type, text(U"__next__"), roots.root(update.value()), update);
+    context.allocate_instance<InstanceObject>(type, out);
+    EXPECT_EQ(iter_next(context, out.value(), out), NextStatus::Raised);
+    EXPECT_EQ(context.type_of(out.exception()), context.builtin(CoreObject::ValueErrorType));
+}
+
 TEST(ParallelIteration, SharedBuiltinIteratorClaimsEachItemOnceDuringGc)
 {
     constexpr std::size_t count = 700;

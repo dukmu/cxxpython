@@ -482,9 +482,13 @@ void length_from_slot(Attachment &context, Handle self, const ResolvedSlot &slot
 } // namespace
 ResultView length(Attachment &context, Handle value, ReturnSlot &out)
 {
+    return length(context, value.get(context), out);
+}
+ResultView length(Attachment &context, Value value, ReturnSlot &out)
+{
     return guarded(context, out, [&] {
         RootScope roots(context);
-        const auto self = roots.root(value.get(context));
+        const auto self = roots.root(value);
         out.reset(context);
         const auto slot = resolve(context, self, Protocol::Len, roots);
         length_from_slot(context, self, slot, out, roots);
@@ -523,17 +527,25 @@ void detail::truth_owned(Attachment &context, Handle self, ReturnSlot &out)
 }
 ResultView truth(Attachment &context, Handle value, ReturnSlot &out)
 {
+    return truth(context, value.get(context), out);
+}
+ResultView truth(Attachment &context, Value value, ReturnSlot &out)
+{
     return guarded(context, out, [&] {
         RootScope roots(context);
-        const auto self = roots.root(value.get(context));
+        const auto self = roots.root(value);
         detail::truth_owned(context, self, out);
     });
 }
 ResultView unary(Attachment &context, Handle value, UnaryOp op, ReturnSlot &out)
 {
+    return unary(context, value.get(context), op, out);
+}
+ResultView unary(Attachment &context, Value value, UnaryOp op, ReturnSlot &out)
+{
     return guarded(context, out, [&] {
         RootScope roots(context);
-        const auto self = roots.root(value.get(context));
+        const auto self = roots.root(value);
         if (op == UnaryOp::Not) {
             ReturnSlot result(context);
             detail::truth_owned(context, self, result);
@@ -624,10 +636,14 @@ void detail::rich_compare_owned(Attachment &context, Handle a, Handle b, Compare
 ResultView rich_compare(Attachment &context, Handle left, Handle right, CompareOp op,
                         ReturnSlot &out)
 {
+    return rich_compare(context, left.get(context), right.get(context), op, out);
+}
+ResultView rich_compare(Attachment &context, Value left, Value right, CompareOp op, ReturnSlot &out)
+{
     return guarded(context, out, [&] {
         RootScope roots(context);
-        auto a = roots.root(left.get(context));
-        auto b = roots.root(right.get(context));
+        auto a = roots.root(left);
+        auto b = roots.root(right);
         detail::rich_compare_owned(context, a, b, op, out);
     });
 }
@@ -657,10 +673,14 @@ ResultView container_equal(Attachment &context, Handle left, Handle right, Retur
 }
 ResultView binary(Attachment &context, Handle left, Handle right, BinaryOp op, ReturnSlot &out)
 {
+    return binary(context, left.get(context), right.get(context), op, out);
+}
+ResultView binary(Attachment &context, Value left, Value right, BinaryOp op, ReturnSlot &out)
+{
     return guarded(context, out, [&] {
         RootScope roots(context);
-        auto a = roots.root(left.get(context));
-        auto b = roots.root(right.get(context));
+        auto a = roots.root(left);
+        auto b = roots.root(right);
         out.reset(context);
         if (binary_numeric(context, a, b, op, out) ||
             sequence_binary(context, a, b, op, false, out))
@@ -670,10 +690,14 @@ ResultView binary(Attachment &context, Handle left, Handle right, BinaryOp op, R
 }
 ResultView inplace(Attachment &context, Handle left, Handle right, BinaryOp op, ReturnSlot &out)
 {
+    return inplace(context, left.get(context), right.get(context), op, out);
+}
+ResultView inplace(Attachment &context, Value left, Value right, BinaryOp op, ReturnSlot &out)
+{
     return guarded(context, out, [&] {
         RootScope roots(context);
-        auto a = roots.root(left.get(context));
-        auto b = roots.root(right.get(context));
+        auto a = roots.root(left);
+        auto b = roots.root(right);
         out.reset(context);
         if (attempt(context, a, b, operations.at(static_cast<std::size_t>(op))[2], out,
                     SlotPhase::Numeric) ||
@@ -704,10 +728,14 @@ ResultView power(Attachment &context, Handle base, Handle exponent, Handle modul
 }
 ResultView get_item(Attachment &context, Handle value, Handle key, ReturnSlot &out)
 {
+    return get_item(context, value.get(context), key.get(context), out);
+}
+ResultView get_item(Attachment &context, Value value, Value key, ReturnSlot &out)
+{
     return guarded(context, out, [&] {
         RootScope roots(context);
-        const auto self = roots.root(value.get(context));
-        const auto item = roots.root(key.get(context));
+        const auto self = roots.root(value);
+        const auto item = roots.root(key);
         auto slot = resolve(context, self, Protocol::GetItem, roots);
         std::array args{item.get(context)};
         if (slot.state == SlotState::Missing &&
@@ -765,11 +793,15 @@ ResultView divmod(Attachment &context, Handle left, Handle right, ReturnSlot &ou
 }
 ResultView set_item(Attachment &context, Handle value, Handle key, Handle item, ReturnSlot &out)
 {
+    return set_item(context, value.get(context), key.get(context), item.get(context), out);
+}
+ResultView set_item(Attachment &context, Value value, Value key, Value item, ReturnSlot &out)
+{
     return guarded(context, out, [&] {
         RootScope roots(context);
-        const auto self = roots.root(value.get(context));
-        const auto index = roots.root(key.get(context));
-        const auto stored = roots.root(item.get(context));
+        const auto self = roots.root(value);
+        const auto index = roots.root(key);
+        const auto stored = roots.root(item);
         auto slot = resolve(context, self, Protocol::SetItem, roots);
         std::array args{index.get(context), stored.get(context)};
         detail::invoke_protocol(context, self, slot, args, out, roots);
@@ -777,10 +809,14 @@ ResultView set_item(Attachment &context, Handle value, Handle key, Handle item, 
 }
 ResultView del_item(Attachment &context, Handle value, Handle key, ReturnSlot &out)
 {
+    return del_item(context, value.get(context), key.get(context), out);
+}
+ResultView del_item(Attachment &context, Value value, Value key, ReturnSlot &out)
+{
     return guarded(context, out, [&] {
         RootScope roots(context);
-        const auto self = roots.root(value.get(context));
-        const auto index = roots.root(key.get(context));
+        const auto self = roots.root(value);
+        const auto index = roots.root(key);
         auto slot = resolve(context, self, Protocol::DelItem, roots);
         std::array args{index.get(context)};
         detail::invoke_protocol(context, self, slot, args, out, roots);

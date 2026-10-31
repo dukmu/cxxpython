@@ -157,6 +157,15 @@ length slot, with the ordinary invocation revalidation. Native dictionary/set
 hash consumers reuse the normalized native hash rather than box it only to
 immediately unbox it; the public hash operation still returns a managed int.
 The same callbacks, normalization/errors and short synchronized commits apply.
+Common VM ObjectOps also accept Value inputs. Their entry snapshots operands
+before any output reset/callback; Handle forms validate and delegate to that same
+implementation. The VM can therefore pass its precisely traced operand stack
+without first building Handles that the entry would immediately copy. The stack
+is not trimmed or overwritten until the operation returns. Iteration resolves
+directly from the checked type Value and lends its owning operation scope to
+invocation, like arithmetic. Prepared calls snapshot a Value target into their
+existing caller-owned root scope, retaining the copied argument buffers needed
+by callable/receiver unwrapping. No borrowed Frame data escapes that preparation.
 Internal protocol resolution accepts the receiver's already checked type Value
 without first creating a throwaway type Handle. The cache validates the borrowed
 Value and promotes fresh type/owner/descriptor roots; public Handle resolution

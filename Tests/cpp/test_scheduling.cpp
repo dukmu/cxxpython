@@ -193,11 +193,12 @@ TEST_F(CoreScheduling, PreparedTargetOwnsItsSnapshotsInTheCallerRootScope)
     ReturnSlot out(context);
     RootScope prepared_roots(context);
     std::array named{KeywordArg{text(U"value").get(context), expected.get(context)}};
-    auto prepared = detail::prepare_call(context, fn, {{}, named}, prepared_roots, out);
+    const auto function_value = fn.get(context), argument_value = expected.get(context);
+    out.ok(function_value);
+    roots.release(fn);
+    auto prepared = detail::prepare_call(context, out.value(), {{}, named}, prepared_roots, out);
     ASSERT_TRUE(prepared);
     EXPECT_EQ(out.result().tag(), ResultTag::Empty);
-    const auto function_value = fn.get(context), argument_value = expected.get(context);
-    roots.release(fn);
     roots.release(expected);
     context.collect();
     EXPECT_EQ(prepared->function.get(context), function_value);
@@ -213,8 +214,7 @@ TEST_F(CoreScheduling, PreparedTargetOwnsItsSnapshotsInTheCallerRootScope)
         auto receiver = temporary.root(local.result().value());
         context.allocate_instance<BoundMethodObject>(builtin(CoreObject::BoundMethodType), local,
                                                      fn.get(context), receiver.get(context));
-        prepared = detail::prepare_call(context, temporary.root(local.result().value()), {},
-                                        prepared_roots, out);
+        prepared = detail::prepare_call(context, local.result().value(), {}, prepared_roots, out);
     }
     context.collect();
     ASSERT_TRUE(prepared);
@@ -222,7 +222,7 @@ TEST_F(CoreScheduling, PreparedTargetOwnsItsSnapshotsInTheCallerRootScope)
     EXPECT_EQ(context.payload<StrObject>(prepared->receiver->get(context)).value,
               U"only prepared receiver");
     auto none = builtin(CoreObject::None);
-    EXPECT_FALSE(detail::prepare_call(context, none, {}, prepared_roots, out));
+    EXPECT_FALSE(detail::prepare_call(context, none.get(context), {}, prepared_roots, out));
     error(out, CoreObject::TypeErrorType);
 }
 

@@ -1,0 +1,10 @@
+neg temporary True 3
+True
+reflected right
+inplace
+box[key]
+set box key value
+del box key
+first
+stop finished
+error failure

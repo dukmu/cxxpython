@@ -7,15 +7,18 @@
 namespace cxxpython::core {
 ResultView get_iter(Attachment &context, Handle value, ReturnSlot &out)
 {
+    return get_iter(context, value.get(context), out);
+}
+ResultView get_iter(Attachment &context, Value value, ReturnSlot &out)
+{
     out.check_caller(context);
     try {
         RootScope roots(context);
-        const auto self = roots.root(value.get(context));
-        auto slot =
-            resolve_protocol(context, roots.root(context.type_of(self)), Protocol::Iter, roots);
+        const auto self = roots.root(value);
+        auto slot = detail::resolve_protocol(context, context.type_of(self), Protocol::Iter, roots);
         if (slot.state == SlotState::Missing) {
-            auto item = resolve_protocol(context, roots.root(context.type_of(self)),
-                                         Protocol::GetItem, roots);
+            auto item =
+                detail::resolve_protocol(context, context.type_of(self), Protocol::GetItem, roots);
             if (item.state != SlotState::Missing) {
                 context.allocate_instance<SequenceIteratorObject>(
                     roots.root(context.builtin(CoreObject::SequenceIteratorType)), out,
@@ -33,10 +36,10 @@ ResultView get_iter(Attachment &context, Handle value, ReturnSlot &out)
                         U"'" + text + U"' object is not iterable", out);
             return out.result();
         }
-        invoke_protocol(context, self, slot, {}, out);
+        detail::invoke_protocol(context, self, slot, {}, out, roots);
         if (out.tag() == ResultTag::Ok) {
-            auto next = resolve_protocol(context, roots.root(context.type_of(out.value())),
-                                         Protocol::Next, roots);
+            auto next = detail::resolve_protocol(context, context.type_of(out.value()),
+                                                 Protocol::Next, roots);
             if (next.state == SlotState::Missing)
                 raise_error(context, CoreObject::TypeErrorType, U"iter() returned a non-iterator",
                             out);
@@ -48,13 +51,16 @@ ResultView get_iter(Attachment &context, Handle value, ReturnSlot &out)
 }
 NextStatus iter_next(Attachment &context, Handle iterator, ReturnSlot &out)
 {
+    return iter_next(context, iterator.get(context), out);
+}
+NextStatus iter_next(Attachment &context, Value iterator, ReturnSlot &out)
+{
     out.check_caller(context);
     try {
         RootScope roots(context);
-        const auto self = roots.root(iterator.get(context));
-        auto slot =
-            resolve_protocol(context, roots.root(context.type_of(self)), Protocol::Next, roots);
-        invoke_protocol(context, self, slot, {}, out);
+        const auto self = roots.root(iterator);
+        auto slot = detail::resolve_protocol(context, context.type_of(self), Protocol::Next, roots);
+        detail::invoke_protocol(context, self, slot, {}, out, roots);
     } catch (const std::bad_alloc &) {
         out.raised(context.builtin(CoreObject::MemoryError));
     }

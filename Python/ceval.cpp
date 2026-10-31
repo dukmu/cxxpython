@@ -5,6 +5,7 @@
 #include "cxxpython/setobject.hpp"
 #include "cxxpython/typealiasobject.hpp"
 #include "cxxpython/typevarobject.hpp"
+#include "internal/abstract.hpp"
 #include "internal/aiterobject.hpp"
 #include "internal/errors.hpp"
 #include "internal/exceptiongroup.hpp"
@@ -325,11 +326,10 @@ void namespace_lookup(Attachment &context, Value mapping, Value key, ReturnSlot 
 {
     if (context.type_of(mapping) == context.builtin(CoreObject::DictType)) {
         RootScope roots(context);
-        dict_lookup(context, roots.root(mapping), roots.root(key), out);
+        detail::dict_lookup_owned(context, roots.root(mapping), roots.root(key), out);
         return;
     }
-    RootScope roots(context);
-    get_item(context, roots.root(mapping), roots.root(key), out);
+    get_item(context, mapping, key, out);
     if (raised(out) && is_subtype(context, context.type_of(out.exception()),
                                   context.builtin(CoreObject::KeyErrorType)))
         out.reset();
@@ -867,20 +867,19 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                     RootScope roots(context);
                     result.reset();
                     if (opcode == Opcode::StoreName)
-                        dict_store(context, roots.root(mapping), roots.root(key),
-                                   roots.root(data.operands[data.sp - 1]), result);
+                        detail::dict_store_owned(context, roots.root(mapping), roots.root(key),
+                                                 roots.root(data.operands[data.sp - 1]), result);
                     else {
-                        dict_erase(context, roots.root(mapping), roots.root(key), result);
+                        detail::dict_erase_owned(context, roots.root(mapping), roots.root(key),
+                                                 result);
                         if (result.tag() == ResultTag::Empty)
                             missing_name(context, name, result);
                     }
                 } else {
-                    RootScope roots(context);
                     if (opcode == Opcode::StoreName)
-                        set_item(context, roots.root(mapping), roots.root(key),
-                                 roots.root(data.operands[data.sp - 1]), result);
+                        set_item(context, mapping, key, data.operands[data.sp - 1], result);
                     else {
-                        del_item(context, roots.root(mapping), roots.root(key), result);
+                        del_item(context, mapping, key, result);
                         if (raised(result) &&
                             is_subtype(context, context.type_of(result.exception()),
                                        context.builtin(CoreObject::KeyErrorType)))
@@ -904,7 +903,7 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                         roots.root(context.builtin(CoreObject::DictType)), dictionary);
                     auto annotations = roots.root(dictionary.value());
                     if (context.type_of(mapping) == context.builtin(CoreObject::DictType))
-                        dict_setdefault(context, mapping, key, annotations, result);
+                        detail::dict_setdefault_owned(context, mapping, key, annotations, result);
                     else
                         set_item(context, mapping, key, annotations, result);
                 }
@@ -930,15 +929,16 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                         data.operands[data.sp++] = result.value();
                 } else if (opcode == Opcode::StoreGlobal) {
                     RootScope roots(context);
-                    dict_store(context, roots.root(function.globals), roots.root(key),
-                               roots.root(data.operands[data.sp - 1]), result);
+                    detail::dict_store_owned(context, roots.root(function.globals), roots.root(key),
+                                             roots.root(data.operands[data.sp - 1]), result);
                     if (raised(result))
                         activation.raising(result.exception());
                     else
                         data.operands[--data.sp] = context.builtin(CoreObject::None);
                 } else {
                     RootScope roots(context);
-                    dict_erase(context, roots.root(function.globals), roots.root(key), result);
+                    detail::dict_erase_owned(context, roots.root(function.globals), roots.root(key),
+                                             result);
                     if (result.tag() == ResultTag::Empty)
                         missing_name(context, name, result);
                     if (raised(result))
@@ -997,8 +997,7 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 ++data.sp;
                 break;
             case Opcode::GetIter: {
-                RootScope roots(context);
-                get_iter(context, roots.root(data.operands[data.sp - 1]), result);
+                get_iter(context, data.operands[data.sp - 1], result);
                 if (raised(result))
                     activation.raising(result.exception());
                 else
@@ -1015,9 +1014,7 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 break;
             }
             case Opcode::ForIter: {
-                RootScope roots(context);
-                const auto status =
-                    iter_next(context, roots.root(data.operands[data.sp - 1]), result);
+                const auto status = iter_next(context, data.operands[data.sp - 1], result);
                 if (status == NextStatus::Raised)
                     activation.raising(result.exception());
                 else if (status == NextStatus::Done) {
@@ -1277,11 +1274,9 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
             case Opcode::StoreItem:
             case Opcode::DeleteItem: {
                 const auto base = data.sp - (opcode == Opcode::StoreItem ? 3 : 2);
-                RootScope roots(context);
-                const auto owner = roots.root(data.operands[base]),
-                           key = roots.root(data.operands[base + 1]);
+                const auto owner = data.operands[base], key = data.operands[base + 1];
                 if (opcode == Opcode::StoreItem)
-                    set_item(context, owner, key, roots.root(data.operands[base + 2]), result);
+                    set_item(context, owner, key, data.operands[base + 2], result);
                 else
                     del_item(context, owner, key, result);
                 if (raised(result))
@@ -1328,9 +1323,7 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 break;
             }
             case Opcode::Unary: {
-                RootScope roots(context);
-                unary(context, roots.root(data.operands[data.sp - 1]),
-                      static_cast<UnaryOp>(operand), result);
+                unary(context, data.operands[data.sp - 1], static_cast<UnaryOp>(operand), result);
                 if (raised(result))
                     activation.raising(result.exception());
                 else
@@ -1365,9 +1358,8 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
             case Opcode::Inplace:
             case Opcode::LoadItem:
             case Opcode::Compare: {
-                RootScope roots(context);
-                auto left = roots.root(data.operands[data.sp - 2]);
-                auto right = roots.root(data.operands[data.sp - 1]);
+                const auto left = data.operands[data.sp - 2];
+                const auto right = data.operands[data.sp - 1];
                 if (opcode == Opcode::Binary)
                     binary(context, left, right, static_cast<BinaryOp>(operand), result);
                 else if (opcode == Opcode::Inplace)
@@ -1388,8 +1380,7 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 data.pc = operand;
                 break;
             case Opcode::JumpIfFalse: {
-                RootScope roots(context);
-                truth(context, roots.root(data.operands[data.sp - 1]), result);
+                truth(context, data.operands[data.sp - 1], result);
                 if (raised(result)) {
                     activation.raising(result.exception());
                     break;
@@ -1491,8 +1482,8 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 }
                 CallArgsView args{positional, named};
                 data.pending_call = base;
-                auto prepared = detail::prepare_call(context, roots.root(data.operands[base]), args,
-                                                     roots, result);
+                auto prepared =
+                    detail::prepare_call(context, data.operands[base], args, roots, result);
                 if (prepared) {
                     ReturnSlot child(context);
                     make_frame(
@@ -1683,8 +1674,7 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 break;
             }
             case Opcode::GetLen: {
-                RootScope roots(context);
-                length(context, roots.root(data.operands[data.sp - 1]), result);
+                length(context, data.operands[data.sp - 1], result);
                 if (raised(result))
                     activation.raising(result.exception());
                 else

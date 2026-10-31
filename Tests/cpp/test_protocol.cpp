@@ -628,6 +628,80 @@ TEST_F(CoreProtocols, OperandsSurviveAliasedOutputAndMemoryErrorIsRooted)
     EXPECT_EQ(out.result().exception(), context.builtin(CoreObject::MemoryError));
 }
 
+TEST_F(CoreProtocols, ValueOperandsSurviveOutputReuseDuringCollectingProtocols)
+{
+    auto cls = type();
+    ReturnSlot out(context);
+    auto install = [&](std::u32string name, Handle result, std::size_t arity) {
+        SignatureLayout signature;
+        signature.parameters = {{U"self", ParameterKind::PositionalOnly}};
+        if (arity)
+            signature.parameters.push_back({U"other", ParameterKind::PositionalOnly});
+        if (arity == 2)
+            signature.parameters.push_back({U"value", ParameterKind::PositionalOnly});
+        std::array captures{cls.get(context), result.get(context)};
+        make_native_function(
+            context, "collecting protocol", signature,
+            [](Attachment &c, Handle fn, std::span<const Value> args, ReturnSlot &result) {
+                c.collect();
+                const auto &captured = c.payload<NativeFunctionObject>(fn).captures;
+                for (auto arg : args)
+                    EXPECT_EQ(c.type_of(arg), captured[0]);
+                result.ok(captured[1]);
+            },
+            captures, out);
+        put(cls, std::move(name), roots.root(out.value()));
+    };
+    install(U"__neg__", integer(17), false);
+    install(U"__bool__", builtin(CoreObject::True), false);
+    install(U"__len__", integer(4), false);
+    install(U"__eq__", builtin(CoreObject::True), true);
+    install(U"__getitem__", integer(19), true);
+    install(U"__add__", integer(23), 1);
+    install(U"__iadd__", integer(29), 1);
+    install(U"__setitem__", builtin(CoreObject::None), 2);
+    install(U"__delitem__", builtin(CoreObject::None), 1);
+
+    context.allocate_instance<InstanceObject>(cls, out);
+    unary(context, out.value(), UnaryOp::Negative, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(int_decimal(context, out.value()), "17");
+    context.allocate_instance<InstanceObject>(cls, out);
+    truth(context, out.value(), out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(out.value(), context.builtin(CoreObject::True));
+    context.allocate_instance<InstanceObject>(cls, out);
+    length(context, out.value(), out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(int_decimal(context, out.value()), "4");
+
+    auto receiver = instance(cls);
+    context.allocate_instance<InstanceObject>(cls, out);
+    rich_compare(context, receiver.get(context), out.value(), CompareOp::Eq, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(out.value(), context.builtin(CoreObject::True));
+    context.allocate_instance<InstanceObject>(cls, out);
+    get_item(context, receiver.get(context), out.value(), out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(int_decimal(context, out.value()), "19");
+    context.allocate_instance<InstanceObject>(cls, out);
+    binary(context, receiver.get(context), out.value(), BinaryOp::Add, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(int_decimal(context, out.value()), "23");
+    context.allocate_instance<InstanceObject>(cls, out);
+    inplace(context, out.value(), receiver.get(context), BinaryOp::Add, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(int_decimal(context, out.value()), "29");
+    context.allocate_instance<InstanceObject>(cls, out);
+    set_item(context, receiver.get(context), receiver.get(context), out.value(), out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(out.value(), context.builtin(CoreObject::None));
+    context.allocate_instance<InstanceObject>(cls, out);
+    del_item(context, out.value(), receiver.get(context), out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(out.value(), context.builtin(CoreObject::None));
+}
+
 TEST_F(CoreProtocols, OwnedProtocolsKeepIndependentOperandsDuringCollection)
 {
     auto cls = type();
@@ -744,10 +818,20 @@ TEST_F(CoreProtocols, ForeignOperandsResultsAndEvenStaleResolutionAreRejected)
     ReturnSlot out(context);
     ReturnSlot foreign_out(foreign);
     EXPECT_THROW(truth(context, foreign_value, out), std::logic_error);
+    EXPECT_THROW(truth(context, foreign_value.get(foreign), out), std::logic_error);
+    EXPECT_THROW(
+        binary(context, value.get(context), foreign_value.get(foreign), BinaryOp::Add, out),
+        std::logic_error);
     EXPECT_THROW(invoke_protocol(context, value, slot, {}, out), std::logic_error);
     foreign_out.ok(foreign.builtin(CoreObject::None));
     EXPECT_THROW(truth(context, value, foreign_out), std::logic_error);
     EXPECT_EQ(foreign_out.result().value(), foreign.builtin(CoreObject::None));
+    EXPECT_THROW(truth(context, value.get(context), foreign_out), std::logic_error);
+    EXPECT_EQ(foreign_out.result().value(), foreign.builtin(CoreObject::None));
+    {
+        NoSafepoint guard(context);
+        EXPECT_THROW(truth(context, value.get(context), out), std::logic_error);
+    }
     EXPECT_NE(context.builtin(CoreObject::IntOne), foreign.builtin(CoreObject::IntOne));
 }
 

@@ -226,12 +226,12 @@ bool bind_arguments(Attachment &context, const SignatureLayout &signature, CallA
         bound.push_back(roots.root(extra_keywords.value()).get(context));
     return true;
 }
-std::optional<PreparedPythonCall> prepare_call(Attachment &context, Handle callable,
+std::optional<PreparedPythonCall> prepare_call(Attachment &context, Value callable,
                                                CallArgsView args, RootScope &roots, ReturnSlot &out)
 {
     out.check_caller(context);
     try {
-        auto target = roots.root(callable.get(context));
+        auto target = roots.root(callable);
         root_arguments(roots, args);
         std::optional<PreparedPythonCall> preparation;
         invoke(context, target, args, {}, out, roots, &preparation);

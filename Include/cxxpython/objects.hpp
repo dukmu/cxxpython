@@ -539,7 +539,7 @@ struct PreparedPythonCall {
 };
 // A prepared target borrows the caller's RootScope; otherwise out owns
 // the completed value/exception. No prepared target is a Python value.
-std::optional<PreparedPythonCall> prepare_call(Attachment &context, Handle callable,
+std::optional<PreparedPythonCall> prepare_call(Attachment &context, Value callable,
                                                CallArgsView args, RootScope &roots,
                                                ReturnSlot &out);
 void validate_return(Attachment &context, ReturnSlot &out);

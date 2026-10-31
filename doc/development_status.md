@@ -1,5 +1,82 @@
 # Development Status
 
+## 2026-11-01 Snapshot VM Operands At One ObjectOps Boundary
+
+Continues the active performance/cleanup goal after pushed edfbd2f. Parent owns
+the VM/ObjectOps/call changes and acceptance; Terra supplied native protocol and
+iteration tests plus the direct vm_operand_snapshots fixture, checked against
+pinned CPython and the immutable edfbd2f executable, and is closed.
+
+- Common VM truth, unary/length/comparison/arithmetic, subscript and iteration
+  entries accept Value operands as well as Handles. Both forms share the same
+  owning implementation: validate and snapshot inputs into precise roots before
+  resetting an output or invoking Python. Handle forms still validate arena and
+  generation. The VM passes its already-traced Frame operands rather than first
+  creating Handles that the public entry immediately copies. It does not trim
+  or overwrite the input stack until the operation returns. These are eleven
+  overloads, not new classes, an unchecked borrowed executor or primitive-type
+  specialization; the input contract is documented in foundation_contracts.md.
+- Iteration now resolves from the checked type Value and lends its owning scope
+  to the existing internal protocol invocation, eliminating throwaway type
+  Handles and the extra public invocation input snapshots. It still owns fresh
+  slot metadata/results, validates epochs and preserves sequence fallback,
+  disabled methods, returned-iterator checks and StopIteration/error separation.
+  Prepared calls snapshot a Value target into their existing caller-owned scope;
+  copied positional/keyword buffers remain necessary for callable unwrapping.
+  VM namespaces reuse already-owned dictionary roots rather than copying them
+  again. No C extension ABI, opcode/stack effect, GIL, Python RC, collector policy,
+  allocator or synchronization change was introduced.
+- New native cases exercise operands rooted only in the output being reused,
+  actively collecting through unary/bool/len/comparison/binary/in-place and
+  get/set/delete callbacks. Iteration keeps its sole input through output reuse,
+  sees __next__ replacement and distinguishes exhaustion from failure. Foreign
+  Value/output and NoSafepoint rejection are covered. The prepared-call test now
+  releases the original target Handle before preparing from that same output.
+  The direct fixture covers temporary operands, reflected/in-place dispatch,
+  subscript writes/deletion and collecting iterator replacement/error paths.
+- Strict Clang 21.1.8 IPO Release, ASan/UBSan/LSan and TSan all complete the full
+  175-action rebuild required by the public headers. Release passes 362 relevant
+  native contracts including 16 bootstrap/promotion fault shards; both sanitizers
+  pass 346 relevant native contracts, including iteration and cross-thread
+  generator coverage. Release and ASan each pass 39 direct Python scenarios;
+  TSan passes 14 targeted scripts. Release additionally passes Source.Differential,
+  Generators.Differential and Extensions.ProductEntry; ASan passes the latter two.
+  All pass with existing budgets, no sanitizer reports or timeouts. Formatting
+  and diff checks pass. No unrelated full file-loader/library campaign was run.
+  Evidence is .cache/vm-values-{release,asan,tsan}-{build,native,scripts}.log and
+  the release/asan-product and format-check logs.
+- After all builds/tests exited, measured only dict_int size=512, allocate
+  size=100000 and matrix N=64 at one/four workers, three independent processes,
+  one warmup and three values/process. Reused the retained edfbd2f raw baseline,
+  not a fresh interleaved A/B or repeated CPython/I/O/startup campaign. Natural
+  GC and validation remain enabled. Reports and standard pyperf comparisons are
+  generated under .cache/benchmarks/vm-values-{integer,allocation,matrix}
+  and their -comparison directories; no hand-maintained tables or new profile.
+- Matrix medians are 406.824/162.689 ms versus 439.814/183.967. Standard pyperf
+  finds about 1.07x/1.12x improvement. Scaling is 2.501x, four-worker CPU/wall
+  3.177 and variation 6.5%; shared-heap CPU-parallel gains are preserved. Integer
+  medians are 145.100/59.624 versus 145.295/61.256, neither significantly changed;
+  scaling is 2.434x and four-worker CPU/wall 2.774. Allocate gives 694.556/278.614
+  versus 697.545/275.849, also not significant, scaling 2.493x and CPU/wall 2.877.
+  Its single-worker variation is 14.5%, with a retained 996.092 ms value. No
+  samples were discarded and no favorable rerun was substituted.
+- Absolute CPython performance remains an unfinished gate; the retained integer
+  reference is still about 56x faster at one worker. The remaining dictionary
+  work is broader than these VM handoffs: source still prepares an unused node
+  on existing-key stores and materializes collision vectors/roots even for an
+  immediate first-candidate identity hit. The retained integer profile also
+  identifies dictionary access and native allocation/free costs. Next work should
+  eliminate that unnecessary work generically, preserving earlier-collision
+  equality callbacks, version/identity retry, prepared non-allocating commits and
+  same-heap parallelism, not add numeric/string workload cases or more helper
+  layers. The performance goal stays active; the full compatibility route stays
+  paused. matrix.py remains unchanged and untracked.
+
+Retired the consumed 3361cac comparison executable and its old raw integer perf
+capture, freeing about 20 MiB. Its self/caller text, profile.jsonl and all timing
+records remain; the newer edfbd2f executable/profile, tools and active builds
+remain available for follow-up work.
+
 ## 2026-11-01 Reuse Owned Operands Across Container Protocols
 
 Continues the active performance/cleanup goal after pushed 3361cac. The preceding

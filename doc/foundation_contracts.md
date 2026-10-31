@@ -13,6 +13,16 @@ The only implementation is `cxxpython::core`, built as `cxxpython_core` and expo
 by `cxxpython`. Legacy code, standard library, extension API and tests were removed
 at the user's request. That removal does not establish M9/N6 acceptance.
 
+VM-facing truth, unary/length/comparison/arithmetic, subscription and iteration
+ObjectOps accept borrowed Value inputs as well as Handle inputs. Both forms use
+the same owning entry: inputs are validated and copied into precise roots before
+an output reset or callback. A Value is not a root and must remain live until
+that entry snapshots it; an active Frame's traced stack supplies this lifetime
+for VM calls. Handle forms retain arena/generation admission checks and delegate
+to the Value form. NativeWait/NoSafepoint, foreign-object rejection, caller-owned
+outputs, protocol revalidation and failure semantics are unchanged. This adds no
+unchecked execution path or change to the C extension ABI.
+
 N0-N5 and M0-M6 contain experimental slices; complete language, object/protocol,
 library, thread/resource, platform/install and performance acceptance remain.
 M7-M9/N6 are not complete. No CPython ABI or .pyc compatibility is promised;

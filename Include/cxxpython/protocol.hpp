@@ -113,8 +113,11 @@ ResolvedSlot resolve_protocol(Attachment &context, Handle type, Protocol id, Roo
 ResultView invoke_protocol(Attachment &context, Handle receiver, const ResolvedSlot &slot,
                            std::span<const Value> args, ReturnSlot &out);
 ResultView truth(Attachment &context, Handle value, ReturnSlot &out);
+ResultView truth(Attachment &context, Value value, ReturnSlot &out);
 ResultView unary(Attachment &context, Handle value, UnaryOp op, ReturnSlot &out);
+ResultView unary(Attachment &context, Value value, UnaryOp op, ReturnSlot &out);
 ResultView length(Attachment &context, Handle value, ReturnSlot &out);
+ResultView length(Attachment &context, Value value, ReturnSlot &out);
 ResultView index(Attachment &context, Handle value, ReturnSlot &out);
 ResultView hash(Attachment &context, Handle value, ReturnSlot &out);
 ResultView repr(Attachment &context, Handle value, ReturnSlot &out);
@@ -123,17 +126,26 @@ ResultView format(Attachment &context, Handle value, Handle spec, ReturnSlot &ou
 ResultView ascii(Attachment &context, Handle value, ReturnSlot &out);
 ResultView rich_compare(Attachment &context, Handle left, Handle right, CompareOp op,
                         ReturnSlot &out);
+ResultView rich_compare(Attachment &context, Value left, Value right, CompareOp op,
+                        ReturnSlot &out);
 ResultView container_equal(Attachment &context, Handle left, Handle right, ReturnSlot &out);
 ResultView binary(Attachment &context, Handle left, Handle right, BinaryOp op, ReturnSlot &out);
+ResultView binary(Attachment &context, Value left, Value right, BinaryOp op, ReturnSlot &out);
 ResultView divmod(Attachment &context, Handle left, Handle right, ReturnSlot &out);
 ResultView power(Attachment &context, Handle base, Handle exponent, Handle modulus,
                  ReturnSlot &out);
 ResultView inplace(Attachment &context, Handle left, Handle right, BinaryOp op, ReturnSlot &out);
+ResultView inplace(Attachment &context, Value left, Value right, BinaryOp op, ReturnSlot &out);
 ResultView get_iter(Attachment &context, Handle value, ReturnSlot &out);
+ResultView get_iter(Attachment &context, Value value, ReturnSlot &out);
 NextStatus iter_next(Attachment &context, Handle iterator, ReturnSlot &out);
+NextStatus iter_next(Attachment &context, Value iterator, ReturnSlot &out);
 ResultView get_item(Attachment &context, Handle value, Handle key, ReturnSlot &out);
+ResultView get_item(Attachment &context, Value value, Value key, ReturnSlot &out);
 ResultView set_item(Attachment &context, Handle value, Handle key, Handle item, ReturnSlot &out);
+ResultView set_item(Attachment &context, Value value, Value key, Value item, ReturnSlot &out);
 ResultView del_item(Attachment &context, Handle value, Handle key, ReturnSlot &out);
+ResultView del_item(Attachment &context, Value value, Value key, ReturnSlot &out);
 namespace detail {
 // Borrowed input while Active; returned type/owner/descriptor roots are independent.
 ResolvedSlot resolve_protocol(Attachment &context, Value type, Protocol id, RootScope &roots);
