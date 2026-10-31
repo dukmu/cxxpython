@@ -435,7 +435,12 @@ struct Session {
     int input_error = 0;
     bool handler_installed = false;
 };
+#if defined(__ANDROID__) && (defined(__aarch64__) || defined(__arm__))
+// Bionic's ARM executable TLS ABI reserves eight pointer words after the TP.
+alignas(8 * sizeof(void *)) thread_local Session *session = nullptr;
+#else
 thread_local Session *session = nullptr;
+#endif
 
 void callback_failure() noexcept
 {

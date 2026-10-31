@@ -1,5 +1,24 @@
 # Development Status
 
+## 2026-10-31 Android ARM Executable TLS Alignment
+
+Prepended after a72b21f without rewriting earlier entries. The user reported
+Android ARM64 rejecting the executable's 8-byte-aligned TLS segment, originating
+from readline's thread-local Session pointer. Bionic's ARM TLS layout requires
+eight pointer words of alignment: 64 bytes on ARM64 and 32 bytes on ARM32.
+The declaration now requests that alignment only for Android ARM targets; it
+remains thread-local, with no global session or additional lock.
+
+Clang/LLD 21.1.8 cross-target probes using the same declaration and native ELF TLS
+produce PT_TLS p_align 0x40 for aarch64-linux-android29 and 0x20 for
+armv7a-linux-androideabi29. Raw object/program headers and commands are retained
+under .cache/android-readline-tls/. This checks the reported ELF ABI requirement,
+not an entire Android interpreter/device run; no complete Android sysroot/device
+is available here. The source of the requirement is AOSP Bionic's
+libc/bionic/bionic_elf_tls.cpp. This is distinct from 16-KB page-size alignment.
+The ongoing pickle/buffer/math/callable work is separate from this focused fix;
+the complete Plan 2 goal remains active.
+
 ## 2026-10-31 Random, Date Policy And Type Publication
 
 Prepended after c05c18b, preserving all earlier entries. This is concrete progress
