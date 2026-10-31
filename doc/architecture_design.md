@@ -772,11 +772,15 @@ compiling C++ wrappers. Native tests cover contracts inaccessible from Python.
 `Tests/nogil_cases/*/test.py` uses the same driver for explicit shared-heap
 contracts that differ from the fixed GIL reference, currently at-most-once
 concurrent atexit dispatch. It is a separate CTest, not a reference-test exclusion.
-`Tools/benchmarks/runtime.cpp` runs the current runtime;
-`Tools/benchmarks/record.py` retains raw runs and generates comparison tables under
-ignored .cache/benchmarks by default. The user requested replacing the foundation
-and one-off drivers with a unified Python-workload benchmark suite; old generated
-doc/benchmarks artifacts have been removed, not republished as current results.
+`Tools/benchmarks/record.py` is the host controller for calibrated fixed-work
+Python workloads in `workloads.py`. It preserves independent processes, warmups,
+raw diagnostics and source/build metadata, generates comparison tables and
+exports actual pyperf JSON. Target workers use ordinary Python threads and join
+their lifetimes before finishing a sample. CPU work, real page-cache I/O, natural
+allocation and explicit cyclic collection are distinct cases; startup and perf
+profiling are separate measurements. Results default to ignored .cache/benchmarks.
+The former C++ foundation and one-off drivers and generated doc snapshots are
+removed, not fallback benchmark paths. See Tools/benchmarks/README.md.
 
 The old implementation and its tests are absent, not disabled behind a build
 option. Historical benchmark observations in the development log describe their

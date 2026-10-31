@@ -16,7 +16,7 @@ clang-format 14, and host Python for test drivers. Tests use an installed GTest
 or CMake's pinned GoogleTest download.
 
 ```sh
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCXXPYTHON_BUILD_BENCHMARKS=ON
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build -j 4
 ctest --test-dir build --output-on-failure -j 4
 build/cxxpython -c 'print(40 + 2)'
@@ -46,12 +46,17 @@ reference. The default host interpreter is only a smoke reference.
 ```sh
 cmake --build build --target format
 cmake --build build --target format-check
-python3 Tools/benchmarks/record.py --binary build/bench_runtime \
-    --reference /path/to/python3.12.14 --series my-run --runs 3
+python3 -m venv .cache/benchmark-venv
+.cache/benchmark-venv/bin/python -m pip install -r Tools/benchmarks/requirements.txt
+.cache/benchmark-venv/bin/python Tools/benchmarks/record.py run \
+    --python cxx=build/cxxpython --python cpython=/path/to/python3.12.14 \
+    --reference cpython --case nbody --workers 1,2,4 \
+    --output .cache/benchmarks/nbody-baseline
 ```
 
 Performance tables are generated from retained raw runs, never hand-filled.
 Run benchmarks after builds and other CPU-heavy work have finished.
+See [benchmark methodology and perf commands](Tools/benchmarks/README.md).
 
 ## Layout
 

@@ -169,17 +169,10 @@ add_executable(cxxpython Programs/cxxpython.cpp)
 target_link_libraries(cxxpython PRIVATE cxxpython_core)
 target_compile_options(cxxpython PRIVATE -Wall -Wextra -Wpedantic -Werror)
 
-option(CXXPYTHON_BUILD_BENCHMARKS "Build runtime cost and parallel scaling probes" OFF)
-if(CXXPYTHON_BUILD_BENCHMARKS)
-    add_executable(bench_runtime Tools/benchmarks/runtime.cpp)
-    target_link_libraries(bench_runtime PRIVATE cxxpython_core)
-    target_compile_options(bench_runtime PRIVATE -Wall -Wextra -Wpedantic -Werror)
-endif()
-
 find_program(CLANG_FORMAT_EXECUTABLE NAMES clang-format-14 clang-format REQUIRED)
 file(GLOB_RECURSE FORMAT_SOURCES CONFIGURE_DEPENDS
     Include/*.hpp Include/*.h Objects/*.cpp Parser/*.cpp Python/*.cpp Modules/*.cpp Programs/*.cpp
-    Tests/cpp/*.cpp Tests/extensions/*.c Tools/benchmarks/*.cpp Tools/parser/*.cpp)
+    Tests/cpp/*.cpp Tests/extensions/*.c Tools/parser/*.cpp)
 list(REMOVE_ITEM FORMAT_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/Parser/generated_parser.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Include/cxxpython/grammar.hpp
@@ -393,9 +386,9 @@ if(BUILD_TESTING)
         ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_dict.py
         --binary $<TARGET_FILE:cxxpython> --reference ${CXXPYTHON_REFERENCE_PYTHON})
     set_tests_properties(Dict.Differential PROPERTIES TIMEOUT 60)
-    add_test(NAME Benchmarks.Report COMMAND ${Python3_EXECUTABLE} -m unittest discover
+    add_test(NAME Benchmarks.Contracts COMMAND ${Python3_EXECUTABLE} -m unittest discover
         -s ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python -p test_benchmarks.py)
-    set_tests_properties(Benchmarks.Report PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    set_tests_properties(Benchmarks.Contracts PROPERTIES WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
     add_test(NAME CodingStyle.ClangFormat
         COMMAND ${CLANG_FORMAT_EXECUTABLE} --dry-run --Werror --style=file ${FORMAT_SOURCES})
     set_tests_properties(CodingStyle.ClangFormat PROPERTIES

@@ -1,0 +1,22 @@
+{"nested": [true, false, null, -12, 3.5, {"text": "line\n\"\\\t"}], "unicode": "caf\u00e9 \ud83d\ude00"}
+True
+{"nested":[true,false,null,-12,3.5,{"text":"line\n\"\\\t"}],"unicode":"café 😀"}
+{
+  "a": null,
+  "b": [
+    1,
+    2
+  ]
+}
+"\ud83d\ude00\ud800"
+True
+['pairs', [('a', 'int:12'), ('b', 'float:-2.5'), ('a', 'int:3')]]
+[{"custom": true}]
+JSONDecodeError Expecting value 5 1 6
+JSONDecodeError Expecting value 3 1 4
+JSONDecodeError Extra data 5 1 6
+JSONDecodeError Unterminated string starting at 0 1 1
+ValueError Circular reference detected
+TypeError Object of type Custom is not JSON serializable
+stream and raw decode
+shared defaults across threads and collection

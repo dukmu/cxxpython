@@ -7,15 +7,16 @@ it does not waive the remaining language/library/performance acceptance gates.
 ## Build And Check
 
 ```sh
-cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCXXPYTHON_BUILD_BENCHMARKS=ON \
+cmake -S . -B build -DCMAKE_BUILD_TYPE=Release \
     -DCXXPYTHON_REFERENCE_PYTHON=/path/to/python3.12.14
 cmake --build build -j 4
 ctest --test-dir build --output-on-failure -j 4
 ```
 
 The current targets include `cxxpython_parser`, `cxxpython_core`, `cxxpython`,
-`test_parser`, `test_runtime`, the native `parser_probe` development tool and
-optional `bench_runtime`. There is no legacy build option or alternate CLI. A system GTest
+`test_parser`, `test_runtime` and the native `parser_probe` development tool.
+Benchmarks use host-side Python scripts, not a compiled performance target.
+There is no legacy build option or alternate CLI. A system GTest
 is used when available; otherwise CMake fetches the pinned source archive.
 OpenSSL 3 development headers and libcrypto are required for native hashlib
 capabilities. Portable BLAKE2 kernels are vendored from the pinned CPython tree;
@@ -100,9 +101,12 @@ data. Python drivers follow ordinary Python formatting.
 
 Use `Tests/python/test_source.py --binary build/cxxpython --reference ... --report ...`
 for retained fixed-reference evidence. Generate benchmark tables with
-`Tools/benchmarks/record.py`; retain slow samples and actual build provenance.
-Existing `foundation-*` artifact names identify the historical series and are
-retained, even though the executable/target names are now consolidated.
+`Tools/benchmarks/record.py run`; retain slow samples and actual build provenance
+under ignored `.cache/benchmarks/`. The former C++ foundation and one-off
+regex/lexing drivers and generated doc snapshots have been retired. See
+`Tools/benchmarks/README.md` for fixed-work threading, calibration, warmups,
+standard pyperf export, comparisons and separate profiling. Correctness tests
+of the harness are `Benchmarks.Contracts`; they do not impose timing thresholds.
 
 Append or prepend verified progress in `doc/development_status.md`; never rewrite
 earlier entries. Keep stable commits timely and exclude unrelated user changes.

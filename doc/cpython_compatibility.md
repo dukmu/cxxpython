@@ -987,6 +987,14 @@ The REPL delivery also requires readline, complete curses, actual-bytecode dis
 and tracing-GC-compatible gc inspection/control/statistics, not just imports.
 These are delivery requirements, not a claim that the modules already work.
 
+The pure-Python Lib/json package is copied unchanged from CPython 3.12.14.
+The upstream optional _json acceleration remains absent; no alternate parser or
+serializer is substituted. Direct acceptance covers nested/Unicode/surrogate
+roundtrips, formatting, collecting hooks, errors/cycles, stream interfaces and
+shared default encoder/decoder use across OS threads and collection. This is an
+experimental pure-Python closure, not complete upstream JSON test acceptance or
+a claim that the native accelerator/private APIs are implemented.
+
 - Close native buffer/resource and codec dependencies first, then upstream
   encodings/codecs/io/os/pathlib/glob and complete runpy. Keep filesystem and
   descriptor capability native, path and library policy in Python.

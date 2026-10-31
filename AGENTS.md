@@ -47,6 +47,10 @@ compiler, VM, and extension platform implemented in a C/C++ mix.
   reuse while preserving semantics, precise roots and shared-heap CPU parallelism.
   The user-supplied root matrix.py is local performance input, not a deliverable:
   do not commit it. Keep raw measurements under .cache/ and generate any tables.
+- The user permits closing small missing features/libraries during this work,
+  preferably through Terra and unchanged fixed CPython sources with direct
+  dependency tests. This does not resume the complete compatibility roadmap or
+  authorize benchmark-specific library workarounds.
 - `Grammar/python.gram` and `Grammar/Tokens` are fixed CPython 3.12.14 inputs.
   Use the vendored pegen grammar reader/left-recursion analysis and the standalone
   C++ output backend in `Tools/peg_generator/`; do not add handwritten grammar
@@ -82,8 +86,9 @@ compiler, VM, and extension platform implemented in a C/C++ mix.
 - Benchmark results belong under ignored `.cache/benchmarks/`, not generated
   `doc/benchmarks/` snapshots. Consolidate useful Python workloads into a unified
   reproducible suite with warmups, independent processes, fixed-work threading
-  and reference comparisons; remove obsolete foundation/one-off drivers once
-  their replacement is connected. GC/allocation/coordination optimization is
+  and reference comparisons. The connected entry is `record.py run/report/profile`;
+  the C++ foundation and one-off drivers are removed. Use standard pyperf exports
+  for further analysis. GC/allocation/coordination optimization is
   in scope, but genuine shared-heap CPU parallelism must be preserved.
 - Do not rerun the full performance suite for every stable commit. Reuse retained
   baselines; measure affected hot paths, new workloads or concrete regressions.

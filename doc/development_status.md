@@ -1,5 +1,73 @@
 # Development Status
 
+## 2026-11-01 Unified Benchmarks, Standard JSON And Cache Pruning
+
+Continues the active performance/cleanup goal after pushed 62ef5c5, a concrete
+progress node. Terra supplied the worker/upstream algorithms and unchanged json
+package; parent implemented the controller, integration and acceptance. Both
+workers are closed. This node changes no native runtime or collector strategy.
+
+- Replaced the C++ foundation and separate regex/lexing drivers with one host
+  record.py and target workloads.py. Cases cover nbody, fannkuch, natural
+  allocation, explicit cyclic collection, real file/page-cache I/O, regex,
+  tokenize and separate process startup. The explicit local matrix adapter uses
+  the user's source without committing or duplicating it. Threads partition the
+  same total work in one Interpreter/heap, really join, and propagate exceptions.
+- Algorithms are pinned to pyperformance 1.14.0 commit
+  2ab96f98f98274d07ebfdfd66e4f021723179706 with notices/MIT license. Parameters are
+  explicitly 200 n-body steps/job and fannkuch n=7, not upstream defaults. These
+  are not default pyperformance scores. Calibration chooses one loop count per
+  interpreter/case/size from all worker probes and reuses it across worker counts
+  and processes. Independent processes, warmups and values remain distinct.
+- Actual pyperf Run/Benchmark/Suite export is host-only. The target needs no
+  pyperf/JSON/subprocess package: host ast.literal_eval reads its result, then
+  stores canonical JSON. Raw records retain source/build/version context,
+  commands, warmups, calibration, failures and clocks. CSV/Markdown/pyperf JSON
+  regenerate without target execution. Timeouts kill perf and its child session;
+  failures cannot become measurements. No checksums or generated tables are
+  committed. Fifteen host contracts pass with pinned host dependencies, including
+  actual pyperf loading, normalization, report statistics and descendant cleanup.
+  Benchmarks.Contracts passes in CTest; pyperf export is separately verified in
+  .cache/benchmark-venv rather than counted from a dependency skip.
+- All eight worker cases pass tiny one/two-thread product checks; outputs parse
+  and worker exceptions re-raise. The host allocation/cycles/I/O/startup smoke
+  completes all 14 planned cells on product/reference. Standard pyperf compare_to
+  reads the exported suites, and regenerated CSV matches. Formatting passes.
+  Unchanged native regression sweeps were not rerun for these Python tools.
+- After other work stopped, captured two independent processes with one warmup
+  and three values each at one/four workers. Generated nbody medians are
+  269.841/114.207 ms on cxxpython versus 5.380/6.086 ms on fixed CPython. Natural
+  allocation at size 2000 is 23.102/13.381 ms versus 0.532/0.961 ms. These are new
+  fixed-work baselines, not improvement claims against different workloads.
+  Variation warnings remain, and short reference-thread CPU accounting is
+  unusually low; clocks are retained, not corrected or used as speedup. Absolute
+  CPython acceptance remains far away. Evidence is under .cache/benchmarks/ in
+  unified-nbody-baseline, unified-allocation-baseline and integration-smoke.
+- Separate four-thread allocation perf data/self/caller reports and diagnostics
+  are in .cache/benchmarks/allocate-profile-4. State::sweep is 16.80% inclusive of
+  the whole capture, including startup/warmup, not a kernel STW wall-time fraction.
+  Multiple allocation traversals/sweep work, root/protocol checking and malloc
+  remain candidates. Last pause/rendezvous snapshots are not totals or percentiles;
+  old setup pauses are not attributed to windows with no new collection. Next
+  native work can address allocator/GC locality and epoch coordination using this
+  harness, without assuming a new concurrent collector is already justified.
+- Under the user's permission to close small gaps, copied all five Lib/json
+  sources unchanged from CPython 3.12.14. No native _json substitute or library
+  adaptation was added. The direct fixture covers Unicode/surrogates, formatting,
+  collecting hooks, errors/cycles, stream/raw decoding and shared defaults across
+  four threads and GC. It matches the pinned reference and passes Release,
+  ASan/UBSan/LSan and TSan. Full upstream JSON acceptance remains separate.
+- At the user's explicit request, removed obsolete GCC sanitizer/release builds,
+  probes, duplicate archives, the temporary old-report copy and 1649 stale files.
+  .cache shrank from about 6.3 to 2.2 GiB. Kept extracted Clang 21.1.8/Boost,
+  pinned CPython source/build, current three Clang builds, host benchmark
+  environment/wheels, fixed benchmark reference, useful adaptation/Android tools
+  and current acceptance/baseline/profile evidence. Clang still reports 21.1.8.
+  Older entries' cache paths may now be absent by user instruction; history is
+  not rewritten. matrix.py remains unmodified/untracked. The active goal is not
+  complete, and the full compatibility route remains paused except small gaps
+  explicitly permitted by the user.
+
 ## 2026-10-31 Shared Invocation Roots And Benchmark Consolidation Direction
 
 Continues the active performance/cleanup goal after pushed da7136d. The previous
