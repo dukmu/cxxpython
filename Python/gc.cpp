@@ -21,6 +21,13 @@
 #include <unordered_set>
 
 namespace cxxpython::core {
+namespace {
+// Keep exception construction out of successful heap/root access checks.
+[[noreturn, gnu::cold, gnu::noinline]] void invalid_heap_access(const char *message)
+{
+    throw std::logic_error(message);
+}
+} // namespace
 void LayoutDescriptor::trace_storage(const ObjectHeader &object, Tracer &tracer) const noexcept
 {
     trace(object, tracer);
@@ -216,9 +223,9 @@ struct AllocationSpan {
 void Allocation::require_owner(const State *owner) const
 {
     if (span->owner != owner)
-        throw std::logic_error("value does not belong to this interpreter");
+        invalid_heap_access("value does not belong to this interpreter");
     if (!live)
-        throw std::logic_error("value is not a published allocation");
+        invalid_heap_access("value is not a published allocation");
 }
 struct ThreadRecord {
     struct SpanBucket {
@@ -915,14 +922,13 @@ void Attachment::require_attached() const
 {
     if (thread_record_->owner != std::this_thread::get_id() ||
         thread_record_->state.load(std::memory_order_relaxed) != MutatorState::Active)
-        throw std::logic_error("Python heap access requires an attached owning thread");
+        invalid_heap_access("Python heap access requires an attached owning thread");
 }
 void Attachment::require_safepoint() const
 {
     require_attached();
     if (no_safepoint_depth_ || allocation_in_progress_)
-        throw std::logic_error(
-            "operation may stop or allocate during a protected native operation");
+        invalid_heap_access("operation may stop or allocate during a protected native operation");
 }
 CallExecutor Attachment::call_executor() const
 {
@@ -972,7 +978,7 @@ void Attachment::require_owns(Value value) const
 void Attachment::require_layout(Value value, const void *family) const
 {
     if (allocation_layout(value).native_family != family)
-        throw std::logic_error("object has incompatible native layout");
+        invalid_heap_access("object has incompatible native layout");
 }
 Value Attachment::require_layout(Handle handle, const void *family) const
 {
@@ -982,7 +988,7 @@ Value Attachment::require_layout(Handle handle, const void *family) const
     const auto &allocation = detail::Allocation::from(value.object());
     allocation.require_owner(state_.get());
     if (allocation.span->layout.native_family != family)
-        throw std::logic_error("object has incompatible native layout");
+        invalid_heap_access("object has incompatible native layout");
     return value;
 }
 bool Attachment::has_native_layout(Value value, const void *family) const
@@ -1004,7 +1010,7 @@ AtomicGcEdge &Attachment::instance_slot(Value object, std::size_t index)
 {
     const auto &layout = allocation_layout(object);
     if (index >= layout.fields.slots)
-        throw std::logic_error("slot is outside immutable instance layout");
+        invalid_heap_access("slot is outside immutable instance layout");
     return layout.field_cells(object.object())[index];
 }
 
@@ -1013,7 +1019,7 @@ detail::RootCell &Attachment::cell(Handle handle) const
     require_attached();
     if (handle.owner_ != state_.get() || handle.arena_id_ != thread_record_->roots.identity ||
         !handle.cell_ || !handle.cell_->scope || handle.cell_->generation != handle.generation_)
-        throw std::logic_error("foreign or expired root handle");
+        invalid_heap_access("foreign or expired root handle");
     return *handle.cell_;
 }
 
@@ -1072,7 +1078,7 @@ Value Handle::get(const Attachment &context) const
 {
     auto &cell = context.cell(*this);
     if (cell.tag == ResultTag::Empty)
-        throw std::logic_error("root has no value");
+        invalid_heap_access("root has no value");
     return Value(*cell.object);
 }
 
@@ -1104,7 +1110,7 @@ void RootScope::release(Handle handle)
     context_.require_safepoint();
     auto &cell = context_.cell(handle);
     if (cell.scope != this)
-        throw std::logic_error("root belongs to another scope");
+        invalid_heap_access("root belongs to another scope");
     auto **link = &head_;
     while (*link != &cell)
         link = &(*link)->next;
@@ -1130,7 +1136,7 @@ void ReturnSlot::reset(const Attachment &caller)
 void ReturnSlot::check_caller(const Attachment &caller) const
 {
     if (&caller != &context_)
-        throw std::logic_error("operation requires a caller-owned return slot");
+        invalid_heap_access("operation requires a caller-owned return slot");
     caller.require_attached();
 }
 void ReturnSlot::ok(Value value)
@@ -1166,13 +1172,13 @@ ResultTag ReturnSlot::tag() const
 Value ReturnSlot::value() const
 {
     if (tag() != ResultTag::Ok)
-        throw std::logic_error("result is not Ok");
+        invalid_heap_access("result is not Ok");
     return Value(*root_.cell_->object);
 }
 Value ReturnSlot::exception() const
 {
     if (tag() != ResultTag::Raised)
-        throw std::logic_error("result is not Raised");
+        invalid_heap_access("result is not Raised");
     return Value(*root_.cell_->object);
 }
 ResultView ReturnSlot::result() const
@@ -1185,7 +1191,7 @@ detail::RootCell &ResultView::cell() const
 {
     auto &cell = context_->cell(root_);
     if (cell.revision != revision_)
-        throw std::logic_error("result view was overwritten");
+        invalid_heap_access("result view was overwritten");
     return cell;
 }
 ResultTag ResultView::tag() const
@@ -1196,14 +1202,14 @@ Value ResultView::value() const
 {
     auto &root = cell();
     if (root.tag != ResultTag::Ok)
-        throw std::logic_error("result is not Ok");
+        invalid_heap_access("result is not Ok");
     return Value(*root.object);
 }
 Value ResultView::exception() const
 {
     auto &root = cell();
     if (root.tag != ResultTag::Raised)
-        throw std::logic_error("result is not Raised");
+        invalid_heap_access("result is not Raised");
     return Value(*root.object);
 }
 
@@ -1747,14 +1753,14 @@ Value Attachment::object_type() const
 {
     require_attached();
     if (!state_->object_type)
-        throw std::logic_error("object/type seeds have not been initialized");
+        invalid_heap_access("object/type seeds have not been initialized");
     return Value(*state_->object_type);
 }
 Value Attachment::type_type() const
 {
     require_attached();
     if (!state_->type_type)
-        throw std::logic_error("object/type seeds have not been initialized");
+        invalid_heap_access("object/type seeds have not been initialized");
     return Value(*state_->type_type);
 }
 Value Attachment::type_of(Handle object) const
@@ -1766,7 +1772,7 @@ Value Attachment::type_of(Value object) const
     require_owns(object);
     auto *type = object.object()->type.object_.load(std::memory_order_acquire);
     if (!type)
-        throw std::logic_error("synthetic storage object has no Python type");
+        invalid_heap_access("synthetic storage object has no Python type");
     return Value(*type);
 }
 bool Attachment::core_ready() const
@@ -1779,7 +1785,7 @@ Value Attachment::builtin(CoreObject object) const
     require_attached();
     auto index = static_cast<std::size_t>(object);
     if (index >= state_->core.size() || !state_->core[index])
-        throw std::logic_error("core runtime image has not been initialized");
+        invalid_heap_access("core runtime image has not been initialized");
     return Value(*state_->core[index]);
 }
 void Attachment::load_exit_callbacks(ReturnSlot &out)

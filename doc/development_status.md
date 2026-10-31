@@ -1,5 +1,59 @@
 # Development Status
 
+## 2026-11-01 Cold Heap-Access Errors And File I/O Baseline
+
+Continues the active performance/cleanup goal after pushed 4f4f109. That node
+delivered shared protocol roots and measured matrix gains. Parent implemented
+this change and acceptance; Terra strengthened native rejection tests and is
+closed. The full compatibility route remains paused.
+
+- The retained matrix profile identified ownership/layout/root/admission checks
+  as substantial costs. Outlined their std::logic_error construction into one
+  private cold, non-inlined helper in Python/gc.cpp. No predicates, error text,
+  exception type, memory orders, object layouts or lifetime/synchronization rules
+  changed. This lets Clang inline successful checks without cloning exception
+  construction. It does not add unchecked access, cached permission, new classes,
+  a lock, RC or benchmark-specific dispatch. Retained disassembly shows the
+  ownership-check symbol shrinking from 128 to 42 bytes; some callers grow as
+  checks inline. These are code-generation observations, not cache-hit counters.
+- Terra extended existing native tests with exact rejection diagnostics and
+  unchanged root/result state after layout mismatch, foreign heap/arena access,
+  stale/empty views, NativeWait and NoSafepoint violations. All 206 selected
+  memory/root/epoch/call/protocol/layout/numeric/VM/finalizer/readiness contracts
+  and fifteen related Python scenarios pass Release, ASan/UBSan/LSan and TSan.
+  Release also passes all 16 bootstrap/promotion allocation-failure shards.
+  Strict Clang 21.1.8, formatting and diff checks pass. Build/test/disassembly
+  evidence is retained under .cache/cold-access-*.
+- After all builds/tests/agents stopped, measured only the affected matrix
+  hotspot, reusing the preceding unified baseline. N=64, one/four workers,
+  three independent processes, one warmup and three values/process produce
+  medians of 725.793/290.408 ms versus retained 804.562/303.861. Standard pyperf
+  compare_to reports mean-time ratios of 1.10x/1.08x faster. The new relative
+  four-worker scaling is 2.499x with CPU/wall 3.336: single-thread improvement is
+  larger, but absolute multithreaded time also improves. This comparison reuses
+  earlier runs, not a newly interleaved matrix A/B. Auto-GC remains enabled and
+  all results validate; matrix.py is neither modified nor committed. Raw runs,
+  generated CSV/Markdown/pyperf suites and comparisons are in .cache/benchmarks/
+  cold-access-matrix and cold-access-matrix-comparison.
+- The unified file_io case previously had only a tiny correctness smoke, not a
+  stable performance baseline. Captured its standard size of 128 files at one/
+  four workers on the retained 4f4f109 binary, new binary and fixed CPython
+  3.12.14, with three independent processes, warmup and three values/process.
+  Runtime order alternates; each runtime reuses its calibrated loops across
+  worker counts. This is create/write/read/unlink on the filesystem/page cache,
+  not fsync/durable-device throughput or CPU-parallel proof. Medians are
+  10.867/7.272 ms before, 10.353/6.923 after and 2.022/11.724 on CPython. Standard
+  pyperf identifies about 1.05x single-worker improvement and no significant
+  four-worker change. CPU baselines were not rerun. Raw runs and generated
+  reports are in .cache/benchmarks/cold-access-file-io; standard comparison logs
+  are .cache/cold-access-{matrix,file-io}-pyperf.log. No tables were hand-maintained.
+- Retained the immediate prechange image as .cache/benchmarks/cxxpython-4f4f109
+  before relinking. Removed the older consumed cxxpython-8587150 executable after
+  retaining its raw measurements; no toolchain, current build or raw evidence
+  was removed. Ownership checks remain enabled on all hot paths. Absolute
+  CPython performance acceptance and broader performance/cleanup work remain
+  incomplete; the active goal is not marked complete.
+
 ## 2026-11-01 Shared ObjectOps Protocol Invocation Scope
 
 Continues the active performance/cleanup goal after pushed 8587150. That goal

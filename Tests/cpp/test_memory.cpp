@@ -80,6 +80,16 @@ Handle make_node(Attachment &context, RootScope &scope, int *destroyed = nullptr
     return scope.root(out.result().value());
 }
 
+template <typename F> void expect_logic_error(F &&operation, const char *message)
+{
+    try {
+        operation();
+        ADD_FAILURE() << "Expected std::logic_error: " << message;
+    } catch (const std::logic_error &error) {
+        EXPECT_STREQ(error.what(), message);
+    }
+}
+
 TEST(FoundationMemory, BoxedValuesHaveStableIdentityAndSmallHeader)
 {
     EXPECT_EQ(sizeof(Value), sizeof(void *));
@@ -240,9 +250,9 @@ TEST(FoundationMemory, ResultViewsRejectReleasedAndReusedCells)
     context.allocate<Node>(live);
     auto old_view = live.result();
     live.reset();
-    EXPECT_THROW(old_view.value(), std::logic_error);
+    expect_logic_error([&] { old_view.value(); }, "result view was overwritten");
     EXPECT_EQ(live.result().tag(), ResultTag::Empty);
-    EXPECT_THROW(live.result().value(), std::logic_error);
+    expect_logic_error([&] { live.result().value(); }, "result is not Ok");
     context.allocate<Node>(live);
     EXPECT_THROW(old_view.value(), std::logic_error);
 }
@@ -325,24 +335,31 @@ TEST(FoundationMemory, CompoundRootAndPayloadValidationRetainsEveryBoundary)
     RootScope roots(context);
     auto node = make_node(context, roots);
     auto value = node.get(context);
-    EXPECT_THROW(context.payload<Node>(Handle{}), std::logic_error);
-    EXPECT_THROW(context.payload<AlignedLeaf>(node), std::logic_error);
+    expect_logic_error([&] { context.payload<Node>(Handle{}); }, "foreign or expired root handle");
+    expect_logic_error([&] { context.payload<AlignedLeaf>(node); },
+                       "object has incompatible native layout");
     const auto count = context.stats().roots;
     {
         NoSafepoint commit(context);
-        EXPECT_THROW(roots.root(value), std::logic_error);
+        expect_logic_error([&] { roots.root(value); },
+                           "operation may stop or allocate during a protected native operation");
         EXPECT_NO_THROW(context.payload<Node>(node));
     }
     EXPECT_EQ(context.stats().roots, count);
     {
         NativeWait wait(context);
-        EXPECT_THROW(context.payload<Node>(node), std::logic_error);
-        EXPECT_THROW(roots.root(value), std::logic_error);
+        expect_logic_error([&] { context.payload<Node>(node); },
+                           "Python heap access requires an attached owning thread");
+        expect_logic_error([&] { roots.root(value); },
+                           "Python heap access requires an attached owning thread");
     }
+    EXPECT_EQ(context.stats().roots, count);
+    EXPECT_EQ(node.get(context), value);
     roots.release(node);
     auto replacement = make_node(context, roots);
-    EXPECT_THROW(context.payload<Node>(node), std::logic_error);
+    expect_logic_error([&] { context.payload<Node>(node); }, "foreign or expired root handle");
     EXPECT_NO_THROW(context.payload<Node>(replacement));
+    EXPECT_EQ(context.stats().roots, count);
 }
 
 TEST(FoundationMemory, StandardLayoutNativeOwnersReleaseOnCollectionAndConstructorFailure)
@@ -588,11 +605,22 @@ TEST(FoundationMemory, InterpreterIsolationRejectsForeignRootsResultsAndEdges)
     RootScope right_scope(right);
     auto a = make_node(left, left_scope);
     auto b = make_node(right, right_scope);
-    EXPECT_THROW(right_scope.root(a.get(left)), std::logic_error);
-    EXPECT_THROW(a.get(right), std::logic_error);
+    const auto left_value = a.get(left);
+    const auto right_value = b.get(right);
+    const auto right_roots = right.stats().roots;
+    expect_logic_error([&] { right_scope.root(left_value); },
+                       "value does not belong to this interpreter");
+    expect_logic_error([&] { a.get(right); }, "foreign or expired root handle");
+    EXPECT_EQ(right.stats().roots, right_roots);
     ReturnSlot out(right);
-    EXPECT_THROW(out.ok(a.get(left)), std::logic_error);
-    EXPECT_THROW(left.allocate<Node>(out), std::logic_error);
+    out.ok(right_value);
+    expect_logic_error([&] { out.ok(left_value); }, "value does not belong to this interpreter");
+    EXPECT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(out.value(), right_value);
+    expect_logic_error([&] { left.allocate<Node>(out); },
+                       "operation requires a caller-owned return slot");
+    EXPECT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(out.value(), right_value);
     EXPECT_THROW(left.store(a, left.payload<Node>(a).child, b), std::logic_error);
     EXPECT_THROW(left.payload<AlignedLeaf>(b), std::logic_error);
     EXPECT_EQ(left.collect(), 0U);
@@ -689,9 +717,11 @@ TEST(FoundationThreads, SameInterpreterHandlesBelongToTheirOwningArena)
             Attachment other(interpreter);
             RootScope local(other);
             EXPECT_EQ(other.stats().registered_threads, 2U);
-            EXPECT_THROW(node.get(other), std::logic_error);
+            const auto root_count = other.stats().roots;
+            expect_logic_error([&] { node.get(other); }, "foreign or expired root handle");
             EXPECT_THROW(other.payload<Node>(node), std::logic_error);
-            EXPECT_THROW(local.release(node), std::logic_error);
+            expect_logic_error([&] { local.release(node); }, "foreign or expired root handle");
+            EXPECT_EQ(other.stats().roots, root_count);
             // Owner stays frozen/rooted until this bounded handoff ends.
             auto own_handle = local.root(value);
             EXPECT_EQ(own_handle.get(other), value);
