@@ -420,13 +420,14 @@ void initialize_string(Attachment &ctx, Handle module, ReturnSlot &out)
         NativeTypeSpec spec{{type_name}, layout};
         spec.type.module = U"_string";
         spec.type.slots = std::vector<std::u32string>{};
+        spec.type.subclassable = false;
+        spec.type.immutable = true;
         create_native_type(ctx, spec, value);
         if (failed(value)) {
             out.raised(value.exception());
             return false;
         }
         auto type = roots.root(value.value());
-        ctx.payload<TypeObject>(type).subclassable = false;
         install_native_attribute(ctx, core, type, U"__new__", unary, no_new);
         auto dict = *TypeView(ctx, type).dictionary();
         auto new_function = roots.root(*name_lookup(ctx, dict, U"__new__"));
@@ -445,7 +446,6 @@ void initialize_string(Attachment &ctx, Handle module, ReturnSlot &out)
         name_store(ctx, dict, key.value(), value.value());
         install_native_attribute(ctx, core, type, U"__iter__", unary, iter_entry);
         install_native_attribute(ctx, core, type, U"__next__", unary, next);
-        ctx.payload<TypeObject>(type).immutable = true;
         const Value captures[] = {type.get(ctx)};
         make_native_function(ctx, factory_name, unary, create, captures, value,
                              NativeFunctionBinding::Function);

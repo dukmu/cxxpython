@@ -2,6 +2,7 @@
 // PSF license: doc/licenses/python-3.12.14.txt.
 #include "internal/unicodeobject.hpp"
 #include "cxxpython/protocol.hpp"
+#include "internal/errors.hpp"
 #include "internal/long.hpp"
 
 #include <algorithm>
@@ -442,6 +443,38 @@ void tailmatch(Attachment &context, Handle, std::span<const Value> args, ReturnS
     }
     out.ok(context.builtin(match(value) ? CoreObject::True : CoreObject::False));
 }
+template <bool Suffix>
+void remove_affix(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(context);
+    const auto self = roots.root(args[0]), candidate = roots.root(args[1]);
+    const std::u32string method = Suffix ? U"removesuffix" : U"removeprefix";
+    if (!is_string(context, self.get(context))) {
+        const auto kind = detail::diagnostic_type_name(context, roots.root(context.type_of(self)));
+        raise_error(context, CoreObject::TypeErrorType,
+                    U"descriptor '" + method + U"' for 'str' objects doesn't apply to a '" + kind +
+                        U"' object",
+                    out);
+        return;
+    }
+    if (!is_string(context, candidate.get(context))) {
+        const auto kind =
+            detail::diagnostic_type_name(context, roots.root(context.type_of(candidate)));
+        raise_error(context, CoreObject::TypeErrorType,
+                    method + U"() argument must be str, not " + kind, out);
+        return;
+    }
+    const auto &text = context.payload<StrObject>(self).value;
+    const auto &part = context.payload<StrObject>(candidate).value;
+    const bool match = Suffix ? text.ends_with(part) : text.starts_with(part);
+    if (match && !part.empty())
+        make_str(context, text.substr(Suffix ? 0 : part.size(), text.size() - part.size()), out);
+    else if (context.type_of(self) == context.builtin(CoreObject::StrType))
+        out.ok(self.get(context));
+    else
+        make_str(context, text, out);
+}
+
 bool string_space(char32_t value)
 {
     return _PyUnicode_IsWhitespace(value);
@@ -1081,6 +1114,12 @@ void detail::install_unicode_methods(Attachment &context, std::span<const Handle
     install_native_attribute(context, core, at(CoreObject::StrType), U"endswith", signature,
                              tailmatch<true>, {});
     signature.parameters.resize(2);
+    signature.parameters[1].name = U"prefix";
+    install_native_attribute(context, core, at(CoreObject::StrType), U"removeprefix", signature,
+                             remove_affix<false>);
+    signature.parameters[1].name = U"suffix";
+    install_native_attribute(context, core, at(CoreObject::StrType), U"removesuffix", signature,
+                             remove_affix<true>);
     signature.parameters[1].name = U"iterable";
     install_native_attribute(context, core, at(CoreObject::StrType), U"join", signature, join);
     signature.parameters[1].name = U"sub";

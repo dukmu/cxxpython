@@ -1,0 +1,15 @@
+import random
+
+r = random.Random(12345)
+print('bits', r.getrandbits(0), r.getrandbits(17), r.getrandbits(65))
+print('range', [r.randrange(3, 80, 7) for _ in range(5)], r.randint(-3, 3))
+print('choice', r.choice('abcdef'), r.choices('abc', weights=[1, 3, 2], k=6))
+values = list(range(8))
+r.shuffle(values)
+print('shuffle', values)
+print('sample', r.sample(range(30), 6), r.sample(['red', 'blue'], counts=[3, 2], k=4))
+print('bytes', r.randbytes(8).hex())
+r.seed('pinned-seed')
+print('string seed', r.getrandbits(64))
+r.seed(b'pinned-seed')
+print('bytes seed', r.getrandbits(64))

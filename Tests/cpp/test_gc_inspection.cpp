@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <array>
 #include <future>
 
 namespace {
@@ -16,6 +17,83 @@ struct InspectionNode {
         tracer.visit(child);
     }
 };
+
+TEST(FoundationInspection, HidesTypeConstructionUntilSnapshotAndFlagsArePublished)
+{
+    Interpreter interpreter({.collect_every_allocation = true});
+    Attachment context(interpreter);
+    context.bootstrap_core();
+    RootScope roots(context);
+    ReturnSlot out(context);
+    auto layout = LayoutDescriptor::of<InstanceObject>();
+    layout.fields.slots = 1;
+    context.allocate_instance<TypeObject>(roots.root(context.type_type()), out, U"Staged", layout);
+    const auto type = roots.root(out.value());
+    detail::initialize_type_dictionary(context, type);
+    const auto dictionary = roots.root(*context.payload<TypeObject>(type).dictionary);
+    make_str(context, U"field", out);
+    const auto name = roots.root(out.value());
+    context.allocate_instance<GetSetDescriptorObject>(
+        roots.root(context.builtin(CoreObject::GetSetDescriptorType)), out, type.get(context),
+        name.get(context), nullptr, nullptr);
+    const auto getset = roots.root(out.value());
+    context.allocate_instance<MemberDescriptorObject>(
+        roots.root(context.builtin(CoreObject::MemberDescriptorType)), out, type.get(context),
+        name.get(context), std::size_t{0});
+    const auto member = roots.root(out.value());
+    context.allocate_instance<MethodDescriptorObject>(
+        roots.root(context.builtin(CoreObject::MethodDescriptorType)), out,
+        context.builtin(CoreObject::None), type.get(context));
+    const auto method = roots.root(out.value());
+    const std::array staged{type.get(context), dictionary.get(context), getset.get(context),
+                            member.get(context), method.get(context)};
+    cxxpython::core::make_tuple(context, staged, out);
+    const auto container = roots.root(out.value());
+    const auto assert_hidden = [&] {
+        RootScope snapshot(context);
+        std::vector<Value> objects;
+        context.set_allocation_limit(0);
+        context.inspect_heap(HeapInspection::Objects, {}, snapshot, objects);
+        for (auto value : staged)
+            EXPECT_EQ(std::find(objects.begin(), objects.end(), value), objects.end());
+        objects.clear();
+        const std::array targets{container.get(context)};
+        context.inspect_heap(HeapInspection::Referents, targets, snapshot, objects);
+        for (auto value : staged)
+            EXPECT_EQ(std::find(objects.begin(), objects.end(), value), objects.end());
+        context.set_allocation_limit(std::numeric_limits<std::size_t>::max());
+    };
+    assert_hidden();
+    auto &data = context.payload<TypeObject>(type);
+    data.bases = {context.object_type()};
+    data.base = context.object_type();
+    data.solid_base = context.object_type();
+    data.mro = {type.get(context), context.object_type()};
+    data.slot_names = {U"field"};
+    data.immutable = true;
+    data.subclassable = false;
+    data.state = TypeState::Structural;
+    assert_hidden();
+    detail::type_ready(context, type);
+    ASSERT_EQ(data.state.load(), TypeState::Ready);
+    ASSERT_TRUE(TypeView(context, type).snapshot());
+    RootScope snapshot(context);
+    std::vector<Value> objects;
+    context.inspect_heap(HeapInspection::Objects, {}, snapshot, objects);
+    for (auto value : staged)
+        EXPECT_NE(std::find(objects.begin(), objects.end(), value), objects.end());
+
+    TypeSpec spec{U"FrozenNative"};
+    spec.immutable = true;
+    spec.subclassable = false;
+    create_type(context, spec, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    const auto &published = context.payload<TypeObject>(out.value());
+    EXPECT_TRUE(published.immutable);
+    EXPECT_FALSE(published.subclassable);
+    EXPECT_EQ(published.state.load(), TypeState::Ready);
+    EXPECT_TRUE(TypeView(context, out.value()).snapshot());
+}
 
 TEST(FoundationInspection, HidesStorageAndPublishesRootsWithoutManagedAllocation)
 {

@@ -376,22 +376,37 @@ void float_divmod(Attachment &context, Handle function, std::span<const Value> a
     cxxpython::core::make_tuple(context, values, out);
 }
 
-void float_int(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+// CPython 3.12.14 Objects/floatobject.c integral methods (PSF license):
+// convert the owned native double, never call a subclass's numeric methods.
+void publish_integral_float(Attachment &context, double value, ReturnSlot &out)
 {
-    const auto *value = require_float(context, args[0], out);
-    if (!value)
-        return;
-    if (std::isnan(value->value)) {
+    if (std::isnan(value)) {
         raise_error(context, CoreObject::ValueErrorType, U"cannot convert float NaN to integer",
                     out);
         return;
     }
-    if (std::isinf(value->value)) {
+    if (std::isinf(value)) {
         raise_error(context, CoreObject::OverflowErrorType,
                     U"cannot convert float infinity to integer", out);
         return;
     }
-    detail::publish_integer(context, detail::Integer(value->value), out);
+    detail::publish_integer(context, detail::Integer(value), out);
+}
+
+void float_int(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    const auto *value = require_float(context, args[0], out);
+    if (value)
+        publish_integral_float(context, value->value, out);
+}
+
+template <bool Ceiling>
+void float_integral_round(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    const auto *value = require_float(context, args[0], out);
+    if (value)
+        publish_integral_float(context,
+                               Ceiling ? std::ceil(value->value) : std::floor(value->value), out);
 }
 
 void float_round(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
@@ -647,6 +662,9 @@ void detail::install_floats(Attachment &context, std::span<const Handle> core)
     install(U"__neg__", float_negative);
     install(U"__abs__", float_absolute);
     install(U"__int__", float_int);
+    install(U"__trunc__", float_int);
+    install(U"__floor__", float_integral_round<false>);
+    install(U"__ceil__", float_integral_round<true>);
     install(U"__repr__", float_repr);
     install(U"__str__", float_repr);
     install(U"__hash__", float_hash);

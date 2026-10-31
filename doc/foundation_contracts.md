@@ -645,7 +645,11 @@ get_objects omits them and referent/referrer queries traverse through them, stop
 at the next typed Python object. Header/type edges are real referents. This may
 differ from CPython's RC/cycle-only tracking: all boxed Python objects, including
 ints and strings, are tracked here. Inspection is a point-in-time graph view, not
-a way to make concurrent subsequent mutations atomic.
+a way to make concurrent subsequent mutations atomic. After core bootstrap,
+construction-only types, their owner-marked namespace dictionaries and native
+descriptors are omitted until the owner is Ready; these Python staging objects
+are not treated as transparent internal storage. Pre-core structural host tests
+retain their existing inspection contract.
 
 The collector currently has one full-heap generation, reported as generation 2.
 collect(0/1/2) all request full collections; get_objects(0/1) are empty, and only
@@ -706,6 +710,13 @@ TypeSnapshot includes actual managed bases/MRO tuples, materialized once at firs
 publication and retained unchanged through name/dictionary updates. __bases__,
 __mro__ and __base__ expose that hierarchy, not newly assembled representations.
 Dynamic __bases__ replacement remains unsupported.
+TypeSpec declares immutable/subclassable flags before construction can reach a
+safepoint. TypeState is atomic; normal creation release-publishes Ready only after
+the initial namespace snapshot and builder cleanup are complete. Bootstrap
+promotion retains its exclusive admission and rollback contract. Native module
+initializers that install further attributes after create_native_type still need
+their complete cold-import/reload publication matrix; this change does not claim
+those multi-step initializers are atomic transactions.
 
 Code and Function code/globals/builtins/closure identities are immutable. Function
 defaults, keyword defaults, name/qualname, annotations, module/doc and type-parameter

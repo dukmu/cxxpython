@@ -442,8 +442,10 @@ or waiting for GC with heap access. strftime delegates ASCII format segments to
 libc and preserves non-ASCII, surrogate and embedded-NUL literals following the
 pinned algorithm. Timezone fields are ordinary module snapshots; they are not a
 multi-key transaction across Interpreters. Host embedding code must coordinate
-its own environment/locale changes. strptime, datetime, locale/platform matrices
-and complete native-module reload/reflection remain gates.
+its own environment/locale changes. Native strptime delegates to the actual
+Python _strptime module through ordinary imports and rooted calls. Unchanged
+datetime/_pydatetime/calendar implement the Python policy and upstream fallback.
+Locale/platform matrices and complete native-module reload/reflection remain gates.
 
 Modules/signalmodule.cpp separates process-owned dispositions from managed
 handlers. Its C signal handler touches only lock-free process-lifetime atomics;
@@ -455,6 +457,19 @@ dictionary. VM poll points dispatch callbacks only on the physical main OS
 thread, using the current rooted Frame and normal exception propagation.
 Other blocking APIs, wakeup-fd/masks/timers and full embedding/platform policy
 remain explicit gates, rather than an implicit global execution lock.
+The process registration mutex is separate from the trivially destructible async
+notification cells: standard libraries need not give std::mutex a trivial
+destructor, and the C handler never accesses the registration lock.
+
+Modules/_randommodule.cpp adapts CPython MT19937 behind one owned native state
+and per-instance mutex. Native draws, seed commits and state snapshots use
+NativeWait; no managed pointer or callback crosses into the locked native work.
+Python policy is unchanged Lib/random.py; SystemRandom reads real os.urandom
+entropy. No GIL, interpreter-wide RNG mutex or duplicate Python policy was added.
+Modules/math_integer.cpp separates exact integer algorithms from scalar math;
+conversion callbacks run Active, owned arithmetic runs NativeWait and results
+return through existing boxed integer slots. Full math accuracy/performance,
+fork/platform RNG and native datetime acceleration remain acceptance work.
 
 Modules/sysmodule.cpp supplies sys.audit/addaudithook over an Interpreter-rooted
 private list. Normal rooted list iteration preserves ordered callbacks and

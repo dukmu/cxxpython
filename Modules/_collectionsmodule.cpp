@@ -1142,13 +1142,13 @@ void initialize_collections(Attachment &c, Handle module, ReturnSlot &out)
     NativeTypeSpec getter_spec{{"_tuplegetter"}, LayoutDescriptor::of<TupleGetter>()};
     getter_spec.type.module = U"collections";
     getter_spec.type.slots = std::vector<std::u32string>{};
+    getter_spec.type.subclassable = false;
     create_native_type(c, getter_spec, getter_slot);
     if (getter_slot.tag() == ResultTag::Raised) {
         out.raised(getter_slot.exception());
         return;
     }
     auto getter_type = roots.root(getter_slot.value());
-    c.payload<TypeObject>(getter_type).subclassable = false;
     auto install = [&](Handle type, std::u32string name, SignatureLayout signature,
                        NativeEntry entry, std::vector<Value> captures = {}) {
         install_native_attribute(c, core, type, std::move(name), std::move(signature), entry,

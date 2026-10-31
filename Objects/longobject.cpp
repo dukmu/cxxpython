@@ -1239,6 +1239,9 @@ void install_numbers(Attachment &context, std::span<const Handle> core)
     }
     install(U"__int__", int_identity);
     install(U"__index__", int_identity);
+    install(U"__trunc__", int_identity);
+    install(U"__floor__", int_identity);
+    install(U"__ceil__", int_identity);
     install(U"__getnewargs__", int_getnewargs);
     install(U"__pos__", int_unary<UnaryOp::Positive>);
     install(U"__neg__", int_unary<UnaryOp::Negative>);

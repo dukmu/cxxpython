@@ -1,0 +1,18 @@
+0 1 42 42
+42 0 1260
+True
+True
+True
+True
+True
+True
+True
+0 0
+ValueError
+OverflowError
+ValueError
+ValueError
+OverflowError
+OverflowError
+TypeError
+TypeError

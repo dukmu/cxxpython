@@ -1,0 +1,10 @@
+fields (2024, 2, 29, 23, 8, 7, 3, 60, -1) 2024 60
+format 2024-02-29 23:08:07
+datetime 2024-02-29 23:59:00
+iso week 2021-01-03
+offset 2024-03-01T00:00:00+05:30
+microseconds 12:34:56.123400
+error ValueError
+error ValueError
+error ValueError
+date 2024-02-29

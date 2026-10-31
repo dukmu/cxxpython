@@ -1,0 +1,16 @@
+from datetime import date, datetime, time, timedelta, timezone
+
+d = date(2024, 2, 29)
+print('date', d, d.weekday(), d.isoweekday(), d.toordinal())
+print('iso', d.isocalendar(), date.fromisocalendar(2020, 53, 7), date.fromisoformat('20240229'))
+print('date arithmetic', d + timedelta(days=2), d - date(2023, 2, 28), d.replace(year=2020))
+delta = timedelta(days=-2, seconds=1, microseconds=250000)
+print('delta', delta, repr(delta), delta.total_seconds(), delta * 2, delta / 2)
+print('division', divmod(timedelta(seconds=10), timedelta(seconds=3)))
+value = datetime(2024, 2, 29, 23, 59, 59, 123456, tzinfo=timezone.utc)
+print('datetime', value.isoformat(), value + timedelta(microseconds=876544))
+print('fromiso', datetime.fromisoformat('2024-02-29T23:59:59.123456+00:00') == value)
+print('time', time.fromisoformat('12:34:56.123456+05:30').isoformat())
+print('combine', datetime.combine(d, time(12, 30)), value.date(), value.timetz())
+print('timestamp', datetime.fromtimestamp(0, timezone.utc), value.timestamp())
+print('format', value.strftime('%Y-%m-%d %H:%M:%S %z'), format(d, '%Y/%m/%d'))

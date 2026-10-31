@@ -1,0 +1,11 @@
+date ValueError
+time ValueError
+fold ValueError
+iso date ValueError
+iso time ValueError
+offset ValueError
+overflow OverflowError
+divide ZeroDivisionError
+naive aware TypeError
+protocol (2024, 1, 2) datetime.timedelta(seconds=1)
+identity True True

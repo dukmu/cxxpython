@@ -716,6 +716,7 @@ void initialize_thread(Attachment &ctx, Handle module, ReturnSlot &out)
     else {
         NativeTypeSpec rlock_spec{{"RLock"}, LayoutDescriptor::of<RLock>()};
         rlock_spec.type.module = U"_thread";
+        rlock_spec.type.immutable = true;
         create_native_type(ctx, rlock_spec, value);
     }
     if (failed(value)) {
@@ -753,7 +754,6 @@ void initialize_thread(Attachment &ctx, Handle module, ReturnSlot &out)
                                  rlock_restore);
         install_native_attribute(ctx, core, rlock_type, U"_at_fork_reinit", unary, rlock_fork);
         install_native_attribute(ctx, core, rlock_type, U"__repr__", unary, rlock_repr);
-        ctx.payload<TypeObject>(rlock_type).immutable = true;
     }
     auto store = [&](const char32_t *name, Value item) {
         auto item_root = roots.root(item);

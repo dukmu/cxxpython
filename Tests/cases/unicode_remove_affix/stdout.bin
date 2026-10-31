@@ -1,0 +1,20 @@
+'ab' 'ab'
+'ba' 'abba'
+'' ''
+'abc' 'abc'
+'abc' 'abc'
+'\x00α' 'α\x00'
+'x' '\ud800x'
+identity True True
+subclass True 'ab'
+subclass True 'abab'
+subclass True 'abab'
+TypeError descriptor 'removeprefix' for 'str' objects doesn't apply to a 'int' object
+TypeError removeprefix() argument must be str, not int
+TypeError removeprefix() argument must be str, not tuple
+subclass True 'ab'
+subclass True 'abab'
+subclass True 'abab'
+TypeError descriptor 'removesuffix' for 'str' objects doesn't apply to a 'int' object
+TypeError removesuffix() argument must be str, not int
+TypeError removesuffix() argument must be str, not tuple

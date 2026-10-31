@@ -3,6 +3,7 @@
 #include "internal/timemodule.hpp"
 
 #include "cxxpython/floatobject.hpp"
+#include "cxxpython/import.hpp"
 #include "cxxpython/moduleobject.hpp"
 #include "cxxpython/protocol.hpp"
 #include "cxxpython/type.hpp"
@@ -557,6 +558,23 @@ void tzset_entry(Attachment &c, Handle function, std::span<const Value>, ReturnS
     RootScope roots(c);
     timezone_fields(c, roots.root(c.payload<NativeFunctionObject>(function).captures[0]), out);
 }
+
+void strptime_entry(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(c);
+    const auto text = roots.root(args[0]);
+    const auto format = roots.root(args[1]);
+    import_module(c, U"_strptime", out);
+    if (failed(out))
+        return;
+    const auto module = roots.root(out.value());
+    make_str(c, U"_strptime_time", out);
+    get_attribute(c, module, roots.root(out.value()), out);
+    if (failed(out))
+        return;
+    const std::array values{text.get(c), format.get(c)};
+    call(c, roots.root(out.value()), {values, {}}, out);
+}
 } // namespace
 
 void initialize_time_calendar(Attachment &c, Handle module, ReturnSlot &out)
@@ -570,6 +588,7 @@ void initialize_time_calendar(Attachment &c, Handle module, ReturnSlot &out)
     TypeSpec spec{U"struct_time", bases};
     spec.module = U"time";
     spec.slots = std::vector<std::u32string>{U"tm_zone", U"tm_gmtoff"};
+    spec.subclassable = false;
     ReturnSlot value(c), key(c);
     create_native_type(c, NativeTypeSpec{spec, LayoutDescriptor::of<TupleObject>()}, value);
     if (failed(value)) {
@@ -616,7 +635,6 @@ void initialize_time_calendar(Attachment &c, Handle module, ReturnSlot &out)
     const auto match_args = roots.root(value.value());
     make_str(c, U"__match_args__", key);
     name_store(c, attributes.get(c), key.value(), match_args.get(c));
-    c.payload<TypeObject>(type).subclassable = false;
     make_str(c, U"struct_time", key);
     dict_store(c, dictionary, roots.root(key.value()), type, out);
     if (failed(out))
@@ -654,6 +672,13 @@ void initialize_time_calendar(Attachment &c, Handle module, ReturnSlot &out)
     format.parameters = {{U"format", ParameterKind::PositionalOnly},
                          {U"tuple", ParameterKind::PositionalOnly, missing.get(c)}};
     if (!install("strftime", U"strftime", format, format_time, captures))
+        return;
+    make_str(c, U"%a %b %d %H:%M:%S %Y", value);
+    const auto default_format = roots.root(value.value());
+    SignatureLayout parse;
+    parse.parameters = {{U"string", ParameterKind::PositionalOnly},
+                        {U"format", ParameterKind::PositionalOnly, default_format.get(c)}};
+    if (!install("strptime", U"strptime", parse, strptime_entry, {}))
         return;
     const std::array timezone_capture{module.get(c)};
     if (!install("tzset", U"tzset", {}, tzset_entry, timezone_capture))

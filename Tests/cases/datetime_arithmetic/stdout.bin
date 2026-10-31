@@ -1,0 +1,11 @@
+date 2024-02-29 3 4 738945
+iso IsoCalendarDate(year=2024, week=9, weekday=4) 2021-01-03 2024-02-29
+date arithmetic 2024-03-02 366 days, 0:00:00 2020-02-29
+delta -2 days, 0:00:01.250000 datetime.timedelta(days=-2, seconds=1, microseconds=250000) -172798.75 -4 days, 0:00:02.500000 -1 day, 0:00:00.625000
+division (3, datetime.timedelta(seconds=1))
+datetime 2024-02-29T23:59:59.123456+00:00 2024-03-01 00:00:00+00:00
+fromiso True
+time 12:34:56.123456+05:30
+combine 2024-02-29 12:30:00 2024-02-29 23:59:59.123456+00:00
+timestamp 1970-01-01 00:00:00+00:00 1709251199.123456
+format 2024-02-29 23:59:59 +0000 2024/02/29

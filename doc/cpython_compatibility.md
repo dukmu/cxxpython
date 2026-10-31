@@ -664,8 +664,10 @@ the target is `builtins` and the `__builtins__` execution namespace.
   Only owned native data crosses NativeWait. The existing POSIX environment mutex
   coordinates process TZ state; no interpreter execution lock covers callbacks.
   Timezone module fields are separate snapshot assignments, not a multi-key
-  transaction. strptime/datetime, non-C locale policy, complete reload/reflection
-  and other-platform matrices remain acceptance work.
+  transaction. Native time.strptime imports/calls the unchanged Python
+  _strptime._strptime_time through ordinary rooted import and call boundaries.
+  Non-C locale policy, complete reload/reflection and other-platform matrices
+  remain acceptance work.
 - Native functions now have a real readonly __name__; full native __qualname__,
   module/self/text-signature and method-descriptor reflection remain gates.
   Attribute diagnostics use immutable declared native module metadata rather
@@ -682,11 +684,48 @@ the target is `builtins` and the `__builtins__` execution namespace.
   collection have direct fixtures. Full pathlib methods still need their actual
   POSIX dependencies, fd handling and platform/error matrices; copying source
   does not make all filesystem operations implemented.
-- Native math currently supplies actual arbitrary-precision isqrt with index/
-  error/callback/GC/parallel coverage. Owned native Newton arithmetic runs in
-  NativeWait, not on a double approximation or a urllib-specific range. Constants,
-  gcd/lcm/factorial, rounding, predicates and the remaining math functions are
-  unfinished; this dependency slice is not the full math module.
+- Native math supplies constants, scalar decomposition/predicates/rounding,
+  trigonometric/hyperbolic/exponential/logarithmic and gamma functions, plus exact
+  isqrt/gcd/lcm/factorial/comb/perm. Huge integer logarithms round the native
+  mantissa instead of overflowing a preliminary float conversion. Rounding uses
+  ordinary special methods; int reuses its exact identity conversion for
+  __trunc__/__floor__/__ceil__, including huge values and native subclass contents.
+  Float exposes the same protocols with arbitrary-precision results and
+  NaN/infinity errors. Native integer work
+  owns its operands in NativeWait. Remaining math APIs include pow/atan2, scaled
+  norms/distance, accurate summation/products, isclose, erf/erfc and nextafter/ulp;
+  complete accuracy/error/performance matrices are still acceptance gates.
+
+## Random And Date Policy
+
+- Lib/random.py, datetime.py, _pydatetime.py, calendar.py and _strptime.py are
+  unchanged pinned CPython 3.12.14 sources. Date/time policy uses upstream's real
+  pure-Python fallback, not a fake _datetime accelerator. ISO parsing, arithmetic,
+  timezone/offset/fold behavior, timestamp conversion, calendars and strptime use
+  normal runtime operations. Full locale, platform/DST, upstream-suite and native
+  acceleration/performance acceptance remain work.
+- _random.Random adapts CPython's MT19937, integer/hash seed conversion, 53-bit
+  random, arbitrary getrandbits and native state tuples. Owned native state has
+  one per-instance mutex; only native buffers/state are touched in NativeWait.
+  Python callbacks, rooted publication and allocation stay outside that mutex.
+  Zero bits returns zero without consuming state or passing an empty range into
+  the native bit importer. Fixed seeded sequences and state restoration, shared
+  draws and collection have executable fixed-reference fixtures.
+- os.urandom uses the real Linux getrandom interface with short-read/EINTR and
+  pending-signal handling; SystemRandom consumes these bytes through upstream
+  Python policy. Default MT seeding also requests actual system entropy. Native
+  entropy errors propagate rather than selecting a deterministic seed. Non-Linux
+  entropy paths, fork reseeding/at-fork registration and full process lifecycle
+  acceptance remain dependencies. MT19937 is not a cryptographic generator.
+- Native RNG calls synchronize their own state, not the interpreter. Multi-draw
+  Python policies and gauss's documented cache are not atomic transactions across
+  threads. Upstream selection, weighted/count sampling, distributions, subclass
+  overrides, seed versions and SystemRandom policy remain Python implementations.
+- str.removeprefix/removesuffix operate on codepoints, preserve unchanged exact
+  string identity and return base strings for subclasses without invoking their
+  conversion/indexing overrides. Empty affixes, surrogates/NUL and descriptor/
+  argument errors have direct fixtures; the bytes/bytearray counterparts remain
+  part of the unfinished primitive-method matrix.
 
 The configured source-tree stdlib path is development configuration, not final
 installation, isolation, environment or embedding acceptance. Full stdio/runpy,

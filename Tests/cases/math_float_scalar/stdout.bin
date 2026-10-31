@@ -1,0 +1,10 @@
+3.141592653589793 2.718281828459045 6.283185307179586
+True True True
+(-0.25, -1.0) (-0.0, -0.0) (0.0, inf)
+(0.75, 4) 12.0
+-3.0 -1.0 -0.0
+3.0 0.0 1.0 1.0 0.0
+-2 -1 -1
+ValueError math domain error
+ValueError math domain error
+OverflowError math range error

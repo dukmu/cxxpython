@@ -1,0 +1,11 @@
+restore True
+gauss cache True
+index callback True
+seed TypeError
+range ValueError
+step ValueError
+choice IndexError
+sample ValueError
+weights ValueError
+bits ValueError
+state ValueError

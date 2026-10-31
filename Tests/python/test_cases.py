@@ -27,6 +27,8 @@ def main():
     parser.add_argument("--cases", type=Path, default=Path(__file__).resolve().parents[1] / "cases")
     parser.add_argument("--case", action="append",
                         help="Run a fixture directory without rebuilding; repeat to select several")
+    parser.add_argument("--timeout", type=float, default=30,
+                        help="Timeout per script in seconds (default: 30)")
     args = parser.parse_args()
     binary = args.binary.resolve()
     root = args.cases.resolve()
@@ -47,9 +49,9 @@ def main():
         try:
             with tempfile.TemporaryDirectory(prefix=f'cxxpython-{directory.name}-') as scratch:
                 result = subprocess.run([str(binary), str(script)], input=stdin,
-                                        capture_output=True, cwd=scratch, timeout=30)
+                                        capture_output=True, cwd=scratch, timeout=args.timeout)
         except subprocess.TimeoutExpired:
-            print(f"FAIL {directory.name}: exceeded 30 seconds", flush=True)
+            print(f"FAIL {directory.name}: exceeded {args.timeout:g} seconds", flush=True)
             failures += 1
             continue
         ok = compare(f"{directory.name}/stdout", expected, result.stdout)

@@ -445,20 +445,54 @@ struct State {
     {
         return object && object->type.object_.load(std::memory_order_relaxed);
     }
+    bool inspectable(ObjectHeader *object) const noexcept
+    {
+        if (!python_object(object))
+            return false;
+        // Structural host objects remain inspectable before core bootstrap.
+        // Afterwards, construction roots must not expose unfinished Python types.
+        if (!core_published)
+            return true;
+        auto ready = [](ObjectHeader *type) {
+            return reinterpret_cast<const TypeObject *>(type)->state.load(
+                       std::memory_order_acquire) == TypeState::Ready;
+        };
+        if (!ready(object->type.object_.load(std::memory_order_relaxed)))
+            return false;
+        const auto family = Allocation::from(object).span->layout.native_family;
+        if (family == &native_layout_id<TypeObject>)
+            return ready(object);
+        if (family == &native_layout_id<DictObject>) {
+            if (auto *owner =
+                    reinterpret_cast<const DictObject *>(object)->namespace_owner.object_.load(
+                        std::memory_order_relaxed))
+                return ready(owner);
+        } else if (family == &native_layout_id<GetSetDescriptorObject>)
+            return ready(reinterpret_cast<const GetSetDescriptorObject *>(object)->owner.object());
+        else if (family == &native_layout_id<MemberDescriptorObject>)
+            return ready(reinterpret_cast<const MemberDescriptorObject *>(object)->owner.object());
+        else if (family == &native_layout_id<MethodDescriptorObject>)
+            return ready(reinterpret_cast<const MethodDescriptorObject *>(object)->owner.object());
+        return true;
+    }
     // Internal snapshots/storage are transparent to Python heap inspection.
     // Stop at each Python object rather than following its transitive graph.
-    static std::vector<ObjectHeader *> referents(ObjectHeader *source)
+    std::vector<ObjectHeader *> referents(ObjectHeader *source) const
     {
         struct Edges {
+            const State &state;
             std::vector<ObjectHeader *> pending, visible;
             std::exception_ptr error;
-        } edges;
+        } edges{*this, {}, {}, {}};
         Tracer tracer(&edges, [](void *opaque, ObjectHeader *object) noexcept {
             auto &edges = *static_cast<Edges *>(opaque);
             if (!object || edges.error)
                 return;
             try {
-                (python_object(object) ? edges.visible : edges.pending).push_back(object);
+                if (!python_object(object))
+                    edges.pending.push_back(object);
+                else if (edges.state.inspectable(object))
+                    edges.visible.push_back(object);
             } catch (...) {
                 edges.error = std::current_exception();
             }
@@ -2000,7 +2034,7 @@ void Attachment::inspect_heap(HeapInspection kind, std::span<const Value> target
         };
         if (kind == HeapInspection::Referents) {
             for (auto target : targets)
-                for (auto *object : detail::State::referents(target.object()))
+                for (auto *object : state.referents(target.object()))
                     publish(object);
             return;
         }
@@ -2011,13 +2045,13 @@ void Attachment::inspect_heap(HeapInspection kind, std::span<const Value> target
             return;
         state.each_allocation([&](detail::Allocation &allocation) {
             auto *object = allocation.object();
-            if (!detail::State::python_object(object))
+            if (!state.inspectable(object))
                 return;
             if (kind == HeapInspection::Objects) {
                 publish(object);
                 return;
             }
-            for (auto *referent : detail::State::referents(object))
+            for (auto *referent : state.referents(object))
                 if (sought.contains(referent)) {
                     publish(object);
                     break;

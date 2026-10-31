@@ -1,0 +1,8 @@
+bits 0 54607 18634332052024017722
+range [31, 38, 24, 31, 66] 0
+choice b ['b', 'c', 'b', 'b', 'b', 'b']
+shuffle [6, 2, 0, 7, 3, 5, 4, 1]
+sample [23, 2, 6, 26, 10, 25] ['red', 'blue', 'red', 'blue']
+bytes 22eeacf724e0bd82
+string seed 1020166476070759713
+bytes seed 1020166476070759713

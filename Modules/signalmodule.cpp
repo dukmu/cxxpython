@@ -21,13 +21,13 @@ namespace {
 // POSIX dispositions belong to the process. No interpreter lock covers execution.
 // The async handler touches only lock-free, process-lifetime notification cells.
 struct ProcessSignals {
-    std::mutex registration;
     std::atomic<std::uint64_t> owner{0};
     std::array<std::atomic<std::uint64_t>, NSIG> pending{};
     std::atomic<bool> tripped{false};
     std::uint64_t next = 0;
 };
 constinit ProcessSignals process;
+std::mutex registration;
 static_assert(std::atomic<std::uint64_t>::is_always_lock_free);
 static_assert(std::atomic<bool>::is_always_lock_free);
 static_assert(std::is_trivially_destructible_v<ProcessSignals>);
@@ -57,7 +57,7 @@ struct SignalNative {
     {
         if (!generation)
             return;
-        std::lock_guard guard(process.registration);
+        std::lock_guard guard(registration);
         if (process.owner.load(std::memory_order_relaxed) == generation) {
             process.owner.store(0, std::memory_order_release);
             for (int number = 1; number < NSIG; ++number) {
@@ -141,7 +141,7 @@ bool claim(Attachment &c, Handle owner, ReturnSlot &out)
     int error = 0;
     bool occupied = false;
     {
-        std::lock_guard guard(process.registration);
+        std::lock_guard guard(registration);
         NoSafepoint commit(c);
         occupied = process.owner.load(std::memory_order_relaxed) != 0;
         if (!occupied) {
@@ -240,7 +240,7 @@ void set_handler(Attachment &c, Handle function, std::span<const Value> args, Re
         roots.root(out.tag() == ResultTag::Empty ? c.builtin(CoreObject::None) : out.value());
     int error;
     {
-        std::lock_guard guard(process.registration);
+        std::lock_guard guard(registration);
         NoSafepoint commit(c);
         error = sigaction(signal, &action, nullptr) == 0 ? 0 : errno;
         if (!error) {

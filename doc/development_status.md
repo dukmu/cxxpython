@@ -1,5 +1,82 @@
 # Development Status
 
+## 2026-10-31 Random, Date Policy And Type Publication
+
+Prepended after c05c18b, preserving all earlier entries. This is concrete progress
+within the active Plan 2 frontend/library/product and N4-N6/M0-M9 objective, not
+completion of that objective. Terra supplied the unchanged Python sources,
+native math/random/entropy implementations and direct fixtures; parent integrated
+them, fixed observed primitive/runtime failures and performed acceptance. All
+workers are closed. No GIL, alternate parser or Python-object RC was introduced.
+
+- Fixed the reported signalmodule.cpp assertion: the process registration mutex
+  is separate from the trivially destructible, lock-free async notification cells.
+  The async handler never accesses the mutex. Strict Clang 21.1.8/libstdc++ builds
+  and real signal-delivery/sleep/module-lifetime tests pass. An alternate libc++
+  build was not available because its headers are absent; this is not claimed as
+  a verified libc++ build.
+- Added unchanged pinned CPython 3.12.14 random, datetime, _pydatetime, calendar
+  and _strptime sources, verified by direct file comparisons. Native time.strptime
+  uses ordinary rooted imports/calls into the actual _strptime Python helper.
+  ISO parsing, arithmetic, offsets/fold, timestamps, calendar formatting and
+  parsing run through upstream policy, not a replacement native date facade.
+- _random adapts CPython MT19937 and retains its additional license in source and
+  doc/licenses/mt19937.txt. Fixed-seed sequences, arbitrary getrandbits, native
+  state restore, seed versions, selection/sampling/distributions, subclass policy
+  and SystemRandom have direct fixtures. Per-instance owned native state is
+  synchronized inside NativeWait; callbacks, managed allocation and result
+  publication remain outside the mutex. Real Linux getrandom supplies os.urandom
+  and default seed entropy; short reads/EINTR and signal exceptions are handled
+  by the OS boundary. There is no interpreter-wide RNG lock or deterministic
+  entropy substitute. The observed zero-bit native-import crash is fixed by the
+  proper zero-result/no-state-consumption path.
+- Expanded native scalar math, including rounded large-integer logarithms,
+  CPython's gamma algorithms, conversion/rounding protocols and exact integer
+  gcd/lcm/factorial/comb/perm alongside isqrt. Native integer arithmetic owns its
+  operands across NativeWait. Actual product tests exposed missing float integral
+  methods and str.removeprefix; those primitives now exist at their proper object
+  boundary, including removesuffix and exact int integral-method aliases. No Lib
+  branch was deleted to hide missing semantics, and no workload-specific number
+  fast path or duplicate numeric representation was added.
+- TypeSpec now supplies immutable/subclassable flags before construction reaches
+  safepoints. Modules no longer write those raw flags after Ready. Normal creation
+  release-publishes atomic Ready only after snapshot publication and builder
+  cleanup. GC inspection reuses existing TypeState/namespace-owner/descriptor-owner
+  edges to omit construction-only Python objects, while internal storage remains
+  transparent and pre-core host inspection keeps its contract. Focused native
+  tests include zero-managed-allocation inspection and publication; a Python
+  shared-heap class-construction/inspection scenario exercises the public path.
+- Clang 21.1.8 Release, ASan/UBSan/LSan and TSan build with strict warnings as
+  errors. The final Release passes 89 relevant native contracts, including all
+  bootstrap/promotion failure shards. Sanitizers retain passing evidence for the
+  same affected runtime paths and all shards, with the six cold-import allocation
+  quotas and parallel initialization verified separately after splitting the old
+  aggregate test. The final three int_identity registration aliases received
+  that final Release run plus four focused numeric scenarios on each sanitizer;
+  unchanged sanitizer evidence was reused rather than rerunning every shard.
+  All 26 new direct scenarios have product and pinned-reference passing evidence;
+  eight directly related existing scripts and three asynchronous signal cases
+  pass on Release and both sanitizer configurations. Initial timeout/failure logs
+  remain retained, not reported as passing runs.
+- Fixed the observed test-budget mismatch without removing quotas/assertions:
+  cold-import quotas are independent parameterized tests; test_cases.py accepts
+  a per-process deadline, and CMake automatically registers each */test.py as
+  Scripts.Cases.<name>/Scripts.Reference.<name>. Instrumented scripts use the
+  configured budget rather than an inner hard-coded 30 seconds. The GC stress
+  fixture joins its real workers under the outer process deadline, rather than
+  incorrectly failing a still-progressing instrumented worker after 20 seconds.
+  Generated registration, formatting, ASDL/244-rule consistency and whitespace
+  checks pass. Raw evidence remains in .cache/date-random-* and worker logs.
+  No unrelated performance baseline, checksum framework or hand-filled benchmark
+  table was added. User test2.py and temporary_plan.md deletion remain excluded.
+- Remaining gates include the full math API/accuracy/performance matrix, native
+  constructor/reflection/error and cold initializer/reload publication matrices,
+  RNG fork/platform lifecycle, locale/DST/native datetime acceleration, remaining
+  primitive methods and requested libraries such as pickle/socket/ctypes/pdb/test.
+  Native initializers that add protocols after create_native_type still need their
+  complete publication acceptance; this change does not claim they are atomic.
+  Continue the full Base-to-Full, import/extension/product and N4-N6/M0-M9 route.
+
 ## 2026-10-31 Logging, Calendar Time, Pathnames And CPU Count
 
 Prepended after 9631d52 without rewriting earlier entries. The previous goal turn

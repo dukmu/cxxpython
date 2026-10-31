@@ -1,0 +1,41 @@
+0.0 [0, 0, 0] [0, 0, 0]
+-0.0 [0, 0, 0] [0, 0, 0]
+1.25 [1, 1, 2] [1, 1, 2]
+-1.25 [-1, -2, -1] [-1, -2, -1]
+1.0 [1, 1, 1] [1, 1, 1]
+-1.0 [-1, -1, -1] [-1, -1, -1]
+5e-324 [0, 0, 1] [0, 0, 1]
+-5e-324 [0, -1, 0] [0, -1, 0]
+4503599627370495.5 [4503599627370495, 4503599627370495, 4503599627370496] [4503599627370495, 4503599627370495, 4503599627370496]
+-4503599627370495.5 [-4503599627370495, -4503599627370496, -4503599627370495] [-4503599627370495, -4503599627370496, -4503599627370495]
+[True, True, True]
+[True, True, True]
+[True, True, True]
+[True, True, True]
+ValueError cannot convert float NaN to integer
+ValueError cannot convert float NaN to integer
+ValueError cannot convert float NaN to integer
+OverflowError cannot convert float infinity to integer
+OverflowError cannot convert float infinity to integer
+OverflowError cannot convert float infinity to integer
+OverflowError cannot convert float infinity to integer
+OverflowError cannot convert float infinity to integer
+OverflowError cannot convert float infinity to integer
+[-1, -2, -1]
+-1 -2 -1
+subclass GC integer results retained
+invalid receiver
+invalid receiver
+invalid receiver
+invalid arity
+invalid arity
+invalid receiver
+invalid receiver
+invalid receiver
+invalid arity
+invalid arity
+invalid receiver
+invalid receiver
+invalid receiver
+invalid arity
+invalid arity

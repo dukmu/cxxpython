@@ -305,6 +305,8 @@ void initialize_tokenize(Attachment &c, Handle module, ReturnSlot &out)
     NativeTypeSpec spec{{"TokenizerIter"}, LayoutDescriptor::of<TokenizerIterator>()};
     spec.type.module = U"_tokenize";
     spec.type.slots = std::vector<std::u32string>{};
+    spec.type.immutable = true;
+    spec.type.subclassable = false;
     ReturnSlot value(c), key(c);
     create_native_type(c, spec, value);
     if (failed(value)) {
@@ -327,8 +329,6 @@ void initialize_tokenize(Attachment &c, Handle module, ReturnSlot &out)
                                             value, function.get(c));
     make_str(c, U"__new__", key);
     name_store(c, dict, key.value(), value.value());
-    c.payload<TypeObject>(type).immutable = true;
-    c.payload<TypeObject>(type).subclassable = false;
     make_str(c, U"TokenizerIter", key);
     dict_store(c, roots.root(module_dict(c, module.get(c))), roots.root(key.value()), type, out);
 }

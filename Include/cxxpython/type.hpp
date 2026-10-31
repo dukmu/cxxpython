@@ -60,7 +60,7 @@ struct TypeObject {
     std::optional<Value> dictionary;
     LayoutDescriptor instance_layout;
     std::vector<std::u32string> slot_names;
-    TypeState state = TypeState::Building;
+    std::atomic<TypeState> state{TypeState::Building};
     bool immutable = false;
     bool subclassable = true;
     bool allow_slots = true;
@@ -99,6 +99,8 @@ struct TypeSpec {
     std::optional<std::u32string> qualname = {};
     std::optional<Handle> dictionary = {};
     std::optional<std::vector<std::u32string>> slots = {};
+    bool immutable = false;
+    bool subclassable = true;
 
     TypeSpec(std::u32string name_in, std::span<const Handle> bases_in = {},
              std::optional<Handle> metaclass_in = {})

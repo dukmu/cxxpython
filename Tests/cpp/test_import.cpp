@@ -458,25 +458,29 @@ struct GateObject {
     GateObject(InitialType head, ImportGate *value) : header(head), gate(value) {}
     void trace(Tracer &) const noexcept {}
 };
-TEST(ParallelImports, ColdBootstrapConcurrentAndAllocationFailureRetry)
+class ColdImportAllocationFailures : public ::testing::TestWithParam<std::size_t> {};
+TEST_P(ColdImportAllocationFailures, RollbackAndRetry)
 {
-    for (std::size_t quota : {0u, 1u, 10u, 100u, 1000u, 5000u}) {
-        SCOPED_TRACE(quota);
-        Interpreter interpreter{{.collect_every_allocation = true}};
-        Attachment owner(interpreter);
-        owner.bootstrap_core();
-        ReturnSlot out(owner);
-        owner.set_allocation_limit(quota);
-        initialize_imports(owner, out);
-        owner.set_allocation_limit(std::numeric_limits<std::size_t>::max());
-        if (out.tag() == ResultTag::Raised)
-            ASSERT_EQ(owner.type_of(out.exception()), owner.builtin(CoreObject::MemoryErrorType));
-        else
-            ASSERT_EQ(out.tag(), ResultTag::Ok);
-        owner.collect();
-        initialize_imports(owner, out);
+    Interpreter interpreter{{.collect_every_allocation = true}};
+    Attachment owner(interpreter);
+    owner.bootstrap_core();
+    ReturnSlot out(owner);
+    owner.set_allocation_limit(GetParam());
+    initialize_imports(owner, out);
+    owner.set_allocation_limit(std::numeric_limits<std::size_t>::max());
+    if (out.tag() == ResultTag::Raised)
+        ASSERT_EQ(owner.type_of(out.exception()), owner.builtin(CoreObject::MemoryErrorType));
+    else
         ASSERT_EQ(out.tag(), ResultTag::Ok);
-    }
+    owner.collect();
+    initialize_imports(owner, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+}
+INSTANTIATE_TEST_SUITE_P(ParallelImports, ColdImportAllocationFailures,
+                         ::testing::Values(0U, 1U, 10U, 100U, 1000U, 5000U));
+
+TEST(ParallelImports, ColdBootstrapConcurrent)
+{
     Interpreter interpreter{{.collect_every_allocation = true}};
     Attachment owner(interpreter);
     owner.bootstrap_core();

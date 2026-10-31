@@ -25,6 +25,7 @@
 #include "internal/readlinemodule.hpp"
 #endif
 #include "internal/posixmodule.hpp"
+#include "internal/randommodule.hpp"
 #include "internal/stdio.hpp"
 #include "internal/stringmodule.hpp"
 #include "internal/structmodule.hpp"
@@ -268,6 +269,7 @@ detail::ImportState::ImportState()
                                      {U"_operator", detail::initialize_operator},
                                      {U"time", detail::initialize_time},
                                      {U"math", detail::initialize_math},
+                                     {U"_random", detail::initialize_random},
                                      {U"_opcode", detail::initialize_opcode},
 #ifdef CXXPYTHON_HAVE_READLINE
                                      {U"readline", detail::initialize_readline},

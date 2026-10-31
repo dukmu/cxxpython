@@ -78,6 +78,8 @@ add_library(cxxpython_core
     Modules/errnomodule.cpp
     Modules/signalmodule.cpp
     Modules/mathmodule.cpp
+    Modules/math_integer.cpp
+    Modules/_randommodule.cpp
     Modules/time_calendar.cpp
     Python/symtable.cpp
     Python/flowgraph.cpp
@@ -328,14 +330,28 @@ if(BUILD_TESTING)
         ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_generators.py
         --binary $<TARGET_FILE:cxxpython> --reference ${CXXPYTHON_REFERENCE_PYTHON})
     set_tests_properties(Generators.Differential PROPERTIES TIMEOUT 90)
-    add_test(NAME Scripts.Cases COMMAND ${Python3_EXECUTABLE}
-        ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_cases.py --binary $<TARGET_FILE:cxxpython>)
-    add_test(NAME Scripts.Reference COMMAND ${Python3_EXECUTABLE}
-        ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_cases.py --binary ${CXXPYTHON_REFERENCE_PYTHON})
+    set(script_timeout 30)
+    if(CXXPYTHON_TEST_TIMEOUT GREATER script_timeout)
+        set(script_timeout ${CXXPYTHON_TEST_TIMEOUT})
+    endif()
+    math(EXPR script_runner_timeout "${script_timeout} + 10")
+    file(GLOB case_scripts CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/Tests/cases/*/test.py")
+    foreach(script IN LISTS case_scripts)
+        get_filename_component(case_directory "${script}" DIRECTORY)
+        get_filename_component(case_name "${case_directory}" NAME)
+        add_test(NAME Scripts.Cases.${case_name} COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_cases.py
+            --binary $<TARGET_FILE:cxxpython> --case ${case_name} --timeout ${script_timeout})
+        add_test(NAME Scripts.Reference.${case_name} COMMAND ${Python3_EXECUTABLE}
+            ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_cases.py
+            --binary ${CXXPYTHON_REFERENCE_PYTHON} --case ${case_name} --timeout ${script_timeout})
+        set_tests_properties(Scripts.Cases.${case_name} Scripts.Reference.${case_name}
+            PROPERTIES TIMEOUT ${script_runner_timeout})
+    endforeach()
     add_test(NAME Scripts.NoGil COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_cases.py
         --binary $<TARGET_FILE:cxxpython> --cases ${CMAKE_CURRENT_SOURCE_DIR}/Tests/nogil_cases)
-    set_tests_properties(Scripts.Cases Scripts.Reference PROPERTIES TIMEOUT 120)
     set_tests_properties(Scripts.NoGil PROPERTIES TIMEOUT 60)
     add_test(NAME Stdlib.Doctests COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_stdlib.py --binary $<TARGET_FILE:cxxpython>)

@@ -8,6 +8,7 @@
 #include "cxxpython/protocol.hpp"
 #include "internal/compiler.hpp"
 #include "internal/long.hpp"
+#include "internal/signalmodule.hpp"
 
 #include <algorithm>
 #include <atomic>
@@ -21,6 +22,7 @@
 #include <pthread.h>
 #include <signal.h>
 #include <sys/ioctl.h>
+#include <sys/random.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -84,6 +86,39 @@ bool descriptor(Attachment &c, Value value, int &fd, ReturnSlot &out)
     }
     fd = static_cast<int>(n);
     return true;
+}
+
+void urandom_entry(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    std::int64_t size;
+    if (!integer(c, args[0], size, out))
+        return;
+    if (size < 0) {
+        raise_error(c, CoreObject::ValueErrorType, U"negative argument not allowed", out);
+        return;
+    }
+    std::string bytes(static_cast<std::size_t>(size), '\0');
+    std::size_t offset = 0;
+    while (offset < bytes.size()) {
+        ssize_t count;
+        int error;
+        {
+            NativeWait wait(c);
+            count = ::getrandom(bytes.data() + offset,
+                                std::min(bytes.size() - offset, std::size_t{33554431}), 0);
+            error = count < 0 ? errno : 0;
+        }
+        if (count > 0) {
+            offset += static_cast<std::size_t>(count);
+        } else if (error == EINTR) {
+            if (check_signals(c, out))
+                return;
+        } else {
+            os_error(c, error ? error : EIO, out);
+            return;
+        }
+    }
+    make_bytes(c, std::move(bytes), out);
 }
 
 template <std::size_t I> void terminal_field(Attachment &c, Value self, ReturnSlot &out)
@@ -1105,6 +1140,8 @@ void install_scandir(Attachment &c, Handle module_dictionary, Handle stat_type, 
         TypeSpec spec{type_name};
         spec.module = U"posix";
         spec.slots = std::vector<std::u32string>{};
+        spec.immutable = true;
+        spec.subclassable = false;
         create_native_type(c, NativeTypeSpec{spec, layout}, temporary);
         if (failed(temporary)) {
             out.raised(temporary.exception());
@@ -1150,10 +1187,6 @@ void install_scandir(Attachment &c, Handle module_dictionary, Handle stat_type, 
         signature(
             {{U"self", only}, {U"exc_type", only}, {U"exc_value", only}, {U"traceback", only}}),
         scan_close);
-    for (auto type : {*entry_type, *iterator_type}) {
-        c.payload<TypeObject>(type).subclassable = false;
-        c.payload<TypeObject>(type).immutable = true;
-    }
     make_str(c, U"DirEntry", name);
     dict_store(c, module_dictionary, roots.root(name.value()), *entry_type, out);
     if (failed(out))
@@ -1208,6 +1241,8 @@ void initialize_posix(Attachment &c, Handle module, ReturnSlot &out)
     Handle base[] = {roots.root(c.builtin(CoreObject::TupleType))};
     TypeSpec type_spec{U"stat_result", base};
     type_spec.module = U"posix";
+    type_spec.immutable = true;
+    type_spec.subclassable = false;
     type_spec.slots =
         std::vector<std::u32string>(std::begin(stat_extra_names), std::end(stat_extra_names));
     create_native_type(c, NativeTypeSpec{type_spec, LayoutDescriptor::of<TupleObject>()}, value);
@@ -1235,8 +1270,6 @@ void initialize_posix(Attachment &c, Handle module, ReturnSlot &out)
                                             value, constructor);
     make_str(c, U"__new__", name);
     name_store(c, type_dict, name.value(), value.value());
-    c.payload<TypeObject>(stat_type).immutable = true;
-    c.payload<TypeObject>(stat_type).subclassable = false;
     make_str(c, U"stat_result", name);
     dict_store(c, dict, roots.root(name.value()), stat_type, out);
     if (failed(out))
@@ -1248,6 +1281,8 @@ void initialize_posix(Attachment &c, Handle module, ReturnSlot &out)
     TypeSpec terminal_spec{U"terminal_size", base};
     terminal_spec.module = U"os";
     terminal_spec.slots = std::vector<std::u32string>{};
+    terminal_spec.immutable = true;
+    terminal_spec.subclassable = false;
     create_native_type(c, NativeTypeSpec{terminal_spec, LayoutDescriptor::of<TupleObject>()},
                        value);
     if (failed(value)) {
@@ -1280,8 +1315,6 @@ void initialize_posix(Attachment &c, Handle module, ReturnSlot &out)
         make_str(c, field, name);
         name_store(c, terminal_dict.get(c), name.value(), number_handle.get(c));
     }
-    c.payload<TypeObject>(terminal_type).immutable = true;
-    c.payload<TypeObject>(terminal_type).subclassable = false;
     make_str(c, U"terminal_size", name);
     dict_store(c, dict, roots.root(name.value()), terminal_type, out);
     if (failed(out))
@@ -1291,7 +1324,8 @@ void initialize_posix(Attachment &c, Handle module, ReturnSlot &out)
     if (!install("get_terminal_size", signature({{U"fd", only, stdout_fd.get(c)}}),
                  get_terminal_size, {terminal_type.get(c)}))
         return;
-    if (!install("fspath", signature({patharg}), fspath) ||
+    if (!install("urandom", signature({{U"size", only}}), urandom_entry) ||
+        !install("fspath", signature({patharg}), fspath) ||
         !install(
             "access",
             signature(

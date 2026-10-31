@@ -225,6 +225,8 @@ void create(Attachment &context, const TypeSpec &spec, const LayoutDescriptor *n
     auto &payload = context.payload<TypeObject>(created);
     payload.qualname = spec.qualname.value_or(spec.name);
     payload.declared_module = spec.module;
+    payload.immutable = spec.immutable;
+    payload.subclassable = spec.subclassable;
     for (auto base : bases)
         payload.bases.push_back(base.get(context));
     payload.mro.reserve(ancestors.size() + 1);
@@ -626,9 +628,9 @@ void type_ready(Attachment &context, Handle type, std::optional<Handle> source)
         payload.base ? context.payload<TypeObject>(*payload.base).slot_names.size() : 0;
     install_slot_descriptors(context, type, inherited);
     context.account_external(type, payload.external_bytes());
-    payload.state = TypeState::Ready;
     if (context.core_ready())
         publish_type(context, type.get(context));
+    payload.state.store(TypeState::Ready, std::memory_order_release);
 }
 Handle select_metaclass(Attachment &context, Handle metaclass, std::span<const Handle> bases,
                         RootScope &roots)

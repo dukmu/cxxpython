@@ -101,6 +101,8 @@ void make_info_type(Attachment &ctx, bool floating, ReturnSlot &out)
     TypeSpec spec{floating ? U"float_info" : U"version_info", bases};
     spec.module = U"sys";
     spec.slots = std::vector<std::u32string>{};
+    spec.subclassable = false;
+    spec.immutable = true;
     ReturnSlot temporary(ctx);
     create_native_type(ctx, NativeTypeSpec{spec, LayoutDescriptor::of<TupleObject>()}, temporary);
     if (failed(temporary)) {
@@ -148,8 +150,6 @@ void make_info_type(Attachment &ctx, bool floating, ReturnSlot &out)
         make_str(ctx, name, temporary);
         name_store(ctx, dictionary.get(ctx), temporary.value(), value.get(ctx));
     }
-    ctx.payload<TypeObject>(type).subclassable = false;
-    ctx.payload<TypeObject>(type).immutable = true;
     out.ok(type.get(ctx));
 }
 void make_version_info(Attachment &ctx, ReturnSlot &out)

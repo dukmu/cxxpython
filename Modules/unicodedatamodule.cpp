@@ -653,6 +653,8 @@ void initialize_unicodedata(Attachment &c, Handle module, ReturnSlot &out)
     NativeTypeSpec spec{{"UCD"}, LayoutDescriptor::of<UCD>()};
     spec.type.module = U"unicodedata";
     spec.type.slots = std::vector<std::u32string>{};
+    spec.type.immutable = true;
+    spec.type.subclassable = false;
     ReturnSlot type_slot(c);
     create_native_type(c, spec, type_slot);
     if (failed(type_slot)) {
@@ -660,7 +662,6 @@ void initialize_unicodedata(Attachment &c, Handle module, ReturnSlot &out)
         return;
     }
     auto type = roots.root(type_slot.value());
-    c.payload<TypeObject>(type).subclassable = false;
     SignatureLayout constructor;
     constructor.parameters = {{U"self", ParameterKind::PositionalOnly}};
     constructor.varargs = U"args";
@@ -715,7 +716,6 @@ void initialize_unicodedata(Attachment &c, Handle module, ReturnSlot &out)
             return;
     }
     ReturnSlot key(c), version(c);
-    c.payload<TypeObject>(type).immutable = true;
     ReturnSlot instance(c);
     c.allocate_instance<UCD>(type, instance);
     if (failed(instance)) {

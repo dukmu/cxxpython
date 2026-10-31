@@ -1,0 +1,8 @@
+6 12
+66 42
+720
+RuntimeError index failure
+RuntimeError index failure
+RuntimeError index failure
+RuntimeError index failure
+[12, 18, 4, 6, 12, 2, 7, 2, 6, 'broken', 'broken', -1, 'broken', -1, 'broken']

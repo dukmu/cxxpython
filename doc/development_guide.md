@@ -78,8 +78,11 @@ data. Python drivers follow ordinary Python formatting.
   generated `stdout.bin`; optional `stdin.bin` is input, not the test script.
   Do not put runnable Python in C++ string literals calling SourceUnit. Run
   `python3 Tests/python/test_cases.py --binary build/cxxpython` without rebuilding
-  tests. `Scripts.Cases` and `Scripts.Reference` run the same byte-exact fixtures
-  through the product and pinned reference. See `Tests/cases/README.md` for stderr
+  tests. CTest automatically registers `Scripts.Cases.<name>` and
+  `Scripts.Reference.<name>` for every fixture directory, running the same byte-exact fixtures
+  through the product and pinned reference. `test_cases.py --timeout SECONDS`
+  sets a per-script process deadline; CMake uses at least 30 seconds, or the
+  configured native-test budget for instrumented builds. See `Tests/cases/README.md` for stderr
   and exit status. Keep C++ for native-only ownership/IR/quota/fault/thread tests.
 - Host terminal/process-signal/CLI boundaries belong in `Tests/python/`; compare
   actual child output and exit status against the fixed reference where applicable.
