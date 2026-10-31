@@ -7,7 +7,7 @@ SyntaxError
 SyntaxError
 SyntaxError
 iso-8859-1 r ['# coding: latin-1', 'value = "é"']
-value = "é" 
+value = "é" ''
 ['# coding: latin-1\n', 'value = "é"\n']
 value = 12345
  True

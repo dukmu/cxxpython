@@ -18,7 +18,7 @@ try:
         stream.write(b'# coding: latin-1\nvalue = "\xe9"\n')
     with tokenize.open(path) as source:
         print(source.encoding, source.mode, source.read().splitlines())
-    print(linecache.getline(path, 2).rstrip(), linecache.getline(path, 3))
+    print(linecache.getline(path, 2).rstrip(), repr(linecache.getline(path, 3)))
     linecache.checkcache(path)
     print(linecache.getlines(path))
     with open(path, 'wb') as stream:
