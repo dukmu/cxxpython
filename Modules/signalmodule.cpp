@@ -3,7 +3,7 @@
 #include "cxxpython/moduleobject.hpp"
 #include "cxxpython/protocol.hpp"
 #include "cxxpython/setobject.hpp"
-#include "internal/iomodule.hpp"
+#include "internal/errors.hpp"
 
 #include <array>
 #include <atomic>
@@ -174,7 +174,7 @@ bool claim(Attachment &c, Handle owner, ReturnSlot &out)
     }
     if (error) {
         state.native.restore();
-        io_os_error(c, error, out);
+        raise_os_error(c, error, out);
         return false;
     }
     return true;
@@ -250,7 +250,7 @@ void set_handler(Attachment &c, Handle function, std::span<const Value> args, Re
         }
     }
     if (error)
-        io_os_error(c, error, out);
+        raise_os_error(c, error, out);
     else
         out.ok(previous.get(c));
 }
@@ -261,7 +261,7 @@ void raise_signal(Attachment &c, Handle, std::span<const Value> args, ReturnSlot
     if (!number(c, args[0], signal, out, false))
         return;
     if (std::raise(signal) != 0) {
-        io_os_error(c, errno, out);
+        raise_os_error(c, errno, out);
         return;
     }
     if (!check_signals(c, out))

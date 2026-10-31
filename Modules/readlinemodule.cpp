@@ -6,7 +6,6 @@
 #include "cxxpython/protocol.hpp"
 #include "internal/codecs.hpp"
 #include "internal/errors.hpp"
-#include "internal/iomodule.hpp"
 #include "internal/posixmodule.hpp"
 
 #include <readline/history.h>
@@ -363,7 +362,7 @@ void method(Attachment &c, Handle function, std::span<const Value> args, ReturnS
                         error = rl_read_init_file(path);
                 }
                 if (error) {
-                    io_os_error(c, error, out);
+                    raise_os_error(c, error, out);
                     return;
                 }
                 if constexpr (op == Op::InitFile)
@@ -740,7 +739,7 @@ void read_terminal_line(Attachment &c, int input_fd, int output_fd, Handle promp
                     fclose(output);
                 else if (out_copy >= 0)
                     close(out_copy);
-                io_os_error(c, error, out);
+                raise_os_error(c, error, out);
                 return;
             }
             setvbuf(input, nullptr, _IONBF, 0);
@@ -763,7 +762,7 @@ void read_terminal_line(Attachment &c, int input_fd, int output_fd, Handle promp
                 return;
             }
             if (run.input_error) {
-                io_os_error(c, run.input_error, out);
+                raise_os_error(c, run.input_error, out);
                 return;
             }
             if (!run.eof && run.line && *run.line) {

@@ -318,6 +318,33 @@ TEST(FoundationMemory, FailedConstructionDoesNotPublishOrLeak)
     EXPECT_EQ(context.stats().live_bytes, 0U);
 }
 
+TEST(FoundationMemory, CompoundRootAndPayloadValidationRetainsEveryBoundary)
+{
+    Interpreter interpreter;
+    Attachment context(interpreter);
+    RootScope roots(context);
+    auto node = make_node(context, roots);
+    auto value = node.get(context);
+    EXPECT_THROW(context.payload<Node>(Handle{}), std::logic_error);
+    EXPECT_THROW(context.payload<AlignedLeaf>(node), std::logic_error);
+    const auto count = context.stats().roots;
+    {
+        NoSafepoint commit(context);
+        EXPECT_THROW(roots.root(value), std::logic_error);
+        EXPECT_NO_THROW(context.payload<Node>(node));
+    }
+    EXPECT_EQ(context.stats().roots, count);
+    {
+        NativeWait wait(context);
+        EXPECT_THROW(context.payload<Node>(node), std::logic_error);
+        EXPECT_THROW(roots.root(value), std::logic_error);
+    }
+    roots.release(node);
+    auto replacement = make_node(context, roots);
+    EXPECT_THROW(context.payload<Node>(node), std::logic_error);
+    EXPECT_NO_THROW(context.payload<Node>(replacement));
+}
+
 TEST(FoundationMemory, StandardLayoutNativeOwnersReleaseOnCollectionAndConstructorFailure)
 {
     static_assert(std::is_standard_layout_v<OwningNode>);

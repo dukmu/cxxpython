@@ -7,7 +7,7 @@
 #include "cxxpython/moduleobject.hpp"
 #include "cxxpython/protocol.hpp"
 #include "cxxpython/type.hpp"
-#include "internal/iomodule.hpp"
+#include "internal/errors.hpp"
 #include "internal/pytime.hpp"
 #include "internal/signalmodule.hpp"
 #include "internal/socket_addresses.hpp"
@@ -139,7 +139,7 @@ bool acquire(Attachment &c, SocketState &state, Descriptor &lease, std::int64_t 
         }
     }
     if (error)
-        io_os_error(c, error, out);
+        raise_os_error(c, error, out);
     return !error;
 }
 bool number(Attachment &c, Value value, std::int64_t &result, ReturnSlot &out)
@@ -273,7 +273,7 @@ void initialize(Attachment &c, Handle function, std::span<const Value> args, Ret
             opened.fd = fd;
     }
     if (error) {
-        io_os_error(c, error, out);
+        raise_os_error(c, error, out);
         return;
     }
     if (kind & SOCK_NONBLOCK)
@@ -285,7 +285,7 @@ void initialize(Attachment &c, Handle function, std::span<const Value> args, Ret
             error = errno;
     }
     if (error) {
-        io_os_error(c, error, out);
+        raise_os_error(c, error, out);
         return;
     }
     c.allocate<SocketResource>(fresh, family, kind, protocol, timeout);
@@ -338,7 +338,7 @@ void close_socket(Attachment &c, Handle, std::span<const Value> args, ReturnSlot
                 error = errno;
     }
     if (error)
-        io_os_error(c, error, out);
+        raise_os_error(c, error, out);
     else if constexpr (Detach)
         make_int(c, fd, out);
     else
@@ -379,7 +379,7 @@ void timeout_entry(Attachment &c, Handle, std::span<const Value> args, ReturnSlo
             timeout = state.timeout;
     }
     if (error)
-        io_os_error(c, error, out);
+        raise_os_error(c, error, out);
     else if constexpr (Set)
         out.ok(c.builtin(CoreObject::None));
     else if constexpr (Blocking)
@@ -416,7 +416,7 @@ bool wait_ready(Attachment &c, int fd, short events, std::int64_t timeout,
             continue;
         }
         if (error) {
-            io_os_error(c, error, out);
+            raise_os_error(c, error, out);
             return false;
         }
         if (result)
@@ -456,7 +456,7 @@ bool perform(Attachment &c, int fd, short events, std::int64_t timeout,
                 return false;
             continue;
         }
-        io_os_error(c, error, out);
+        raise_os_error(c, error, out);
         return false;
     }
 }
@@ -507,7 +507,7 @@ void address_operation(Attachment &c, Handle function, std::span<const Value> ar
     if constexpr (Ex)
         make_int(c, error, out);
     else if (error)
-        io_os_error(c, error, out);
+        raise_os_error(c, error, out);
     else
         out.ok(c.builtin(CoreObject::None));
 }
@@ -533,7 +533,7 @@ void get_address(Attachment &c, Handle, std::span<const Value> args, ReturnSlot 
         error = result < 0 ? errno : 0;
     }
     if (error)
-        io_os_error(c, error, out);
+        raise_os_error(c, error, out);
     else
         socket_address_value(c, reinterpret_cast<sockaddr *>(&address.storage), address.size, out);
 }
@@ -559,7 +559,7 @@ void simple_operation(Attachment &c, Handle, std::span<const Value> args, Return
         error = result < 0 ? errno : 0;
     }
     if (error)
-        io_os_error(c, error, out);
+        raise_os_error(c, error, out);
     else
         out.ok(c.builtin(CoreObject::None));
 }
@@ -737,7 +737,7 @@ void send(Attachment &c, Handle function, std::span<const Value> args, ReturnSlo
             return;
         }
         if (!count && offset < data.size()) {
-            io_os_error(c, EPIPE, out);
+            raise_os_error(c, EPIPE, out);
             return;
         }
         if (check_signals(c, out))
@@ -824,7 +824,7 @@ template <bool Set> void option(Attachment &c, Handle, std::span<const Value> ar
         error = result < 0 ? errno : 0;
     }
     if (error)
-        io_os_error(c, error, out);
+        raise_os_error(c, error, out);
     else if constexpr (Set)
         out.ok(c.builtin(CoreObject::None));
     else if (as_integer)
@@ -868,7 +868,7 @@ void descriptor_operation(Attachment &c, Handle, std::span<const Value> args, Re
             duplicate.fd = result;
     }
     if (error)
-        io_os_error(c, error, out);
+        raise_os_error(c, error, out);
     else if constexpr (Close)
         out.ok(c.builtin(CoreObject::None));
     else {
@@ -896,7 +896,7 @@ void socket_pair(Attachment &c, Handle function, std::span<const Value> args, Re
         }
     }
     if (error) {
-        io_os_error(c, error, out);
+        raise_os_error(c, error, out);
         return;
     }
     auto type = roots.root(c.payload<NativeFunctionObject>(function).captures[0]);

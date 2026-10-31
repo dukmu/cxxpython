@@ -17,6 +17,14 @@ Storage/native delivery probes do not establish Python VM parallelism. RSS is th
 | cpython-matrix-3.12.14 | matrix_workers | 3 | wall_ns | ms | 3 | 20.805 | 20.516 | 20.930 |
 | cpython-matrix-3.12.14 | matrix_workers | 4 | process_cpu_ns | ms | 3 | 12.107 | 9.212 | 13.659 |
 | cpython-matrix-3.12.14 | matrix_workers | 4 | wall_ns | ms | 3 | 22.404 | 21.887 | 22.672 |
+| cpython-matrix-3.12.14-n128 | matrix_workers | 1 | process_cpu_ns | ms | 3 | 170.766 | 168.305 | 178.707 |
+| cpython-matrix-3.12.14-n128 | matrix_workers | 1 | wall_ns | ms | 3 | 170.347 | 167.901 | 178.284 |
+| cpython-matrix-3.12.14-n128 | matrix_workers | 2 | process_cpu_ns | ms | 3 | 160.905 | 153.289 | 164.070 |
+| cpython-matrix-3.12.14-n128 | matrix_workers | 2 | wall_ns | ms | 3 | 169.444 | 160.785 | 170.997 |
+| cpython-matrix-3.12.14-n128 | matrix_workers | 3 | process_cpu_ns | ms | 3 | 165.399 | 148.166 | 174.769 |
+| cpython-matrix-3.12.14-n128 | matrix_workers | 3 | wall_ns | ms | 3 | 174.202 | 160.072 | 180.192 |
+| cpython-matrix-3.12.14-n128 | matrix_workers | 4 | process_cpu_ns | ms | 3 | 148.119 | 144.494 | 149.907 |
+| cpython-matrix-3.12.14-n128 | matrix_workers | 4 | wall_ns | ms | 3 | 160.238 | 159.201 | 160.448 |
 | cxx-matrix-11a3ae2 | matrix_workers | 1 | process_cpu_ns | ms | 3 | 3487.145 | 3450.578 | 4064.501 |
 | cxx-matrix-11a3ae2 | matrix_workers | 1 | wall_ns | ms | 3 | 3499.778 | 3489.699 | 4092.168 |
 | cxx-matrix-11a3ae2 | matrix_workers | 2 | process_cpu_ns | ms | 3 | 2082.558 | 2063.514 | 2277.440 |
@@ -25,6 +33,22 @@ Storage/native delivery probes do not establish Python VM parallelism. RSS is th
 | cxx-matrix-11a3ae2 | matrix_workers | 3 | wall_ns | ms | 3 | 805.044 | 782.029 | 905.265 |
 | cxx-matrix-11a3ae2 | matrix_workers | 4 | process_cpu_ns | ms | 3 | 2249.235 | 2225.559 | 2329.547 |
 | cxx-matrix-11a3ae2 | matrix_workers | 4 | wall_ns | ms | 3 | 647.410 | 636.841 | 653.087 |
+| cxx-matrix-root-fusion-n128 | matrix_workers | 1 | process_cpu_ns | ms | 3 | 10434.588 | 10398.707 | 10586.413 |
+| cxx-matrix-root-fusion-n128 | matrix_workers | 1 | wall_ns | ms | 3 | 10418.253 | 10407.512 | 10535.757 |
+| cxx-matrix-root-fusion-n128 | matrix_workers | 2 | process_cpu_ns | ms | 3 | 11697.902 | 11670.595 | 11752.287 |
+| cxx-matrix-root-fusion-n128 | matrix_workers | 2 | wall_ns | ms | 3 | 6077.936 | 6039.627 | 6143.423 |
+| cxx-matrix-root-fusion-n128 | matrix_workers | 3 | process_cpu_ns | ms | 3 | 13257.172 | 13024.153 | 13326.176 |
+| cxx-matrix-root-fusion-n128 | matrix_workers | 3 | wall_ns | ms | 3 | 4722.887 | 4706.202 | 4760.913 |
+| cxx-matrix-root-fusion-n128 | matrix_workers | 4 | process_cpu_ns | ms | 3 | 15041.203 | 14561.304 | 15549.524 |
+| cxx-matrix-root-fusion-n128 | matrix_workers | 4 | wall_ns | ms | 3 | 4321.162 | 4148.181 | 4474.010 |
+| cxx-matrix-root-fusion-n64 | matrix_workers | 1 | process_cpu_ns | ms | 3 | 1299.043 | 1265.090 | 1396.645 |
+| cxx-matrix-root-fusion-n64 | matrix_workers | 1 | wall_ns | ms | 3 | 1309.610 | 1265.456 | 1425.664 |
+| cxx-matrix-root-fusion-n64 | matrix_workers | 2 | process_cpu_ns | ms | 3 | 1715.620 | 1348.554 | 1751.744 |
+| cxx-matrix-root-fusion-n64 | matrix_workers | 2 | wall_ns | ms | 3 | 916.987 | 710.522 | 922.667 |
+| cxx-matrix-root-fusion-n64 | matrix_workers | 3 | process_cpu_ns | ms | 3 | 1593.205 | 1500.435 | 1632.397 |
+| cxx-matrix-root-fusion-n64 | matrix_workers | 3 | wall_ns | ms | 3 | 591.959 | 571.445 | 619.679 |
+| cxx-matrix-root-fusion-n64 | matrix_workers | 4 | process_cpu_ns | ms | 3 | 1682.522 | 1676.449 | 1733.296 |
+| cxx-matrix-root-fusion-n64 | matrix_workers | 4 | wall_ns | ms | 3 | 492.572 | 486.777 | 524.209 |
 | cxx-matrix-span-cache | matrix_workers | 1 | process_cpu_ns | ms | 3 | 1617.626 | 1541.518 | 1704.958 |
 | cxx-matrix-span-cache | matrix_workers | 1 | wall_ns | ms | 3 | 1617.543 | 1542.088 | 1704.292 |
 | cxx-matrix-span-cache | matrix_workers | 2 | process_cpu_ns | ms | 3 | 1737.435 | 1613.696 | 1914.727 |
@@ -44,10 +68,22 @@ Derived from median wall/process CPU times. CPU/wall is not a speedup; 1-worker 
 | cpython-matrix-3.12.14 | matrix_workers | 2 | 20.994 | 0.584 | 1.059 | 0.529 |
 | cpython-matrix-3.12.14 | matrix_workers | 3 | 20.805 | 0.815 | 1.068 | 0.356 |
 | cpython-matrix-3.12.14 | matrix_workers | 4 | 22.404 | 0.540 | 0.992 | 0.248 |
+| cpython-matrix-3.12.14-n128 | matrix_workers | 1 | 170.347 | 1.002 | 1.000 | 1.000 |
+| cpython-matrix-3.12.14-n128 | matrix_workers | 2 | 169.444 | 0.950 | 1.005 | 0.503 |
+| cpython-matrix-3.12.14-n128 | matrix_workers | 3 | 174.202 | 0.949 | 0.978 | 0.326 |
+| cpython-matrix-3.12.14-n128 | matrix_workers | 4 | 160.238 | 0.924 | 1.063 | 0.266 |
 | cxx-matrix-11a3ae2 | matrix_workers | 1 | 3499.778 | 0.996 | 1.000 | 1.000 |
 | cxx-matrix-11a3ae2 | matrix_workers | 2 | 1070.713 | 1.945 | 3.269 | 1.634 |
 | cxx-matrix-11a3ae2 | matrix_workers | 3 | 805.044 | 2.775 | 4.347 | 1.449 |
 | cxx-matrix-11a3ae2 | matrix_workers | 4 | 647.410 | 3.474 | 5.406 | 1.351 |
+| cxx-matrix-root-fusion-n128 | matrix_workers | 1 | 10418.253 | 1.002 | 1.000 | 1.000 |
+| cxx-matrix-root-fusion-n128 | matrix_workers | 2 | 6077.936 | 1.925 | 1.714 | 0.857 |
+| cxx-matrix-root-fusion-n128 | matrix_workers | 3 | 4722.887 | 2.807 | 2.206 | 0.735 |
+| cxx-matrix-root-fusion-n128 | matrix_workers | 4 | 4321.162 | 3.481 | 2.411 | 0.603 |
+| cxx-matrix-root-fusion-n64 | matrix_workers | 1 | 1309.610 | 0.992 | 1.000 | 1.000 |
+| cxx-matrix-root-fusion-n64 | matrix_workers | 2 | 916.987 | 1.871 | 1.428 | 0.714 |
+| cxx-matrix-root-fusion-n64 | matrix_workers | 3 | 591.959 | 2.691 | 2.212 | 0.737 |
+| cxx-matrix-root-fusion-n64 | matrix_workers | 4 | 492.572 | 3.416 | 2.659 | 0.665 |
 | cxx-matrix-span-cache | matrix_workers | 1 | 1617.543 | 1.000 | 1.000 | 1.000 |
 | cxx-matrix-span-cache | matrix_workers | 2 | 915.780 | 1.897 | 1.766 | 0.883 |
 | cxx-matrix-span-cache | matrix_workers | 3 | 645.114 | 2.705 | 2.507 | 0.836 |

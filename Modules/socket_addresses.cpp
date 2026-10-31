@@ -5,6 +5,7 @@
 #include "cxxpython/memoryobject.hpp"
 #include "cxxpython/protocol.hpp"
 #include "internal/compiler.hpp"
+#include "internal/errors.hpp"
 #include "internal/long.hpp"
 
 #include <arpa/inet.h>
@@ -40,11 +41,6 @@ void native_error(Attachment &c, Handle type, int code, const char *message, Ret
     const Value args[] = {number.value(), text.value()};
     call(c, type, {args, {}}, result);
     out.raised(failed(result) ? result.exception() : result.value());
-}
-void os_error(Attachment &c, int code, ReturnSlot &out)
-{
-    RootScope roots(c);
-    native_error(c, roots.root(c.builtin(CoreObject::OSErrorType)), code, std::strerror(code), out);
 }
 void gai_error(Attachment &c, Handle type, int code, ReturnSlot &out)
 {
@@ -145,7 +141,7 @@ void hostname(Attachment &c, Handle, std::span<const Value>, ReturnSlot &out)
         error = rc < 0 ? errno : 0;
     }
     if (error)
-        os_error(c, error, out);
+        raise_os_error(c, error, out);
     else
         make_str(c, decode_filename(SourceBuffer("", name)), out);
 }
@@ -281,7 +277,7 @@ void socket_address_value(Attachment &c, const sockaddr *address, socklen_t size
         scope = v6->sin6_scope_id;
     }
     if (!inet_ntop(address->sa_family, src, host, sizeof(host))) {
-        os_error(c, errno, out);
+        raise_os_error(c, errno, out);
         return;
     }
     ReturnSlot text(c), p(c), f(c), s(c);
@@ -329,7 +325,7 @@ void inet_ntoa_entry(Attachment &c, Handle, std::span<const Value> a, ReturnSlot
     std::memcpy(&address, data.data(), sizeof(address));
     char text[INET_ADDRSTRLEN];
     if (!::inet_ntop(AF_INET, &address, text, sizeof(text))) {
-        os_error(c, errno, out);
+        raise_os_error(c, errno, out);
         return;
     }
     make_str(c, decode_filename(SourceBuffer("", text)), out);
@@ -343,7 +339,7 @@ void inet_pton_entry(Attachment &c, Handle, std::span<const Value> a, ReturnSlot
     unsigned char bytes[sizeof(in6_addr)]{};
     int rc = ::inet_pton(static_cast<int>(family), text.c_str(), bytes);
     if (rc < 0) {
-        os_error(c, errno, out);
+        raise_os_error(c, errno, out);
         return;
     }
     if (!rc) {
@@ -360,7 +356,9 @@ void inet_ntop_entry(Attachment &c, Handle, std::span<const Value> a, ReturnSlot
     if (!native_int(c, a[0], family, out))
         return;
     if (family != AF_INET && family != AF_INET6) {
-        os_error(c, EAFNOSUPPORT, out);
+        const auto number = std::to_string(family);
+        raise_error(c, CoreObject::ValueErrorType,
+                    U"unknown address family " + std::u32string(number.begin(), number.end()), out);
         return;
     }
     std::string data;
@@ -376,7 +374,7 @@ void inet_ntop_entry(Attachment &c, Handle, std::span<const Value> a, ReturnSlot
     }
     char text[INET6_ADDRSTRLEN];
     if (!::inet_ntop(static_cast<int>(family), data.data(), text, sizeof(text))) {
-        os_error(c, errno, out);
+        raise_os_error(c, errno, out);
         return;
     }
     make_str(c, decode_filename(SourceBuffer("", text)), out);
@@ -526,7 +524,7 @@ void gethostbyname_entry(Attachment &c, Handle function, std::span<const Value> 
     auto address = reinterpret_cast<sockaddr_in *>(result->ai_addr)->sin_addr;
     ::freeaddrinfo(result);
     if (!::inet_ntop(AF_INET, &address, text, sizeof(text))) {
-        os_error(c, errno, out);
+        raise_os_error(c, errno, out);
         return;
     }
     make_str(c, decode_filename(SourceBuffer("", text)), out);

@@ -121,6 +121,7 @@ struct AllocationSpan;
 // over-aligned payloads. Span domain/layout never change after creation.
 struct Allocation {
     explicit Allocation(AllocationSpan *span) : span(span) {}
+    void require_owner(const State *) const;
     Allocation *next = nullptr; // Free list or STW mark worklist.
     std::atomic<std::size_t> external_bytes{0};
     AllocationSpan *const span;
@@ -212,6 +213,13 @@ struct AllocationSpan {
     std::size_t bucket_index;
     AllocationSpan *available_next = nullptr;
 };
+void Allocation::require_owner(const State *owner) const
+{
+    if (span->owner != owner)
+        throw std::logic_error("value does not belong to this interpreter");
+    if (!live)
+        throw std::logic_error("value is not a published allocation");
+}
 struct ThreadRecord {
     struct SpanBucket {
         LayoutDescriptor layout;
@@ -948,17 +956,24 @@ void Attachment::leave_repr(Value object) noexcept
 void Attachment::require_owns(Value value) const
 {
     require_attached();
-    const auto &allocation = detail::Allocation::from(value.object());
-    if (allocation.span->owner != state_.get())
-        throw std::logic_error("value does not belong to this interpreter");
-    if (!allocation.live)
-        throw std::logic_error("value is not a published allocation");
+    detail::Allocation::from(value.object()).require_owner(state_.get());
 }
 
 void Attachment::require_layout(Value value, const void *family) const
 {
     if (allocation_layout(value).native_family != family)
         throw std::logic_error("object has incompatible native layout");
+}
+Value Attachment::require_layout(Handle handle, const void *family) const
+{
+    // get() validates attachment, arena and generation. Keep the object domain
+    // and live/layout checks, without repeating the same thread admission test.
+    const auto value = handle.get(*this);
+    const auto &allocation = detail::Allocation::from(value.object());
+    allocation.require_owner(state_.get());
+    if (allocation.span->layout.native_family != family)
+        throw std::logic_error("object has incompatible native layout");
+    return value;
 }
 bool Attachment::has_native_layout(Value value, const void *family) const
 {
@@ -996,6 +1011,15 @@ Handle Attachment::acquire(const void *scope)
 {
     require_safepoint();
     return acquire_cell(scope);
+}
+Handle Attachment::acquire(const void *scope, Value value)
+{
+    require_safepoint();
+    detail::Allocation::from(value.object()).require_owner(state_.get());
+    auto handle = acquire_cell(scope);
+    handle.cell_->object = value.object();
+    handle.cell_->tag = ResultTag::Ok;
+    return handle;
 }
 Handle Attachment::acquire_cell(const void *scope)
 {
@@ -1058,11 +1082,8 @@ RootScope::~RootScope()
 
 Handle RootScope::root(Value value)
 {
-    context_.require_owns(value);
-    auto handle = context_.acquire(this);
+    auto handle = context_.acquire(this, value);
     auto &cell = *handle.cell_;
-    cell.object = value.object();
-    cell.tag = ResultTag::Ok;
     cell.next = head_;
     head_ = &cell;
     return handle;

@@ -266,6 +266,12 @@ Per-thread full-layout buckets and available-span chains avoid the former scan
 of every span on layout switches. A small exact-match hint cache accelerates hot
 layout pairs; STW rebuild/pruning performs no allocation and retains the existing
 empty-span release policy. The buckets own native cursor metadata, not Python roots.
+Root creation and Handle payload access validate thread admission once per
+compound operation. Object domain/live state and native layout remain checked;
+Handle access also checks arena, scope, generation and nonempty state before
+reading the object. NativeWait still prohibits heap access and NoSafepoint still
+prohibits growing roots. This does not add unchecked payload access or a TLS
+attachment cache.
 Weak targets and intrusive callback/finalizer batches are classified during STW;
 Python runs only after attachments resume. Pending and running batches retain
 their complete strong graphs, and a second mark checks resurrection. Immutable
@@ -277,7 +283,12 @@ so a dead weakref cannot remove a concurrently replaced entry. Lib/weakref.py an
 Lib/_weakrefset.py retain complete upstream mapping/set, WeakMethod and finalize
 policy; weak-target clearing remains tied to this tracing collector, not RC timing.
 `Python/errors.cpp` owns exception/unraisable hook dispatch, including callbacks
-from GC and generator close. `Modules/gcmodule.cpp` exposes collector controls.
+from GC and generator close. Its shared raise_os_error helper roots optional
+filenames and calls the canonical OSError constructor for errno subclass dispatch;
+POSIX, I/O, time, signal, select, socket and readline use the same boundary.
+Caller-specific validation and resolver-specific gaierror/herror remain local.
+The narrow internal/errors.hpp does not expose I/O or object layout definitions.
+`Modules/gcmodule.cpp` exposes collector controls.
 `Objects/exceptions.cpp` owns errno-based OSError construction and traced native
 error fields, including characters_written. BaseException has an ordinary traced
 instance dictionary; add_note uses rooted reads and conditional first-list

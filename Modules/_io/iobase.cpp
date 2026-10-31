@@ -3,11 +3,8 @@
 
 #include "cxxpython/bytearrayobject.hpp"
 #include "cxxpython/protocol.hpp"
-#include "internal/compiler.hpp"
 
 #include <algorithm>
-#include <cerrno>
-#include <cstring>
 
 namespace cxxpython::core::detail {
 bool io_index(Attachment &c, Handle value, std::int64_t &number, ReturnSlot &out)
@@ -45,20 +42,6 @@ void io_closed_error(Attachment &c, ReturnSlot &out)
 void io_unsupported(Attachment &c, std::u32string message, ReturnSlot &out)
 {
     raise_error(c, CoreObject::UnsupportedOperationType, std::move(message), out);
-}
-void io_os_error(Attachment &c, int error, ReturnSlot &out, std::optional<Value> filename)
-{
-    RootScope roots(c);
-    if (filename)
-        roots.root(*filename);
-    ReturnSlot code(c), message(c), exception(c);
-    make_int(c, error, code);
-    make_str(c, decode_filename(SourceBuffer("", std::strerror(error))), message);
-    std::vector<Value> args{code.value(), message.value()};
-    if (filename)
-        args.push_back(*filename);
-    call(c, roots.root(c.builtin(CoreObject::OSErrorType)), {args, {}}, exception);
-    out.raised(exception.tag() == ResultTag::Raised ? exception.exception() : exception.value());
 }
 namespace {
 bool receiver(Attachment &c, Value self, ReturnSlot &out)

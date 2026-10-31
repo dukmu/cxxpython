@@ -4,7 +4,7 @@
 
 #include "cxxpython/moduleobject.hpp"
 #include "cxxpython/protocol.hpp"
-#include "internal/iomodule.hpp"
+#include "internal/errors.hpp"
 #include "internal/pytime.hpp"
 #include "internal/signalmodule.hpp"
 
@@ -151,7 +151,7 @@ void select_entry(Attachment &c, Handle, std::span<const Value> args, ReturnSlot
         if (!error)
             break;
         if (error != EINTR) {
-            io_os_error(c, error, out);
+            raise_os_error(c, error, out);
             return;
         }
         if (check_signals(c, out))

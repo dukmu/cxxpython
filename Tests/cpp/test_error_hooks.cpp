@@ -6,6 +6,7 @@
 
 #include <gtest/gtest.h>
 
+#include <cerrno>
 #include <limits>
 #include <new>
 
@@ -81,6 +82,21 @@ class ErrorHooks : public testing::Test {
         return roots.root(out.exception());
     }
 };
+
+TEST_F(ErrorHooks, SharedOsErrorRootsAnIndependentSecondFilenameDuringCollection)
+{
+    auto target = text(U"target");
+    ReturnSlot out(ctx);
+    raise_os_error(ctx, ENOENT, out, {}, target.get(ctx));
+    ASSERT_EQ(out.tag(), ResultTag::Raised);
+    auto error = roots.root(out.exception());
+    EXPECT_EQ(ctx.type_of(error), ctx.builtin(CoreObject::FileNotFoundErrorType));
+    EXPECT_EQ(get(error, U"filename").get(ctx), ctx.builtin(CoreObject::None));
+    EXPECT_EQ(get(error, U"filename2").get(ctx), ctx.builtin(CoreObject::None));
+    const auto &args = ctx.payload<TupleObject>(get(error, U"args")).items;
+    ASSERT_EQ(args.size(), 5U);
+    EXPECT_EQ(args[4], target.get(ctx));
+}
 
 TEST_F(ErrorHooks, UnraisableDoesNotEscapeWhenManagedAllocationIsExhausted)
 {

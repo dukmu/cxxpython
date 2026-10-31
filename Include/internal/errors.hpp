@@ -1,12 +1,19 @@
 #pragma once
 
-#include "cxxpython/objects.hpp"
+#include "cxxpython/runtime.hpp"
 
 #include <optional>
+#include <string>
+
+namespace cxxpython::core {
+struct TupleObject;
+}
 
 namespace cxxpython::core::detail {
 // Native layout is exactly tuple; item order is the CPython struct-sequence order.
 using UnraisableHookArgs = TupleObject;
+void raise_os_error(Attachment &, int, ReturnSlot &, std::optional<Value> filename = {},
+                    std::optional<Value> filename2 = {});
 std::u32string diagnostic_type_name(Attachment &, Handle type);
 
 void write_unraisable(Attachment &ctx, Handle exception, std::optional<Handle> object,

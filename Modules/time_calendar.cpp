@@ -10,7 +10,6 @@
 #include "internal/codecs.hpp"
 #include "internal/compiler.hpp"
 #include "internal/errors.hpp"
-#include "internal/iomodule.hpp"
 #include "internal/posixmodule.hpp"
 
 #include <algorithm>
@@ -99,7 +98,7 @@ bool native_time(Attachment &c, time_t seconds, bool utc, NativeTime &result, Re
     }
     if (!error)
         return true;
-    io_os_error(c, error, out);
+    raise_os_error(c, error, out);
     return false;
 }
 template <std::size_t I> void record_field(Attachment &c, Value self, ReturnSlot &out)
@@ -519,7 +518,7 @@ void timezone_fields(Attachment &c, Handle module, ReturnSlot &out)
         }
     }
     if (error) {
-        io_os_error(c, error, out);
+        raise_os_error(c, error, out);
         return;
     }
     if (offsets[0] < offsets[1]) {

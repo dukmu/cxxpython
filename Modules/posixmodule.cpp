@@ -7,6 +7,7 @@
 #include "cxxpython/import.hpp"
 #include "cxxpython/protocol.hpp"
 #include "internal/compiler.hpp"
+#include "internal/errors.hpp"
 #include "internal/long.hpp"
 #include "internal/signalmodule.hpp"
 
@@ -33,31 +34,6 @@ namespace {
 bool failed(ReturnSlot &out)
 {
     return out.tag() == ResultTag::Raised;
-}
-
-void os_error(Attachment &c, int error, ReturnSlot &out, std::optional<Value> filename = {},
-              std::optional<Value> filename2 = {})
-{
-    RootScope roots(c);
-    if (filename)
-        roots.root(*filename);
-    if (filename2)
-        roots.root(*filename2);
-    ReturnSlot number(c), message(c), exception(c);
-    make_int(c, error, number);
-    make_str(c, decode_filename(SourceBuffer("", std::strerror(error))), message);
-    std::vector<Value> values{number.value(), message.value()};
-    if (filename)
-        values.push_back(*filename);
-    if (filename2) {
-        values.push_back(c.builtin(CoreObject::None));
-        values.push_back(*filename2);
-    }
-    call(c, roots.root(c.builtin(CoreObject::OSErrorType)), {values, {}}, exception);
-    if (failed(exception))
-        out.raised(exception.exception());
-    else
-        out.raised(exception.value());
 }
 
 bool integer(Attachment &c, Value value, std::int64_t &number, ReturnSlot &out)
@@ -117,7 +93,7 @@ void inheritable_entry(Attachment &c, Handle, std::span<const Value> args, Retur
         }
     }
     if (error) {
-        os_error(c, error, out);
+        raise_os_error(c, error, out);
         return;
     }
     if constexpr (Set)
@@ -152,7 +128,7 @@ void urandom_entry(Attachment &c, Handle, std::span<const Value> args, ReturnSlo
             if (check_signals(c, out))
                 return;
         } else {
-            os_error(c, error ? error : EIO, out);
+            raise_os_error(c, error ? error : EIO, out);
             return;
         }
     }
@@ -221,7 +197,7 @@ void get_terminal_size(Attachment &c, Handle function, std::span<const Value> ar
         return;
     winsize size{};
     if (ioctl(fd, TIOCGWINSZ, &size) != 0) {
-        os_error(c, errno, out);
+        raise_os_error(c, errno, out);
         return;
     }
     RootScope roots(c);
@@ -451,17 +427,17 @@ template <Op op> void entry(Attachment &c, Handle, std::span<const Value> a, Ret
     }
     if (error) {
         if constexpr (op == Op::Rename || op == Op::Symlink)
-            os_error(c, error, out, filename.value(), filename2.value());
+            raise_os_error(c, error, out, filename.value(), filename2.value());
         else if constexpr (op == Op::Chdir) {
             if (chdir_fd)
-                os_error(c, error, out);
+                raise_os_error(c, error, out);
             else
-                os_error(c, error, out, filename.value());
+                raise_os_error(c, error, out, filename.value());
         } else if constexpr (op == Op::Open || op == Op::Mkdir || op == Op::Rmdir ||
                              op == Op::Unlink)
-            os_error(c, error, out, filename.value());
+            raise_os_error(c, error, out, filename.value());
         else
-            os_error(c, error, out);
+            raise_os_error(c, error, out);
         return;
     }
     if constexpr (op == Op::Read) {
@@ -523,7 +499,7 @@ void cwd(Attachment &c, Handle function, std::span<const Value>, ReturnSlot &out
         }
     }
     if (error)
-        os_error(c, error, out);
+        raise_os_error(c, error, out);
     else if (bytes)
         make_bytes(c, std::move(result), out);
     else
@@ -566,8 +542,9 @@ void listdir(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
         }
     }
     if (error) {
-        os_error(c, error, out,
-                 a[0] == c.builtin(CoreObject::None) ? std::optional<Value>{} : converted.value());
+        raise_os_error(c, error, out,
+                       a[0] == c.builtin(CoreObject::None) ? std::optional<Value>{}
+                                                           : converted.value());
         return;
     }
     std::vector<Value> items;
@@ -612,7 +589,7 @@ void readlink_entry(Attachment &c, Handle, std::span<const Value> a, ReturnSlot 
         }
     }
     if (error)
-        os_error(c, error, out, converted.value());
+        raise_os_error(c, error, out, converted.value());
     else if (bytes)
         make_bytes(c, std::move(result), out);
     else
@@ -646,7 +623,7 @@ void environment_change(Attachment &c, Handle, std::span<const Value> a, ReturnS
             error = errno;
     }
     if (error)
-        os_error(c, error, out);
+        raise_os_error(c, error, out);
     else
         out.ok(c.builtin(CoreObject::None));
 }
@@ -821,7 +798,7 @@ void stat_entry(Attachment &c, Handle function, std::span<const Value> a, Return
             error = errno;
     }
     if (error) {
-        os_error(c, error, out, by_fd ? std::optional<Value>{} : filename.value());
+        raise_os_error(c, error, out, by_fd ? std::optional<Value>{} : filename.value());
         return;
     }
     make_stat_result(c, type, st, out);
@@ -1031,9 +1008,9 @@ void scan_entry(Attachment &c, Handle function, std::span<const Value> args, Ret
             snapshot.storage_bytes += name.name.capacity() + 1;
     }
     if (error) {
-        os_error(c, error, out,
-                 args[0] == c.builtin(CoreObject::None) ? std::optional<Value>{}
-                                                        : converted.value());
+        raise_os_error(c, error, out,
+                       args[0] == c.builtin(CoreObject::None) ? std::optional<Value>{}
+                                                              : converted.value());
         return;
     }
     const auto &types = c.payload<NativeFunctionObject>(function).captures;
@@ -1100,7 +1077,7 @@ void entry_stat(Attachment &c, Handle object, bool follow, ReturnSlot &out)
                 error = errno;
         }
         if (error) {
-            os_error(c, error, out, self.path);
+            raise_os_error(c, error, out, self.path);
             return;
         }
         make_stat_result(c, roots.root(self.stat_type), status, out);

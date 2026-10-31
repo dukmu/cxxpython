@@ -581,8 +581,7 @@ class Attachment final {
 
     template <class T> T &payload(Handle object)
     {
-        Value value = object.get(*this);
-        require_layout(value, &detail::native_layout_id<T>);
+        Value value = require_layout(object, &detail::native_layout_id<T>);
         return *reinterpret_cast<T *>(value.object());
     }
     template <class T> T &payload(Value object)
@@ -695,12 +694,14 @@ class Attachment final {
     void enter_native_wait();
     void leave_native_wait();
     void require_layout(Value value, const void *family) const;
+    Value require_layout(Handle value, const void *family) const;
     const LayoutDescriptor &allocation_layout(Value value) const;
     bool has_native_layout(Value value, const void *family) const;
     LayoutDescriptor require_instance_layout(Handle type, const LayoutDescriptor &layout);
     void require_edge(Value owner, const void *edge, std::size_t bytes) const;
     detail::RootCell &cell(Handle handle) const;
     Handle acquire(const void *scope);
+    Handle acquire(const void *scope, Value value);
     Handle acquire_cell(const void *scope);
     void release(detail::RootCell &cell) noexcept;
     void prepare_allocation(ReturnSlot &out, std::size_t bytes);

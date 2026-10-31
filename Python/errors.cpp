@@ -2,17 +2,52 @@
 // PSF license: doc/licenses/python-3.12.14.txt.
 #include "internal/errors.hpp"
 
+#include "cxxpython/objects.hpp"
 #include "cxxpython/protocol.hpp"
+#include "internal/compiler.hpp"
 #include "internal/pythonrun.hpp"
 #include "internal/sysmodule.hpp"
 
 #include <array>
 #include <cstdio>
+#include <cstring>
 #include <new>
 #include <unordered_set>
 #include <vector>
 
 namespace cxxpython::core::detail {
+void raise_os_error(Attachment &c, int error, ReturnSlot &out, std::optional<Value> filename,
+                    std::optional<Value> filename2)
+{
+    RootScope roots(c);
+    if (filename)
+        roots.root(*filename);
+    if (filename2)
+        roots.root(*filename2);
+    ReturnSlot number(c), message(c), exception(c);
+    make_int(c, error, number);
+    if (number.tag() == ResultTag::Raised) {
+        out.raised(number.exception());
+        return;
+    }
+    make_str(c, decode_filename(SourceBuffer("", std::strerror(error))), message);
+    if (message.tag() == ResultTag::Raised) {
+        out.raised(message.exception());
+        return;
+    }
+    std::vector<Value> values{number.value(), message.value()};
+    if (filename)
+        values.push_back(*filename);
+    else if (filename2)
+        values.push_back(c.builtin(CoreObject::None));
+    if (filename2) {
+        values.push_back(c.builtin(CoreObject::None));
+        values.push_back(*filename2);
+    }
+    call(c, roots.root(c.builtin(CoreObject::OSErrorType)), {values, {}}, exception);
+    out.raised(exception.tag() == ResultTag::Raised ? exception.exception() : exception.value());
+}
+
 std::u32string diagnostic_type_name(Attachment &ctx, Handle type)
 {
     TypeView view(ctx, type);

@@ -1,5 +1,6 @@
 // FileIO contracts follow CPython 3.12.14 Modules/_io/fileio.c (PSF license).
 #include "internal/fileio.hpp"
+#include "internal/errors.hpp"
 #include "internal/iomodule.hpp"
 
 #include "cxxpython/memoryobject.hpp"
@@ -114,7 +115,7 @@ void initialize(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out
     auto &s = *c.payload<FileIOObject>(self).state;
     int error = replace(c, s, -1);
     if (error) {
-        io_os_error(c, error, out);
+        raise_os_error(c, error, out);
         return;
     }
     if (!c.has_layout<StrObject>(a[2])) {
@@ -229,7 +230,7 @@ void initialize(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out
             error = errno;
     }
     if (error) {
-        io_os_error(c, error, out, name.value());
+        raise_os_error(c, error, out, name.value());
         return;
     }
     ReturnSlot key(c);
@@ -242,7 +243,7 @@ void initialize(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out
                     selected == 'x');
     opened.fd = -1;
     if (error)
-        io_os_error(c, error, out);
+        raise_os_error(c, error, out);
     else
         out.ok(c.builtin(CoreObject::None));
 }
@@ -272,7 +273,7 @@ void close(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
     }
     const int error = replace(c, *c.payload<FileIOObject>(self).state, -1);
     if (error)
-        io_os_error(c, error, out);
+        raise_os_error(c, error, out);
     else if (flushed.tag() == ResultTag::Raised)
         out.raised(flushed.exception());
     else
@@ -309,7 +310,7 @@ template <Method M> void method(Attachment &c, Handle, std::span<const Value> a,
             out))
         return;
     if (error)
-        io_os_error(c, error, out);
+        raise_os_error(c, error, out);
     else if constexpr (M == Method::Fileno || M == Method::Tell)
         make_int(c, result, out);
     else
@@ -359,7 +360,7 @@ template <bool Truncate> void seek(Attachment &c, Handle, std::span<const Value>
             out))
         return;
     if (error)
-        io_os_error(c, error, out);
+        raise_os_error(c, error, out);
     else
         make_int(c, result, out);
 }
@@ -410,7 +411,7 @@ template <bool All> void read(Attachment &c, Handle, std::span<const Value> a, R
     if ((error == EAGAIN || error == EWOULDBLOCK) && data.empty())
         out.ok(c.builtin(CoreObject::None));
     else if (error && error != EAGAIN && error != EWOULDBLOCK)
-        io_os_error(c, error, out);
+        raise_os_error(c, error, out);
     else
         make_bytes(c, std::move(data), out);
 }
@@ -456,7 +457,7 @@ void write(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
     if (error == EAGAIN || error == EWOULDBLOCK)
         out.ok(c.builtin(CoreObject::None));
     else if (error)
-        io_os_error(c, error, out);
+        raise_os_error(c, error, out);
     else
         make_int(c, n, out);
 }
@@ -488,7 +489,7 @@ void readinto(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
         return;
     }
     if (error) {
-        io_os_error(c, error, out);
+        raise_os_error(c, error, out);
         return;
     }
     data.resize(static_cast<std::size_t>(n));

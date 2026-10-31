@@ -8,7 +8,7 @@
 #include "cxxpython/moduleobject.hpp"
 #include "cxxpython/protocol.hpp"
 #include "cxxpython/type.hpp"
-#include "internal/iomodule.hpp"
+#include "internal/errors.hpp"
 #include "internal/pytime.hpp"
 
 #include <cerrno>
@@ -25,7 +25,7 @@ void clock_entry(Attachment &ctx, Handle, std::span<const Value>, ReturnSlot &ou
 {
     timespec value{};
     if (clock_gettime(Clock, &value) != 0) {
-        io_os_error(ctx, errno, out);
+        raise_os_error(ctx, errno, out);
         return;
     }
     if constexpr (Nanoseconds) {
@@ -57,7 +57,7 @@ void sleep_entry(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlo
     }
     timespec deadline{};
     if (clock_gettime(CLOCK_MONOTONIC, &deadline) != 0) {
-        io_os_error(ctx, errno, out);
+        raise_os_error(ctx, errno, out);
         return;
     }
     deadline.tv_sec += static_cast<time_t>(nanos / billion);
@@ -75,7 +75,7 @@ void sleep_entry(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlo
         if (!error)
             break;
         if (error != EINTR) {
-            io_os_error(ctx, error, out);
+            raise_os_error(ctx, error, out);
             return;
         }
         if (check_signals(ctx, out))
@@ -153,7 +153,7 @@ void clock_info(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot
     }
     timespec resolution{};
     if (clock_getres(clock, &resolution) != 0) {
-        io_os_error(ctx, errno, out);
+        raise_os_error(ctx, errno, out);
         return;
     }
     RootScope roots(ctx);

@@ -1,5 +1,64 @@
 # Development Status
 
+## 2026-10-31 Compound Root Access And Shared Native Errors
+
+Continues the active performance/cleanup goal after 86c2463; the complete
+compatibility route remains paused. Terra consolidated native errno construction;
+parent integrated the shared boundary, optimized measured root access and ran
+acceptance. The worker is closed. matrix.py remains the user's unmodified,
+untracked local reference and is excluded from the commit.
+
+- The previous CPU profile identified ownership/root admission overhead after the
+  span-index fix. RootScope now validates admission and object ownership in one
+  initialized-root acquisition. Handle payload access validates admission once,
+  then checks object domain/live state and native layout. Arena identity, active
+  scope, generation, nonempty root, foreign-object rejection, NativeWait and
+  NoSafepoint restrictions are retained. There is no unchecked payload API, TLS
+  attachment cache, GIL, reference counting or benchmark-specific arithmetic.
+- Python/errors.cpp now owns raise_os_error. Removed three duplicated error
+  constructors and the misleading io_os_error dependency from POSIX, socket,
+  select, signal, time and readline callers. Filename roots, errno subclass
+  dispatch and caller-specific parameter/resolver exceptions remain explicit.
+  errors.hpp no longer imports object layouts. The existing errno-message
+  decoding is preserved; complete locale/error-text portability remains a gate.
+- Added a direct Python errno fixture for str/bytes paths, both filenames,
+  collecting __fspath__, FileIO, closed descriptors, socket/select and signal.
+  It passes the fixed CPython 3.12.14 reference. The fixture exposed the existing
+  inet_ntop invalid-family OSError mismatch, now fixed to the reference ValueError
+  and message. A native collecting test checks the helper's independent second
+  filename. Its initial filename2 expectation was wrong: with filename=None,
+  CPython retains the second value in args but leaves filename2=None. The test
+  was corrected to that actual behavior, not by changing the runtime semantics.
+- Release passes 151 selected root/epoch/thread/shared-VM/call/attribute/layout/
+  module/I/O/error and bootstrap/promotion contracts. Two promotion shards hit
+  the existing 15-second limit during overlapping compiler/test load; both pass
+  individually without changing that limit. The initial failures and successful
+  targeted rechecks are retained. ASan/UBSan/LSan and TSan each pass the 135
+  affected native contracts excluding the expensive bootstrap shards. Twelve
+  focused Python scenarios pass on all three builds. Strict Clang 21.1.8 is used;
+  formatting and generated grammar/ASDL consistency pass. Logs are retained as
+  .cache/root-access-*; failed runs are not counted as passing evidence.
+- After all builds and tests stopped, captured N=64 at workers 1-4 with three
+  repetitions. Existing baselines were reused, not rerun. Median wall time moves
+  from 1617.543 to 1309.610 ms at one worker and 556.890 to 492.572 ms at four;
+  the two-worker median is essentially unchanged. Tools/benchmarks/record.py
+  appends raw runs and regenerates CSV/Markdown in doc/benchmarks/matrix-span-cache/.
+  No benchmark rows or derived speedups are hand-written. Absolute CPython
+  performance remains far ahead; this is not completion of the active goal.
+- Added the previously unmeasured N=128 point with the same worker/repetition
+  settings and a new fixed-reference capture. One-worker median is 10418.253 ms
+  and four-worker median 4321.162 ms; CPython is 170.347 and 160.238 ms respectively.
+  Doubling N grows single-worker wall time approximately with the cubic work in
+  this sample, not exponentially. All original row-equality checks pass. These
+  captures and whole-workflow RSS are retained as .cache/matrix-*-root-fusion.*
+  and .cache/matrix-cpython-n128.*. Sampling is separate from timed table runs.
+- The new N=128 single-worker CPU profile still puts object ownership, root
+  construction/release, admission and protocol dispatch ahead of arithmetic.
+  The next dependency is reducing duplicated rooting/binding work across the
+  ordinary VM/protocol/native-call boundaries, while retaining their lifetime
+  and concurrency contracts, rather than more library expansion or benchmark
+  special cases. Profiles remain in .cache/matrix-n128-root-fusion-perf.*.
+
 ## 2026-10-31 Layout Allocation Index And First Cleanup Stable Point
 
 Prepended after the pushed network node 11a3ae2. At the user's direction the
