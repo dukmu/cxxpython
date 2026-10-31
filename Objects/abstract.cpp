@@ -1,5 +1,5 @@
+#include "internal/abstract.hpp"
 #include "cxxpython/genericaliasobject.hpp"
-#include "cxxpython/protocol.hpp"
 #include "internal/errors.hpp"
 
 namespace cxxpython::core {
@@ -166,13 +166,13 @@ bool reflected_override(Attachment &context, Handle left_type, Handle right_type
         return out.tag() != ResultTag::Raised;
     if (left->get(context) == right->get(context))
         return false;
-    rich_compare(context, *left, *right, CompareOp::Ne, result);
+    detail::rich_compare_owned(context, *left, *right, CompareOp::Ne, result);
     if (raised(result)) {
         out.raised(result.exception());
         return false;
     }
     ReturnSlot converted(context);
-    truth(context, roots.root(result.value()), converted);
+    detail::truth_owned(context, roots.root(result.value()), converted);
     if (raised(converted)) {
         out.raised(converted.exception());
         return false;
@@ -239,7 +239,7 @@ void object_ne(Attachment &context, Handle, std::span<const Value> args, ReturnS
         return;
     }
     ReturnSlot converted(context);
-    truth(context, roots.root(equal.value()), converted);
+    detail::truth_owned(context, roots.root(equal.value()), converted);
     if (raised(converted))
         out.raised(converted.exception());
     else
@@ -337,65 +337,73 @@ ResolvedSlot detail::resolve_protocol(Attachment &context, Value value, Protocol
         std::this_thread::yield();
     }
 }
+void detail::index_owned(Attachment &context, Handle self, ReturnSlot &out)
+{
+    RootScope roots(context);
+    out.reset(context);
+    if (is_int(context, self.get(context))) {
+        copy_int(context, self.get(context), out);
+        return;
+    }
+    auto slot = resolve(context, self, Protocol::Index, roots);
+    if (slot.state == SlotState::Missing || slot.state == SlotState::Disabled) {
+        const auto text = detail::diagnostic_type_name(context, roots.root(context.type_of(self)));
+        type_error(context, U"'" + text + U"' object cannot be interpreted as an integer", out);
+        return;
+    }
+    ReturnSlot result(context);
+    detail::invoke_protocol(context, self, slot, {}, result, roots);
+    if (raised(result)) {
+        out.raised(result.exception());
+        return;
+    }
+    if (!is_int(context, result.value())) {
+        type_error(
+            context,
+            U"__index__ returned non-int (type " +
+                detail::diagnostic_type_name(context, roots.root(context.type_of(result.value()))) +
+                U")",
+            out);
+        return;
+    }
+    copy_int(context, result.value(), out);
+}
 ResultView index(Attachment &context, Handle value, ReturnSlot &out)
 {
     return guarded(context, out, [&] {
         RootScope roots(context);
         auto self = roots.root(value.get(context));
-        out.reset(context);
-        if (is_int(context, self.get(context))) {
-            copy_int(context, self.get(context), out);
-            return;
-        }
-        auto slot = resolve(context, self, Protocol::Index, roots);
-        if (slot.state == SlotState::Missing || slot.state == SlotState::Disabled) {
-            const auto text =
-                detail::diagnostic_type_name(context, roots.root(context.type_of(self)));
-            type_error(context, U"'" + text + U"' object cannot be interpreted as an integer", out);
-            return;
-        }
-        ReturnSlot result(context);
-        detail::invoke_protocol(context, self, slot, {}, result, roots);
-        if (raised(result)) {
-            out.raised(result.exception());
-            return;
-        }
-        if (!is_int(context, result.value())) {
-            type_error(context,
-                       U"__index__ returned non-int (type " +
-                           detail::diagnostic_type_name(
-                               context, roots.root(context.type_of(result.value()))) +
-                           U")",
-                       out);
-            return;
-        }
-        copy_int(context, result.value(), out);
+        detail::index_owned(context, self, out);
     });
+}
+std::optional<std::int64_t> detail::hash_word(Attachment &context, Handle self, ReturnSlot &out)
+{
+    RootScope roots(context);
+    out.reset(context);
+    auto slot = resolve(context, self, Protocol::Hash, roots);
+    detail::invoke_protocol(context, self, slot, {}, out, roots);
+    if (raised(out))
+        return {};
+    const auto integer = out.value();
+    if (!is_int(context, integer)) {
+        type_error(context, U"__hash__ returned a non-int", out);
+        return {};
+    }
+    std::int64_t word;
+    if (!int_fits_signed(context, integer, word) ||
+        word < std::numeric_limits<std::intptr_t>::min() ||
+        word > std::numeric_limits<std::intptr_t>::max())
+        word = detail::int_hash_value(context, integer);
+    out.reset(context);
+    return word == -1 ? -2 : word;
 }
 ResultView hash(Attachment &context, Handle value, ReturnSlot &out)
 {
     return guarded(context, out, [&] {
         RootScope roots(context);
-        auto self = roots.root(value.get(context));
-        out.reset(context);
-        auto slot = resolve(context, self, Protocol::Hash, roots);
-        ReturnSlot result(context);
-        detail::invoke_protocol(context, self, slot, {}, result, roots);
-        if (raised(result)) {
-            out.raised(result.exception());
-            return;
-        }
-        const auto integer = result.value();
-        if (!is_int(context, integer)) {
-            type_error(context, U"__hash__ returned a non-int", out);
-            return;
-        }
-        std::int64_t word;
-        if (!int_fits_signed(context, integer, word) ||
-            word < std::numeric_limits<std::intptr_t>::min() ||
-            word > std::numeric_limits<std::intptr_t>::max())
-            word = detail::int_hash_value(context, integer);
-        make_int(context, word == -1 ? -2 : word, out);
+        const auto self = roots.root(value.get(context));
+        if (const auto word = detail::hash_word(context, self, out))
+            make_int(context, *word, out);
     });
 }
 namespace {
@@ -434,81 +442,91 @@ ResultView str(Attachment &context, Handle value, ReturnSlot &out)
 {
     return string_operation(context, value, Protocol::Str, out);
 }
+namespace {
+void length_from_slot(Attachment &context, Handle self, const ResolvedSlot &slot, ReturnSlot &out,
+                      RootScope &roots)
+{
+    if (slot.state == SlotState::Missing) {
+        auto name = TypeView(context, context.type_of(self)).name();
+        auto text = std::holds_alternative<Value>(name)
+                        ? context.payload<StrObject>(std::get<Value>(name)).value
+                        : std::get<std::u32string>(name);
+        type_error(context, U"object of type '" + text + U"' has no len()", out);
+        return;
+    }
+    ReturnSlot result(context);
+    detail::invoke_protocol(context, self, slot, {}, result, roots);
+    if (raised(result)) {
+        out.raised(result.exception());
+        return;
+    }
+    ReturnSlot converted(context);
+    detail::index_owned(context, roots.root(result.value()), converted);
+    if (raised(converted)) {
+        out.raised(converted.exception());
+        return;
+    }
+    auto integer = converted.value();
+    if (int_sign(context, integer) < 0) {
+        raise_error(context, CoreObject::ValueErrorType, U"__len__ returned a negative value", out);
+        return;
+    }
+    std::int64_t size;
+    if (!int_fits_signed(context, integer, size) ||
+        size > std::numeric_limits<std::intptr_t>::max()) {
+        raise_error(context, CoreObject::OverflowErrorType, U"length does not fit Py_ssize_t", out);
+        return;
+    }
+    out.ok(integer);
+}
+} // namespace
 ResultView length(Attachment &context, Handle value, ReturnSlot &out)
 {
     return guarded(context, out, [&] {
         RootScope roots(context);
-        auto self = roots.root(value.get(context));
+        const auto self = roots.root(value.get(context));
         out.reset(context);
-        auto slot = resolve(context, self, Protocol::Len, roots);
-        if (slot.state == SlotState::Missing) {
-            auto name = TypeView(context, context.type_of(self)).name();
-            auto text = std::holds_alternative<Value>(name)
-                            ? context.payload<StrObject>(std::get<Value>(name)).value
-                            : std::get<std::u32string>(name);
-            type_error(context, U"object of type '" + text + U"' has no len()", out);
-            return;
-        }
-        ReturnSlot result(context);
+        const auto slot = resolve(context, self, Protocol::Len, roots);
+        length_from_slot(context, self, slot, out, roots);
+    });
+}
+void detail::truth_owned(Attachment &context, Handle self, ReturnSlot &out)
+{
+    RootScope roots(context);
+    out.reset(context);
+    auto slot = resolve(context, self, Protocol::Bool, roots);
+    ReturnSlot result(context);
+    if (slot.state != SlotState::Missing) {
         detail::invoke_protocol(context, self, slot, {}, result, roots);
         if (raised(result)) {
             out.raised(result.exception());
             return;
         }
-        ReturnSlot converted(context);
-        index(context, roots.root(result.value()), converted);
-        if (raised(converted)) {
-            out.raised(converted.exception());
+        auto boolean_value = result.value();
+        if (context.type_of(boolean_value) != context.builtin(CoreObject::BoolType)) {
+            type_error(context, U"__bool__ returned a non-bool", out);
             return;
         }
-        auto integer = converted.value();
-        if (int_sign(context, integer) < 0) {
-            raise_error(context, CoreObject::ValueErrorType, U"__len__ returned a negative value",
-                        out);
-            return;
-        }
-        std::int64_t size;
-        if (!int_fits_signed(context, integer, size) ||
-            size > std::numeric_limits<std::intptr_t>::max()) {
-            raise_error(context, CoreObject::OverflowErrorType, U"length does not fit Py_ssize_t",
-                        out);
-            return;
-        }
-        out.ok(integer);
-    });
+        out.ok(boolean_value);
+        return;
+    }
+    auto len = resolve(context, self, Protocol::Len, roots);
+    if (len.state == SlotState::Missing) {
+        boolean(context, true, out);
+        return;
+    }
+    length_from_slot(context, self, len, result, roots);
+    if (raised(result))
+        out.raised(result.exception());
+    else
+        boolean(context, int_sign(context, result.value()) != 0, out);
 }
 ResultView truth(Attachment &context, Handle value, ReturnSlot &out)
 {
     return guarded(context, out, [&] {
         RootScope roots(context);
-        auto self = roots.root(value.get(context));
-        out.reset(context);
-        auto slot = resolve(context, self, Protocol::Bool, roots);
-        ReturnSlot result(context);
-        if (slot.state != SlotState::Missing) {
-            detail::invoke_protocol(context, self, slot, {}, result, roots);
-            if (raised(result)) {
-                out.raised(result.exception());
-                return;
-            }
-            auto boolean_value = result.value();
-            if (context.type_of(boolean_value) != context.builtin(CoreObject::BoolType)) {
-                type_error(context, U"__bool__ returned a non-bool", out);
-                return;
-            }
-            out.ok(boolean_value);
-            return;
-        }
-        auto len = resolve(context, self, Protocol::Len, roots);
-        if (len.state == SlotState::Missing) {
-            boolean(context, true, out);
-            return;
-        }
-        length(context, self, result);
-        if (raised(result))
-            out.raised(result.exception());
-        else
-            boolean(context, int_sign(context, result.value()) != 0, out);
+        const auto self = roots.root(value.get(context));
+        detail::truth_owned(context, self, out);
     });
 }
 ResultView unary(Attachment &context, Handle value, UnaryOp op, ReturnSlot &out)
@@ -518,7 +536,7 @@ ResultView unary(Attachment &context, Handle value, UnaryOp op, ReturnSlot &out)
         const auto self = roots.root(value.get(context));
         if (op == UnaryOp::Not) {
             ReturnSlot result(context);
-            truth(context, self, result);
+            detail::truth_owned(context, self, result);
             if (raised(result))
                 out.raised(result.exception());
             else
@@ -530,6 +548,79 @@ ResultView unary(Attachment &context, Handle value, UnaryOp op, ReturnSlot &out)
         detail::invoke_protocol(context, self, slot, {}, out, roots);
     });
 }
+void detail::rich_compare_owned(Attachment &context, Handle a, Handle b, CompareOp op,
+                                ReturnSlot &out)
+{
+    RootScope roots(context);
+    out.reset(context);
+    if (op == CompareOp::Is || op == CompareOp::IsNot) {
+        boolean(context, (a.get(context) == b.get(context)) == (op == CompareOp::Is), out);
+        return;
+    }
+    if (op == CompareOp::In || op == CompareOp::NotIn) {
+        ReturnSlot result(context);
+        auto slot = resolve(context, b, Protocol::Contains, roots);
+        bool found = false;
+        if (slot.state != SlotState::Missing) {
+            std::array args{a.get(context)};
+            detail::invoke_protocol(context, b, slot, args, result, roots);
+            if (raised(result)) {
+                out.raised(result.exception());
+                return;
+            }
+            detail::truth_owned(context, roots.root(result.value()), result);
+            if (raised(result)) {
+                out.raised(result.exception());
+                return;
+            }
+            found = result.value() == context.builtin(CoreObject::True);
+        } else {
+            get_iter(context, b, result);
+            if (raised(result)) {
+                out.raised(result.exception());
+                return;
+            }
+            auto iterator = roots.root(result.value());
+            for (;;) {
+                auto status = iter_next(context, iterator, result);
+                if (status == NextStatus::Raised) {
+                    out.raised(result.exception());
+                    return;
+                }
+                if (status == NextStatus::Done)
+                    break;
+                RootScope iteration(context);
+                auto item = iteration.root(result.value());
+                detail::container_equal_owned(context, item, a, result);
+                if (raised(result)) {
+                    out.raised(result.exception());
+                    return;
+                }
+                if (result.value() == context.builtin(CoreObject::True)) {
+                    found = true;
+                    break;
+                }
+            }
+        }
+        boolean(context, found == (op == CompareOp::In), out);
+        return;
+    }
+    auto normal = comparisons.at(static_cast<std::size_t>(op));
+    auto reflected = reflected_comparisons.at(static_cast<std::size_t>(op));
+    const auto ltype = context.type_of(a);
+    const auto rtype = context.type_of(b);
+    const bool right_first = ltype != rtype && is_subtype(context, rtype, ltype);
+    if (right_first && attempt(context, b, a, reflected, out))
+        return;
+    if (attempt(context, a, b, normal, out))
+        return;
+    if (!right_first && attempt(context, b, a, reflected, out))
+        return;
+    if (op == CompareOp::Eq || op == CompareOp::Ne)
+        boolean(context, (a.get(context) == b.get(context)) == (op == CompareOp::Eq), out);
+    else
+        type_error(context, U"ordering is not supported between these objects", out);
+}
 ResultView rich_compare(Attachment &context, Handle left, Handle right, CompareOp op,
                         ReturnSlot &out)
 {
@@ -537,93 +628,31 @@ ResultView rich_compare(Attachment &context, Handle left, Handle right, CompareO
         RootScope roots(context);
         auto a = roots.root(left.get(context));
         auto b = roots.root(right.get(context));
-        out.reset(context);
-        if (op == CompareOp::Is || op == CompareOp::IsNot) {
-            boolean(context, (a.get(context) == b.get(context)) == (op == CompareOp::Is), out);
-            return;
-        }
-        if (op == CompareOp::In || op == CompareOp::NotIn) {
-            ReturnSlot result(context);
-            auto slot = resolve(context, b, Protocol::Contains, roots);
-            bool found = false;
-            if (slot.state != SlotState::Missing) {
-                std::array args{a.get(context)};
-                detail::invoke_protocol(context, b, slot, args, result, roots);
-                if (raised(result)) {
-                    out.raised(result.exception());
-                    return;
-                }
-                truth(context, roots.root(result.value()), result);
-                if (raised(result)) {
-                    out.raised(result.exception());
-                    return;
-                }
-                found = result.value() == context.builtin(CoreObject::True);
-            } else {
-                get_iter(context, b, result);
-                if (raised(result)) {
-                    out.raised(result.exception());
-                    return;
-                }
-                auto iterator = roots.root(result.value());
-                for (;;) {
-                    auto status = iter_next(context, iterator, result);
-                    if (status == NextStatus::Raised) {
-                        out.raised(result.exception());
-                        return;
-                    }
-                    if (status == NextStatus::Done)
-                        break;
-                    RootScope iteration(context);
-                    auto item = iteration.root(result.value());
-                    container_equal(context, item, a, result);
-                    if (raised(result)) {
-                        out.raised(result.exception());
-                        return;
-                    }
-                    if (result.value() == context.builtin(CoreObject::True)) {
-                        found = true;
-                        break;
-                    }
-                }
-            }
-            boolean(context, found == (op == CompareOp::In), out);
-            return;
-        }
-        auto normal = comparisons.at(static_cast<std::size_t>(op));
-        auto reflected = reflected_comparisons.at(static_cast<std::size_t>(op));
-        const auto ltype = context.type_of(a);
-        const auto rtype = context.type_of(b);
-        const bool right_first = ltype != rtype && is_subtype(context, rtype, ltype);
-        if (right_first && attempt(context, b, a, reflected, out))
-            return;
-        if (attempt(context, a, b, normal, out))
-            return;
-        if (!right_first && attempt(context, b, a, reflected, out))
-            return;
-        if (op == CompareOp::Eq || op == CompareOp::Ne)
-            boolean(context, (a.get(context) == b.get(context)) == (op == CompareOp::Eq), out);
-        else
-            type_error(context, U"ordering is not supported between these objects", out);
+        detail::rich_compare_owned(context, a, b, op, out);
     });
+}
+void detail::container_equal_owned(Attachment &context, Handle a, Handle b, ReturnSlot &out)
+{
+    RootScope roots(context);
+    out.reset(context);
+    if (a.get(context) == b.get(context)) {
+        boolean(context, true, out);
+        return;
+    }
+    ReturnSlot result(context);
+    detail::rich_compare_owned(context, a, b, CompareOp::Eq, result);
+    if (raised(result))
+        out.raised(result.exception());
+    else
+        detail::truth_owned(context, roots.root(result.value()), out);
 }
 ResultView container_equal(Attachment &context, Handle left, Handle right, ReturnSlot &out)
 {
     return guarded(context, out, [&] {
         RootScope roots(context);
-        auto a = roots.root(left.get(context));
-        auto b = roots.root(right.get(context));
-        out.reset(context);
-        if (a.get(context) == b.get(context)) {
-            boolean(context, true, out);
-            return;
-        }
-        ReturnSlot result(context);
-        rich_compare(context, a, b, CompareOp::Eq, result);
-        if (raised(result))
-            out.raised(result.exception());
-        else
-            truth(context, roots.root(result.value()), out);
+        const auto a = roots.root(left.get(context));
+        const auto b = roots.root(right.get(context));
+        detail::container_equal_owned(context, a, b, out);
     });
 }
 ResultView binary(Attachment &context, Handle left, Handle right, BinaryOp op, ReturnSlot &out)

@@ -1,4 +1,4 @@
-#include "cxxpython/protocol.hpp"
+#include "internal/abstract.hpp"
 #include "internal/listsort.hpp"
 
 #include <algorithm>
@@ -36,7 +36,7 @@ bool integer(Attachment &context, Handle value, std::int64_t &number, CoreObject
              ReturnSlot &out, bool clip = false)
 {
     ReturnSlot converted(context);
-    index(context, value, converted);
+    detail::index_owned(context, value, converted);
     if (failed(converted)) {
         out.raised(converted.exception());
         return false;
@@ -489,7 +489,7 @@ void sort(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &
     RootScope roots(context);
     const auto self = roots.root(args[0]), key = roots.root(args[1]);
     ReturnSlot converted(context);
-    truth(context, roots.root(args[2]), converted);
+    detail::truth_owned(context, roots.root(args[2]), converted);
     if (failed(converted)) {
         out.raised(converted.exception());
         return;
@@ -582,7 +582,7 @@ void compare(Attachment &context, Handle, std::span<const Value> args, ReturnSlo
             break;
         RootScope pair(context);
         const auto av = pair.root(a.value()), bv = pair.root(b.value());
-        container_equal(context, av, bv, equal);
+        detail::container_equal_owned(context, av, bv, equal);
         if (failed(equal)) {
             out.raised(equal.exception());
             return;
@@ -592,7 +592,7 @@ void compare(Attachment &context, Handle, std::span<const Value> args, ReturnSlo
         if constexpr (Op == CompareOp::Eq || Op == CompareOp::Ne)
             finish(0, 1);
         else
-            rich_compare(context, av, bv, Op, out);
+            detail::rich_compare_owned(context, av, bv, Op, out);
         return;
     }
     finish(detail::list_size(context, left), detail::list_size(context, right));
@@ -632,7 +632,7 @@ void search(Attachment &context, Handle, std::span<const Value> args, ReturnSlot
         if (value.tag() == ResultTag::Empty)
             break;
         RootScope iteration(context);
-        container_equal(context, iteration.root(value.value()), needle, equal);
+        detail::container_equal_owned(context, iteration.root(value.value()), needle, equal);
         if (failed(equal)) {
             out.raised(equal.exception());
             return;
@@ -843,12 +843,12 @@ void sort_list(Attachment &context, Handle self, Handle key, bool reverse, Retur
                 RootScope pair(context);
                 const auto a = pair.root(keys[order[reverse ? left : right]].value());
                 const auto b = pair.root(keys[order[reverse ? right : left]].value());
-                rich_compare(context, a, b, CompareOp::Lt, result);
+                rich_compare_owned(context, a, b, CompareOp::Lt, result);
                 if (failed(result)) {
                     out.raised(result.exception());
                     return;
                 }
-                truth(context, pair.root(result.value()), converted);
+                truth_owned(context, pair.root(result.value()), converted);
                 if (failed(converted)) {
                     out.raised(converted.exception());
                     return;

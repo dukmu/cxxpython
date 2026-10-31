@@ -1,5 +1,92 @@
 # Development Status
 
+## 2026-11-01 Reuse Owned Operands Across Container Protocols
+
+Continues the active performance/cleanup goal after pushed 3361cac. The preceding
+goal turn completed requested cache pruning; this node finishes the pending
+operation-level runtime work. Parent owns the runtime/header changes and
+acceptance. Terra supplied native/direct root-lifetime tests and extended the
+direct fixture for list/set callbacks, checked against pinned CPython and the
+immutable prechange executable; both workers are closed.
+
+- Private abstract operations borrow independently rooted operand Handles from
+  native container methods and other owning ObjectOps. Public index, truth,
+  comparison and dictionary entries still snapshot inputs before resetting an
+  output. Rich comparison, container equality and truth conversion no longer
+  repeatedly re-root the same operands at every nested public boundary. Derived
+  metadata and callback results retain operation-local roots; reflected fallback
+  attempts still retire their own snapshots before the next resolution.
+- Dictionary access has one shared implementation behind owning public entries
+  and private borrowed entries. Prepared nodes, rooted collision candidates,
+  callback order, stable-identity/version retry, namespace publication and short
+  per-object commits remain intact. Dict/list/mappingproxy methods and set
+  backing-table operations reuse their existing roots. This adds no runtime
+  type, pool, cache, lock, GIL, Python RC or extension-ABI change.
+- Native hash consumers share ordinary protocol resolution and normalization,
+  returning a native word instead of boxing a normalized int only to immediately
+  unbox it. The public hash function still returns a managed int; non-int errors,
+  huge integers and -1 normalization are unchanged. Truth's length fallback
+  reuses the already-resolved Len slot and the same epoch-revalidating invocation
+  and index/error checks, rather than repeating public length lookup/rooting.
+- Strict Clang 21.1.8 IPO Release passes 353 relevant native contracts, including
+  the 16 bootstrap/promotion fault shards. ASan/UBSan/LSan and TSan each pass 337
+  relevant native contracts. Release and ASan pass 33 direct Python scenarios;
+  TSan additionally passes 10 targeted callback/container/shared-heap scripts.
+  The new cases actively collect through hash/index/equality/bool/len callbacks,
+  reuse public outputs, normalize native hashes and clear/delete/reinsert during
+  dictionary comparison. Existing foreign/admission, independent snapshot,
+  reflected/class-mutation, failure, list/set and parallel-GC gates pass. No
+  sanitizer reports, test timeouts or timeout changes. Formatting/diff checks
+  pass. Full unrelated file-loader/library suites were not repeated. Evidence is
+  .cache/owned-ops-{release,asan,tsan}-{build,native,scripts}.log.
+- After all builds/tests exited, measured affected dict_int, allocate and matrix
+  workloads at one/four workers, three processes, one warmup and three values per
+  process. Reused the retained 3361cac raw baseline, not a fresh interleaved A/B
+  or a repeated CPython/I/O/startup campaign. Natural GC and validation stay on.
+  dict_int size=512 medians are 145.295/61.256 ms versus 157.954/66.549; standard
+  pyperf finds about 1.09x single-worker improvement, not a significant change at
+  four workers. Four-worker variation is 10.9%, scaling 2.372x and CPU/wall 2.734.
+  The retained CPython single-worker median is 2.591 ms, so the approximately 56x
+  absolute gap is still a major unfinished gate, not an acceptance claim.
+- Allocate size=100000 medians are 697.545/275.849 ms versus 698.262/278.539;
+  neither difference is significant. Scaling is 2.529x and four-worker CPU/wall
+  2.864. Matrix N=64 gives 439.814/183.967 versus 457.191/188.114; pyperf finds
+  about 1.04x single-worker improvement, not a significant four-worker change.
+  Matrix scaling is 2.391x, four-worker CPU/wall 3.110 and variation 8.6%.
+  Shared-heap CPU-parallel gains are retained, not replaced by serialization.
+- Raw runs and generated reports/pyperf comparisons are in .cache/benchmarks/
+  owned-ops-{integer,allocation,matrix}{,-comparison}. No hand-maintained tables.
+  A separate 32-loop one-worker integer profile retains about 1K software CPU
+  samples in owned-ops-integer-profile-1, including startup/warmup. Root-acquisition
+  symbols still account for 11.37%/1.85% self samples, dictionary access 6.61%, VM
+  run 6.03%, protocol invocation 5.05% and type lookup 3.79%. Relative sample
+  shares do not prove reduced root CPU or hardware cache behavior. Next work
+  should address the remaining VM/protocol/root handoff costs as a whole, rather
+  than iterate on this helper API or start a collector framework without pause/
+  contention evidence. The performance goal stays active; the full compatibility
+  route stays paused. matrix.py remains unchanged and untracked.
+
+## 2026-11-01 Cache Pruning After Dictionary Baseline
+
+At the user's request, removed consumed 45850de/e6d3625/668843f comparison
+executables, the superseded IPO matrix and protocol-role allocation perf.data
+captures, the pinned reference's completed _freeze_module build helper, Android
+TLS probe object/ELF outputs, and six empty report logs. Historical profile
+self/caller text and profile.jsonl remain; the Android probe source, commands
+and observed-header logs remain. Rebuilding the reference helper requires
+regenerating it from the retained CPython source.
+
+Retained the 3361cac executable and latest integer-dictionary perf capture for
+the pending operation-level work, all 24 runs.jsonl files and generated reports,
+verification logs, Clang/LLVM 21.1.8, Boost, pinned CPython source/interpreter/
+extensions, benchmark environment and current IPO/ASan/TSan incremental builds.
+No compiler, benchmark or test was active during deletion. Cache disk usage
+decreased from 2180186112 to 2081107968 bytes, about 94.5 MiB freed. Raw-run
+paths/sizes are unchanged. Clang startup, reference math/json/threading and
+pyperf/psutil imports pass; no regression suite or performance campaign was
+repeated. This cleanup does not validate the pending runtime changes or complete
+the performance goal. matrix.py remains unchanged and untracked.
+
 ## 2026-11-01 Co-Locate Dictionary Index Nodes
 
 Continues the active performance/cleanup goal after pushed 668843f. Parent owns

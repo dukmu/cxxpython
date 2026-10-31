@@ -1,6 +1,6 @@
 // Set operations follow CPython 3.12.14 Objects/setobject.c (PSF license).
-#include "cxxpython/protocol.hpp"
 #include "cxxpython/setobject.hpp"
+#include "internal/abstract.hpp"
 #include "internal/setobject.hpp"
 
 #include <stdexcept>
@@ -53,7 +53,7 @@ void set_update_impl(Attachment &ctx, Handle self, Handle iterable, ReturnSlot &
                 return;
             }
             RootScope step(ctx);
-            dict_store(ctx, table, step.root(item.value()), none, result);
+            detail::dict_store_owned(ctx, table, step.root(item.value()), none, result);
             if (result.tag() == ResultTag::Raised) {
                 out.raised(result.exception());
                 return;
@@ -118,15 +118,12 @@ bool set_op_walk(Attachment &ctx, Handle source, bool dict_fast, F &&visit, Retu
         }
         RootScope step(ctx);
         auto key = step.root(item.value());
-        hash(ctx, key, hashed);
-        if (hashed.tag() == ResultTag::Raised) {
+        const auto hash = detail::hash_word(ctx, key, hashed);
+        if (!hash) {
             out.raised(hashed.exception());
             return false;
         }
-        std::int64_t h = 0;
-        if (!int_fits_signed(ctx, hashed.value(), h))
-            throw std::logic_error("invalid hash result");
-        if (!visit(key, h))
+        if (!visit(key, *hash))
             return false;
     }
 }

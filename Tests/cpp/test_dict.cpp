@@ -1,4 +1,5 @@
 #include "cxxpython/compiler.hpp"
+#include "internal/abstract.hpp"
 #include "internal/dict.hpp"
 
 #include <gtest/gtest.h>
@@ -313,6 +314,69 @@ TEST_F(CoreDict, SharedDictionaryStoresAcrossAttachmentsDuringCollection)
         ASSERT_EQ(out.tag(), ResultTag::Ok);
         EXPECT_EQ(int_decimal(context, out.result().value()), std::to_string(n));
     }
+}
+
+TEST_F(CoreDict, OwnedOperationsKeepCallerRootsThroughCollectingCallbacks)
+{
+    ReturnSlot out(context);
+    context.allocate_instance<DictObject>(roots.root(context.builtin(CoreObject::DictType)), out);
+    auto dictionary = roots.root(out.value());
+    create_type(context, {"CollectingKey", {}}, out);
+    auto cls = roots.root(out.value());
+    context.allocate_instance<InstanceObject>(cls, out);
+    auto key = roots.root(out.value());
+    context.allocate_instance<InstanceObject>(cls, out);
+    auto equal_key = roots.root(out.value());
+    make_int(context, 17, out);
+    auto hash = roots.root(out.value());
+    make_int(context, 42, out);
+    auto value = roots.root(out.value());
+
+    auto install = [&](std::u32string name, Handle result, bool binary) {
+        SignatureLayout signature;
+        signature.parameters = {{U"self", ParameterKind::PositionalOnly}};
+        if (binary)
+            signature.parameters.push_back({U"other", ParameterKind::PositionalOnly});
+        std::array captures{result.get(context)};
+        make_native_function(
+            context, "collecting dict protocol", signature,
+            [](Attachment &c, Handle fn, std::span<const Value>, ReturnSlot &result) {
+                c.collect();
+                result.ok(c.payload<NativeFunctionObject>(fn).captures[0]);
+            },
+            captures, out);
+        auto function = roots.root(out.value());
+        make_str(context, std::move(name), out);
+        auto attribute = roots.root(out.value());
+        set_attribute(context, cls, attribute, function, out);
+        ASSERT_EQ(out.tag(), ResultTag::Ok);
+    };
+    install(U"__hash__", hash, false);
+    install(U"__eq__", roots.root(context.builtin(CoreObject::True)), true);
+
+    detail::dict_store_owned(context, dictionary, key, value, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    detail::dict_lookup_owned(context, dictionary, equal_key, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(out.value(), value.get(context));
+    detail::dict_setdefault_owned(context, dictionary, equal_key, hash, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(out.value(), value.get(context));
+    detail::dict_erase_owned(context, dictionary, equal_key, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    detail::dict_setdefault_owned(context, dictionary, key, value, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(out.value(), value.get(context));
+
+    out.ok(equal_key.get(context));
+    auto reused = roots.root(out.value());
+    dict_lookup(context, dictionary, reused, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(out.value(), value.get(context));
+    context.collect();
+    EXPECT_EQ(context.type_of(key.get(context)), cls.get(context));
+    EXPECT_EQ(context.type_of(reused.get(context)), cls.get(context));
+    EXPECT_EQ(int_decimal(context, value.get(context)), "42");
 }
 TEST_F(CoreDict, CachedHashesAndCopyDoNotReplayUserHashCallbacks)
 {

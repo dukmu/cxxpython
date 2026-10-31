@@ -1,4 +1,4 @@
-#include "cxxpython/protocol.hpp"
+#include "internal/abstract.hpp"
 
 #include <tuple>
 
@@ -40,7 +40,7 @@ void getitem(Attachment &context, Handle, std::span<const Value> args, ReturnSlo
         return;
     RootScope roots(context);
     const auto self = roots.root(args[0]), key = roots.root(args[1]);
-    dict_lookup(context, self, key, out);
+    detail::dict_lookup_owned(context, self, key, out);
     if (out.tag() != ResultTag::Empty)
         return;
     if (context.type_of(self) != context.builtin(CoreObject::DictType))
@@ -102,14 +102,15 @@ void proxy_compare(Attachment &context, Handle, std::span<const Value> args, Ret
     auto right = roots.root(args[1]);
     if (context.has_layout<MappingProxyObject>(right.get(context)))
         right = roots.root(context.payload<MappingProxyObject>(right).mapping);
-    rich_compare(context, left, right, op, out);
+    detail::rich_compare_owned(context, left, right, op, out);
 }
 void setitem(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     if (!dictionary(context, args[0], out))
         return;
     RootScope roots(context);
-    dict_store(context, roots.root(args[0]), roots.root(args[1]), roots.root(args[2]), out);
+    detail::dict_store_owned(context, roots.root(args[0]), roots.root(args[1]), roots.root(args[2]),
+                             out);
 }
 void delitem(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
@@ -117,7 +118,7 @@ void delitem(Attachment &context, Handle, std::span<const Value> args, ReturnSlo
         return;
     RootScope roots(context);
     auto key = roots.root(args[1]);
-    dict_erase(context, roots.root(args[0]), key, out);
+    detail::dict_erase_owned(context, roots.root(args[0]), key, out);
     if (out.tag() == ResultTag::Empty)
         missing_key(context, key, out);
     else if (!failed(out))
@@ -145,7 +146,8 @@ void get(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &o
         return;
     }
     RootScope roots(context);
-    dict_lookup(context, roots.root(mapping<Proxy>(context, args[0])), roots.root(args[1]), out);
+    detail::dict_lookup_owned(context, roots.root(mapping<Proxy>(context, args[0])),
+                              roots.root(args[1]), out);
     if (out.tag() == ResultTag::Empty)
         out.ok(args[2]);
 }
@@ -154,7 +156,8 @@ void setdefault(Attachment &context, Handle, std::span<const Value> args, Return
     if (!dictionary(context, args[0], out))
         return;
     RootScope roots(context);
-    dict_setdefault(context, roots.root(args[0]), roots.root(args[1]), roots.root(args[2]), out);
+    detail::dict_setdefault_owned(context, roots.root(args[0]), roots.root(args[1]),
+                                  roots.root(args[2]), out);
 }
 void pop(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
@@ -167,7 +170,7 @@ void pop(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &o
     }
     RootScope roots(context);
     auto key = roots.root(args[1]);
-    dict_erase(context, roots.root(args[0]), key, out);
+    detail::dict_erase_owned(context, roots.root(args[0]), key, out);
     if (out.tag() == ResultTag::Empty) {
         if (defaults.empty())
             missing_key(context, key, out);
@@ -189,11 +192,13 @@ void contains(Attachment &context, Handle, std::span<const Value> args, ReturnSl
         return;
     RootScope roots(context);
     if constexpr (Proxy) {
-        rich_compare(context, roots.root(args[1]), roots.root(mapping<Proxy>(context, args[0])),
-                     CompareOp::In, out);
+        detail::rich_compare_owned(context, roots.root(args[1]),
+                                   roots.root(mapping<Proxy>(context, args[0])), CompareOp::In,
+                                   out);
         return;
     }
-    dict_lookup(context, roots.root(mapping<Proxy>(context, args[0])), roots.root(args[1]), out);
+    detail::dict_lookup_owned(context, roots.root(mapping<Proxy>(context, args[0])),
+                              roots.root(args[1]), out);
     if (!failed(out))
         out.ok(context.builtin(out.tag() == ResultTag::Ok ? CoreObject::True : CoreObject::False));
 }
@@ -261,11 +266,10 @@ bool merge(Attachment &context, Handle self, Handle source, ReturnSlot &out, boo
             const auto name = roots.root(key.value());
             std::int64_t saved_hash = 0;
             if (unique) {
-                hash(context, name, out);
-                if (failed(out))
+                const auto word = detail::hash_word(context, name, out);
+                if (!word)
                     return false;
-                if (!int_fits_signed(context, out.value(), saved_hash))
-                    throw std::logic_error("invalid hash result");
+                saved_hash = *word;
                 detail::dict_lookup_hash(context, self, name, saved_hash, out);
                 if (failed(out))
                     return false;
@@ -284,7 +288,7 @@ bool merge(Attachment &context, Handle self, Handle source, ReturnSlot &out, boo
                 detail::dict_store_hash(context, self, name, roots.root(value.value()), saved_hash,
                                         out);
             else
-                dict_store(context, self, name, roots.root(value.value()), out);
+                detail::dict_store_owned(context, self, name, roots.root(value.value()), out);
             if (failed(out))
                 return false;
         }
@@ -341,7 +345,8 @@ bool merge(Attachment &context, Handle self, Handle source, ReturnSlot &out, boo
                         U"dictionary update sequence element has length greater than 2", out);
             return false;
         }
-        dict_store(context, self, pair.root(key.value()), pair.root(value.value()), out);
+        detail::dict_store_owned(context, self, pair.root(key.value()), pair.root(value.value()),
+                                 out);
         if (failed(out))
             return false;
     }
@@ -518,7 +523,8 @@ void equal(Attachment &context, Handle, std::span<const Value> args, ReturnSlot 
             out.ok(context.builtin(CoreObject::False));
             return;
         }
-        container_equal(context, roots.root(entry.value), roots.root(value.value()), comparison);
+        detail::container_equal_owned(context, roots.root(entry.value), roots.root(value.value()),
+                                      comparison);
         if (failed(comparison)) {
             out.raised(comparison.exception());
             return;

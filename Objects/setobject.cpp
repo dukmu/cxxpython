@@ -1,7 +1,7 @@
 // Set semantics follow CPython 3.12.14 Objects/setobject.c (PSF license).
 // Storage and synchronization are provided by this runtime's dictionary.
 #include "cxxpython/setobject.hpp"
-#include "cxxpython/protocol.hpp"
+#include "internal/abstract.hpp"
 #include "internal/setobject.hpp"
 
 #include <bit>
@@ -49,8 +49,8 @@ bool fill(Attachment &ctx, Handle table, Handle iterable, ReturnSlot &out)
             return false;
         }
         RootScope step(ctx);
-        dict_store(ctx, table, step.root(item.value()), step.root(ctx.builtin(CoreObject::None)),
-                   out);
+        detail::dict_store_owned(ctx, table, step.root(item.value()),
+                                 step.root(ctx.builtin(CoreObject::None)), out);
         if (out.tag() == ResultTag::Raised)
             return false;
     }
@@ -74,9 +74,9 @@ bool mutable_key_error(Attachment &ctx, Handle key, ReturnSlot &out)
 void lookup_key(Attachment &ctx, Handle table, Handle key, bool erase, ReturnSlot &out)
 {
     if (erase)
-        dict_erase(ctx, table, key, out);
+        detail::dict_erase_owned(ctx, table, key, out);
     else
-        dict_lookup(ctx, table, key, out);
+        detail::dict_lookup_owned(ctx, table, key, out);
     if (!mutable_key_error(ctx, key, out))
         return;
     RootScope roots(ctx);
@@ -88,9 +88,9 @@ void lookup_key(Attachment &ctx, Handle table, Handle key, bool erase, ReturnSlo
     }
     auto converted = roots.root(frozen.value());
     if (erase)
-        dict_erase(ctx, table, converted, out);
+        detail::dict_erase_owned(ctx, table, converted, out);
     else
-        dict_lookup(ctx, table, converted, out);
+        detail::dict_lookup_owned(ctx, table, converted, out);
 }
 void missing_key(Attachment &ctx, Handle key, ReturnSlot &out)
 {
@@ -485,7 +485,8 @@ void make_set(Attachment &ctx, std::span<const Value> values, ReturnSlot &out)
     ctx.allocate_instance<DictObject>(roots.root(ctx.builtin(CoreObject::DictType)), table_out);
     auto table = roots.root(table_out.value());
     for (auto item : items) {
-        dict_store(ctx, table, item, roots.root(ctx.builtin(CoreObject::None)), result);
+        detail::dict_store_owned(ctx, table, item, roots.root(ctx.builtin(CoreObject::None)),
+                                 result);
         if (result.tag() == ResultTag::Raised) {
             out.raised(result.exception());
             return;

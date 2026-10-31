@@ -1,5 +1,6 @@
 #include "cxxpython/floatobject.hpp"
 #include "cxxpython/protocol.hpp"
+#include "internal/abstract.hpp"
 
 #include <gtest/gtest.h>
 #include <limits>
@@ -625,6 +626,70 @@ TEST_F(CoreProtocols, OperandsSurviveAliasedOutputAndMemoryErrorIsRooted)
     length(context, obj, out);
     ASSERT_EQ(out.result().tag(), ResultTag::Raised);
     EXPECT_EQ(out.result().exception(), context.builtin(CoreObject::MemoryError));
+}
+
+TEST_F(CoreProtocols, OwnedProtocolsKeepIndependentOperandsDuringCollection)
+{
+    auto cls = type();
+    auto left = instance(cls);
+    auto right = instance(cls);
+    method(cls, U"__index__", integer(7));
+    method(cls, U"__bool__", builtin(CoreObject::True));
+    method(cls, U"__eq__", builtin(CoreObject::True), 1);
+    ReturnSlot out(context);
+
+    detail::index_owned(context, left, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(int_decimal(context, out.value()), "7");
+    detail::truth_owned(context, left, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(out.value(), context.builtin(CoreObject::True));
+    detail::rich_compare_owned(context, left, right, CompareOp::Eq, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(out.value(), context.builtin(CoreObject::True));
+    detail::container_equal_owned(context, left, right, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(out.value(), context.builtin(CoreObject::True));
+    context.collect();
+    EXPECT_EQ(context.type_of(left.get(context)), cls.get(context));
+    EXPECT_EQ(context.type_of(right.get(context)), cls.get(context));
+
+    // Public operations continue to accept an operand independently rooted from out.
+    out.ok(left.get(context));
+    auto reused = roots.root(out.value());
+    truth(context, reused, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(out.value(), context.builtin(CoreObject::True));
+    EXPECT_EQ(context.type_of(reused.get(context)), cls.get(context));
+}
+
+TEST_F(CoreProtocols, NativeHashNormalizesAndKeepsOperandRooted)
+{
+    auto cls = type();
+    auto obj = instance(cls);
+    ReturnSlot out(context);
+    method(cls, U"__hash__", integer(-1));
+    out.ok(obj.get(context));
+    auto hash = detail::hash_word(context, obj, out);
+    ASSERT_TRUE(hash.has_value());
+    EXPECT_EQ(*hash, -2);
+    EXPECT_EQ(out.tag(), ResultTag::Empty);
+
+    make_int_decimal(context, "1267650600228229401496703205376", out);
+    auto big = roots.root(out.value());
+    method(cls, U"__hash__", big);
+    hash = detail::hash_word(context, obj, out);
+    ASSERT_TRUE(hash.has_value());
+    EXPECT_EQ(*hash, 549755813888LL);
+    EXPECT_EQ(out.tag(), ResultTag::Empty);
+    EXPECT_EQ(context.type_of(obj.get(context)), cls.get(context));
+
+    method(cls, U"__hash__", builtin(CoreObject::None));
+    hash = detail::hash_word(context, obj, out);
+    EXPECT_FALSE(hash.has_value());
+    error(out, CoreObject::TypeErrorType);
+    context.collect();
+    EXPECT_EQ(context.type_of(obj.get(context)), cls.get(context));
 }
 
 TEST_F(CoreProtocols, ImplicitLookupIgnoresInstanceMethodsAndAttributeHooks)

@@ -1,4 +1,4 @@
-#include "cxxpython/protocol.hpp"
+#include "internal/abstract.hpp"
 #include "internal/dict.hpp"
 
 #include <algorithm>
@@ -362,13 +362,9 @@ ResultView access_dictionary(Attachment &context, Handle dictionary, Handle key,
     out.check_caller(context);
     if (binding)
         *binding = {};
-    RootScope roots(context);
-    dictionary = roots.root(dictionary.get(context));
-    key = roots.root(key.get(context));
-    if (value)
-        value = roots.root(value->get(context));
     out.reset(context);
     try {
+        RootScope roots(context);
         if (!context.has_layout<DictObject>(dictionary.get(context)) ||
             !is_subtype(context, context.type_of(dictionary),
                         context.builtin(CoreObject::DictType))) {
@@ -383,13 +379,12 @@ ResultView access_dictionary(Attachment &context, Handle dictionary, Handle key,
         if (cached_hash)
             hash_value = *cached_hash;
         else if (!string) {
-            hash(context, key, temporary);
-            if (temporary.tag() == ResultTag::Raised) {
+            const auto word = detail::hash_word(context, key, temporary);
+            if (!word) {
                 out.raised(temporary.exception());
                 return out.result();
             }
-            if (!int_fits_signed(context, temporary.value(), hash_value))
-                throw std::logic_error("hash protocol did not normalize its result");
+            hash_value = *word;
         }
         auto &shell = context.payload<DictObject>(dictionary);
         auto &data = *shell.contents;
@@ -426,7 +421,8 @@ ResultView access_dictionary(Attachment &context, Handle dictionary, Handle key,
                         const auto &entry = entries[i];
                         if (entry.hash != hash_value)
                             continue;
-                        container_equal(context, roots.root(entry.key), key, temporary);
+                        detail::container_equal_owned(context, roots.root(entry.key), key,
+                                                      temporary);
                         if (temporary.tag() == ResultTag::Raised) {
                             out.raised(temporary.exception());
                             return out.result();
@@ -524,7 +520,7 @@ ResultView access_dictionary(Attachment &context, Handle dictionary, Handle key,
             }
             bool restart = false;
             for (const auto &entry : candidates) {
-                container_equal(context, iteration.root(entry.key), key, temporary);
+                detail::container_equal_owned(context, iteration.root(entry.key), key, temporary);
                 if (temporary.tag() == ResultTag::Raised) {
                     out.raised(temporary.exception());
                     return out.result();
@@ -568,34 +564,75 @@ ResultView access_dictionary(Attachment &context, Handle dictionary, Handle key,
     }
     return out.result();
 }
+ResultView dictionary_operation(Attachment &context, Handle dictionary, Handle key,
+                                std::optional<Handle> value, DictOperation operation,
+                                ReturnSlot &out, std::optional<std::int64_t> cached_hash = {},
+                                detail::DictBinding *binding = nullptr)
+{
+    out.check_caller(context);
+    if (binding)
+        *binding = {};
+    try {
+        RootScope roots(context);
+        dictionary = roots.root(dictionary.get(context));
+        key = roots.root(key.get(context));
+        if (value)
+            value = roots.root(value->get(context));
+        return access_dictionary(context, dictionary, key, value, operation, out, cached_hash,
+                                 binding);
+    } catch (const std::bad_alloc &) {
+        out.raised(context.builtin(CoreObject::MemoryError));
+    }
+    return out.result();
+}
 } // namespace
 ResultView dict_lookup(Attachment &context, Handle dictionary, Handle key, ReturnSlot &out)
 {
-    return access_dictionary(context, dictionary, key, {}, DictOperation::Lookup, out);
+    return dictionary_operation(context, dictionary, key, {}, DictOperation::Lookup, out);
 }
 ResultView detail::dict_lookup_binding(Attachment &context, Handle dictionary, Handle key,
                                        DictBinding &binding, ReturnSlot &out)
 {
-    return access_dictionary(context, dictionary, key, {}, DictOperation::Lookup, out, {},
-                             &binding);
+    return dictionary_operation(context, dictionary, key, {}, DictOperation::Lookup, out, {},
+                                &binding);
 }
 ResultView dict_store(Attachment &context, Handle dictionary, Handle key, Handle value,
                       ReturnSlot &out)
 {
-    return access_dictionary(context, dictionary, key, value, DictOperation::Store, out);
+    return dictionary_operation(context, dictionary, key, value, DictOperation::Store, out);
 }
 ResultView detail::dict_store_binding(Attachment &context, Handle dictionary, Handle key,
                                       Handle value, DictBinding &binding, ReturnSlot &out)
 {
-    return access_dictionary(context, dictionary, key, value, DictOperation::Store, out, {},
-                             &binding);
+    return dictionary_operation(context, dictionary, key, value, DictOperation::Store, out, {},
+                                &binding);
 }
 ResultView dict_erase(Attachment &context, Handle dictionary, Handle key, ReturnSlot &out)
 {
-    return access_dictionary(context, dictionary, key, {}, DictOperation::Erase, out);
+    return dictionary_operation(context, dictionary, key, {}, DictOperation::Erase, out);
 }
 ResultView dict_setdefault(Attachment &context, Handle dictionary, Handle key, Handle value,
                            ReturnSlot &out)
+{
+    return dictionary_operation(context, dictionary, key, value, DictOperation::SetDefault, out);
+}
+ResultView detail::dict_lookup_owned(Attachment &context, Handle dictionary, Handle key,
+                                     ReturnSlot &out)
+{
+    return access_dictionary(context, dictionary, key, {}, DictOperation::Lookup, out);
+}
+ResultView detail::dict_store_owned(Attachment &context, Handle dictionary, Handle key,
+                                    Handle value, ReturnSlot &out)
+{
+    return access_dictionary(context, dictionary, key, value, DictOperation::Store, out);
+}
+ResultView detail::dict_erase_owned(Attachment &context, Handle dictionary, Handle key,
+                                    ReturnSlot &out)
+{
+    return access_dictionary(context, dictionary, key, {}, DictOperation::Erase, out);
+}
+ResultView detail::dict_setdefault_owned(Attachment &context, Handle dictionary, Handle key,
+                                         Handle value, ReturnSlot &out)
 {
     return access_dictionary(context, dictionary, key, value, DictOperation::SetDefault, out);
 }
@@ -648,17 +685,17 @@ void detail::dict_popitem(Attachment &context, Handle dictionary, ReturnSlot &ke
 ResultView detail::dict_lookup_hash(Attachment &context, Handle dictionary, Handle key,
                                     std::int64_t hash, ReturnSlot &out)
 {
-    return access_dictionary(context, dictionary, key, {}, DictOperation::Lookup, out, hash);
+    return dictionary_operation(context, dictionary, key, {}, DictOperation::Lookup, out, hash);
 }
 ResultView detail::dict_store_hash(Attachment &context, Handle dictionary, Handle key, Handle value,
                                    std::int64_t hash, ReturnSlot &out)
 {
-    return access_dictionary(context, dictionary, key, value, DictOperation::Store, out, hash);
+    return dictionary_operation(context, dictionary, key, value, DictOperation::Store, out, hash);
 }
 ResultView detail::dict_erase_hash(Attachment &context, Handle dictionary, Handle key,
                                    std::int64_t hash, ReturnSlot &out)
 {
-    return access_dictionary(context, dictionary, key, {}, DictOperation::Erase, out, hash);
+    return dictionary_operation(context, dictionary, key, {}, DictOperation::Erase, out, hash);
 }
 std::size_t detail::dictionary_size(Attachment &context, Value dictionary)
 {

@@ -146,6 +146,17 @@ share that invocation-owned scope. ObjectOps that already own their operands
 also lend their protocol-resolution scope to invocation instead of rooting the
 same inputs again. The public protocol entry still owns borrowed inputs; both
 entries use the same epoch/receiver revalidation and descriptor dispatch.
+Private abstract operations in `Include/internal/abstract.hpp` likewise borrow
+independent live operand Handles from their callers. Public index/truth/comparison
+and dictionary entries snapshot their inputs before resetting an output slot;
+native container methods can reuse roots they already own. Derived protocol
+metadata/results still have operation-local roots, and no operand may depend on
+the output root being reset. Container equality shares this path through rich
+comparison and truth conversion. Truth's length fallback reuses its resolved
+length slot, with the ordinary invocation revalidation. Native dictionary/set
+hash consumers reuse the normalized native hash rather than box it only to
+immediately unbox it; the public hash operation still returns a managed int.
+The same callbacks, normalization/errors and short synchronized commits apply.
 Internal protocol resolution accepts the receiver's already checked type Value
 without first creating a throwaway type Handle. The cache validates the borrowed
 Value and promotes fresh type/owner/descriptor roots; public Handle resolution
