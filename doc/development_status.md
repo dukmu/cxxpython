@@ -1,5 +1,82 @@
 # Development Status
 
+## 2026-10-31 Upstream Threading, Queue, Clocks And Round
+
+Prepended after 84acaf9, preserving earlier entries. The previous goal turn was
+progress: its verified frontend/dataclasses slice is committed. This turn closes
+another actual Base-to-Full dependency slice, not the full active Plan 2 goal.
+Two Terra workers supplied clocks, upstream Python library copies/fixtures and
+numeric round; parent implemented thread retirement/launch/shutdown, corrected
+observed semantics, integrated tests and performed final acceptance. Both workers
+are closed. No whole N4/N5/N6 or M milestone is declared complete.
+
+- Added unchanged pinned CPython 3.12.14 threading.py, queue.py,
+  _threading_local.py, difflib.py and pprint.py under the retained PSF license.
+  Actual Thread start/join/timeouts, exception hooks/current/enumerate, recursive
+  Conditions, Events, Semaphores, Barriers, Timers, local subclass initialization
+  and weak cleanup now execute as Python policy. FIFO/LIFO/priority/SimpleQueue,
+  bounded queues, task accounting and joined producers/consumers use the existing
+  native deque and GC-aware locks. Python local/SimpleQueue are upstream's own
+  fallbacks, not replacement policies or CPython C implementation guarantees.
+- ThreadRecord owns a single precisely traced exit-sentinel lease. Attachment
+  retirement requires drained ordinary roots/Frames, completes the epoch, transfers spans
+  and releases the native notification under the running coordinator gate.
+  Waiters cannot regain heap access until the record is removed. No allocation
+  or Python callback runs in that native release action; no interpreter execution
+  lock or parallel thread-lifecycle manager was introduced. Native tests prove
+  the otherwise unreferenced sentinel survives collection until retirement and
+  is reclaimed afterward. Replacement affects only the latest notification.
+  This bounded strong resource lease differs from CPython's weak RC timing.
+- POSIX Python workers now use explicit per-launch pthread attributes with an
+  atomic per-Interpreter stack-size setting. Transfer admission and real child
+  startup still govern success, preserving independent heap leases and exception
+  reporting without borrowing an Interpreter C++ object. _set_sentinel,
+  daemon_threads_allowed, _is_main_interpreter and stack_size close actual
+  upstream threading dependencies. The pinned 3.12 implementation resets the
+  setting on a no-argument stack_size call; the first integration mismatch was
+  corrected against its source rather than guessed from the API name.
+- The CLI calls an already loaded threading._shutdown before ordinary atexit,
+  so non-daemon workers finish first. Direct shutdown, worker exception hooks,
+  collection while waiting and thread-local cycles pass. Complete embedding,
+  daemon cancellation, tracing/profiling hooks, fork and abnormal shutdown remain
+  work. No stronger shutdown/CPU-performance claim follows from a library import.
+- Native time exposes actual POSIX realtime/monotonic/performance/process/thread
+  clocks, nanosecond variants and clock_getres metadata. sleep converts managed
+  inputs while Active, then parks only native timespec/error state and retries
+  interrupted native sleeps. Tests cover invalid/index inputs and other threads'
+  collection/progress while sleeping. Calendar/timezone APIs, signal delivery and
+  portability remain unfinished. C native diagnostic qualification is an explicit
+  shared reflection gap: get_clock_info(BytesIO()) says BytesIO rather than
+  _io.BytesIO. A separate VM difference fixture records it; no time-specific
+  type-name classification was added and no full compatibility pass is claimed.
+- Added round as a real base builtin after the library dependency work exposed
+  its absence. Ordinary __round__ dispatch honors custom descriptors, callbacks,
+  precision/index conversion and subtype results. Int reuses copy_int so exact
+  unrounded ints retain identity; negative precision bounds powers of ten by
+  the operand size and polls between exponentiation steps. Float uses its exact
+  binary rational, ties-to-even and correctly rounded decimal conversion, not
+  std::round. Source/reference tests cover special values, signed zero, overflow,
+  callbacks/GC and a 252-case precision/boundary matrix. A separate VM fixture
+  proves bounded completion for gigantic negative integer precision; the pinned
+  source instead attempts the infeasible power before determining the result.
+- Final Clang 21.1.8 Release, ASan/UBSan/LSan and TSan builds pass strict
+  -Wall -Wextra -Wpedantic -Werror. Release passes 88 selected native/constructor
+  checks, all eight bootstrap allocation-failure shards, 20 direct scripts and
+  two VM scenarios. Valid passing script evidence was retained across the
+  subsequent numeric-only correction. Each sanitizer passes the same 87 native
+  contracts, all 20 final scripts and both VM scenarios; the unchanged passing
+  constructor differential was not repeated under sanitizers. Race/leak
+  detection, assertions and script timeouts remain enabled. Formatting, ASDL/
+  PEG generation and whitespace checks pass. Raw builds, mismatches and passing
+  logs remain in .cache/threading-*. No unrelated performance sweep, hand-filled
+  measurement table or new checksum system was added.
+- Next dependency is actual unittest, including argparse/gettext/fnmatch and
+  signal/runtime support, followed by remaining library/product closures rather
+  than name-only imports. Full frontend validation/version matrices, native
+  reflection, thread lifecycle/platform matrices and N4-N6/M0-M9/performance
+  gates remain active. User test2.py and temporary_plan.md deletion stay excluded.
+  No previously denied remote push was retried.
+
 ## 2026-10-31 Type Comments, Descriptor Identity And Upstream Dataclasses
 
 Prepended after fffb10c without changing earlier entries. This is a verified

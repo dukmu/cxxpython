@@ -1,0 +1,10 @@
+custom ('custom', ()) ('custom', ()) ('custom', (3,))
+calls [(), (), (3,)]
+keywords 120
+index 120 10.0
+subclasses int float
+none 12 1 1
+int direct none rejected
+missing round rejected
+missing round rejected
+invalid digits rejected

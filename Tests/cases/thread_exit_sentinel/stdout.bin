@@ -1,0 +1,10 @@
+default stack 0
+set stack 0
+running True True
+retired ['finished'] True
+query stack 1048576
+restore stack 0
+invalid stack ValueError
+invalid stack ValueError
+invalid stack TypeError
+invalid stack OverflowError

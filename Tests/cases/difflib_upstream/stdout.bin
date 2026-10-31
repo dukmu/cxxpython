@@ -1,0 +1,18 @@
+insert [('insert', 0, 0, 0, 1), ('equal', 0, 100, 1, 101)] True
+delete [('equal', 0, 40, 0, 40), ('delete', 40, 41, 40, 40), ('equal', 41, 81, 40, 80)] True
+blocks [(0, 0, 2), (3, 2, 2), (5, 4, 0)]
+cache True
+autojunk 0.0 True True
+close ['apple', 'ape', 'maple']
+unified
+--- old
++++ new
+@@ -1,4 +1,4 @@
+ one
+-two
++TWO
+ three
+-four
++five
+restore True True
+empty []

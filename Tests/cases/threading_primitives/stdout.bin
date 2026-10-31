@@ -1,0 +1,9 @@
+condition ['notified', 'woken']
+event False False
+event set True
+event clear False
+semaphore True False
+over-release rejected
+barrier [0, 1] False
+timer cancelled False
+timer fired True

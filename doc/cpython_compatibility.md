@@ -117,6 +117,16 @@ the target is `builtins` and the `__builtins__` execution namespace.
   no storage lock surrounds callbacks. These operations do not claim whole-call
   atomicity across arbitrary callbacks. Tuple concatenation/repetition and
   str.split/rsplit retain ordinary subtype/index/Unicode behavior.
+- round uses ordinary __round__ descriptor dispatch and the shared numeric
+  payloads, including custom callbacks, optional precision and subtype results.
+  Int results preserve exact-int identity when no rounding is needed; negative
+  precision bounds its power-of-ten exponent by the operand before allocation.
+  Float rounding uses an exact binary rational, ties-to-even and correctly rounded
+  decimal-to-binary conversion, not std::round's different tie rule. Signed zero,
+  NaN/infinity, conversion failures and collection have direct fixtures. The
+  extreme-integer-precision VM fixture checks bounded completion where the pinned
+  3.12 implementation attempts an infeasible power; no general numeric/performance
+  milestone is declared from these tests.
 - Builtin compile/eval/exec reuse the existing compiler and VM. Ordinary module
   names now emit namespace instructions, matching separate globals/locals
   behavior; explicit global still emits global instructions. Current valid slices
@@ -541,8 +551,32 @@ the target is `builtins` and the `__builtins__` execution namespace.
   and shared heap. Startup uses Transfer admission, not a detached borrowed
   Interpreter reference. Locks and interpreter leases retain only their actual
   lifecycle. Python failures are reported, not silently discarded.
-  Thread-local storage, signals/interrupt_main, thread sentinels/count/stack configuration,
-  threading joins and product shutdown coordination remain delivery work.
+  _set_sentinel releases the most recent registered lock after Attachment roots,
+  Frames and allocation ownership retire. Its bounded precise lease keeps that
+  lock alive until replacement/exit, rather than CPython's weak RC timing.
+  Per-Interpreter stack configuration uses real pthread attributes. The pinned
+  3.12 no-argument stack_size call also resets the setting; this quirk is tested.
+  Independent Interpreters allow detached workers and are not subinterpreters.
+  Signals/interrupt_main, counts and complete daemon/embedding shutdown remain
+  delivery work.
+- Unchanged pinned threading.py, queue.py and _threading_local.py run actual
+  Thread lifecycle, exception hooks, synchronization primitives, timers, local
+  dictionaries and queue/task accounting. CLI shutdown calls an already loaded
+  threading._shutdown before atexit, without importing it unnecessarily. Python
+  local and SimpleQueue are the upstream fallbacks, not C++ policy rewrites;
+  native _local cleanup timing and C SimpleQueue reentrancy are not claimed.
+  Trace/profile setters, fork integration, complete shutdown and full upstream
+  thread/queue suites remain gates. difflib.py and pprint.py are also unchanged
+  pinned sources with direct actual-behavior fixtures for upcoming unittest.
+- The native time slice provides actual realtime/monotonic/performance/process/
+  thread clocks and nanoseconds, clock_getres metadata and GC-aware sleep.
+  Conversion errors, signed/invalid timeouts and progress while another thread
+  sleeps use direct tests. Signal interruption delivery, calendar/timezone APIs
+  and other platforms are not implied. Native C qualified diagnostic names are
+  a known shared reflection gap: get_clock_info(BytesIO()) currently says
+  BytesIO instead of CPython's _io.BytesIO. A separate VM fixture records it;
+  remove that difference when canonical native diagnostic names are available,
+  rather than adding a time-specific class/module-name classification.
 - `_abc` reload preserves its private data type and epoch state; `_thread` reload
   preserves lock type identity. Existing classes/functions and instances continue
   to use the same state, rather than constructing incompatible native types on
@@ -578,8 +612,9 @@ REPL/product configuration and requested library dependency closures remain in P
 - `_thread.RLock` tracks the actual owning OS thread and recursion depth. Native
   waits park the attachment without blocking GC. Save/restore supports condition
   semantics, but coordinated process fork is absent: _at_fork_reinit reports
-  NotImplementedError instead of claiming fork safety. Full threading remains a
-  distinct Python/native dependency closure.
+  NotImplementedError instead of claiming fork safety. The upstream threading
+  layer now uses this native recursive lock; full fork/trace/shutdown matrices
+  remain a distinct acceptance gate.
 - `_weakref.proxy` uses the collector's existing weak-target/callback storage and
   roots each live referent before forwarding protocols; dead access raises the
   canonical ReferenceError. Proxy types are distinct from ReferenceType and

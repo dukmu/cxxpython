@@ -1,0 +1,6 @@
+inactive join rejected
+running True True
+worker [('worker', True)] False
+current join rejected
+hook [('ValueError', 'worker failure', 'failing')]
+main True

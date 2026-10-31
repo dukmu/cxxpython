@@ -1,0 +1,1 @@
+TypeError get_clock_info() argument 1 must be str, not BytesIO

@@ -1,0 +1,2 @@
+values main ['MainThread', 'local-worker']
+thread local collected True

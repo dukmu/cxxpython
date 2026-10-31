@@ -394,6 +394,93 @@ void float_int(Attachment &context, Handle, std::span<const Value> args, ReturnS
     detail::publish_integer(context, detail::Integer(value->value), out);
 }
 
+void float_round(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    const auto *object = require_float(context, args[0], out);
+    if (!object)
+        return;
+    const double value = object->value;
+    if (args[1] == context.builtin(CoreObject::None)) {
+        if (std::isnan(value)) {
+            raise_error(context, CoreObject::ValueErrorType, U"cannot convert float NaN to integer",
+                        out);
+            return;
+        }
+        if (std::isinf(value)) {
+            raise_error(context, CoreObject::OverflowErrorType,
+                        U"cannot convert float infinity to integer", out);
+            return;
+        }
+        const double magnitude = std::fabs(value);
+        const double integral = std::floor(magnitude);
+        detail::Integer result(integral);
+        const double fraction = magnitude - integral;
+        if (fraction > 0.5 || (fraction == 0.5 && (result & 1) != 0))
+            ++result;
+        if (std::signbit(value))
+            result = -result;
+        detail::publish_integer(context, std::move(result), out);
+        return;
+    }
+    RootScope roots(context);
+    ReturnSlot indexed(context);
+    index(context, roots.root(args[1]), indexed);
+    if (indexed.tag() == ResultTag::Raised) {
+        out.raised(indexed.exception());
+        return;
+    }
+    auto digits = detail::integer_value(context.payload<IntObject>(indexed.value()));
+    if (!std::isfinite(value) || digits > 323) {
+        make_float(context, value, out);
+        return;
+    }
+    if (digits < -308 || value == 0.0) {
+        make_float(context, std::copysign(0.0, value), out);
+        return;
+    }
+    const int precision = digits.convert_to<int>();
+    int exponent = 0;
+    const double fraction = std::frexp(std::fabs(value), &exponent);
+    detail::Integer numerator(static_cast<std::uint64_t>(std::ldexp(fraction, 53)));
+    detail::Integer denominator = 1;
+    exponent -= 53;
+    if (exponent >= 0)
+        numerator <<= exponent;
+    else
+        denominator <<= -exponent;
+    detail::Integer scale = 1;
+    for (int i = 0; i < std::abs(precision); ++i)
+        scale *= 10;
+    if (precision >= 0)
+        numerator *= scale;
+    else
+        denominator *= scale;
+    detail::Integer rounded = numerator / denominator;
+    const detail::Integer remainder = numerator % denominator;
+    if (remainder * 2 > denominator || (remainder * 2 == denominator && (rounded & 1) != 0))
+        ++rounded;
+    if (rounded == 0) {
+        make_float(context, std::copysign(0.0, value), out);
+        return;
+    }
+    // Convert the exact rounded decimal back to binary using the same
+    // correctly-rounded standard-library conversion as float parsing.
+    std::string text = rounded.convert_to<std::string>() + "e" + std::to_string(-precision);
+    double result = 0.0;
+    const auto parsed = std::from_chars(text.data(), text.data() + text.size(), result,
+                                        std::chars_format::scientific);
+    if (parsed.ec == std::errc::result_out_of_range) {
+        const auto decimal_order = static_cast<int>(text.find('e')) - 1 - precision;
+        if (decimal_order >= 0) {
+            raise_error(context, CoreObject::OverflowErrorType,
+                        U"rounded value too large to represent", out);
+            return;
+        }
+        result = 0.0;
+    }
+    make_float(context, std::copysign(result, value), out);
+}
+
 void float_repr(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     const auto *value = require_float(context, args[0], out);
@@ -548,6 +635,11 @@ void detail::install_floats(Attachment &context, std::span<const Handle> core)
         install_native_attribute(context, core, at(CoreObject::FloatType), std::move(name),
                                  binary ? pair : unary, entry);
     };
+    auto round_signature = unary;
+    round_signature.parameters.push_back(
+        {U"ndigits", ParameterKind::PositionalOnly, at(CoreObject::None).get(context)});
+    install_native_attribute(context, core, at(CoreObject::FloatType), U"__round__",
+                             round_signature, float_round);
     install(U"__bool__", float_bool);
     install(U"__float__", float_identity);
     install(U"__getnewargs__", float_getnewargs);

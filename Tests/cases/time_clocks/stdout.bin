@@ -1,0 +1,7 @@
+time True True True True False True
+monotonic True True True True True False
+perf_counter True True True True True False
+process_time True True True True True False
+thread_time True True True True True False
+ValueError unknown clock
+ValueError embedded null character

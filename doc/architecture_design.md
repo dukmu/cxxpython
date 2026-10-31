@@ -141,6 +141,10 @@ conversion shares Unicode decimal/whitespace helpers in `Include/internal/long.h
 Float literals share the native conversion helper; the compiler freezes native
 binary64 constants into normal managed objects. Integer true division rounds
 exact ratios in longobject rather than narrowing both operands first.
+The round builtin dispatches the ordinary __round__ protocol. Int reuses its
+identity/conversion boundary and bounds negative precision before powers of ten;
+float computes ties-to-even on its exact binary rational, then converts the
+rounded decimal through the existing standard-library conversion kernel.
 Power/shift/bitwise dispatch uses the same ordinary/reflected/in-place protocol
 boundary. Integer bit_length/bit_count use the existing arbitrary-precision
 magnitude; bin/oct/hex use the normal index protocol at the builtin boundary.
@@ -350,10 +354,11 @@ Prepared callback records and short local commits separate mutation from Python
 equality and invocation. A per-registry recursive run claim coordinates runners;
 waiters park, and callback errors use unraisable reporting. Module collection or
 reload does not own the registry lifetime. `Modules/main.cpp` invokes callbacks
-after its normal script/interactive execution path; upstream weakref.finalize
-registers through this real atexit API. This is not complete process/interpreter
-shutdown: thread joins, standard-stream flushing, final GC/module teardown and
-embedding/abnormal-exit ordering remain separate contracts.
+after its normal script/interactive execution path and threading._shutdown;
+upstream weakref.finalize registers through this real atexit API. The CLI joins
+non-daemon threading workers before atexit and flushes afterward. Final GC/module
+teardown and complete embedding/daemon/abnormal-exit ordering remain contracts
+to finish, not implied by that product path.
 
 The eight complete, unchanged CPython 3.12.14 additions are Lib/io.py, os.py,
 genericpath.py, posixpath.py, enum.py, weakref.py, _weakrefset.py and copyreg.py.
@@ -382,8 +387,28 @@ same admission gate rejects launches after close. A successful start is returned
 only after child admission, and admitted children retain heap state independently
 of the embedding owner's lifetime. Lock waits park; ordinary Python runs on the
 existing parallel VM. Uncaught Python exceptions use unraisable reporting and
-SystemExit exits quietly. These low-level daemon threads are not the unfinished
-`threading` join/shutdown policy.
+SystemExit exits quietly. POSIX worker creation applies the Interpreter's atomic
+stack-size setting through per-launch pthread attributes, not process-global
+defaults. ThreadRecord retains one precise exit-sentinel root; after ordinary
+roots/Frames retire and the epoch gate is running, a native resource-only action
+releases it. No Python callback/allocation runs in retirement, and lock waiters
+cannot resume heap access before the record is removed. Replacement changes the
+single pending notification, without a second thread-lifecycle manager.
+
+Unchanged upstream threading.py owns Thread/join, exception hooks, Conditions,
+Events, Semaphores, Barriers, Timers and shutdown policy. Its own upstream
+_threading_local.py fallback supplies Python thread-local dictionaries over
+current Thread identities and weak references. Unchanged queue.py uses those
+locks/conditions and the existing native deque; _queue's C-specific reentrancy
+properties are not claimed for its upstream Python SimpleQueue fallback.
+Lib/difflib.py and pprint.py likewise retain upstream policy over existing
+collection/regex/dataclass protocols, closing actual unittest dependencies.
+
+Modules/timemodule.cpp supplies real POSIX realtime, monotonic, process and
+thread CPU clocks, nanosecond variants and get_clock_info. sleep converts while
+Active, then parks only native timespec/error state; interrupted native sleeps
+retry without detached heap access. Signal delivery, calendar/timezone APIs and
+full platform coverage remain separate capabilities.
 
 Runtime contracts are in `Include/cxxpython/`. Compiler-private implementation
 structures belong in `Include/internal/`. All C++ interfaces remain unstable.

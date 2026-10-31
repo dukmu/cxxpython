@@ -231,6 +231,8 @@ struct ThreadRecord {
     bool dispatching = false;
     Allocation *finalizers = nullptr;
     WeakRefObject *weak_callbacks = nullptr;
+    ObjectHeader *exit_sentinel = nullptr;
+    void (*release_exit_sentinel)(ObjectHeader *) noexcept = nullptr;
     // Borrowed identities, not roots. Sweep clears them before reuse.
     std::array<ProtocolEntry, 64> protocols;
     ProtocolEntry &protocol_entry(Value type, Protocol protocol) noexcept
@@ -271,6 +273,7 @@ struct State {
         std::size_t roots = 0, cells = 0;
         for (const auto &thread : threads) {
             roots += thread->roots.count;
+            roots += thread->exit_sentinel != nullptr;
             cells += thread->roots.cells.size();
         }
         HeapStats result{0,
@@ -515,6 +518,7 @@ struct State {
         });
         for (const auto &thread : threads) {
             thread->protocols.fill({});
+            mark(thread->exit_sentinel);
             for (const auto &cell : thread->roots.cells)
                 if (cell.scope && cell.tag != ResultTag::Empty)
                     mark(cell.object);
@@ -639,6 +643,7 @@ struct State {
     }
 
     HeapConfig config;
+    std::atomic<std::size_t> native_stack_size{0};
     const std::array<std::uint64_t, 2> hash_key = [] {
         std::random_device random;
         std::uniform_int_distribution<std::uint64_t> distribution;
@@ -763,6 +768,9 @@ Attachment::~Attachment()
     state_->retired_spans.splice(state_->retired_spans.end(), thread_record_->spans);
     state_->retired_allocations_since_gc = detail::saturated_add(
         state_->retired_allocations_since_gc, thread_record_->allocations_since_gc);
+    // Lock waiters cannot regain heap access until this retirement gate is released.
+    if (thread_record_->exit_sentinel)
+        thread_record_->release_exit_sentinel(thread_record_->exit_sentinel);
     std::erase(state_->threads, thread_record_);
     state_->changed.notify_all();
 }
@@ -1674,6 +1682,21 @@ void Attachment::set_sys_dictionary(Handle dictionary)
     const auto value = dictionary.get(*this);
     std::lock_guard gate(state_->coordinator);
     state_->sys_dictionary = value.object();
+}
+void Attachment::set_exit_sentinel(Handle sentinel, void (*release)(ObjectHeader *) noexcept)
+{
+    require_attached();
+    if (!release)
+        throw std::invalid_argument("exit sentinel requires a native release action");
+    thread_record_->exit_sentinel = sentinel.get(*this).object();
+    thread_record_->release_exit_sentinel = release;
+}
+std::size_t Attachment::native_thread_stack_size(std::optional<std::size_t> replacement)
+{
+    require_attached();
+    if (replacement)
+        return state_->native_stack_size.exchange(*replacement, std::memory_order_relaxed);
+    return state_->native_stack_size.load(std::memory_order_relaxed);
 }
 std::uint64_t Attachment::publication_epoch(PublicationDomain domain) const
 {

@@ -56,6 +56,67 @@ void boolean(Attachment &context, bool value, ReturnSlot &out)
 {
     out.ok(context.builtin(value ? CoreObject::True : CoreObject::False));
 }
+void integer_round(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!is_int(context, args[0])) {
+        type_error(context, out);
+        return;
+    }
+    RootScope roots(context);
+    auto self = roots.root(args[0]);
+    const auto &arguments = context.payload<TupleObject>(args[1]).items;
+    if (arguments.size() > 1) {
+        raise_error(context, CoreObject::TypeErrorType, U"__round__ takes at most one argument",
+                    out);
+        return;
+    }
+    if (arguments.empty()) {
+        copy_int(context, self.get(context), out);
+        return;
+    }
+    auto digits_arg = roots.root(arguments[0]);
+    ReturnSlot indexed(context);
+    index(context, digits_arg, indexed);
+    if (raised(indexed)) {
+        out.raised(indexed.exception());
+        return;
+    }
+    Integer digits = expanded(integer(context, indexed.value()));
+    if (digits >= 0) {
+        copy_int(context, self.get(context), out);
+        return;
+    }
+    Integer value = expanded(integer(context, self.get(context)));
+    if (value == 0) {
+        copy_int(context, self.get(context), out);
+        return;
+    }
+    const bool negative = value < 0;
+    if (negative)
+        value = -value;
+    digits = -digits;
+    // 10**n > 2**n, so this bound guarantees a rounded result of zero.
+    if (digits > boost::multiprecision::msb(value) + 1) {
+        make_int(context, 0, out);
+        return;
+    }
+    auto count = digits.convert_to<std::size_t>();
+    Integer scale = 1, base = 10;
+    while (count) {
+        context.poll();
+        if (count & 1)
+            scale *= base;
+        count >>= 1;
+        if (count)
+            base *= base;
+    }
+    Integer quotient = value / scale;
+    Integer remainder = value % scale;
+    if (remainder * 2 > scale || (remainder * 2 == scale && (quotient & 1) != 0))
+        ++quotient;
+    value = quotient * scale;
+    publish(context, negative ? -value : value, out);
+}
 template <bool Count>
 void int_bits(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
@@ -1071,6 +1132,10 @@ void install_numbers(Attachment &context, std::span<const Handle> core)
         install_native_attribute(context, core, at(CoreObject::IntType), std::move(name),
                                  binary ? pair : unary, entry);
     };
+    auto round_signature = unary;
+    round_signature.varargs = U"args";
+    install_native_attribute(context, core, at(CoreObject::IntType), U"__round__", round_signature,
+                             integer_round);
     install(U"__add__", arithmetic<BinaryOp::Add, false>, true);
     install(U"__radd__", arithmetic<BinaryOp::Add, true>, true);
     install(U"__sub__", arithmetic<BinaryOp::Subtract, false>, true);

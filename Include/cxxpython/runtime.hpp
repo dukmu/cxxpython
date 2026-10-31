@@ -629,6 +629,9 @@ class Attachment final {
     void publish_gc_callbacks(Handle candidate, ReturnSlot &);
     void load_sys_dictionary(ReturnSlot &);
     void set_sys_dictionary(Handle dictionary);
+    // Native resource release only, after roots/Frames retire. No allocation or Python calls.
+    void set_exit_sentinel(Handle sentinel, void (*release)(ObjectHeader *) noexcept);
+    std::size_t native_thread_stack_size(std::optional<std::size_t> replacement = {});
     Value builtin(CoreObject object) const;
     std::uint64_t type_epoch() const;
     void invalidate_types();

@@ -1,0 +1,18 @@
+dataclass
+Record(name='alpha',
+       numbers=[1,
+                2,
+                3,
+                4])
+sorted
+{'a': [1, 2],
+ 'z': [3, 4]}
+depth {'a': [[...]]}
+compact
+[0, 1, 2, 3, 4,
+ 5, 6, 7, 8,
+ 9]
+numbers [1_000_000, 123_456_789]
+stream True
+recursive True False True True
+plain False True {'items': [1, 2]}

@@ -1,6 +1,7 @@
 #include "cxxpython/import.hpp"
 #include "internal/threadmodule.hpp"
 
+#include <atomic>
 #include <chrono>
 #include <future>
 #include <gtest/gtest.h>
@@ -9,6 +10,59 @@
 
 using namespace cxxpython::core;
 namespace {
+struct ExitSentinel {
+    ObjectHeader header;
+    std::atomic<int> *released, *destroyed;
+    ExitSentinel(InitialType type, std::atomic<int> *release, std::atomic<int> *destroy)
+        : header(type), released(release), destroyed(destroy)
+    {}
+    ~ExitSentinel()
+    {
+        ++*destroyed;
+    }
+    void trace(Tracer &) const noexcept {}
+};
+
+TEST(NativeThreads, ExitSentinelRemainsRootedUntilAttachmentRetires)
+{
+    std::atomic<int> released{0}, destroyed{0};
+    Interpreter interpreter;
+    Attachment context(interpreter);
+    std::promise<void> ready, finish;
+    auto started = ready.get_future();
+    auto finishing = finish.get_future();
+    std::thread worker([&] {
+        Attachment child(interpreter);
+        {
+            ReturnSlot owner(child);
+            child.allocate<ExitSentinel>(owner, &released, &destroyed);
+            RootScope roots(child);
+            child.set_exit_sentinel(
+                roots.root(owner.value()), +[](ObjectHeader *header) noexcept {
+                    ++*reinterpret_cast<ExitSentinel *>(header)->released;
+                });
+        }
+        NativeWait parked(child);
+        ready.set_value();
+        finishing.wait();
+    });
+    {
+        NativeWait parked(context);
+        started.wait();
+    }
+    context.collect();
+    EXPECT_EQ(destroyed, 0);
+    EXPECT_EQ(released, 0);
+    finish.set_value();
+    {
+        NativeWait parked(context);
+        worker.join();
+    }
+    EXPECT_EQ(released, 1);
+    context.collect();
+    EXPECT_EQ(destroyed, 1);
+}
+
 void invoke(Attachment &ctx, Handle object, const char32_t *name, ReturnSlot &out)
 {
     RootScope roots(ctx);

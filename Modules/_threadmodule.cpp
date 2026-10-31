@@ -7,6 +7,7 @@
 #include "internal/errors.hpp"
 #include "internal/long.hpp"
 
+#include <cerrno>
 #include <chrono>
 #include <cmath>
 #include <condition_variable>
@@ -14,6 +15,7 @@
 #include <cstdio>
 #include <future>
 #include <limits>
+#include <memory>
 #include <mutex>
 #include <pthread.h>
 #include <sys/syscall.h>
@@ -55,6 +57,67 @@ void allocate_lock(Attachment &ctx, Handle function, std::span<const Value>, Ret
     RootScope roots(ctx);
     auto type = roots.root(ctx.payload<NativeFunctionObject>(function).captures[0]);
     ctx.allocate_instance<Lock>(type, out);
+}
+
+void set_sentinel(Attachment &ctx, Handle function, std::span<const Value> args, ReturnSlot &out)
+{
+    allocate_lock(ctx, function, args, out);
+    RootScope roots(ctx);
+    ctx.set_exit_sentinel(
+        roots.root(out.value()), +[](ObjectHeader *header) noexcept {
+            auto &lock = *reinterpret_cast<Lock *>(header);
+            std::lock_guard guard(lock.mutex);
+            if (lock.locked) {
+                lock.locked = false;
+                lock.changed.notify_all();
+            }
+        });
+}
+
+void threads_allowed(Attachment &ctx, Handle, std::span<const Value>, ReturnSlot &out)
+{
+    out.ok(ctx.builtin(CoreObject::True));
+}
+
+void stack_size(Attachment &ctx, Handle function, std::span<const Value> args, ReturnSlot &out)
+{
+    // CPython 3.12 also restores the default on the no-argument call.
+    std::optional<std::size_t> replacement = 0;
+    if (args[0] != ctx.payload<NativeFunctionObject>(function).captures[0]) {
+        RootScope roots(ctx);
+        index(ctx, roots.root(args[0]), out);
+        if (out.tag() == ResultTag::Raised)
+            return;
+        std::int64_t value;
+        if (!int_fits_signed(ctx, out.value(), value)) {
+            raise_error(ctx, CoreObject::OverflowErrorType,
+                        U"Python int too large to convert to C ssize_t", out);
+            return;
+        }
+        if (value < 0) {
+            raise_error(ctx, CoreObject::ValueErrorType, U"size must be 0 or a positive value",
+                        out);
+            return;
+        }
+        if (value) {
+            pthread_attr_t attributes;
+            int error = pthread_attr_init(&attributes);
+            if (!error) {
+                error = value < 32768 ? EINVAL : pthread_attr_setstacksize(&attributes, value);
+                pthread_attr_destroy(&attributes);
+            }
+            if (error) {
+                const auto number = std::to_string(value);
+                raise_error(ctx, CoreObject::ValueErrorType,
+                            U"size not valid: " + std::u32string(number.begin(), number.end()) +
+                                U" bytes",
+                            out);
+                return;
+            }
+        }
+        replacement = static_cast<std::size_t>(value);
+    }
+    make_int_decimal(ctx, std::to_string(ctx.native_thread_stack_size(replacement)), out);
 }
 
 bool parse_acquire(Attachment &ctx, std::span<const Value> args, bool &blocking,
@@ -461,6 +524,56 @@ void thread_exit(Attachment &ctx, Handle, std::span<const Value>, ReturnSlot &ou
         out.raised(exception.value());
 }
 
+struct ThreadLaunch {
+    Transfer transfer;
+    std::shared_ptr<std::promise<unsigned long>> started;
+};
+
+void *thread_bootstrap(void *data) noexcept
+{
+    std::unique_ptr<ThreadLaunch> launch(static_cast<ThreadLaunch *>(data));
+    bool admitted = false;
+    try {
+        Attachment child(launch->transfer);
+        launch->started->set_value(static_cast<unsigned long>(pthread_self()));
+        admitted = true;
+        RootScope child_roots(child);
+        ReturnSlot received(child), answer(child);
+        child.receive(launch->transfer, received);
+        auto tuple = child_roots.root(received.value());
+        const auto &values = child.payload<TupleObject>(tuple).items;
+        auto target = child_roots.root(values[0]);
+        auto positional = child_roots.root(values[1]);
+        auto kwargs = child_roots.root(values[2]);
+        std::vector<KeywordArg> named;
+        if (kwargs.get(child) != child.builtin(CoreObject::None)) {
+            DictView view(child, kwargs.get(child));
+            for (const auto &entry : view.entries()) {
+                child_roots.root(entry.key);
+                child_roots.root(entry.value);
+                named.push_back({entry.key, entry.value});
+            }
+        }
+        call(child, target, {child.payload<TupleObject>(positional).items, named}, answer);
+        if (failed(answer) && !is_subtype(child, child.type_of(answer.exception()),
+                                          child.builtin(CoreObject::SystemExitType))) {
+            ReturnSlot message(child);
+            make_str(child, U"Exception ignored in thread started by", message);
+            write_unraisable(child, child_roots.root(answer.exception()), target,
+                             child_roots.root(message.value()));
+        }
+    } catch (...) {
+        if (!admitted) {
+            try {
+                launch->started->set_exception(std::current_exception());
+            } catch (...) {
+            }
+        } else
+            std::fputs("Exception in native thread runtime\n", stderr);
+    }
+    return nullptr;
+}
+
 void thread_start(Attachment &ctx, Handle function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
@@ -496,51 +609,24 @@ void thread_start(Attachment &ctx, Handle function, std::span<const Value> args,
     auto transfer = ctx.make_transfer(roots.root(payload.value()));
     auto started = std::make_shared<std::promise<unsigned long>>();
     auto result = started->get_future();
-    try {
-        std::thread worker([launch = std::move(transfer), started]() mutable {
-            bool admitted = false;
-            try {
-                Attachment child(launch);
-                started->set_value(static_cast<unsigned long>(pthread_self()));
-                admitted = true;
-                RootScope child_roots(child);
-                ReturnSlot received(child), answer(child);
-                child.receive(launch, received);
-                auto tuple = child_roots.root(received.value());
-                const auto &values = child.payload<TupleObject>(tuple).items;
-                auto target = child_roots.root(values[0]);
-                auto positional = child_roots.root(values[1]);
-                auto kwargs = child_roots.root(values[2]);
-                std::vector<KeywordArg> named;
-                if (kwargs.get(child) != child.builtin(CoreObject::None)) {
-                    DictView view(child, kwargs.get(child));
-                    for (const auto &entry : view.entries()) {
-                        child_roots.root(entry.key);
-                        child_roots.root(entry.value);
-                        named.push_back({entry.key, entry.value});
-                    }
-                }
-                call(child, target, {child.payload<TupleObject>(positional).items, named}, answer);
-                if (failed(answer) && !is_subtype(child, child.type_of(answer.exception()),
-                                                  child.builtin(CoreObject::SystemExitType))) {
-                    ReturnSlot message(child);
-                    make_str(child, U"Exception ignored in thread started by", message);
-                    write_unraisable(child, child_roots.root(answer.exception()), target,
-                                     child_roots.root(message.value()));
-                }
-            } catch (...) {
-                if (!admitted) {
-                    try {
-                        started->set_exception(std::current_exception());
-                    } catch (...) {
-                    }
-                } else {
-                    std::fputs("Exception in native thread runtime\n", stderr);
-                }
-            }
-        });
-        worker.detach();
-    } catch (const std::system_error &) {
+    auto launch = std::make_unique<ThreadLaunch>(ThreadLaunch{std::move(transfer), started});
+    pthread_attr_t attributes;
+    int error = pthread_attr_init(&attributes);
+    if (!error) {
+        error = pthread_attr_setdetachstate(&attributes, PTHREAD_CREATE_DETACHED);
+        if (!error)
+            if (const auto size = ctx.native_thread_stack_size())
+                error = pthread_attr_setstacksize(&attributes, size);
+        if (!error) {
+            pthread_t worker;
+            NativeWait wait(ctx);
+            error = pthread_create(&worker, &attributes, thread_bootstrap, launch.get());
+            if (!error)
+                launch.release();
+        }
+        pthread_attr_destroy(&attributes);
+    }
+    if (error) {
         raise_error(ctx, CoreObject::RuntimeErrorType, U"can't start new thread", out);
         return;
     }
@@ -556,6 +642,27 @@ void thread_start(Attachment &ctx, Handle function, std::span<const Value> args,
     make_int_decimal(ctx, std::to_string(id), out);
 }
 } // namespace
+
+void shutdown_threads(Attachment &ctx, ReturnSlot &out)
+{
+    RootScope roots(ctx);
+    auto entry = name_lookup(ctx, ctx.builtin(CoreObject::Modules), U"threading");
+    if (!entry) {
+        out.ok(ctx.builtin(CoreObject::None));
+        return;
+    }
+    auto module = roots.root(*entry);
+    make_str(ctx, U"_shutdown", out);
+    get_attribute(ctx, module, roots.root(out.value()), out);
+    if (!failed(out))
+        call(ctx, roots.root(out.value()), {}, out);
+    if (failed(out)) {
+        auto exception = roots.root(out.exception());
+        make_str(ctx, U"Exception ignored on threading shutdown", out);
+        write_unraisable(ctx, exception, module, roots.root(out.value()));
+    }
+    out.ok(ctx.builtin(CoreObject::None));
+}
 
 void initialize_thread(Attachment &ctx, Handle module, ReturnSlot &out)
 {
@@ -666,6 +773,19 @@ void initialize_thread(Attachment &ctx, Handle module, ReturnSlot &out)
     auto allocator = roots.root(value.value());
     if (!store(U"allocate_lock", allocator.get(ctx)) || !store(U"allocate", allocator.get(ctx)))
         return;
+    make_native_function(ctx, "_set_sentinel", {}, set_sentinel, {&capture, 1}, value,
+                         NativeFunctionBinding::Function);
+    if (!store(U"_set_sentinel", value.value()))
+        return;
+    for (auto name : {U"daemon_threads_allowed", U"_is_main_interpreter"}) {
+        make_native_function(ctx,
+                             name == std::u32string_view(U"daemon_threads_allowed")
+                                 ? "daemon_threads_allowed"
+                                 : "_is_main_interpreter",
+                             {}, threads_allowed, {}, value, NativeFunctionBinding::Function);
+        if (!store(name, value.value()))
+            return;
+    }
     make_native_function(ctx, "get_ident", {}, ident, {}, value, NativeFunctionBinding::Function);
     if (!store(U"get_ident", value.value()))
         return;
@@ -684,6 +804,12 @@ void initialize_thread(Attachment &ctx, Handle module, ReturnSlot &out)
                          {&sentinel_value, 1}, value, NativeFunctionBinding::Function);
     auto starter = roots.root(value.value());
     if (!store(U"start_new_thread", starter.get(ctx)) || !store(U"start_new", starter.get(ctx)))
+        return;
+    SignatureLayout size_signature;
+    size_signature.parameters = {{U"size", ParameterKind::PositionalOnly, sentinel.get(ctx)}};
+    make_native_function(ctx, "stack_size", size_signature, stack_size, {&sentinel_value, 1}, value,
+                         NativeFunctionBinding::Function);
+    if (!store(U"stack_size", value.value()))
         return;
     make_native_function(ctx, "exit", {}, thread_exit, {}, value, NativeFunctionBinding::Function);
     auto exit_function = roots.root(value.value());

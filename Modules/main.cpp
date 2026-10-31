@@ -7,6 +7,7 @@
 #include "internal/pythonrun.hpp"
 #include "internal/stdio.hpp"
 #include "internal/sysmodule.hpp"
+#include "internal/threadmodule.hpp"
 
 #include <array>
 #include <filesystem>
@@ -313,6 +314,7 @@ int pymain(int argc, char **argv)
         if (repl_only || options.interactive)
             status = run_interactive(context, globals, sys, tty || options.interactive,
                                      tty && !options.quiet && repl_only, future_flags);
+        shutdown_threads(context, out);
         run_exitfuncs(context, out);
         if (out.tag() == ResultTag::Raised)
             return report_exception(context, out.exception());

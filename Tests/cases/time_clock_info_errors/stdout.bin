@@ -1,0 +1,17 @@
+TypeError get_clock_info() argument 1 must be str, not None
+TypeError get_clock_info() argument 1 must be str, not bool
+TypeError get_clock_info() argument 1 must be str, not int
+TypeError get_clock_info() argument 1 must be str, not float
+TypeError get_clock_info() argument 1 must be str, not bytes
+TypeError get_clock_info() argument 1 must be str, not bytearray
+TypeError get_clock_info() argument 1 must be str, not list
+TypeError get_clock_info() argument 1 must be str, not tuple
+TypeError get_clock_info() argument 1 must be str, not dict
+TypeError get_clock_info() argument 1 must be str, not object
+TypeError get_clock_info() argument 1 must be str, not Custom
+TypeError get_clock_info() argument 1 must be str, not CustomInt
+TypeError get_clock_info() argument 1 must be str, not type
+TypeError get_clock_info() argument 1 must be str, not xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TypeError get_clock_info() argument 1 must be str, not ééééééééééééééééééééééééé
+UnicodeDecodeError 'utf-8' codec can't decode byte 0xc3 in position 94: unexpected end of data
+True

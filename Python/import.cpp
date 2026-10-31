@@ -27,6 +27,7 @@
 #include "internal/structmodule.hpp"
 #include "internal/sysmodule.hpp"
 #include "internal/threadmodule.hpp"
+#include "internal/timemodule.hpp"
 #include "internal/tokenizemodule.hpp"
 #include "internal/unicodedata.hpp"
 
@@ -255,6 +256,7 @@ detail::ImportState::ImportState()
                                      {U"_blake2", detail::initialize_blake2},
                                      {U"_io", detail::initialize_io},
                                      {U"_operator", detail::initialize_operator},
+                                     {U"time", detail::initialize_time},
                                      {U"_opcode", detail::initialize_opcode},
 #ifdef CXXPYTHON_HAVE_READLINE
                                      {U"readline", detail::initialize_readline},

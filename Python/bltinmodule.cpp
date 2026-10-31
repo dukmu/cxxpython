@@ -172,6 +172,29 @@ void builtin_abs(Attachment &context, Handle, std::span<const Value> args, Retur
     }
     detail::invoke_special(context, value, roots.root(*method), {{}, {}}, out);
 }
+void builtin_round(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(context);
+    auto value = roots.root(args[0]);
+    auto digits = roots.root(args[1]);
+    auto method = detail::type_attribute(context, context.type_of(value), U"__round__");
+    if (!method) {
+        auto name = TypeView(context, context.type_of(value)).name();
+        auto text = std::holds_alternative<Value>(name)
+                        ? context.payload<StrObject>(std::get<Value>(name)).value
+                        : std::get<std::u32string>(name);
+        raise_error(context, CoreObject::TypeErrorType,
+                    U"type " + text + U" doesn't define __round__ method", out);
+        return;
+    }
+    auto callable = roots.root(*method);
+    if (digits.get(context) == context.builtin(CoreObject::None))
+        detail::invoke_special(context, value, callable, {{}, {}}, out);
+    else {
+        const std::array arguments{digits.get(context)};
+        detail::invoke_special(context, value, callable, {arguments, {}}, out);
+    }
+}
 void builtin_id(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     make_int(context, static_cast<std::int64_t>(reinterpret_cast<std::uintptr_t>(args[0].object())),
@@ -805,6 +828,11 @@ void install_class_builtins(Attachment &context, std::span<const Handle> core, V
     ascii_signature.parameters = {{U"object", ParameterKind::PositionalOnly}};
     install("ascii", U"ascii", ascii_signature, builtin_ascii);
     install("abs", U"abs", ascii_signature, builtin_abs);
+    SignatureLayout round_signature;
+    round_signature.parameters = {{U"number", ParameterKind::PositionalOrKeyword},
+                                  {U"ndigits", ParameterKind::PositionalOrKeyword,
+                                   core[static_cast<std::size_t>(CoreObject::None)].get(context)}};
+    install("round", U"round", round_signature, builtin_round);
     install("id", U"id", ascii_signature, builtin_id);
     install("chr", U"chr", ascii_signature, builtin_chr);
     install("ord", U"ord", ascii_signature, builtin_ord);

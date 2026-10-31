@@ -39,6 +39,7 @@ add_library(cxxpython_core
     Modules/_impmodule.cpp
     Modules/_iomodule.cpp
     Modules/_operator.cpp
+    Modules/timemodule.cpp
     Modules/_opcodemodule.cpp
     Modules/_tokenizemodule.cpp
     Modules/_astmodule.cpp

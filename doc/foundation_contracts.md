@@ -674,6 +674,22 @@ and ReturnSlot are never transferred directly between threads. Closing rejects
 new admission while existing leases can finish; bootstrap publication alone
 requires single-initializer admission.
 
+ThreadRecord owns at most one explicit exit-sentinel root and a native-only
+release action. Sweep traces that root even after ordinary scopes drain; a
+replacement releases only ownership of the previous notification. Retirement
+first freezes/exits the mutator, finishes the current epoch and transfers its
+allocation spans. It then releases the native notification under the running
+coordinator gate before removing the record. The action must not allocate,
+access managed protocols or call Python. Native lock waiters cannot resume heap
+access until that gate is released, so Thread.join never observes a still-active
+Python Frame/root arena. The bounded strong lease differs from CPython's weak
+reference-counted sentinel timing and is not a second thread registry.
+
+The native stack-size setting is atomic per Interpreter; Python worker startup
+uses per-launch POSIX attributes. No process-global pthread default or execution
+lock is changed. The CLI invokes loaded threading._shutdown before atexit; full
+embedding, daemon cancellation and abnormal teardown remain separate gates.
+
 ## Shared Fields And Calls
 
 Header/type references, instance field tails, Cell contents and exception graph
