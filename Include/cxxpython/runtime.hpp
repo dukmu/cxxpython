@@ -638,6 +638,7 @@ class Attachment final {
     bool begin_publication(PublicationDomain domain, std::uint64_t epoch);
     void end_publication(PublicationDomain domain, std::uint64_t epoch);
     bool enter_call();
+    std::size_t call_depth_limit() const;
     void leave_call() noexcept;
     bool enter_native_call();
     void leave_native_call() noexcept;

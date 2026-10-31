@@ -1,0 +1,29 @@
+(a: int, /, b=2, *values, c: str = 'value', **keywords) -> tuple
+FullArgSpec(args=['a', 'b'], varargs='values', varkw='keywords', defaults=(2,), kwonlyargs=['c'], kwonlydefaults={'c': 'value'}, annotations={'return': <class 'tuple'>, 'a': <class 'int'>, 'c': <class 'str'>})
+[('a', 'POSITIONAL_ONLY'), ('b', 'POSITIONAL_OR_KEYWORD'), ('values', 'VAR_POSITIONAL'), ('c', 'KEYWORD_ONLY'), ('keywords', 'VAR_KEYWORD')]
+{'a': 1, 'b': 3, 'values': (4,), 'c': 'x', 'keywords': {'extra': 5}}
+{'a': 1, 'b': 2, 'values': (), 'c': 'value', 'keywords': {}}
+(1, 2) {'c': 'value'}
+True
+2 1 1 6
+('a', 'b', 'c', 'values', 'keywords', 'local')
+Summary.
+
+Body.
+First
+second
+third
+{'a': <class 'int'>, 'c': <class 'str'>, 'return': <class 'tuple'>}
+(self, value=3)
+(value=3)
+(value)
+True True True
+(b=2, *values, c: str = 'fixed', **keywords) -> tuple
+True
+True
+True True True
+True
+1
+Summary
+Detail
+(a: int, /, b=2, *values, c: str = 'value', **keywords) -> tuple

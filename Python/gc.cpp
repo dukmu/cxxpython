@@ -1751,6 +1751,11 @@ bool Attachment::enter_call()
     ++call_depth_;
     return true;
 }
+std::size_t Attachment::call_depth_limit() const
+{
+    require_safepoint();
+    return state_->config.max_call_depth;
+}
 void Attachment::leave_call() noexcept
 {
     assert(call_depth_ != 0);

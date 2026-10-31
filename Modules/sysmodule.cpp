@@ -3,6 +3,7 @@
 #include "internal/sysmodule.hpp"
 
 #include "cxxpython/execution.hpp"
+#include "cxxpython/floatobject.hpp"
 #include "cxxpython/moduleobject.hpp"
 #include "cxxpython/namespaceobject.hpp"
 #include "cxxpython/protocol.hpp"
@@ -12,6 +13,7 @@
 #include "internal/import.hpp"
 
 #include <bit>
+#include <cfloat>
 #include <limits>
 
 namespace cxxpython::core::detail {
@@ -20,18 +22,25 @@ bool failed(const ReturnSlot &out)
 {
     return out.tag() == ResultTag::Raised;
 }
-template <std::size_t I> void version_field(Attachment &ctx, Value self, ReturnSlot &out)
+constexpr const char32_t *version_names[] = {U"major", U"minor", U"micro", U"releaselevel",
+                                             U"serial"};
+constexpr const char32_t *float_names[] = {U"max",     U"max_exp",    U"max_10_exp", U"min",
+                                           U"min_exp", U"min_10_exp", U"dig",        U"mant_dig",
+                                           U"epsilon", U"radix",      U"rounds"};
+template <std::size_t I> void info_field(Attachment &ctx, Value self, ReturnSlot &out)
 {
     out.ok(ctx.payload<TupleObject>(self).items[I]);
 }
-void version_repr(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+template <bool Float>
+void info_repr(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto self = roots.root(args[0]);
-    const char32_t *names[] = {U"major", U"minor", U"micro", U"releaselevel", U"serial"};
-    std::u32string text = U"sys.version_info(";
+    const auto names = Float ? std::span<const char32_t *const>(float_names)
+                             : std::span<const char32_t *const>(version_names);
+    std::u32string text = Float ? U"sys.float_info(" : U"sys.version_info(";
     ReturnSlot item(ctx);
-    for (std::size_t i = 0; i < 5; ++i) {
+    for (std::size_t i = 0; i < names.size(); ++i) {
         if (i)
             text += U", ";
         text += names[i];
@@ -50,14 +59,45 @@ void version_new(Attachment &ctx, Handle, std::span<const Value>, ReturnSlot &ou
 {
     raise_error(ctx, CoreObject::TypeErrorType, U"cannot create 'sys.version_info' instances", out);
 }
-void make_version_info(Attachment &ctx, ReturnSlot &out)
+void float_info_new(Attachment &ctx, Handle function, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(ctx);
+    auto type = roots.root(args[0]);
+    if (type.get(ctx) != ctx.payload<NativeFunctionObject>(function).captures[0]) {
+        raise_error(ctx, CoreObject::TypeErrorType, U"invalid sys.float_info type", out);
+        return;
+    }
+    if (!ctx.has_layout<DictObject>(args[2])) {
+        raise_error(ctx, CoreObject::TypeErrorType,
+                    U"sys.float_info() takes a dict as second arg, if any", out);
+        return;
+    }
+    ReturnSlot sequence(ctx);
+    const std::array input{args[1]};
+    call(ctx, roots.root(ctx.builtin(CoreObject::TupleType)), {input}, sequence);
+    if (failed(sequence)) {
+        out.raised(sequence.exception());
+        return;
+    }
+    const auto &items = ctx.payload<TupleObject>(sequence.value()).items;
+    if (items.size() != 11) {
+        auto count = std::to_string(items.size());
+        raise_error(ctx, CoreObject::TypeErrorType,
+                    U"sys.float_info() takes a 11-sequence (" +
+                        std::u32string(count.begin(), count.end()) + U"-sequence given)",
+                    out);
+        return;
+    }
+    ctx.allocate_instance<TupleObject>(type, out, items);
+}
+void make_info_type(Attachment &ctx, bool floating, ReturnSlot &out)
 {
     RootScope roots(ctx);
     std::vector<Handle> core;
     for (std::size_t i = 0; i < core_count; ++i)
         core.push_back(roots.root(ctx.builtin(static_cast<CoreObject>(i))));
     const Handle bases[] = {roots.root(ctx.builtin(CoreObject::TupleType))};
-    TypeSpec spec{U"version_info", bases};
+    TypeSpec spec{floating ? U"float_info" : U"version_info", bases};
     spec.module = U"sys";
     spec.slots = std::vector<std::u32string>{};
     ReturnSlot temporary(ctx);
@@ -67,18 +107,30 @@ void make_version_info(Attachment &ctx, ReturnSlot &out)
         return;
     }
     auto type = roots.root(temporary.value());
-    const char32_t *names[] = {U"major", U"minor", U"micro", U"releaselevel", U"serial"};
-    const NativeGetter getters[] = {version_field<0>, version_field<1>, version_field<2>,
-                                    version_field<3>, version_field<4>};
-    for (std::size_t i = 0; i < 5; ++i)
+    const auto names = floating ? std::span<const char32_t *const>(float_names)
+                                : std::span<const char32_t *const>(version_names);
+    const NativeGetter getters[] = {info_field<0>, info_field<1>, info_field<2>, info_field<3>,
+                                    info_field<4>, info_field<5>, info_field<6>, info_field<7>,
+                                    info_field<8>, info_field<9>, info_field<10>};
+    for (std::size_t i = 0; i < names.size(); ++i)
         install_native_field(ctx, core, type, names[i], getters[i]);
     SignatureLayout signature;
     signature.parameters = {{U"self", ParameterKind::PositionalOnly}};
-    install_native_attribute(ctx, core, type, U"__repr__", signature, version_repr);
+    install_native_attribute(ctx, core, type, U"__repr__", signature,
+                             floating ? info_repr<true> : info_repr<false>);
     signature.parameters[0].name = U"cls";
-    signature.varargs = U"args";
-    signature.varkwargs = U"kwargs";
-    install_native_attribute(ctx, core, type, U"__new__", signature, version_new);
+    if (floating) {
+        ctx.allocate_instance<DictObject>(roots.root(ctx.builtin(CoreObject::DictType)), temporary);
+        auto defaults = roots.root(temporary.value());
+        signature.parameters.push_back({U"sequence"});
+        signature.parameters.push_back(
+            {U"dict", ParameterKind::PositionalOrKeyword, defaults.get(ctx)});
+    } else {
+        signature.varargs = U"args";
+        signature.varkwargs = U"kwargs";
+    }
+    install_native_attribute(ctx, core, type, U"__new__", signature,
+                             floating ? float_info_new : version_new, {type.get(ctx)});
     auto dictionary = roots.root(*TypeView(ctx, type).dictionary());
     auto constructor = roots.root(*name_lookup(ctx, dictionary.get(ctx), U"__new__"));
     ctx.allocate_instance<StaticMethodObject>(
@@ -87,8 +139,9 @@ void make_version_info(Attachment &ctx, ReturnSlot &out)
     auto function = roots.root(temporary.value());
     make_str(ctx, U"__new__", temporary);
     name_store(ctx, dictionary.get(ctx), temporary.value(), function.get(ctx));
-    for (const auto &[name, number] :
-         {std::pair{U"n_fields", 5}, {U"n_sequence_fields", 5}, {U"n_unnamed_fields", 0}}) {
+    for (const auto &[name, number] : {std::pair{U"n_fields", static_cast<int>(names.size())},
+                                       {U"n_sequence_fields", static_cast<int>(names.size())},
+                                       {U"n_unnamed_fields", 0}}) {
         make_int(ctx, number, temporary);
         auto value = roots.root(temporary.value());
         make_str(ctx, name, temporary);
@@ -96,6 +149,18 @@ void make_version_info(Attachment &ctx, ReturnSlot &out)
     }
     ctx.payload<TypeObject>(type).subclassable = false;
     ctx.payload<TypeObject>(type).immutable = true;
+    out.ok(type.get(ctx));
+}
+void make_version_info(Attachment &ctx, ReturnSlot &out)
+{
+    RootScope roots(ctx);
+    ReturnSlot temporary(ctx);
+    make_info_type(ctx, false, temporary);
+    if (failed(temporary)) {
+        out.raised(temporary.exception());
+        return;
+    }
+    auto type = roots.root(temporary.value());
     std::vector<Value> items;
     for (auto number : {3, 12, 14}) {
         make_int(ctx, number, temporary);
@@ -107,6 +172,30 @@ void make_version_info(Attachment &ctx, ReturnSlot &out)
     items.push_back(roots.root(temporary.value()).get(ctx));
     ctx.allocate_instance<TupleObject>(type, out, std::move(items));
 }
+void make_float_info(Attachment &ctx, ReturnSlot &out)
+{
+    RootScope roots(ctx);
+    ReturnSlot temporary(ctx);
+    make_info_type(ctx, true, temporary);
+    if (failed(temporary)) {
+        out.raised(temporary.exception());
+        return;
+    }
+    auto type = roots.root(temporary.value());
+    std::vector<Value> items;
+    for (std::size_t i = 0; i < 11; ++i) {
+        if (i == 0 || i == 3 || i == 8)
+            make_float(ctx, i == 0 ? DBL_MAX : i == 3 ? DBL_MIN : DBL_EPSILON, temporary);
+        else {
+            const int numbers[] = {0,           DBL_MAX_EXP,    DBL_MAX_10_EXP, 0,
+                                   DBL_MIN_EXP, DBL_MIN_10_EXP, DBL_DIG,        DBL_MANT_DIG,
+                                   0,           FLT_RADIX,      FLT_ROUNDS};
+            make_int(ctx, numbers[i], temporary);
+        }
+        items.push_back(roots.root(temporary.value()).get(ctx));
+    }
+    ctx.allocate_instance<TupleObject>(type, out, std::move(items));
+}
 template <bool Errors>
 void filesystem_encoding(Attachment &ctx, Handle, std::span<const Value>, ReturnSlot &out)
 {
@@ -116,6 +205,10 @@ void filesystem_encoding(Attachment &ctx, Handle, std::span<const Value>, Return
 void sys_exception(Attachment &ctx, Handle, std::span<const Value>, ReturnSlot &out)
 {
     out.ok(ctx.handled_exception().value_or(ctx.builtin(CoreObject::None)));
+}
+void recursion_limit(Attachment &ctx, Handle, std::span<const Value>, ReturnSlot &out)
+{
+    make_int(ctx, static_cast<std::int64_t>(ctx.call_depth_limit()), out);
 }
 
 void sys_exc_info(Attachment &ctx, Handle, std::span<const Value>, ReturnSlot &out)
@@ -518,6 +611,10 @@ void initialize_sys_hooks(Attachment &ctx, Handle sys, ReturnSlot &out)
                          NativeFunctionBinding::Function);
     if (!store(U"exc_info"))
         return;
+    make_native_function(ctx, "getrecursionlimit", {}, recursion_limit, {}, function,
+                         NativeFunctionBinding::Function);
+    if (!store(U"getrecursionlimit"))
+        return;
     SignatureLayout exit_signature;
     exit_signature.parameters = {
         {U"status", ParameterKind::PositionalOnly, ctx.builtin(CoreObject::None)}};
@@ -588,6 +685,13 @@ void initialize_sys_hooks(Attachment &ctx, Handle sys, ReturnSlot &out)
         return;
     }
     if (!store(U"version_info"))
+        return;
+    make_float_info(ctx, function);
+    if (failed(function)) {
+        out.raised(function.exception());
+        return;
+    }
+    if (!store(U"float_info"))
         return;
     make_str(ctx, U"3.12.14 (cxxpython)", function);
     if (!store(U"version"))

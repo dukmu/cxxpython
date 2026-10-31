@@ -250,10 +250,37 @@ including those not-yet-executable families. `Grammar/` is the source of truth;
 `Tools/peg_generator/generate.py` uses vendored pegen grammar/SCC analysis and
 emits checked-in C++ rules. Ordinary parser builds link only the standard library.
 It accepts UTF-8 Unicode source; file encoding-cookie decoding is a loader gate.
-The CST adapter in `Parser/ast.cpp` is not a grammar recognizer. The previous
+The CST adapter in `Parser/ast_public.cpp` is not a grammar recognizer. The previous
 handwritten parser and its dedicated parser tests have been removed; compiler,
 execution and precise-root tests remain on the new frontend. The native parser's
 generic syntax errors do not claim CPython's invalid_* second-pass wording.
+
+The pinned Python.asdl schema and upstream ASDL reader generate all native AST
+node/field/hierarchy metadata. Public Python nodes use ordinary traced instance
+dictionaries and attributes. Each owns its immutable canonical type table; the
+current type MRO determines its semantic family even after compatible __class__
+assignment. Native ASDL nodes contain only owned C++ data. Python/ast.cpp reads
+required/optional fields, families, lists, integers, constants and positions while
+Active, retaining precise roots through descriptors and collection. Lists use
+their normal rooted snapshots; concurrent whole-tree edits are not one atomic
+transaction. Only the resulting unmanaged tree crosses NativeWait.
+
+SourceUnit(source) and SourceUnit(native AST) both enter ast_lower.cpp, then the
+same scope/CFG/freeze passes. The old CST-to-execution-IR adapter is deleted.
+SourceUnit borrows its native AST input only during construction and owns all
+resulting graph data. Span retains byte offsets for source input and optionally
+owns explicit SourcePosition coordinates for AST input; there is no fabricated
+source or ordinal-as-byte-offset conversion. Unknown AST columns use an internal
+sentinel and are exposed as None. Scope metadata records a decorated definition's
+Code first line separately from its AST node span. The current verified VM still
+requires positive source lines: Python AST inputs with non-positive lines raise
+an explicit ValueError before bytecode construction, unlike CPython. Removing
+that representation limit remains a frontend acceptance gate, not a hidden C++
+fault or a fabricated line number. Constant snapshots support signed integers,
+complex values, immutable tuples and frozensets without hiding Python identities
+in native IR. AST schema/type errors and structural ValueErrors remain distinct
+from source/scope SyntaxErrors. Complete type-comment, versioned grammar, error
+and complexity matrices remain gates.
 
 The native PEG recursion budget is 1024 active grammar calls. The old 4096
 budget could overflow an instrumented native stack before its own check.

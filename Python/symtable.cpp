@@ -432,6 +432,9 @@ class ScopePass final {
             annotation(item.second, parent);
         node.scope =
             add(ScopeKind::Function, node.name, qualified(node.name, parent), parent, span);
+        if (!node.decorators.empty())
+            program_.scopes[node.scope].first_line =
+                program_.source.position(node.decorators.front()->span).line;
         for (auto &annotation : node.annotations)
             annotation.first = mangle(std::move(annotation.first), node.scope);
         program_.scopes[node.scope].coroutine = node.coroutine;
@@ -789,6 +792,9 @@ class ScopePass final {
                         }
                         node.scope = add(ScopeKind::Class, node.name, qualified(node.name, scope),
                                          parent, statement->span);
+                        if (!node.decorators.empty())
+                            program_.scopes[node.scope].first_line =
+                                program_.source.position(node.decorators.front()->span).line;
                         if (parent != scope)
                             bindings_[node.scope].get(U".type_params", statement->span).used = true;
                         private_names_[node.scope] = node.name;

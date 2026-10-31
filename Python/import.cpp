@@ -4,6 +4,7 @@
 #include "cxxpython/typealiasobject.hpp"
 #include "cxxpython/weakrefobject.hpp"
 #include "internal/abc.hpp"
+#include "internal/astmodule.hpp"
 #include "internal/atexitmodule.hpp"
 #include "internal/binascii.hpp"
 #include "internal/codecregistry.hpp"
@@ -27,6 +28,7 @@
 #include "internal/sysmodule.hpp"
 #include "internal/threadmodule.hpp"
 #include "internal/tokenizemodule.hpp"
+#include "internal/unicodedata.hpp"
 
 #include <filesystem>
 
@@ -262,6 +264,8 @@ detail::ImportState::ImportState()
 #endif
                                      {U"_thread", detail::initialize_thread},
                                      {U"_abc", detail::initialize_abc},
+                                     {U"_ast", detail::initialize_ast},
+                                     {U"unicodedata", detail::initialize_unicodedata},
                                      {U"_typing", detail::initialize_typing},
                                      {U"_sre", detail::initialize_sre},
                                      {U"_tokenize", detail::initialize_tokenize},

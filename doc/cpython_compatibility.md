@@ -30,6 +30,11 @@ acceptance evidence; this list is not a generated support matrix.
   not CPython code bytes or its C ABI. Bytecode caching stays absent rather than
   manufacturing CPython-compatible .pyc paths. Add a documented private cache
   format only with compiler/version validation and the corresponding tests.
+- importlib.machinery suffix metadata and all_suffixes now share the actual
+  FileFinder policy lists: .py sources, the native extension ABI suffixes and
+  no bytecode suffixes. DEBUG/OPTIMIZED_BYTECODE_SUFFIXES alias the empty bytecode
+  list rather than advertising unsupported CPython .pyc loading. This closes the
+  real inspect source-discovery dependency without changing inspect's policy.
 - Source file decoding is still UTF-8/BOM with universal newlines. Complete
   bytes/buffer and codecs/encodings before replacing this with the upstream
   encoding-cookie and source decoding implementation. Do not treat a non-UTF-8
@@ -117,7 +122,8 @@ the target is `builtins` and the `__builtins__` execution namespace.
   behavior; explicit global still emits global instructions. Current valid slices
   include exec/eval/single, supported future flags/dont_inherit and the independent
   0x200/0x4000 codeop input flags. Parser-only flags do not become co_flags.
-  AST compilation, closure execution, path-like filenames, optimization modes
+  Source-to-AST and AST-to-Code now share the ordinary ASDL/IR compiler path.
+  Closure execution, path-like filenames, bytecode optimization modes
   and complete diagnostics are not done.
   Complete them in the compiler rather than making Lib permanently avoid them.
 - `Lib/codeop.py` and `Lib/code.py` are unchanged pinned sources. The compiler
@@ -131,9 +137,45 @@ the target is `builtins` and the `__builtins__` execution namespace.
   `_get_code_position` indexes actual VM instructions, not CPython two-byte
   wordcode. Code.co_positions/co_lines and readonly Frame.f_lasti expose actual
   immutable program positions and the atomic frame cursor. Focused exception-only,
-  traceback and console cases pass. Public ast, unicodedata, frame.clear and
-  complete reflection/Unicode-caret/upstream-suite coverage remain dependencies;
+  traceback and console cases pass. Native AST and Unicode dependencies are now
+  present; frame.clear and complete reflection/Unicode-caret/upstream-suite
+  coverage remain dependencies;
   no fake modules or fabricated co_code are introduced to hide them.
+- `Grammar/Python.asdl`, the upstream ASDL reader, `Lib/ast.py` and `Lib/inspect.py`
+  are copied from pinned 3.12.14. The generated native schema is the sole AST
+  field/type authority. The CST-to-ASDL and ASDL-to-IR adapters replace the former
+  direct CST-to-IR path. Public parse/dump/walk/visitors/transformers/literal_eval/
+  unparse and actual compile(AST) have direct source/reference tests. Managed
+  conversion honors attribute callbacks, list synchronization, mutable AST class
+  identity, native constants and explicit positions. No unparse-to-source compile
+  fallback or missing-module policy edits exist. Type comments, historical
+  feature_version grammars, complete AST constructor/validation/module-lifecycle
+  and upstream test matrices remain acceptance work. The current verified VM's
+  positive-source-line requirement rejects non-positive AST lines with a tested
+  ValueError; CPython accepts them. This explicit representation limit, like the
+  native parser/IR depth bounds, remains work rather than full AST compatibility.
+- Code argument counts, keyword-only/positional-only counts and local count expose
+  actual SignatureLayout/local metadata. dis.COMPILER_FLAG_NAMES names the public
+  trait bits already used by VerifiedCode; it does not introduce wordcode.
+  Unchanged inspect runs Python function/bound-method signatures and binding,
+  annotations, documentation, wrapping and cached-source workflows. Complete
+  native callable text signatures, code replacement, frame APIs and inspect's
+  remaining matrices are not claimed.
+- sys.float_info is a readonly native tuple record backed by actual float.h
+  values, with all eleven fields, tuple protocols and sequence construction.
+  Its metadata/repr helpers are shared with version_info, not a partial namespace
+  containing only max_10_exp. sys.getrecursionlimit reports the Interpreter's
+  actual configured logical-call budget (currently 128 by default), not CPython's
+  default value. Dynamic limit setters and complete sys/platform records remain
+  separate capabilities.
+- Native unicodedata adapts pinned immutable Unicode 15.0.0 tables and the 3.2.0
+  change records, numeric/type tables and named sequences. Property/default/name/
+  lookup APIs, NFC/NFD/NFKC/NFKD and is_normalized use per-call scratch and bounded
+  polling. The legacy UCD object uses actual versioned data, not the current
+  database under an old label. Stable bounded-class ordering and append-only
+  composition avoid repeated whole-string erases. Fixed upstream-derived cases,
+  long combining runs and shared-heap GC exercise the product; complete upstream
+  Unicode conformance/performance/platform matrices remain acceptance work.
 - Native Unicode interpolation/prefix methods now close actual library dependencies
   instead of rewriting runpy's messages. Percent interpolation, str.format field/
   conversion/nested-spec behavior and startswith/endswith use ordinary typed

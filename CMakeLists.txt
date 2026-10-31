@@ -31,6 +31,7 @@ add_library(cxxpython_core
     Python/pythonrun.cpp
     Python/compile.cpp
     Python/ast_unparse.cpp
+    Python/ast.cpp
     Python/bltinmodule.cpp
     Python/builtinexec.cpp
     Python/import.cpp
@@ -40,6 +41,7 @@ add_library(cxxpython_core
     Modules/_operator.cpp
     Modules/_opcodemodule.cpp
     Modules/_tokenizemodule.cpp
+    Modules/_astmodule.cpp
     Modules/_stringmodule.cpp
     Modules/_sre/engine.c
     Modules/_sre/sre.cpp
@@ -63,6 +65,7 @@ add_library(cxxpython_core
     Modules/binascii.cpp
     Modules/main.cpp
     Modules/sysmodule.cpp
+    Modules/unicodedatamodule.cpp
     Modules/gcmodule.cpp
     Modules/_weakref.cpp
     Modules/_codecsmodule.cpp
@@ -76,7 +79,8 @@ add_library(cxxpython_core
     Python/ceval.cpp
     Python/traceback.cpp
     Python/unwind.cpp
-    Parser/ast.cpp
+    Parser/ast_lower.cpp
+    Parser/ast_public.cpp
     Parser/source.cpp
     Objects/typeobject.cpp
     Objects/object.cpp
@@ -161,7 +165,10 @@ file(GLOB_RECURSE FORMAT_SOURCES CONFIGURE_DEPENDS
     Tests/cpp/*.cpp Tests/extensions/*.c Tools/benchmarks/*.cpp Tools/parser/*.cpp)
 list(REMOVE_ITEM FORMAT_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/Parser/generated_parser.cpp
-    ${CMAKE_CURRENT_SOURCE_DIR}/Include/cxxpython/grammar.hpp)
+    ${CMAKE_CURRENT_SOURCE_DIR}/Include/cxxpython/grammar.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Include/internal/unicodedata_db.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Include/internal/unicodedata_type_db.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/Include/internal/unicodedata_sequences.hpp)
 list(APPEND FORMAT_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/Modules/_sre/engine.c
     ${CMAKE_CURRENT_SOURCE_DIR}/Modules/_sre/engine.h)
 find_package(Python3 COMPONENTS Interpreter QUIET)
@@ -171,6 +178,9 @@ if(Python3_Interpreter_FOUND)
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
     add_custom_target(parser-generated-check
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/Tools/peg_generator/generate.py --check
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
+    add_custom_target(ast-generated-check
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/Tools/asdl_generator/generate.py --check
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 endif()
 add_custom_target(format
@@ -332,6 +342,8 @@ if(BUILD_TESTING)
     set_tests_properties(Grammar.Differential PROPERTIES TIMEOUT 90)
     add_test(NAME Grammar.Generated COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/Tools/peg_generator/generate.py --check)
+    add_test(NAME Ast.Generated COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/Tools/asdl_generator/generate.py --check)
     add_test(NAME Constructors.Differential COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_constructors.py
         --binary $<TARGET_FILE:cxxpython> --reference ${CXXPYTHON_REFERENCE_PYTHON})

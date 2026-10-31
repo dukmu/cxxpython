@@ -20,6 +20,8 @@ SourceBuffer::SourceBuffer(std::string text, std::string filename) : filename_(s
 }
 SourcePosition SourceBuffer::position(Span span) const
 {
+    if (span.coordinates)
+        return *span.coordinates;
     auto at = [&](std::size_t offset) {
         offset = std::min(offset, text_.size());
         const auto row = static_cast<std::size_t>(
@@ -44,8 +46,13 @@ SourceError::SourceError(const SourceBuffer &source, Span where, std::string mes
     : std::invalid_argument(std::move(message)), kind(category), span(where),
       position(source.position(where)), filename(source.filename()),
       source_line(source.line(position.line)),
-      offset(source.character_column(position.line, position.column) + 1),
-      end_offset(source.character_column(position.end_line, position.end_column) + 1)
+      offset((where.coordinates ? position.column
+                                : source.character_column(position.line, position.column)) +
+             1),
+      end_offset((where.coordinates
+                      ? position.end_column
+                      : source.character_column(position.end_line, position.end_column)) +
+                 1)
 {}
 std::uint32_t SourceBuffer::character_column(std::uint32_t number, std::uint32_t byte_column) const
 {

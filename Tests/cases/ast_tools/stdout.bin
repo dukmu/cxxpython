@@ -1,0 +1,38 @@
+base fields ((), (), ())
+name fields (('id', 'ctx'), ('lineno', 'col_offset', 'end_lineno', 'end_col_offset'), ('id', 'ctx'))
+families (True, True, True, 'ast')
+constructed ("Name(id='x', ctx=Load(), lineno=3, col_offset=2)", 'custom', None)
+missing {}
+optional (None, None, None)
+constructor error 'Name constructor takes at most 2 positional arguments'
+constructor error "Name got multiple values for argument 'id'"
+constructor error 'AST constructor takes at most 0 positional arguments'
+custom ({'left': 1, 'right': 2, 'arbitrary': 3}, 'Custom(left=1, right=2)')
+callback construction "CollectDuringSet(id='name', ctx=Load())"
+fields [('left', 'Constant'), ('op', 'Add'), ('right', 'Constant')]
+walk ['Expression', 'BinOp', 'Constant', 'Add', 'Constant']
+copy location "Name(id='copy', ctx=Load(), lineno=3, col_offset=2)"
+locations 'Expression(body=BinOp(left=Constant(value=2, lineno=5, col_offset=0, end_lineno=5, end_col_offset=0), op=Add(), right=Constant(value=3, lineno=5, col_offset=0, end_lineno=5, end_col_offset=0), lineno=5, col_offset=0, end_lineno=5, end_col_offset=0))'
+visitor ['first', 'second']
+transform "Expression(body=BinOp(left=Name(id='FIRST', ctx=Load()), op=Add(), right=Attribute(value=Name(id='SECOND', ctx=Load()), attr='attr', ctx=Load())))"
+unparse 'value = (1 + 2) * 3'
+source segment '(1 + 2) * 3'
+docstring 'title\nbody'
+literal None
+literal True
+literal 123456789012345678901234567890
+literal -1.25
+literal (3+4j)
+literal {'a': [1, 2], 'b': (None, True)}
+literal set()
+literal b'abc'
+invalid literal 'name'
+invalid literal '1 + 2'
+invalid literal '{**{}}'
+invalid literal 'f"{x}"'
+deepcopy (True, True)
+reduce (True, (), True)
+cycle collected True
+only AST input True
+operator singleton True
+changed class ('Constant(value=23)', 23)

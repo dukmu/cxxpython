@@ -6,9 +6,24 @@ namespace cxxpython::core::detail {
 struct Expr;
 using ExprPtr = std::unique_ptr<Expr>;
 struct Literal {
-    enum class Kind { Integer, Float, Imaginary, String, Bytes, None, True, False, Ellipsis } kind;
+    enum class Kind {
+        Integer,
+        Float,
+        Imaginary,
+        Complex,
+        String,
+        Bytes,
+        None,
+        True,
+        False,
+        Ellipsis,
+        Tuple,
+        FrozenSet
+    } kind;
     std::u32string text;
     double number = 0.0;
+    double imaginary = 0.0;
+    std::vector<Literal> elements = {};
 };
 struct NameExpr {
     std::u32string name;
@@ -341,7 +356,7 @@ struct SourceProgram {
     std::vector<FunctionGraph> graphs;
     std::uint32_t future_flags = 0;
 };
-Suite parse_source(const SourceBuffer &source, InputMode mode, std::uint32_t flags);
+void materialize_literal(Attachment &, const Literal &, ReturnSlot &);
 void analyze_scopes(SourceProgram &program, Suite &body);
 std::u32string decode_source(const SourceBuffer &source, Span span);
 std::u32string decode_filename(const SourceBuffer &source);

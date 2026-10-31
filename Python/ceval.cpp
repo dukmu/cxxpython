@@ -1852,6 +1852,33 @@ void code_flags(Attachment &c, Value value, ReturnSlot &out)
 {
     make_int(c, c.payload<CodeObject>(value).program.flags(), out);
 }
+void parameter_count(Attachment &c, Value value, std::optional<ParameterKind> kind, ReturnSlot &out)
+{
+    const auto &parameters = c.payload<CodeObject>(value).program.signature().parameters;
+    const auto count =
+        std::count_if(parameters.begin(), parameters.end(), [&](const auto &parameter) {
+            return kind ? parameter.kind == *kind : parameter.kind != ParameterKind::KeywordOnly;
+        });
+    make_int(c, count, out);
+}
+void code_argcount(Attachment &c, Value value, ReturnSlot &out)
+{
+    parameter_count(c, value, {}, out);
+}
+void code_posonlycount(Attachment &c, Value value, ReturnSlot &out)
+{
+    parameter_count(c, value, ParameterKind::PositionalOnly, out);
+}
+void code_kwonlycount(Attachment &c, Value value, ReturnSlot &out)
+{
+    parameter_count(c, value, ParameterKind::KeywordOnly, out);
+}
+void code_nlocals(Attachment &c, Value value, ReturnSlot &out)
+{
+    make_int(c,
+             static_cast<std::int64_t>(c.payload<CodeObject>(value).program.local_names().size()),
+             out);
+}
 template <bool Lines>
 void code_locations(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
 {
@@ -1895,7 +1922,9 @@ void code_locations(Attachment &c, Handle, std::span<const Value> args, ReturnSl
         } else {
             for (const auto n :
                  {position.line, position.end_line, position.column, position.end_column})
-                if (!number(position.line ? std::optional<std::int64_t>{n} : std::nullopt))
+                if (!number(position.line && n != std::numeric_limits<std::uint32_t>::max()
+                                ? std::optional<std::int64_t>{n}
+                                : std::nullopt))
                     return;
         }
         cxxpython::core::make_tuple(c, fields, value);
@@ -2155,6 +2184,10 @@ void install_execution(Attachment &context, std::span<const Handle> core)
     field(CoreObject::CodeType, U"co_stacksize", code_stacksize);
     field(CoreObject::CodeType, U"co_firstlineno", code_firstline);
     field(CoreObject::CodeType, U"co_flags", code_flags);
+    field(CoreObject::CodeType, U"co_argcount", code_argcount);
+    field(CoreObject::CodeType, U"co_posonlyargcount", code_posonlycount);
+    field(CoreObject::CodeType, U"co_kwonlyargcount", code_kwonlycount);
+    field(CoreObject::CodeType, U"co_nlocals", code_nlocals);
     field(CoreObject::CodeType, U"co_names", code_names);
     field(CoreObject::CodeType, U"co_cellvars", code_cellvars);
     field(CoreObject::CodeType, U"co_freevars", code_freevars);

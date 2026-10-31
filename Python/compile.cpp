@@ -1,6 +1,7 @@
 #include "cxxpython/complexobject.hpp"
 #include "cxxpython/floatobject.hpp"
 #include "cxxpython/moduleobject.hpp"
+#include "internal/ast_nodes.hpp"
 #include "internal/compiler.hpp"
 
 #include <boost/multiprecision/cpp_int.hpp>
@@ -23,20 +24,25 @@ std::optional<PatternKey> pattern_key(const Expr &expression)
             return Complex(value->number, 0);
         if (value->kind == Literal::Kind::Imaginary)
             return Complex(0, value->number);
+        if (value->kind == Literal::Kind::Complex)
+            return Complex(value->number, value->imaginary);
         if (value->kind != Literal::Kind::Integer)
             return *value;
         Integer result = 0;
         unsigned base = 10;
         std::size_t start = 0;
         const auto &text = value->text;
-        if (text.size() > 1 && text[0] == U'0') {
-            auto prefix = text[1];
+        const bool negative = !text.empty() && text[0] == U'-';
+        if (!text.empty() && (negative || text[0] == U'+'))
+            ++start;
+        if (text.size() > start + 1 && text[start] == U'0') {
+            auto prefix = text[start + 1];
             base = prefix == U'x' || prefix == U'X'   ? 16
                    : prefix == U'o' || prefix == U'O' ? 8
                    : prefix == U'b' || prefix == U'B' ? 2
                                                       : 10;
             if (base != 10)
-                start = 2;
+                start += 2;
         }
         for (std::size_t i = start; i < text.size(); ++i)
             if (text[i] != U'_') {
@@ -44,7 +50,7 @@ std::optional<PatternKey> pattern_key(const Expr &expression)
                 result *= base;
                 result += ch <= U'9' ? ch - U'0' : ch <= U'F' ? ch - U'A' + 10 : ch - U'a' + 10;
             }
-        return result;
+        return negative ? Integer(-result) : result;
     }
     if (const auto *unary = std::get_if<UnaryExpr>(&expression.node)) {
         auto value = pattern_key(*unary->value);
@@ -1637,6 +1643,31 @@ class GraphPass final {
 
 void literal(Attachment &context, const Literal &value, ReturnSlot &out)
 {
+    if (value.kind == Literal::Kind::Tuple || value.kind == Literal::Kind::FrozenSet) {
+        RootScope roots(context);
+        std::vector<Value> elements;
+        ReturnSlot item(context), tuple(context);
+        for (const auto &child : value.elements) {
+            literal(context, child, item);
+            if (item.tag() == ResultTag::Raised) {
+                out.raised(item.exception());
+                return;
+            }
+            elements.push_back(roots.root(item.value()).get(context));
+        }
+        cxxpython::core::make_tuple(context, elements, tuple);
+        if (value.kind == Literal::Kind::Tuple) {
+            out.ok(tuple.value());
+            return;
+        }
+        const std::array arguments{tuple.value()};
+        call(context, roots.root(context.builtin(CoreObject::FrozenSetType)), {arguments}, out);
+        return;
+    }
+    if (value.kind == Literal::Kind::Complex) {
+        make_complex(context, value.number, value.imaginary, out);
+        return;
+    }
     if (value.kind == Literal::Kind::Imaginary) {
         make_complex(context, 0.0, value.number, out);
         return;
@@ -1667,14 +1698,17 @@ void literal(Attachment &context, const Literal &value, ReturnSlot &out)
     boost::multiprecision::cpp_int number = 0;
     unsigned base = 10;
     std::size_t begin = 0;
-    if (value.text.size() > 1 && value.text[0] == U'0') {
-        const auto ch = value.text[1];
+    const bool negative = !value.text.empty() && value.text[0] == U'-';
+    if (!value.text.empty() && (negative || value.text[0] == U'+'))
+        ++begin;
+    if (value.text.size() > begin + 1 && value.text[begin] == U'0') {
+        const auto ch = value.text[begin + 1];
         base = ch == U'x' || ch == U'X'   ? 16
                : ch == U'o' || ch == U'O' ? 8
                : ch == U'b' || ch == U'B' ? 2
                                           : 10;
         if (base != 10)
-            begin = 2;
+            begin += 2;
     }
     for (auto i = begin; i < value.text.size(); ++i) {
         const auto ch = value.text[i];
@@ -1686,17 +1720,37 @@ void literal(Attachment &context, const Literal &value, ReturnSlot &out)
         if (i % 64 == 63)
             context.poll();
     }
+    if (negative)
+        number = -number;
     make_int_decimal(context, number.str(), out);
 }
 } // namespace
+void materialize_literal(Attachment &context, const Literal &value, ReturnSlot &out)
+{
+    literal(context, value, out);
+}
 } // namespace cxxpython::core::detail
 
 namespace cxxpython::core {
 SourceUnit::SourceUnit(SourceBuffer source, InputMode mode, std::uint32_t flags)
 {
+    const auto syntax_mode = mode == InputMode::Eval     ? syntax::InputMode::Eval
+                             : mode == InputMode::Single ? syntax::InputMode::Single
+                                                         : syntax::InputMode::File;
+    auto tree = ast::parse(source, syntax_mode, flags);
+    compile_tree(std::move(source), *tree, mode, flags);
+}
+SourceUnit::SourceUnit(SourceBuffer source, const ast::Node &tree, InputMode mode,
+                       std::uint32_t flags)
+{
+    compile_tree(std::move(source), tree, mode, flags);
+}
+void SourceUnit::compile_tree(SourceBuffer source, const ast::Node &tree, InputMode mode,
+                              std::uint32_t flags)
+{
     auto program = std::make_unique<detail::SourceProgram>(
         detail::SourceProgram{std::move(source), mode, {}, {}, flags & supported_future_flags});
-    auto body = detail::parse_source(program->source, mode, flags);
+    auto body = ast::lower(tree, program->source, mode);
     bool prefix = true;
     for (std::size_t i = 0; i < body.size(); ++i) {
         if (!i)
@@ -1766,7 +1820,7 @@ void SourceUnit::freeze(Attachment &context, ReturnSlot &out) const
             spec.name = scope.name;
             spec.qualname = scope.qualname;
             spec.filename = filename_text;
-            spec.first_line = source().position(scope.span).line;
+            spec.first_line = scope.first_line.value_or(source().position(scope.span).line);
             spec.locals = scope.locals;
             spec.signature = graph.signature;
             spec.docstring = graph.docstring;

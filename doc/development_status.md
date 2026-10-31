@@ -1,5 +1,84 @@
 # Development Status
 
+## 2026-10-31 Unified ASDL Frontend, Unicode And Introspection
+
+Prepended after 507a73c, preserving earlier entries. This is substantial progress
+within the active frontend/import/library/N4-N6/M0-M9 goal, not completion of that
+whole objective. Terra supplied CST-to-ASDL and ASDL-to-IR conversion, source/AST
+fixtures and native Unicode implementation/data/tests. Parent implemented schema
+generation, traced AST types, managed snapshots, unified compilation, metadata,
+library dependency closure and final acceptance. Both workers are closed.
+
+- Copied pinned Python.asdl and its upstream ASDL reader. Generated C++ schema
+  supplies all 3.12 node kinds, fields, families, attributes and documentation;
+  ast-generated-check and CTest verify generation without new artifact hashes.
+  Normal builds still need no host Python or CPython runtime. The existing
+  generated 244-rule PEG recognizer and shared native lexer remain independent.
+- SourceUnit(source) now follows CST -> native ASDL -> execution IR -> scope/CFG
+  -> managed freeze. compile(AST) snapshots Python nodes into that same native
+  tree and enters the same lowerer. Deleted the former Parser/ast.cpp direct
+  CST-to-IR adapter and its declaration; no old-parser or unparse/reparse fallback
+  remains. Restored soft-keyword type aliases and forbidden starred type-parameter
+  bounds discovered by the existing source fixtures during migration.
+- Public AST objects retain ordinary traced dictionaries, subclassing, arbitrary
+  attributes, constructor callbacks and reduction. Their precise canonical-type
+  edge survives collection; semantic identity follows current MRO, including
+  compatible __class__ changes, not a stale construction tag. An actual initial
+  constructor crash exposed a temporary DictView span used after its owner died;
+  the view now outlives the loop. Callback/collection/class-mutation/cycle tests
+  pass with strict sanitizers, without a new ownership or execution-lock system.
+- Managed conversion validates schema families, required fields, synchronized
+  list snapshots, integer bounds, positions and native constants while Active.
+  Only owned C++ data crosses NativeWait. Signed integers, complex values, tuple
+  and frozenset constants freeze through existing native mechanisms. Span can
+  carry explicit AST coordinates without fake source text; products derive IR
+  diagnostic positions from real children. Decorated Code first-line metadata is
+  independent of its AST node span. Unknown columns are None, not UINT32_MAX.
+- Unchanged pinned ast.py and inspect.py run actual visitors/transformers,
+  literal_eval/unparse, AST compilation, Python/bound-method signatures and
+  binding, wrapping, documentation, annotations and cached-source discovery.
+  Missing dependencies were implemented at their owners: all eleven float_info
+  fields over actual float.h data, readonly Code argument/local counts, real VM
+  recursion-budget queries, public flag names and actual import suffix metadata.
+  FileFinder and machinery share .py/private-extension lists; bytecode suffixes
+  remain empty rather than claiming .pyc support. No inspect/ast policy workaround
+  was introduced. getrecursionlimit reports the configured budget, default 128;
+  a setter and complete native-callable/frame reflection remain separate work.
+- Native unicodedata uses pinned Unicode 15.0.0 tables, genuine 3.2.0 change data,
+  names/aliases/named sequences, property/default APIs and four normalization
+  forms. Per-call scratch, bounded polling, stable bounded-class ordering and
+  append-only composition preserve shared-heap progress without a GIL. Temporary
+  C++ probe validation stayed under ignored .cache; committed behavior tests are
+  directly executable Python fixtures with pinned reference output.
+- The migration sweep passed 355/359 scripts and identified four concrete
+  failures, all fixed and passing in targeted final runs. No full passing sweep
+  is claimed for that earlier invocation. Added AST data retains all 126 literal
+  upstream test_ast/snippets.py samples plus broad source/position samples.
+  New AST parallel and inspect workflows also pass. The 73-check Release run
+  passed parser/GC/epoch/parallel/budget/compiler, syntax, grammar and generation
+  checks; its sole source-driver failure was decorated co_firstlineno. After
+  fixing it, that specific class/decorator workflow passes, including new manual
+  AST/non-monotonic decorator positions. All eight allocation-failure bootstrap
+  shards pass. Unchanged passing evidence was reused, not repeatedly swept.
+- Final Clang 21.1.8 Release, ASan/UBSan/LSan and TSan builds pass strict -Werror.
+  Each sanitizer passes 68 affected native checks, all fifteen selected direct
+  fixtures and three VM-specific metadata/limit/import-suffix fixtures. Shared
+  AST compilation/mutation/collection, collecting attribute callbacks, cyclic
+  AST rejection, generator positions and Unicode GC workflows are included.
+  Assertions, leak/race detection and existing timeouts stay enabled. Raw build,
+  failure and passing logs are retained in .cache/ast-*. Formatting, both
+  generation checks and whitespace checks pass. No unrelated performance suite,
+  hand-written measurement table or checksum framework was added.
+- Explicit remaining frontend gates include type comments, historical grammar
+  versions, full constructor/error/module-lifecycle matrices and complexity/
+  performance acceptance. The verified VM still requires positive source lines;
+  non-positive Python AST lines report a tested ValueError instead of escaping
+  as a C++ verifier fault. CPython accepts those lines, so this is a recorded
+  representation limit to remove, not full compatibility. Full Unicode/inspect/
+  traceback/frame.clear, remaining Base-to-Full libraries, REPL and N4-N6/M0-M9
+  requirements remain active. User test2.py and temporary_plan.md deletion are
+  excluded. No previously denied remote push was retried.
+
 ## 2026-10-31 Strict Clang 21 And Upstream Interactive Compilation
 
 Prepended after 1188dc3 without rewriting earlier evidence. This completes the

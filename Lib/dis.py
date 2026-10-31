@@ -10,6 +10,13 @@ import _opcode
 import opcode
 from opcode import *
 
+# VerifiedCode.flags uses these Python public trait bits, not wordcode encodings.
+COMPILER_FLAG_NAMES = {
+    1: 'OPTIMIZED', 2: 'NEWLOCALS', 4: 'VARARGS', 8: 'VARKEYWORDS',
+    16: 'NESTED', 32: 'GENERATOR', 64: 'NOFREE', 128: 'COROUTINE',
+    256: 'ITERABLE_COROUTINE', 512: 'ASYNC_GENERATOR',
+}
+
 __all__ = ["code_info", "dis", "disassemble", "disco", "distb", "findlinestarts",
            "find_line_starts", "findlabels", "show_code", "get_instructions",
            "Instruction", "Positions", "Bytecode"] + opcode.__all__

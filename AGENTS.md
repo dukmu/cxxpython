@@ -51,6 +51,13 @@ compiler, VM, and extension platform implemented in a C/C++ mix.
   tokenizer depend only on the C++ standard library. Native CST-to-AST lowering
   is distinct from recognition and must report missing execution capabilities
   honestly. Regenerate with `regen-parser` and verify `parser-generated-check`.
+- `Grammar/Python.asdl` and the fixed upstream ASDL reader generate the public
+  AST schema with `Tools/asdl_generator/generate.py`; check `ast-generated-check`.
+  Source and AST inputs share CST-to-ASDL, ASDL-to-execution-IR and scope/CFG
+  passes. Do not restore the deleted direct CST-to-IR adapter or compile ASTs by
+  unparsing them into source. Managed AST snapshots stay Active and rooted;
+  only owned native trees cross NativeWait. Node semantics follow current type
+  MRO, not a construction tag that becomes stale after __class__ assignment.
 - Follow CPython's native/Python responsibilities: `Modules/` supplies necessary
   C/C++ capabilities, `Lib/` supplies Python libraries and policy. Do not rewrite
   an entire Python library in C++ just to avoid completing its syntax/dependencies.

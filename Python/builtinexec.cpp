@@ -1,5 +1,6 @@
 #include "internal/builtinexec.hpp"
 #include "cxxpython/compiler.hpp"
+#include "internal/astmodule.hpp"
 
 #include <algorithm>
 #include <limits>
@@ -175,6 +176,14 @@ std::u32string diagnostic_text(std::string_view text)
 } // namespace
 void detail::raise_source_error(Attachment &context, const SourceError &error, ReturnSlot &out)
 {
+    if (error.kind == SourceErrorKind::AstValidation ||
+        error.kind == SourceErrorKind::AstTypeValidation) {
+        raise_error(context,
+                    error.kind == SourceErrorKind::AstValidation ? CoreObject::ValueErrorType
+                                                                 : CoreObject::TypeErrorType,
+                    diagnostic_text(error.what()), out);
+        return;
+    }
     if (error.kind == SourceErrorKind::Capability) {
         raise_error(context, CoreObject::RuntimeErrorType, diagnostic_text(error.what()), out);
         return;
@@ -263,6 +272,42 @@ void freeze_source(Attachment &context, Value source, std::string filename, Inpu
         detail::raise_source_error(context, error, out);
     }
 }
+void parse_ast_source(Attachment &context, Value source, std::string filename,
+                      syntax::InputMode mode, ReturnSlot &out, std::uint32_t flags)
+{
+    std::string text;
+    if (!source_text(context, source, text, out))
+        return;
+    try {
+        std::optional<SourceBuffer> buffer;
+        ast::NodePtr tree;
+        {
+            NativeWait parked(context);
+            buffer.emplace(std::move(text), std::move(filename));
+            tree = ast::parse(*buffer, mode, flags);
+        }
+        detail::materialize_ast(context, *tree, *buffer, out);
+    } catch (const SourceError &error) {
+        detail::raise_source_error(context, error, out);
+    }
+}
+void freeze_ast(Attachment &context, Handle source, std::string filename, InputMode mode,
+                ReturnSlot &out, std::uint32_t flags)
+{
+    auto tree = detail::snapshot_ast(context, source, mode, out);
+    if (!tree)
+        return;
+    try {
+        std::optional<SourceUnit> unit;
+        {
+            NativeWait parked(context);
+            unit.emplace(SourceBuffer({}, std::move(filename)), *tree, mode, flags);
+        }
+        unit->freeze(context, out);
+    } catch (const SourceError &error) {
+        detail::raise_source_error(context, error, out);
+    }
+}
 std::uint32_t caller_future_flags(Attachment &context)
 {
     auto frame = context.current_frame();
@@ -307,7 +352,7 @@ void compile_builtin(Attachment &context, Handle, std::span<const Value> args, R
         !integer_arg(context, args[6], feature, out))
         return;
     constexpr auto accepted_flags = supported_future_flags | compile_dont_imply_dedent |
-                                    compile_allow_incomplete_input | 0x10ULL;
+                                    compile_allow_incomplete_input | 0x400ULL | 0x2000ULL | 0x10ULL;
     if (flags < 0 || (static_cast<std::uint64_t>(flags) & ~accepted_flags)) {
         raise_error(context, CoreObject::ValueErrorType, U"compile(): unrecognised flags", out);
         return;
@@ -316,26 +361,54 @@ void compile_builtin(Attachment &context, Handle, std::span<const Value> args, R
         raise_error(context, CoreObject::ValueErrorType, U"compile(): invalid optimize value", out);
         return;
     }
-    if (optimize > 0 || feature != -1) {
+    const bool only_ast = (flags & 0x400) != 0;
+    if ((!only_ast && (optimize > 0 || feature != -1 || (flags & 0x2000))) ||
+        (only_ast && feature != -1 && feature < 12)) {
         raise_error(context, CoreObject::ValueErrorType,
                     U"compile(): requested option is not supported", out);
         return;
     }
     const auto &mode = context.payload<StrObject>(args[2]).value;
-    if (mode != U"exec" && mode != U"eval" && mode != U"single") {
+    if (mode != U"exec" && mode != U"eval" && mode != U"single" && mode != U"func_type") {
         raise_error(context, CoreObject::ValueErrorType,
                     U"compile(): mode must be exec, eval or single", out);
+        return;
+    }
+    if (mode == U"func_type" && !only_ast) {
+        raise_error(context, CoreObject::ValueErrorType,
+                    U"compile() mode 'func_type' requires flag PyCF_ONLY_AST", out);
+        return;
+    }
+    if (only_ast) {
+        if (detail::is_ast(context, args[0])) {
+            out.ok(args[0]);
+            return;
+        }
+        parse_ast_source(context, args[0], source_utf8(context.payload<StrObject>(args[1]).value),
+                         mode == U"eval"        ? syntax::InputMode::Eval
+                         : mode == U"single"    ? syntax::InputMode::Single
+                         : mode == U"func_type" ? syntax::InputMode::FunctionType
+                                                : syntax::InputMode::File,
+                         out, static_cast<std::uint32_t>(flags));
+        return;
+    }
+    const auto effective_flags =
+        static_cast<std::uint32_t>(flags) |
+        (inherit.value() == context.builtin(CoreObject::False) ? caller_future_flags(context) : 0);
+    const auto input_mode = mode == U"eval"     ? InputMode::Eval
+                            : mode == U"single" ? InputMode::Single
+                                                : InputMode::Exec;
+    if (detail::is_ast(context, args[0])) {
+        freeze_ast(context, roots.root(args[0]),
+                   source_utf8(context.payload<StrObject>(args[1]).value), input_mode, out,
+                   effective_flags);
         return;
     }
     freeze_source(context, args[0], source_utf8(context.payload<StrObject>(args[1]).value),
                   mode == U"eval"     ? InputMode::Eval
                   : mode == U"single" ? InputMode::Single
                                       : InputMode::Exec,
-                  out,
-                  static_cast<std::uint32_t>(flags) |
-                      (inherit.value() == context.builtin(CoreObject::False)
-                           ? caller_future_flags(context)
-                           : 0));
+                  out, effective_flags);
 }
 
 template <bool Eval>

@@ -1,0 +1,22 @@
+15.0.0
+'A' None None None Lu L 0 0 Na  LATIN CAPITAL LETTER A
+'9' 9 9 9.0 Nd EN 0 0 Na  DIGIT NINE
+'\u0662' 2 2 2.0 Nd AN 0 0 N  ARABIC-INDIC DIGIT TWO
+'\xb2' None 2 2.0 No EN 0 0 A <super> 0032 SUPERSCRIPT TWO
+'\xbd' None None 0.5 No ON 0 0 A <fraction> 0031 2044 0032 VULGAR FRACTION ONE HALF
+'\u0f33' None None -0.5 No L 0 0 N  TIBETAN DIGIT HALF ZERO
+'\u0301' None None None Mn NSM 230 0 A  COMBINING ACUTE ACCENT
+'\u05d0' None None None Lo R 0 0 N  HEBREW LETTER ALEF
+'\u4e2d' None None None Lo L 0 0 W  CJK UNIFIED IDEOGRAPH-4E2D
+'\U0001f600' None None None So ON 0 0 W  GRINNING FACE
+'\u0378' None None None Cn  0 0 N  None
+'\ud800' None None None Cs L 0 0 N  None
+latin small letter a 'a'
+HANGUL SYLLABLE GA '\uac00'
+CJK UNIFIED IDEOGRAPH-4E2D '\u4e2d'
+LINE FEED '\n'
+ValueError
+ValueError
+ValueError
+ValueError
+KeyError

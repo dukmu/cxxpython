@@ -5,6 +5,8 @@
 #include "cxxpython/moduleobject.hpp"
 #include "internal/errors.hpp"
 
+#include <limits>
+
 namespace cxxpython::core::detail {
 namespace {
 std::string_view domain_name(OperandDomain domain)
@@ -88,6 +90,13 @@ struct TupleBuilder {
         ReturnSlot value(c);
         make_str(c, std::u32string(s.begin(), s.end()), value);
         fields.push_back(roots.root(value.value()));
+    }
+    void column(std::uint32_t n)
+    {
+        if (n == std::numeric_limits<std::uint32_t>::max())
+            fields.push_back(roots.root(c.builtin(CoreObject::None)));
+        else
+            number(n);
     }
     void finish(ReturnSlot &out)
     {
@@ -188,8 +197,8 @@ void instructions(Attachment &c, Handle, std::span<const Value> args, ReturnSlot
         row.number(instruction.operand);
         row.number(position.line);
         row.number(position.end_line);
-        row.number(position.column);
-        row.number(position.end_column);
+        row.column(position.column);
+        row.column(position.end_column);
         row.number(static_cast<std::int64_t>(fall.pushes) - static_cast<std::int64_t>(fall.pops));
         row.number(static_cast<std::int64_t>(jump.pushes) - static_cast<std::int64_t>(jump.pops));
         ReturnSlot result(c);

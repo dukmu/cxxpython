@@ -1,0 +1,62 @@
+3.2.0 UCD unicodedata
+'A' None None None Lu L 0 0 Na  LATIN CAPITAL LETTER A
+'\xb2' 2 2 2.0 No EN 0 0 A <super> 0032 SUPERSCRIPT TWO
+'\u0f33' None None -0.5 No L 0 0 N  TIBETAN DIGIT HALF ZERO
+'\u20ac' None None None Sc ET 0 0 A  EURO SIGN
+'\u03f9' None None None Cn  0 0 N  None
+'\u1d2c' None None None Cn  0 0 N  None
+'\u1e9b' None None None Ll L 0 0 N 017F 0307 LATIN SMALL LETTER LONG S WITH DOT ABOVE
+'\U0001f600' None None None Cn  0 0 N  None
+'\U0002f868' None None None Lo L 0 0 W 36FC CJK COMPATIBILITY IDEOGRAPH-2F868
+'\U000f0000' None None None Co L 0 0 A  None
+15.0.0 LATIN SMALL LETTER A 'a'
+15.0.0 LINE FEED '\n'
+15.0.0 KEYCAP NUMBER SIGN '#\ufe0f\u20e3'
+15.0.0 ARABIC SEQUENCE NOON WITH KEHEH '\u0646\u06a9'
+15.0.0 HANGUL SYLLABLE GA '\uac00'
+15.0.0 hangul syllable ga KeyError "undefined character name 'hangul syllable ga'"
+15.0.0 CJK UNIFIED IDEOGRAPH-4E2D '\u4e2d'
+15.0.0 NFC '\u36fc'
+15.0.0 NFC '\u1e9b\u0323'
+15.0.0 NFC '\uac01'
+15.0.0 NFD '\u36fc'
+15.0.0 NFD '\u017f\u0323\u0307'
+15.0.0 NFD '\u1100\u1161\u11a8'
+15.0.0 NFKC '\u36fc'
+15.0.0 NFKC '\u1e69'
+15.0.0 NFKC '\uac01'
+15.0.0 NFKD '\u36fc'
+15.0.0 NFKD 's\u0323\u0307'
+15.0.0 NFKD '\u1100\u1161\u11a8'
+ True
+3.2.0 LATIN SMALL LETTER A 'a'
+3.2.0 LINE FEED KeyError "undefined character name 'LINE FEED'"
+3.2.0 KEYCAP NUMBER SIGN KeyError "undefined character name 'KEYCAP NUMBER SIGN'"
+3.2.0 ARABIC SEQUENCE NOON WITH KEHEH KeyError "undefined character name 'ARABIC SEQUENCE NOON WITH KEHEH'"
+3.2.0 HANGUL SYLLABLE GA '\uac00'
+3.2.0 hangul syllable ga KeyError "undefined character name 'hangul syllable ga'"
+3.2.0 CJK UNIFIED IDEOGRAPH-4E2D '\u4e2d'
+3.2.0 NFC '\U0002136a'
+3.2.0 NFC '\u1e9b\u0323'
+3.2.0 NFC '\uac01'
+3.2.0 NFD '\U0002136a'
+3.2.0 NFD '\u017f\u0323\u0307'
+3.2.0 NFD '\u1100\u1161\u11a8'
+3.2.0 NFKC '\U0002136a'
+3.2.0 NFKC '\u1e69'
+3.2.0 NFKC '\uac01'
+3.2.0 NFKD '\U0002136a'
+3.2.0 NFKD 's\u0323\u0307'
+3.2.0 NFKD '\u1100\u1161\u11a8'
+ True
+TypeError 'category() argument must be a unicode character, not int'
+TypeError 'name() argument 1 must be a unicode character, not str'
+TypeError 'decimal expected at most 2 arguments, got 3'
+TypeError 'normalize() argument 1 must be str, not int'
+TypeError 'is_normalized() argument 2 must be str, not int'
+TypeError "a bytes-like object is required, not 'int'"
+TypeError 'lookup() argument must be read-only bytes-like object, not bytearray'
+KeyError "'name too long'"
+KeyError '"undefined character name \'missing\'"'
+UnicodeEncodeError "'utf-8' codec can't encode character '\\ud800' in position 0: surrogates not allowed"
+'A'

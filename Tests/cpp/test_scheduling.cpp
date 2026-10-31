@@ -416,6 +416,7 @@ TEST(CoreSchedulingDepth, LogicalRecursionLimitUnwindsAndNativeReentryHasItsOwnL
     Interpreter interpreter(
         {.collect_every_allocation = true, .max_call_depth = 24, .max_native_depth = 8});
     Attachment context(interpreter);
+    EXPECT_EQ(context.call_depth_limit(), 24u);
     context.bootstrap_core();
     RootScope roots(context);
     auto fn = recursive_function(context, roots);

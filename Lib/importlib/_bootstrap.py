@@ -19,6 +19,12 @@ import sys
 import _imp
 import builtins
 
+SOURCE_SUFFIXES = ['.py']
+BYTECODE_SUFFIXES = []  # No CPython .pyc or private bytecode cache is loaded.
+DEBUG_BYTECODE_SUFFIXES = BYTECODE_SUFFIXES
+OPTIMIZED_BYTECODE_SUFFIXES = BYTECODE_SUFFIXES
+EXTENSION_SUFFIXES = _imp.extension_suffixes()
+
 
 class ModuleSpec:
     def __init__(self, name, loader, *, origin=None, loader_state=None, is_package=None):
@@ -493,7 +499,7 @@ def _install():
     # publishing, and overwrite partial installation on a failed-boot retry.
     meta_path = [RegistryFinder, PathFinder]
     path_hooks = [FileFinder.path_hook(
-        (NativeLoader, ('.cxxpy.so',)), (SourceFileLoader, ('.py',)))]
+        (NativeLoader, EXTENSION_SUFFIXES), (SourceFileLoader, SOURCE_SUFFIXES))]
     cache = {}
     sys.meta_path = meta_path
     sys.path_hooks = path_hooks

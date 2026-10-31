@@ -116,18 +116,42 @@ std::u32string annotation_literal(const Literal &value)
             text += 'j';
         return {text.begin(), text.end()};
     }
+    case Literal::Kind::Complex: {
+        auto real = float_text(value.number, true);
+        auto imaginary = float_text(std::abs(value.imaginary), true);
+        auto number = "(" + real + (std::signbit(value.imaginary) ? "-" : "+") + imaginary + "j)";
+        return {number.begin(), number.end()};
+    }
+    case Literal::Kind::Tuple:
+    case Literal::Kind::FrozenSet: {
+        const bool tuple = value.kind == Literal::Kind::Tuple;
+        if (!tuple && value.elements.empty())
+            return U"frozenset()";
+        std::u32string result = tuple ? U"(" : U"frozenset({";
+        for (std::size_t i = 0; i < value.elements.size(); ++i) {
+            if (i)
+                result += U", ";
+            result += annotation_literal(value.elements[i]);
+        }
+        if (tuple && value.elements.size() == 1)
+            result += U",";
+        return result + (tuple ? U")" : U"})");
+    }
     case Literal::Kind::Integer: {
         boost::multiprecision::cpp_int number = 0;
         unsigned base = 10;
         std::size_t begin = 0;
-        if (value.text.size() > 1 && value.text[0] == U'0') {
-            const auto ch = value.text[1];
+        const bool negative = !value.text.empty() && value.text[0] == U'-';
+        if (!value.text.empty() && (negative || value.text[0] == U'+'))
+            ++begin;
+        if (value.text.size() > begin + 1 && value.text[begin] == U'0') {
+            const auto ch = value.text[begin + 1];
             base = ch == U'x' || ch == U'X'   ? 16
                    : ch == U'o' || ch == U'O' ? 8
                    : ch == U'b' || ch == U'B' ? 2
                                               : 10;
             if (base != 10)
-                begin = 2;
+                begin += 2;
         }
         for (auto i = begin; i < value.text.size(); ++i) {
             const auto ch = value.text[i];
@@ -139,6 +163,8 @@ std::u32string annotation_literal(const Literal &value)
             number *= base;
             number += digit;
         }
+        if (negative)
+            number = -number;
         const auto text = number.str();
         return {text.begin(), text.end()};
     }

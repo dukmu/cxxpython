@@ -5,8 +5,17 @@
 namespace cxxpython::core {
 struct Span {
     std::size_t begin = 0, end = 0;
+    std::optional<SourcePosition> coordinates = {};
 };
-enum class SourceErrorKind { Syntax, Indentation, Tab, Encoding, Capability };
+enum class SourceErrorKind {
+    Syntax,
+    Indentation,
+    Tab,
+    Encoding,
+    Capability,
+    AstValidation,
+    AstTypeValidation
+};
 class SourceBuffer final {
   public:
     explicit SourceBuffer(std::string text, std::string filename = "<string>");
@@ -62,15 +71,20 @@ struct ScopeInfo {
     bool annotations = false;
     AnnotationRole annotation_role = AnnotationRole::None;
     bool sees_class_namespace = false;
+    std::optional<std::uint32_t> first_line = {};
 };
 namespace detail {
 struct SourceProgram;
+}
+namespace ast {
+struct Node;
 }
 // Pure host parse/scope/CFG state; immutable and shareable after construction.
 class SourceUnit final {
   public:
     explicit SourceUnit(SourceBuffer source, InputMode mode = InputMode::Exec,
                         std::uint32_t flags = 0);
+    SourceUnit(SourceBuffer source, const ast::Node &tree, InputMode mode, std::uint32_t flags);
     ~SourceUnit();
     SourceUnit(SourceUnit &&) noexcept;
     SourceUnit &operator=(SourceUnit &&) noexcept;
@@ -80,6 +94,7 @@ class SourceUnit final {
     void freeze(Attachment &context, ReturnSlot &out) const;
 
   private:
+    void compile_tree(SourceBuffer source, const ast::Node &, InputMode, std::uint32_t flags);
     std::unique_ptr<const detail::SourceProgram> program_;
 };
 struct RunRequest {

@@ -43,8 +43,18 @@ only the subsequent managed Code freeze runs Active. `Lib/codeop.py` and
 another native interactive parser.
 
 `Parser/source.cpp` owns the runtime's SourceBuffer decoding and diagnostics.
-`Parser/ast.cpp` adapts the generated CST to the existing native compiler AST;
-it does not recognize grammar or retain a handwritten parser fallback.
+`Grammar/Python.asdl` and the fixed upstream ASDL reader feed
+`Tools/asdl_generator/`, generating native node kinds, field families, hierarchy
+and attributes. `Parser/ast_public.cpp` adapts generated CST to this native ASDL
+tree. `Parser/ast_lower.cpp` lowers it into execution IR for the existing scope
+and CFG passes. The former `Parser/ast.cpp` CST-to-IR adapter is deleted.
+SourceUnit and builtin compile(AST) share this pipeline, not two semantic paths.
+`Modules/_astmodule.cpp` supplies traced, mutable/subclassable Python AST nodes;
+`Python/ast.cpp` snapshots their fields while Active before native compilation.
+It resolves node identity through current MRO and rooted canonical types, not a
+stale native construction tag. Explicit AST positions travel in Span coordinates
+without manufacturing source text. Unchanged `Lib/ast.py` and `Lib/inspect.py`
+own traversal, transformation, rendering and introspection policy.
 `Include/internal/compiler.hpp` is the private compiler IR contract and contains
 no hidden managed Python references. Full grammar recognition and executable
 language support are separate: missing AST/compiler/VM capabilities remain
