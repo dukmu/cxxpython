@@ -172,6 +172,71 @@ TEST(FoundationMemory, InterleavedScopeReleaseAndCellReusePreserveEachOwner)
     EXPECT_EQ(context.stats().objects, 2U);
 }
 
+TEST(FoundationMemory, BulkScopeTeardownWithInterleavedSlotsAndHoles)
+{
+    int destroyed = 0;
+    Interpreter interpreter;
+    Attachment context(interpreter);
+    const auto baseline = context.stats().roots;
+    {
+        RootScope outer(context);
+        auto retained = make_node(context, outer, &destroyed);
+        std::size_t first_cycle_cells = 0;
+        for (int cycle = 0; cycle < 8; ++cycle) {
+            Handle stale;
+            Handle outer_interleaved;
+            std::optional<ResultView> stale_view;
+            {
+                RootScope inner(context);
+                stale = make_node(context, inner, &destroyed);
+                auto hole = make_node(context, inner, &destroyed);
+                {
+                    ReturnSlot slot(context);
+                    context.allocate<Node>(slot, &destroyed);
+                    stale_view = slot.result();
+                    outer_interleaved = make_node(context, outer, &destroyed);
+                    make_node(context, inner, &destroyed);
+                    inner.release(hole);
+                    EXPECT_THROW(hole.get(context), std::logic_error);
+                    EXPECT_EQ(context.collect(), 1U);
+                    EXPECT_NO_THROW(stale_view->value());
+                }
+                EXPECT_THROW(stale_view->value(), std::logic_error);
+                EXPECT_EQ(context.collect(), 1U);
+                EXPECT_NO_THROW(stale.get(context));
+                EXPECT_NO_THROW(outer_interleaved.get(context));
+            }
+            EXPECT_THROW(stale.get(context), std::logic_error);
+            EXPECT_THROW(stale_view->value(), std::logic_error);
+            EXPECT_EQ(context.collect(), 2U);
+            EXPECT_NO_THROW(retained.get(context));
+            EXPECT_NO_THROW(outer_interleaved.get(context));
+
+            auto replacement = make_node(context, outer, &destroyed);
+            ReturnSlot replacement_slot(context);
+            context.allocate<Node>(replacement_slot, &destroyed);
+            EXPECT_THROW(stale.get(context), std::logic_error);
+            EXPECT_THROW(stale_view->value(), std::logic_error);
+            EXPECT_NO_THROW(replacement.get(context));
+            outer.release(replacement);
+            outer.release(outer_interleaved);
+            replacement_slot.reset();
+            EXPECT_EQ(context.collect(), 3U);
+            EXPECT_EQ(destroyed, (cycle + 1) * 7);
+            EXPECT_EQ(context.stats().roots, baseline + 2U);
+            if (cycle == 0)
+                first_cycle_cells = context.stats().root_cells;
+            else
+                EXPECT_EQ(context.stats().root_cells, first_cycle_cells);
+        }
+        EXPECT_NO_THROW(retained.get(context));
+        EXPECT_EQ(context.stats().roots, baseline + 1U);
+    }
+    EXPECT_EQ(context.stats().roots, baseline);
+    EXPECT_EQ(context.collect(), 1U);
+    EXPECT_EQ(destroyed, 57);
+}
+
 TEST(FoundationMemory, HeaderTypeAndPayloadEdgesKeepCyclesAlive)
 {
     int destroyed = 0;

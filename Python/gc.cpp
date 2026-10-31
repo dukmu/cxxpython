@@ -108,8 +108,8 @@ std::uint64_t siphash24(std::span<const std::byte> data, std::array<std::uint64_
 }
 struct RootCell {
     ObjectHeader *object = nullptr;
-    const void *scope = nullptr;
-    RootCell *next = nullptr; // Owning RootScope chain, or arena free list after release.
+    const void *scope = nullptr; // Null makes object/tag inactive, even before cell reuse.
+    RootCell *next = nullptr;    // Owning RootScope chain, or arena free list after release.
     std::uint64_t generation = 0;
     std::uint64_t revision = 0;
     ResultTag tag = ResultTag::Empty;
@@ -1026,18 +1026,15 @@ detail::RootCell &Attachment::cell(Handle handle) const
 Handle Attachment::acquire(const void *scope)
 {
     require_safepoint();
-    return acquire_cell(scope);
+    return acquire_cell(scope, nullptr, nullptr);
 }
-Handle Attachment::acquire(const void *scope, Value value)
+Handle Attachment::acquire(const void *scope, Value value, detail::RootCell *next)
 {
     require_safepoint();
     detail::Allocation::from(value.object()).require_owner(state_.get());
-    auto handle = acquire_cell(scope);
-    handle.cell_->object = value.object();
-    handle.cell_->tag = ResultTag::Ok;
-    return handle;
+    return acquire_cell(scope, value.object(), next);
 }
-Handle Attachment::acquire_cell(const void *scope)
+Handle Attachment::acquire_cell(const void *scope, ObjectHeader *object, detail::RootCell *next)
 {
     auto &arena = thread_record_->roots;
     auto *cell = arena.free;
@@ -1049,10 +1046,10 @@ Handle Attachment::acquire_cell(const void *scope)
     }
     ++cell->generation;
     cell->revision = 0;
-    cell->object = nullptr;
+    cell->object = object;
     cell->scope = scope;
-    cell->next = nullptr;
-    cell->tag = ResultTag::Empty;
+    cell->next = next;
+    cell->tag = object ? ResultTag::Ok : ResultTag::Empty;
     ++arena.count;
     Handle handle;
     handle.owner_ = state_.get();
@@ -1066,12 +1063,28 @@ void Attachment::release(detail::RootCell &cell) noexcept
 {
     auto &arena = thread_record_->roots;
     assert(cell.scope);
-    cell.object = nullptr;
     cell.scope = nullptr;
-    cell.tag = ResultTag::Empty;
     cell.next = arena.free;
     arena.free = &cell;
     --arena.count;
+}
+
+void Attachment::release(detail::RootCell *head) noexcept
+{
+    if (!head)
+        return;
+    auto *tail = head;
+    std::size_t count = 0;
+    for (auto *cell = head; cell; cell = cell->next) {
+        assert(cell->scope);
+        cell->scope = nullptr;
+        tail = cell;
+        ++count;
+    }
+    auto &arena = thread_record_->roots;
+    tail->next = arena.free;
+    arena.free = head;
+    arena.count -= count;
 }
 
 Value Handle::get(const Attachment &context) const
@@ -1089,19 +1102,13 @@ RootScope::RootScope(Attachment &context) : context_(context)
 RootScope::~RootScope()
 {
     context_.require_safepoint();
-    while (head_) {
-        auto *cell = head_;
-        head_ = cell->next;
-        context_.release(*cell);
-    }
+    context_.release(head_);
 }
 
 Handle RootScope::root(Value value)
 {
-    auto handle = context_.acquire(this, value);
-    auto &cell = *handle.cell_;
-    cell.next = head_;
-    head_ = &cell;
+    auto handle = context_.acquire(this, value, head_);
+    head_ = handle.cell_;
     return handle;
 }
 
@@ -2138,12 +2145,8 @@ void Attachment::inspect_heap(HeapInspection kind, std::span<const Value> target
     }
     auto inspect = [&](detail::State &state) {
         auto publish = [&](ObjectHeader *object) {
-            auto handle = acquire_cell(&roots);
-            auto &cell = *handle.cell_;
-            cell.object = object;
-            cell.tag = ResultTag::Ok;
-            cell.next = roots.head_;
-            roots.head_ = &cell;
+            auto handle = acquire_cell(&roots, object, roots.head_);
+            roots.head_ = handle.cell_;
             out.emplace_back(*object);
         };
         if (kind == HeapInspection::Referents) {

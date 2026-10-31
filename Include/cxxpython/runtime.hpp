@@ -708,9 +708,10 @@ class Attachment final {
     void require_edge(Value owner, const void *edge, std::size_t bytes) const;
     detail::RootCell &cell(Handle handle) const;
     Handle acquire(const void *scope);
-    Handle acquire(const void *scope, Value value);
-    Handle acquire_cell(const void *scope);
+    Handle acquire(const void *scope, Value value, detail::RootCell *next);
+    Handle acquire_cell(const void *scope, ObjectHeader *object, detail::RootCell *next);
     void release(detail::RootCell &cell) noexcept;
+    void release(detail::RootCell *head) noexcept;
     void prepare_allocation(ReturnSlot &out, std::size_t bytes);
     void *reserve_storage(LayoutDescriptor layout);
     void abandon_storage(ObjectHeader *object) noexcept;

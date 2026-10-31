@@ -1,5 +1,59 @@
 # Development Status
 
+## 2026-11-01 Reuse Root Arena Chains
+
+Continues the active performance/cleanup goal after pushed 569edee. The previous
+software profile put root acquisition/teardown at 10.41%/9.42% self CPU time;
+this node addresses those operations, not another native-call branch. Parent
+implemented the allocator change and acceptance; Terra added the mixed root/
+slot contract test in a disjoint file and is closed. Compatibility work stays
+paused.
+
+- Root acquisition initializes its final object/tag and scope link in one pass,
+  including the STW heap-inspection publisher. Whole-scope teardown clears each
+  live scope marker and returns the existing chain with one free-list splice
+  and count update, instead of rewriting those fields for every cell. Individual
+  release also relies on the null scope marker rather than clearing inactive
+  object/tag bits. GC and Handle/ResultView checks already reject inactive cells;
+  generation/revision handling and empty ReturnSlot initialization are retained.
+  No root representation, class, TLS cache, lock, RC, public API or collector
+  policy was added. Explicit non-LIFO unlinking, domain/live checks, attachment
+  admission, NativeWait and NoSafepoint restrictions remain unchanged.
+- Added a mixed outer/inner scope, ReturnSlot and non-LIFO-hole test with GC
+  before/after teardown, immediate and reused stale-reference rejection, exact
+  destruction counts and bounded root-cell reuse across cycles. All 460 selected
+  native memory/epoch/inspection/type/protocol/constructor/VM/import/parallel
+  contracts pass Release, ASan/UBSan/LSan and TSan; all 23 selected direct Python
+  lifetime/callback/inspection/thread/GC cases pass on all three. Release passes
+  all 16 bootstrap/promotion allocation-failure shards. Strict Clang 21.1.8,
+  formatting and diff checks pass. Final evidence is .cache/root-chain-*;
+  initial compile logs retain the caught inspection-publisher signature migration.
+- After all builds/tests stopped, matrix N=64 at one/four workers, three
+  independent processes, one warmup and three values/process gives medians
+  647.286/254.735 ms versus retained 692.474/275.661. Standard pyperf reports
+  about 1.07x improvement for both worker counts. Scaling is 2.541x with
+  four-worker CPU/wall 3.366. This reuses the prior baseline, not a newly
+  interleaved matrix A/B. Auto-GC and result validation remain enabled.
+- Also ran the existing allocate case at its standard full size of 100000
+  short-lived container jobs, alternating the 569edee image and new image, with
+  the same worker/process/warmup/value settings. Before/after medians are
+  970.730/379.212 and 935.429/366.836 ms. Standard pyperf finds about 1.03x
+  single-worker improvement and no significant four-worker difference. New
+  scaling is 2.550x with four-worker CPU/wall 3.044. The earlier 2000-job pilot
+  and its CPython reference are a different size, not a matching denominator;
+  no CPython or unrelated I/O campaign was repeated.
+- Raw runs and generated Markdown/CSV/pyperf suites are in .cache/benchmarks/
+  root-chain-matrix, root-chain-matrix-comparison and root-chain-allocation;
+  standard comparisons are root-chain-{matrix,allocation}-pyperf.log. Before/
+  after assembly confirms the smaller teardown loop's metadata writes; it is
+  not a hardware cache-hit or GC-pause-distribution measurement. Retained the
+  immediate 569edee comparison executable and removed the consumed 96560fc copy,
+  without deleting its raw evidence. matrix.py remains unmodified/untracked.
+  Absolute CPython acceptance remains incomplete; the goal stays active. Next
+  work should reduce the remaining measured admission/root/allocation costs
+  across complete operations, rather than introduce a different GC framework
+  without evidence or continue adjusting this chain helper in isolation.
+
 ## 2026-11-01 Reuse Native Special-Method Classification
 
 Continues the active performance/cleanup goal after pushed 96560fc and cache

@@ -666,6 +666,11 @@ RootScope owns stable cells in the attachment's thread-private arena, reusing
 each cell's existing link for scope membership/free storage. Explicit non-LIFO
 release unlinks before reuse. Handle validates interpreter, arena and generation.
 No root operation may be used from another attachment/thread or during NativeWait.
+Whole-scope teardown invalidates cells through the scope marker and returns the
+existing chain in one free-list splice. Null scope makes retained object/tag bits
+inactive for tracing and handle access; acquisition initializes their final
+state before exposing a new generation. ReturnSlot empty-cell initialization and
+ResultView generation/revision checks are unchanged.
 
 Attachment::try_payload<T>(Value) performs the same attachment, allocation-domain,
 live-publication and native-family checks as has_layout. It returns nullptr only

@@ -287,6 +287,13 @@ Handle access also checks arena, scope, generation and nonempty state before
 reading the object. NativeWait still prohibits heap access and NoSafepoint still
 prohibits growing roots. This does not add unchecked payload access or a TLS
 attachment cache.
+Root acquisition initializes the final value/tag and scope link together. Scope
+teardown clears each cell's live scope marker, then splices the whole chain onto
+the thread-owned free list with one count update. Released value/tag bits are
+inactive: GC and Handle/ResultView checks reject a null scope before using them,
+and acquisition reinitializes them while advancing the generation. Explicit
+non-LIFO release still unlinks before reuse; no root storage moves or new lock
+is introduced.
 Checked nullable payload projection lets int/float operations reuse a native
 layout check instead of checking again when reading the payload. It returns a
 borrowed pointer, not a root; Python subtype admission remains separate, including
