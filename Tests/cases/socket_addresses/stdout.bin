@@ -1,0 +1,19 @@
+b'\x7f\x00\x00\x01'
+127.0.0.1
+4 192.0.2.1
+16 2001:db8::1234
+12345 305419896
+True
+(<AddressFamily.AF_INET: 2>, <SocketKind.SOCK_STREAM: 1>, 6, '', ('127.0.0.1', 80)) 1
+('127.0.0.1', '80')
+127.0.0.1
+OSError
+OSError
+OSError
+ValueError
+gaierror
+gaierror
+OverflowError
+OverflowError
+unix-server.sock unix-client.sock
+b'unix' unix-client.sock

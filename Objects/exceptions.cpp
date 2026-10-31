@@ -44,7 +44,17 @@ CoreObject errno_type(std::int64_t error)
     case EINTR:
         return CoreObject::InterruptedErrorType;
     case EAGAIN:
+    case EINPROGRESS:
+    case EALREADY:
         return CoreObject::BlockingIOErrorType;
+    case ETIMEDOUT:
+        return CoreObject::TimeoutErrorType;
+    case ECONNABORTED:
+        return CoreObject::ConnectionAbortedErrorType;
+    case ECONNREFUSED:
+        return CoreObject::ConnectionRefusedErrorType;
+    case ECONNRESET:
+        return CoreObject::ConnectionResetErrorType;
     case EPIPE:
         return CoreObject::BrokenPipeErrorType;
     default:

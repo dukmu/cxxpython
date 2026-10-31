@@ -77,11 +77,14 @@ add_library(cxxpython_core
     Modules/posixmodule.cpp
     Modules/errnomodule.cpp
     Modules/signalmodule.cpp
+    Modules/selectmodule.cpp
     Modules/mathmodule.cpp
     Modules/math_integer.cpp
     Modules/math_reductions.cpp
     Modules/_picklemodule.cpp
     Modules/_randommodule.cpp
+    Modules/socketmodule.cpp
+    Modules/socket_addresses.cpp
     Modules/time_calendar.cpp
     Python/symtable.cpp
     Python/flowgraph.cpp

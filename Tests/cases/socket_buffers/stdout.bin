@@ -1,0 +1,10 @@
+export held during callback
+3 b'.abc.'
+b'.abc.!'
+b'' 0
+ValueError
+OverflowError
+TypeError
+ValueError
+TypeError
+BufferError

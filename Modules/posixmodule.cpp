@@ -88,6 +88,44 @@ bool descriptor(Attachment &c, Value value, int &fd, ReturnSlot &out)
     return true;
 }
 
+template <bool Set>
+void inheritable_entry(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    int fd;
+    if (!descriptor(c, args[0], fd, out))
+        return;
+    bool inheritable = false;
+    if constexpr (Set) {
+        RootScope roots(c);
+        ReturnSlot converted(c);
+        truth(c, roots.root(args[1]), converted);
+        if (failed(converted)) {
+            out.raised(converted.exception());
+            return;
+        }
+        inheritable = converted.value() == c.builtin(CoreObject::True);
+    }
+    int flags, error;
+    {
+        NativeWait wait(c);
+        flags = ::fcntl(fd, F_GETFD);
+        error = flags < 0 ? errno : 0;
+        if constexpr (Set) {
+            if (!error &&
+                ::fcntl(fd, F_SETFD, inheritable ? flags & ~FD_CLOEXEC : flags | FD_CLOEXEC) < 0)
+                error = errno;
+        }
+    }
+    if (error) {
+        os_error(c, error, out);
+        return;
+    }
+    if constexpr (Set)
+        out.ok(c.builtin(CoreObject::None));
+    else
+        out.ok(c.builtin((flags & FD_CLOEXEC) ? CoreObject::False : CoreObject::True));
+}
+
 void urandom_entry(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     std::int64_t size;
@@ -1356,6 +1394,9 @@ void initialize_posix(Attachment &c, Handle module, ReturnSlot &out)
                  signature({patharg, {U"flags", only}, {U"mode", only, mode_default.get(c)}}),
                  entry<Op::Open>) ||
         !install("close", signature({fdarg}), entry<Op::Close>) ||
+        !install("get_inheritable", signature({fdarg}), inheritable_entry<false>) ||
+        !install("set_inheritable", signature({fdarg, {U"inheritable", only}}),
+                 inheritable_entry<true>) ||
         !install("chdir", signature({patharg}), entry<Op::Chdir>) ||
         !install("fchdir", signature({fdarg}), entry<Op::Fchdir>) ||
         !install("read", signature({fdarg, {U"length", only}}), entry<Op::Read>) ||

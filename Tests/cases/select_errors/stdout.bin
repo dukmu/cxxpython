@@ -1,0 +1,16 @@
+no fileno TypeError
+bad result TypeError
+fileno raises RuntimeError
+getter raises RuntimeError
+negative fd ValueError
+huge fd OverflowError
+out of range ValueError
+too many ValueError
+negative timeout ValueError
+negative float ValueError
+nan ValueError
+infinity OverflowError
+huge timeout OverflowError
+bad timeout TypeError
+bad index TypeError
+index raises RuntimeError

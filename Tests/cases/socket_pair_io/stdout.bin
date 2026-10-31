@@ -1,0 +1,14 @@
+True True
+None True
+0.0 False
+would block
+1.5 True
+timed out
+None True
+6
+b'ab' b'ab'
+4 b'\x00cdef\x00'
+b'dup' True
+closed
+b'hello\n'
+b'world\n'

@@ -287,8 +287,18 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
            LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::OSErrorType));
     define(CoreObject::BlockingIOErrorType, "BlockingIOError",
            LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::OSErrorType));
-    define(CoreObject::BrokenPipeErrorType, "BrokenPipeError",
+    define(CoreObject::TimeoutErrorType, "TimeoutError", LayoutDescriptor::of<ExceptionObject>(),
+           at(CoreObject::OSErrorType));
+    define(CoreObject::ConnectionErrorType, "ConnectionError",
            LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::OSErrorType));
+    define(CoreObject::ConnectionAbortedErrorType, "ConnectionAbortedError",
+           LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::ConnectionErrorType));
+    define(CoreObject::ConnectionRefusedErrorType, "ConnectionRefusedError",
+           LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::ConnectionErrorType));
+    define(CoreObject::ConnectionResetErrorType, "ConnectionResetError",
+           LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::ConnectionErrorType));
+    define(CoreObject::BrokenPipeErrorType, "BrokenPipeError",
+           LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::ConnectionErrorType));
     define(CoreObject::ReversedType, "reversed", LayoutDescriptor::of<SequenceIteratorObject>());
     define(CoreObject::ListReverseIteratorType, "list_reverseiterator",
            LayoutDescriptor::of<SequenceIteratorObject>());
@@ -738,6 +748,11 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                     CoreObject::NotADirectoryErrorType,
                     CoreObject::InterruptedErrorType,
                     CoreObject::BlockingIOErrorType,
+                    CoreObject::TimeoutErrorType,
+                    CoreObject::ConnectionErrorType,
+                    CoreObject::ConnectionAbortedErrorType,
+                    CoreObject::ConnectionRefusedErrorType,
+                    CoreObject::ConnectionResetErrorType,
                     CoreObject::BrokenPipeErrorType,
                     CoreObject::PropertyType,
                     CoreObject::StaticMethodType,

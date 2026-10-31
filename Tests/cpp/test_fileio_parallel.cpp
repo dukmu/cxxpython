@@ -95,7 +95,10 @@ TEST(FileIOContracts, AllocationFailureDuringFlushLookupStillClosesDescriptor)
     run(context, {&source, globals}, out);
     ASSERT_EQ(out.tag(), ResultTag::Ok);
     auto file = roots.root(*detail::name_lookup(context, globals.get(context), U"f"));
-    auto close = roots.root(*detail::type_attribute(context, context.type_of(file), U"close"));
+    auto descriptor_object =
+        roots.root(*detail::type_attribute(context, context.type_of(file), U"close"));
+    ASSERT_TRUE(context.has_layout<MethodDescriptorObject>(descriptor_object.get(context)));
+    auto close = roots.root(context.payload<MethodDescriptorObject>(descriptor_object).function);
     const auto entry = context.payload<NativeFunctionObject>(close).entry;
     const Value arguments[] = {file.get(context)};
     context.set_allocation_limit(0);

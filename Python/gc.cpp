@@ -600,19 +600,22 @@ struct State {
                 ref = next;
             }
         });
-        // First register every unreachable finalizer; marking one candidate
-        // early would hide other finalizers in the same cyclic isolate.
+        auto queue_finalizer = [&](Allocation &allocation) {
+            allocation.finalization = Allocation::Finalization::Queued;
+            allocation.finalizer_next = nullptr;
+            if (finalizer_tail)
+                finalizer_tail->finalizer_next = &allocation;
+            else
+                finalizer_head = &allocation;
+            finalizer_tail = &allocation;
+        };
+        // Register the complete Python finalizer isolate before tracing it.
+        // Native resources reachable from a potentially resurrected object
+        // must not be disposed in that same finalization batch.
         each_allocation([&](Allocation &allocation) {
             if (!allocation.marked && allocation.finalization == Allocation::Finalization::Unseen &&
-                (allocation.span->layout.finalize || python_finalizer(allocation))) {
-                allocation.finalization = Allocation::Finalization::Queued;
-                allocation.finalizer_next = nullptr;
-                if (finalizer_tail)
-                    finalizer_tail->finalizer_next = &allocation;
-                else
-                    finalizer_head = &allocation;
-                finalizer_tail = &allocation;
-            }
+                python_finalizer(allocation))
+                queue_finalizer(allocation);
         });
         auto retain = [&](Allocation *finalizers, WeakRefObject *callbacks) {
             for (auto *item = finalizers; item; item = item->finalizer_next)
@@ -623,6 +626,13 @@ struct State {
         retain(finalizer_head, weak_callback_head);
         for (const auto &thread : threads)
             retain(thread->finalizers, thread->weak_callbacks);
+        trace_work();
+        each_allocation([&](Allocation &allocation) {
+            if (!allocation.marked && allocation.finalization == Allocation::Finalization::Unseen &&
+                allocation.span->layout.finalize)
+                queue_finalizer(allocation);
+        });
+        retain(finalizer_head, nullptr);
         trace_work();
         std::size_t collected = 0;
         std::erase_if(interned_strings,

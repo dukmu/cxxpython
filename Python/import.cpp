@@ -27,6 +27,8 @@
 #include "internal/picklemodule.hpp"
 #include "internal/posixmodule.hpp"
 #include "internal/randommodule.hpp"
+#include "internal/selectmodule.hpp"
+#include "internal/socketmodule.hpp"
 #include "internal/stdio.hpp"
 #include "internal/stringmodule.hpp"
 #include "internal/structmodule.hpp"
@@ -272,6 +274,8 @@ detail::ImportState::ImportState()
                                      {U"math", detail::initialize_math},
                                      {U"_pickle", detail::initialize_pickle},
                                      {U"_random", detail::initialize_random},
+                                     {U"select", detail::initialize_select},
+                                     {U"_socket", detail::initialize_socket},
                                      {U"_opcode", detail::initialize_opcode},
 #ifdef CXXPYTHON_HAVE_READLINE
                                      {U"readline", detail::initialize_readline},

@@ -201,6 +201,45 @@ from writes through the binary buffer. Failed pending output is not duplicated b
 a later flush. Complete codec,
 warning, subclass and configuration matrices are not implied by this slice.
 
+## Network Resources
+
+The experimental POSIX network foundation uses unchanged pinned socket.py,
+selectors.py and socketserver.py. Native _socket supplies actual IPv4/IPv6/Unix
+socket operations and address resolution; select supplies the real select syscall.
+Only select is advertised, so upstream policy chooses SelectSelector rather than
+a fabricated poll/epoll implementation. This is not full socket API/platform parity.
+
+Each socket traces an internal resource object. The latter has a native-only
+state and a post-STW finalizer, independent of a public subclass's __del__ and
+resurrection. Ordinary GC never performs a potentially lingering socket close in
+a collector destructor. The collector quarantines every unreachable Python
+finalizer graph first, then selects native finalizers still unreachable after
+that trace. A dependent native resource cannot be disposed in the same batch as
+its potentially resurrecting Python owner. Final interpreter destruction may
+still dispose native resources after every attachment has exited; complete
+product shutdown remains a gate.
+Metadata is immutable per resource; timeout/fd changes use its short native mutex.
+Reinitialization publishes a new rooted resource and closes the previous one.
+Unlike pinned CPython's overwrite, it does not leak an already-open old descriptor.
+
+Blocking operations acquire a CLOEXEC duplicate under that mutex, then release
+the mutex before any I/O, callback or allocation. The duplicate pins the kernel
+open-file description independently of public close/detach or fd reuse. Acquisition,
+syscalls and duplicate disposal use NativeWait. This deliberately trades an extra
+dup/close pair per operation for a small explicit lifetime contract, not a GIL,
+active-call registry or another collector. A close in another thread does not
+cancel an in-flight receive; use peer data/shutdown or configured timeouts.
+
+Sends snapshot bytes; receives fill native storage before publishing through the
+ordinary synchronized buffer writer. BufferExport retains precise exporter/data
+roots and storage leases across conversion callbacks and waits. No kernel call
+writes unsynchronized managed bytearray storage. Positive timeouts and sendall
+retries use a monotonic deadline; EINTR checks ordinary Python signal delivery.
+Select roots a snapshot of each input, returns original objects in input order,
+preserves duplicates, restores fd sets on EINTR and never owns caller descriptors.
+
+## Library Protocols
+
 The unchanged pinned abc.py uses real _abc weak registries and epoch-tagged
 negative caches. Type abstract flags publish with immutable namespace snapshots;
 direct subclasses use prepared dictionary nodes with weak targets and conditional

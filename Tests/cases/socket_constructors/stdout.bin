@@ -1,0 +1,17 @@
+0 0 0 -1 None
+True True 0 0.25 True
+None
+-1 True
+True True
+True
+True
+b'adopt'
+ValueError
+ValueError
+ValueError
+True True
+ConnectionRefusedError
+ConnectionResetError
+ConnectionAbortedError
+TimeoutError
+BlockingIOError

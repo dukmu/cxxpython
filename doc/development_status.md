@@ -1,5 +1,62 @@
 # Development Status
 
+## 2026-10-31 Network Foundation And User-Directed Route Pause
+
+Prepended after aca6804 without rewriting earlier entries. The previous goal turn
+made concrete progress through the pushed pickle/buffer stable point. This turn
+adds a real POSIX network base and records the user's new priority: after this
+network stable point, pause the incomplete full-compatibility goal and work on
+performance, diagnostics and code cleanup instead of expanding more libraries.
+The complete Plan 2 objective is not declared achieved or reduced in scope.
+
+- Added unchanged pinned CPython 3.12.14 socket.py, selectors.py and socketserver.py,
+  verified by direct source comparisons. Native _socket supports actual TCP/UDP/
+  Unix construction/adoption, address resolution/conversion, bind/listen/accept,
+  connect/connect_ex, send/receive/buffer variants, shutdown, socket options,
+  timeout/blocking configuration, detach, dup and socketpair. Native select keeps
+  original object identity/order/duplicates and handles signals/deadlines. Only
+  the actual select capability is advertised; Python chooses SelectSelector.
+- Socket resources use the existing post-STW finalizer and precise edges. I/O
+  holds CLOEXEC native duplicates independently of public close/detach/fd reuse;
+  all kernel waits and disposals park. No new execution lock, object RC, active-call
+  registry or GC service was introduced. Sends snapshot data; receives commit
+  native buffers through the existing synchronized BufferExport writer. This
+  explicit base trades an extra dup/close pair for safe descriptor lifetime.
+- Actual resurrection testing exposed that the collector selected dependent
+  native resources in the same batch as Python finalizers. It now quarantines
+  the whole Python-finalizer graph before selecting still-unreachable native
+  finalizers. A resurrected socket keeps its fd. Native close never waits in a
+  normal collector destructor. Added canonical TimeoutError/ConnectionError and
+  subclasses/errno dispatch, plus real os.get_inheritable/set_inheritable.
+- Sixteen direct network scenarios have product/fixed-reference evidence,
+  including TCP/UDP/Unix, native buffer callbacks, makefile lifetime, selectors,
+  ThreadingTCPServer shutdown, GC/resurrection and error boundaries. Release and
+  TSan pass all sixteen; ASan/UBSan/LSan passes all sixteen with targeted final
+  address/buffer checks. Eight affected existing weakref/generator/I/O/exception
+  scripts pass on all three builds. Release passes all 34 selected native
+  finalization/shared-VM/weakref/I/O/inspection and bootstrap/promotion contracts;
+  both sanitizers pass the 18 affected contracts excluding the costly bootstrap
+  shards. The native FileIO fault test was updated to read its actual owner-bearing
+  method descriptor, retaining its original strict allocation-failure assertions.
+- VM/sleep/select/socket asynchronous signal tests pass. The host test observes
+  actual native wait state, using Linux recv/poll syscalls when the kernel hides
+  socket wchan; a worker-targeted raise_signal test is not claimed as EINTR proof.
+  Strict Clang 21.1.8, formatting and ASDL/244-rule consistency pass. Raw evidence
+  is retained under .cache/socket-* and .cache/select-*; initial failures and the
+  sandbox-denied socket/LSan runs are not passing evidence. The fixed reference's
+  own socket/select/array extensions are linked in its normal build path.
+- This is an experimental POSIX base, not complete socket API/platform parity.
+  Ancillary messages/array, interface and remaining name/service APIs, IDNA,
+  complete numeric-address/diagnostic matrices, Android device and Windows
+  acceptance remain. Reinitializing a live socket closes its old fd rather than
+  reproducing pinned CPython's overwrite leak. Complete shutdown/product/N4-N6
+  and full compatibility gates remain incomplete.
+- Next user-directed work: actionable AttributeError messages, repeated Modules
+  conversion/installation logic, clearer header boundaries, measured cache and
+  allocation reuse. matrix.py is the user's local reference and must not be
+  committed. No unrelated performance sweep, checksum framework or hand-written
+  measurement table was added in this correctness-focused network step.
+
 ## 2026-10-31 Pickle, Direct Buffer Leases And Callable Metadata
 
 Prepended after the independently committed Android TLS fix 62a12b7. The previous

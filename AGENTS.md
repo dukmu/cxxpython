@@ -38,12 +38,15 @@ compiler, VM, and extension platform implemented in a C/C++ mix.
 - Advance through N0-N6 and the complete M0-M9 acceptance gates. Record actual tests,
   remaining gates and the next dependency in `doc/development_status.md`.
   Do not mark a whole milestone complete based on a narrower passing slice.
-- The active service goal covers the generated Python 3.12 frontend, unified
-  imports and the remaining standard-library/product/N4-N6 work. A verified
-  slice does not complete that full objective;
-  the full language, standard-library and product scope remains in Plan 2
-  sections 0.8 and 11.2. Complete a stage only on its actual acceptance evidence,
-  then promptly commit/push and create the next dependent stage goal.
+- The user has directed a route pause after the current network stable point.
+  Then pause the full frontend/import/library/product/N4-N6 service goal without
+  marking it complete, and prioritize performance and code cleanup instead of
+  expanding more libraries. Retain the full delivery scope in Plan 2 sections
+  0.8 and 11.2. Improve Python exception diagnostics, repeated Modules conversion/
+  installation code, header boundaries, measured cache locality and allocation
+  reuse while preserving semantics, precise roots and shared-heap CPU parallelism.
+  The user-supplied root matrix.py is local performance input, not a deliverable:
+  do not commit it. Keep raw measurements under .cache/ and generate any tables.
 - `Grammar/python.gram` and `Grammar/Tokens` are fixed CPython 3.12.14 inputs.
   Use the vendored pegen grammar reader/left-recursion analysis and the standalone
   C++ output backend in `Tools/peg_generator/`; do not add handwritten grammar

@@ -48,6 +48,28 @@ acceptance evidence; this list is not a generated support matrix.
   fields for name/path/msg/name_from. Runtime error support must grow with the
   copied source instead of deleting these error paths from Lib.
 
+## Network Policy
+
+- socket.py, selectors.py and socketserver.py are unchanged pinned CPython 3.12.14
+  sources. Their TCP/UDP/Unix workflows, stream wrappers and selector/server policy
+  call actual native _socket/select capabilities, not Python-library workarounds.
+- Native socket/address handling adapts socketmodule.c; select follows
+  selectmodule.c and fileobject.c. Precise resource roots, native fd duplicates,
+  post-STW disposal and short per-resource commits replace the RC/GIL lifetime
+  assumptions. OSError now has the real TimeoutError/ConnectionError subclasses
+  and corresponding errno dispatch; socket.timeout aliases canonical TimeoutError.
+- This remains an experimental POSIX base, not all of upstream socketmodule.c.
+  Ancillary messages/array, sendmsg/recvmsg, interface APIs, all service/protocol
+  lookups, IDNA host encoding, complete numeric getnameinfo validation, exact
+  diagnostics, Windows/native-extension and Android device acceptance remain.
+  Unsupported APIs are absent, so unchanged upstream capability branches remain
+  honest. Address resolver failures use actual gaierror/OSError classes.
+- Reinitializing a live socket closes its old descriptor instead of reproducing
+  pinned CPython's overwrite leak. Finalization follows tracing-GC resurrection
+  rules, not refcount timing or repeated native-subtype finalization behavior.
+  Concurrent mode changes share the kernel open-file description just as dup/fromfd
+  do; a compound sequence of mode changes and I/O is not an atomic transaction.
+
 ## Builtins And Product
 
 - Structural patterns follow pinned Python/compile.c and Python/ceval.c protocol
