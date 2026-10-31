@@ -486,6 +486,73 @@ void predicate(Attachment &context, Handle, std::span<const Value> args, ReturnS
     out.ok(context.builtin(result ? CoreObject::True : CoreObject::False));
 }
 
+// CPython 3.12.14 unicode_{islower,isupper,istitle}_impl and unicodectype.c masks.
+enum class CasePredicate { Lower, Upper, Title };
+template <CasePredicate Kind>
+void case_predicate(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(context);
+    const auto self = roots.root(args[0]);
+    if (!is_string(context, self.get(context))) {
+        const auto name = TypeView(context, context.type_of(self)).name();
+        const auto type_name = std::holds_alternative<Value>(name)
+                                   ? context.payload<StrObject>(std::get<Value>(name)).value
+                                   : std::get<std::u32string>(name);
+        const auto method = Kind == CasePredicate::Lower   ? U"islower"
+                            : Kind == CasePredicate::Upper ? U"isupper"
+                                                           : U"istitle";
+        raise_error(context, CoreObject::TypeErrorType,
+                    U"descriptor '" + std::u32string(method) +
+                        U"' for 'str' objects doesn't apply to a '" + type_name.substr(0, 100) +
+                        U"' object",
+                    out);
+        return;
+    }
+    constexpr unsigned short lower_mask = 0x08, title_mask = 0x40, upper_mask = 0x80;
+    const auto &text = context.payload<StrObject>(self).value;
+    if (text.size() == 1) {
+        constexpr auto mask = Kind == CasePredicate::Lower   ? lower_mask
+                              : Kind == CasePredicate::Upper ? upper_mask
+                                                             : title_mask | upper_mask;
+        out.ok(context.builtin((unicode_record(text[0]).flags & mask) ? CoreObject::True
+                                                                      : CoreObject::False));
+        return;
+    }
+    bool cased = false, previous_is_cased = false;
+    for (std::size_t i = 0; i < text.size(); ++i) {
+        const auto flags = unicode_record(text[i]).flags;
+        if constexpr (Kind == CasePredicate::Title) {
+            if (flags & (upper_mask | title_mask)) {
+                if (previous_is_cased) {
+                    out.ok(context.builtin(CoreObject::False));
+                    return;
+                }
+                previous_is_cased = cased = true;
+            } else if (flags & lower_mask) {
+                if (!previous_is_cased) {
+                    out.ok(context.builtin(CoreObject::False));
+                    return;
+                }
+                previous_is_cased = cased = true;
+            } else
+                previous_is_cased = false;
+        } else {
+            constexpr auto rejected =
+                Kind == CasePredicate::Lower ? upper_mask | title_mask : lower_mask | title_mask;
+            constexpr auto accepted = Kind == CasePredicate::Lower ? lower_mask : upper_mask;
+            if (flags & rejected) {
+                out.ok(context.builtin(CoreObject::False));
+                return;
+            }
+            if (flags & accepted)
+                cased = true;
+        }
+        if ((i & 4095) == 4095)
+            context.poll();
+    }
+    out.ok(context.builtin(cased ? CoreObject::True : CoreObject::False));
+}
+
 // Follows CPython 3.12's charmap translation, including its ASCII cache.
 void translate(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
@@ -1086,6 +1153,12 @@ void detail::install_unicode_methods(Attachment &context, std::span<const Handle
                              predicate<Predicate::Numeric>);
     install_native_attribute(context, core, at(CoreObject::StrType), U"isidentifier", unary,
                              predicate<Predicate::Identifier>);
+    install_native_attribute(context, core, at(CoreObject::StrType), U"islower", unary,
+                             case_predicate<CasePredicate::Lower>);
+    install_native_attribute(context, core, at(CoreObject::StrType), U"isupper", unary,
+                             case_predicate<CasePredicate::Upper>);
+    install_native_attribute(context, core, at(CoreObject::StrType), U"istitle", unary,
+                             case_predicate<CasePredicate::Title>);
     SignatureLayout translated = unary;
     translated.parameters.push_back({U"table", ParameterKind::PositionalOnly});
     install_native_attribute(context, core, at(CoreObject::StrType), U"translate", translated,

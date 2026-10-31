@@ -1,0 +1,18 @@
+iterator True True
+names ['broken', 'file', 'link', 'sub']
+exports True True True
+broken True True True True
+kind False False True False False
+inode True
+file True True True True
+kind False True False False True
+inode True
+link True True True True
+kind False True True False False
+inode True
+sub True True True True
+kind True False False True False
+inode True
+closed []
+reclosed []
+context exception []

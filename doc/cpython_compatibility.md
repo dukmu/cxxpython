@@ -66,9 +66,8 @@ acceptance evidence; this list is not a generated support matrix.
 The canonical builtins module/dictionary, namespace lookup and core bootstrap are
 present. Base slices now include print, bytes/bytearray, complex, set/frozenset,
 super, namespace/reflection, exec/eval compilation/execution, sorting, reverse
-iteration, enumerate/zip/map and common aggregate builtins. Complete Python
-3.12 builtins are not: filter and other remaining
-iterators, compiler flags/modes and constructors/protocol matrices are still work.
+iteration, enumerate/zip/map/filter and common aggregate builtins. Complete Python
+3.12 builtins, compiler flags/modes and constructors/protocol matrices are still work.
 Complete their native dependencies and fixed-reference tests before copying
 dependent libraries wholesale. `__builtin__` is not the Python 3 module name;
 the target is `builtins` and the `__builtins__` execution namespace.
@@ -142,15 +141,27 @@ the target is `builtins` and the `__builtins__` execution namespace.
   Literal samples from upstream test_codeop.py, the independent flag/mode matrix,
   future flag memory, real-stdin consoles, hooks and exception recovery have
   direct product tests. KeyboardInterrupt is an ordinary canonical BaseException
-  subtype, not a console-only sentinel; OS signal delivery remains separate work.
+  subtype, not a console-only sentinel. The explicit POSIX signal slice and its
+  remaining blocking-I/O/startup gates are described below.
 - `Lib/traceback.py` retains pinned formatting policy with one private adaptation:
   `_get_code_position` indexes actual VM instructions, not CPython two-byte
   wordcode. Code.co_positions/co_lines and readonly Frame.f_lasti expose actual
   immutable program positions and the atomic frame cursor. Focused exception-only,
   traceback and console cases pass. Native AST and Unicode dependencies are now
-  present; frame.clear and complete reflection/Unicode-caret/upstream-suite
-  coverage remain dependencies;
+  present; complete reflection/Unicode-caret/upstream-suite coverage remains a
+  dependency. frame.clear releases completed locals and this frame's Cell edges
+  without emptying externally shared closure Cells. Running frames reject clear;
+  ordinary suspended generators/coroutines reuse close's actual execution claim
+  and finally/GeneratorExit protocol. No per-generator weakref/back-reference or
+  new lifetime manager is added. Unraisable cleanup reports the originating Frame,
+  not CPython's generator object; async-generator clearing remains an explicit
+  experimental finalizer-hook gate. f_locals and full reflection remain work;
   no fake modules or fabricated co_code are introduced to hide them.
+  This runtime's standalone generator Frame drops its local edges immediately on
+  clear. Pinned CPython retains generator-owned locals after clear until ownership
+  transfers and the Frame is cleared/destroyed. The earlier release is recorded
+  in Tests/vm_cases/frame_clear_generator_lifetime; common fixtures compare cleanup
+  and eventual weak callbacks, not that private refcount-dependent retention.
 - `Grammar/Python.asdl`, the upstream ASDL reader, `Lib/ast.py` and `Lib/inspect.py`
   are copied from pinned 3.12.14. The generated native schema is the sole AST
   field/type authority. The CST-to-ASDL and ASDL-to-IR adapters replace the former
@@ -571,8 +582,9 @@ the target is `builtins` and the `__builtins__` execution namespace.
 - The native time slice provides actual realtime/monotonic/performance/process/
   thread clocks and nanoseconds, clock_getres metadata and GC-aware sleep.
   Conversion errors, signed/invalid timeouts and progress while another thread
-  sleeps use direct tests. Signal interruption delivery, calendar/timezone APIs
-  and other platforms are not implied. Native C qualified diagnostic names are
+  sleeps use direct tests. POSIX sleep now checks pending Python signals on EINTR
+  and resumes the same monotonic deadline. Calendar/timezone APIs and other
+  platforms are not implied. Native C qualified diagnostic names are
   a known shared reflection gap: get_clock_info(BytesIO()) currently says
   BytesIO instead of CPython's _io.BytesIO. A separate VM fixture records it;
   remove that difference when canonical native diagnostic names are available,
@@ -581,6 +593,54 @@ the target is `builtins` and the `__builtins__` execution namespace.
   preserves lock type identity. Existing classes/functions and instances continue
   to use the same state, rather than constructing incompatible native types on
   every execution of the initializer.
+
+## Unittest And Native Policy Dependencies
+
+- Unchanged pinned unittest, argparse, gettext, fnmatch, locale, shutil and glob sources
+  retain Python policy. Core TestCase/Suite/Loader/Runner, discovery, CLI failures
+  and catchbreak use actual runtime dependencies. Copying mock.py and async_case.py
+  does not complete their unfinished asyncio/logging and other dependency suites.
+  locale currently uses upstream's C-locale fallback, not a native _locale backend.
+  glob's wildcard/hidden/recursive/root_dir/bytes/symlink paths use the real
+  directory primitives; fd-relative globbing is not complete.
+- filter reuses the existing immutable child/predicate iterator layout. The child
+  iterator owns cursor synchronization; no filter lock spans Python predicates.
+  None/bool optimization, lazy errors/retry, subclasses, reduction and collecting/
+  parallel callbacks are ordinary builtin behavior, not unittest special cases.
+  str.isupper/islower/istitle use the pinned Unicode property tables.
+- Native errno supplies platform constants/errorcode. os.access uses faccessat,
+  including dir_fd/effective_ids/follow_symlinks; supported capability sets expose
+  only implemented variants. terminal_size is a readonly tuple record and
+  get_terminal_size uses a real ioctl, not environment guesses or fixed values.
+- sys.audit/addaudithook keep an Interpreter-rooted private hook list. Ordered
+  hooks and exceptions execute with no callback-spanning lock; adding a hook emits
+  the upstream veto event. Explicit audit and Python-policy events work. Complete
+  native import/open/exec event coverage and tracing hooks remain gates; this is
+  not a security or sandbox boundary.
+- _signal owns one process signal lease, with process-lifetime lock-free native
+  notification cells and precisely rooted Interpreter handlers. Only the physical
+  main OS thread installs/dispatches Python handlers; VM safety points and EINTR
+  sleep checks deliver ordinary Python exceptions. Other threads still run Python
+  simultaneously. Independent Interpreters may import/read signal information but
+  may not replace an active owner's handlers. Destruction restores dispositions
+  still owned by that lease, without overwriting host replacements.
+- Handler state survives deleting/reimporting _signal in this runtime; pinned
+  CPython 3.12 resets that module state. This intentional native-resource ownership
+  difference is tested separately in Tests/vm_cases/signal_module_lifetime, not
+  hidden in common-reference fixtures. First-worker import/embedding shutdown,
+  wakeup-fd, masks/timers, fork/platform coverage and interruption of locks, general
+  I/O and readline remain unfinished. The CLI does not unconditionally activate
+  the signal module before those blocking paths are integrated.
+- sys._stdlib_dir and prefix/base-prefix/exec-prefix fields reflect explicit CMake
+  resource configuration, not an inferred host CPython or virtual environment.
+- os.scandir publishes an eager native name snapshot with an atomic iterator
+  cursor, and closes the directory in NativeWait before managed publication.
+  DirEntry has immutable name/path/inode/type hints and precisely traced atomic
+  first-success stat/lstat caches; callbacks never run under a directory lock.
+  This base slice uses O(directory-size) native memory, retained until iterator
+  collection even after close, unlike CPython's streaming DIR handle. fd-based
+  scandir, native scandir audit events and full live-directory/platform matrices
+  remain gates. Resource tests currently use Linux /proc/self/fd.
 
 The configured source-tree stdlib path is development configuration, not final
 installation, isolation, environment or embedding acceptance. Full stdio/runpy,

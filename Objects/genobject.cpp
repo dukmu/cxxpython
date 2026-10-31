@@ -1,4 +1,5 @@
 #include "cxxpython/genobject.hpp"
+#include "internal/errors.hpp"
 
 #include <charconv>
 
@@ -143,6 +144,70 @@ void convert_stop_iteration(Attachment &ctx, bool coroutine, ReturnSlot &out)
         out.raised(replacement.get(ctx));
 }
 
+// Shared by generator.close() and frame.clear(); no generator back-reference or
+// extra weakref allocation is needed to run a suspended frame's cleanup.
+bool close_frame(Attachment &ctx, Handle frame, bool clearing, ReturnSlot &out)
+{
+    auto &data = ctx.payload<FrameObject>(frame);
+    const bool coroutine = ctx.payload<CodeObject>(data.code).program.is_coroutine();
+    auto state = data.state.load(std::memory_order_acquire);
+    for (;;) {
+        if (state == FrameState::Running) {
+            raise_error(ctx, clearing ? CoreObject::RuntimeErrorType : CoreObject::ValueErrorType,
+                        clearing    ? U"cannot clear an executing frame"
+                        : coroutine ? U"coroutine already executing"
+                                    : U"generator already executing",
+                        out);
+            return false;
+        }
+        if (state == FrameState::Completed) {
+            out.ok(ctx.builtin(CoreObject::None));
+            return true;
+        }
+        if (data.state.compare_exchange_weak(state, FrameState::Running, std::memory_order_acquire))
+            break;
+    }
+    data.owner.store(std::this_thread::get_id(), std::memory_order_relaxed);
+    FrameClaim claim{data, state};
+    if (state == FrameState::Created) {
+        claim.publish(FrameState::Completed);
+        out.ok(ctx.builtin(CoreObject::None));
+        return true;
+    }
+    RootScope roots(ctx);
+    ReturnSlot thrown(ctx);
+    detail::normalize_exception(ctx, roots.root(ctx.builtin(CoreObject::GeneratorExitType)),
+                                thrown);
+    if (thrown.tag() == ResultTag::Raised) {
+        out.raised(thrown.exception());
+        return true;
+    }
+    const auto exception = roots.root(thrown.value());
+    detail::ResumeResult result;
+    try {
+        result = detail::resume_generator_frame(
+            ctx, frame, roots.root(ctx.builtin(CoreObject::None)), exception, out);
+    } catch (...) {
+        claim.publish(FrameState::Completed);
+        throw;
+    }
+    const bool suspended =
+        result == detail::ResumeResult::Yielded || result == detail::ResumeResult::Rejected;
+    claim.publish(suspended ? FrameState::Suspended : FrameState::Completed);
+    if (result == detail::ResumeResult::Yielded)
+        raise_error(ctx, CoreObject::RuntimeErrorType,
+                    coroutine ? U"coroutine ignored GeneratorExit"
+                              : U"generator ignored GeneratorExit",
+                    out);
+    else if (result == detail::ResumeResult::Returned ||
+             (out.tag() == ResultTag::Raised &&
+              exception_is(ctx, out.exception(), CoreObject::GeneratorExitType)))
+        out.ok(ctx.builtin(CoreObject::None));
+    else if (result == detail::ResumeResult::Raised)
+        convert_stop_iteration(ctx, coroutine, out);
+    return true;
+}
+
 void resume(Attachment &ctx, Value self_value, Operation operation, std::span<const Value> args,
             ReturnSlot &out, std::optional<Handle> throw_args = {})
 {
@@ -179,6 +244,18 @@ void resume(Attachment &ctx, Value self_value, Operation operation, std::span<co
     }
     const auto frame = roots.root(loaded.value());
     auto &data = ctx.payload<FrameObject>(frame);
+    if (operation == Operation::Close) {
+        try {
+            close_frame(ctx, frame, false, out);
+        } catch (...) {
+            if (data.state.load(std::memory_order_acquire) == FrameState::Completed)
+                ctx.store(self.get(ctx), ctx.payload<GeneratorObject>(self).frame, {});
+            throw;
+        }
+        if (data.state.load(std::memory_order_acquire) == FrameState::Completed)
+            ctx.store(self.get(ctx), ctx.payload<GeneratorObject>(self).frame, {});
+        return;
+    }
     auto state = data.state.load(std::memory_order_acquire);
     for (;;) {
         if (state == FrameState::Running) {
@@ -219,12 +296,6 @@ void resume(Attachment &ctx, Value self_value, Operation operation, std::span<co
                     out);
         return;
     }
-    if (operation == Operation::Close && state == FrameState::Created) {
-        out.ok(none);
-        claim.publish(FrameState::Completed);
-        ctx.store(self.get(ctx), ctx.payload<GeneratorObject>(self).frame, {});
-        return;
-    }
     std::optional<Handle> exception;
     if (operation == Operation::Throw) {
         ReturnSlot delegate(ctx);
@@ -237,14 +308,6 @@ void resume(Attachment &ctx, Value self_value, Operation operation, std::span<co
             }
             exception = roots.root(thrown.value());
         }
-    } else if (operation == Operation::Close) {
-        detail::normalize_exception(ctx, roots.root(ctx.builtin(CoreObject::GeneratorExitType)),
-                                    thrown);
-        if (thrown.tag() == ResultTag::Raised) {
-            out.raised(thrown.exception());
-            return;
-        }
-        exception = roots.root(thrown.value());
     }
     const auto sent = roots.root(operation == Operation::Send ? args[0] : none);
     detail::ResumeResult result;
@@ -260,20 +323,6 @@ void resume(Attachment &ctx, Value self_value, Operation operation, std::span<co
     claim.publish(suspended ? FrameState::Suspended : FrameState::Completed);
     if (!suspended)
         ctx.store(self.get(ctx), ctx.payload<GeneratorObject>(self).frame, {});
-    if (operation == Operation::Close) {
-        if (result == detail::ResumeResult::Yielded)
-            raise_error(ctx, CoreObject::RuntimeErrorType,
-                        coroutine ? U"coroutine ignored GeneratorExit"
-                                  : U"generator ignored GeneratorExit",
-                        out);
-        else if (result == detail::ResumeResult::Returned ||
-                 (out.tag() == ResultTag::Raised &&
-                  exception_is(ctx, out.exception(), CoreObject::GeneratorExitType)))
-            out.ok(none);
-        else if (result == detail::ResumeResult::Raised)
-            convert_stop_iteration(ctx, coroutine, out);
-        return;
-    }
     if (result == detail::ResumeResult::Returned) {
         const auto value = roots.root(out.value());
         detail::generator_stop(ctx, value, out);
@@ -457,6 +506,17 @@ void make_generator(Attachment &context, Handle frame, ReturnSlot &out)
     context.allocate_instance<GeneratorObject>(roots.root(context.builtin(type)), out,
                                                rooted_frame.get(context), code.get(context),
                                                name.get(context), qualname.get(context));
+}
+
+void clear_generator_frame(Attachment &context, Handle frame, ReturnSlot &out)
+{
+    // Reuse close's actual execution claim, cleanup and exception protocol.
+    // A competing resume is an ordinary clear() error, not an ignored finalizer.
+    if (close_frame(context, frame, true, out) && out.tag() == ResultTag::Raised) {
+        RootScope roots(context);
+        write_unraisable(context, roots.root(out.exception()), frame);
+        out.ok(context.builtin(CoreObject::None));
+    }
 }
 
 void get_awaitable(Attachment &context, Handle value, ReturnSlot &out)

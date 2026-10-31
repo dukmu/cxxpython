@@ -1,0 +1,9 @@
+direct [(True, True, True)]
+worker notification (True, True, True) ['main-only']
+signal enums SIGINT SIG_IGN True
+signal zero None
+keyboard interrupt ()
+invalid signal rejected
+invalid signal rejected
+invalid signal rejected
+invalid handler rejected

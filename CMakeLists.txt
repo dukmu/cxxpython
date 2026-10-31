@@ -75,6 +75,8 @@ add_library(cxxpython_core
     Modules/_blake2/impl/blake2b-ref.c
     Modules/_blake2/impl/blake2s-ref.c
     Modules/posixmodule.cpp
+    Modules/errnomodule.cpp
+    Modules/signalmodule.cpp
     Python/symtable.cpp
     Python/flowgraph.cpp
     Python/ceval.cpp
@@ -133,8 +135,11 @@ add_library(cxxpython_core
 )
 target_include_directories(cxxpython_core PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/Include)
 target_include_directories(cxxpython_core SYSTEM PRIVATE ${BOOST_MULTIPRECISION_INCLUDE_DIR})
-set(CXXPYTHON_STDLIB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Lib" CACHE PATH "Python standard library source directory")
-target_compile_definitions(cxxpython_core PRIVATE CXXPYTHON_STDLIB_DIR="${CXXPYTHON_STDLIB_DIR}")
+set(CXXPYTHON_PREFIX "${CMAKE_CURRENT_SOURCE_DIR}" CACHE PATH "Runtime resource prefix (no virtual environment)")
+set(CXXPYTHON_STDLIB_DIR "${CXXPYTHON_PREFIX}/Lib" CACHE PATH "Python standard library source directory")
+target_compile_definitions(cxxpython_core PRIVATE
+    CXXPYTHON_PREFIX="${CXXPYTHON_PREFIX}"
+    CXXPYTHON_STDLIB_DIR="${CXXPYTHON_STDLIB_DIR}")
 target_link_libraries(cxxpython_core PUBLIC cxxpython_parser Threads::Threads ${CMAKE_DL_LIBS})
 target_link_libraries(cxxpython_core PRIVATE OpenSSL::Crypto)
 if(TARGET PkgConfig::Readline)
@@ -349,6 +354,16 @@ if(BUILD_TESTING)
         ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_constructors.py
         --binary $<TARGET_FILE:cxxpython> --reference ${CXXPYTHON_REFERENCE_PYTHON})
     set_tests_properties(Constructors.Differential PROPERTIES TIMEOUT 60)
+    add_test(NAME Unittest.Cli COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_unittest_cli.py
+        --binary $<TARGET_FILE:cxxpython> --reference ${CXXPYTHON_REFERENCE_PYTHON}
+        --timeout ${CXXPYTHON_TEST_TIMEOUT})
+    add_test(NAME Signal.Delivery COMMAND ${Python3_EXECUTABLE}
+        ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_signal_delivery.py
+        --binary $<TARGET_FILE:cxxpython> --reference ${CXXPYTHON_REFERENCE_PYTHON})
+    math(EXPR UNITTEST_CLI_TIMEOUT "4 * (${CXXPYTHON_TEST_TIMEOUT} + 30) + 10")
+    set_tests_properties(Unittest.Cli PROPERTIES TIMEOUT ${UNITTEST_CLI_TIMEOUT})
+    set_tests_properties(Signal.Delivery PROPERTIES TIMEOUT 90)
     add_test(NAME Dict.Differential COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_dict.py
         --binary $<TARGET_FILE:cxxpython> --reference ${CXXPYTHON_REFERENCE_PYTHON})

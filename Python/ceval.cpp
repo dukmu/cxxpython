@@ -10,6 +10,7 @@
 #include "internal/exceptiongroup.hpp"
 #include "internal/patternmatching.hpp"
 #include "internal/setobject.hpp"
+#include "internal/signalmodule.hpp"
 #include "internal/sysmodule.hpp"
 
 #include <algorithm>
@@ -361,8 +362,12 @@ void import_locals(Attachment &context, FrameObject &frame, const CodeObject &co
         auto item = frame.locals[i];
         const auto cell = std::find(cell_locals.begin(), cell_locals.end(), i);
         if (cell != cell_locals.end()) {
-            read_cell(context, frame.cells[cell - cell_locals.begin()], value);
-            item = value.tag() == ResultTag::Empty ? std::optional<Value>{} : value.value();
+            const auto offset = static_cast<std::size_t>(cell - cell_locals.begin());
+            if (offset < frame.cells.size()) {
+                read_cell(context, frame.cells[offset], value);
+                item = value.tag() == ResultTag::Empty ? std::optional<Value>{} : value.value();
+            } else
+                item.reset();
         }
         const auto &name = code.program.local_names()[i];
         if (item)
@@ -584,11 +589,15 @@ DelegateResult delegate_step(Attachment &context, Value frame_value, FrameObject
 void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &out)
 {
     ReturnSlot result(context);
-    std::size_t poll_budget = 64;
+    std::size_t poll_budget = 1;
     for (;;) {
         if (!--poll_budget) {
             context.poll();
             poll_budget = 64;
+            if (detail::check_signals(context, result)) {
+                activation.raising(result.exception());
+                continue;
+            }
         }
         auto &data = activation.frame();
         const auto &code = activation.code();
@@ -1981,6 +1990,57 @@ void frame_lasti(Attachment &c, Value value, ReturnSlot &out)
         c, lasti == std::numeric_limits<std::size_t>::max() ? -1 : static_cast<std::int64_t>(lasti),
         out);
 }
+void frame_clear(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!kind<FrameObject, CoreObject::FrameType>(c, args[0])) {
+        type_error(c, U"clear requires a frame", out);
+        return;
+    }
+    RootScope roots(c);
+    const auto self = roots.root(args[0]);
+    auto &frame = c.payload<FrameObject>(self);
+    auto state = frame.state.load(std::memory_order_acquire);
+    if (state != FrameState::Running && state != FrameState::Completed) {
+        const auto &program = c.payload<CodeObject>(frame.code).program;
+        if (!program.is_generator() && !program.is_coroutine()) {
+            raise_error(c, CoreObject::RuntimeErrorType, U"cannot clear an executing frame", out);
+            return;
+        }
+        if (program.is_generator() && program.is_coroutine()) {
+            raise_error(c, CoreObject::NotImplementedErrorType,
+                        U"async generator frame clearing requires finalizer hooks", out);
+            return;
+        }
+        detail::clear_generator_frame(c, self, out);
+        if (raised(out))
+            return;
+        state = frame.state.load(std::memory_order_acquire);
+        if (state != FrameState::Completed) {
+            // A generator which ignored GeneratorExit remains resumable.
+            out.ok(c.builtin(CoreObject::None));
+            return;
+        }
+    }
+    for (;;) {
+        if (state == FrameState::Running) {
+            raise_error(c, CoreObject::RuntimeErrorType, U"cannot clear an executing frame", out);
+            return;
+        }
+        if (frame.state.compare_exchange_weak(state, FrameState::Running,
+                                              std::memory_order_acquire))
+            break;
+    }
+    // No callbacks or safepoints while dropping this frame's private edges.
+    // Shared closure cells themselves are not emptied.
+    for (auto &local : frame.locals)
+        local.reset();
+    frame.cells.clear();
+    frame.locals_snapshot.reset();
+    frame.trim_stack(c, 0);
+    frame.owner.store({}, std::memory_order_relaxed);
+    frame.state.store(FrameState::Completed, std::memory_order_release);
+    out.ok(c.builtin(CoreObject::None));
+}
 std::u32string address(Value value)
 {
     char buffer[2 * sizeof(std::uintptr_t)];
@@ -2193,6 +2253,8 @@ void install_execution(Attachment &context, std::span<const Handle> core)
     field(CoreObject::FrameType, U"f_lasti", frame_lasti);
     SignatureLayout unary;
     unary.parameters = {{U"self", ParameterKind::PositionalOnly}};
+    install_native_attribute(context, core, at(CoreObject::FrameType), U"clear", unary,
+                             frame_clear);
     install_native_attribute(context, core, at(CoreObject::CodeType), U"co_positions", unary,
                              code_locations<false>);
     install_native_attribute(context, core, at(CoreObject::CodeType), U"co_lines", unary,

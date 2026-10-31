@@ -88,6 +88,11 @@ cleanup continuations. `Python/traceback.cpp` owns traceback operations.
 functions bind/create an ordinary Frame without executing its body; yield and
 yield-from suspend that same Frame/operand stack/cleanup state. Resumption is
 still ceval, not another interpreter or source execution path.
+frame.clear rejects executing frames, releases completed local/Cell edges and
+shares generator.close's FrameClaim/GeneratorExit cleanup for suspended ordinary
+generators/coroutines. It does not clear the contents of externally shared Cells
+or add generator back-references. Async-generator finalizer hooks/clear and full
+Frame reflection remain explicit experimental gates.
 `Python/bltinmodule.cpp` owns the ordinary __build_class__ builtin, coordinating
 base expansion, metaclass preparation, a normal class-body Frame and existing
 type construction. It is not a separate class VM or lifetime authority.
@@ -275,6 +280,14 @@ underlying environment itself is process-wide. External embedding code must
 coordinate its own concurrent environment mutations. stat/lstat dir_fd,
 stat follow_symlinks/file descriptors and chdir/fchdir use actual POSIX calls;
 the advertised capability list includes only implemented variants.
+scandir snapshots native directory names in NativeWait and closes the DIR before
+publishing a managed iterator. Its immutable snapshot and atomic cursor support
+shared reads; DirEntry uses immutable name/path/type-hint edges and atomic precise
+stat caches. It reuses the same stat-result builder as stat/lstat. There is no
+GC-time directory close or callback-spanning lock. This bounded base interface
+uses O(directory-size) memory until iterator collection; fd-based scanning and
+streaming resources remain separate gates. errno constants/errorcode live in
+Modules/errnomodule.cpp; terminal_size uses a native readonly tuple and real ioctl.
 Lib/os.py, genericpath.py and posixpath.py retain upstream environment/path policy.
 Filesystem encoding is currently UTF-8/surrogateescape, not a completed locale or
 installed-runtime configuration system. Other POSIX APIs, Windows portability and
@@ -406,9 +419,29 @@ collection/regex/dataclass protocols, closing actual unittest dependencies.
 
 Modules/timemodule.cpp supplies real POSIX realtime, monotonic, process and
 thread CPU clocks, nanosecond variants and get_clock_info. sleep converts while
-Active, then parks only native timespec/error state; interrupted native sleeps
-retry without detached heap access. Signal delivery, calendar/timezone APIs and
-full platform coverage remain separate capabilities.
+Active, then parks only native timespec/error state. EINTR resumes Active to
+dispatch signals and retries the original absolute monotonic deadline if no
+exception was raised. Calendar/timezone APIs and full platform coverage remain
+separate capabilities.
+
+Modules/signalmodule.cpp separates process-owned dispositions from managed
+handlers. Its C signal handler touches only lock-free process-lifetime atomics;
+no VM pointer, allocation, lock or Python call enters an async signal context.
+A bounded process registration lock protects an Interpreter ownership generation
+and saved dispositions, never ordinary execution or callbacks. Interpreter-owned
+SignalState traces atomic handler edges independent of the replaceable module
+dictionary. VM poll points dispatch callbacks only on the physical main OS
+thread, using the current rooted Frame and normal exception propagation.
+Other blocking APIs, wakeup-fd/masks/timers and full embedding/platform policy
+remain explicit gates, rather than an implicit global execution lock.
+
+Modules/sysmodule.cpp supplies sys.audit/addaudithook over an Interpreter-rooted
+private list. Normal rooted list iteration preserves ordered callbacks and
+registration during dispatch; no list/coordinator lock spans a hook. This covers
+explicit and Python-library events, not all native operation audit coverage.
+Unchanged unittest, argparse, gettext, fnmatch, locale and shutil use these native
+dependencies and existing Python library policy; no C++ unittest engine or fake
+subprocess module is provided.
 
 Runtime contracts are in `Include/cxxpython/`. Compiler-private implementation
 structures belong in `Include/internal/`. All C++ interfaces remain unstable.

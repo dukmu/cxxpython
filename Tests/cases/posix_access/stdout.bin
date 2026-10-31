@@ -1,0 +1,6 @@
+access True True False
+missing False
+symlink False True
+dir fd True True
+path protocol True
+capabilities True True True

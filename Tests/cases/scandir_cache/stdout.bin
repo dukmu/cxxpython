@@ -1,0 +1,14 @@
+record True True True True
+shared cache True True
+cached metadata True True
+link caches True True True True True
+broken stat True
+failed stat not cached True
+readonly name
+readonly path
+no public constructor
+no subclass
+keyword only
+keyword only
+keyword only
+retained cache True

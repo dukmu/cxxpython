@@ -1,0 +1,16 @@
+created retained True
+created clear None
+created closed True
+created repeat None
+created collected True ['collected']
+suspended paused
+suspended clear None
+suspended closed True True
+suspended repeat None
+suspended collected True ['finally', 'collected']
+running RuntimeError cannot clear an executing frame
+worker errors []
+running cleanup True
+coroutine suspended paused
+coroutine clear None
+coroutine closed ['coroutine finally'] True

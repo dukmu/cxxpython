@@ -1,0 +1,45 @@
+invalid literal for int() with base 10: 'bad'
+invalid literal for int() with base 0: 'bad'
+invalid literal for int() with base 2: 'bad'
+invalid literal for int() with base 10: ''
+invalid literal for int() with base 0: ''
+invalid literal for int() with base 2: ''
+invalid literal for int() with base 16: ''
+invalid literal for int() with base 10: '0xq'
+invalid literal for int() with base 0: '0xq'
+invalid literal for int() with base 2: '0xq'
+invalid literal for int() with base 16: '0xq'
+invalid literal for int() with base 10: '\x00'
+invalid literal for int() with base 0: '\x00'
+invalid literal for int() with base 2: '\x00'
+invalid literal for int() with base 16: '\x00'
+invalid literal for int() with base 10: '１x'
+invalid literal for int() with base 0: '１x'
+invalid literal for int() with base 2: '１x'
+invalid literal for int() with base 16: '１x'
+invalid literal for int() with base 10: 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+invalid literal for int() with base 0: 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+invalid literal for int() with base 2: 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+invalid literal for int() with base 16: 'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+invalid literal for int() with base 10: b'bad'
+invalid literal for int() with base 0: b'bad'
+invalid literal for int() with base 2: b'bad'
+invalid literal for int() with base 10: b'bad'
+invalid literal for int() with base 0: b'bad'
+invalid literal for int() with base 2: b'bad'
+invalid literal for int() with base 10: b'bad'
+invalid literal for int() with base 10: b'\xff'
+invalid literal for int() with base 0: b'\xff'
+invalid literal for int() with base 2: b'\xff'
+invalid literal for int() with base 16: b'\xff'
+invalid literal for int() with base 10: b'\x00'
+invalid literal for int() with base 0: b'\x00'
+invalid literal for int() with base 2: b'\x00'
+invalid literal for int() with base 16: b'\x00'
+invalid literal for int() with base 10: b'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+invalid literal for int() with base 0: b'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+invalid literal for int() with base 2: b'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+invalid literal for int() with base 16: b'xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+subtype invalid literal for int() with base 10: <custom text>
+subtype invalid literal for int() with base 10: b'bad'
+LookupError repr failed

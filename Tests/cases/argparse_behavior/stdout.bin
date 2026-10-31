@@ -1,0 +1,16 @@
+Namespace(count=3, command='run', name='job')
+usage: demo [-h] [--count COUNT] {run} ...
+
+Example
+
+positional arguments:
+  {run}
+    run          run a task
+
+options:
+  -h, --help     show this help message and exit
+  --count COUNT  repeat count
+
+exit: 2
+usage: demo [-h] [--count COUNT] {run} ...
+demo: error: argument --count: invalid int value: 'bad'

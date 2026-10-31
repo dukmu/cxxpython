@@ -10,6 +10,8 @@
 #include "internal/codecregistry.hpp"
 #include "internal/collectionsmodule.hpp"
 #include "internal/compiler.hpp"
+#include "internal/errnomodule.hpp"
+#include "internal/signalmodule.hpp"
 #ifdef CXXPYTHON_HAVE_CURSES
 #include "internal/cursesmodule.hpp"
 #endif
@@ -130,10 +132,17 @@ void sys_init(Attachment &context, Handle module, ReturnSlot &out)
     RootScope roots(context);
     ReturnSlot temporary(context);
     make_str(context, detail::decode_filename(SourceBuffer("", CXXPYTHON_STDLIB_DIR)), temporary);
+    if (store_name(context, dictionary, U"_stdlib_dir", temporary.value(), out) ==
+        ResultTag::Raised)
+        return;
     const std::array paths{temporary.value()};
     make_list(context, paths, temporary);
     if (store_name(context, dictionary, U"path", temporary.value(), out) == ResultTag::Raised)
         return;
+    make_str(context, detail::decode_filename(SourceBuffer("", CXXPYTHON_PREFIX)), temporary);
+    for (const auto label : {U"prefix", U"base_prefix", U"exec_prefix", U"base_exec_prefix"})
+        if (store_name(context, dictionary, label, temporary.value(), out) == ResultTag::Raised)
+            return;
     for (const auto label : {U"argv", U"meta_path", U"path_hooks"}) {
         make_list(context, {}, temporary);
         if (store_name(context, dictionary, label, temporary.value(), out) == ResultTag::Raised)
@@ -276,6 +285,8 @@ detail::ImportState::ImportState()
                                      {U"_collections", detail::initialize_collections},
                                      {U"binascii", detail::install_binascii},
                                      {U"posix", detail::initialize_posix},
+                                     {U"errno", detail::initialize_errno},
+                                     {U"_signal", detail::initialize_signal},
                                      {U"_weakref", detail::initialize_weakref},
                                      {U"__main__", main_init},
                                      {U"_imp", detail::initialize_imp}})

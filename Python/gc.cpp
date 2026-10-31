@@ -531,6 +531,8 @@ struct State {
             mark(object);
         mark(exit_callbacks);
         mark(gc_callbacks);
+        mark(signal_state);
+        mark(audit_hooks);
         mark(sys_dictionary);
         auto trace_work = [&] {
             while (worklist) {
@@ -679,6 +681,8 @@ struct State {
     std::array<ObjectHeader *, detail::core_count> core{};
     ObjectHeader *exit_callbacks = nullptr;
     ObjectHeader *gc_callbacks = nullptr;
+    ObjectHeader *signal_state = nullptr;
+    ObjectHeader *audit_hooks = nullptr;
     ObjectHeader *sys_dictionary = nullptr;
     bool core_published = false;
     std::atomic<std::uint64_t> type_epoch{0}, exception_epoch{0};
@@ -1669,6 +1673,36 @@ void Attachment::publish_gc_callbacks(Handle candidate, ReturnSlot &out)
     if (!state_->gc_callbacks)
         state_->gc_callbacks = value.object();
     out.ok(Value(*state_->gc_callbacks));
+}
+void Attachment::load_signal_state(ReturnSlot &out)
+{
+    out.reset(*this);
+    std::lock_guard gate(state_->coordinator);
+    if (state_->signal_state)
+        out.ok(Value(*state_->signal_state));
+}
+void Attachment::publish_signal_state(Handle candidate, ReturnSlot &out)
+{
+    const auto value = candidate.get(*this);
+    std::lock_guard gate(state_->coordinator);
+    if (!state_->signal_state)
+        state_->signal_state = value.object();
+    out.ok(Value(*state_->signal_state));
+}
+void Attachment::load_audit_hooks(ReturnSlot &out)
+{
+    out.reset(*this);
+    std::lock_guard gate(state_->coordinator);
+    if (state_->audit_hooks)
+        out.ok(Value(*state_->audit_hooks));
+}
+void Attachment::publish_audit_hooks(Handle candidate, ReturnSlot &out)
+{
+    const auto value = candidate.get(*this);
+    std::lock_guard gate(state_->coordinator);
+    if (!state_->audit_hooks)
+        state_->audit_hooks = value.object();
+    out.ok(Value(*state_->audit_hooks));
 }
 void Attachment::load_sys_dictionary(ReturnSlot &out)
 {

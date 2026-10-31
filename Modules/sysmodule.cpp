@@ -12,6 +12,7 @@
 #include "internal/errors.hpp"
 #include "internal/import.hpp"
 
+#include <algorithm>
 #include <bit>
 #include <cfloat>
 #include <limits>
@@ -577,6 +578,89 @@ void install_system_exit(Attachment &ctx, std::span<const Handle> core)
     install_native_attribute(ctx, core, owner, U"__init__", signature, system_exit_init);
     install_native_field(ctx, core, owner, U"code", code_get, code_set);
 }
+namespace {
+void audit_event(Attachment &ctx, Handle event, Handle arguments, ReturnSlot &out)
+{
+    RootScope roots(ctx);
+    ReturnSlot hooks(ctx), iterator(ctx), hook(ctx);
+    ctx.load_audit_hooks(hooks);
+    if (hooks.tag() == ResultTag::Empty) {
+        out.ok(ctx.builtin(CoreObject::None));
+        return;
+    }
+    auto list = roots.root(hooks.value());
+    if (!ctx.has_layout<StrObject>(event.get(ctx)) ||
+        !is_subtype(ctx, ctx.type_of(event), ctx.builtin(CoreObject::StrType))) {
+        TypeView type(ctx, ctx.type_of(event));
+        const auto name = type.name();
+        const auto text = std::holds_alternative<Value>(name)
+                              ? ctx.payload<StrObject>(std::get<Value>(name)).value
+                              : std::get<std::u32string>(name);
+        raise_error(ctx, CoreObject::TypeErrorType,
+                    U"expected str for argument 'event', not " + text, out);
+        return;
+    }
+    auto name = ctx.payload<StrObject>(event).value;
+    if (std::any_of(name.begin(), name.end(),
+                    [](char32_t ch) { return ch >= 0xd800 && ch <= 0xdfff; })) {
+        make_str(ctx, U"strict", out);
+        encode_primitive(ctx, event, TextEncoding::Utf8, roots.root(out.value()), out);
+        if (failed(out))
+            return;
+    }
+    name.resize(name.find(U'\0') == std::u32string::npos ? name.size() : name.find(U'\0'));
+    make_str(ctx, std::move(name), out);
+    auto normalized = roots.root(out.value());
+    get_iter(ctx, list, iterator);
+    if (failed(iterator)) {
+        out.raised(iterator.exception());
+        return;
+    }
+    auto cursor = roots.root(iterator.value());
+    for (;;) {
+        const auto next = iter_next(ctx, cursor, hook);
+        if (next == NextStatus::Done)
+            break;
+        if (next == NextStatus::Raised) {
+            out.raised(hook.exception());
+            return;
+        }
+        const std::array args{normalized.get(ctx), arguments.get(ctx)};
+        call(ctx, roots.root(hook.value()), {args, {}}, out);
+        if (failed(out))
+            return;
+    }
+    out.ok(ctx.builtin(CoreObject::None));
+}
+
+void sys_audit(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(ctx);
+    audit_event(ctx, roots.root(args[0]), roots.root(args[1]), out);
+}
+
+void sys_addaudithook(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(ctx);
+    auto hook = roots.root(args[0]);
+    ReturnSlot event(ctx), hooks(ctx);
+    make_str(ctx, U"sys.addaudithook", event);
+    audit_event(ctx, roots.root(event.value()), roots.root(ctx.builtin(CoreObject::EmptyTuple)),
+                out);
+    if (failed(out)) {
+        if (is_subtype(ctx, ctx.type_of(out.exception()), ctx.builtin(CoreObject::ExceptionType)))
+            out.ok(ctx.builtin(CoreObject::None));
+        return;
+    }
+    ctx.load_audit_hooks(hooks);
+    if (hooks.tag() == ResultTag::Empty) {
+        make_list(ctx, {}, hooks);
+        ctx.publish_audit_hooks(roots.root(hooks.value()), hooks);
+    }
+    list_append(ctx, roots.root(hooks.value()), hook, out);
+}
+} // namespace
+
 void initialize_sys_hooks(Attachment &ctx, Handle sys, ReturnSlot &out)
 {
     RootScope roots(ctx);
@@ -594,6 +678,19 @@ void initialize_sys_hooks(Attachment &ctx, Handle sys, ReturnSlot &out)
     }
     cxxpython::core::make_tuple(ctx, builtin_modules, function);
     if (!store(U"builtin_module_names"))
+        return;
+    SignatureLayout audit;
+    audit.parameters = {{U"event", ParameterKind::PositionalOnly}};
+    audit.varargs = U"args";
+    make_native_function(ctx, "audit", audit, sys_audit, {}, function,
+                         NativeFunctionBinding::Function);
+    if (!store(U"audit"))
+        return;
+    SignatureLayout add_hook;
+    add_hook.parameters = {{U"hook", ParameterKind::PositionalOnly}};
+    make_native_function(ctx, "addaudithook", add_hook, sys_addaudithook, {}, function,
+                         NativeFunctionBinding::Function);
+    if (!store(U"addaudithook"))
         return;
     make_native_function(ctx, "getfilesystemencoding", {}, filesystem_encoding<false>, {}, function,
                          NativeFunctionBinding::Function);

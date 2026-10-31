@@ -1,0 +1,10 @@
+True True
+True True
+os.terminal_size(columns=80, lines=24) 80 24 80 24 2 (80, 24)
+os.terminal_size(columns=3, lines=4)
+2 2 0
+readonly
+bad dict
+bad length
+bad length
+bad length

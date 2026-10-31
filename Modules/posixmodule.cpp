@@ -1,5 +1,5 @@
 // POSIX primitives, informed by CPython 3.12.14 Modules/posixmodule.c.
-// dir_fd and follow_symlinks variants are not yet exposed.
+// Each advertised dir_fd/follow_symlinks capability is backed by its native call.
 #include "internal/posixmodule.hpp"
 
 #include "cxxpython/bytearrayobject.hpp"
@@ -10,6 +10,7 @@
 #include "internal/long.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <cerrno>
 #include <climits>
 #include <cstdlib>
@@ -19,6 +20,7 @@
 #include <mutex>
 #include <pthread.h>
 #include <signal.h>
+#include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -82,6 +84,81 @@ bool descriptor(Attachment &c, Value value, int &fd, ReturnSlot &out)
     }
     fd = static_cast<int>(n);
     return true;
+}
+
+template <std::size_t I> void terminal_field(Attachment &c, Value self, ReturnSlot &out)
+{
+    out.ok(c.payload<TupleObject>(self).items[I]);
+}
+
+void terminal_repr(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(c);
+    auto self = roots.root(args[0]);
+    std::u32string text = U"os.terminal_size(";
+    ReturnSlot item(c);
+    for (std::size_t i = 0; i < 2; ++i) {
+        text += i == 0 ? U"columns=" : U", lines=";
+        repr(c, roots.root(c.payload<TupleObject>(self).items[i]), item);
+        if (failed(item)) {
+            out.raised(item.exception());
+            return;
+        }
+        text += c.payload<StrObject>(item.value()).value;
+    }
+    make_str(c, text + U")", out);
+}
+
+void terminal_new(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(c);
+    auto type = roots.root(args[0]);
+    if (type.get(c) != c.payload<NativeFunctionObject>(function).captures[0]) {
+        raise_error(c, CoreObject::TypeErrorType, U"invalid os.terminal_size type", out);
+        return;
+    }
+    if (!c.has_layout<DictObject>(args[2])) {
+        raise_error(c, CoreObject::TypeErrorType,
+                    U"os.terminal_size() takes a dict as second arg, if any", out);
+        return;
+    }
+    ReturnSlot sequence(c);
+    const std::array input{args[1]};
+    call(c, roots.root(c.builtin(CoreObject::TupleType)), {input}, sequence);
+    if (failed(sequence)) {
+        out.raised(sequence.exception());
+        return;
+    }
+    const auto &items = c.payload<TupleObject>(sequence.value()).items;
+    if (items.size() != 2) {
+        auto count = std::to_string(items.size());
+        raise_error(c, CoreObject::TypeErrorType,
+                    U"os.terminal_size() takes a 2-sequence (" +
+                        std::u32string(count.begin(), count.end()) + U"-sequence given)",
+                    out);
+        return;
+    }
+    c.allocate_instance<TupleObject>(type, out, items);
+}
+
+void get_terminal_size(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+{
+    int fd;
+    if (!descriptor(c, args[0], fd, out))
+        return;
+    winsize size{};
+    if (ioctl(fd, TIOCGWINSZ, &size) != 0) {
+        os_error(c, errno, out);
+        return;
+    }
+    RootScope roots(c);
+    auto type = roots.root(c.payload<NativeFunctionObject>(function).captures[0]);
+    ReturnSlot item(c);
+    make_int(c, size.ws_col, item);
+    auto columns = roots.root(item.value());
+    make_int(c, size.ws_row, item);
+    std::vector<Value> values{columns.get(c), item.value()};
+    c.allocate_instance<TupleObject>(type, out, std::move(values));
 }
 bool path_value(Attachment &c, Handle object, ReturnSlot &out)
 {
@@ -565,6 +642,46 @@ void stat_new(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
     }
     out.ok(object.get(c));
 }
+void access_entry(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(c);
+    std::string target;
+    int directory = AT_FDCWD;
+    std::int64_t numeric_mode;
+    if (!path(c, args[0], target, out) || !integer(c, args[1], numeric_mode, out))
+        return;
+    if (numeric_mode < INT_MIN || numeric_mode > INT_MAX) {
+        raise_error(c, CoreObject::OverflowErrorType, U"Python int too large to convert to C long",
+                    out);
+        return;
+    }
+    const auto mode = static_cast<int>(numeric_mode);
+    if (args[2] != c.builtin(CoreObject::None) && !descriptor(c, args[2], directory, out))
+        return;
+    ReturnSlot converted(c);
+    truth(c, roots.root(args[3]), converted);
+    if (failed(converted)) {
+        out.raised(converted.exception());
+        return;
+    }
+    int flags = converted.value() == c.builtin(CoreObject::True) ? AT_EACCESS : 0;
+    truth(c, roots.root(args[4]), converted);
+    if (failed(converted)) {
+        out.raised(converted.exception());
+        return;
+    }
+    if (converted.value() == c.builtin(CoreObject::False))
+        flags |= AT_SYMLINK_NOFOLLOW;
+    bool allowed;
+    {
+        NativeWait wait(c);
+        allowed = faccessat(directory, target.c_str(), mode, flags) == 0;
+    }
+    out.ok(c.builtin(allowed ? CoreObject::True : CoreObject::False));
+}
+
+void make_stat_result(Attachment &, Handle, const struct stat &, ReturnSlot &);
+
 void stat_entry(Attachment &c, Handle function, std::span<const Value> a, ReturnSlot &out)
 {
     RootScope roots(c);
@@ -612,6 +729,12 @@ void stat_entry(Attachment &c, Handle function, std::span<const Value> a, Return
         os_error(c, error, out, by_fd ? std::optional<Value>{} : filename.value());
         return;
     }
+    make_stat_result(c, type, st, out);
+}
+
+void make_stat_result(Attachment &c, Handle type, const struct stat &st, ReturnSlot &out)
+{
+    RootScope roots(c);
     std::vector<Value> items;
     ReturnSlot temp(c), result(c);
 #if defined(__APPLE__)
@@ -645,6 +768,381 @@ void stat_entry(Attachment &c, Handle function, std::span<const Value> a, Return
         stat_extra(c, object, i + 6, temp.value());
     }
     out.ok(object.get(c));
+}
+// DirEntry behavior is adapted from CPython 3.12.14 Modules/posixmodule.c.
+// PSF license: doc/licenses/python-3.12.14.txt. Unlike its live DIR iterator,
+// this base slice closes the directory in NativeWait before publishing names.
+struct ScanName {
+    std::string name;
+    ino_t inode;
+    unsigned char kind;
+};
+struct ScanSnapshot {
+    std::string directory;
+    std::vector<ScanName> names;
+    bool bytes = false;
+    std::size_t storage_bytes = 0;
+    std::size_t external_bytes() const noexcept
+    {
+        return storage_bytes;
+    }
+};
+struct ScandirObject {
+    ObjectHeader header;
+    const Value entry_type, stat_type;
+    const ScanSnapshot snapshot;
+    std::atomic<std::size_t> position{0};
+    ScandirObject(InitialType type, Value entry, Value stat, ScanSnapshot input)
+        : header(type), entry_type(entry), stat_type(stat), snapshot(std::move(input))
+    {}
+    void trace(Tracer &tracer) const noexcept
+    {
+        tracer.visit(entry_type);
+        tracer.visit(stat_type);
+    }
+    std::size_t external_bytes() const noexcept
+    {
+        return snapshot.external_bytes();
+    }
+};
+struct DirEntryObject {
+    ObjectHeader header;
+    const Value name, path, stat_type;
+    const std::string native_path;
+    const ino_t inode;
+    const unsigned char kind;
+    AtomicGcEdge stat, lstat;
+    DirEntryObject(InitialType type, Value entry_name, Value entry_path, Value stat_class,
+                   std::string filename, ino_t number, unsigned char hint)
+        : header(type), name(entry_name), path(entry_path), stat_type(stat_class),
+          native_path(std::move(filename)), inode(number), kind(hint)
+    {}
+    void trace(Tracer &tracer) const noexcept
+    {
+        tracer.visit(name);
+        tracer.visit(path);
+        tracer.visit(stat_type);
+        tracer.visit(stat);
+        tracer.visit(lstat);
+    }
+    std::size_t external_bytes() const noexcept
+    {
+        return native_path.capacity() + 1;
+    }
+};
+template <class T> bool scan_receiver(Attachment &c, Value self, ReturnSlot &out)
+{
+    if (c.has_layout<T>(self))
+        return true;
+    raise_error(c, CoreObject::TypeErrorType, U"invalid directory iterator or entry receiver", out);
+    return false;
+}
+void scan_new(Attachment &c, Handle, std::span<const Value>, ReturnSlot &out)
+{
+    raise_error(c, CoreObject::TypeErrorType,
+                U"cannot create directory iterator or entry instances", out);
+}
+void scan_iter(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (scan_receiver<ScandirObject>(c, args[0], out))
+        out.ok(args[0]);
+}
+void scan_close(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!scan_receiver<ScandirObject>(c, args[0], out))
+        return;
+    auto &self = c.payload<ScandirObject>(args[0]);
+    self.position.store(self.snapshot.names.size(), std::memory_order_relaxed);
+    out.ok(c.builtin(CoreObject::None));
+}
+void scan_next(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!scan_receiver<ScandirObject>(c, args[0], out))
+        return;
+    RootScope roots(c);
+    auto owner = roots.root(args[0]);
+    auto &self = c.payload<ScandirObject>(owner);
+    auto position = self.position.load(std::memory_order_relaxed);
+    for (;;) {
+        if (position == self.snapshot.names.size()) {
+            stop_iteration(c, out);
+            return;
+        }
+        if (self.position.compare_exchange_weak(position, position + 1, std::memory_order_relaxed))
+            break;
+    }
+    const auto &entry = self.snapshot.names[position];
+    auto filename = self.snapshot.directory;
+    if (!filename.empty() && filename.back() != '/')
+        filename += '/';
+    filename += entry.name;
+    ReturnSlot name(c), path(c);
+    if (self.snapshot.bytes) {
+        make_bytes(c, entry.name, name);
+        make_bytes(c, filename, path);
+    } else {
+        make_str(c, fs_decode(entry.name), name);
+        make_str(c, fs_decode(filename), path);
+    }
+    c.allocate_instance<DirEntryObject>(roots.root(self.entry_type), out, name.value(),
+                                        path.value(), self.stat_type, std::move(filename),
+                                        entry.inode, entry.kind);
+}
+void scan_entry(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(c);
+    ReturnSlot converted(c);
+    ScanSnapshot snapshot;
+    snapshot.directory = ".";
+    if (args[0] != c.builtin(CoreObject::None)) {
+        if (is_int(c, args[0])) {
+            raise_error(c, CoreObject::NotImplementedErrorType,
+                        U"scandir: file descriptor paths are not supported yet", out);
+            return;
+        }
+        snapshot.directory.clear();
+        if (!path(c, args[0], snapshot.directory, out, &converted))
+            return;
+        snapshot.bytes = is_bytes(c, converted.value());
+    }
+    int error = 0;
+    {
+        NativeWait wait(c);
+        std::unique_ptr<DIR, int (*)(DIR *)> directory(::opendir(snapshot.directory.c_str()),
+                                                       ::closedir);
+        if (!directory)
+            error = errno;
+        else {
+            for (;;) {
+                errno = 0;
+                const auto *entry = ::readdir(directory.get());
+                if (!entry) {
+                    error = errno;
+                    break;
+                }
+                if (!std::strcmp(entry->d_name, ".") || !std::strcmp(entry->d_name, ".."))
+                    continue;
+#ifdef _DIRENT_HAVE_D_TYPE
+                const auto kind = entry->d_type;
+#else
+                const unsigned char kind = DT_UNKNOWN;
+#endif
+                snapshot.names.push_back({entry->d_name, entry->d_ino, kind});
+            }
+        }
+        snapshot.storage_bytes =
+            snapshot.directory.capacity() + 1 + snapshot.names.capacity() * sizeof(ScanName);
+        for (const auto &name : snapshot.names)
+            snapshot.storage_bytes += name.name.capacity() + 1;
+    }
+    if (error) {
+        os_error(c, error, out,
+                 args[0] == c.builtin(CoreObject::None) ? std::optional<Value>{}
+                                                        : converted.value());
+        return;
+    }
+    const auto &types = c.payload<NativeFunctionObject>(function).captures;
+    c.allocate_instance<ScandirObject>(roots.root(types[0]), out, types[1], types[2],
+                                       std::move(snapshot));
+}
+void direntry_name(Attachment &c, Value self, ReturnSlot &out)
+{
+    out.ok(c.payload<DirEntryObject>(self).name);
+}
+void direntry_path(Attachment &c, Value self, ReturnSlot &out)
+{
+    out.ok(c.payload<DirEntryObject>(self).path);
+}
+void direntry_fspath(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (scan_receiver<DirEntryObject>(c, args[0], out))
+        direntry_path(c, args[0], out);
+}
+void direntry_repr(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!scan_receiver<DirEntryObject>(c, args[0], out))
+        return;
+    RootScope roots(c);
+    auto self = roots.root(args[0]);
+    repr(c, roots.root(c.payload<DirEntryObject>(self).name), out);
+    if (!failed(out))
+        make_str(c, U"<DirEntry " + c.payload<StrObject>(out.value()).value + U">", out);
+}
+void direntry_inode(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (scan_receiver<DirEntryObject>(c, args[0], out))
+        publish_integer(c, Integer(c.payload<DirEntryObject>(args[0]).inode), out);
+}
+void entry_stat(Attachment &c, Handle object, bool follow, ReturnSlot &out)
+{
+    auto &self = c.payload<DirEntryObject>(object);
+    auto &cache = follow ? self.stat : self.lstat;
+    c.load(object.get(c), cache, out);
+    if (out.tag() == ResultTag::Ok)
+        return;
+    RootScope roots(c);
+    bool symlink = self.kind == DT_LNK;
+    if (follow && self.kind == DT_UNKNOWN) {
+        entry_stat(c, object, false, out);
+        if (failed(out))
+            return;
+        std::int64_t mode;
+        int_fits_signed(c, c.payload<TupleObject>(out.value()).items[0], mode);
+        symlink = S_ISLNK(mode);
+    }
+    if (follow && !symlink) {
+        entry_stat(c, object, false, out);
+        if (failed(out))
+            return;
+    } else {
+        struct stat status {};
+        int error = 0;
+        const auto filename = self.native_path;
+        {
+            NativeWait wait(c);
+            if ((follow ? ::stat(filename.c_str(), &status) : ::lstat(filename.c_str(), &status)) <
+                0)
+                error = errno;
+        }
+        if (error) {
+            os_error(c, error, out, self.path);
+            return;
+        }
+        make_stat_result(c, roots.root(self.stat_type), status, out);
+        if (failed(out))
+            return;
+    }
+    // No Python callback or blocking operation is inside cache publication.
+    // Concurrent misses return the same first-published, precisely traced record.
+    if (!c.compare_exchange(object.get(c), cache, {}, out.value()))
+        c.load(object.get(c), cache, out);
+}
+bool entry_follow(Attachment &c, Value value, bool &follow, ReturnSlot &out)
+{
+    RootScope roots(c);
+    truth(c, roots.root(value), out);
+    if (failed(out))
+        return false;
+    follow = out.value() == c.builtin(CoreObject::True);
+    return true;
+}
+void direntry_stat(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!scan_receiver<DirEntryObject>(c, args[0], out))
+        return;
+    RootScope roots(c);
+    auto self = roots.root(args[0]);
+    bool follow;
+    if (entry_follow(c, args[1], follow, out))
+        entry_stat(c, self, follow, out);
+}
+template <unsigned short Mode>
+void direntry_test(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!scan_receiver<DirEntryObject>(c, args[0], out))
+        return;
+    RootScope roots(c);
+    auto object = roots.root(args[0]);
+    auto &self = c.payload<DirEntryObject>(object);
+    bool follow = false;
+    if constexpr (Mode != S_IFLNK)
+        if (!entry_follow(c, args[1], follow, out))
+            return;
+    bool result;
+    if (self.kind != DT_UNKNOWN && !(follow && self.kind == DT_LNK)) {
+        result = self.kind == (Mode == S_IFDIR ? DT_DIR : Mode == S_IFREG ? DT_REG : DT_LNK);
+    } else {
+        entry_stat(c, object, follow, out);
+        if (failed(out)) {
+            if (is_subtype(c, c.type_of(out.exception()),
+                           c.builtin(CoreObject::FileNotFoundErrorType)))
+                out.ok(c.builtin(CoreObject::False));
+            return;
+        }
+        std::int64_t mode;
+        int_fits_signed(c, c.payload<TupleObject>(out.value()).items[0], mode);
+        result = (mode & S_IFMT) == Mode;
+    }
+    out.ok(c.builtin(result ? CoreObject::True : CoreObject::False));
+}
+void install_scandir(Attachment &c, Handle module_dictionary, Handle stat_type, ReturnSlot &out)
+{
+    RootScope roots(c);
+    std::vector<Handle> core;
+    for (std::size_t i = 0; i < core_count; ++i)
+        core.push_back(roots.root(c.builtin(static_cast<CoreObject>(i))));
+    ReturnSlot temporary(c), name(c);
+    auto signature = [](std::initializer_list<Parameter> parameters) {
+        SignatureLayout result;
+        result.parameters = parameters;
+        return result;
+    };
+    const auto only = ParameterKind::PositionalOnly;
+    const auto unary = signature({{U"self", only}});
+    auto create = [&](const char32_t *type_name, LayoutDescriptor layout) {
+        TypeSpec spec{type_name};
+        spec.module = U"posix";
+        spec.slots = std::vector<std::u32string>{};
+        create_native_type(c, NativeTypeSpec{spec, layout}, temporary);
+        if (failed(temporary)) {
+            out.raised(temporary.exception());
+            return std::optional<Handle>{};
+        }
+        auto type = roots.root(temporary.value());
+        auto constructor = signature({{U"cls", only}});
+        constructor.varargs = U"args";
+        constructor.varkwargs = U"kwargs";
+        install_native_attribute(c, core, type, U"__new__", constructor, scan_new);
+        auto dictionary = roots.root(*TypeView(c, type).dictionary());
+        auto function = roots.root(*name_lookup(c, dictionary.get(c), U"__new__"));
+        c.allocate_instance<StaticMethodObject>(roots.root(c.builtin(CoreObject::StaticMethodType)),
+                                                temporary, function.get(c));
+        make_str(c, U"__new__", name);
+        name_store(c, dictionary.get(c), name.value(), temporary.value());
+        return std::optional<Handle>{type};
+    };
+    auto entry_type = create(U"DirEntry", LayoutDescriptor::of<DirEntryObject>());
+    if (!entry_type)
+        return;
+    auto iterator_type = create(U"ScandirIterator", LayoutDescriptor::of<ScandirObject>());
+    if (!iterator_type)
+        return;
+    install_native_field(c, core, *entry_type, U"name", direntry_name);
+    install_native_field(c, core, *entry_type, U"path", direntry_path);
+    install_native_attribute(c, core, *entry_type, U"__fspath__", unary, direntry_fspath);
+    install_native_attribute(c, core, *entry_type, U"__repr__", unary, direntry_repr);
+    install_native_attribute(c, core, *entry_type, U"inode", unary, direntry_inode);
+    install_native_attribute(c, core, *entry_type, U"is_symlink", unary, direntry_test<S_IFLNK>);
+    auto follow = unary;
+    follow.parameters.push_back(
+        {U"follow_symlinks", ParameterKind::KeywordOnly, c.builtin(CoreObject::True)});
+    install_native_attribute(c, core, *entry_type, U"stat", follow, direntry_stat);
+    install_native_attribute(c, core, *entry_type, U"is_dir", follow, direntry_test<S_IFDIR>);
+    install_native_attribute(c, core, *entry_type, U"is_file", follow, direntry_test<S_IFREG>);
+    install_native_attribute(c, core, *iterator_type, U"__iter__", unary, scan_iter);
+    install_native_attribute(c, core, *iterator_type, U"__next__", unary, scan_next);
+    install_native_attribute(c, core, *iterator_type, U"close", unary, scan_close);
+    install_native_attribute(c, core, *iterator_type, U"__enter__", unary, scan_iter);
+    install_native_attribute(
+        c, core, *iterator_type, U"__exit__",
+        signature(
+            {{U"self", only}, {U"exc_type", only}, {U"exc_value", only}, {U"traceback", only}}),
+        scan_close);
+    for (auto type : {*entry_type, *iterator_type}) {
+        c.payload<TypeObject>(type).subclassable = false;
+        c.payload<TypeObject>(type).immutable = true;
+    }
+    make_str(c, U"DirEntry", name);
+    dict_store(c, module_dictionary, roots.root(name.value()), *entry_type, out);
+    if (failed(out))
+        return;
+    const Value captures[] = {iterator_type->get(c), entry_type->get(c), stat_type.get(c)};
+    make_native_function(
+        c, "scandir",
+        signature({{U"path", ParameterKind::PositionalOrKeyword, c.builtin(CoreObject::None)}}),
+        scan_entry, captures, temporary, NativeFunctionBinding::Function);
+    make_str(c, U"scandir", name);
+    dict_store(c, module_dictionary, roots.root(name.value()), roots.root(temporary.value()), out);
 }
 } // namespace
 
@@ -717,7 +1215,65 @@ void initialize_posix(Attachment &c, Handle module, ReturnSlot &out)
     if (failed(out))
         return;
     const std::vector<Value> stat_capture{stat_type.get(c)};
+    install_scandir(c, dict, stat_type, out);
+    if (failed(out))
+        return;
+    TypeSpec terminal_spec{U"terminal_size", base};
+    terminal_spec.module = U"os";
+    terminal_spec.slots = std::vector<std::u32string>{};
+    create_native_type(c, NativeTypeSpec{terminal_spec, LayoutDescriptor::of<TupleObject>()},
+                       value);
+    if (failed(value)) {
+        out.raised(value.exception());
+        return;
+    }
+    auto terminal_type = roots.root(value.value());
+    install_native_field(c, core, terminal_type, U"columns", terminal_field<0>);
+    install_native_field(c, core, terminal_type, U"lines", terminal_field<1>);
+    install_native_attribute(c, core, terminal_type, U"__repr__", signature({{U"self", only}}),
+                             terminal_repr);
+    c.allocate_instance<DictObject>(roots.root(c.builtin(CoreObject::DictType)), value);
+    auto defaults = roots.root(value.value());
+    install_native_attribute(
+        c, core, terminal_type, U"__new__",
+        signature({{U"cls", only},
+                   {U"sequence"},
+                   {U"dict", ParameterKind::PositionalOrKeyword, defaults.get(c)}}),
+        terminal_new, {terminal_type.get(c)});
+    auto terminal_dict = roots.root(*TypeView(c, terminal_type).dictionary());
+    auto terminal_constructor = roots.root(*name_lookup(c, terminal_dict.get(c), U"__new__"));
+    c.allocate_instance<StaticMethodObject>(roots.root(c.builtin(CoreObject::StaticMethodType)),
+                                            value, terminal_constructor.get(c));
+    make_str(c, U"__new__", name);
+    name_store(c, terminal_dict.get(c), name.value(), value.value());
+    for (const auto &[field, number] :
+         {std::pair{U"n_fields", 2}, {U"n_sequence_fields", 2}, {U"n_unnamed_fields", 0}}) {
+        make_int(c, number, value);
+        auto number_handle = roots.root(value.value());
+        make_str(c, field, name);
+        name_store(c, terminal_dict.get(c), name.value(), number_handle.get(c));
+    }
+    c.payload<TypeObject>(terminal_type).immutable = true;
+    c.payload<TypeObject>(terminal_type).subclassable = false;
+    make_str(c, U"terminal_size", name);
+    dict_store(c, dict, roots.root(name.value()), terminal_type, out);
+    if (failed(out))
+        return;
+    make_int(c, STDOUT_FILENO, value);
+    auto stdout_fd = roots.root(value.value());
+    if (!install("get_terminal_size", signature({{U"fd", only, stdout_fd.get(c)}}),
+                 get_terminal_size, {terminal_type.get(c)}))
+        return;
     if (!install("fspath", signature({patharg}), fspath) ||
+        !install(
+            "access",
+            signature(
+                {{U"path", ParameterKind::PositionalOrKeyword},
+                 {U"mode", ParameterKind::PositionalOrKeyword},
+                 {U"dir_fd", ParameterKind::KeywordOnly, c.builtin(CoreObject::None)},
+                 {U"effective_ids", ParameterKind::KeywordOnly, c.builtin(CoreObject::False)},
+                 {U"follow_symlinks", ParameterKind::KeywordOnly, c.builtin(CoreObject::True)}}),
+            access_entry) ||
         !install("stat",
                  signature({patharg,
                             {U"dir_fd", ParameterKind::KeywordOnly, c.builtin(CoreObject::None)},
@@ -770,7 +1326,10 @@ void initialize_posix(Attachment &c, Handle module, ReturnSlot &out)
     make_str(c, U"HAVE_FCHDIR", value);
     auto fchdir_capability = roots.root(value.value());
     make_str(c, U"HAVE_FSTATAT", value);
-    Value capabilities[] = {fchdir_capability.get(c), roots.root(value.value()).get(c)};
+    auto stat_capability = roots.root(value.value());
+    make_str(c, U"HAVE_FACCESSAT", value);
+    Value capabilities[] = {fchdir_capability.get(c), stat_capability.get(c),
+                            roots.root(value.value()).get(c)};
     make_list(c, capabilities, value);
     make_str(c, U"_have_functions", name);
     dict_store(c, dict, roots.root(name.value()), roots.root(value.value()), out);
@@ -780,7 +1339,8 @@ void initialize_posix(Attachment &c, Handle module, ReturnSlot &out)
         {"O_RDONLY", O_RDONLY}, {"O_WRONLY", O_WRONLY},   {"O_RDWR", O_RDWR},
         {"O_CREAT", O_CREAT},   {"O_EXCL", O_EXCL},       {"O_TRUNC", O_TRUNC},
         {"O_APPEND", O_APPEND}, {"O_CLOEXEC", O_CLOEXEC}, {"SEEK_SET", SEEK_SET},
-        {"SEEK_CUR", SEEK_CUR}, {"SEEK_END", SEEK_END}};
+        {"SEEK_CUR", SEEK_CUR}, {"SEEK_END", SEEK_END},   {"F_OK", F_OK},
+        {"R_OK", R_OK},         {"W_OK", W_OK},           {"X_OK", X_OK}};
     for (const auto &[key, number] : constants) {
         make_str(c, std::u32string(key, key + std::strlen(key)), name);
         make_int(c, number, value);

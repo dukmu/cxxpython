@@ -1,0 +1,5 @@
+clear None
+reported [('RuntimeError', 'generator ignored GeneratorExit', True)]
+resumable True finished
+async gate async generator frame clearing requires finalizer hooks
+async closed

@@ -141,6 +141,7 @@ enum class CoreObject : std::size_t {
     EnumerateType,
     ZipType,
     MapType,
+    FilterType,
     SystemErrorType,
     BufferErrorType,
     MemoryViewType,
@@ -627,6 +628,10 @@ class Attachment final {
     void publish_exit_callbacks(Handle candidate, ReturnSlot &);
     void load_gc_callbacks(ReturnSlot &);
     void publish_gc_callbacks(Handle candidate, ReturnSlot &);
+    void load_signal_state(ReturnSlot &);
+    void publish_signal_state(Handle candidate, ReturnSlot &);
+    void load_audit_hooks(ReturnSlot &);
+    void publish_audit_hooks(Handle candidate, ReturnSlot &);
     void load_sys_dictionary(ReturnSlot &);
     void set_sys_dictionary(Handle dictionary);
     // Native resource release only, after roots/Frames retire. No allocation or Python calls.

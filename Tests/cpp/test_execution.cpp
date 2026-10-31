@@ -1557,6 +1557,29 @@ TEST_F(CoreExecution, RunningFrameSlotsSurviveCallbacksGcAndCompletedFrameObserv
     EXPECT_FALSE(context.current_frame());
 }
 
+TEST_F(CoreExecution, CreatedOrdinaryFrameRetainsExecutionOwnershipBeforeFirstInstruction)
+{
+    CodeSpec spec;
+    spec.locals = {U"kept"};
+    CodeBuilder builder(context, spec);
+    builder.emit(Opcode::LoadConst, builder.constant(builtin(CoreObject::None)));
+    builder.emit(Opcode::Return);
+    const auto program = code(builder), callable = function(program);
+    ReturnSlot out(context);
+    context.allocate_instance<FrameObject>(builtin(CoreObject::FrameType), out,
+                                           callable.get(context), program.get(context), 1, 1,
+                                           context.builtin(CoreObject::None));
+    const auto frame = roots.root(out.value());
+    auto &data = context.payload<FrameObject>(frame);
+    data.locals[0] = context.builtin(CoreObject::True);
+    get_attribute(context, frame, text(U"clear"), out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    call(context, roots.root(out.value()), {}, out);
+    error(out, CoreObject::RuntimeErrorType);
+    EXPECT_EQ(data.state.load(), FrameState::Created);
+    EXPECT_EQ(data.locals[0], context.builtin(CoreObject::True));
+}
+
 TEST_F(CoreExecution, FrameAllocationFailureLeavesNoCurrentFrameAndCanRetry)
 {
     CodeBuilder builder(context);

@@ -731,6 +731,14 @@ This classification belongs to the callable definition, not a VM list special ca
 
 ## Code, Frames And Closures
 
+Experimental frame.clear uses the same atomic execution claim as generator close,
+not a global execution lock. Running frames reject it; completed frames drop local
+slots, private Cell references and their reflection cache without changing shared
+Cell contents. Suspended ordinary generators/coroutines execute normal finally/
+GeneratorExit cleanup through the existing scheduler. Ignored cleanup exceptions
+use unraisable reporting with the originating Frame. Async-generator finalizer
+hooks/clear and complete public frame reflection remain acceptance gates.
+
 CodeBuilder verifies opcode domains, bounds, stack joins, call shapes, control
 regions and source positions before immutable publication, including unreachable
 instructions. Shared Code has actual managed name/constant/metadata tuples.

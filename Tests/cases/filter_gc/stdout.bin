@@ -1,0 +1,8 @@
+callback roots [1, 3, 5]
+callback roots [1, 3, 5]
+callback roots [1, 3, 5]
+owns inputs True True
+retained execution [1, 3, 5]
+exhausted retains inputs True True
+released inputs True True
+traced cycle True True

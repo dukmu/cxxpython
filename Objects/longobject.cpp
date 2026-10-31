@@ -795,11 +795,38 @@ bool parse_integer(std::u32string_view text, int base, Integer &result)
         result = -result;
     return true;
 }
+void invalid_literal(Attachment &context, Handle value, int base, ReturnSlot &out,
+                     const std::string *bytes = nullptr)
+{
+    // CPython 3.12.14 PyLong_FromUnicodeObject/_PyLong_FromBytes use %.200R.
+    RootScope roots(context);
+    ReturnSlot displayed(context);
+    if (bytes) {
+        make_bytes(context, bytes->substr(0, 200), displayed);
+        value = roots.root(displayed.value());
+    }
+    repr(context, value, displayed);
+    if (raised(displayed)) {
+        out.raised(displayed.exception());
+        return;
+    }
+    auto text = context.payload<StrObject>(displayed.value()).value;
+    if (text.size() > 200)
+        text.resize(200);
+    const auto number = std::to_string(base);
+    raise_error(context, CoreObject::ValueErrorType,
+                U"invalid literal for int() with base " +
+                    std::u32string(number.begin(), number.end()) + U": " + text,
+                out);
+}
 void parse_object(Attachment &context, Handle value, int base, bool explicit_base, ReturnSlot &out)
 {
     std::u32string text;
-    if (context.has_layout<StrObject>(value.get(context)) &&
-        is_subtype(context, context.type_of(value), context.builtin(CoreObject::StrType)))
+    std::string data;
+    const bool unicode =
+        context.has_layout<StrObject>(value.get(context)) &&
+        is_subtype(context, context.type_of(value), context.builtin(CoreObject::StrType));
+    if (unicode)
         text = context.payload<StrObject>(value).value;
     else {
         if (explicit_base && !is_bytes(context, value.get(context)) &&
@@ -807,7 +834,6 @@ void parse_object(Attachment &context, Handle value, int base, bool explicit_bas
             type_error(context, out);
             return;
         }
-        std::string data;
         if (!detail::buffer_bytes(context, value, data, out)) {
             if (!raised(out))
                 type_error(context, out);
@@ -815,7 +841,7 @@ void parse_object(Attachment &context, Handle value, int base, bool explicit_bas
         }
         for (unsigned char ch : data) {
             if (ch >= 128) {
-                raise_error(context, CoreObject::ValueErrorType, U"invalid literal for int()", out);
+                invalid_literal(context, value, base, out, &data);
                 return;
             }
             text += static_cast<char32_t>(ch);
@@ -823,7 +849,7 @@ void parse_object(Attachment &context, Handle value, int base, bool explicit_bas
     }
     Integer parsed;
     if (!parse_integer(text, base, parsed)) {
-        raise_error(context, CoreObject::ValueErrorType, U"invalid literal for int()", out);
+        invalid_literal(context, value, base, out, unicode ? nullptr : &data);
         return;
     }
     publish(context, std::move(parsed), out);
@@ -871,7 +897,7 @@ void int_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlo
     else if (context.type_of(values[0]) == context.builtin(CoreObject::StrType)) {
         Integer parsed;
         if (!parse_integer(context.payload<StrObject>(values[0]).value, 10, parsed)) {
-            raise_error(context, CoreObject::ValueErrorType, U"invalid literal for int()", out);
+            invalid_literal(context, roots.root(values[0]), 10, out);
             return;
         }
         publish(context, std::move(parsed), converted);
@@ -903,8 +929,7 @@ void int_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlo
                                   context.builtin(CoreObject::StrType))) {
                 Integer parsed;
                 if (!parse_integer(context.payload<StrObject>(value).value, 10, parsed)) {
-                    raise_error(context, CoreObject::ValueErrorType, U"invalid literal for int()",
-                                out);
+                    invalid_literal(context, value, 10, out);
                     return;
                 }
                 publish(context, std::move(parsed), converted);

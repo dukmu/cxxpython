@@ -509,7 +509,7 @@ struct FrameObject {
     AtomicGcEdge delegate;
     std::vector<std::optional<Value>> locals;
     std::vector<Value> operands;
-    const std::vector<Value> cells;
+    std::vector<Value> cells;
     const std::optional<Value> namespace_mapping;
     // Lazily refreshed reflection snapshot, never the fast-local/Cell authority.
     std::optional<Value> locals_snapshot;

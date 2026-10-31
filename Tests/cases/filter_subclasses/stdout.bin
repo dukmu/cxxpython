@@ -1,0 +1,29 @@
+subclass True True child [1, 2]
+subclass keyword TypeError
+wrong type TypeError
+non-type TypeError
+receiver TypeError
+receiver TypeError
+receiver TypeError
+receiver TypeError
+receiver TypeError
+receiver TypeError
+receiver TypeError
+receiver TypeError
+receiver TypeError
+receiver TypeError
+receiver TypeError
+receiver TypeError
+custom init accepted [3]
+direct new True False [4]
+custom new [5]
+reduce first 1
+reduce state True True True
+reduce shared 2 3 [4] []
+reduce exhausted True True []
+reduce first 1
+reduce state True True True
+reduce shared 2 3 [4] []
+reduce exhausted True True []
+reduce None True True True
+reduce arguments TypeError

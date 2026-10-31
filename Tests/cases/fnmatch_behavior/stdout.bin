@@ -1,0 +1,5 @@
+(?s:a.*[^0-9].\.txt)\Z
+['abx.txt', 'ab3.txt']
+False
+True
+TypeError cannot use a string pattern on a bytes-like object

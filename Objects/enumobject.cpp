@@ -383,6 +383,113 @@ void other_iter(Attachment &context, Handle, std::span<const Value> args, Return
     }
     out.ok(args[0]);
 }
+
+// CPython 3.12.14 Python/bltinmodule.c filter_new/filter_next/filter_reduce.
+// One child and predicate use MultiIteratorObject's immutable traced edges.
+// Child protocols own cursor synchronization; no filter lock spans callbacks.
+void filter_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!check_type(context, args[0], CoreObject::FilterType, out))
+        return;
+    RootScope roots(context);
+    const auto cls = roots.root(args[0]), positional = roots.root(args[1]),
+               keywords = roots.root(args[2]);
+    if (detail::dictionary_size(context, keywords.get(context))) {
+        bool reject = cls.get(context) == context.builtin(CoreObject::FilterType);
+        if (!reject) {
+            const auto init = detail::type_attribute(context, cls.get(context), U"__init__");
+            if (init)
+                roots.root(*init);
+            reject = init == detail::type_attribute(
+                                 context, context.builtin(CoreObject::FilterType), U"__init__");
+        }
+        if (reject) {
+            raise_error(context, CoreObject::TypeErrorType, U"filter() takes no keyword arguments",
+                        out);
+            return;
+        }
+    }
+    const auto &values = context.payload<TupleObject>(positional).items;
+    if (values.size() != 2) {
+        const auto count = std::to_string(values.size());
+        raise_error(
+            context, CoreObject::TypeErrorType,
+            U"filter expected 2 arguments, got " + std::u32string(count.begin(), count.end()), out);
+        return;
+    }
+    const auto predicate = roots.root(values[0]), source = roots.root(values[1]);
+    ReturnSlot iterator(context);
+    get_iter(context, source, iterator);
+    if (raised(iterator)) {
+        out.raised(iterator.exception());
+        return;
+    }
+    context.allocate_instance<MultiIteratorObject>(cls, out, std::vector<Value>{iterator.value()},
+                                                   predicate.get(context), false);
+}
+void filter_next(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!context.has_layout<MultiIteratorObject>(args[0]) ||
+        !is_subtype(context, context.type_of(args[0]), context.builtin(CoreObject::FilterType))) {
+        raise_error(context, CoreObject::TypeErrorType, U"filter descriptor requires a filter",
+                    out);
+        return;
+    }
+    RootScope roots(context);
+    const auto self = roots.root(args[0]);
+    const auto &state = context.payload<MultiIteratorObject>(self);
+    const auto iterator = roots.root(state.iterators[0]), predicate = roots.root(*state.callable);
+    const bool check_true = predicate.get(context) == context.builtin(CoreObject::None) ||
+                            predicate.get(context) == context.builtin(CoreObject::BoolType);
+    for (;;) {
+        RootScope iteration(context);
+        ReturnSlot item(context), selected(context), accepted(context);
+        if (iter_next(context, iterator, item) != NextStatus::Item) {
+            // Preserve StopIteration's payload, and let the child decide if it
+            // can resume on the next call rather than latching exhaustion.
+            out.raised(item.exception());
+            return;
+        }
+        const auto value = iteration.root(item.value());
+        if (check_true)
+            truth(context, value, accepted);
+        else {
+            const std::array arguments{value.get(context)};
+            call(context, predicate, {arguments, {}}, selected);
+            if (raised(selected)) {
+                out.raised(selected.exception());
+                return;
+            }
+            truth(context, iteration.root(selected.value()), accepted);
+        }
+        if (raised(accepted)) {
+            out.raised(accepted.exception());
+            return;
+        }
+        if (accepted.value() == context.builtin(CoreObject::True)) {
+            out.ok(value.get(context));
+            return;
+        }
+        context.poll();
+    }
+}
+void filter_reduce(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!context.has_layout<MultiIteratorObject>(args[0]) ||
+        !is_subtype(context, context.type_of(args[0]), context.builtin(CoreObject::FilterType))) {
+        raise_error(context, CoreObject::TypeErrorType, U"filter descriptor requires a filter",
+                    out);
+        return;
+    }
+    RootScope roots(context);
+    const auto self = roots.root(args[0]);
+    const auto &state = context.payload<MultiIteratorObject>(self);
+    const std::array fields{*state.callable, state.iterators[0]};
+    ReturnSlot arguments(context);
+    cxxpython::core::make_tuple(context, fields, arguments);
+    const std::array result{context.type_of(self), arguments.value()};
+    cxxpython::core::make_tuple(context, result, out);
+}
 } // namespace
 namespace detail {
 void install_reversed(Attachment &context, std::span<const Handle> core)
@@ -458,6 +565,18 @@ void install_reversed(Attachment &context, std::span<const Handle> core)
                              other_iter<CoreObject::MapType, MultiIteratorObject>);
     install_native_attribute(context, core, at(CoreObject::MapType), U"__next__", unary,
                              multi_next<CoreObject::MapType>);
+    auto filter_signature = unary;
+    filter_signature.varargs = U"args";
+    filter_signature.varkwargs = U"kwargs";
+    install_native_attribute(context, core, at(CoreObject::FilterType), U"__new__",
+                             filter_signature, filter_new);
+    wrap_new(CoreObject::FilterType);
+    install_native_attribute(context, core, at(CoreObject::FilterType), U"__iter__", unary,
+                             other_iter<CoreObject::FilterType, MultiIteratorObject>);
+    install_native_attribute(context, core, at(CoreObject::FilterType), U"__next__", unary,
+                             filter_next);
+    install_native_attribute(context, core, at(CoreObject::FilterType), U"__reduce__", unary,
+                             filter_reduce);
 }
 } // namespace detail
 } // namespace cxxpython::core

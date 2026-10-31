@@ -1,6 +1,7 @@
 // Clock and sleep behavior follows CPython 3.12.14 Modules/timemodule.c
 // and Python/pytime.c, Copyright Python Software Foundation (PSF license).
 #include "internal/timemodule.hpp"
+#include "internal/signalmodule.hpp"
 
 #include "cxxpython/compiler.hpp"
 #include "cxxpython/floatobject.hpp"
@@ -85,20 +86,31 @@ void sleep_entry(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlo
         raise_error(ctx, CoreObject::ValueErrorType, U"sleep length must be non-negative", out);
         return;
     }
-    timespec remaining{static_cast<time_t>(nanos / billion), static_cast<long>(nanos % billion)};
-    int error = 0;
-    {
-        NativeWait wait(ctx);
-        while (nanosleep(&remaining, &remaining) != 0) {
-            if (errno != EINTR) {
-                error = errno;
-                break;
-            }
-        }
-    }
-    if (error != 0) {
-        io_os_error(ctx, error, out);
+    timespec deadline{};
+    if (clock_gettime(CLOCK_MONOTONIC, &deadline) != 0) {
+        io_os_error(ctx, errno, out);
         return;
+    }
+    deadline.tv_sec += static_cast<time_t>(nanos / billion);
+    deadline.tv_nsec += static_cast<long>(nanos % billion);
+    if (deadline.tv_nsec >= billion) {
+        ++deadline.tv_sec;
+        deadline.tv_nsec -= billion;
+    }
+    for (;;) {
+        int error;
+        {
+            NativeWait wait(ctx);
+            error = clock_nanosleep(CLOCK_MONOTONIC, TIMER_ABSTIME, &deadline, nullptr);
+        }
+        if (!error)
+            break;
+        if (error != EINTR) {
+            io_os_error(ctx, error, out);
+            return;
+        }
+        if (check_signals(ctx, out))
+            return;
     }
     out.ok(ctx.builtin(CoreObject::None));
 }

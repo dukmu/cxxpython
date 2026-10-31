@@ -1,5 +1,96 @@
 # Development Status
 
+## 2026-10-31 Upstream Unittest, Signals And Filesystem Dependencies
+
+Prepended after 5a909ca, preserving every earlier entry. This closes an actual
+Base-to-Full unittest dependency slice within the active Plan 2 goal, not all
+frontend/library/product or N4-N6/M0-M9 acceptance. Terra supplied upstream source
+copies, Unicode/filter/POSIX work and focused fixtures; parent implemented signal,
+audit, resource configuration, Frame cleanup and observed integer diagnostics,
+integrated the slice and performed acceptance. All workers are closed.
+
+- Added unchanged pinned CPython 3.12.14 unittest, argparse, gettext, fnmatch,
+  locale, shutil, signal and glob sources under the retained PSF license. Actual
+  TestCase/Suite/Loader/Runner, cleanup, subtests, expected/unexpected outcomes,
+  discovery and catchbreak execute through normal Python policy. Four real
+  -m unittest CLI scenarios compare full output/status with the pinned reference,
+  normalizing only elapsed time. Host CLI orchestration belongs in Tests/python,
+  not a fake product subprocess module or a compiled wrapper around Python.
+  Copying mock/async_case does not complete their unfinished dependencies.
+- filter reuses MultiIteratorObject's immutable predicate/child edges and normal
+  child cursor synchronization. None/bool optimization, lazy errors/retry,
+  subclasses, reduction and collecting/parallel callbacks have direct fixtures.
+  str.isupper/islower/istitle use the pinned Unicode property tables, not ASCII
+  approximations or signal-specific classification. Core image changes passed
+  the final eight allocation-failure bootstrap shards.
+- Native errno provides actual platform constants/errorcode. posix supplies real
+  faccessat access variants and terminal-size ioctl plus a readonly tuple record.
+  DirEntry uses immutable names/paths/type hints, precise atomic first-success
+  stat/lstat caches and the same stat-result builder as stat/lstat. scandir closes
+  its native directory in NativeWait before publishing an immutable snapshot;
+  its atomic cursor supports shared iteration without a callback-spanning lock.
+  The deliberate base tradeoff is O(directory-size) memory until iterator GC,
+  including after close. fd scanning and native scandir audit events remain work.
+  Fixtures cover path callbacks/bytes/surrogates, links, cache identity, concurrent
+  reads and descriptor cleanup. The pinned reference alone locks shared readdir
+  calls to avoid its concurrent iterator crash; product iteration stays unlocked.
+  shutil.copyfile/DirEntry and actual recursive/hidden/root_dir glob paths pass.
+- sys.audit/addaudithook retain one precisely rooted per-Interpreter private list.
+  Ordered callbacks, registration-veto exceptions and shared-thread callbacks run
+  through normal calls without a hook-spanning lock. Explicit/Python-policy audit
+  events work; complete native import/open/exec event coverage is not claimed.
+  sys._stdlib_dir and all four prefix fields report explicit CMake resource
+  configuration, not host CPython guesses or completed virtual-environment policy.
+- _signal separates one process disposition lease from Interpreter-rooted Python
+  handlers. Async C notifications touch only lock-free process-lifetime atomics;
+  generation ownership prevents stale notifications from becoming new-owner
+  events. Only the physical main OS thread installs/dispatches Python handlers.
+  VM safety points deliver a rooted current Frame and ordinary exceptions while
+  other threads still execute Python simultaneously. State destruction restores
+  dispositions still owned by the lease without replacing later host handlers.
+  Native lifecycle tests cover independent Interpreters and restoration. External
+  CPU-loop delivery, module removal/GC and actual native-sleep SIGINT interruption
+  pass. sleep resumes Active on EINTR and retries the same monotonic deadline.
+- Actual unittest first exposed missing frame.clear, then int's incomplete
+  invalid-literal diagnostics. Frame.clear now releases completed local/Cell
+  edges without emptying externally shared Cells. Suspended ordinary generator/
+  coroutine cleanup shares close's existing FrameClaim and GeneratorExit path;
+  no reverse link, extra weakref or lifecycle manager was introduced. Running
+  frames and ordinary Created frames still owned by their creating execution
+  reject clearing; the latter has a native-only ownership contract test. Integer
+  errors now include base and the upstream bounded repr, preserving original str
+  callbacks and exact bytes snapshots for buffer inputs. Normal successful numeric
+  paths do not perform error formatting. Both fixes have fixed-reference fixtures.
+- Three VM fixtures record real differences instead of weakening reference
+  goldens: signal state survives module deletion/reimport; standalone generator
+  Frames drop local edges earlier than CPython's generator-owned inline frame;
+  failed clear cleanup reports the originating Frame as unraisable object.
+  Async-generator frame clearing remains an explicit experimental finalizer-hook
+  gate. Full f_locals/reflection, signal wakeup/masks/timers/first-worker import,
+  CLI startup and interruption of locks/general I/O/readline remain unfinished.
+- Final Clang 21.1.8 Release, ASan/UBSan/LSan and TSan builds pass strict
+  -Wall -Wextra -Wpedantic -Werror. Release retains 83 unaffected native results,
+  61 Frame/generator/traceback results, 13 numeric/constructor results and the final
+  Created-frame ownership check; all eight final bootstrap shards pass. Each
+  sanitizer passes the same 157 affected contracts plus that final ownership
+  check. All builds have passing evidence for 37 direct scripts, three VM cases,
+  four unittest CLI scenarios and external signal delivery. Final Frame-only
+  confirmation followed the last ownership check; unrelated passing evidence was
+  reused. The initial instrumented CLI watchdog was incorrectly fixed at 90
+  seconds; it now uses the existing configured product-process budget plus four
+  bounded reference runs. No detector/assertion was disabled. An earlier sandbox
+  LeakSanitizer ptrace restriction was resolved by permitted unsandboxed execution.
+  Formatting, ASDL/244-rule generation and whitespace checks pass. Raw builds,
+  mismatches and acceptance logs remain in .cache/unittest-*. No unrelated baseline
+  performance campaign, hand-copied benchmark table or checksum system was added.
+- Next dependency is logging and its actual calendar/time support, followed by
+  remaining filesystem/pathlib and upstream library suites through real unittest.
+  Full native audit/locale, async/daemon/embedding/fork/platform/resource matrices,
+  frontend validation, extension/import/product and N4-N6/M0-M9/performance gates
+  remain active. No whole milestone or absolute-performance completion is claimed.
+  User test2.py and temporary_plan.md deletion remain excluded from this slice.
+  The previously denied remote push was not retried.
+
 ## 2026-10-31 Upstream Threading, Queue, Clocks And Round
 
 Prepended after 84acaf9, preserving earlier entries. The previous goal turn was

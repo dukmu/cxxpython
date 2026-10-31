@@ -3,6 +3,7 @@
 
 #include <atomic>
 #include <chrono>
+#include <csignal>
 #include <future>
 #include <gtest/gtest.h>
 #include <stdexcept>
@@ -10,6 +11,54 @@
 
 using namespace cxxpython::core;
 namespace {
+TEST(NativeSignals, DispositionsAreRestoredAndIndependentInterpretersDoNotShareHandlers)
+{
+    struct sigaction original {
+    }, ignored{}, restored{};
+    ignored.sa_handler = SIG_IGN;
+    sigemptyset(&ignored.sa_mask);
+    ASSERT_EQ(sigaction(SIGUSR1, &ignored, &original), 0);
+    {
+        Interpreter first;
+        Attachment context(first);
+        context.bootstrap_core();
+        RootScope roots(context);
+        ReturnSlot module(context), method(context), key(context), number(context), result(context);
+        import_module(context, U"_signal", module);
+        ASSERT_EQ(module.tag(), ResultTag::Ok);
+        make_str(context, U"signal", key);
+        get_attribute(context, roots.root(module.value()), roots.root(key.value()), method);
+        ASSERT_EQ(method.tag(), ResultTag::Ok);
+        make_int(context, SIGUSR1, number);
+        const std::array args{number.value(), context.builtin(CoreObject::IntZero)};
+        call(context, roots.root(method.value()), {args, {}}, result);
+        ASSERT_EQ(result.tag(), ResultTag::Ok);
+        EXPECT_EQ(result.value(), context.builtin(CoreObject::IntOne));
+        {
+            Interpreter second;
+            Attachment other(second);
+            other.bootstrap_core();
+            RootScope second_roots(other);
+            ReturnSlot imported(other), function(other), name(other), signal(other), answer(other);
+            import_module(other, U"_signal", imported);
+            ASSERT_EQ(imported.tag(), ResultTag::Ok);
+            make_str(other, U"signal", name);
+            get_attribute(other, second_roots.root(imported.value()),
+                          second_roots.root(name.value()), function);
+            ASSERT_EQ(function.tag(), ResultTag::Ok);
+            make_int(other, SIGUSR1, signal);
+            const std::array values{signal.value(), other.builtin(CoreObject::IntOne)};
+            call(other, second_roots.root(function.value()), {values, {}}, answer);
+            ASSERT_EQ(answer.tag(), ResultTag::Raised);
+            EXPECT_EQ(other.type_of(answer.exception()),
+                      other.builtin(CoreObject::RuntimeErrorType));
+        }
+    }
+    ASSERT_EQ(sigaction(SIGUSR1, nullptr, &restored), 0);
+    EXPECT_EQ(restored.sa_handler, SIG_IGN);
+    EXPECT_EQ(sigaction(SIGUSR1, &original, nullptr), 0);
+}
+
 struct ExitSentinel {
     ObjectHeader header;
     std::atomic<int> *released, *destroyed;

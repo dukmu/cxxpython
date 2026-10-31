@@ -1,0 +1,89 @@
+'' (False, False, False)
+'123 _-\t\n' (False, False, False)
+'\x00\ud800\U0010ffff' (False, False, False)
+'\u4e2d\U0001f40d' (False, False, False)
+'A' (True, False, True)
+'a' (False, True, False)
+'ABC' (True, False, False)
+'abc' (False, True, False)
+'Abc' (False, False, True)
+'aBc' (False, False, False)
+'ABC 123' (True, False, False)
+'abc 123' (False, True, False)
+'Hello World' (False, False, True)
+'Hello world' (False, False, False)
+'Hello_World' (False, False, True)
+'Hello-World' (False, False, True)
+"They'Re" (False, False, True)
+'\xc4\xd6' (True, False, False)
+'\xe4\xf6' (False, True, False)
+'\xc4pfel \xd6l' (False, False, True)
+'\xdf' (False, True, False)
+'\u1e9e' (True, False, True)
+'\u03a3' (True, False, True)
+'\u03c2\u03c3' (False, True, False)
+'\u03a3\u03c2' (False, False, True)
+'\u0410\u0431' (False, False, True)
+'\u01c4' (True, False, True)
+'\u01c5' (False, False, True)
+'\u01c6' (False, True, False)
+'\u01c5uro' (False, False, True)
+'\u01c5\u01c5' (False, False, False)
+'\u01c5 \u01c5' (False, False, True)
+'\u01c5\u01c6' (False, False, True)
+'\u01c6\u01c5' (False, False, False)
+'\u1f88' (False, False, True)
+'\u2160' (True, False, True)
+'\u2170' (False, True, False)
+'\u24b6' (True, False, True)
+'\u24d0' (False, True, False)
+'\u02b0' (False, True, False)
+'\u0345' (False, True, False)
+'\u0301' (False, False, False)
+'A\u0301' (True, False, True)
+'A\u0301b' (False, False, False)
+'A\u0301B' (True, False, True)
+'a\u0301' (False, True, False)
+'\u4e2dA\u4e2d' (True, False, True)
+'\u4e2da\u4e2d' (False, True, False)
+'A\x00B' (True, False, True)
+'A\x00b' (False, False, False)
+'\U00010400' (True, False, True)
+'\U00010428' (False, True, False)
+'\U00010400\U00010428' (False, False, True)
+'\U0001d400' (True, False, True)
+'\U0001d41a' (False, True, False)
+'\U0001d400\U0001d41a' (False, False, True)
+subclass '' (False, False, False) True
+unbound False False False
+subclass '123' (False, False, False) True
+unbound False False False
+subclass 'ABC' (True, False, False) True
+unbound True False False
+subclass 'abc' (False, True, False) True
+unbound False True False
+subclass '\u01c5uro' (False, False, True) True
+unbound False False True
+subclass 'A\u0301b' (False, False, False) True
+unbound False False False
+receiver descriptor 'isupper' for 'str' objects doesn't apply to a 'NoneType' object
+receiver descriptor 'isupper' for 'str' objects doesn't apply to a 'int' object
+receiver descriptor 'isupper' for 'str' objects doesn't apply to a 'bytes' object
+receiver descriptor 'isupper' for 'str' objects doesn't apply to a 'object' object
+receiver descriptor 'islower' for 'str' objects doesn't apply to a 'NoneType' object
+receiver descriptor 'islower' for 'str' objects doesn't apply to a 'int' object
+receiver descriptor 'islower' for 'str' objects doesn't apply to a 'bytes' object
+receiver descriptor 'islower' for 'str' objects doesn't apply to a 'object' object
+receiver descriptor 'istitle' for 'str' objects doesn't apply to a 'NoneType' object
+receiver descriptor 'istitle' for 'str' objects doesn't apply to a 'int' object
+receiver descriptor 'istitle' for 'str' objects doesn't apply to a 'bytes' object
+receiver descriptor 'istitle' for 'str' objects doesn't apply to a 'object' object
+long upper (True, False, True)
+long lower (False, True, False)
+long title (False, False, True)
+long uncased (False, False, False)
+long upper late lower (False, False, False)
+long lower late upper (False, False, False)
+long title late upper (False, False, False)
+long uncased late upper (True, False, True)
+long uncased late lower (False, True, False)

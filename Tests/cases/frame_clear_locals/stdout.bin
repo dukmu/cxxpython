@@ -1,0 +1,7 @@
+finished retained True
+clear returns None
+finished released True
+clear again None
+executing RuntimeError cannot clear an executing frame
+closure intact True True
+closure released True

@@ -1,0 +1,28 @@
+arity TypeError filter expected 2 arguments, got 0
+arity TypeError filter expected 2 arguments, got 1
+arity TypeError filter expected 2 arguments, got 3
+keyword TypeError filter() takes no keyword arguments
+named positional TypeError filter() takes no keyword arguments
+not iterable TypeError 'int' object is not iterable
+iter ValueError iter failed
+noncallable empty []
+noncallable first TypeError 'int' object is not callable
+noncallable second TypeError 'int' object is not callable
+noncallable consumed done
+predicate ValueError predicate failed
+predicate retry 2
+predicate stop StopIteration predicate stop
+predicate stop retry [4, 5]
+truth ValueError truth failed
+truth retry 2
+truth stop StopIteration truth stop
+truth stop retry [4, 5]
+direct truth ValueError truth failed
+direct truth retry 2
+child ValueError next failed
+child stop StopIteration child stop
+child stop retry 3
+truth protocol TypeError 9
+truth protocol ValueError 9
+reentrant child 2
+reentrant outer 1 [3]

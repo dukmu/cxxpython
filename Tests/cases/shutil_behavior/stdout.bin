@@ -1,0 +1,6 @@
+hello
+DirEntry copy True
+False
+SameFileError
+['a.tmp', 'skipme']
+os.terminal_size(columns=91, lines=37)

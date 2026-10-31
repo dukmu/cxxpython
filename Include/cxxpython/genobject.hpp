@@ -31,6 +31,7 @@ ResumeResult resume_generator_frame(Attachment &, Handle frame, Handle sent,
                                     std::optional<Handle> throw_args = {});
 void normalize_generator_throw(Attachment &, std::span<const Value>, ReturnSlot &);
 void make_generator(Attachment &, Handle frame, ReturnSlot &);
+void clear_generator_frame(Attachment &, Handle frame, ReturnSlot &);
 void get_awaitable(Attachment &, Handle, ReturnSlot &);
 void install_generators(Attachment &, std::span<const Handle>);
 void generator_stop(Attachment &, std::optional<Handle> value, ReturnSlot &);

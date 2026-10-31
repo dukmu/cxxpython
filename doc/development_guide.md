@@ -23,12 +23,22 @@ their CC0 license is retained in `doc/licenses/blake2-CC0-1.0.txt`.
 Set `BOOST_MULTIPRECISION_INCLUDE_DIR` when Boost headers are not on the compiler
 search path. `CXXPYTHON_STDLIB_DIR` defaults to the repository's `Lib/`; the source
 bootstrap reads this directory, which must remain available to the executable.
-This development setting is not a completed installed/isolated path configuration.
+`CXXPYTHON_PREFIX` defaults to the repository root; sys prefix/base-prefix fields
+report this configured resource root, and sys._stdlib_dir reports the configured
+stdlib directory. Search-path mutations do not redefine these fields. These
+development settings are not completed installation, virtual-environment or
+isolated path configuration.
+Use Clang 21.1.8 for strict acceptance, with both C and C++ compilers selected in
+a separate build directory. Project targets enable -Wall -Wextra -Wpedantic
+-Werror; do not suppress warnings globally or accept a GCC-only pass in its place.
 Configure sanitizers with the compiler/linker flags in a separate
 build directory; never measure performance while compiling or running sanitizers.
 Use `-DCXXPYTHON_TEST_TIMEOUT=120` for instrumented debug suites; normal builds
 default to 15 seconds per native test. Preserve elapsed times and investigate
 actual failures rather than removing slow correctness cases.
+The unittest CLI driver uses that same product-process budget and a fixed
+30-second reference budget; its outer watchdog accounts for all four sequential
+scenarios. Direct driver runs default to 30 seconds per product process.
 Keep reusable inputs and builds under the repository's ignored `.cache/`, for
 example `.cache/deps/`, `.cache/cpython31214-build/`, `.cache/build-asan/` and
 `.cache/build-tsan/`. `/tmp` is restart-disposable, not durable build state.
@@ -60,12 +70,17 @@ data. Python drivers follow ordinary Python formatting.
 
 ## Semantic Changes
 
-- Python-visible behavior belongs in `Tests/cases/<name>/stdin.bin` plus reference-
-  generated `stdout.bin`, not C++ string literals calling SourceUnit. Run
+- Python-visible behavior belongs in `Tests/cases/<name>/test.py` plus reference-
+  generated `stdout.bin`; optional `stdin.bin` is input, not the test script.
+  Do not put runnable Python in C++ string literals calling SourceUnit. Run
   `python3 Tests/python/test_cases.py --binary build/cxxpython` without rebuilding
   tests. `Scripts.Cases` and `Scripts.Reference` run the same byte-exact fixtures
   through the product and pinned reference. See `Tests/cases/README.md` for stderr
   and exit status. Keep C++ for native-only ownership/IR/quota/fault/thread tests.
+- Host terminal/process-signal/CLI boundaries belong in `Tests/python/`; compare
+  actual child output and exit status against the fixed reference where applicable.
+  `test_unittest_cli.py` covers real -m unittest execution without requiring the
+  product to implement subprocess just to launch its own test process.
 - Add focused native contracts and, where supported, executable source tests.
 - Define ownership/traversal, synchronization, failure and callback boundaries
   with the behavior. No unrooted object may span an allocating/polling operation.

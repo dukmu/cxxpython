@@ -1,0 +1,6 @@
+no hooks None
+veto None
+events [('first', 'cxx.audit.one', (1, 'a')), ('first', 'cxx.audit.two', ()), ('first', 'cxx.audit.three', ([3],)), ('second', 'cxx.audit.three', ([3],))]
+event type expected str for argument 'event', not int
+nul [('first', 'cxx.audit.nul', (4,)), ('second', 'cxx.audit.nul', (4,))]
+propagated denied

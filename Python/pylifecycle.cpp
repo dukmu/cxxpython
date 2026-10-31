@@ -295,6 +295,7 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     define(CoreObject::EnumerateType, "enumerate", LayoutDescriptor::of<EnumObject>());
     define(CoreObject::ZipType, "zip", LayoutDescriptor::of<MultiIteratorObject>());
     define(CoreObject::MapType, "map", LayoutDescriptor::of<MultiIteratorObject>());
+    define(CoreObject::FilterType, "filter", LayoutDescriptor::of<MultiIteratorObject>());
     define(CoreObject::SystemErrorType, "SystemError", LayoutDescriptor::of<ExceptionObject>(),
            at(CoreObject::ExceptionType));
     define(CoreObject::BufferErrorType, "BufferError", LayoutDescriptor::of<ExceptionObject>(),
@@ -676,6 +677,7 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                     CoreObject::EnumerateType,
                     CoreObject::ZipType,
                     CoreObject::MapType,
+                    CoreObject::FilterType,
                     CoreObject::BaseExceptionType,
                     CoreObject::SystemExitType,
                     CoreObject::GeneratorExitType,

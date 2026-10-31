@@ -1,0 +1,6 @@
+tests 4
+failures errors skipped expected unexpected 1 0 1 1 1
+success False
+skip reason not today
+subtest True
+events ['class setup', 'setup', 'teardown', 'cleanup', 'setup', 'teardown', 'cleanup', 'setup', 'teardown', 'cleanup', 'class teardown', 'class cleanup']

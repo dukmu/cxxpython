@@ -1,0 +1,21 @@
+filter builtins
+[1, 'word', [3], True]
+[1, 'word', [3], True]
+[1, 9, 2]
+elloorld
+[1, 255]
+['first', 'second']
+constructed ['iter']
+identity True
+first 1 ['iter', 'next', ('predicate', 1)]
+second 3 ['iter', 'next', ('predicate', 1), 'next', ('predicate', 3)]
+shared 0 1 2 [3, 5]
+getitem [1, 2, 3, 4]
+truth once 1 True [('truth', False), ('truth', True)]
+truth once 1 True [('truth', False), ('truth', True)]
+truth once 1 True [('truth', False), ('truth', True)]
+length truth 1
+object protocols True False True True
+repr True True
+empty done done
+long rejection 7

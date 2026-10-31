@@ -1,0 +1,7 @@
+prefix True True
+base_prefix True True
+exec_prefix True True
+base_exec_prefix True True
+_stdlib_dir True True
+no venv True True
+actual stdlib True
