@@ -47,7 +47,7 @@ TEST(CoreReadiness, ExistingB2TypesAndInstancesBecomeNormalRuntimeObjects)
     EXPECT_TRUE(context.core_ready());
     EXPECT_EQ(type.get(context), identity);
     EXPECT_EQ(context.payload<TypeObject>(type).state, TypeState::Ready);
-    EXPECT_FALSE(context.payload<TypeObject>(type).bootstrap_module.has_value());
+    EXPECT_EQ(context.payload<TypeObject>(type).declared_module, U"existing_module");
     auto name = attribute(context, roots, type, U"__name__");
     EXPECT_EQ(context.payload<StrObject>(name).value, U"Existing");
     EXPECT_EQ(context.payload<StrObject>(attribute(context, roots, type, U"__qualname__")).value,
@@ -129,7 +129,7 @@ TEST_P(CorePromotionAllocationFailures, EveryBootstrapAndPromotionAllocationCanF
         EXPECT_EQ(data.state, TypeState::Structural);
         EXPECT_FALSE(data.dictionary.has_value());
         EXPECT_EQ(std::get<std::u32string>(data.name), U"Existing");
-        EXPECT_EQ(data.bootstrap_module, U"existing_module");
+        EXPECT_EQ(data.declared_module, U"existing_module");
         context.set_allocation_limit(std::numeric_limits<std::size_t>::max());
         const auto collections = context.stats().collections;
         {

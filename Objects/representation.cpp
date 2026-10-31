@@ -55,7 +55,10 @@ std::u32string display_type(Attachment &context, Value type)
         const auto &name = context.payload<StrObject>(*module).value;
         if (name != U"builtins")
             return name + U"." + context.payload<StrObject>(std::get<Value>(data.qualname())).value;
-    }
+    } else if (const auto &native = context.payload<TypeObject>(type);
+               native.immutable && native.declared_module && *native.declared_module != U"builtins")
+        return *native.declared_module + U"." +
+               context.payload<StrObject>(std::get<Value>(data.qualname())).value;
     return context.payload<StrObject>(std::get<Value>(data.name())).value;
 }
 void object_hash(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)

@@ -189,6 +189,27 @@ void import_error_init(Attachment &context, Handle, std::span<const Value> args,
                   items.size() == 1 ? items[0] : context.builtin(CoreObject::None));
     out.ok(context.builtin(CoreObject::None));
 }
+void name_error_init(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!is_instance(context, args[0], CoreObject::NameErrorType)) {
+        type_error(context, U"NameError.__init__ requires NameError", out);
+        return;
+    }
+    context.store(args[0], context.payload<ExceptionObject>(args[0]).args, args[2]);
+    context.store(args[0], context.instance_slot(args[0], 0), args[1]);
+    out.ok(context.builtin(CoreObject::None));
+}
+void name_error_get(Attachment &context, Value self, ReturnSlot &out)
+{
+    context.load(self, context.instance_slot(self, 0), out);
+    if (out.tag() == ResultTag::Empty)
+        out.ok(context.builtin(CoreObject::None));
+}
+void name_error_set(Attachment &context, Value self, std::optional<Value> value, ReturnSlot &out)
+{
+    context.store(self, context.instance_slot(self, 0), value);
+    out.ok(context.builtin(CoreObject::None));
+}
 void type_call(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_type(context, args[0])) {
@@ -922,6 +943,12 @@ void install_construction(Attachment &context, std::span<const Handle> core)
     import_error.parameters.push_back(
         {U"name_from", ParameterKind::KeywordOnly, at(CoreObject::None).get(context)});
     install(at(CoreObject::ImportErrorType), U"__init__", import_error, import_error_init);
+    auto name_error = exception;
+    name_error.parameters.push_back(
+        {U"name", ParameterKind::KeywordOnly, at(CoreObject::None).get(context)});
+    install(at(CoreObject::NameErrorType), U"__init__", name_error, name_error_init);
+    install_native_field(context, core, at(CoreObject::NameErrorType), U"name", name_error_get,
+                         name_error_set);
     install(type, U"__call__", variadic, type_call);
     SignatureLayout union_signature;
     union_signature.parameters = {{U"self", ParameterKind::PositionalOnly},

@@ -90,6 +90,8 @@ add_library(cxxpython_core
     Objects/asyncgenobject.cpp
     Objects/namespaceobject.cpp
     Objects/genericaliasobject.cpp
+    Objects/typealiasobject.cpp
+    Modules/_typingmodule.cpp
     Objects/unionobject.cpp
     Objects/weakrefobject.cpp
     Objects/weakproxyobject.cpp

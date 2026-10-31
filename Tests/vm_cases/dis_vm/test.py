@@ -135,6 +135,36 @@ assert any(i.opname == 'PREP_RERAISE_STAR' for i in grouped_ops)
 assert any(i.opname == 'RERAISE' and i.arg == 1 for i in grouped_ops)
 assert opcode.stack_effect(opcode.opmap['CHECK_EG_MATCH']) == 0
 assert opcode.stack_effect(opcode.opmap['PREP_RERAISE_STAR']) == -1
+
+def alias_outer():
+    FreeVar = int
+    class AliasClass:
+        ClassLocal = str
+        type Alias = tuple[ClassLocal, FreeVar]
+    return AliasClass
+
+alias_class = alias_outer()
+assert alias_class.Alias.__value__ == tuple[str, int]
+alias_class_code = [c for c in alias_outer.__code__.co_consts
+                    if hasattr(c, "co_name") and c.co_name == "AliasClass"][0]
+alias_class_ops = list(dis.get_instructions(alias_class_code))
+make_alias = [i for i in alias_class_ops if i.opname == "MAKE_TYPE_ALIAS"]
+assert len(make_alias) == 1
+assert dis.Bytecode(alias_class_code).stack_effect(make_alias[0].offset) == -2
+assert opcode.stack_effect(make_alias[0].opcode) == -2
+alias_code = [c for c in alias_class_code.co_consts
+              if hasattr(c, "co_name") and c.co_name == "Alias"][0]
+alias_ops = list(dis.get_instructions(alias_code))
+alias_bytecode = dis.Bytecode(alias_code)
+for name, expected in (("LOAD_FROM_DICT_OR_GLOBALS", "ClassLocal"),
+                       ("LOAD_FROM_DICT_OR_DEREF", "FreeVar")):
+    found = [i for i in alias_ops if i.opname == name and i.argval == expected]
+    assert len(found) == 1
+    assert opcode.opmap[name] == found[0].opcode
+    assert alias_bytecode.stack_effect(found[0].offset) == 0
+    assert opcode.stack_effect(found[0].opcode, found[0].arg) == 0
+
+# Generic aliases (type A[T]) remain a separate acceptance gate.
 assert opcode.stack_effect(opcode.opmap['RERAISE'], 0) == 0
 assert opcode.stack_effect(opcode.opmap['RERAISE'], 1) == -1
 try:

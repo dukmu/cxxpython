@@ -11,6 +11,7 @@
 #include "cxxpython/protocol.hpp"
 #include "cxxpython/setobject.hpp"
 #include "cxxpython/superobject.hpp"
+#include "cxxpython/typealiasobject.hpp"
 #include "cxxpython/unionobject.hpp"
 #include "cxxpython/weakrefobject.hpp"
 #include "internal/aiterobject.hpp"
@@ -62,11 +63,15 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
             bases.push_back(at(CoreObject::ExceptionType));
         TypeSpec spec{name, bases};
         spec.module = U"builtins";
+        if (id == CoreObject::TypeAliasType)
+            spec.module = U"typing";
         if (id == CoreObject::FunctionType || id == CoreObject::ModuleType ||
             id == CoreObject::SimpleNamespaceType || id == CoreObject::BaseExceptionType)
             spec.slots = std::vector<std::u32string>{U"__dict__"};
         if (id == CoreObject::ImportErrorType)
             spec.slots = std::vector<std::u32string>{U"name", U"path", U"msg", U"name_from"};
+        if (id == CoreObject::NameErrorType)
+            spec.slots = std::vector<std::u32string>{U"name"};
         if (id == CoreObject::StopIterationType)
             spec.slots = std::vector<std::u32string>{U"value"};
         if (id == CoreObject::SystemExitType)
@@ -322,6 +327,7 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
            LayoutDescriptor::of<ExceptionObject>(), at(CoreObject::ExceptionType));
     define(CoreObject::AnextAwaitableType, "anext_awaitable",
            LayoutDescriptor::of<AnextAwaitableObject>());
+    define(CoreObject::TypeAliasType, "TypeAliasType", LayoutDescriptor::of<TypeAliasObject>());
     for (auto id :
          {CoreObject::FunctionType, CoreObject::ModuleType, CoreObject::CodeType,
           CoreObject::GeneratorType, CoreObject::CoroutineType, CoreObject::SetType,
@@ -379,7 +385,6 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                                              std::get<std::u32string>(payload.name));
         payload.name = text.value();
         payload.qualname = text.value();
-        payload.bootstrap_module.reset();
         context.account_external(type, payload.external_bytes());
     };
     for (std::size_t i = 0; i < static_cast<std::size_t>(CoreObject::None); ++i) {
@@ -423,6 +428,7 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     install_namespace(context, core);
     install_genericalias(context, core);
     install_union(context, core);
+    install_typealias(context, core);
     install_weakrefs(context, core);
     install_weakproxies(context, core);
     install_error_types(context, core);
@@ -512,6 +518,7 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                     CoreObject::AsyncGenAThrowType,
                     CoreObject::AsyncGenWrappedValueType,
                     CoreObject::AnextAwaitableType,
+                    CoreObject::TypeAliasType,
                     CoreObject::UnionType,
                     CoreObject::GenericAliasIteratorType,
                     CoreObject::SetIteratorType,

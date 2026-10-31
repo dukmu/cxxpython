@@ -57,6 +57,8 @@ struct ScopeInfo {
     bool generator = false;
     bool coroutine = false;
     bool annotations = false;
+    bool type_alias = false;
+    bool sees_class_namespace = false;
 };
 namespace detail {
 struct SourceProgram;

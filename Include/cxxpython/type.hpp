@@ -49,7 +49,9 @@ struct TypeObject {
     // moves their managed identities to TypeSnapshot and clears these builders.
     std::variant<std::u32string, Value> name;
     std::variant<std::u32string, Value> qualname;
-    std::optional<std::u32string> bootstrap_module = U"builtins";
+    // Static native types may use __module__ as an instance descriptor. Their
+    // declared module remains immutable metadata for class-level reflection.
+    std::optional<std::u32string> declared_module = U"builtins";
     // The structural graph and instance layout are frozen after type readiness.
     std::vector<Value> bases;
     std::vector<Value> mro;

@@ -98,6 +98,9 @@ enum class Opcode : std::uint8_t {
     MatchClass,
     CopyDictWithoutKeys,
     SetupAnnotations,
+    MakeTypeAlias,
+    LoadFromDictOrGlobals,
+    LoadFromDictOrDeref,
     Count,
 };
 enum class OperandDomain {

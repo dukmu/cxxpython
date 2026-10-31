@@ -1,0 +1,14 @@
+module
+class private
+outer
+changed
+module
+NameError __classdictcell__
+published class True True
+False False
+module
+type True
+yield expression cannot be used within a type alias
+await expression cannot be used within a type alias
+named expression cannot be used within a type alias
+Cannot use comprehension in annotation scope within class scope

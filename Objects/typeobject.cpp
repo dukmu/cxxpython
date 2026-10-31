@@ -224,7 +224,7 @@ void create(Attachment &context, const TypeSpec &spec, const LayoutDescriptor *n
     auto created = roots.root(staged.value());
     auto &payload = context.payload<TypeObject>(created);
     payload.qualname = spec.qualname.value_or(spec.name);
-    payload.bootstrap_module = spec.module;
+    payload.declared_module = spec.module;
     for (auto base : bases)
         payload.bases.push_back(base.get(context));
     payload.mro.reserve(ancestors.size() + 1);
@@ -303,8 +303,8 @@ std::size_t TypeObject::external_bytes() const noexcept
         bytes += string_bytes(*text);
     if (auto text = std::get_if<std::u32string>(&qualname))
         bytes += string_bytes(*text);
-    if (bootstrap_module)
-        bytes += string_bytes(*bootstrap_module);
+    if (declared_module)
+        bytes += string_bytes(*declared_module);
     bytes += slot_names.capacity() * sizeof(std::u32string);
     for (const auto &name : slot_names) {
         auto address = reinterpret_cast<std::uintptr_t>(name.data());
@@ -602,10 +602,10 @@ void type_ready(Attachment &context, Handle type, std::optional<Handle> source)
         make_str(context, U"__hash__", text);
         name_store(context, *payload.dictionary, text.value(), context.builtin(CoreObject::None));
     }
-    if (payload.bootstrap_module && !name_lookup(context, *payload.dictionary, U"__module__")) {
+    if (payload.declared_module && !name_lookup(context, *payload.dictionary, U"__module__")) {
         make_str(context, U"__module__", text);
         auto key = roots.root(text.value());
-        make_str(context, *payload.bootstrap_module, text);
+        make_str(context, *payload.declared_module, text);
         name_store(context, *payload.dictionary, key.get(context), text.value());
     }
     if (payload.instance_layout.fields.dictionary &&
@@ -625,7 +625,6 @@ void type_ready(Attachment &context, Handle type, std::optional<Handle> source)
     const auto inherited =
         payload.base ? context.payload<TypeObject>(*payload.base).slot_names.size() : 0;
     install_slot_descriptors(context, type, inherited);
-    payload.bootstrap_module.reset();
     context.account_external(type, payload.external_bytes());
     payload.state = TypeState::Ready;
     if (context.core_ready())

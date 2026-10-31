@@ -1,5 +1,6 @@
 #include "internal/import.hpp"
 #include "cxxpython/protocol.hpp"
+#include "cxxpython/typealiasobject.hpp"
 #include "cxxpython/weakrefobject.hpp"
 #include "internal/abc.hpp"
 #include "internal/atexitmodule.hpp"
@@ -258,6 +259,7 @@ detail::ImportState::ImportState()
 #endif
                                      {U"_thread", detail::initialize_thread},
                                      {U"_abc", detail::initialize_abc},
+                                     {U"_typing", detail::initialize_typing},
                                      {U"itertools", detail::initialize_itertools},
                                      {U"_collections", detail::initialize_collections},
                                      {U"binascii", detail::install_binascii},

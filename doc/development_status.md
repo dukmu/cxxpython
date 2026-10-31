@@ -1,5 +1,69 @@
 # Development Status
 
+## 2026-10-31 Lazy Type Aliases And Executable Class Annotation Scopes
+
+Prepended after 2fdc337, preserving earlier entries. Terra implemented the native
+alias object/module, initial reference fixtures and IR/root tests; parent
+implemented AST/symbol/CFG/VM integration, class namespace lookup and metadata
+fixes. A separate Terra task synchronized the three current contract/design/
+compatibility documents. All workers are closed. This is a completed vertical
+slice, not completion of the active frontend/library/product/N4-N6/M0-M9 goal.
+
+- Non-generic type Alias = expr lowers from the generated CST to a typed alias
+  statement and a lazy evaluator Function/Code. Failed evaluation is retriable;
+  successful values retain closure state and are cached. Recursive aliases keep
+  their identity without eager expansion. The native _typing module exports the
+  canonical TypeAliasType, not a replacement typing policy library.
+- The native object adapts pinned CPython 3.12.14 Objects/typevarobject.c with
+  immutable traced input edges and an existing atomic GC edge for its value.
+  Concurrent first readers may both execute the evaluator; the first successful
+  CAS wins and a losing reader reloads that rooted published value. Exceptions
+  are not cached. There is no execution lock, new ownership registry or RC/GIL
+  fallback. Direct construction supports positional/keyword name and value,
+  keyword-only tuple parameters, readonly reflection, identity/hash, alias
+  subscription and unions; nongeneric subscription and subclassing are rejected.
+- Class-local evaluators capture the actual class dictionary through the
+  existing class-dictionary Cell contract. Lookup consults that dictionary before
+  captured free variables or globals/builtins, while explicit globals bypass it.
+  Private-name mangling, nested captures, later class publication and coexistence
+  with __class__ cells are covered. The compiler no longer assumes __class__ is
+  the sole or first class cell. Internal class cell entries are consumed during
+  construction. The reference's direct yield/await/named-expression and class
+  comprehension restrictions remain compile-time errors.
+- MAKE_TYPE_ALIAS, LOAD_FROM_DICT_OR_GLOBALS and LOAD_FROM_DICT_OR_DEREF have
+  verified operands, stack effects, safepoints, raising behavior and real VM dis
+  metadata. Alias helper allocation failures retain rooted inputs and permit
+  retry. NameError.name now uses a normal traced instance slot, including builtin
+  construction, deletion and VM missing-name/free-variable errors.
+- Static native types retain their immutable declared module text separately
+  from instance descriptors named __module__. Type-level reflection therefore
+  reports typing.TypeAliasType without destroying the alias instance descriptor;
+  mutable classes still use their own published namespace. Bootstrap rollback
+  snapshots and readiness tests follow this metadata contract.
+- Five direct test.py fixtures have pinned-reference-generated goldens. They
+  exercise construction, lazy failures/caching, class scopes, worker handoff and
+  two simultaneous first evaluators with GC inside the callbacks. Every worker
+  catches failures and releases its completion gate. Tests remain Python scripts;
+  stdin.bin remains actual process input, including interactive commands, never
+  the test-suite source. Existing readline/curses/dis/gc/PTY evidence remains in
+  the earlier entries; this slice additionally extends VM dis for the alias ops.
+- Acceptance passes all 295 portable fixtures (294 in the retained full run plus
+  the subsequently added concurrent-cache fixture), 151 selected native/source/
+  grammar/dis/terminal checks and eight bootstrap allocation-failure shards.
+  Strict ASan/UBSan/LSan and TSan each pass 92 affected native/dis/terminal checks
+  plus all five new scripts. Format-check and diff whitespace checks pass. Source
+  changes were frozen before the final three builds; only Python fixture/docs
+  were added afterward. Raw logs and binary hashes are in .cache/type-alias-*.
+  No sanitizer setting or time limit was relaxed, and no unrelated performance
+  suite or hand-maintained measurement table was introduced.
+- Next dependencies remain native TypeVar/ParamSpec/TypeVarTuple and Generic,
+  generic type-parameter syntax and lazy bounds, then the actual typing library
+  with its re/warnings closure. Full upstream annotation/alias compatibility,
+  remaining compile options, -i after -m future flags and the broader requested
+  standard libraries/N4-N6/M0-M9 acceptance are not declared complete. Origin push
+  still awaits destination authorization; no retry or bypass was attempted.
+  The user's test2.py and temporary_plan.md deletion are excluded from this node.
+
 ## 2026-10-31 Variable And Postponed Annotations With Compiler Flags
 
 Prepended after 3072505, preserving earlier entries. Terra supplied the pinned

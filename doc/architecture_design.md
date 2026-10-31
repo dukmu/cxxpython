@@ -274,7 +274,7 @@ longjmp-based signal handling is disabled rather than crossing C++/GC scopes.
 The shared stdio selector uses GNU only for saved standard-stream identities,
 descriptors 0/1 and real terminals. Redirected/replaced streams retain ordinary
 readline/write protocols. Full signal integration, display hooks, automatic
-rlcompleter policy and curses remain dependencies.
+rlcompleter policy and the remaining curses capabilities remain dependencies.
 
 `Modules/_opcodemodule.cpp` exposes immutable instruction, source-position,
 signature and stack-effect metadata. `Lib/opcode.py` and `Lib/dis.py` implement
@@ -418,6 +418,15 @@ without adding runtime closures. Unused local-annotation scopes have no emitted
 graph and do not get a Code object. BoolExpr keeps an explicit operand vector,
 and FormattedExpr preserves format-spec presence so canonical output does not
 lose grouping or empty format specifications.
+
+Non-generic type-alias lowering creates a lazy evaluator
+in an annotation-like scope. In a class it captures __classdict__; class
+construction fills that Cell with the class dictionary, and dedicated VM reads
+consult it before closure or global lookup. The native _typing.TypeAliasType
+traces its immutable inputs and atomically publishes the first successful cached
+value without serializing evaluator calls. Static native type module metadata is
+kept separately from instance descriptors named __module__. Generic type
+parameters and the typing library remain separate, unfinished dependencies.
 
 Variable annotations lower through ordinary stores and SETUP_ANNOTATIONS, not a
 second VM evaluation path. Type annotation reflection reuses the own namespace's

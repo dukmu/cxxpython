@@ -173,6 +173,18 @@ class GraphPass final {
     void name(const std::u32string &text, Span span, Opcode local, Opcode global)
     {
         const auto &binding = symbol(text);
+        const auto &scope = program_.scopes[scope_];
+        if (scope.sees_class_namespace && local == Opcode::LoadFast &&
+            (binding.classification == NameClass::Free ||
+             binding.classification == NameClass::GlobalImplicit)) {
+            emit(Opcode::LoadDeref, span,
+                 static_cast<std::uint32_t>(*symbol(U"__classdict__").slot));
+            if (binding.classification == NameClass::Free)
+                emit(Opcode::LoadFromDictOrDeref, span, static_cast<std::uint32_t>(*binding.slot));
+            else
+                emit(Opcode::LoadFromDictOrGlobals, span, 0, text);
+            return;
+        }
         if (binding.classification == NameClass::Namespace ||
             (program_.scopes[scope_].kind != ScopeKind::Function &&
              binding.classification == NameClass::GlobalImplicit))
@@ -1131,6 +1143,13 @@ class GraphPass final {
                         emit(scope_ == 0 && program_.mode == InputMode::Single ? Opcode::PrintExpr
                                                                                : Opcode::PopTop,
                              span);
+                    } else if constexpr (std::is_same_v<T, TypeAliasStmt>) {
+                        nested(node.evaluator->scope, node.evaluator->body, node.evaluator.get());
+                        literal({Literal::Kind::String, node.name}, span);
+                        emit(Opcode::BuildTuple, span, 0);
+                        make_function(node.evaluator->scope, span);
+                        emit(Opcode::MakeTypeAlias, span);
+                        name(node.binding, span, Opcode::StoreFast, Opcode::StoreGlobal);
                     } else if constexpr (std::is_same_v<T, AnnAssignStmt>)
                         annotated_assignment(node, span);
                     else if constexpr (std::is_same_v<T, AssignStmt>) {
@@ -1473,8 +1492,19 @@ class GraphPass final {
         }
         suite(body);
         if (current().exit == FlowBlock::Exit::Open) {
-            if (info.kind == ScopeKind::Class && !info.cellvars.empty()) {
-                emit(Opcode::LoadClosure, info.span, 0);
+            auto cell = std::find(info.cellvars.begin(), info.cellvars.end(), U"__class__");
+            if (info.kind == ScopeKind::Class) {
+                auto dictionary =
+                    std::find(info.cellvars.begin(), info.cellvars.end(), U"__classdict__");
+                if (dictionary != info.cellvars.end()) {
+                    emit(Opcode::LoadClosure, info.span,
+                         static_cast<std::uint32_t>(dictionary - info.cellvars.begin()));
+                    emit(Opcode::StoreName, info.span, 0, U"__classdictcell__");
+                }
+            }
+            if (info.kind == ScopeKind::Class && cell != info.cellvars.end()) {
+                emit(Opcode::LoadClosure, info.span,
+                     static_cast<std::uint32_t>(cell - info.cellvars.begin()));
                 emit(Opcode::DupTop, info.span);
                 emit(Opcode::StoreName, info.span, 0, U"__classcell__");
             } else

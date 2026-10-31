@@ -162,6 +162,7 @@ enum class CoreObject : std::size_t {
     CallableWeakProxyType,
     ReferenceErrorType,
     AnextAwaitableType,
+    TypeAliasType,
     None,
     NotImplemented,
     Ellipsis,

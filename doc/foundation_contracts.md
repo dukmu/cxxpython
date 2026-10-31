@@ -605,6 +605,30 @@ before mangling. Temporary annotation scopes validate syntax without introducing
 runtime bindings/closures. Local variable annotations still affect symbol/function
 classification but do not evaluate or emit nested Code objects.
 
+The non-generic `type Alias = expr` path creates a traced
+TypeAliasType with a lazy evaluator and an empty parameter tuple. `_typing`
+exports that native type; its constructor takes a name, value and keyword-only
+type_params. Name, parameters, evaluator and module are immutable traced edges;
+the cached value is an atomic GC edge. A successful evaluation is published by
+compare-exchange and a losing reader loads the published value. Concurrent
+first readers may execute the evaluator more than once; exceptions propagate and
+are not cached. Constructor values are already populated. Alias fields expose
+name, module, value and parameters; non-generic aliases reject subscription,
+and aliases participate in unions.
+
+Class-local alias evaluators capture a __classdict__ Cell. Class construction
+removes __classdictcell__ from the class dictionary and fills the Cell with that
+dictionary; name reads consult it before the enclosing Cell or globals/builtins.
+MAKE_TYPE_ALIAS consumes three stack values and produces one;
+LOAD_FROM_DICT_OR_GLOBALS and LOAD_FROM_DICT_OR_DEREF replace one mapping with
+one value. All three can raise and are safepoints. Missing VM names populate
+NameError.name; its writable instance slot uses normal traced storage.
+Static native types retain declared_module as immutable native metadata so a
+type-level __module__ remains available even when the namespace entry is an
+instance descriptor. Mutable types use their own namespace publication path.
+TypeVar, ParamSpec, TypeVarTuple, generic syntax and the typing closure remain
+unfinished; this implementation is not their acceptance evidence.
+
 Variable annotations use ordinary assignment/item/attribute protocols and retain
 the reference's RHS/target/annotation order. Simple module/class names store into
 __annotations__; parenthesized names and complex targets do not. Bare attributes
@@ -693,7 +717,8 @@ configuration calls during callbacks remain valid; recursive terminal reads are
 rejected. Whole GNU calls park, callbacks execute Active, and tty/callback/stream state
 is restored on exit. GNU longjmp signal handling is disabled. Shared-heap Python
 workers can collect/compute during input waits and output backpressure. Full signal integration,
-display hooks, automatic rlcompleter, reload/history policy and curses remain gates.
+display hooks, automatic rlcompleter and reload/history policy remain gates;
+the specific remaining curses gaps are listed above.
 
 Native _opcode metadata reads immutable Code data into rooted results. Python
 opcode/dis supply tuple protocols, instruction iteration, recursive formatting,

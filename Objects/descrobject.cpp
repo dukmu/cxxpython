@@ -388,6 +388,35 @@ void type_dict_get(Attachment &context, Value receiver, ReturnSlot &out)
     context.allocate_instance<MappingProxyObject>(
         roots.root(context.builtin(CoreObject::MappingProxyType)), out, *dictionary);
 }
+void type_module_get(Attachment &context, Value receiver, ReturnSlot &out)
+{
+    TypeView view(context, receiver);
+    auto module = detail::name_lookup(context, *view.dictionary(), U"__module__");
+    const auto &type = context.payload<TypeObject>(receiver);
+    if (module && (!type.immutable || context.has_layout<StrObject>(*module))) {
+        out.ok(*module);
+        return;
+    }
+    if (type.immutable && type.declared_module)
+        make_str(context, *type.declared_module, out);
+    else
+        raise_error(context, CoreObject::AttributeErrorType, U"__module__", out);
+}
+void type_module_set(Attachment &context, Value receiver, std::optional<Value> value,
+                     ReturnSlot &out)
+{
+    if (context.payload<TypeObject>(receiver).immutable || !value) {
+        type_error(context, U"cannot set or delete __module__ on this type", out);
+        return;
+    }
+    RootScope roots(context);
+    auto owner = roots.root(receiver), module = roots.root(*value);
+    ReturnSlot key(context);
+    make_str(context, U"__module__", key);
+    detail::type_namespace_change(context, owner.get(context), U"__module__", key.value(),
+                                  module.get(context));
+    out.ok(context.builtin(CoreObject::None));
+}
 void type_abstract_get(Attachment &context, Value receiver, ReturnSlot &out)
 {
     auto dictionary = TypeView(context, receiver).dictionary();
@@ -711,6 +740,8 @@ void install_attribute_descriptors(Attachment &context, std::span<const Handle> 
                   U"__class__", class_get, class_set);
     install_field(context, descriptor_type, string_type, roots.root(context.type_type()),
                   U"__dict__", type_dict_get, nullptr);
+    install_field(context, descriptor_type, string_type, roots.root(context.type_type()),
+                  U"__module__", type_module_get, type_module_set);
     install_field(context, descriptor_type, string_type, roots.root(context.type_type()),
                   U"__abstractmethods__", type_abstract_get, type_abstract_set);
     install_field(context, descriptor_type, string_type, roots.root(context.type_type()),

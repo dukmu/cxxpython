@@ -1,0 +1,18 @@
+typing <class 'typing.TypeAliasType'>
+True
+Alias True () __main__
+False False True
+__name__ AttributeError
+__value__ AttributeError
+__type_params__ AttributeError
+__module__ AttributeError
+weakref TypeError
+subclass TypeError
+params TypeError type_params must be a tuple
+params TypeError type_params must be a tuple
+params TypeError type_params must be a tuple
+subscript TypeError Only generic type aliases are subscriptable
+(<class 'int'>,) True (<class 'str'>,)
+True True
+symbol ('message',)
+None

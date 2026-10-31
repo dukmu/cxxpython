@@ -1,4 +1,5 @@
 #include "cxxpython/execution.hpp"
+#include "cxxpython/typealiasobject.hpp"
 #include "internal/exceptiongroup.hpp"
 #include "internal/patternmatching.hpp"
 
@@ -666,6 +667,107 @@ TEST_F(CoreExecution, ExceptionGroupOpcodesUseVerifiedHandlerStacksAndReraiseAri
     const auto listing = disassemble(context, program);
     EXPECT_NE(listing.find("CHECK_EG_MATCH"), listing.npos);
     EXPECT_NE(listing.find("PREP_RERAISE_STAR"), listing.npos);
+}
+
+TEST_F(CoreExecution, TypeAliasOpcodesVerifyOperandsAndStackEffects)
+{
+    struct Contract {
+        Opcode op;
+        const char *name;
+        OperandDomain domain;
+        std::size_t inputs;
+    };
+    for (const auto &contract :
+         {Contract{Opcode::MakeTypeAlias, "MAKE_TYPE_ALIAS", OperandDomain::None, 3},
+          Contract{Opcode::LoadFromDictOrGlobals, "LOAD_FROM_DICT_OR_GLOBALS", OperandDomain::Name,
+                   1},
+          Contract{Opcode::LoadFromDictOrDeref, "LOAD_FROM_DICT_OR_DEREF", OperandDomain::Cell,
+                   1}}) {
+        SCOPED_TRACE(contract.name);
+        const auto &definition = opcode_definition(contract.op);
+        EXPECT_EQ(definition.name, contract.name);
+        EXPECT_EQ(definition.operand, contract.domain);
+        EXPECT_TRUE(definition.may_raise);
+        EXPECT_TRUE(definition.safepoint);
+        const auto effect = instruction_effect({contract.op, 0});
+        EXPECT_EQ(effect.inputs, contract.inputs);
+        EXPECT_EQ(effect.pops, contract.inputs);
+        EXPECT_EQ(effect.pushes, 1U);
+        CodeSpec spec;
+        spec.freevars = {U"FreeVar"};
+        CodeBuilder underflow(context, spec);
+        const auto constant = underflow.constant(builtin(CoreObject::None));
+        underflow.name(U"ClassLocal");
+        for (std::size_t i = 1; i < contract.inputs; ++i)
+            underflow.emit(Opcode::LoadConst, constant);
+        underflow.emit(contract.op);
+        invalid(underflow, CodeErrorKind::StackUnderflow);
+        CodeBuilder bounds(context, spec);
+        bounds.emit(contract.op, contract.domain == OperandDomain::Cell ? 1 : 0);
+        invalid(bounds, contract.domain == OperandDomain::None   ? CodeErrorKind::StackUnderflow
+                        : contract.domain == OperandDomain::Name ? CodeErrorKind::NameBounds
+                                                                 : CodeErrorKind::CellBounds);
+        if (contract.domain == OperandDomain::None) {
+            CodeBuilder operand(context);
+            operand.emit(contract.op, 1);
+            invalid(operand, CodeErrorKind::Operand);
+        }
+        CodeBuilder valid(context, spec);
+        const auto value = valid.constant(builtin(CoreObject::None));
+        valid.name(U"ClassLocal");
+        for (std::size_t i = 0; i < contract.inputs; ++i)
+            valid.emit(Opcode::LoadConst, value);
+        valid.emit(contract.op);
+        valid.emit(Opcode::Return);
+        const auto program = code(valid);
+        EXPECT_NE(disassemble(context, program).find(contract.name), std::string::npos);
+        EXPECT_EQ(context.payload<CodeObject>(program).program.max_stack(), contract.inputs);
+    }
+}
+
+TEST_F(CoreExecution, TypeAliasHelperKeepsRootsAcrossAllocationFailures)
+{
+    const auto name = text(U"Alias");
+    const auto parameters = builtin(CoreObject::EmptyTuple);
+    const auto value = integer(42);
+    CodeBuilder builder(context);
+    builder.emit(Opcode::LoadConst, builder.constant(value));
+    builder.emit(Opcode::Return);
+    const auto compute = function(code(builder));
+    const auto value_name = text(U"__value__");
+    ReturnSlot out(context);
+    bool succeeded = false;
+    for (std::size_t quota = 0; quota < 256; ++quota) {
+        SCOPED_TRACE(quota);
+        out.reset();
+        context.set_allocation_limit(quota);
+        bool exhausted = false;
+        try {
+            detail::make_type_alias(context, name, parameters, compute, out);
+        } catch (const std::bad_alloc &) {
+            exhausted = true;
+        }
+        context.set_allocation_limit(std::numeric_limits<std::size_t>::max());
+        if (!exhausted && out.tag() == ResultTag::Ok) {
+            const auto alias = roots.root(out.value());
+            context.collect();
+            get_attribute(context, alias, value_name, out);
+            ASSERT_EQ(out.tag(), ResultTag::Ok);
+            EXPECT_EQ(out.value(), value.get(context));
+            succeeded = true;
+            break;
+        }
+        if (out.tag() == ResultTag::Raised) {
+            EXPECT_EQ(context.type_of(out.exception()),
+                      context.builtin(CoreObject::MemoryErrorType));
+        }
+        context.collect();
+        EXPECT_EQ(interpreter.gc_state().phase, GcPhase::Running);
+        call(context, compute, {}, out);
+        ASSERT_EQ(out.tag(), ResultTag::Ok);
+        EXPECT_EQ(out.value(), value.get(context));
+    }
+    EXPECT_TRUE(succeeded);
 }
 
 TEST_F(CoreExecution, MatchOpcodesVerifyOperandsAndStackEffects)

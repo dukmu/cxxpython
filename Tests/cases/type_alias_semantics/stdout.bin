@@ -1,0 +1,10 @@
+Forward () []
+NameError target 1
+NameError target 2
+42 42 ['evaluate', 'evaluate', 'evaluate']
+42
+True
+True
+after after
+__main__
+__main__

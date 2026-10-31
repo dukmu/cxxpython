@@ -106,6 +106,11 @@ constexpr std::array definitions{
     OpcodeDefinition{"COPY_DICT_WITHOUT_KEYS", 2, 2, 1, OperandDomain::None, FlowKind::Next, true,
                      true},
     OpcodeDefinition{"SETUP_ANNOTATIONS", 0, 0, 0, OperandDomain::Name, FlowKind::Next, true, true},
+    OpcodeDefinition{"MAKE_TYPE_ALIAS", 3, 3, 1, OperandDomain::None, FlowKind::Next, true, true},
+    OpcodeDefinition{"LOAD_FROM_DICT_OR_GLOBALS", 1, 1, 1, OperandDomain::Name, FlowKind::Next,
+                     true, true},
+    OpcodeDefinition{"LOAD_FROM_DICT_OR_DEREF", 1, 1, 1, OperandDomain::Cell, FlowKind::Next, true,
+                     true},
 };
 static_assert(definitions.size() == static_cast<std::size_t>(Opcode::Count));
 [[noreturn]] void invalid(CodeErrorKind kind, const char *message,

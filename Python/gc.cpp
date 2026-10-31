@@ -1809,7 +1809,7 @@ void Attachment::bootstrap_core()
                         ? std::optional<Value>{roots.root(registry.value()).get(*this)}
                         : std::optional<Value>{};
                 previous_types.push_back({roots.root(value), type.name, type.qualname,
-                                          type.bootstrap_module, type.dictionary, subclasses,
+                                          type.declared_module, type.dictionary, subclasses,
                                           type.state, type.immutable});
             }
         }
@@ -1871,7 +1871,7 @@ void Attachment::bootstrap_core()
             store(saved.type.get(*this), type.subclasses, saved.subclasses);
             type.name = std::move(saved.name);
             type.qualname = std::move(saved.qualname);
-            type.bootstrap_module = std::move(saved.module);
+            type.declared_module = std::move(saved.module);
             type.dictionary = saved.dictionary;
             type.state = saved.state;
             type.immutable = saved.immutable;

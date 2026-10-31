@@ -3,6 +3,7 @@
 #include "cxxpython/genobject.hpp"
 #include "cxxpython/import.hpp"
 #include "cxxpython/setobject.hpp"
+#include "cxxpython/typealiasobject.hpp"
 #include "internal/aiterobject.hpp"
 #include "internal/errors.hpp"
 #include "internal/exceptiongroup.hpp"
@@ -219,13 +220,30 @@ template <class T, CoreObject Kind> bool kind(Attachment &context, Value value)
     return is_subtype(context, context.type_of(value), context.builtin(Kind)) &&
            context.has_layout<T>(value);
 }
+void missing_name(Attachment &context, const std::u32string &name, ReturnSlot &out,
+                  std::optional<std::u32string> message = {})
+{
+    raise_error(context, CoreObject::NameErrorType,
+                message.value_or(U"name '" + name + U"' is not defined"), out);
+    if (out.tag() == ResultTag::Raised &&
+        context.type_of(out.exception()) == context.builtin(CoreObject::NameErrorType)) {
+        RootScope roots(context);
+        auto error = roots.root(out.exception());
+        ReturnSlot text(context);
+        make_str(context, name, text);
+        context.store(error.get(context), context.instance_slot(error.get(context), 0),
+                      text.value());
+    }
+}
 void unbound(Attachment &context, const std::u32string &name, ReturnSlot &out, bool free = false)
 {
-    raise_error(context, free ? CoreObject::NameErrorType : CoreObject::UnboundLocalErrorType,
-                free ? U"cannot access free variable '" + name +
-                           U"' where it is not associated with a value in enclosing scope"
-                     : U"local variable '" + name + U"' is not bound",
-                out);
+    if (free)
+        missing_name(context, name, out,
+                     U"cannot access free variable '" + name +
+                         U"' where it is not associated with a value in enclosing scope");
+    else
+        raise_error(context, CoreObject::UnboundLocalErrorType,
+                    U"local variable '" + name + U"' is not bound", out);
 }
 void with_method(Attachment &context, Handle manager, Protocol protocol, ReturnSlot &out)
 {
@@ -642,6 +660,54 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                     data.operands[data.sp++] = result.value();
                 break;
             }
+            case Opcode::LoadFromDictOrGlobals:
+            case Opcode::LoadFromDictOrDeref: {
+                RootScope roots(context);
+                auto mapping = roots.root(data.operands[data.sp - 1]);
+                Value key = context.builtin(CoreObject::None);
+                if (opcode == Opcode::LoadFromDictOrGlobals)
+                    key = context.payload<TupleObject>(code.names).items[operand];
+                else if (operand < code.program.cell_names().size())
+                    key = context.payload<TupleObject>(code.cellvars).items[operand];
+                else
+                    key = context.payload<TupleObject>(code.freevars)
+                              .items[operand - code.program.cell_names().size()];
+                auto name = roots.root(key);
+                namespace_lookup(context, mapping.get(context), key, result);
+                if (result.tag() == ResultTag::Empty) {
+                    if (opcode == Opcode::LoadFromDictOrDeref) {
+                        read_cell(context, data.cells[operand], result);
+                        if (result.tag() == ResultTag::Empty)
+                            unbound(context, context.payload<StrObject>(name).value, result,
+                                    operand >= code.program.cell_names().size());
+                    } else {
+                        const auto &function = context.payload<FunctionObject>(data.function);
+                        namespace_lookup(context, function.globals, key, result);
+                        if (result.tag() == ResultTag::Empty)
+                            namespace_lookup(context, function.builtins, key, result);
+                        if (result.tag() == ResultTag::Empty)
+                            missing_name(context, context.payload<StrObject>(name).value, result);
+                    }
+                }
+                if (raised(result))
+                    activation.raising(result.exception());
+                else
+                    data.operands[data.sp - 1] = result.value();
+                break;
+            }
+            case Opcode::MakeTypeAlias: {
+                RootScope roots(context);
+                detail::make_type_alias(context, roots.root(data.operands[data.sp - 3]),
+                                        roots.root(data.operands[data.sp - 2]),
+                                        roots.root(data.operands[data.sp - 1]), result);
+                if (raised(result))
+                    activation.raising(result.exception());
+                else {
+                    data.operands[data.sp - 3] = result.value();
+                    data.trim_stack(context, data.sp - 2);
+                }
+                break;
+            }
             case Opcode::StoreDeref:
                 write_cell(context, data.cells[operand], data.operands[data.sp - 1]);
                 data.operands[--data.sp] = context.builtin(CoreObject::None);
@@ -705,8 +771,7 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 namespace_lookup(context, function.builtins,
                                  roots.root(result.value()).get(context), result);
                 if (result.tag() == ResultTag::Empty)
-                    raise_error(context, CoreObject::NameErrorType, U"__build_class__ not found",
-                                result);
+                    missing_name(context, U"__build_class__", result, U"__build_class__ not found");
                 if (raised(result))
                     activation.raising(result.exception());
                 else
@@ -727,8 +792,7 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                         if (result.tag() == ResultTag::Empty)
                             namespace_lookup(context, function.builtins, key, result);
                         if (result.tag() == ResultTag::Empty)
-                            raise_error(context, CoreObject::NameErrorType,
-                                        U"name '" + name + U"' is not defined", result);
+                            missing_name(context, name, result);
                     }
                     if (!raised(result))
                         data.operands[data.sp++] = result.value();
@@ -741,8 +805,7 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                     else {
                         dict_erase(context, roots.root(mapping), roots.root(key), result);
                         if (result.tag() == ResultTag::Empty)
-                            raise_error(context, CoreObject::NameErrorType,
-                                        U"name '" + name + U"' is not defined", result);
+                            missing_name(context, name, result);
                     }
                 } else {
                     RootScope roots(context);
@@ -754,8 +817,7 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                         if (raised(result) &&
                             is_subtype(context, context.type_of(result.exception()),
                                        context.builtin(CoreObject::KeyErrorType)))
-                            raise_error(context, CoreObject::NameErrorType,
-                                        U"name '" + name + U"' is not defined", result);
+                            missing_name(context, name, result);
                     }
                 }
                 if (raised(result))
@@ -794,8 +856,7 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                     if (result.tag() == ResultTag::Empty)
                         namespace_lookup(context, function.builtins, key, result);
                     if (result.tag() == ResultTag::Empty)
-                        raise_error(context, CoreObject::NameErrorType,
-                                    U"name '" + name + U"' is not defined", result);
+                        missing_name(context, name, result);
                     if (raised(result))
                         activation.raising(result.exception());
                     else
@@ -812,8 +873,7 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                     RootScope roots(context);
                     dict_erase(context, roots.root(function.globals), roots.root(key), result);
                     if (result.tag() == ResultTag::Empty)
-                        raise_error(context, CoreObject::NameErrorType,
-                                    U"name '" + name + U"' is not defined", result);
+                        missing_name(context, name, result);
                     if (raised(result))
                         activation.raising(result.exception());
                 }

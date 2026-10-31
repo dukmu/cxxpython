@@ -204,6 +204,11 @@ struct FunctionStmt {
     std::size_t scope = 0;
     bool comprehension = false;
     bool coroutine = false;
+    bool type_alias = false;
+};
+struct TypeAliasStmt {
+    std::u32string name, binding;
+    std::unique_ptr<FunctionStmt> evaluator;
 };
 struct ClassStmt {
     std::u32string name, binding;
@@ -269,7 +274,8 @@ struct Stmt {
     Span span;
     std::variant<ExprStmt, AssignStmt, AugAssignStmt, DeleteStmt, IfStmt, WhileStmt, ForStmt,
                  FunctionStmt, ClassStmt, ReturnStmt, RaiseStmt, TryStmt, WithStmt, DeclareStmt,
-                 ImportStmt, AssertStmt, CollectionAddStmt, ControlStmt, MatchStmt, AnnAssignStmt>
+                 ImportStmt, AssertStmt, CollectionAddStmt, ControlStmt, MatchStmt, AnnAssignStmt,
+                 TypeAliasStmt>
         node;
 };
 // CFG instructions use native literals/names until one attached freeze task

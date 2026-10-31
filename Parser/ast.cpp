@@ -1347,6 +1347,28 @@ class Adapter {
             }
             break;
         }
+        case Rule::type_alias: {
+            if (find(n, Rule::type_params))
+                unsupported(n);
+            TypeAliasStmt alias;
+            bool first = true;
+            for (auto p : c)
+                if (p->rule == Rule::Token && token(*p).kind == TokenKind::NAME) {
+                    if (first)
+                        first = false;
+                    else {
+                        alias.name = identifier(*p);
+                        break;
+                    }
+                }
+            auto evaluator = std::make_unique<FunctionStmt>();
+            evaluator->name = alias.name;
+            evaluator->type_alias = true;
+            evaluator->body.push_back(stmt(n, ReturnStmt{expression(*find(n, Rule::expression))}));
+            alias.evaluator = std::move(evaluator);
+            result.push_back(stmt(n, std::move(alias)));
+            break;
+        }
         case Rule::return_stmt:
             result.push_back(stmt(n, ReturnStmt{r.empty() ? nullptr : expression(*r[0])}));
             break;

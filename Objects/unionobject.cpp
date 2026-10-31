@@ -6,6 +6,7 @@
 #include "cxxpython/protocol.hpp"
 #include "cxxpython/setobject.hpp"
 #include "cxxpython/type.hpp"
+#include "cxxpython/typealiasobject.hpp"
 
 #include <array>
 
@@ -594,7 +595,8 @@ void make_union(Attachment &ctx, Handle left, Handle right, ReturnSlot &out)
     auto unionable = [&](Handle item) {
         auto value = item.get(ctx);
         return value == ctx.builtin(CoreObject::None) || ctx.has_layout<TypeObject>(value) ||
-               is_alias(ctx, value) || is_union(ctx, value);
+               is_alias(ctx, value) || is_union(ctx, value) ||
+               ctx.type_of(value) == ctx.builtin(CoreObject::TypeAliasType);
     };
     if (!unionable(left) || !unionable(right)) {
         out.ok(ctx.builtin(CoreObject::NotImplemented));

@@ -60,15 +60,27 @@ class ScopePass final {
                 const auto entry = bindings_[scope].entries[i];
                 if (entry.global || (entry.bound && !entry.nonlocal))
                     continue;
+                const auto &current = program_.scopes[scope];
+                if (current.sees_class_namespace && entry.name != U"__classdict__") {
+                    auto *class_entry = bindings_[*current.parent].find(entry.name);
+                    if (class_entry &&
+                        (class_entry->global || (class_entry->bound && !class_entry->nonlocal))) {
+                        bindings_[scope].entries[i].classification =
+                            class_entry->global ? NameClass::GlobalExplicit
+                                                : NameClass::GlobalImplicit;
+                        continue;
+                    }
+                }
                 auto parent = program_.scopes[scope].parent;
                 std::optional<std::size_t> owner;
                 while (parent && program_.scopes[*parent].kind != ScopeKind::Module) {
                     if (program_.scopes[*parent].kind == ScopeKind::Class) {
-                        if (entry.name == U"__class__") {
+                        if (entry.name == U"__class__" ||
+                            (entry.name == U"__classdict__" && current.sees_class_namespace)) {
                             owner = parent;
                             auto &cells = program_.scopes[*parent].cellvars;
-                            if (cells.empty())
-                                cells.push_back(U"__class__");
+                            if (std::find(cells.begin(), cells.end(), entry.name) == cells.end())
+                                cells.push_back(entry.name);
                             break;
                         }
                         parent = program_.scopes[*parent].parent;
@@ -174,6 +186,8 @@ class ScopePass final {
                     if (node.name == U"super" && program_.scopes[scope].kind == ScopeKind::Function)
                         bindings_[scope].get(U"__class__", value.span).used = true;
                 } else if constexpr (std::is_same_v<T, YieldExpr>) {
+                    if (program_.scopes[scope].type_alias)
+                        error(value.span, "yield expression cannot be used within a type alias");
                     if (program_.scopes[scope].kind == ScopeKind::Annotation)
                         error(value.span, "yield expression cannot be used within an annotation");
                     if (program_.scopes[scope].kind != ScopeKind::Function)
@@ -186,6 +200,8 @@ class ScopePass final {
                     if (node.value)
                         expression(*node.value, scope);
                 } else if constexpr (std::is_same_v<T, AwaitExpr>) {
+                    if (program_.scopes[scope].type_alias)
+                        error(value.span, "await expression cannot be used within a type alias");
                     if (program_.scopes[scope].kind == ScopeKind::Annotation)
                         error(value.span, "await expression cannot be used within an annotation");
                     async_scope(scope, value.span, "'await' outside async function");
@@ -197,6 +213,8 @@ class ScopePass final {
                     expression(*node.body, scope);
                     expression(*node.alternative, scope);
                 } else if constexpr (std::is_same_v<T, NamedExpr>) {
+                    if (program_.scopes[scope].type_alias)
+                        error(value.span, "named expression cannot be used within a type alias");
                     if (program_.scopes[scope].kind == ScopeKind::Annotation)
                         error(value.span, "named expression cannot be used within an annotation");
                     if (comprehension_iterable_)
@@ -232,6 +250,9 @@ class ScopePass final {
                 } else if constexpr (std::is_same_v<T, LambdaExpr>)
                     function(*node.function, scope, value.span);
                 else if constexpr (std::is_same_v<T, ComprehensionExpr>) {
+                    if (program_.scopes[scope].sees_class_namespace)
+                        error(value.span,
+                              "Cannot use comprehension in annotation scope within class scope");
                     ++comprehension_iterable_;
                     expression(*node.iterable, scope);
                     --comprehension_iterable_;
@@ -337,6 +358,11 @@ class ScopePass final {
         for (auto &annotation : node.annotations)
             annotation.first = mangle(std::move(annotation.first), node.scope);
         program_.scopes[node.scope].coroutine = node.coroutine;
+        program_.scopes[node.scope].type_alias = node.type_alias;
+        if (node.type_alias && program_.scopes[scope].kind == ScopeKind::Class) {
+            program_.scopes[node.scope].sees_class_namespace = true;
+            bindings_[node.scope].get(U"__classdict__", span).used = true;
+        }
         comprehensions_[node.scope] = node.comprehension;
         if (node.comprehension)
             iteration_targets(node.body, node.scope);
@@ -524,6 +550,12 @@ class ScopePass final {
                                 expression(*item.guard, scope);
                             collect(item.body, scope);
                         }
+                    } else if constexpr (std::is_same_v<T, TypeAliasStmt>) {
+                        if (node.name == U"__debug__")
+                            error(statement->span, "cannot assign __debug__");
+                        node.binding = mangle(node.name, scope);
+                        bindings_[scope].get(node.binding, statement->span).bound = true;
+                        function(*node.evaluator, scope, statement->span);
                     } else if constexpr (std::is_same_v<T, AnnAssignStmt>) {
                         if (program_.scopes[scope].kind != ScopeKind::Function)
                             program_.scopes[scope].annotations = true;
