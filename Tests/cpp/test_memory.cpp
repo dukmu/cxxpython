@@ -335,20 +335,31 @@ TEST(FoundationMemory, CompoundRootAndPayloadValidationRetainsEveryBoundary)
     RootScope roots(context);
     auto node = make_node(context, roots);
     auto value = node.get(context);
+    ReturnSlot result(context);
+    result.ok(value);
     expect_logic_error([&] { context.payload<Node>(Handle{}); }, "foreign or expired root handle");
     expect_logic_error([&] { context.payload<AlignedLeaf>(node); },
                        "object has incompatible native layout");
     const auto count = context.stats().roots;
+    EXPECT_EQ(context.try_payload<Node>(value), &context.payload<Node>(node));
+    EXPECT_EQ(context.try_payload<AlignedLeaf>(value), nullptr);
+    EXPECT_EQ(result.tag(), ResultTag::Ok);
+    EXPECT_EQ(result.value(), value);
+    EXPECT_EQ(context.stats().roots, count);
     {
         NoSafepoint commit(context);
         expect_logic_error([&] { roots.root(value); },
                            "operation may stop or allocate during a protected native operation");
         EXPECT_NO_THROW(context.payload<Node>(node));
+        EXPECT_EQ(context.try_payload<Node>(value), &context.payload<Node>(node));
+        EXPECT_EQ(context.try_payload<AlignedLeaf>(value), nullptr);
     }
     EXPECT_EQ(context.stats().roots, count);
     {
         NativeWait wait(context);
         expect_logic_error([&] { context.payload<Node>(node); },
+                           "Python heap access requires an attached owning thread");
+        expect_logic_error([&] { context.try_payload<Node>(value); },
                            "Python heap access requires an attached owning thread");
         expect_logic_error([&] { roots.root(value); },
                            "Python heap access requires an attached owning thread");
@@ -609,6 +620,8 @@ TEST(FoundationMemory, InterpreterIsolationRejectsForeignRootsResultsAndEdges)
     const auto right_value = b.get(right);
     const auto right_roots = right.stats().roots;
     expect_logic_error([&] { right_scope.root(left_value); },
+                       "value does not belong to this interpreter");
+    expect_logic_error([&] { right.try_payload<Node>(left_value); },
                        "value does not belong to this interpreter");
     expect_logic_error([&] { a.get(right); }, "foreign or expired root handle");
     EXPECT_EQ(right.stats().roots, right_roots);

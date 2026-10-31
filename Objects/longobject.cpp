@@ -25,11 +25,18 @@ bool raised(ReturnSlot &out)
 {
     return out.tag() == ResultTag::Raised;
 }
+const IntObject *maybe_integer(Attachment &context, Value value)
+{
+    if (!is_subtype(context, context.type_of(value), context.builtin(CoreObject::IntType)))
+        return nullptr;
+    return context.try_payload<IntObject>(value);
+}
 const IntObject &integer(Attachment &context, Value value)
 {
-    if (!is_int(context, value))
+    const auto *data = maybe_integer(context, value);
+    if (!data)
         throw std::invalid_argument("expected an integer value");
-    return context.payload<IntObject>(value);
+    return *data;
 }
 Integer expanded(const IntObject &value)
 {
@@ -120,11 +127,12 @@ void integer_round(Attachment &context, Handle, std::span<const Value> args, Ret
 template <bool Count>
 void int_bits(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
-    if (!is_int(context, args[0])) {
+    const auto *data = maybe_integer(context, args[0]);
+    if (!data) {
         type_error(context, out);
         return;
     }
-    Integer value = expanded(integer(context, args[0]));
+    Integer value = expanded(*data);
     if (value < 0)
         value = -value;
     Integer result = 0;
@@ -141,16 +149,18 @@ void int_bits(Attachment &context, Handle, std::span<const Value> args, ReturnSl
 template <bool Reflected>
 void true_divide(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
-    if (!is_int(context, args[0])) {
+    const auto *self = maybe_integer(context, args[0]);
+    if (!self) {
         type_error(context, out);
         return;
     }
-    if (!is_int(context, args[1])) {
+    const auto *other = maybe_integer(context, args[1]);
+    if (!other) {
         out.ok(context.builtin(CoreObject::NotImplemented));
         return;
     }
-    Integer numerator = expanded(integer(context, args[Reflected ? 1 : 0]));
-    Integer denominator = expanded(integer(context, args[Reflected ? 0 : 1]));
+    Integer numerator = expanded(*(Reflected ? other : self));
+    Integer denominator = expanded(*(Reflected ? self : other));
     if (denominator == 0) {
         raise_error(context, CoreObject::ZeroDivisionErrorType, U"division by zero", out);
         return;
@@ -203,16 +213,18 @@ void true_divide(Attachment &context, Handle, std::span<const Value> args, Retur
 template <BinaryOp Op, bool Reflected>
 void arithmetic(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
-    if (!is_int(context, args[0])) {
+    const auto *self = maybe_integer(context, args[0]);
+    if (!self) {
         type_error(context, out);
         return;
     }
-    if (!is_int(context, args[1])) {
+    const auto *other = maybe_integer(context, args[1]);
+    if (!other) {
         out.ok(context.builtin(CoreObject::NotImplemented));
         return;
     }
-    auto &a = integer(context, args[Reflected ? 1 : 0]);
-    auto &b = integer(context, args[Reflected ? 0 : 1]);
+    const auto &a = *(Reflected ? other : self);
+    const auto &b = *(Reflected ? self : other);
     if constexpr (Op == BinaryOp::FloorDivide || Op == BinaryOp::Modulo)
         if (!b.large && b.small == 0) {
             raise_error(context, CoreObject::ZeroDivisionErrorType,
@@ -275,16 +287,18 @@ void arithmetic(Attachment &context, Handle, std::span<const Value> args, Return
 template <BinaryOp Op, bool Reflected>
 void integer_extended(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
-    if (!is_int(context, args[0])) {
+    const auto *self = maybe_integer(context, args[0]);
+    if (!self) {
         type_error(context, out);
         return;
     }
-    if (!is_int(context, args[1])) {
+    const auto *other = maybe_integer(context, args[1]);
+    if (!other) {
         out.ok(context.builtin(CoreObject::NotImplemented));
         return;
     }
-    Integer a = expanded(integer(context, args[Reflected ? 1 : 0]));
-    Integer b = expanded(integer(context, args[Reflected ? 0 : 1]));
+    Integer a = expanded(*(Reflected ? other : self));
+    Integer b = expanded(*(Reflected ? self : other));
     Integer result;
     if constexpr (Op == BinaryOp::BitAnd)
         result = a & b;
@@ -376,17 +390,20 @@ void integer_power(Attachment &context, Handle function, std::span<const Value> 
         integer_extended<BinaryOp::Power, Reflected>(context, function, args.first(2), out);
         return;
     }
-    if (!is_int(context, args[0])) {
+    const auto *self = maybe_integer(context, args[0]);
+    if (!self) {
         type_error(context, out);
         return;
     }
-    if (!is_int(context, args[1]) || !is_int(context, args[2])) {
+    const auto *other = maybe_integer(context, args[1]);
+    const auto *mod = other ? maybe_integer(context, args[2]) : nullptr;
+    if (!other || !mod) {
         out.ok(context.builtin(CoreObject::NotImplemented));
         return;
     }
-    Integer base = expanded(integer(context, args[Reflected ? 1 : 0]));
-    Integer exponent = expanded(integer(context, args[Reflected ? 0 : 1]));
-    Integer modulus = expanded(integer(context, args[2]));
+    Integer base = expanded(*(Reflected ? other : self));
+    Integer exponent = expanded(*(Reflected ? self : other));
+    Integer modulus = expanded(*mod);
     if (modulus == 0) {
         raise_error(context, CoreObject::ValueErrorType, U"pow() 3rd argument cannot be 0", out);
         return;
@@ -436,16 +453,18 @@ void integer_power(Attachment &context, Handle function, std::span<const Value> 
 template <CompareOp Op>
 void compare(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
-    if (!is_int(context, args[0])) {
+    const auto *self = maybe_integer(context, args[0]);
+    if (!self) {
         type_error(context, out);
         return;
     }
-    if (!is_int(context, args[1])) {
+    const auto *other = maybe_integer(context, args[1]);
+    if (!other) {
         out.ok(context.builtin(CoreObject::NotImplemented));
         return;
     }
-    const auto &a = integer(context, args[0]);
-    const auto &b = integer(context, args[1]);
+    const auto &a = *self;
+    const auto &b = *other;
     int order;
     if (!a.large && !b.large)
         order = (a.small > b.small) - (a.small < b.small);
@@ -469,11 +488,12 @@ void compare(Attachment &context, Handle, std::span<const Value> args, ReturnSlo
 }
 void int_bool(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
-    if (!is_int(context, args[0])) {
+    const auto *data = maybe_integer(context, args[0]);
+    if (!data) {
         type_error(context, out);
         return;
     }
-    boolean(context, int_sign(context, args[0]) != 0, out);
+    boolean(context, data->large ? data->large->value != 0 : data->small != 0, out);
 }
 void int_identity(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
@@ -970,11 +990,12 @@ void int_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlo
 template <UnaryOp Op>
 void int_unary(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
-    if (!is_int(context, args[0])) {
+    const auto *data = maybe_integer(context, args[0]);
+    if (!data) {
         type_error(context, out);
         return;
     }
-    auto value = expanded(integer(context, args[0]));
+    auto value = expanded(*data);
     if constexpr (Op == UnaryOp::Negative)
         value = -value;
     if constexpr (Op == UnaryOp::Invert)
@@ -983,11 +1004,12 @@ void int_unary(Attachment &context, Handle, std::span<const Value> args, ReturnS
 }
 void int_absolute(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
-    if (!is_int(context, args[0])) {
+    const auto *data = maybe_integer(context, args[0]);
+    if (!data) {
         type_error(context, out);
         return;
     }
-    auto value = expanded(integer(context, args[0]));
+    auto value = expanded(*data);
     if (value < 0)
         value = -value;
     publish(context, std::move(value), out);
@@ -1054,8 +1076,7 @@ std::size_t IntObject::external_bytes() const noexcept
 }
 bool is_int(Attachment &context, Value value)
 {
-    return is_subtype(context, context.type_of(value), context.builtin(CoreObject::IntType)) &&
-           context.has_layout<IntObject>(value);
+    return maybe_integer(context, value) != nullptr;
 }
 bool int_fits_signed(Attachment &context, Value value, std::int64_t &result)
 {

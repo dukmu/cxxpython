@@ -593,6 +593,13 @@ class Attachment final {
     {
         return has_native_layout(object, &detail::native_layout_id<T>);
     }
+    // Conditional native access, not a Python subtype test or a new root.
+    template <class T> T *try_payload(Value object)
+    {
+        return has_native_layout(object, &detail::native_layout_id<T>)
+                   ? reinterpret_cast<T *>(object.object())
+                   : nullptr;
+    }
 
     AtomicGcEdge *instance_dictionary(Value object);
     AtomicGcEdge &instance_slot(Value object, std::size_t index);

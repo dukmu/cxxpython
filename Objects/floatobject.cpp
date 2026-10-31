@@ -91,13 +91,21 @@ void type_error(Attachment &context, std::u32string message, ReturnSlot &out)
     raise_error(context, CoreObject::TypeErrorType, std::move(message), out);
 }
 
+const FloatObject *maybe_float(Attachment &context, Value value)
+{
+    const auto *data = context.try_payload<FloatObject>(value);
+    if (!data ||
+        !is_subtype(context, context.type_of(value), context.builtin(CoreObject::FloatType)))
+        return nullptr;
+    return data;
+}
+
 const FloatObject *require_float(Attachment &context, Value value, ReturnSlot &out)
 {
-    if (!is_float(context, value)) {
+    const auto *data = maybe_float(context, value);
+    if (!data)
         type_error(context, U"float descriptor requires a float", out);
-        return nullptr;
-    }
-    return &context.payload<FloatObject>(value);
+    return data;
 }
 
 bool integer_to_double(Attachment &context, Value value, double &number, ReturnSlot &out)
@@ -218,11 +226,12 @@ void float_new(Attachment &context, Handle, std::span<const Value> args, ReturnS
                 return;
             }
             if (method) {
-                if (!is_float(context, converted.value())) {
+                const auto *data = maybe_float(context, converted.value());
+                if (!data) {
                     type_error(context, U"__float__ returned a non-float", out);
                     return;
                 }
-                number = context.payload<FloatObject>(converted.value()).value;
+                number = data->value;
             } else if (!integer_to_double(context, converted.value(), number, out))
                 return;
         }
@@ -276,8 +285,8 @@ void float_absolute(Attachment &context, Handle, std::span<const Value> args, Re
 
 bool operand_double(Attachment &context, Value value, double &number, ReturnSlot &out)
 {
-    if (is_float(context, value)) {
-        number = context.payload<FloatObject>(value).value;
+    if (const auto *data = maybe_float(context, value)) {
+        number = data->value;
         return true;
     }
     if (is_int(context, value))
@@ -613,8 +622,8 @@ void float_compare(Attachment &context, Handle, std::span<const Value> args, Ret
     const double number = left->value;
     bool unordered = std::isnan(number);
     int order = 0;
-    if (is_float(context, args[1])) {
-        const double right = context.payload<FloatObject>(args[1]).value;
+    if (const auto *data = maybe_float(context, args[1])) {
+        const double right = data->value;
         unordered |= std::isnan(right);
         order = (number > right) - (number < right);
     } else if (is_int(context, args[1])) {
@@ -650,8 +659,7 @@ void float_compare(Attachment &context, Handle, std::span<const Value> args, Ret
 
 bool is_float(Attachment &context, Value value)
 {
-    return context.has_layout<FloatObject>(value) &&
-           is_subtype(context, context.type_of(value), context.builtin(CoreObject::FloatType));
+    return maybe_float(context, value) != nullptr;
 }
 
 void make_float(Attachment &context, double value, ReturnSlot &out)

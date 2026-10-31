@@ -667,6 +667,15 @@ each cell's existing link for scope membership/free storage. Explicit non-LIFO
 release unlinks before reuse. Handle validates interpreter, arena and generation.
 No root operation may be used from another attachment/thread or during NativeWait.
 
+Attachment::try_payload<T>(Value) performs the same attachment, allocation-domain,
+live-publication and native-family checks as has_layout. It returns nullptr only
+for a different native family; invalid access still throws the existing native
+contract error. The returned pointer is borrowed, like payload's reference: it
+does not root or pin the allocation, and the caller retains precise owner roots
+through any safepoint or callback. Native-family agreement does not replace a
+Python subtype/protocol check. This is a C++ embedding helper, not a change to
+the versioned C extension ABI or an unchecked access mode.
+
 ReturnSlot is a noncopyable caller-owned stable root. Empty, Ok and Raised are
 distinct; callees publish before dropping their roots. Immediate accessors read
 the current cell after owner/tag checks. Saved ResultViews retain revision and

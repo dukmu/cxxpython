@@ -1,5 +1,66 @@
 # Development Status
 
+## 2026-11-01 Checked Numeric Payload Reuse
+
+Continues the active performance/cleanup goal after pushed 76fb0c6. That goal
+turn delivered cold access errors and measured CPU/I/O gains. Parent implemented
+the checked query, float path and acceptance; Terra refactored integer access and
+extended native query tests in disjoint files. Both workers are closed. The full
+compatibility route remains paused.
+
+- Documented and added Attachment::try_payload<T>(Value), a checked conditional
+  native projection using the existing domain/live/family checks. Only a native
+  family mismatch returns nullptr; foreign heaps, inactive threads and unpublished
+  allocations still raise their native contract errors. It returns a borrowed
+  pointer, not a root/pin or Python subtype result. No new class, module, cache,
+  unchecked mode, allocation representation, lock, RC or collector policy.
+- Int arithmetic/division/extended operators/power/comparison and simple unary
+  operations reuse one checked operand result instead of repeating is_int,
+  strict integer access and payload checks. Float receiver/operand/comparison
+  and conversion paths similarly reuse a checked pointer. Semantic subtype
+  checks, invalid-self errors, NotImplemented ordering, bool/subclass rules,
+  overflow promotion, precision and callback/root boundaries remain intact.
+  No exact-number/sample shortcut or copy_int identity reordering was introduced.
+- Native tests cover query address identity, mismatch without root/result
+  mutation, NoSafepoint reads, NativeWait/foreign rejection and unpublished
+  constructor access. Fake int/float native layouts remain physically readable
+  but cannot acquire Python numeric semantics; float arithmetic and equality
+  lock down that distinction. All 212 selected native contracts and 22 direct
+  Python numeric/protocol/callback/thread scenarios pass Release, ASan/UBSan/LSan
+  and TSan. Release also passes all 16 bootstrap/promotion fault shards. Final
+  Release reruns the unpublished-construction probe after its test object relink.
+- The complete constructor differential passes on Release. Its original fixed
+  60s outer timeout interrupted both sanitizer runs; those failed logs remain
+  retained. The first isolated method passed, and the complete unchanged corpus
+  then passes sequentially in 103.22s on ASan and 122.59s on TSan after raising
+  only its CTest outer budget to 180s. Every child still has the existing 15s
+  limit; no cases, reference checks or sanitizer checks were dropped. Strict
+  Clang 21.1.8, formatting and diff checks pass. Evidence is .cache/numeric-payload-*.
+- With validation/builds/agents stopped, matrix N=64 at one/four workers, three
+  independent processes, one warmup and three values/process gives medians
+  703.398/277.494 ms versus retained 725.793/290.408. Standard pyperf compare_to
+  finds about 1.04x single-worker improvement and no significant four-worker
+  difference. Four-worker scaling is 2.535x with CPU/wall 3.368. This comparison
+  reuses the prior unified baseline; it is not a newly interleaved matrix A/B.
+- Established the existing fannkuch case's full integer-compute baseline (four
+  independent n=7 jobs, not upstream defaults) using the prechange 76fb0c6 image,
+  new image and fixed CPython 3.12.14. Same warmups/process/value/worker settings,
+  alternating runtime order and calibrated fixed-work loops. Medians before/
+  after are 545.223/209.758 and 524.151/204.359 ms; CPython is 14.062/14.917.
+  Standard pyperf finds about 1.03x single-worker improvement and no significant
+  four-worker change. New scaling is 2.565x with CPU/wall 3.311. The existing
+  short-reference-thread CPU-accounting warning stays visible. These are modest
+  gains, not absolute CPython acceptance or a reason to repeat unrelated baselines.
+- Raw runs and generated reports/CSV/pyperf suites are in .cache/benchmarks/
+  numeric-payload-matrix, numeric-payload-matrix-comparison and
+  numeric-payload-fannkuch; standard comparisons are numeric-payload-*-pyperf.log.
+  Auto-GC remains enabled and all checks pass. matrix.py is unmodified/untracked.
+  Kept the immediate prechange executable as cxxpython-76fb0c6 and removed the
+  consumed older cxxpython-4f4f109 image, retaining its raw evidence. No generated
+  table was hand-maintained or committed. The active goal remains incomplete;
+  the next work should address larger native protocol dispatch costs rather
+  than continue polishing this checked-query helper.
+
 ## 2026-11-01 Cold Heap-Access Errors And File I/O Baseline
 
 Continues the active performance/cleanup goal after pushed 4f4f109. That node

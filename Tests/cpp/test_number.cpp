@@ -270,11 +270,31 @@ TEST_F(CoreNumbers, NativeLayoutAloneDoesNotConferIntegerSemantics)
     auto type = roots.root(out.result().value());
     context.allocate_instance<IntObject>(type, out, std::int64_t{4});
     auto fake = roots.root(out.result().value());
+    EXPECT_NE(context.try_payload<IntObject>(fake.get(context)), nullptr);
     EXPECT_FALSE(is_int(context, fake.get(context)));
     index(context, fake, out);
     ASSERT_EQ(out.result().tag(), ResultTag::Raised);
     EXPECT_EQ(context.type_of(out.result().exception()),
               context.builtin(CoreObject::TypeErrorType));
+}
+
+TEST_F(CoreNumbers, NativeLayoutAloneDoesNotConferFloatSemantics)
+{
+    ReturnSlot out(context);
+    create_native_type(context, {{"FakeFloat"}, LayoutDescriptor::of<FloatObject>()}, out);
+    const auto type = roots.root(out.value());
+    context.allocate_instance<FloatObject>(type, out, 4.0);
+    const auto fake = roots.root(out.value());
+    EXPECT_NE(context.try_payload<FloatObject>(fake.get(context)), nullptr);
+    EXPECT_FALSE(is_float(context, fake.get(context)));
+    make_float(context, 4.0, out);
+    const auto real = roots.root(out.value());
+    binary(context, real, fake, BinaryOp::Add, out);
+    ASSERT_EQ(out.tag(), ResultTag::Raised);
+    EXPECT_EQ(context.type_of(out.exception()), context.builtin(CoreObject::TypeErrorType));
+    rich_compare(context, real, fake, CompareOp::Eq, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(out.value(), context.builtin(CoreObject::False));
 }
 
 TEST_F(CoreNumbers, IntConversionHonorsSubclassIntOverrideButIndexDoesNot)

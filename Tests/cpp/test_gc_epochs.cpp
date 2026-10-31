@@ -27,6 +27,7 @@ struct CollectingConstructor {
     ObjectHeader header;
     CollectingConstructor(InitialType head, Attachment &context) : header(head)
     {
+        EXPECT_THROW(context.try_payload<CollectingConstructor>(Value(header)), std::logic_error);
         context.collect();
     }
     void trace(Tracer &) const noexcept {}

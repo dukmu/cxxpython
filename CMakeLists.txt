@@ -371,7 +371,9 @@ if(BUILD_TESTING)
     add_test(NAME Constructors.Differential COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_constructors.py
         --binary $<TARGET_FILE:cxxpython> --reference ${CXXPYTHON_REFERENCE_PYTHON})
-    set_tests_properties(Constructors.Differential PROPERTIES TIMEOUT 60)
+    # Each expression starts a fresh interpreter; keep the per-child 15s limit
+    # while allowing instrumented builds to finish the complete corpus.
+    set_tests_properties(Constructors.Differential PROPERTIES TIMEOUT 180)
     add_test(NAME Unittest.Cli COMMAND ${Python3_EXECUTABLE}
         ${CMAKE_CURRENT_SOURCE_DIR}/Tests/python/test_unittest_cli.py
         --binary $<TARGET_FILE:cxxpython> --reference ${CXXPYTHON_REFERENCE_PYTHON}

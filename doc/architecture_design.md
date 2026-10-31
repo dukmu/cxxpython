@@ -283,6 +283,10 @@ Handle access also checks arena, scope, generation and nonempty state before
 reading the object. NativeWait still prohibits heap access and NoSafepoint still
 prohibits growing roots. This does not add unchecked payload access or a TLS
 attachment cache.
+Checked nullable payload projection lets int/float operations reuse a native
+layout check instead of checking again when reading the payload. It returns a
+borrowed pointer, not a root; Python subtype admission remains separate, including
+for unrelated native types with the same physical prefix.
 Weak targets and intrusive callback/finalizer batches are classified during STW;
 Python runs only after attachments resume. Pending and running batches retain
 their complete strong graphs, and a second mark checks resurrection. Weak death
