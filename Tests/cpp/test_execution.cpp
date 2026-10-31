@@ -1,5 +1,6 @@
 #include "cxxpython/execution.hpp"
 #include "internal/exceptiongroup.hpp"
+#include "internal/patternmatching.hpp"
 
 #include <gtest/gtest.h>
 
@@ -570,6 +571,116 @@ TEST_F(CoreExecution, ExceptionGroupOpcodesUseVerifiedHandlerStacksAndReraiseAri
     const auto listing = disassemble(context, program);
     EXPECT_NE(listing.find("CHECK_EG_MATCH"), listing.npos);
     EXPECT_NE(listing.find("PREP_RERAISE_STAR"), listing.npos);
+}
+
+TEST_F(CoreExecution, MatchOpcodesVerifyOperandsAndStackEffects)
+{
+    struct Contract {
+        Opcode op;
+        const char *name;
+        std::size_t inputs, pops, pushes;
+        bool may_raise;
+    };
+    for (const auto &contract :
+         {Contract{Opcode::MatchSequence, "MATCH_SEQUENCE", 1, 0, 1, false},
+          Contract{Opcode::MatchMapping, "MATCH_MAPPING", 1, 0, 1, false},
+          Contract{Opcode::GetLen, "GET_LEN", 1, 0, 1, true},
+          Contract{Opcode::MatchKeys, "MATCH_KEYS", 2, 0, 1, true},
+          Contract{Opcode::MatchClass, "MATCH_CLASS", 3, 3, 1, true},
+          Contract{Opcode::CopyDictWithoutKeys, "COPY_DICT_WITHOUT_KEYS", 2, 2, 1, true}}) {
+        const auto &definition = opcode_definition(contract.op);
+        EXPECT_EQ(definition.name, contract.name);
+        EXPECT_EQ(definition.may_raise, contract.may_raise);
+        EXPECT_EQ(definition.safepoint, contract.may_raise);
+        const auto effect = instruction_effect({contract.op, 0});
+        EXPECT_EQ(effect.inputs, contract.inputs);
+        EXPECT_EQ(effect.pops, contract.pops);
+        EXPECT_EQ(effect.pushes, contract.pushes);
+        CodeBuilder underflow(context);
+        const auto value = underflow.constant(builtin(CoreObject::None));
+        for (std::size_t i = 1; i < contract.inputs; ++i)
+            underflow.emit(Opcode::LoadConst, value);
+        underflow.emit(contract.op);
+        invalid(underflow, CodeErrorKind::StackUnderflow);
+        if (contract.op != Opcode::MatchClass) {
+            CodeBuilder bad_operand(context);
+            bad_operand.emit(contract.op, 1);
+            invalid(bad_operand, CodeErrorKind::Operand);
+        }
+        CodeBuilder valid(context);
+        const auto constant = valid.constant(builtin(CoreObject::None));
+        for (std::size_t i = 0; i < contract.inputs; ++i)
+            valid.emit(Opcode::LoadConst, constant);
+        valid.emit(contract.op, contract.op == Opcode::MatchClass ? 2 : 0);
+        for (std::size_t i = 1; i < contract.inputs - contract.pops + contract.pushes; ++i)
+            valid.emit(Opcode::PopTop);
+        valid.emit(Opcode::Return);
+        const auto program = code(valid);
+        EXPECT_NE(disassemble(context, program).find(contract.name), std::string::npos);
+    }
+    for (auto count : {0U, 1U, 42U}) {
+        const auto effect = instruction_effect({Opcode::MatchClass, count});
+        EXPECT_EQ(effect.inputs, 3U);
+        EXPECT_EQ(effect.pops, 3U);
+        EXPECT_EQ(effect.pushes, 1U);
+    }
+}
+
+TEST_F(CoreExecution, PatternHelpersKeepRootsAcrossEveryAllocationFailure)
+{
+    auto subject = dictionary();
+    auto key = text(U"value");
+    auto value = integer(42);
+    ReturnSlot out(context);
+    dict_store(context, subject, key, value, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    const Value names[] = {key.get(context)};
+    cxxpython::core::make_tuple(context, names, out);
+    auto keys = roots.root(out.value());
+    auto keywords = builtin(CoreObject::EmptyTuple);
+    for (int operation = 0; operation < 3; ++operation) {
+        SCOPED_TRACE(operation);
+        bool succeeded = false;
+        for (std::size_t quota = 0; quota < 256; ++quota) {
+            SCOPED_TRACE(quota);
+            out.reset();
+            context.set_allocation_limit(quota);
+            bool exhausted = false;
+            try {
+                if (operation == 0)
+                    detail::match_keys(context, subject, keys, out);
+                else if (operation == 1)
+                    detail::match_mapping_rest(context, subject, keys, out);
+                else
+                    detail::match_class(context, value, builtin(CoreObject::IntType), keywords, 1,
+                                        out);
+            } catch (const std::bad_alloc &) {
+                exhausted = true;
+            }
+            context.set_allocation_limit(std::numeric_limits<std::size_t>::max());
+            context.collect();
+            if (!exhausted && out.tag() == ResultTag::Ok) {
+                succeeded = true;
+                if (operation == 1) {
+                    EXPECT_TRUE(DictView(context, out.value()).entries().empty());
+                } else {
+                    const auto &values = context.payload<TupleObject>(out.value()).items;
+                    ASSERT_EQ(values.size(), 1U);
+                    EXPECT_EQ(values[0], value.get(context));
+                }
+                break;
+            }
+            if (out.tag() == ResultTag::Raised) {
+                EXPECT_EQ(context.type_of(out.exception()),
+                          context.builtin(CoreObject::MemoryErrorType));
+            }
+            EXPECT_EQ(interpreter.gc_state().phase, GcPhase::Running);
+            dict_lookup(context, subject, key, out);
+            ASSERT_EQ(out.tag(), ResultTag::Ok);
+            EXPECT_EQ(out.value(), value.get(context));
+        }
+        EXPECT_TRUE(succeeded);
+    }
 }
 
 TEST_F(CoreExecution, GroupSplitAndProjectionKeepRootsAcrossEveryAllocationFailure)

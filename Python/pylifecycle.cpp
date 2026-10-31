@@ -82,6 +82,14 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
         create_native_type(context, NativeTypeSpec{spec, layout},
                            *outputs[static_cast<std::size_t>(id)]);
         core.push_back(roots.root(outputs[static_cast<std::size_t>(id)]->result().value()));
+        auto collection = CollectionKind::None;
+        if (id == CoreObject::TupleType || id == CoreObject::ListType ||
+            id == CoreObject::RangeType || id == CoreObject::MemoryViewType)
+            collection = CollectionKind::Sequence;
+        if (id == CoreObject::DictType || id == CoreObject::MappingProxyType)
+            collection = CollectionKind::Mapping;
+        context.payload<TypeObject>(core.back())
+            .collection.store(collection, std::memory_order_relaxed);
     };
     define(CoreObject::PropertyType, "property", LayoutDescriptor::of<PropertyObject>());
     define(CoreObject::NoneType, "NoneType", LayoutDescriptor::of<NoneObject>());

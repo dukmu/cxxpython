@@ -6,6 +6,7 @@
 #include "internal/aiterobject.hpp"
 #include "internal/errors.hpp"
 #include "internal/exceptiongroup.hpp"
+#include "internal/patternmatching.hpp"
 #include "internal/setobject.hpp"
 #include "internal/sysmodule.hpp"
 
@@ -1524,6 +1525,61 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 data.operands[data.sp - 2] = result.value();
                 data.operands[--data.sp] = context.builtin(CoreObject::None);
                 break;
+            case Opcode::MatchSequence:
+            case Opcode::MatchMapping: {
+                const auto type = context.type_of(data.operands[data.sp - 1]);
+                const auto kind =
+                    context.payload<TypeObject>(type).collection.load(std::memory_order_acquire);
+                const auto expected = opcode == Opcode::MatchSequence ? CollectionKind::Sequence
+                                                                      : CollectionKind::Mapping;
+                data.operands[data.sp++] =
+                    context.builtin(kind == expected ? CoreObject::True : CoreObject::False);
+                break;
+            }
+            case Opcode::GetLen: {
+                RootScope roots(context);
+                length(context, roots.root(data.operands[data.sp - 1]), result);
+                if (raised(result))
+                    activation.raising(result.exception());
+                else
+                    data.operands[data.sp++] = result.value();
+                break;
+            }
+            case Opcode::MatchKeys: {
+                RootScope roots(context);
+                detail::match_keys(context, roots.root(data.operands[data.sp - 2]),
+                                   roots.root(data.operands[data.sp - 1]), result);
+                if (raised(result))
+                    activation.raising(result.exception());
+                else
+                    data.operands[data.sp++] = result.value();
+                break;
+            }
+            case Opcode::MatchClass: {
+                RootScope roots(context);
+                detail::match_class(context, roots.root(data.operands[data.sp - 3]),
+                                    roots.root(data.operands[data.sp - 2]),
+                                    roots.root(data.operands[data.sp - 1]), operand, result);
+                if (raised(result))
+                    activation.raising(result.exception());
+                else {
+                    data.operands[data.sp - 3] = result.value();
+                    data.trim_stack(context, data.sp - 2);
+                }
+                break;
+            }
+            case Opcode::CopyDictWithoutKeys: {
+                RootScope roots(context);
+                detail::match_mapping_rest(context, roots.root(data.operands[data.sp - 2]),
+                                           roots.root(data.operands[data.sp - 1]), result);
+                if (raised(result))
+                    activation.raising(result.exception());
+                else {
+                    data.operands[data.sp - 2] = result.value();
+                    data.operands[--data.sp] = context.builtin(CoreObject::None);
+                }
+                break;
+            }
             case Opcode::GetAwaitable: {
                 RootScope roots(context);
                 detail::get_awaitable(context, roots.root(data.operands[data.sp - 1]), result);

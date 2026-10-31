@@ -109,6 +109,7 @@ add_library(cxxpython_core
     Objects/enumobject.cpp
     Objects/aiterobject.cpp
     Objects/exceptiongroup.cpp
+    Objects/patternmatching.cpp
     Objects/abstract.cpp
     Objects/representation.cpp
     Objects/reduction.cpp

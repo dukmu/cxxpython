@@ -371,6 +371,106 @@ class ScopePass final {
                 iteration_targets(filter->body, scope);
         }
     }
+    struct PatternInfo {
+        std::vector<std::u32string> names;
+        bool irrefutable = false;
+    };
+    PatternInfo pattern(Pattern &value, std::size_t scope, bool allow_star = false)
+    {
+        PatternInfo info;
+        auto bind = [&](PatternCapture &capture) {
+            if (!capture.binding)
+                return;
+            target(*capture.binding, scope);
+            const auto &name = capture.name;
+            if (std::find(info.names.begin(), info.names.end(), name) != info.names.end())
+                error(capture.binding->span, "multiple assignments to name in pattern");
+            info.names.push_back(name);
+        };
+        auto merge = [&](Pattern &child, bool star = false) {
+            auto nested = pattern(child, scope, star);
+            for (const auto &name : nested.names) {
+                if (std::find(info.names.begin(), info.names.end(), name) != info.names.end())
+                    error(child.span, "multiple assignments to name in pattern");
+                info.names.push_back(name);
+            }
+            return nested.irrefutable;
+        };
+        std::visit(
+            [&](auto &node) {
+                using T = std::decay_t<decltype(node)>;
+                if constexpr (std::is_same_v<T, ValuePattern>) {
+                    if (!std::holds_alternative<Literal>(node.value->node) &&
+                        !std::holds_alternative<AttributeExpr>(node.value->node) &&
+                        !std::holds_alternative<UnaryExpr>(node.value->node) &&
+                        !std::holds_alternative<BinaryExpr>(node.value->node))
+                        error(value.span, "patterns may only match literals and attribute lookups");
+                    expression(*node.value, scope);
+                } else if constexpr (std::is_same_v<T, CapturePattern>) {
+                    bind(node.target);
+                    info.irrefutable = true;
+                } else if constexpr (std::is_same_v<T, StarPattern>) {
+                    if (!allow_star)
+                        error(value.span, "star pattern must be in a sequence pattern");
+                    bind(node.target);
+                } else if constexpr (std::is_same_v<T, AsPattern>) {
+                    info.irrefutable = merge(*node.pattern);
+                    bind(node.target);
+                } else if constexpr (std::is_same_v<T, SequencePattern>) {
+                    bool starred = false;
+                    for (auto &item : node.items) {
+                        if (std::holds_alternative<StarPattern>(item->node)) {
+                            if (starred)
+                                error(item->span, "multiple starred names in sequence pattern");
+                            starred = true;
+                        }
+                        merge(*item, true);
+                    }
+                } else if constexpr (std::is_same_v<T, MappingPattern>) {
+                    for (auto &[key, child] : node.items) {
+                        if (!std::holds_alternative<Literal>(key->node) &&
+                            !std::holds_alternative<AttributeExpr>(key->node) &&
+                            !std::holds_alternative<UnaryExpr>(key->node) &&
+                            !std::holds_alternative<BinaryExpr>(key->node))
+                            error(key->span, "mapping pattern keys may only match literals and "
+                                             "attribute lookups");
+                        expression(*key, scope);
+                        merge(*child);
+                    }
+                    bind(node.rest);
+                } else if constexpr (std::is_same_v<T, ClassPattern>) {
+                    expression(*node.type, scope);
+                    for (auto &child : node.positional)
+                        merge(*child);
+                    std::vector<std::u32string> attributes;
+                    for (auto &[name, child] : node.keywords) {
+                        if (std::find(attributes.begin(), attributes.end(), name) !=
+                            attributes.end())
+                            error(child->span, "attribute name repeated in class pattern");
+                        attributes.push_back(name);
+                        merge(*child);
+                    }
+                } else if constexpr (std::is_same_v<T, OrPattern>) {
+                    std::vector<std::u32string> expected;
+                    for (std::size_t i = 0; i < node.items.size(); ++i) {
+                        auto alternative = pattern(*node.items[i], scope);
+                        if (alternative.irrefutable && i + 1 < node.items.size())
+                            error(node.items[i]->span,
+                                  "irrefutable pattern makes remaining patterns unreachable");
+                        auto names = alternative.names;
+                        std::sort(names.begin(), names.end());
+                        if (!i) {
+                            expected = names;
+                            info.names = std::move(alternative.names);
+                        } else if (names != expected)
+                            error(node.items[i]->span, "alternative patterns bind different names");
+                        info.irrefutable |= alternative.irrefutable;
+                    }
+                }
+            },
+            value.node);
+        return info;
+    }
     void collect(Suite &body, std::size_t scope)
     {
         for (auto &statement : body)
@@ -379,7 +479,19 @@ class ScopePass final {
                     using T = std::decay_t<decltype(node)>;
                     if constexpr (std::is_same_v<T, ExprStmt>)
                         expression(*node.value, scope);
-                    else if constexpr (std::is_same_v<T, AssignStmt>) {
+                    else if constexpr (std::is_same_v<T, MatchStmt>) {
+                        expression(*node.subject, scope);
+                        for (std::size_t i = 0; i < node.cases.size(); ++i) {
+                            auto &item = node.cases[i];
+                            const auto info = pattern(*item.pattern, scope);
+                            if (info.irrefutable && !item.guard && i + 1 < node.cases.size())
+                                error(item.span,
+                                      "irrefutable pattern makes remaining patterns unreachable");
+                            if (item.guard)
+                                expression(*item.guard, scope);
+                            collect(item.body, scope);
+                        }
+                    } else if constexpr (std::is_same_v<T, AssignStmt>) {
                         for (const auto &item : node.targets)
                             target(*item, scope);
                         expression(*node.value, scope);

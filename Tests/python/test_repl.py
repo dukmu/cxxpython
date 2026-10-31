@@ -113,6 +113,10 @@ def main():
     terminal(binary, [str(root / "pty_cases/readline_gc/test.py")],
              [(b"GC_PROGRESS", b"answer\n")], [b"RESULT answer", b"THREAD_DONE"])
     terminal(binary, ["-q"], [(b">>> ", b"1 + 20\x7f\n\x04")], [b"3"])
+    patterns = root / "pty_cases/repl_patterns"
+    terminal(binary, ["-q", "-i", str(patterns / "test.py")],
+             [(b">>> ", (patterns / "stdin.bin").read_bytes() + b"\x04")],
+             [b"PAIR 3 4", b"\r\n7\r\n", b"SyntaxError", b"RECOVERED 7"])
     backpressure(binary, root / "pty_cases/readline_backpressure/test.py")
     print("PASS terminal REPL editing, GC progress and terminal restoration")
 

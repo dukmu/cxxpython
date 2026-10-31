@@ -6,9 +6,95 @@
 #include <boost/multiprecision/cpp_int.hpp>
 
 #include <algorithm>
+#include <cmath>
+#include <complex>
 
 namespace cxxpython::core::detail {
 namespace {
+using PatternKey = std::variant<Literal, boost::multiprecision::cpp_int, std::complex<double>>;
+std::optional<PatternKey> pattern_key(const Expr &expression)
+{
+    using Integer = boost::multiprecision::cpp_int;
+    using Complex = std::complex<double>;
+    if (const auto *value = std::get_if<Literal>(&expression.node)) {
+        if (value->kind == Literal::Kind::True || value->kind == Literal::Kind::False)
+            return Integer(value->kind == Literal::Kind::True);
+        if (value->kind == Literal::Kind::Float)
+            return Complex(value->number, 0);
+        if (value->kind == Literal::Kind::Imaginary)
+            return Complex(0, value->number);
+        if (value->kind != Literal::Kind::Integer)
+            return *value;
+        Integer result = 0;
+        unsigned base = 10;
+        std::size_t start = 0;
+        const auto &text = value->text;
+        if (text.size() > 1 && text[0] == U'0') {
+            auto prefix = text[1];
+            base = prefix == U'x' || prefix == U'X'   ? 16
+                   : prefix == U'o' || prefix == U'O' ? 8
+                   : prefix == U'b' || prefix == U'B' ? 2
+                                                      : 10;
+            if (base != 10)
+                start = 2;
+        }
+        for (std::size_t i = start; i < text.size(); ++i)
+            if (text[i] != U'_') {
+                const auto ch = text[i];
+                result *= base;
+                result += ch <= U'9' ? ch - U'0' : ch <= U'F' ? ch - U'A' + 10 : ch - U'a' + 10;
+            }
+        return result;
+    }
+    if (const auto *unary = std::get_if<UnaryExpr>(&expression.node)) {
+        auto value = pattern_key(*unary->value);
+        if (!value || unary->op != UnaryOp::Negative)
+            return {};
+        if (auto integer = std::get_if<Integer>(&*value))
+            return Integer(-*integer);
+        if (auto number = std::get_if<Complex>(&*value))
+            return -*number;
+    }
+    if (const auto *binary = std::get_if<BinaryExpr>(&expression.node)) {
+        auto left = pattern_key(*binary->left), right = pattern_key(*binary->right);
+        if (!left || !right || !std::holds_alternative<Complex>(*right))
+            return {};
+        Complex number;
+        if (auto integer = std::get_if<Integer>(&*left)) {
+            const auto real = integer->convert_to<double>();
+            if (!std::isfinite(real))
+                return {};
+            number = Complex(real, 0);
+        } else if (auto real = std::get_if<Complex>(&*left))
+            number = *real;
+        else
+            return {};
+        return binary->op == BinaryOp::Add ? number + std::get<Complex>(*right)
+                                           : number - std::get<Complex>(*right);
+    }
+    return {};
+}
+bool equal_pattern_keys(const PatternKey &left, const PatternKey &right)
+{
+    using Integer = boost::multiprecision::cpp_int;
+    using Complex = std::complex<double>;
+    if (auto value = std::get_if<Literal>(&left)) {
+        auto other = std::get_if<Literal>(&right);
+        return other && value->kind == other->kind && value->text == other->text;
+    }
+    if (auto value = std::get_if<Integer>(&left)) {
+        if (auto other = std::get_if<Integer>(&right))
+            return *value == *other;
+        if (auto other = std::get_if<Complex>(&right))
+            return other->imag() == 0 && std::isfinite(other->real()) &&
+                   std::trunc(other->real()) == other->real() && Integer(other->real()) == *value;
+        return false;
+    }
+    if (std::holds_alternative<Integer>(right))
+        return equal_pattern_keys(right, left);
+    auto other = std::get_if<Complex>(&right);
+    return other && std::get<Complex>(left) == *other;
+}
 class GraphPass final {
   public:
     explicit GraphPass(SourceProgram &program) : program_(program)
@@ -681,6 +767,292 @@ class GraphPass final {
             jump(done, span);
         select(done);
     }
+    struct PatternFailure {
+        std::size_t block, pops, target;
+        Span span;
+    };
+    struct PatternContext {
+        std::vector<const PatternCapture *> captures;
+        std::vector<PatternFailure> failures;
+    };
+    std::size_t pattern_failure(PatternContext &context, std::size_t pops, std::size_t target,
+                                Span span)
+    {
+        if (!pops)
+            return target;
+        const auto failed = block();
+        context.failures.push_back({failed, pops, target, span});
+        return failed;
+    }
+    void pattern_test(std::size_t failed, Span span)
+    {
+        const auto passed = block();
+        branch(passed, failed, span);
+        select(passed);
+    }
+    void pattern_not_none(PatternContext &context, std::size_t failed, Span span)
+    {
+        emit(Opcode::DupTop, span);
+        none(span);
+        emit(Opcode::Compare, span, static_cast<std::uint32_t>(CompareOp::IsNot));
+        pattern_test(pattern_failure(context, 1, failed, span), span);
+    }
+    void pattern_remove_container(std::size_t captures, Span span)
+    {
+        for (std::size_t depth = 2; depth <= captures + 1; ++depth)
+            emit(Opcode::Swap, span, static_cast<std::uint32_t>(depth));
+        emit(Opcode::PopTop, span);
+    }
+    void pattern_permute(std::vector<const PatternCapture *> actual,
+                         const std::vector<const PatternCapture *> &wanted, Span span)
+    {
+        const auto count = actual.size();
+        for (std::size_t i = 0; i < count; ++i) {
+            auto found = std::find_if(actual.begin() + i, actual.end(),
+                                      [&](auto item) { return item->name == wanted[i]->name; });
+            if (found == actual.end())
+                throw std::logic_error("scope pass accepted inconsistent pattern bindings");
+            const auto j = static_cast<std::size_t>(found - actual.begin());
+            if (i == j)
+                continue;
+            const auto a = static_cast<std::uint32_t>(count - i);
+            const auto b = static_cast<std::uint32_t>(count - j);
+            if (b == 1)
+                emit(Opcode::Swap, span, a);
+            else {
+                emit(Opcode::Swap, span, a);
+                emit(Opcode::Swap, span, b);
+                emit(Opcode::Swap, span, a);
+            }
+            std::swap(actual[i], actual[j]);
+        }
+    }
+    void pattern_tuple(const std::vector<const Pattern *> &items, PatternContext &context,
+                       std::size_t failed, Span span, bool reverse = false)
+    {
+        const auto start = context.captures.size();
+        for (std::size_t i = 0; i < items.size(); ++i) {
+            const auto captured = context.captures.size() - start;
+            emit(Opcode::Copy, span, static_cast<std::uint32_t>(captured + 1));
+            literal({Literal::Kind::Integer, std::u32string{}}, span);
+            auto number = std::to_string(reverse ? items.size() - i - 1 : i);
+            current().instructions.back().literal->text.assign(number.begin(), number.end());
+            emit(Opcode::LoadItem, span);
+            pattern(*items[i], context, pattern_failure(context, captured + 1, failed, span));
+        }
+        pattern_remove_container(context.captures.size() - start, span);
+    }
+    void pattern_length(std::size_t required, bool exact, std::size_t failed, Span span)
+    {
+        emit(Opcode::GetLen, span);
+        const auto text = std::to_string(required);
+        literal({Literal::Kind::Integer, {text.begin(), text.end()}}, span);
+        emit(Opcode::Compare, span,
+             static_cast<std::uint32_t>(exact ? CompareOp::Eq : CompareOp::Ge));
+        pattern_test(failed, span);
+    }
+    void pattern(const Pattern &value, PatternContext &context, std::size_t failed)
+    {
+        const auto start = context.captures.size();
+        const auto span = value.span;
+        auto capture = [&](const PatternCapture &target) {
+            if (target.binding)
+                context.captures.push_back(&target);
+            else
+                emit(Opcode::PopTop, span);
+        };
+        std::visit(
+            [&](const auto &node) {
+                using T = std::decay_t<decltype(node)>;
+                if constexpr (std::is_same_v<T, ValuePattern>) {
+                    expression(*node.value);
+                    emit(
+                        Opcode::Compare, span,
+                        static_cast<std::uint32_t>(node.singleton ? CompareOp::Is : CompareOp::Eq));
+                    pattern_test(failed, span);
+                } else if constexpr (std::is_same_v<T, CapturePattern> ||
+                                     std::is_same_v<T, StarPattern>)
+                    capture(node.target);
+                else if constexpr (std::is_same_v<T, AsPattern>) {
+                    emit(Opcode::DupTop, span);
+                    pattern(*node.pattern, context, pattern_failure(context, 1, failed, span));
+                    for (std::size_t depth = 2; depth <= context.captures.size() - start + 1;
+                         ++depth)
+                        emit(Opcode::Swap, span, static_cast<std::uint32_t>(depth));
+                    capture(node.target);
+                } else if constexpr (std::is_same_v<T, OrPattern>) {
+                    const auto saved = context.captures;
+                    const auto matched = block();
+                    std::vector<const PatternCapture *> expected;
+                    for (std::size_t i = 0; i < node.items.size(); ++i) {
+                        const auto next = block();
+                        context.captures = saved;
+                        emit(Opcode::DupTop, span);
+                        pattern(*node.items[i], context, next);
+                        std::vector<const PatternCapture *> actual(context.captures.begin() + start,
+                                                                   context.captures.end());
+                        if (!i)
+                            expected = actual;
+                        else
+                            pattern_permute(actual, expected, span);
+                        pattern_remove_container(expected.size(), span);
+                        jump(matched, span);
+                        select(next);
+                    }
+                    emit(Opcode::PopTop, span);
+                    jump(failed, span);
+                    select(matched);
+                    context.captures = saved;
+                    context.captures.insert(context.captures.end(), expected.begin(),
+                                            expected.end());
+                } else if constexpr (std::is_same_v<T, SequencePattern>) {
+                    const auto drop = pattern_failure(context, 1, failed, span);
+                    emit(Opcode::MatchSequence, span);
+                    pattern_test(drop, span);
+                    std::optional<std::size_t> star;
+                    bool only_wildcards = true, star_wildcard = false;
+                    std::vector<const Pattern *> items;
+                    for (std::size_t i = 0; i < node.items.size(); ++i) {
+                        const auto &item = *node.items[i];
+                        items.push_back(&item);
+                        if (const auto *capture = std::get_if<CapturePattern>(&item.node))
+                            only_wildcards &= !capture->target.binding;
+                        else if (const auto *capture = std::get_if<StarPattern>(&item.node)) {
+                            star = i;
+                            star_wildcard = !capture->target.binding;
+                            only_wildcards &= star_wildcard;
+                        } else
+                            only_wildcards = false;
+                    }
+                    if (!star || items.size() > 1)
+                        pattern_length(items.size() - (star ? 1 : 0), !star, drop, span);
+                    if (only_wildcards)
+                        emit(Opcode::PopTop, span);
+                    else if (star_wildcard) {
+                        for (std::size_t i = 0; i < items.size(); ++i) {
+                            const auto *wildcard = std::get_if<CapturePattern>(&items[i]->node);
+                            if (i == *star || (wildcard && !wildcard->target.binding))
+                                continue;
+                            const auto captured = context.captures.size() - start;
+                            emit(Opcode::Copy, span, static_cast<std::uint32_t>(captured + 1));
+                            const auto number = std::to_string(i < *star ? i : items.size() - i);
+                            if (i > *star)
+                                emit(Opcode::GetLen, span);
+                            literal({Literal::Kind::Integer, {number.begin(), number.end()}}, span);
+                            if (i > *star)
+                                emit(Opcode::Binary, span,
+                                     static_cast<std::uint32_t>(BinaryOp::Subtract));
+                            emit(Opcode::LoadItem, span);
+                            pattern(*items[i], context,
+                                    pattern_failure(context, captured + 1, failed, span));
+                        }
+                        pattern_remove_container(context.captures.size() - start, span);
+                    } else {
+                        if (star) {
+                            if (*star > 65535 || items.size() - *star - 1 > 65535)
+                                error(span,
+                                      "too many expressions in star-unpacking sequence pattern");
+                            emit(Opcode::UnpackEx, span,
+                                 static_cast<std::uint32_t>(*star |
+                                                            ((items.size() - *star - 1) << 16)));
+                        } else
+                            emit(Opcode::UnpackSequence, span,
+                                 static_cast<std::uint32_t>(items.size()));
+                        emit(Opcode::BuildTuple, span, static_cast<std::uint32_t>(items.size()));
+                        pattern_tuple(items, context, failed, span, true);
+                    }
+                } else if constexpr (std::is_same_v<T, MappingPattern>) {
+                    std::vector<PatternKey> constants;
+                    for (const auto &[key, child] : node.items)
+                        if (auto constant = pattern_key(*key)) {
+                            for (const auto &previous : constants)
+                                if (equal_pattern_keys(previous, *constant))
+                                    error(key->span, "mapping pattern checks duplicate key");
+                            constants.push_back(std::move(*constant));
+                        }
+                    emit(Opcode::MatchMapping, span);
+                    const auto drop = pattern_failure(context, 1, failed, span);
+                    pattern_test(drop, span);
+                    if (!node.items.empty())
+                        pattern_length(node.items.size(), false, drop, span);
+                    std::vector<const Pattern *> items;
+                    for (const auto &[key, child] : node.items) {
+                        expression(*key);
+                        items.push_back(child.get());
+                    }
+                    emit(Opcode::BuildTuple, span, static_cast<std::uint32_t>(items.size()));
+                    emit(Opcode::MatchKeys, span);
+                    const auto outer = pattern_failure(context, 2, failed, span);
+                    pattern_not_none(context, outer, span);
+                    pattern_tuple(items, context, outer, span);
+                    if (node.rest.binding) {
+                        const auto depth =
+                            static_cast<std::uint32_t>(context.captures.size() - start + 2);
+                        emit(Opcode::Copy, span, depth);
+                        emit(Opcode::Copy, span, depth);
+                        emit(Opcode::CopyDictWithoutKeys, span);
+                        capture(node.rest);
+                    }
+                    pattern_remove_container(context.captures.size() - start, span);
+                    pattern_remove_container(context.captures.size() - start, span);
+                } else if constexpr (std::is_same_v<T, ClassPattern>) {
+                    expression(*node.type);
+                    std::vector<const Pattern *> items;
+                    for (const auto &item : node.positional)
+                        items.push_back(item.get());
+                    for (const auto &[name, child] : node.keywords) {
+                        literal({Literal::Kind::String, name}, span);
+                        items.push_back(child.get());
+                    }
+                    emit(Opcode::BuildTuple, span,
+                         static_cast<std::uint32_t>(node.keywords.size()));
+                    emit(Opcode::MatchClass, span,
+                         static_cast<std::uint32_t>(node.positional.size()));
+                    pattern_not_none(context, failed, span);
+                    pattern_tuple(items, context, failed, span);
+                }
+            },
+            value.node);
+    }
+    void match_statement(const MatchStmt &node, Span span)
+    {
+        expression(*node.subject);
+        const auto done = block();
+        for (const auto &item : node.cases) {
+            const auto next = block();
+            PatternContext context;
+            emit(Opcode::DupTop, item.span);
+            pattern(*item.pattern, context, next);
+            const auto matched = block();
+            jump(matched, item.span);
+            for (const auto &failure : context.failures) {
+                select(failure.block);
+                for (std::size_t i = 0; i < failure.pops; ++i)
+                    emit(Opcode::PopTop, failure.span);
+                jump(failure.target, failure.span);
+            }
+            select(matched);
+            auto reversed = context.captures;
+            std::reverse(reversed.begin(), reversed.end());
+            pattern_permute(context.captures, reversed, item.span);
+            for (const auto *capture : context.captures)
+                name(std::get<NameExpr>(capture->binding->node).name, item.span, Opcode::StoreFast,
+                     Opcode::StoreGlobal);
+            if (item.guard) {
+                const auto guarded = block();
+                test(*item.guard, guarded, next);
+                select(guarded);
+            }
+            emit(Opcode::PopTop, item.span);
+            suite(item.body);
+            if (current().exit == FlowBlock::Exit::Open)
+                jump(done, item.span);
+            select(next);
+        }
+        emit(Opcode::PopTop, span);
+        jump(done, span);
+        select(done);
+    }
     void suite(const Suite &body)
     {
         for (std::size_t index = 0; index < body.size(); ++index) {
@@ -812,6 +1184,8 @@ class GraphPass final {
                         emit(Opcode::PopTop, span);
                         jump(done, span);
                         select(done);
+                    } else if constexpr (std::is_same_v<T, MatchStmt>) {
+                        match_statement(node, span);
                     } else if constexpr (std::is_same_v<T, ReturnStmt>) {
                         if (!star_handlers_.empty())
                             error(span, "'break', 'continue' and 'return' cannot appear in an "

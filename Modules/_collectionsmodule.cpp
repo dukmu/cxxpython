@@ -1109,6 +1109,8 @@ void initialize_collections(Attachment &c, Handle module, ReturnSlot &out)
         return;
     }
     auto deque_type = roots.root(deque_slot.value());
+    c.payload<TypeObject>(deque_type)
+        .collection.store(CollectionKind::Sequence, std::memory_order_relaxed);
     NativeTypeSpec iter_spec{{"_deque_iterator"}, LayoutDescriptor::of<DequeIterator>()};
     iter_spec.type.module = U"collections";
     iter_spec.type.slots = std::vector<std::u32string>{};

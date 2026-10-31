@@ -277,6 +277,34 @@ class Adapter {
         auto c = children(n);
         auto r = rules(n);
         switch (n.rule) {
+        case Rule::signed_number:
+        case Rule::signed_real_number: {
+            ExprPtr value;
+            if (!r.empty())
+                value = expression(*r[0]);
+            else
+                for (auto p : c)
+                    if (p->rule == Rule::Token && token(*p).kind == TokenKind::NUMBER)
+                        value = terminal(*p);
+            if (!value)
+                unsupported(n);
+            if (has(n, U"-"))
+                return make(n, UnaryExpr{UnaryOp::Negative, std::move(value)}, 2);
+            return value;
+        }
+        case Rule::complex_number: {
+            auto left = expression(*r.at(0)), right = expression(*r.at(1));
+            return make(n,
+                        BinaryExpr{has(n, U"-") ? BinaryOp::Subtract : BinaryOp::Add,
+                                   std::move(left), std::move(right)},
+                        3);
+        }
+        case Rule::literal_expr:
+            if (r.empty())
+                for (auto p : c)
+                    if (p->rule == Rule::Token)
+                        return terminal(*p);
+            break;
         case Rule::await_primary:
             if (has(n, U"await")) {
                 auto value = expression(*r.at(0));
@@ -341,7 +369,23 @@ class Adapter {
                 if (p->rule == Rule::Token && token(*p).kind == TokenKind::STRING)
                     return terminal(*p);
             unsupported(n);
+        case Rule::real_number:
+        case Rule::imaginary_number:
+            for (auto p : c)
+                if (p->rule == Rule::Token && token(*p).kind == TokenKind::NUMBER) {
+                    auto value = terminal(*p);
+                    const auto imaginary =
+                        std::get<Literal>(value->node).kind == Literal::Kind::Imaginary;
+                    if (imaginary != (n.rule == Rule::imaginary_number))
+                        throw SourceError(source_, span(n),
+                                          imaginary
+                                              ? "real number required in complex literal"
+                                              : "imaginary number required in complex literal");
+                    return value;
+                }
+            unsupported(n);
         case Rule::atom:
+        case Rule::name_or_attr:
             for (auto p : c)
                 if (p->rule != Rule::Token || token(*p).kind == TokenKind::NAME ||
                     token(*p).kind == TokenKind::NUMBER || token(*p).kind == TokenKind::ELLIPSIS)
@@ -364,6 +408,19 @@ class Adapter {
                 tuple.items.push_back(std::move(e));
             }
             return make(n, std::move(tuple), depth);
+        }
+        case Rule::subject_expr: {
+            if (!has(n, U","))
+                return expression(*r.at(0));
+            TupleExpr tuple;
+            for (auto p : r) {
+                if (p->rule == Rule::star_named_expressions) {
+                    for (auto item : rules(*p))
+                        tuple.items.push_back(expression(*item));
+                } else
+                    tuple.items.push_back(expression(*p));
+            }
+            return make(n, std::move(tuple), 2);
         }
         case Rule::star_expression:
         case Rule::star_named_expression:
@@ -515,6 +572,7 @@ class Adapter {
             }
             break;
         case Rule::primary:
+        case Rule::attr:
         case Rule::t_primary:
         case Rule::single_subscript_attribute_target:
         case Rule::target_with_star_atom:
@@ -614,6 +672,109 @@ class Adapter {
         }
         if (r.size() == 1)
             return expression(*r[0]);
+        unsupported(n);
+    }
+    PatternCapture pattern_target(const Node &n)
+    {
+        for (auto p : children(n))
+            if (p->rule == Rule::Token && token(*p).kind == TokenKind::NAME) {
+                auto name = identifier(*p);
+                return {name, make(*p, NameExpr{name})};
+            }
+        unsupported(n);
+    }
+    void pattern_items(const Node &n, std::vector<PatternPtr> &items)
+    {
+        for (auto p : rules(n))
+            if (p->rule == Rule::maybe_sequence_pattern)
+                pattern_items(*p, items);
+            else
+                items.push_back(pattern(*p));
+    }
+    PatternPtr pattern(const Node &n)
+    {
+        const auto r = rules(n);
+        auto build = [&](auto value) {
+            return std::make_unique<Pattern>(Pattern{span(n), std::move(value)});
+        };
+        switch (n.rule) {
+        case Rule::patterns:
+            if (!r.empty() && r[0]->rule == Rule::open_sequence_pattern) {
+                SequencePattern value;
+                pattern_items(*r[0], value.items);
+                return build(std::move(value));
+            }
+            break;
+        case Rule::or_pattern:
+            if (r.size() > 1) {
+                OrPattern value;
+                for (auto p : r)
+                    value.items.push_back(pattern(*p));
+                return build(std::move(value));
+            }
+            break;
+        case Rule::as_pattern:
+            return build(AsPattern{pattern(*r.at(0)), pattern_target(*r.at(1))});
+        case Rule::wildcard_pattern:
+            return build(CapturePattern{});
+        case Rule::capture_pattern:
+            return build(CapturePattern{pattern_target(*r.at(0))});
+        case Rule::star_pattern:
+            return build(StarPattern{!r.empty() && r[0]->rule == Rule::pattern_capture_target
+                                         ? pattern_target(*r[0])
+                                         : PatternCapture{}});
+        case Rule::literal_pattern:
+            if (!r.empty())
+                return build(ValuePattern{expression(*r[0])});
+            for (auto p : children(n))
+                if (p->rule == Rule::Token)
+                    return build(ValuePattern{terminal(*p), true});
+            unsupported(n);
+        case Rule::value_pattern:
+            return build(ValuePattern{expression(*r.at(0))});
+        case Rule::sequence_pattern: {
+            SequencePattern value;
+            if (!r.empty())
+                pattern_items(*r[0], value.items);
+            return build(std::move(value));
+        }
+        case Rule::mapping_pattern: {
+            MappingPattern value;
+            for (auto p : r) {
+                if (p->rule == Rule::double_star_pattern)
+                    value.rest = pattern_target(*find(*p, Rule::pattern_capture_target));
+                else if (p->rule == Rule::items_pattern)
+                    for (auto pair : rules(*p)) {
+                        auto parts = rules(*pair);
+                        value.items.emplace_back(expression(*parts.at(0)), pattern(*parts.at(1)));
+                    }
+            }
+            return build(std::move(value));
+        }
+        case Rule::class_pattern: {
+            ClassPattern value;
+            value.type = expression(*r.at(0));
+            for (std::size_t i = 1; i < r.size(); ++i)
+                if (r[i]->rule == Rule::positional_patterns) {
+                    for (auto item : rules(*r[i]))
+                        value.positional.push_back(pattern(*item));
+                } else if (r[i]->rule == Rule::keyword_patterns)
+                    for (auto item : rules(*r[i])) {
+                        auto parts = rules(*item);
+                        for (auto key : children(*item))
+                            if (key->rule == Rule::Token && token(*key).kind == TokenKind::NAME) {
+                                value.keywords.emplace_back(identifier(*key),
+                                                            pattern(*parts.at(0)));
+                                break;
+                            }
+                    }
+            return build(std::move(value));
+        }
+        default:
+            break;
+        }
+        if (r.size() == 1)
+            return pattern(*r[0]);
         unsupported(n);
     }
     ExprPtr comprehension(const Node &n)
@@ -1120,6 +1281,22 @@ class Adapter {
         case Rule::star_expressions:
             result.push_back(stmt(n, ExprStmt{expression(n)}));
             break;
+        case Rule::match_stmt: {
+            MatchStmt value;
+            value.subject = expression(*find(n, Rule::subject_expr));
+            for (auto p : r)
+                if (p->rule == Rule::case_block) {
+                    MatchCase item;
+                    item.span = span(*p);
+                    item.pattern = pattern(*find(*p, Rule::patterns));
+                    if (auto guard = find(*p, Rule::guard))
+                        item.guard = expression(*rules(*guard).at(0));
+                    item.body = suite(*find(*p, Rule::block));
+                    value.cases.push_back(std::move(item));
+                }
+            result.push_back(stmt(n, std::move(value)));
+            break;
+        }
         case Rule::yield_stmt:
             result.push_back(stmt(n, ExprStmt{expression(*r.at(0))}));
             break;

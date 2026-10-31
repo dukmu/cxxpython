@@ -101,6 +101,34 @@ except ValueError:
 else:
     assert False
 
+def matching(subject):
+    match subject:
+        case [_, _]:
+            return None
+        case {"key": _, **rest}:
+            return rest
+        case Example(_, _):
+            return None
+
+match_ops = list(dis.get_instructions(matching))
+match_bytecode = dis.Bytecode(matching)
+match_listing = match_bytecode.dis()
+for name, effect in (("MATCH_SEQUENCE", 1), ("MATCH_MAPPING", 1),
+                     ("GET_LEN", 1), ("MATCH_KEYS", 1),
+                     ("MATCH_CLASS", -2), ("COPY_DICT_WITHOUT_KEYS", -1)):
+    found = [i for i in match_ops if i.opname == name]
+    assert found
+    assert name in match_listing
+    for instruction in found:
+        assert opcode.opname[instruction.opcode] == name
+        assert opcode.opmap[name] == instruction.opcode
+        assert match_bytecode.stack_effect(instruction.offset) == effect
+        if name == "MATCH_CLASS":
+            assert instruction.arg == 2
+            assert opcode.stack_effect(instruction.opcode, instruction.arg) == effect
+        else:
+            assert opcode.stack_effect(instruction.opcode) == effect
+
 class Index:
     def __init__(self, value):
         self.value = value

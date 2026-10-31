@@ -1,0 +1,10 @@
+match Pair(3, 4):
+    case Pair(left, right):
+        print('PAIR', left, right)
+
+left + right
+match [1, 2]:
+    case [same, same]:
+        pass
+
+print('RECOVERED', 7)

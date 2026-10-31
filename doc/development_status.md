@@ -1,5 +1,83 @@
 # Development Status
 
+## 2026-10-31 Executable Structural Patterns And Multiline REPL
+
+Prepended after 4e47df2 without rewriting earlier evidence. Terra supplied native
+protocol helper groundwork, fixed-reference scripts and IR/dis assertions; parent
+implemented AST/scope/CFG/VM integration, ABC classification, compatibility fixes
+and acceptance. All workers are closed. No sol/astra, runtime AST interpreter,
+second unwind state, hidden namespace or interpreter execution lock was added.
+The full frontend/import/library/product/N4-N6 goal remains active.
+
+- match/case now executes literal/singleton/dotted value, capture/wildcard,
+  sequence/star, mapping/rest, class, OR and AS patterns. Native typed patterns
+  lower to existing CFG/operand-stack/name-store machinery. Saved subjects,
+  extracted values and pending captures remain precise roots; deferred failure
+  blocks discard structural temporaries. OR arms normalize capture order before
+  joining; stores precede guard evaluation. Guards preserve ordinary yield/await,
+  closure/global/nonlocal behavior and cross-thread continuation ownership.
+- Binding-set checks use source identifiers before private-name mangling, with
+  the resolved target retained separately for final storage. Reference checks
+  caught the initially incorrect rejection of distinct names that mangle to one
+  class attribute, and the inverse incorrect acceptance of inconsistent OR arms.
+  Duplicate static mapping keys compare exact integers against floats/complex
+  values without rounding large integers first. The adapter enforces the fixed
+  grammar's removed ensure-real/imaginary actions, and scope analysis rejects
+  f-string patterns/keys instead of broadening accepted Python syntax.
+- Six actual VM instructions have explicit operand, stack, exception, safepoint
+  and disassembly contracts: MATCH_SEQUENCE, MATCH_MAPPING, GET_LEN, MATCH_KEYS,
+  MATCH_CLASS and COPY_DICT_WITHOUT_KEYS. MATCH_CLASS keeps a fixed 3->1 effect
+  regardless of its positional-count operand. Native mapping/class helpers use
+  get-with-sentinel, normal mapping-copy and shared instance/attribute protocols.
+  The fixed reference requires exact tuple/str __match_args__ components; a str
+  subclass was initially accepted and the differential caught that discrepancy.
+- Sequence/mapping classification is an atomic semantic TypeObject field, not
+  duck typing or a physical-layout guess. MRO priority, ABC flags, registrations
+  and existing descendants are connected; subclass linking rechecks inherited
+  classification to cover a registration snapshot taken before the child link.
+  Immutable core types retain declared flags; native deque declares Sequence at
+  creation without depending on a later collections import. Wildcard-only and
+  wildcard-star sequences preserve the reference's item/length callback elision.
+- Five test.py fixtures and generated CPython 3.12.14 goldens cover the pattern
+  forms, protocol exceptions/order, exact numeric keys, scope/private-name rules,
+  syntax failures, collecting callbacks, inheritance/registration and shared-heap
+  workers/continuations. The adapted upstream test_patma.py cases retain source
+  provenance. Worker entries catch exceptions and release gates in finally.
+  Native additions are verifier and allocation-quota/root contracts: every
+  managed allocation collects, each helper allocation is failed through its first
+  success, then input survival and retry results are checked.
+- The actual terminal REPL now has a dedicated test.py setup and stdin.bin for
+  process input, exercised through a PTY. Multiline class patterns, expression
+  display, invalid-pattern error recovery, readline editing, GC progress and
+  terminal restoration pass. dis tests inspect this VM's actual new instructions,
+  not CPython instruction encodings. Existing readline/curses/gc delivery and
+  remaining policy requirements are retained in Plan 2 section 0.12; this syntax
+  slice does not declare a complete REPL or complete standard libraries.
+- Normal acceptance passes all 284 portable fixtures, an 89-check compiler/VM/
+  source/grammar batch, 39 type/construction checks and terminal integration.
+  Strict ASan/UBSan/LSan passes 45 selected native/dis checks, all five new scripts
+  and terminal integration. TSan passes the same 45 checks across its 44-check
+  initial success and final dis rerun, all five scripts and terminal integration.
+  format-check passes. No sanitizer or timeout was relaxed; no unrelated
+  performance suite or hand-copied measurement table was introduced.
+- Failed evidence is retained: ASan build-time test discovery hit sandbox LSan/
+  ptrace restrictions and was completed in the approved environment. ASan then
+  exposed an AST object compiled across a header edit: its completion timestamp
+  hid the old layout from incremental Make. Removing that one stale build object
+  and recompiling resolved it; the complete affected checks were rerun against
+  the unmixed binary. The initial TSan dis test timed out because the new test
+  rendered the same listing six times; one rendering retains every assertion and
+  passes the original timeout. Evidence is under .cache/patterns-*, with final
+  source/binary hashes retained there. These failures are not reported as passes.
+- Full upstream pattern tests, precise unsupported grammar diagnostics, variable/
+  postponed annotations, type/annotation scopes and native TypeVar/typing remain
+  language/library gates. Next dependency is the annotation/type foundation and
+  its actual standard-library closure, followed by the outstanding requested
+  Base-to-Full libraries and N4-N6/M0-M9 acceptance, not repeated unrelated
+  benchmarking or another local execution lock. Origin push still awaits the
+  previously requested destination authorization; no retry/bypass was attempted.
+  The user's test2.py and temporary_plan.md deletion remain excluded.
+
 ## 2026-10-31 Executable Except-Star And Grammar-Derived Diagnostics
 
 Prepended after 6a30783 without rewriting previous evidence. Parent work completed

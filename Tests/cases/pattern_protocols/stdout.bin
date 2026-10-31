@@ -1,0 +1,19 @@
+native deque 1 2
+sequence protocol 1 [2, 3] ['len', ('item', 0), ('item', 1), ('item', 2), ('item', 3)]
+pretender rejected
+registered sequence 0 1
+mapping protocol 1 {'b': 2} ['map len', ('get', 'a', True), ('getitem', 'a'), ('getitem', 'b')]
+missing key ['map len', ('get', 'missing', True)]
+registered mapping 9
+duplicate runtime keys
+class 3 4
+bad match args
+missing match args ['match args']
+descriptor error descriptor
+missing attribute ['attribute']
+attribute error attribute error ['first', 'second']
+self int 3
+self int 4
+self str text
+self list [1]
+self dict {'x': 1}

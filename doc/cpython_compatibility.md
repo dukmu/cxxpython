@@ -45,6 +45,19 @@ acceptance evidence; this list is not a generated support matrix.
 
 ## Builtins And Product
 
+- Structural patterns follow pinned Python/compile.c and Python/ceval.c protocol
+  ordering, using native typed AST/CFG and precise traced operand-stack roots
+  instead of CPython's AST/bytecode layout and RC. Mapping get/rest, class
+  instance-check/attribute errors, exact __match_args__ tuple/str restrictions,
+  builtin self-match and wildcard sequence callback elision have fixed-reference
+  script coverage, including adapted Lib/test/test_patma.py cases. Binding-set
+  checks precede private-name mangling. Sequence/mapping flags are atomic and
+  inherited/ABC-propagated, not inferred through isinstance or __getitem__.
+  The generated grammar's ensure-real/imaginary and f-string restrictions are
+  enforced in the adapter/scope pass; removed C actions do not broaden accepted
+  executable syntax. This slice does not complete the whole upstream test suite,
+  type/annotation scopes, or other remaining Python 3.12 gates.
+
 The canonical builtins module/dictionary, namespace lookup and core bootstrap are
 present. Base slices now include print, bytes/bytearray, complex, set/frozenset,
 super, namespace/reflection, exec/eval compilation/execution, sorting, reverse

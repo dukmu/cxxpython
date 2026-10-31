@@ -388,8 +388,20 @@ shutdown and never-awaited warning policy remain explicit dependencies.
 and child slots. Native constructors, derive/subgroup/split and metadata copying
 support unchanged upstream `Lib/contextlib.py`, including group suppression.
 The Python library also supplies synchronous/asynchronous generators, stacks,
-decorators and resource helpers. Native group APIs do not imply except* compiler
-support, complete nested diagnostic formatting or pickle support.
+decorators and resource helpers. except* lowers to ordinary Except/Finally
+regions, with original/results/remainder on the traced operand stack. Complete
+nested diagnostic formatting and pickle support remain gates.
+
+Structural patterns have native typed AST nodes lowered to ordinary CFG blocks,
+stack operations and six explicit matching/length instructions. Captures stay on
+the precise operand stack until the structural pattern succeeds, then enter the
+normal name/Cell/namespace store path before guard evaluation. Deferred failure
+blocks clean temporary operands; OR arms normalize binding order before joining.
+No runtime AST interpreter, hidden locals dictionary or separate unwind state is
+introduced. `Objects/patternmatching.cpp` implements mapping-key/rest and class
+protocols with rooted callback results. Sequence/mapping classification is an
+atomic semantic TypeObject field inherited through the MRO and propagated by ABC
+registration, not inferred from physical layout or __getitem__ availability.
 
 `Objects/funcobject.cpp` owns Function traversal and metadata descriptors; the VM
 owns construction and call binding, not a second metadata dictionary. Independently

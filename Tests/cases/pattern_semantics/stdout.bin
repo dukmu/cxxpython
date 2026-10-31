@@ -1,0 +1,19 @@
+sequence 1 [2] 3 [1, 2, 3] 4 ['subject']
+singleton none
+singleton true
+singleton false
+value 42
+wildcard other
+mapping 1 {'extra': 2}
+or 2
+or 2
+or reorder 20 10
+guard bindings 10 20
+scope ('global', 'nonlocal') nonlocal global
+private 7
+private aliases 2 10
+exact keys integer float
+distinct keys text bytes
+yield guard 3 ('matched', 3)
+await guard pause
+await result 4

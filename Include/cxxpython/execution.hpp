@@ -91,6 +91,12 @@ enum class Opcode : std::uint8_t {
     ForAwait,
     CheckEgMatch,
     PrepReraiseStar,
+    MatchSequence,
+    MatchMapping,
+    GetLen,
+    MatchKeys,
+    MatchClass,
+    CopyDictWithoutKeys,
     Count,
 };
 enum class OperandDomain {

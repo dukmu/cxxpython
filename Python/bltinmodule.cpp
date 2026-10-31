@@ -550,7 +550,7 @@ void class_check(Attachment &context, Handle subject, Handle candidate, bool ins
 void builtin_isinstance(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
-    class_check(context, roots.root(args[0]), roots.root(args[1]), true, out);
+    instance_check(context, roots.root(args[0]), roots.root(args[1]), out);
 }
 void builtin_issubclass(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
@@ -751,6 +751,10 @@ void build_class(Attachment &context, Handle, std::span<const Value> args, Retur
     }
 }
 } // namespace
+void instance_check(Attachment &context, Handle subject, Handle candidate, ReturnSlot &out)
+{
+    class_check(context, subject, candidate, true, out);
+}
 namespace detail {
 void install_class_builtins(Attachment &context, std::span<const Handle> core, Value mapping)
 {

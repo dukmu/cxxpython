@@ -448,6 +448,23 @@ void subclasscheck(Attachment &ctx, Handle function, std::span<const Value> args
         return;
     boolean(ctx, false, out);
 }
+void set_collection_kind(Attachment &ctx, Handle type, CollectionKind kind)
+{
+    RootScope roots(ctx);
+    std::vector<Handle> pending{roots.root(type.get(ctx))};
+    for (std::size_t i = 0; i < pending.size(); ++i) {
+        auto current = pending[i];
+        auto &data = ctx.payload<TypeObject>(current);
+        if (data.immutable || data.collection.exchange(kind, std::memory_order_acq_rel) == kind)
+            continue;
+        ReturnSlot children(ctx);
+        direct_subclasses(ctx, current, children);
+        std::vector<Value> values;
+        list_snapshot(ctx, roots.root(children.value()), roots, values);
+        for (auto child : values)
+            pending.push_back(roots.root(child));
+    }
+}
 void register_class(Attachment &ctx, Handle function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
@@ -489,6 +506,9 @@ void register_class(Attachment &ctx, Handle function, std::span<const Value> arg
     }
     auto state = ctx.payload<NativeFunctionObject>(function).captures[0];
     ctx.payload<AbcData>(state).counter.fetch_add(1);
+    const auto kind = ctx.payload<TypeObject>(cls).collection.load(std::memory_order_acquire);
+    if (kind != CollectionKind::None)
+        set_collection_kind(ctx, child, kind);
     out.ok(child.get(ctx));
 }
 void instancecheck(Attachment &ctx, Handle function, std::span<const Value> args, ReturnSlot &out)
@@ -665,8 +685,39 @@ void initialize_class(Attachment &ctx, Handle function, std::span<const Value> a
     auto data = roots.root(result.value());
     ctx.payload<AbcData>(data).version.store(ctx.payload<AbcData>(state).counter.load());
     set_attr(ctx, cls, U"_abc_impl", data, out);
-    if (!failed(out))
-        out.ok(ctx.builtin(CoreObject::None));
+    if (failed(out))
+        return;
+    auto dictionary = TypeView(ctx, cls).dictionary();
+    if (dictionary) {
+        auto owner = roots.root(*dictionary);
+        auto flags = name_lookup(ctx, owner.get(ctx), U"__abc_tpflags__");
+        if (flags) {
+            auto value = roots.root(*flags);
+            CollectionKind kind = CollectionKind::None;
+            if (ctx.type_of(value) == ctx.builtin(CoreObject::IntType)) {
+                std::int64_t bits;
+                if (!int_fits_signed(ctx, value.get(ctx), bits)) {
+                    raise_error(ctx, CoreObject::OverflowErrorType,
+                                U"Python int too large to convert to C long", out);
+                    return;
+                }
+                if ((bits & 96) == 96) {
+                    raise_error(ctx, CoreObject::TypeErrorType,
+                                U"__abc_tpflags__ cannot be both Py_TPFLAGS_SEQUENCE and "
+                                U"Py_TPFLAGS_MAPPING",
+                                out);
+                    return;
+                }
+                kind = (bits & 32)   ? CollectionKind::Sequence
+                       : (bits & 64) ? CollectionKind::Mapping
+                                     : CollectionKind::None;
+            }
+            type_namespace_change(ctx, cls.get(ctx), U"__abc_tpflags__", {}, {});
+            if (kind != CollectionKind::None)
+                ctx.payload<TypeObject>(cls).collection.store(kind, std::memory_order_release);
+        }
+    }
+    out.ok(ctx.builtin(CoreObject::None));
 }
 void dump(Attachment &ctx, Handle function, std::span<const Value> args, ReturnSlot &out)
 {

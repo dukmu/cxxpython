@@ -39,7 +39,7 @@ assert, expanded calls, power/shift/bitwise protocols, property/attribute builti
 Unicode identifiers and f-strings use the existing compiler/VM/protocol path.
 Import/from/package syntax remains an experimental implemented slice.
 Complex execution, full iteration APIs, exception groups,
-suspension, annotations/type parameters, patterns, locale formatting and the
+suspension, annotations/type parameters, locale formatting and the
 remaining Python 3.12 matrix are
 unfinished. These are remaining delivery requirements, not a reduction of the
 basic-language objective. Existing native VM/type/cleanup interfaces do not imply
@@ -684,8 +684,9 @@ readonly message/child slots. Construction validates children and group families
 derive/subgroup/split retain ordered structure and normal metadata/notes rules.
 ExceptionGroup is a mutable heap type, while BaseExceptionGroup is immutable.
 Unchanged pinned contextlib.py exercises synchronous/asynchronous managers and
-stacks plus group suppression. except* lowering, nested group diagnostics and
-complete serialization remain separate gates.
+stacks plus group suppression. except* uses existing Except/Finally regions and
+traced operand-stack state for splitting, handler cleanup and recombination;
+nested group diagnostics and complete serialization remain separate gates.
 
 Several threads may call the same Function/Code/closure. Individual shared Cell
 edges are synchronized; compound nonlocal += is not implicitly atomic.
@@ -728,6 +729,39 @@ Base super and namespace reflection are specified above. Full reflection,
 general containers, call/base unpacking, annotation scopes/type parameters and
 the rest of the type protocol/method matrix remain delivery requirements.
 Class source support here is experimental, not complete M2/M5.
+
+## Structural Patterns
+
+match/case lowers from the generated grammar through typed AST/scope analysis
+into verified CFG blocks. Literal/singleton/value, capture/wildcard, sequence,
+mapping/rest, class, OR and AS patterns share normal expression and name-store
+semantics. Guards run after binding, including yield/await suspension. Capture
+values and saved subjects remain precise operand-stack roots; partial structural
+failure discards temporary captures. Python does not specify whether bindings
+from a failed pattern survive, so this implementation does not publish them.
+Duplicate names/constant keys/attributes, inconsistent OR bindings, multiple stars and
+unreachable irrefutable alternatives are compile-time errors. Pattern attribute
+keywords keep their literal names; binding comparisons use source identifiers,
+while captured private names use ordinary mangling only for the final store.
+
+MATCH_SEQUENCE and MATCH_MAPPING retain one operand and append a boolean using
+the type's atomic collection classification. GET_LEN retains the subject and
+appends its protocol length. MATCH_KEYS retains subject/keys and appends an exact
+values tuple or None. MATCH_CLASS consumes subject/class/keyword names and
+produces an exact attribute tuple or None; its count operand does not alter the
+fixed 3->1 stack effect. COPY_DICT_WITHOUT_KEYS consumes subject/keys and produces
+a new dict. Raising operations are safepoints; type-flag checks cannot callback.
+
+Collection classification follows MRO priority, ABC initialization and explicit
+ABC registration (including existing descendants). Immutable native types keep
+their declared flags; strings/bytes/bytearrays are not sequence patterns. Atomic
+publication and post-subclass-link inheritance close the registration/creation
+handoff without serializing Python execution. Mapping patterns use get(key,
+sentinel), not __missing__; rest copies use normal mapping protocols. Class
+patterns use the same instance-check and attribute protocols as the builtins,
+including AttributeError-as-mismatch and exact __match_args__ tuple/str checks.
+Wildcard-only sequences avoid item reads, and wildcard stars avoid unnecessary
+iteration, matching the fixed reference's observable callback behavior.
 
 ## Iteration And Items
 

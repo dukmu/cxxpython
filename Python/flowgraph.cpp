@@ -98,6 +98,13 @@ constexpr std::array definitions{
     OpcodeDefinition{"FOR_AWAIT", 1, 0, 1, OperandDomain::Target, FlowKind::IterBranch, true, true},
     OpcodeDefinition{"CHECK_EG_MATCH", 2, 2, 2, OperandDomain::None, FlowKind::Next, true, true},
     OpcodeDefinition{"PREP_RERAISE_STAR", 2, 2, 1, OperandDomain::None, FlowKind::Next, true, true},
+    OpcodeDefinition{"MATCH_SEQUENCE", 1, 0, 1, OperandDomain::None, FlowKind::Next, false, false},
+    OpcodeDefinition{"MATCH_MAPPING", 1, 0, 1, OperandDomain::None, FlowKind::Next, false, false},
+    OpcodeDefinition{"GET_LEN", 1, 0, 1, OperandDomain::None, FlowKind::Next, true, true},
+    OpcodeDefinition{"MATCH_KEYS", 2, 0, 1, OperandDomain::None, FlowKind::Next, true, true},
+    OpcodeDefinition{"MATCH_CLASS", 3, 3, 1, OperandDomain::Count, FlowKind::Next, true, true},
+    OpcodeDefinition{"COPY_DICT_WITHOUT_KEYS", 2, 2, 1, OperandDomain::None, FlowKind::Next, true,
+                     true},
 };
 static_assert(definitions.size() == static_cast<std::size_t>(Opcode::Count));
 [[noreturn]] void invalid(CodeErrorKind kind, const char *message,
@@ -483,6 +490,8 @@ StackEffect instruction_effect(Instruction instruction, std::span<const CallLayo
     }
     if (instruction.opcode == Opcode::UnpackSequence)
         return {1, 1, instruction.operand};
+    if (instruction.opcode == Opcode::MatchClass)
+        return {3, 3, 1};
     if (instruction.opcode == Opcode::UnpackEx)
         return {1, 1, (instruction.operand & 65535U) + (instruction.operand >> 16) + 1};
     if (instruction.opcode == Opcode::BuildMap) {

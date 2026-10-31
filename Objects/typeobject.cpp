@@ -230,6 +230,17 @@ void create(Attachment &context, const TypeSpec &spec, const LayoutDescriptor *n
     payload.mro.reserve(ancestors.size() + 1);
     payload.mro.push_back(created.get(context));
     payload.mro.insert(payload.mro.end(), ancestors.begin(), ancestors.end());
+    auto inherited_collection = [&] {
+        for (auto ancestor : ancestors) {
+            const auto kind =
+                context.payload<TypeObject>(ancestor).collection.load(std::memory_order_acquire);
+            if (kind != CollectionKind::None)
+                return kind;
+        }
+        return CollectionKind::None;
+    };
+    const auto initial_collection = inherited_collection();
+    payload.collection.store(initial_collection, std::memory_order_relaxed);
     payload.solid_base = introduces_layout ? created.get(context) : solid.get(context);
     if (!own_slots.empty())
         payload.solid_base = created.get(context);
@@ -249,6 +260,11 @@ void create(Attachment &context, const TypeSpec &spec, const LayoutDescriptor *n
     if (context.core_ready())
         for (auto base : bases)
             detail::register_subclass(context, base, created);
+    // An ABC registration's descendant snapshot may precede this child's link.
+    // Re-read after linking; preserve a concurrent explicit child registration.
+    auto expected_collection = initial_collection;
+    payload.collection.compare_exchange_strong(expected_collection, inherited_collection(),
+                                               std::memory_order_acq_rel);
     out.ok(created.get(context));
 }
 } // namespace

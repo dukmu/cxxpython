@@ -101,6 +101,58 @@ struct Expr {
 };
 struct Stmt;
 using Suite = std::vector<std::unique_ptr<Stmt>>;
+struct Pattern;
+using PatternPtr = std::unique_ptr<Pattern>;
+struct ValuePattern {
+    ExprPtr value;
+    bool singleton = false;
+};
+struct PatternCapture {
+    // OR/duplicate checks precede private-name mangling of the store target.
+    std::u32string name;
+    ExprPtr binding;
+};
+struct CapturePattern {
+    PatternCapture target;
+};
+struct StarPattern {
+    PatternCapture target;
+};
+struct SequencePattern {
+    std::vector<PatternPtr> items;
+};
+struct MappingPattern {
+    std::vector<std::pair<ExprPtr, PatternPtr>> items;
+    PatternCapture rest;
+};
+struct ClassPattern {
+    ExprPtr type;
+    std::vector<PatternPtr> positional;
+    std::vector<std::pair<std::u32string, PatternPtr>> keywords;
+};
+struct OrPattern {
+    std::vector<PatternPtr> items;
+};
+struct AsPattern {
+    PatternPtr pattern;
+    PatternCapture target;
+};
+struct Pattern {
+    Span span;
+    std::variant<ValuePattern, CapturePattern, StarPattern, SequencePattern, MappingPattern,
+                 ClassPattern, OrPattern, AsPattern>
+        node;
+};
+struct MatchCase {
+    PatternPtr pattern;
+    ExprPtr guard;
+    Suite body;
+    Span span;
+};
+struct MatchStmt {
+    ExprPtr subject;
+    std::vector<MatchCase> cases;
+};
 struct ExprStmt {
     ExprPtr value;
 };
@@ -211,7 +263,7 @@ struct Stmt {
     Span span;
     std::variant<ExprStmt, AssignStmt, AugAssignStmt, DeleteStmt, IfStmt, WhileStmt, ForStmt,
                  FunctionStmt, ClassStmt, ReturnStmt, RaiseStmt, TryStmt, WithStmt, DeclareStmt,
-                 ImportStmt, AssertStmt, CollectionAddStmt, ControlStmt>
+                 ImportStmt, AssertStmt, CollectionAddStmt, ControlStmt, MatchStmt>
         node;
 };
 // CFG instructions use native literals/names until one attached freeze task

@@ -1,0 +1,4 @@
+shared [600, 600]
+initial 5 paused
+handoff (6, 8)
+registration during construction True

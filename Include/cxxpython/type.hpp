@@ -39,6 +39,7 @@ struct TypeSnapshot {
     }
 };
 
+enum class CollectionKind : std::uint8_t { None, Sequence, Mapping };
 // Internal TypeReady API; Ready covers the currently implemented protocols.
 struct TypeObject {
     ObjectHeader header;
@@ -62,6 +63,8 @@ struct TypeObject {
     bool subclassable = true;
     bool allow_slots = true;
     bool allow_weakrefs = true;
+    // Pattern classification follows MRO/ABC registration, not __getitem__ duck typing.
+    std::atomic<CollectionKind> collection{CollectionKind::None};
 
     TypeObject(InitialType head, std::u32string name_in, LayoutDescriptor layout)
         : header(head), name(std::move(name_in)), qualname(name), instance_layout(layout)
@@ -127,6 +130,7 @@ void create_native_type(Attachment &context, const NativeTypeSpec &spec, ReturnS
 bool is_subtype(Attachment &context, Handle type, Handle base);
 bool is_subtype(Attachment &context, Value type, Value base);
 bool is_layout_compatible(Attachment &context, Value left, Value right);
+void instance_check(Attachment &, Handle subject, Handle candidate, ReturnSlot &);
 
 namespace detail {
 void build_type_seeds(Attachment &context, ReturnSlot &object, ReturnSlot &type);
