@@ -119,6 +119,101 @@ TEST_F(CoreExecution, ImportInstructionsVerifyNamesStackAndModuleOnlyStar)
     EXPECT_NE(disassemble(context, program).find("IMPORT_FROM"), std::string::npos);
 }
 
+TEST_F(CoreExecution, SetupAnnotationsVerificationAndModuleRoots)
+{
+    const auto &definition = opcode_definition(Opcode::SetupAnnotations);
+    EXPECT_EQ(definition.operand, OperandDomain::Name);
+    EXPECT_TRUE(definition.may_raise);
+    EXPECT_TRUE(definition.safepoint);
+    const auto effect = instruction_effect({Opcode::SetupAnnotations, 0});
+    EXPECT_EQ(effect.inputs, 0U);
+    EXPECT_EQ(effect.pops, 0U);
+    EXPECT_EQ(effect.pushes, 0U);
+
+    CodeSpec spec;
+    spec.kind = CodeKind::Module;
+    CodeBuilder bounds(context, spec);
+    bounds.emit(Opcode::SetupAnnotations);
+    invalid(bounds, CodeErrorKind::NameBounds);
+    CodeBuilder function_code(context);
+    function_code.emit(Opcode::SetupAnnotations, function_code.name(U"__annotations__"));
+    invalid(function_code, CodeErrorKind::Operand);
+    for (auto kind : {CodeKind::Module, CodeKind::ClassBody}) {
+        spec.kind = kind;
+        CodeBuilder builder(context, spec);
+        builder.emit(Opcode::SetupAnnotations, builder.name(U"__annotations__"));
+        builder.emit(Opcode::LoadConst, builder.constant(builtin(CoreObject::None)));
+        builder.emit(Opcode::Return);
+        EXPECT_EQ(context.payload<CodeObject>(code(builder)).program.max_stack(), 1U);
+    }
+
+    spec.kind = CodeKind::Module;
+    CodeBuilder builder(context, spec);
+    builder.emit(Opcode::SetupAnnotations, builder.name(U"__annotations__"));
+    builder.emit(Opcode::LoadConst, builder.constant(builtin(CoreObject::None)));
+    builder.emit(Opcode::Return);
+    const auto program = code(builder);
+    const auto globals = dictionary();
+    ReturnSlot out(context);
+    make_function(context, {program, globals}, out);
+    const auto fn = roots.root(out.value());
+    call(context, fn, {}, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    context.collect();
+    const auto key = text(U"__annotations__");
+    dict_lookup(context, globals, key, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    const auto annotations = roots.root(out.value());
+    EXPECT_TRUE(DictView(context, annotations.get(context)).entries().empty());
+    call(context, fn, {}, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    dict_lookup(context, globals, key, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(out.value(), annotations.get(context));
+
+    const auto empty_globals = dictionary();
+    make_function(context, {program, empty_globals}, out);
+    const auto limited = roots.root(out.value());
+    context.set_allocation_limit(0);
+    bool exhausted = false;
+    try {
+        call(context, limited, {}, out);
+    } catch (const std::bad_alloc &) {
+        exhausted = true;
+    }
+    context.set_allocation_limit(std::numeric_limits<std::size_t>::max());
+    if (!exhausted)
+        error(out, CoreObject::MemoryErrorType);
+    context.collect();
+    call(context, limited, {}, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    dict_lookup(context, empty_globals, key, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_TRUE(DictView(context, out.value()).entries().empty());
+}
+
+TEST_F(CoreExecution, FutureFlagsAreValidatedAndCapturedByVerifiedCode)
+{
+    CodeSpec spec;
+    spec.future_flags = supported_future_flags | 1U;
+    CodeBuilder invalid_flags(context, spec);
+    invalid_flags.emit(Opcode::Jump);
+    invalid(invalid_flags, CodeErrorKind::Operand);
+    spec.future_flags = future_annotations;
+    spec.nested = true;
+    CodeBuilder builder(context, spec);
+    builder.emit(Opcode::LoadConst, builder.constant(builtin(CoreObject::None)));
+    builder.emit(Opcode::Return);
+    const auto program = code(builder);
+    spec.future_flags = 0;
+    spec.nested = false;
+    const auto &verified = context.payload<CodeObject>(program).program;
+    EXPECT_EQ(verified.future_flags(), future_annotations);
+    EXPECT_EQ(verified.flags(), future_annotations | 3U | 16U);
+    context.collect();
+    EXPECT_EQ(context.payload<CodeObject>(program).program.flags(), future_annotations | 19U);
+}
+
 TEST_F(CoreExecution, FunctionCreationRetainsCodeIdentityAndInheritsTheExecutionEnvironment)
 {
     CodeBuilder child(context);

@@ -17,7 +17,7 @@ struct Binding {
     Span first;
     bool bound = false, used = false, parameter = false, global = false, nonlocal = false;
     NameClass classification = NameClass::GlobalImplicit;
-    bool forwarded = false;
+    bool forwarded = false, annotated = false;
 };
 struct ScopeBindings {
     std::vector<Binding> entries;
@@ -174,6 +174,8 @@ class ScopePass final {
                     if (node.name == U"super" && program_.scopes[scope].kind == ScopeKind::Function)
                         bindings_[scope].get(U"__class__", value.span).used = true;
                 } else if constexpr (std::is_same_v<T, YieldExpr>) {
+                    if (program_.scopes[scope].kind == ScopeKind::Annotation)
+                        error(value.span, "yield expression cannot be used within an annotation");
                     if (program_.scopes[scope].kind != ScopeKind::Function)
                         error(value.span, "'yield' outside function");
                     if (comprehensions_[scope] && !node.implicit)
@@ -184,6 +186,8 @@ class ScopePass final {
                     if (node.value)
                         expression(*node.value, scope);
                 } else if constexpr (std::is_same_v<T, AwaitExpr>) {
+                    if (program_.scopes[scope].kind == ScopeKind::Annotation)
+                        error(value.span, "await expression cannot be used within an annotation");
                     async_scope(scope, value.span, "'await' outside async function");
                     expression(*node.value, scope);
                 } else if constexpr (std::is_same_v<T, UnaryExpr> || std::is_same_v<T, StarredExpr>)
@@ -193,6 +197,8 @@ class ScopePass final {
                     expression(*node.body, scope);
                     expression(*node.alternative, scope);
                 } else if constexpr (std::is_same_v<T, NamedExpr>) {
+                    if (program_.scopes[scope].kind == ScopeKind::Annotation)
+                        error(value.span, "named expression cannot be used within an annotation");
                     if (comprehension_iterable_)
                         error(value.span, "assignment expression cannot be used in a comprehension "
                                           "iterable expression");
@@ -235,7 +241,10 @@ class ScopePass final {
                         async_scope(scope, value.span,
                                     "asynchronous comprehension outside of an "
                                     "asynchronous function");
-                } else if constexpr (std::is_same_v<T, BinaryExpr> || std::is_same_v<T, BoolExpr>) {
+                } else if constexpr (std::is_same_v<T, BoolExpr>) {
+                    for (const auto &item : node.values)
+                        expression(*item, scope);
+                } else if constexpr (std::is_same_v<T, BinaryExpr>) {
                     expression(*node.left, scope);
                     expression(*node.right, scope);
                 } else if constexpr (std::is_same_v<T, CompareExpr>) {
@@ -284,7 +293,7 @@ class ScopePass final {
     }
     void async_scope(std::size_t scope, Span span, const char *message)
     {
-        if (comprehensions_[scope])
+        if (comprehensions_[scope] || annotation_symbol_only_)
             program_.scopes[scope].coroutine = true;
         else if (!program_.scopes[scope].coroutine)
             error(span, message);
@@ -322,8 +331,8 @@ class ScopePass final {
         for (const auto &parameter : node.parameters)
             if (parameter.default_value)
                 expression(*parameter.default_value, scope);
-        for (const auto &annotation : node.annotations)
-            expression(*annotation.second, scope);
+        for (auto &item : node.annotations)
+            annotation(item.second, scope);
         node.scope = add(ScopeKind::Function, node.name, qualified(node.name, scope), scope, span);
         for (auto &annotation : node.annotations)
             annotation.first = mangle(std::move(annotation.first), node.scope);
@@ -370,6 +379,30 @@ class ScopePass final {
             } else if (const auto *filter = std::get_if<IfStmt>(&statement->node))
                 iteration_targets(filter->body, scope);
         }
+    }
+    void annotation(ExprPtr &value, std::size_t scope, bool evaluated = true)
+    {
+        const bool previous = annotation_symbol_only_;
+        annotation_symbol_only_ |= !evaluated || bool(program_.future_flags & future_annotations);
+        if (!(program_.future_flags & future_annotations)) {
+            expression(*value, scope);
+            annotation_symbol_only_ = previous;
+            return;
+        }
+        auto text = unparse_expression(*value, program_.source);
+        const auto size = bindings_.size();
+        const auto temporary =
+            add(ScopeKind::Annotation, U"<annotation>", U"<annotation>", {}, value->span);
+        private_names_[temporary] = private_names_[scope];
+        // CPython's AnnotationBlock does not contribute runtime closures.
+        expression(*value, temporary);
+        bindings_.resize(size);
+        comprehensions_.resize(size);
+        iteration_names_.resize(size);
+        private_names_.resize(size);
+        program_.scopes.resize(size);
+        value->node = Literal{Literal::Kind::String, std::move(text)};
+        annotation_symbol_only_ = previous;
     }
     struct PatternInfo {
         std::vector<std::u32string> names;
@@ -491,6 +524,28 @@ class ScopePass final {
                                 expression(*item.guard, scope);
                             collect(item.body, scope);
                         }
+                    } else if constexpr (std::is_same_v<T, AnnAssignStmt>) {
+                        if (program_.scopes[scope].kind != ScopeKind::Function)
+                            program_.scopes[scope].annotations = true;
+                        if (auto *name = std::get_if<NameExpr>(&node.target->node)) {
+                            if (node.simple) {
+                                auto &entry = bindings_[scope].get(mangle(name->name, scope),
+                                                                   node.target->span);
+                                if (scope && (entry.global || entry.nonlocal))
+                                    error(statement->span,
+                                          "annotated name '" + source_utf8(name->name) +
+                                              "' can't be " +
+                                              (entry.global ? "global" : "nonlocal"));
+                                entry.annotated = true;
+                            }
+                            if (node.simple || node.value)
+                                target(*node.target, scope);
+                        } else
+                            target(*node.target, scope);
+                        annotation(node.annotation, scope,
+                                   program_.scopes[scope].kind != ScopeKind::Function);
+                        if (node.value)
+                            expression(*node.value, scope);
                     } else if constexpr (std::is_same_v<T, AssignStmt>) {
                         for (const auto &item : node.targets)
                             target(*item, scope);
@@ -562,6 +617,10 @@ class ScopePass final {
                         }
                         collect(node.body, scope);
                     } else if constexpr (std::is_same_v<T, ImportStmt>) {
+                        if (node.module == U"__future__" && !node.level && !node.future)
+                            error(
+                                statement->span,
+                                "from __future__ imports must occur at the beginning of the file");
                         node.private_name = private_names_[scope];
                         for (auto &alias : node.names) {
                             if (alias.name == U"*") {
@@ -585,6 +644,9 @@ class ScopePass final {
                         for (auto &[name, span] : node.names) {
                             name = mangle(std::move(name), scope);
                             auto &entry = bindings_[scope].get(name, span);
+                            if (entry.annotated)
+                                error(span, "annotated name '" + source_utf8(name) + "' can't be " +
+                                                (node.nonlocal ? "nonlocal" : "global"));
                             if (entry.parameter || entry.bound || entry.used)
                                 error(span, "name used, assigned or parameter before "
                                             "global/nonlocal declaration");
@@ -629,6 +691,7 @@ class ScopePass final {
     std::vector<bool> comprehensions_;
     std::vector<std::vector<std::u32string>> iteration_names_;
     std::size_t comprehension_iterable_ = 0;
+    bool annotation_symbol_only_ = false;
 };
 
 } // namespace

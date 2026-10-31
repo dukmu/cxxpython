@@ -105,6 +105,7 @@ constexpr std::array definitions{
     OpcodeDefinition{"MATCH_CLASS", 3, 3, 1, OperandDomain::Count, FlowKind::Next, true, true},
     OpcodeDefinition{"COPY_DICT_WITHOUT_KEYS", 2, 2, 1, OperandDomain::None, FlowKind::Next, true,
                      true},
+    OpcodeDefinition{"SETUP_ANNOTATIONS", 0, 0, 0, OperandDomain::Name, FlowKind::Next, true, true},
 };
 static_assert(definitions.size() == static_cast<std::size_t>(Opcode::Count));
 [[noreturn]] void invalid(CodeErrorKind kind, const char *message,
@@ -136,6 +137,8 @@ std::size_t verify(const CodeSpec &spec, std::span<const Instruction> instructio
         invalid(CodeErrorKind::EmptyCode, "empty instruction sequence");
     if (!spec.first_line)
         invalid(CodeErrorKind::SourcePosition, "first line must be positive");
+    if (spec.future_flags & ~supported_future_flags)
+        invalid(CodeErrorKind::Operand, "unsupported future flags");
     if ((spec.generator || spec.coroutine) && spec.kind != CodeKind::Function)
         invalid(CodeErrorKind::Signature, "only function code can be a generator");
     if (spec.kind < CodeKind::Function || spec.kind > CodeKind::ClassBody ||
@@ -196,7 +199,8 @@ std::size_t verify(const CodeSpec &spec, std::span<const Instruction> instructio
         if (opcode == Opcode::ImportStar && spec.kind != CodeKind::Module)
             invalid(CodeErrorKind::Operand, "IMPORT_STAR requires module code", pc);
         if ((opcode == Opcode::LoadName || opcode == Opcode::StoreName ||
-             opcode == Opcode::DeleteName || opcode == Opcode::LoadClassDeref) &&
+             opcode == Opcode::DeleteName || opcode == Opcode::LoadClassDeref ||
+             opcode == Opcode::SetupAnnotations) &&
             spec.kind == CodeKind::Function)
             invalid(CodeErrorKind::Operand, "namespace opcode requires mapping code", pc);
         if (opcode == Opcode::LoadClassDeref &&
@@ -662,7 +666,8 @@ void CodeBuilder::freeze(ReturnSlot &out)
                                 constants_.size(), names_.size());
     VerifiedCode verified(std::move(instructions), positions_, std::move(calls), std::move(regions),
                           spec_.signature, spec_.locals, spec_.cellvars, spec_.freevars, maximum,
-                          spec_.first_line, spec_.kind, spec_.generator, spec_.coroutine);
+                          spec_.first_line, spec_.kind, spec_.generator, spec_.coroutine,
+                          spec_.future_flags, spec_.nested);
     RootScope roots(context_);
     ReturnSlot temporary(context_);
     cxxpython::core::make_tuple(context_, constants_, temporary);

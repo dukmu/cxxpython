@@ -398,6 +398,51 @@ void type_abstract_get(Attachment &context, Value receiver, ReturnSlot &out)
     else
         raise_error(context, CoreObject::AttributeErrorType, U"__abstractmethods__", out);
 }
+void type_annotations_get(Attachment &context, Value receiver, ReturnSlot &out)
+{
+    if (context.payload<TypeObject>(receiver).immutable) {
+        raise_error(context, CoreObject::AttributeErrorType, U"__annotations__", out);
+        return;
+    }
+    RootScope roots(context);
+    auto owner = roots.root(receiver);
+    auto dictionary = roots.root(*TypeView(context, owner).dictionary());
+    ReturnSlot key(context), value(context), empty(context);
+    make_str(context, U"__annotations__", key);
+    auto name = roots.root(key.value());
+    dict_lookup(context, dictionary, name, value);
+    if (value.tag() == ResultTag::Empty) {
+        context.allocate_instance<DictObject>(roots.root(context.builtin(CoreObject::DictType)),
+                                              empty);
+        dict_setdefault(context, dictionary, name, roots.root(empty.value()), value);
+    }
+    if (value.tag() == ResultTag::Raised) {
+        out.raised(value.exception());
+        return;
+    }
+    detail::bind_descriptor(context, value.value(), {}, owner.get(context), out);
+}
+void type_annotations_set(Attachment &context, Value receiver, std::optional<Value> value,
+                          ReturnSlot &out)
+{
+    if (context.payload<TypeObject>(receiver).immutable) {
+        type_error(context, U"cannot set attributes of immutable type", out);
+        return;
+    }
+    RootScope roots(context);
+    auto owner = roots.root(receiver);
+    if (value)
+        roots.root(*value);
+    ReturnSlot key(context);
+    make_str(context, U"__annotations__", key);
+    if (!detail::type_namespace_change(context, owner.get(context), U"__annotations__",
+                                       value ? std::optional<Value>(key.value()) : std::nullopt,
+                                       value)) {
+        raise_error(context, CoreObject::AttributeErrorType, U"__annotations__", out);
+        return;
+    }
+    out.ok(context.builtin(CoreObject::None));
+}
 void type_abstract_set(Attachment &context, Value receiver, std::optional<Value> value,
                        ReturnSlot &out)
 {
@@ -668,6 +713,8 @@ void install_attribute_descriptors(Attachment &context, std::span<const Handle> 
                   U"__dict__", type_dict_get, nullptr);
     install_field(context, descriptor_type, string_type, roots.root(context.type_type()),
                   U"__abstractmethods__", type_abstract_get, type_abstract_set);
+    install_field(context, descriptor_type, string_type, roots.root(context.type_type()),
+                  U"__annotations__", type_annotations_get, type_annotations_set);
     install_field(context, descriptor_type, string_type, roots.root(context.type_type()),
                   U"__bases__", type_bases, nullptr);
     install_field(context, descriptor_type, string_type, roots.root(context.type_type()),

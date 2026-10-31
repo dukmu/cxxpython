@@ -472,15 +472,14 @@ class Adapter {
         case Rule::disjunction:
         case Rule::conjunction:
             if (r.size() > 1) {
-                auto left = expression(*r[0]);
-                for (std::size_t i = 1; i < r.size(); ++i) {
-                    auto right = expression(*r[i]);
-                    auto d = std::max(left->depth, right->depth) + 1;
-                    left = make(
-                        n, BoolExpr{n.rule == Rule::conjunction, std::move(left), std::move(right)},
-                        d);
+                BoolExpr value{n.rule == Rule::conjunction, {}};
+                std::size_t depth = 1;
+                for (auto item : r) {
+                    auto child = expression(*item);
+                    depth = std::max(depth, child->depth + 1);
+                    value.values.push_back(std::move(child));
                 }
-                return left;
+                return make(n, std::move(value), depth);
             }
             break;
         case Rule::inversion:
@@ -968,7 +967,8 @@ class Adapter {
             auto expr = expression(*value);
             auto depth = std::max(expr->depth, spec->depth) + 1;
             joined.items.push_back(
-                make(n, FormattedExpr{std::move(expr), std::move(spec), conv}, depth));
+                make(n, FormattedExpr{std::move(expr), std::move(spec), conv, format != nullptr},
+                     depth));
             return;
         }
         for (auto p : children(n)) {
@@ -1301,7 +1301,31 @@ class Adapter {
             result.push_back(stmt(n, ExprStmt{expression(*r.at(0))}));
             break;
         case Rule::assignment: {
-            if (find(n, Rule::augassign)) {
+            if (has(n, U":")) {
+                AnnAssignStmt a;
+                a.simple = n.alternative == 0;
+                const auto parts = children(n);
+                const Node *target = nullptr;
+                for (auto p : parts)
+                    if ((p->rule == Rule::Token && token(*p).kind == TokenKind::NAME) ||
+                        p->rule == Rule::single_target ||
+                        p->rule == Rule::single_subscript_attribute_target) {
+                        target = p;
+                        break;
+                    }
+                if (!target)
+                    unsupported(n);
+                a.target = expression(*target);
+                validate_target(*a.target);
+                if (!std::holds_alternative<NameExpr>(a.target->node) &&
+                    !std::holds_alternative<AttributeExpr>(a.target->node) &&
+                    !std::holds_alternative<SubscriptExpr>(a.target->node))
+                    throw SourceError(source_, span(n), "illegal target for annotation");
+                a.annotation = expression(*find(n, Rule::expression));
+                if (auto rhs = find(n, Rule::annotated_rhs))
+                    a.value = expression(*rhs);
+                result.push_back(stmt(n, std::move(a)));
+            } else if (find(n, Rule::augassign)) {
                 const Node *op = find(n, Rule::augassign);
                 auto oc = children(*op);
                 auto target = expression(*r.at(0));
@@ -1311,8 +1335,6 @@ class Adapter {
                     stmt(n, AugAssignStmt{std::move(target), binary(token(*oc.at(0)).text, *op),
                                           std::move(value)}));
             } else {
-                if (has(n, U":"))
-                    unsupported(n);
                 AssignStmt a;
                 for (std::size_t i = 0; i + 1 < r.size(); ++i)
                     a.targets.push_back(expression(*r[i]));

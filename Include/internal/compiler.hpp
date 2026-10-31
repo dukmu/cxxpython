@@ -23,7 +23,7 @@ struct BinaryExpr {
 };
 struct BoolExpr {
     bool conjunction;
-    ExprPtr left, right;
+    std::vector<ExprPtr> values;
 };
 struct ConditionalExpr {
     ExprPtr test, body, alternative;
@@ -89,6 +89,7 @@ struct JoinedStrExpr {
 struct FormattedExpr {
     ExprPtr value, spec;
     char conversion = 0;
+    bool has_spec = false;
 };
 struct Expr {
     Span span;
@@ -159,6 +160,10 @@ struct ExprStmt {
 struct AssignStmt {
     std::vector<ExprPtr> targets;
     ExprPtr value;
+};
+struct AnnAssignStmt {
+    ExprPtr target, annotation, value;
+    bool simple = false;
 };
 struct AugAssignStmt {
     ExprPtr target;
@@ -257,13 +262,14 @@ struct ImportStmt {
     std::uint32_t level = 0;
     std::vector<ImportAlias> names;
     std::u32string private_name;
+    bool future = false;
 };
 enum class ControlStmt { Pass, Break, Continue };
 struct Stmt {
     Span span;
     std::variant<ExprStmt, AssignStmt, AugAssignStmt, DeleteStmt, IfStmt, WhileStmt, ForStmt,
                  FunctionStmt, ClassStmt, ReturnStmt, RaiseStmt, TryStmt, WithStmt, DeclareStmt,
-                 ImportStmt, AssertStmt, CollectionAddStmt, ControlStmt, MatchStmt>
+                 ImportStmt, AssertStmt, CollectionAddStmt, ControlStmt, MatchStmt, AnnAssignStmt>
         node;
 };
 // CFG instructions use native literals/names until one attached freeze task
@@ -312,10 +318,12 @@ struct SourceProgram {
     InputMode mode;
     std::vector<ScopeInfo> scopes;
     std::vector<FunctionGraph> graphs;
+    std::uint32_t future_flags = 0;
 };
 Suite parse_source(const SourceBuffer &source, InputMode mode);
 void analyze_scopes(SourceProgram &program, Suite &body);
 std::u32string decode_source(const SourceBuffer &source, Span span);
 std::u32string decode_filename(const SourceBuffer &source);
 std::u32string mangle_name(std::u32string name, const std::u32string &owner);
+std::u32string unparse_expression(const Expr &, const SourceBuffer &);
 } // namespace cxxpython::core::detail

@@ -1,0 +1,11 @@
+{'field': <class 'int'>}
+{}
+True
+None
+{}
+missing annotations
+(True, True)
+no builtin annotations
+no builtin annotations
+no builtin annotations
+['__module__', '__qualname__', '__annotations__', '__doc__']

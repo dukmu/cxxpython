@@ -37,7 +37,7 @@ class SourceError final : public std::invalid_argument {
     const std::uint32_t offset, end_offset;
 };
 enum class InputMode { Exec, Eval, Single };
-enum class ScopeKind { Module, Function, Class };
+enum class ScopeKind { Module, Function, Class, Annotation };
 enum class NameClass { Local, Namespace, GlobalExplicit, GlobalImplicit, Free, Cell };
 struct SymbolInfo {
     std::u32string name;
@@ -56,6 +56,7 @@ struct ScopeInfo {
     std::vector<std::u32string> cellvars, freevars;
     bool generator = false;
     bool coroutine = false;
+    bool annotations = false;
 };
 namespace detail {
 struct SourceProgram;
@@ -63,12 +64,14 @@ struct SourceProgram;
 // Pure host parse/scope/CFG state; immutable and shareable after construction.
 class SourceUnit final {
   public:
-    explicit SourceUnit(SourceBuffer source, InputMode mode = InputMode::Exec);
+    explicit SourceUnit(SourceBuffer source, InputMode mode = InputMode::Exec,
+                        std::uint32_t future_flags = 0);
     ~SourceUnit();
     SourceUnit(SourceUnit &&) noexcept;
     SourceUnit &operator=(SourceUnit &&) noexcept;
     const SourceBuffer &source() const noexcept;
     std::span<const ScopeInfo> scopes() const noexcept;
+    std::uint32_t future_flags() const noexcept;
     void freeze(Attachment &context, ReturnSlot &out) const;
 
   private:

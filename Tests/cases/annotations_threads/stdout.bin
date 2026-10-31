@@ -1,0 +1,2 @@
+['entered']
+['entered', 'caught', 'finally', (42, True)]

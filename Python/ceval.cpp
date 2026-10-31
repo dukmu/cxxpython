@@ -764,6 +764,25 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                     data.operands[--data.sp] = context.builtin(CoreObject::None);
                 break;
             }
+            case Opcode::SetupAnnotations: {
+                RootScope roots(context);
+                auto mapping = roots.root(*data.namespace_mapping);
+                auto key = roots.root(context.payload<TupleObject>(code.names).items[operand]);
+                namespace_lookup(context, mapping.get(context), key.get(context), result);
+                if (result.tag() == ResultTag::Empty) {
+                    ReturnSlot dictionary(context);
+                    context.allocate_instance<DictObject>(
+                        roots.root(context.builtin(CoreObject::DictType)), dictionary);
+                    auto annotations = roots.root(dictionary.value());
+                    if (context.type_of(mapping) == context.builtin(CoreObject::DictType))
+                        dict_setdefault(context, mapping, key, annotations, result);
+                    else
+                        set_item(context, mapping, key, annotations, result);
+                }
+                if (raised(result))
+                    activation.raising(result.exception());
+                break;
+            }
             case Opcode::LoadGlobal:
             case Opcode::StoreGlobal:
             case Opcode::DeleteGlobal: {
@@ -1711,6 +1730,10 @@ void code_firstline(Attachment &c, Value value, ReturnSlot &out)
 {
     make_int(c, c.payload<CodeObject>(value).program.first_line(), out);
 }
+void code_flags(Attachment &c, Value value, ReturnSlot &out)
+{
+    make_int(c, c.payload<CodeObject>(value).program.flags(), out);
+}
 void frame_code(Attachment &c, Value value, ReturnSlot &out)
 {
     out.ok(c.payload<FrameObject>(value).code);
@@ -1940,6 +1963,7 @@ void install_execution(Attachment &context, std::span<const Handle> core)
     field(CoreObject::CodeType, U"co_varnames", code_varnames);
     field(CoreObject::CodeType, U"co_stacksize", code_stacksize);
     field(CoreObject::CodeType, U"co_firstlineno", code_firstline);
+    field(CoreObject::CodeType, U"co_flags", code_flags);
     field(CoreObject::CodeType, U"co_names", code_names);
     field(CoreObject::CodeType, U"co_cellvars", code_cellvars);
     field(CoreObject::CodeType, U"co_freevars", code_freevars);

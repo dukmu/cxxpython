@@ -97,6 +97,7 @@ enum class Opcode : std::uint8_t {
     MatchKeys,
     MatchClass,
     CopyDictWithoutKeys,
+    SetupAnnotations,
     Count,
 };
 enum class OperandDomain {
@@ -234,6 +235,9 @@ class CodeValidationError : public std::invalid_argument {
     std::optional<std::size_t> pc;
 };
 enum class CodeKind { Function, Module, ClassBody };
+inline constexpr std::uint32_t future_annotations = 0x1000000;
+// Historical future flags whose semantics are already mandatory in Python 3.
+inline constexpr std::uint32_t supported_future_flags = 0x1be0000;
 struct CodeSpec {
     std::u32string name = U"<code>";
     std::optional<std::u32string> qualname;
@@ -246,6 +250,8 @@ struct CodeSpec {
     CodeKind kind = CodeKind::Function;
     bool generator = false;
     bool coroutine = false;
+    std::uint32_t future_flags = 0;
+    bool nested = false;
 };
 class CodeBuilder;
 class VerifiedCode final {
@@ -304,6 +310,20 @@ class VerifiedCode final {
     {
         return coroutine_;
     }
+    std::uint32_t future_flags() const noexcept
+    {
+        return future_flags_;
+    }
+    std::uint32_t flags() const noexcept
+    {
+        auto result = future_flags_;
+        if (kind_ == CodeKind::Function) {
+            result |= 3 | (signature_.varargs ? 4 : 0) | (signature_.varkwargs ? 8 : 0) |
+                      (nested_ ? 16 : 0);
+            result |= generator_ ? (coroutine_ ? 512 : 32) : coroutine_ ? 128 : 0;
+        }
+        return result;
+    }
     std::size_t max_stack() const noexcept
     {
         return max_stack_;
@@ -321,12 +341,12 @@ class VerifiedCode final {
                  SignatureLayout signature, std::vector<std::u32string> locals,
                  std::vector<std::u32string> cellvars, std::vector<std::u32string> freevars,
                  std::size_t stack, std::uint32_t first_line, CodeKind kind, bool generator,
-                 bool coroutine)
+                 bool coroutine, std::uint32_t future_flags, bool nested)
         : instructions_(std::move(instructions)), positions_(std::move(positions)),
           calls_(std::move(calls)), regions_(std::move(regions)), signature_(std::move(signature)),
           locals_(std::move(locals)), cellvars_(std::move(cellvars)),
           freevars_(std::move(freevars)), max_stack_(stack), first_line_(first_line), kind_(kind),
-          generator_(generator), coroutine_(coroutine)
+          generator_(generator), coroutine_(coroutine), future_flags_(future_flags), nested_(nested)
     {
         for (const auto &region : regions_)
             if (region.depth > max_regions_)
@@ -354,6 +374,8 @@ class VerifiedCode final {
     CodeKind kind_;
     bool generator_;
     bool coroutine_;
+    std::uint32_t future_flags_;
+    bool nested_;
 };
 struct CodeObject {
     ObjectHeader header;

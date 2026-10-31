@@ -1,0 +1,12 @@
+True
+[('nested_scopes', True), ('generators', False), ('division', True), ('absolute_import', True), ('with_statement', True), ('print_function', True), ('unicode_literals', True), ('generator_stop', True), ('annotations', True)]
+False NameError
+True {'x': 'missing'}
+{'x': 'missing'}
+True
+False
+True
+False
+SyntaxError from __future__ imports must occur at the beginning of the file
+SyntaxError future feature imaginary_feature is not defined
+True

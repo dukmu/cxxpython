@@ -55,6 +55,49 @@ for before, after in zip(instructions, shifted):
                                      else before.positions.lineno + delta)
 assert len(list(dis.get_instructions("1 + 2"))) > 0
 
+annotated_code = compile("value: int\nclass Annotated:\n    field: int\n", "<annotations>", "exec")
+class_code = [c for c in annotated_code.co_consts
+              if hasattr(c, "co_name") and c.co_name == "Annotated"][0]
+for code_object in (annotated_code, class_code):
+    annotation_instructions = list(dis.get_instructions(code_object))
+    setup = [i for i in annotation_instructions if i.opname == "SETUP_ANNOTATIONS"]
+    assert len(setup) == 1
+    assert dis.Bytecode(code_object).stack_effect(setup[0].offset) == 0
+    assert opcode.stack_effect(setup[0].opcode, setup[0].arg) == 0
+
+# Values match CPython 3.12 code flags for these definitions.
+def flags_plain():
+    pass
+
+def flags_arguments(*args, **kwargs):
+    pass
+
+def flags_generator():
+    yield 1
+
+async def flags_coroutine():
+    pass
+
+async def flags_async_generator():
+    yield 1
+
+def flags_outer():
+    def inner():
+        pass
+    return inner
+
+assert flags_plain.__code__.co_flags == 3
+assert flags_arguments.__code__.co_flags == 15
+assert flags_generator.__code__.co_flags == 35
+assert flags_coroutine.__code__.co_flags == 131
+assert flags_async_generator.__code__.co_flags == 515
+assert flags_outer().__code__.co_flags == 19
+future_code = compile("from __future__ import annotations\ndef f():\n    pass\n", "<future>", "exec")
+future_function_code = [c for c in future_code.co_consts
+                        if hasattr(c, "co_name") and c.co_name == "f"][0]
+assert future_code.co_flags == 0x1000000
+assert future_function_code.co_flags == 0x1000003
+
 class Example:
     def method(self):
         return 1

@@ -30,6 +30,7 @@ add_library(cxxpython_core
     Python/pylifecycle.cpp
     Python/pythonrun.cpp
     Python/compile.cpp
+    Python/ast_unparse.cpp
     Python/bltinmodule.cpp
     Python/builtinexec.cpp
     Python/import.cpp

@@ -260,8 +260,22 @@ the target is `builtins` and the `__builtins__` execution namespace.
 - Ordinary function parameter and return annotations evaluate in the defining
   scope after defaults and before closure publication. __annotations__ is a
   traced atomic dictionary edge supporting lazy empty values, replacement, None
-  reset and deletion. Variable annotations and postponed/future evaluation are
-  not yet delivered. No upstream annotation was stripped to import these files.
+  reset and deletion. Variable annotations now follow pinned compile.c/symtable.c
+  rules for simple/complex targets, no-RHS effects, local binding, global/nonlocal
+  restrictions and prologue mapping setup. Class annotation reflection follows
+  typeobject.c's own-namespace and descriptor rules, using existing metadata CAS
+  publication rather than inheriting another class's annotations.
+- `Lib/__future__.py` is unchanged pinned CPython 3.12.14 source. Annotation
+  postponement uses a native AST unparser adapted from Python/ast_unparse.c,
+  including precedence, literals, lambda/comprehension and f-string formatting,
+  not token joining or source slicing. Temporary annotation scopes do not leak
+  runtime closures. Supported compile flags/dont_inherit, source exec/eval and
+  REPL input preserve effective flags; precompiled Code does not inherit again.
+  co_flags reports actual runtime traits. Barry comparison syntax, other compile
+  modes/options, the complete upstream annotation suite, generic/type-alias
+  scopes and native TypeVar/typing remain gates. The -i after -m future-flags
+  handoff is also not delivered. No upstream annotation was stripped to import
+  these files.
 - Native async generators distinguish user yields from inner await suspension
   and reuse the existing VM Frame/unwind. asend/athrow/aclose requests preserve
   their generator-running claim across await suspension and reject competitors.

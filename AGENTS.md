@@ -82,7 +82,8 @@ compiler, VM, and extension platform implemented in a C/C++ mix.
   when useful, script-level integration tests.
 - Test Python-visible behavior directly with `Tests/cases/<name>/test.py` and
   `stdout.bin` fixtures through `Tests/python/test_cases.py`. Optional `stdin.bin`
-  contains process input, never Python source; optional
+  contains process input, never the script under test (interactive REPL commands
+  are process input); optional
   `stderr.bin` and `exitcode.txt` describe other output/status. Generate goldens
   with the pinned reference. Do not wrap runnable Python programs in compiled
   C++ tests. Native tests are for roots, quotas, host faults, IR and shared-heap

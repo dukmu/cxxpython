@@ -597,10 +597,35 @@ annotation dictionary, closure tuple and Code in that order when flags 1/2/8/4
 are present. Shape errors use Python
 TypeError/ValueError. co_varnames, co_cellvars, co_freevars and __closure__ expose
 actual managed metadata; runtime closure creation reuses the scope's Code.
-Function parameter/return annotations evaluate in the defining scope, retain
-private-name mangling, and publish through a traced atomic __annotations__ edge.
+Function parameter/return annotations normally evaluate in the defining scope,
+retain private-name mangling, and publish through a traced atomic __annotations__ edge.
 Lazy empty dictionaries, replacement, None reset and deletion share that edge.
-Postponed/future and variable annotations remain separate language gates.
+With future annotations, pure-native AST unparsing supplies canonical strings
+before mangling. Temporary annotation scopes validate syntax without introducing
+runtime bindings/closures. Local variable annotations still affect symbol/function
+classification but do not evaluate or emit nested Code objects.
+
+Variable annotations use ordinary assignment/item/attribute protocols and retain
+the reference's RHS/target/annotation order. Simple module/class names store into
+__annotations__; parenthesized names and complex targets do not. Bare attributes
+and subscripts evaluate the required receiver/index expressions without doing an
+item or attribute read. SETUP_ANNOTATIONS is a raising/safepoint-bearing 0->0 Name
+instruction restricted to mapping Code. Module/class prologues initialize the
+local annotations mapping even if a declaration is in an untaken branch. Exact
+dict initialization uses existing atomic setdefault; custom mappings use their
+Python item protocols. Type.__annotations__ consults only the class's own
+namespace, binds descriptor values and lazily publishes an empty dict through
+the existing metadata CAS path, not an independent TypeObject edge.
+
+SourceUnit accepts an explicit future-flags mask and exposes its effective mask;
+VerifiedCode freezes it along with actual nested/generator/coroutine/argument
+traits. co_flags uses Python bit assignments for those real traits, without
+claiming CPython instruction encodings. compile handles supported historical and
+annotation flags/dont_inherit; exec/eval inherit only for source strings, not
+precompiled Code. Imports do not inherit the importer's flags. REPL state retains
+future directives across input units and ordinary -i scripts. Barry comparison
+syntax, other compile modes/options, full type-parameter scopes/typing and -i
+after -m flag handoff remain separate gates.
 
 ASYNC_YIELD_VALUE has the same one-slot resumption effect as YIELD_VALUE, may
 allocate/raise and is a safepoint. Verification requires both generator and

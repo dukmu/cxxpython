@@ -290,13 +290,15 @@ class GraphPass final {
     {
         // Jump-context lowering must not repeat an observable __bool__.
         if (const auto *node = std::get_if<BoolExpr>(&value.node)) {
-            const auto right = block();
-            test(*node->left, node->conjunction ? right : yes, node->conjunction ? no : right,
-                 preserve);
-            select(right);
-            if (preserve)
-                emit(Opcode::PopTop, value.span);
-            test(*node->right, yes, no, preserve);
+            for (std::size_t i = 0; i + 1 < node->values.size(); ++i) {
+                const auto next = block();
+                test(*node->values[i], node->conjunction ? next : yes,
+                     node->conjunction ? no : next, preserve);
+                select(next);
+                if (preserve)
+                    emit(Opcode::PopTop, value.span);
+            }
+            test(*node->values.back(), yes, no, preserve);
             return;
         }
         if (const auto *node = std::get_if<CompareExpr>(&value.node)) {
@@ -472,12 +474,15 @@ class GraphPass final {
                          : node.conversion == 'a' ? 3
                                                   : 0);
                 } else if constexpr (std::is_same_v<T, BoolExpr>) {
-                    const auto right = block(), done = block();
-                    test(*node.left, node.conjunction ? right : done,
-                         node.conjunction ? done : right, true);
-                    select(right);
-                    emit(Opcode::PopTop, value.span);
-                    expression(*node.right);
+                    const auto done = block();
+                    for (std::size_t i = 0; i + 1 < node.values.size(); ++i) {
+                        const auto next = block();
+                        test(*node.values[i], node.conjunction ? next : done,
+                             node.conjunction ? done : next, true);
+                        select(next);
+                        emit(Opcode::PopTop, value.span);
+                    }
+                    expression(*node.values.back());
                     jump(done, value.span);
                     select(done);
                 } else if constexpr (std::is_same_v<T, CompareExpr>) {
@@ -851,6 +856,49 @@ class GraphPass final {
              static_cast<std::uint32_t>(exact ? CompareOp::Eq : CompareOp::Ge));
         pattern_test(failed, span);
     }
+    void annotation_target(const Expr &value)
+    {
+        if (const auto *slice = std::get_if<SliceExpr>(&value.node)) {
+            for (const auto *item : {&slice->start, &slice->stop, &slice->step})
+                if (*item) {
+                    expression(**item);
+                    emit(Opcode::PopTop, (*item)->span);
+                }
+        } else if (const auto *tuple = std::get_if<TupleExpr>(&value.node)) {
+            for (const auto &item : tuple->items)
+                annotation_target(*item);
+        } else {
+            expression(value);
+            emit(Opcode::PopTop, value.span);
+        }
+    }
+    void annotated_assignment(const AnnAssignStmt &node, Span span)
+    {
+        if (node.value) {
+            expression(*node.value);
+            store(*node.target);
+        } else if (const auto *attribute = std::get_if<AttributeExpr>(&node.target->node)) {
+            expression(*attribute->object);
+            emit(Opcode::PopTop, span);
+        } else if (const auto *item = std::get_if<SubscriptExpr>(&node.target->node)) {
+            expression(*item->object);
+            emit(Opcode::PopTop, span);
+            annotation_target(*item->key);
+        }
+        const auto kind = program_.scopes[scope_].kind;
+        if (node.simple && kind != ScopeKind::Function) {
+            expression(*node.annotation);
+            emit(Opcode::LoadName, span, 0, U"__annotations__");
+            literal({Literal::Kind::String, std::get<NameExpr>(node.target->node).name}, span);
+            emit(Opcode::Swap, span, 2);
+            emit(Opcode::Swap, span, 3);
+            emit(Opcode::StoreItem, span);
+        } else if (!node.simple && kind != ScopeKind::Function &&
+                   !(program_.future_flags & future_annotations)) {
+            expression(*node.annotation);
+            emit(Opcode::PopTop, span);
+        }
+    }
     void pattern(const Pattern &value, PatternContext &context, std::size_t failed)
     {
         const auto start = context.captures.size();
@@ -1083,7 +1131,9 @@ class GraphPass final {
                         emit(scope_ == 0 && program_.mode == InputMode::Single ? Opcode::PrintExpr
                                                                                : Opcode::PopTop,
                              span);
-                    } else if constexpr (std::is_same_v<T, AssignStmt>) {
+                    } else if constexpr (std::is_same_v<T, AnnAssignStmt>)
+                        annotated_assignment(node, span);
+                    else if constexpr (std::is_same_v<T, AssignStmt>) {
                         expression(*node.value);
                         for (std::size_t i = 0; i < node.targets.size(); ++i) {
                             if (i + 1 < node.targets.size())
@@ -1412,6 +1462,10 @@ class GraphPass final {
             emit(Opcode::StoreName, info.span, 0, U"__module__");
             literal({Literal::Kind::String, info.qualname}, info.span);
             emit(Opcode::StoreName, info.span, 0, U"__qualname__");
+        }
+        if (info.annotations && info.kind != ScopeKind::Function)
+            emit(Opcode::SetupAnnotations, info.span, 0, U"__annotations__");
+        if (info.kind == ScopeKind::Class) {
             if (const auto &docstring = program_.graphs[scope].docstring) {
                 literal({Literal::Kind::String, *docstring}, info.span);
                 emit(Opcode::StoreName, info.span, 0, U"__doc__");
@@ -1493,11 +1547,42 @@ void literal(Attachment &context, const Literal &value, ReturnSlot &out)
 } // namespace cxxpython::core::detail
 
 namespace cxxpython::core {
-SourceUnit::SourceUnit(SourceBuffer source, InputMode mode)
+SourceUnit::SourceUnit(SourceBuffer source, InputMode mode, std::uint32_t future_flags)
 {
     auto program = std::make_unique<detail::SourceProgram>(
-        detail::SourceProgram{std::move(source), mode, {}, {}});
+        detail::SourceProgram{std::move(source), mode, {}, {}, future_flags});
     auto body = detail::parse_source(program->source, mode);
+    bool prefix = true;
+    for (std::size_t i = 0; i < body.size(); ++i) {
+        if (!i)
+            if (auto expr = std::get_if<detail::ExprStmt>(&body[i]->node))
+                if (auto literal = std::get_if<detail::Literal>(&expr->value->node);
+                    literal && literal->kind == detail::Literal::Kind::String)
+                    continue;
+        auto imported = std::get_if<detail::ImportStmt>(&body[i]->node);
+        if (!prefix || !imported || imported->module != U"__future__" || imported->level) {
+            prefix = false;
+            continue;
+        }
+        imported->future = true;
+        for (const auto &name : imported->names) {
+            if (name.name == U"annotations")
+                program->future_flags |= future_annotations;
+            else if (name.name == U"barry_as_FLUFL")
+                throw SourceError(program->source, name.span,
+                                  "Barry comparison syntax is not implemented",
+                                  SourceErrorKind::Capability);
+            else if (name.name != U"nested_scopes" && name.name != U"generators" &&
+                     name.name != U"division" && name.name != U"absolute_import" &&
+                     name.name != U"with_statement" && name.name != U"print_function" &&
+                     name.name != U"unicode_literals" && name.name != U"generator_stop")
+                throw SourceError(program->source, name.span,
+                                  name.name == U"braces"
+                                      ? "not a chance"
+                                      : "future feature " + source_utf8(name.name) +
+                                            " is not defined");
+        }
+    }
     detail::analyze_scopes(*program, body);
     detail::GraphPass(*program).build(body);
     program_ = std::move(program);
@@ -1513,6 +1598,10 @@ std::span<const ScopeInfo> SourceUnit::scopes() const noexcept
 {
     return program_->scopes;
 }
+std::uint32_t SourceUnit::future_flags() const noexcept
+{
+    return program_->future_flags;
+}
 void SourceUnit::freeze(Attachment &context, ReturnSlot &out) const
 {
     out.reset(context);
@@ -1523,6 +1612,10 @@ void SourceUnit::freeze(Attachment &context, ReturnSlot &out) const
         const auto filename_text = detail::decode_filename(source());
         for (std::size_t id = codes.size(); id-- > 0;) {
             const auto &graph = program_->graphs[id];
+            // Local annotations are analyzed but never evaluated, so lambdas
+            // and comprehensions inside them do not produce executable Code.
+            if (graph.blocks.empty())
+                continue;
             const auto &scope = program_->scopes[id];
             CodeSpec spec;
             spec.name = scope.name;
@@ -1536,6 +1629,9 @@ void SourceUnit::freeze(Attachment &context, ReturnSlot &out) const
             spec.freevars = scope.freevars;
             spec.generator = scope.generator;
             spec.coroutine = scope.coroutine;
+            spec.future_flags = program_->future_flags;
+            for (auto parent = scope.parent; parent; parent = program_->scopes[*parent].parent)
+                spec.nested |= program_->scopes[*parent].kind == ScopeKind::Function;
             spec.kind = scope.kind == ScopeKind::Class    ? CodeKind::ClassBody
                         : scope.kind == ScopeKind::Module ? CodeKind::Module
                                                           : CodeKind::Function;

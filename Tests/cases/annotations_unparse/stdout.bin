@@ -1,0 +1,69 @@
+None
+True
+False
+...
+255
+1000000
+2.0
+1e-05
+1e+16
+1e309
+2j
+1e309j
+-0.0
+-2j
+1 + 2j
+'hello'
+'a\nb'
+b'\x00a'
+'\u200b'
+"a'b"
+a + b * c
+(a + b) * c
+a - (b - c)
+(a ** b) ** c
+a ** b ** c
+a | b ^ c & d << e
+not a and b or c
+a and b and c
+(a and b) and c
+a and (b and c)
+(a < b) < c
+a is not b not in c
+a if b else c if d else e
+(a if b else c) if d else e
+(1,)
+()
+(a, b)
+[a, *items]
+{a, *items}
+{'x': a, **kw}
+obj.attr
+1 .real
+obj[a, b:c, ::d]
+obj[a,]
+obj[()]
+f(a, *items, name=b, **kw)
+f(x for x in values)
+lambda: None
+lambda x=1, /, *args, z=2, **kw: (x, z)
+lambda*, x=1: x
+lambda: (yield 1)
+lambda: (x := 1)
+[x + 1 for x in values if x if test(x)]
+{x for x in values for y in other if y}
+{x: y for x, y in values}
+(x for x in values)
+[await a for a in b]
+[a async for a in b]
+lambda: await value
+f'{name}'
+f'{name:}'
+f'{name!r:>{width}}'
+f'{{text}}  value = {value!r}'
+f'{ {1: 2}}'
+f'{(lambda x: x)(1)}'
+SyntaxError named expression cannot be used within an annotation
+SyntaxError yield expression cannot be used within an annotation
+SyntaxError yield expression cannot be used within an annotation
+SyntaxError await expression cannot be used within an annotation

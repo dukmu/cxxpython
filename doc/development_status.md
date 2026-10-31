@@ -1,5 +1,77 @@
 # Development Status
 
+## 2026-10-31 Variable And Postponed Annotations With Compiler Flags
+
+Prepended after 3072505, preserving earlier entries. Terra supplied the pinned
+__future__ library, initial direct-script/IR cases and native literal-rendering
+helper; parent implemented expression unparsing, AST/symbol/CFG/VM/builtin/REPL
+integration and class reflection. An earlier broad unparser assignment returned
+no implementation and was replaced by the concrete literal subtask; no unbuilt
+worker result is counted as completion. All workers are closed. The full active
+frontend/import/library/product/N4-N6/M0-M9 objective is not complete.
+
+- Variable annotations now distinguish simple names, parenthesized names,
+  attributes and subscripts, with and without RHS. Assignment precedes annotation
+  evaluation. Bare complex targets evaluate required receiver/index expressions
+  without performing a target read. Only simple module/class names store into
+  __annotations__; local declarations classify bindings without evaluating their
+  annotations. Global/nonlocal declaration conflicts have compile-time errors.
+  New typed AnnAssign AST nodes use existing binding and object protocols.
+- SETUP_ANNOTATIONS has a verified Name operand, 0->0 effect, raising/safepoint
+  contract and real dis output. It is rejected in optimized function Code.
+  Module/class setup occurs even for declarations in untaken branches and keeps
+  existing values. Exact dict initialization uses existing atomic setdefault;
+  custom class mappings keep their ordinary callbacks/errors. Class prologues
+  retain reference ordering of module/qualname, annotations and docstring stores.
+- Type.__annotations__ consults only the own namespace, not base annotations.
+  Its lazy dict publication uses the existing type-namespace metadata CAS and
+  normal descriptor binding; setter/deleter preserve arbitrary assigned values
+  and missing/immutable errors. No additional TypeObject storage authority,
+  global compilation state or execution mutex was introduced.
+- Future import prefix/known-feature validation and explicit supported compiler
+  flags feed immutable SourceUnit/VerifiedCode state. compile honors dont_inherit;
+  source exec/eval inherit the actual caller flags, while precompiled Code does
+  not inherit again and independent imported modules keep their own flags.
+  co_flags reports real function/local/argument/nested/generator/coroutine traits
+  plus effective futures, not CPython bytecode compatibility. Historical mandatory
+  futures are supported; Barry comparison syntax remains explicitly unavailable.
+  Lib/__future__.py matches the pinned 3.12.14 source byte-for-byte.
+- Python/ast_unparse.cpp adapts pinned ast_unparse.c for native expressions:
+  decoded literals, precedence, displays, slicing, calls, lambdas, reconstructed
+  comprehensions and f-strings, without source slicing or token joining.
+  BoolExpr now preserves operand groups and FormattedExpr records format-spec
+  presence. Future annotations are stringized before name mangling, then checked
+  in disconnected Annotation scopes that cannot add runtime bindings/closures.
+- Reference checks established that unevaluated local annotations can still
+  classify a function as generator/coroutine, and that postponed annotations
+  permit await inside nested lambdas/comprehensions while rejecting direct
+  yield/await/named expressions. Symbol-only validation now follows that split.
+  Analyzed local-annotation lambda/comprehension scopes do not emit graphs or
+  allocate Code. The first product differential passed four fixtures and exposed
+  the two pending symbol-only paths; the final rebuilt binaries pass all six.
+- Six new test.py fixtures and reference-generated goldens cover evaluation and
+  namespace order, closure/local classification, exact canonical strings,
+  compiler inheritance, own-class reflection, descriptor callbacks and shared-heap
+  thread/GC handoff. Worker failures are caught and gates completed. Native tests
+  cover IR/mask validation, immutable metadata and allocation/root contracts, not
+  C++ wrappers around Python-visible examples. Dedicated PTY fixtures keep setup
+  in test.py and actual interactive input in stdin.bin. Both interactive future
+  imports and -i script inheritance persist across later REPL units.
+- Acceptance passes 290/290 portable fixtures and 131 selected native/source/
+  grammar/dis/terminal checks. Strict ASan/UBSan/LSan and TSan each pass 72 affected
+  native/dis/terminal checks plus all six new differential scripts. Format-check
+  and the pinned library comparison pass. No sanitizer/time limit was relaxed,
+  unrelated performance suite rerun, or manual measurement table introduced.
+  Raw evidence and final source/binary hashes are retained under .cache/annotations-*.
+- Remaining gates include the complete upstream annotation matrix, other compile
+  modes/options and diagnostics, Barry syntax, -i after -m flag handoff, generic/
+  alias annotation scopes, TypeVar/ParamSpec/TypeVarTuple/TypeAliasType and the
+  actual typing/inspect/library dependency closure. Those are next dependencies
+  toward the requested Base-to-Full standard library and N4-N6/M0-M9 release
+  acceptance, not grounds to call the full goal complete. Origin push still awaits
+  destination authorization; no retry or bypass was attempted. The user's test2.py
+  and temporary_plan.md deletion are excluded from this node.
+
 ## 2026-10-31 Executable Structural Patterns And Multiline REPL
 
 Prepended after 4e47df2 without rewriting earlier evidence. Terra supplied native

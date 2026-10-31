@@ -117,6 +117,14 @@ def main():
     terminal(binary, ["-q", "-i", str(patterns / "test.py")],
              [(b">>> ", (patterns / "stdin.bin").read_bytes() + b"\x04")],
              [b"PAIR 3 4", b"\r\n7\r\n", b"SyntaxError", b"RECOVERED 7"])
+    annotations = root / "pty_cases/repl_annotations"
+    commands = (annotations / "stdin.bin").read_bytes() + b"\x04"
+    expected = [b"{'value': 'Missing'}", b"{'arg': 'Unknown', 'return': 'list[int]'}",
+                b"FUTURE True"]
+    terminal(binary, ["-q", "-i", str(annotations / "test.py")],
+             [(b">>> ", commands)], expected)
+    terminal(binary, ["-q"],
+             [(b">>> ", b"from __future__ import annotations\n" + commands)], expected)
     backpressure(binary, root / "pty_cases/readline_backpressure/test.py")
     print("PASS terminal REPL editing, GC progress and terminal restoration")
 

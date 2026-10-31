@@ -1,0 +1,13 @@
+['value', 'name', 'paren value', 'paren', 'attr value', 'attribute', 'item value', 0, 'subscript', 'no attr rhs', 0, 'no item rhs', 'bare']
+{'name': 'name', 'bare': 'bare'}
+value paren value attr value ['item value']
+{}
+{'existing': 1, 'new': <class 'int'>}
+class annotations setup
+{'field': <class 'str'>}
+ValueError setup rejected
+unbound local {}
+unevaluated 3 35 131
+SyntaxError annotated name 'x' can't be global
+SyntaxError annotated name 'x' can't be nonlocal
+SyntaxError annotated name 'x' can't be nonlocal

@@ -1,0 +1,7 @@
+value: Missing
+print(__annotations__)
+def annotated(arg: Unknown) -> list[int]:
+    pass
+
+print(annotated.__annotations__)
+print('FUTURE', bool(compile('0', '<repl>', 'eval').co_flags & 16777216))

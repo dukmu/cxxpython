@@ -113,7 +113,8 @@ int report_source_error(const SourceError &error)
     return 1;
 }
 
-int run_interactive(Attachment &context, Handle globals, Handle sys, bool prompts, bool banner)
+int run_interactive(Attachment &context, Handle globals, Handle sys, bool prompts, bool banner,
+                    std::uint32_t future_flags)
 {
     RootScope roots(context);
     globals = roots.root(globals.get(context));
@@ -203,7 +204,8 @@ int run_interactive(Attachment &context, Handle globals, Handle sys, bool prompt
             }
         }
         try {
-            SourceUnit source(SourceBuffer(pending, "<stdin>"), InputMode::Single);
+            SourceUnit source(SourceBuffer(pending, "<stdin>"), InputMode::Single, future_flags);
+            future_flags = source.future_flags();
             run(context, {&source, globals}, result);
             if (result.tag() == ResultTag::Raised) {
                 auto error = iteration.root(result.exception());

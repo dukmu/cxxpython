@@ -114,7 +114,7 @@ bool source_text(Attachment &context, Value source, std::string &text, ReturnSlo
 }
 
 void freeze_source(Attachment &context, Value source, std::string filename, InputMode mode,
-                   ReturnSlot &out)
+                   ReturnSlot &out, std::uint32_t flags)
 {
     std::string text;
     if (!source_text(context, source, text, out))
@@ -124,11 +124,18 @@ void freeze_source(Attachment &context, Value source, std::string filename, Inpu
         text.erase(0, first == std::string::npos ? text.size() : first);
     }
     try {
-        SourceUnit unit(SourceBuffer(std::move(text), std::move(filename)), mode);
+        SourceUnit unit(SourceBuffer(std::move(text), std::move(filename)), mode, flags);
         unit.freeze(context, out);
     } catch (const SourceError &error) {
         source_error(context, error, out);
     }
+}
+std::uint32_t caller_future_flags(Attachment &context)
+{
+    auto frame = context.current_frame();
+    return frame ? context.payload<CodeObject>(context.payload<FrameObject>(*frame).code)
+                       .program.future_flags()
+                 : 0;
 }
 
 bool integer_arg(Attachment &context, Value value, std::int64_t &number, ReturnSlot &out)
@@ -166,9 +173,8 @@ void compile_builtin(Attachment &context, Handle, std::span<const Value> args, R
         !integer_arg(context, args[5], optimize, out) ||
         !integer_arg(context, args[6], feature, out))
         return;
-    if (flags != 0) {
-        raise_error(context, CoreObject::ValueErrorType, U"compile(): flags are not supported",
-                    out);
+    if (flags < 0 || (static_cast<std::uint64_t>(flags) & ~(supported_future_flags | 0x10ULL))) {
+        raise_error(context, CoreObject::ValueErrorType, U"compile(): unrecognised flags", out);
         return;
     }
     if (optimize < -1 || optimize > 2) {
@@ -190,7 +196,11 @@ void compile_builtin(Attachment &context, Handle, std::span<const Value> args, R
                   mode == U"eval"     ? InputMode::Eval
                   : mode == U"single" ? InputMode::Single
                                       : InputMode::Exec,
-                  out);
+                  out,
+                  (static_cast<std::uint32_t>(flags) & supported_future_flags) |
+                      (inherit.value() == context.builtin(CoreObject::False)
+                           ? caller_future_flags(context)
+                           : 0));
 }
 
 template <bool Eval>
@@ -252,7 +262,8 @@ void execute_builtin(Attachment &context, Handle, std::span<const Value> args, R
         value.ok(source.get(context));
     } else {
         freeze_source(context, source.get(context), "<string>",
-                      Eval ? InputMode::Eval : InputMode::Exec, value);
+                      Eval ? InputMode::Eval : InputMode::Exec, value,
+                      caller_future_flags(context));
         if (failed(value)) {
             out.raised(value.exception());
             return;

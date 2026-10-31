@@ -224,6 +224,7 @@ int pymain(int argc, char **argv)
         }
 
         int status = 0;
+        std::uint32_t future_flags = 0;
         try {
             if (options.mode == Mode::Module) {
                 import_module(context, U"runpy", out);
@@ -275,13 +276,15 @@ int pymain(int argc, char **argv)
                 }
                 if (!status) {
                     SourceUnit source(SourceBuffer(std::move(text), filename));
+                    future_flags = source.future_flags();
                     run(context, {&source, globals}, out);
                     if (out.tag() == ResultTag::Raised)
                         status = report_exception(context, out.exception());
                 }
             }
             if (!status && options.expression) {
-                SourceUnit source(SourceBuffer(*options.expression, "<eval>"), InputMode::Eval);
+                SourceUnit source(SourceBuffer(*options.expression, "<eval>"), InputMode::Eval,
+                                  future_flags);
                 run(context, {&source, globals}, out);
                 if (out.tag() != ResultTag::Raised)
                     repr(context, roots.root(out.value()), out);
@@ -309,7 +312,7 @@ int pymain(int argc, char **argv)
             flush_stdio(context, StdioFlush::AfterExecution);
         if (repl_only || options.interactive)
             status = run_interactive(context, globals, sys, tty || options.interactive,
-                                     tty && !options.quiet && repl_only);
+                                     tty && !options.quiet && repl_only, future_flags);
         run_exitfuncs(context, out);
         if (out.tag() == ResultTag::Raised)
             return report_exception(context, out.exception());

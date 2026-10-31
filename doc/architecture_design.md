@@ -411,7 +411,20 @@ Writable __code__ and Code.replace remain separate compatibility work.
 Function annotations are evaluated in the defining scope after defaults and
 carried by MAKE_FUNCTION's annotation flag. Their mutable dictionary edge uses
 rooted atomic reads, stores and lazy compare-exchange publication; it is not a
-second namespace entry with conflicting authority. Generic aliases and unions
+second namespace entry with conflicting authority. Future annotations instead
+use `Python/ast_unparse.cpp`, adapted from the pinned native annotation unparser,
+before name mangling. Disconnected Annotation scopes validate the expression
+without adding runtime closures. Unused local-annotation scopes have no emitted
+graph and do not get a Code object. BoolExpr keeps an explicit operand vector,
+and FormattedExpr preserves format-spec presence so canonical output does not
+lose grouping or empty format specifications.
+
+Variable annotations lower through ordinary stores and SETUP_ANNOTATIONS, not a
+second VM evaluation path. Type annotation reflection reuses the own namespace's
+immutable metadata publication, including atomic lazy initialization and normal
+descriptor callbacks. Compiler future flags belong to SourceUnit/VerifiedCode
+and each REPL invocation, never mutable interpreter-global compilation state.
+Generic aliases and unions
 hold immutable rooted argument tuples and atomically publish immutable parameter
 tuples. Class subscripting prefers metaclass __getitem__, then the ordinary
 __class_getitem__ protocol. NamespaceObject reuses the existing traced instance
