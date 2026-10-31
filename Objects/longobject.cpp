@@ -1,4 +1,5 @@
 #include "cxxpython/floatobject.hpp"
+#include "cxxpython/memoryobject.hpp"
 #include "cxxpython/protocol.hpp"
 #include "internal/long.hpp"
 
@@ -517,6 +518,39 @@ bool parse_integer(std::u32string_view text, int base, Integer &result)
         result = -result;
     return true;
 }
+void parse_object(Attachment &context, Handle value, int base, bool explicit_base, ReturnSlot &out)
+{
+    std::u32string text;
+    if (context.has_layout<StrObject>(value.get(context)) &&
+        is_subtype(context, context.type_of(value), context.builtin(CoreObject::StrType)))
+        text = context.payload<StrObject>(value).value;
+    else {
+        if (explicit_base && !is_bytes(context, value.get(context)) &&
+            !is_bytearray(context, value.get(context))) {
+            type_error(context, out);
+            return;
+        }
+        std::string data;
+        if (!detail::buffer_bytes(context, value, data, out)) {
+            if (!raised(out))
+                type_error(context, out);
+            return;
+        }
+        for (unsigned char ch : data) {
+            if (ch >= 128) {
+                raise_error(context, CoreObject::ValueErrorType, U"invalid literal for int()", out);
+                return;
+            }
+            text += static_cast<char32_t>(ch);
+        }
+    }
+    Integer parsed;
+    if (!parse_integer(text, base, parsed)) {
+        raise_error(context, CoreObject::ValueErrorType, U"invalid literal for int()", out);
+        return;
+    }
+    publish(context, std::move(parsed), out);
+}
 void int_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     if (!context.has_layout<TypeObject>(args[0]) ||
@@ -554,19 +588,7 @@ void int_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlo
                         U"int() base must be >= 2 and <= 36, or 0", out);
             return;
         }
-        if (!context.has_layout<StrObject>(values[0]) ||
-            !is_subtype(context, context.type_of(values[0]),
-                        context.builtin(CoreObject::StrType))) {
-            type_error(context, out);
-            return;
-        }
-        Integer parsed;
-        if (!parse_integer(context.payload<StrObject>(values[0]).value, static_cast<int>(base),
-                           parsed)) {
-            raise_error(context, CoreObject::ValueErrorType, U"invalid literal for int()", out);
-            return;
-        }
-        publish(context, std::move(parsed), converted);
+        parse_object(context, roots.root(values[0]), static_cast<int>(base), true, converted);
     } else if (values.empty())
         make_int(context, 0, converted);
     else if (context.type_of(values[0]) == context.builtin(CoreObject::StrType)) {
@@ -609,7 +631,12 @@ void int_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlo
                     return;
                 }
                 publish(context, std::move(parsed), converted);
-            } else
+            } else if (index_slot.state == SlotState::Missing &&
+                       (is_bytes(context, value.get(context)) ||
+                        is_bytearray(context, value.get(context)) ||
+                        context.has_layout<MemoryViewObject>(value.get(context))))
+                parse_object(context, value, 10, false, converted);
+            else
                 index(context, value, converted);
         }
         if (raised(converted)) {
@@ -620,6 +647,10 @@ void int_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlo
             type_error(context, out);
             return;
         }
+    }
+    if (raised(converted)) {
+        out.raised(converted.exception());
+        return;
     }
     const auto value = converted.value();
     if (cls.get(context) == context.builtin(CoreObject::IntType)) {

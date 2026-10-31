@@ -239,7 +239,7 @@ void pad(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &o
     make_str(context, std::move(result), out);
 }
 
-template <bool Reverse, bool Raising>
+template <bool Reverse, bool Raising, bool Count = false>
 void find(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
@@ -257,13 +257,27 @@ void find(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &
     const auto length = static_cast<std::intptr_t>(text.size());
     start = start < 0 ? std::max<std::intptr_t>(0, start + length) : start;
     end = end < 0 ? std::max<std::intptr_t>(0, end + length) : std::min(end, length);
-    std::int64_t position = -1;
+    std::int64_t position = Count ? 0 : -1;
     if (start <= length && start <= end) {
         const std::u32string_view window(text.data() + start, end - start);
         const auto &needle = context.payload<StrObject>(part).value;
-        const auto found = Reverse ? window.rfind(needle) : window.find(needle);
-        if (found != window.npos)
-            position = static_cast<std::int64_t>(found) + start;
+        if constexpr (Count) {
+            if (needle.empty())
+                position = static_cast<std::int64_t>(window.size()) + 1;
+            else
+                for (auto cursor = std::size_t{0};;) {
+                    const auto found = window.find(needle, cursor);
+                    if (found == window.npos)
+                        break;
+                    ++position;
+                    cursor = found + needle.size();
+                    context.poll();
+                }
+        } else {
+            const auto found = Reverse ? window.rfind(needle) : window.find(needle);
+            if (found != window.npos)
+                position = static_cast<std::int64_t>(found) + start;
+        }
     }
     if constexpr (Raising)
         if (position < 0) {
@@ -851,6 +865,35 @@ void split(Attachment &context, Handle, std::span<const Value> args, ReturnSlot 
 }
 } // namespace
 
+char32_t detail::unicode_simple_lower(char32_t ch) noexcept
+{
+    const auto &record = unicode_record(ch);
+    return record.flags & 0x4000 ? _PyUnicode_ExtendedCase[record.lower & 0xffff]
+                                 : static_cast<char32_t>(ch + record.lower);
+}
+char32_t detail::unicode_simple_upper(char32_t ch) noexcept
+{
+    const auto &record = unicode_record(ch);
+    return record.flags & 0x4000 ? _PyUnicode_ExtendedCase[record.upper & 0xffff]
+                                 : static_cast<char32_t>(ch + record.upper);
+}
+bool detail::unicode_decimal(char32_t ch) noexcept
+{
+    return unicode_record(ch).flags & 0x02;
+}
+bool detail::unicode_space(char32_t ch) noexcept
+{
+    return _PyUnicode_IsWhitespace(ch);
+}
+bool detail::unicode_linebreak(char32_t ch) noexcept
+{
+    return _PyUnicode_IsLinebreak(ch);
+}
+bool detail::unicode_alnum(char32_t ch) noexcept
+{
+    return unicode_record(ch).flags & (0x01 | 0x02 | 0x04 | 0x800);
+}
+
 void detail::install_unicode_methods(Attachment &context, std::span<const Handle> core)
 {
     auto at = [&](CoreObject id) { return core[static_cast<std::size_t>(id)]; };
@@ -888,6 +931,8 @@ void detail::install_unicode_methods(Attachment &context, std::span<const Handle
                              find<false, true>);
     install_native_attribute(context, core, at(CoreObject::StrType), U"rindex", signature,
                              find<true, true>);
+    install_native_attribute(context, core, at(CoreObject::StrType), U"count", signature,
+                             find<false, false, true>);
     RootScope roots(context);
     ReturnSlot negative(context);
     context.allocate_instance<IntObject>(at(CoreObject::IntType), negative, -1);

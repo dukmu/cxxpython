@@ -1,0 +1,26 @@
+'' ValueError
+'II' ValueError
+'=I' ValueError
+'<I' ValueError
+'>I' ValueError
+'x' ValueError
+'s' ValueError
+'e' no error
+size TypeError
+stride TypeError
+nonbyte TypeError
+range ValueError
+range ValueError
+range TypeError
+range TypeError
+readonly TypeError
+format ValueError
+size mismatch ValueError
+hash native ValueError
+hash writable ValueError
+hash byte owner TypeError
+float text TypeError
+char TypeError
+released ValueError
+hash bytes True
+prefix @I

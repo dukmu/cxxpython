@@ -1,0 +1,16 @@
+['café', '你好', '42']
+['caf', '42']
+['١２3']
+['\u2003', ' ']
+[True, True, True, True, True, True]
+[True, True, True]
+[True, True, False, False, False, False]
+[b'abc_42']
+b'abc123' (b'abc', b'123') (0, 6) True
+[b'123']
+b'abc123' (b'abc', b'123') (0, 6) True
+[b'123']
+ValueError
+ValueError
+ValueError
+TypeError

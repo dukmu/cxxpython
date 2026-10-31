@@ -1,0 +1,13 @@
+256 88 89
+b'XYcz' b'ac'
+bytearray(b'XYcz') bytearray(b'ac')
+True
+b'Xc'
+b'abc' True
+bytes bytearray
+ValueError
+ValueError
+ValueError
+TypeError
+TypeError
+bytearray(b'XYc')

@@ -1,0 +1,11 @@
+callable_iterator True [1, 2] done
+compare 1
+compare 2
+[1]
+ValueError
+2 done done
+released True
+TypeError
+TypeError
+TypeError
+TypeError

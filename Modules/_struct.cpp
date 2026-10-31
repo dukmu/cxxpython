@@ -1,4 +1,5 @@
 // Format rules follow CPython 3.12.14 Modules/_struct.c.
+#include "internal/floatpack.hpp"
 #include "internal/structmodule.hpp"
 
 #include "cxxpython/bytearrayobject.hpp"
@@ -196,51 +197,6 @@ bool snapshot(Attachment &ctx, Handle source, std::string &bytes, ReturnSlot &ou
     return false;
 }
 
-bool half_bits(double number, std::uint64_t &bits)
-{
-    auto sign = std::signbit(number) ? 0x8000u : 0u;
-    auto magnitude = std::abs(number);
-    if (std::isnan(number)) {
-        bits = sign | 0x7e00u;
-        return true;
-    }
-    if (std::isinf(number)) {
-        bits = sign | 0x7c00u;
-        return true;
-    }
-    if (magnitude >= 65520.0)
-        return false;
-    if (magnitude < std::ldexp(1.0, -14)) {
-        bits = sign | static_cast<unsigned>(std::nearbyint(std::ldexp(magnitude, 24)));
-        return true;
-    }
-    int exponent;
-    double fraction = std::frexp(magnitude, &exponent);
-    auto mantissa = static_cast<unsigned>(std::nearbyint((fraction * 2 - 1) * 1024));
-    auto exp = static_cast<unsigned>(exponent + 14);
-    if (mantissa == 1024) {
-        mantissa = 0;
-        ++exp;
-    }
-    bits = sign | (exp << 10) | mantissa;
-    return true;
-}
-
-double half_value(std::uint16_t bits)
-{
-    auto exponent = (bits >> 10) & 31;
-    auto mantissa = bits & 1023;
-    double value;
-    if (exponent == 31)
-        value = mantissa ? std::numeric_limits<double>::quiet_NaN()
-                         : std::numeric_limits<double>::infinity();
-    else if (!exponent)
-        value = std::ldexp(static_cast<double>(mantissa), -24);
-    else
-        value = std::ldexp(static_cast<double>(1024 + mantissa), exponent - 25);
-    return bits & 0x8000 ? -value : value;
-}
-
 bool pack_values(Attachment &ctx, const Format &format, std::span<const Value> args,
                  std::string &bytes, ReturnSlot &out)
 {
@@ -308,7 +264,7 @@ bool pack_values(Attachment &ctx, const Format &format, std::span<const Value> a
                 }
                 double number_value = ctx.payload<FloatObject>(converted.value()).value;
                 if (field.code == 'e') {
-                    if (!half_bits(number_value, bits)) {
+                    if (!detail::half_bits(number_value, bits)) {
                         raise_error(ctx, CoreObject::OverflowErrorType,
                                     U"float too large to pack with e format", out);
                         return false;
@@ -405,7 +361,7 @@ void unpack_values(Attachment &ctx, const Format &format, std::string_view bytes
             else if (field.code == '?')
                 value.ok(ctx.builtin(bits ? CoreObject::True : CoreObject::False));
             else if (field.code == 'e')
-                make_float(ctx, half_value(static_cast<std::uint16_t>(bits)), value);
+                make_float(ctx, detail::half_value(static_cast<std::uint16_t>(bits)), value);
             else if (field.code == 'f')
                 make_float(ctx, std::bit_cast<float>(static_cast<std::uint32_t>(bits)), value);
             else if (field.code == 'd')

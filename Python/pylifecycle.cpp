@@ -1,5 +1,6 @@
 #include "cxxpython/asyncgenobject.hpp"
 #include "cxxpython/bytearrayobject.hpp"
+#include "cxxpython/calliterobject.hpp"
 #include "cxxpython/complexobject.hpp"
 #include "cxxpython/floatobject.hpp"
 #include "cxxpython/genericaliasobject.hpp"
@@ -10,6 +11,7 @@
 #include "cxxpython/objects.hpp"
 #include "cxxpython/protocol.hpp"
 #include "cxxpython/setobject.hpp"
+#include "cxxpython/sreobject.hpp"
 #include "cxxpython/superobject.hpp"
 #include "cxxpython/typealiasobject.hpp"
 #include "cxxpython/typevarobject.hpp"
@@ -66,6 +68,12 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
         spec.module = U"builtins";
         if (id >= CoreObject::TypeAliasType && id <= CoreObject::GenericType)
             spec.module = U"typing";
+        if (id == CoreObject::SrePatternType || id == CoreObject::SreMatchType)
+            spec.module = U"re";
+        if (id == CoreObject::SreScannerType || id == CoreObject::SreTemplateType)
+            spec.module = U"_sre";
+        if (id == CoreObject::SrePatternType)
+            spec.slots = std::vector<std::u32string>{U"__weakref__"};
         if (id == CoreObject::TypeVarType || id == CoreObject::ParamSpecType ||
             id == CoreObject::TypeVarTupleType)
             spec.slots = std::vector<std::u32string>{U"__dict__", U"__weakref__"};
@@ -343,6 +351,12 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     define(CoreObject::ParamSpecKwargsType, "ParamSpecKwargs",
            LayoutDescriptor::of<ParamSpecAttributeObject>());
     define(CoreObject::GenericType, "Generic", LayoutDescriptor::of<InstanceObject>());
+    define(CoreObject::SrePatternType, "Pattern", LayoutDescriptor::of<SrePatternObject>());
+    define(CoreObject::SreMatchType, "Match", LayoutDescriptor::of<SreMatchObject>());
+    define(CoreObject::SreScannerType, "SRE_Scanner", LayoutDescriptor::of<SreScannerObject>());
+    define(CoreObject::SreTemplateType, "SRE_Template", LayoutDescriptor::of<SreTemplateObject>());
+    define(CoreObject::CallIteratorType, "callable_iterator",
+           LayoutDescriptor::of<CallIteratorObject>());
     for (auto id :
          {CoreObject::FunctionType, CoreObject::ModuleType, CoreObject::CodeType,
           CoreObject::GeneratorType, CoreObject::CoroutineType, CoreObject::SetType,
@@ -445,6 +459,7 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
     install_union(context, core);
     install_typealias(context, core);
     install_typevars(context, core);
+    install_sre(context, core);
     install_weakrefs(context, core);
     install_weakproxies(context, core);
     install_error_types(context, core);
@@ -541,6 +556,11 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                     CoreObject::TypeVarTupleType,
                     CoreObject::ParamSpecArgsType,
                     CoreObject::ParamSpecKwargsType,
+                    CoreObject::SrePatternType,
+                    CoreObject::SreMatchType,
+                    CoreObject::SreScannerType,
+                    CoreObject::SreTemplateType,
+                    CoreObject::CallIteratorType,
                     CoreObject::UnionType,
                     CoreObject::GenericAliasIteratorType,
                     CoreObject::SetIteratorType,
@@ -555,6 +575,14 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
           CoreObject::ParamSpecArgsType, CoreObject::ParamSpecKwargsType, CoreObject::GenericType})
         name_store(context, *context.payload<TypeObject>(at(id)).dictionary,
                    module_key.get(context), text.value());
+    for (auto [id, module] : {std::pair{CoreObject::SrePatternType, U"re"},
+                              {CoreObject::SreMatchType, U"re"},
+                              {CoreObject::SreScannerType, U"_sre"},
+                              {CoreObject::SreTemplateType, U"_sre"}}) {
+        context.allocate_instance<StrObject>(at(CoreObject::StrType), text, module);
+        name_store(context, *context.payload<TypeObject>(at(id)).dictionary,
+                   module_key.get(context), text.value());
+    }
     context.allocate_instance<StrObject>(at(CoreObject::StrType), text, U"weakref");
     for (auto id :
          {CoreObject::WeakRefType, CoreObject::WeakProxyType, CoreObject::CallableWeakProxyType})

@@ -39,6 +39,10 @@ add_library(cxxpython_core
     Modules/_iomodule.cpp
     Modules/_operator.cpp
     Modules/_opcodemodule.cpp
+    Modules/_sre/engine.c
+    Modules/_sre/sre.cpp
+    Objects/srematchobject.cpp
+    Objects/srepatternobject.cpp
     Modules/_io/stdio.cpp
     Modules/_io/iobase.cpp
     Modules/_io/bufferedio.cpp
@@ -108,6 +112,7 @@ add_library(cxxpython_core
     Objects/complexobject.cpp
     Objects/bytearrayobject.cpp
     Objects/memoryobject.cpp
+    Objects/memoryformat.cpp
     Objects/exceptions.cpp
     Objects/rangeobject.cpp
     Objects/iterobject.cpp
@@ -155,6 +160,8 @@ file(GLOB_RECURSE FORMAT_SOURCES CONFIGURE_DEPENDS
 list(REMOVE_ITEM FORMAT_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/Parser/generated_parser.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/Include/cxxpython/grammar.hpp)
+list(APPEND FORMAT_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/Modules/_sre/engine.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/Modules/_sre/engine.h)
 find_package(Python3 COMPONENTS Interpreter QUIET)
 if(Python3_Interpreter_FOUND)
     add_custom_target(regen-parser
@@ -252,6 +259,7 @@ if(BUILD_TESTING)
         Tests/cpp/test_number.cpp
         Tests/cpp/test_representation.cpp
         Tests/cpp/test_execution.cpp
+        Tests/cpp/test_sre.cpp
         Tests/cpp/test_scheduling.cpp
         Tests/cpp/test_traceback.cpp
         Tests/cpp/test_unwind.cpp

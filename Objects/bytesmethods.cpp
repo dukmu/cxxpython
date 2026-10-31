@@ -56,6 +56,60 @@ template <CoreObject Type> void result_bytes(Attachment &c, std::string data, Re
         make_bytearray(c, std::move(data), out);
 }
 
+template <CoreObject Type>
+void translate(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(c);
+    auto self = roots.root(args[0]), mapping = roots.root(args[1]), removed = roots.root(args[2]);
+    if (!receiver<Type>(c, self, out))
+        return;
+    std::string table, deleted, data;
+    if (mapping.get(c) != c.builtin(CoreObject::None)) {
+        if (!bytes_arg(c, mapping, table, out))
+            return;
+        if (table.size() != 256) {
+            raise_error(c, CoreObject::ValueErrorType,
+                        U"translation table must be 256 characters long", out);
+            return;
+        }
+    }
+    if (!bytes_arg(c, removed, deleted, out) || !bytes_arg(c, self, data, out))
+        return;
+    std::array<bool, 256> skip{};
+    for (unsigned char value : deleted)
+        skip[value] = true;
+    std::string result;
+    result.reserve(data.size());
+    for (unsigned char value : data)
+        if (!skip[value])
+            result += table.empty() ? static_cast<char>(value) : table[value];
+    if constexpr (Type == CoreObject::BytesType)
+        if (result == data && c.type_of(self) == c.builtin(Type)) {
+            out.ok(self.get(c));
+            return;
+        }
+    result_bytes<Type>(c, std::move(result), out);
+}
+void make_translation(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(c);
+    std::string from, to;
+    if (!bytes_arg(c, roots.root(args[0]), from, out) ||
+        !bytes_arg(c, roots.root(args[1]), to, out))
+        return;
+    if (from.size() != to.size()) {
+        raise_error(c, CoreObject::ValueErrorType, U"maketrans arguments must have same length",
+                    out);
+        return;
+    }
+    std::string table(256, '\0');
+    for (unsigned i = 0; i < 256; ++i)
+        table[i] = static_cast<char>(i);
+    for (std::size_t i = 0; i < from.size(); ++i)
+        table[static_cast<unsigned char>(from[i])] = to[i];
+    make_bytes(c, std::move(table), out);
+}
+
 enum class Search { Find, RFind, Index, RIndex, Count };
 template <CoreObject Type, Search Mode>
 void search(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
@@ -322,6 +376,27 @@ void detail::install_bytes_methods(Attachment &c, std::span<const Handle> core)
     strip_sig.parameters = {{U"self", ParameterKind::PositionalOnly},
                             {U"chars", ParameterKind::PositionalOnly, at(CoreObject::None).get(c)}};
     SignatureLayout split_sig;
+    ReturnSlot empty(c);
+    c.allocate_instance<BytesObject>(at(CoreObject::BytesType), empty, std::string{});
+    auto translation = pair;
+    translation.parameters[1].name = U"table";
+    translation.parameters.push_back(
+        {U"delete", ParameterKind::PositionalOrKeyword, empty.value()});
+    install(CoreObject::BytesType, U"translate", translation, translate<CoreObject::BytesType>);
+    install(CoreObject::ByteArrayType, U"translate", translation,
+            translate<CoreObject::ByteArrayType>);
+    SignatureLayout mapping;
+    mapping.parameters = {{U"from", ParameterKind::PositionalOnly},
+                          {U"to", ParameterKind::PositionalOnly}};
+    ReturnSlot function(c), wrapper(c), key(c);
+    c.allocate_instance<NativeFunctionObject>(at(CoreObject::NativeFunctionType), function,
+                                              "maketrans", mapping, make_translation,
+                                              std::vector<Value>{});
+    c.allocate_instance<StaticMethodObject>(at(CoreObject::StaticMethodType), wrapper,
+                                            function.value());
+    c.allocate_instance<StrObject>(at(CoreObject::StrType), key, U"maketrans");
+    for (auto type : {CoreObject::BytesType, CoreObject::ByteArrayType})
+        name_store(c, *TypeView(c, at(type)).dictionary(), key.value(), wrapper.value());
     ReturnSlot minus_one(c);
     c.allocate_instance<IntObject>(at(CoreObject::IntType), minus_one, -1);
     roots.root(minus_one.value());

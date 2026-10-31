@@ -1,8 +1,10 @@
 #include "cxxpython/memoryobject.hpp"
 #include "cxxpython/protocol.hpp"
+#include "internal/memoryformat.hpp"
 
 #include <bit>
 #include <charconv>
+#include <cstring>
 #include <limits>
 
 namespace cxxpython::core {
@@ -60,12 +62,12 @@ bool integer(Attachment &c, Handle h, std::int64_t &n, ReturnSlot &out)
 }
 void create_view(Attachment &c, Handle owner, std::shared_ptr<MemoryViewExport> token,
                  std::int64_t offset, std::int64_t stride, std::int64_t length, bool readonly,
-                 char format, ReturnSlot &out)
+                 std::string format, ReturnSlot &out)
 {
     RootScope roots(c);
     c.allocate_instance<MemoryViewObject>(roots.root(c.builtin(CoreObject::MemoryViewType)), out,
                                           owner.get(c), std::move(token), offset, stride, length,
-                                          readonly, format);
+                                          readonly, std::move(format));
 }
 void create(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
 {
@@ -89,7 +91,7 @@ void create(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
     }
     if (is_bytes(c, source.get(c))) {
         auto n = c.payload<BytesObject>(source).value.size();
-        create_view(c, source, std::make_shared<MemoryViewExport>(nullptr), 0, 1, n, true, 'B',
+        create_view(c, source, std::make_shared<MemoryViewExport>(nullptr), 0, 1, n, true, "B",
                     out);
         return;
     }
@@ -101,7 +103,7 @@ void create(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
             ++storage->exports;
             return storage->bytes.size();
         });
-        create_view(c, source, std::move(token), 0, 1, n, false, 'B', out);
+        create_view(c, source, std::move(token), 0, 1, n, false, "B", out);
         return;
     }
     raise_error(c, CoreObject::TypeErrorType, U"memoryview: a bytes-like object is required", out);
@@ -112,11 +114,13 @@ bool snapshot(Attachment &c, Handle self, std::string &data, ReturnSlot &out)
     auto token = live(c, v, out);
     if (!token)
         return false;
-    data.resize(static_cast<std::size_t>(v.length));
+    const auto itemsize = detail::memory_format_size(v.format.back());
+    data.resize(static_cast<std::size_t>(v.length) * itemsize);
     auto copy = [&](const std::string &source) {
         auto p = v.offset;
         for (std::int64_t i = 0; i < v.length; ++i) {
-            data[static_cast<std::size_t>(i)] = source[static_cast<std::size_t>(p)];
+            std::memcpy(data.data() + static_cast<std::size_t>(i) * itemsize, source.data() + p,
+                        itemsize);
             if (i + 1 < v.length)
                 p += v.stride;
         }
@@ -179,7 +183,16 @@ template <Op op> void item(Attachment &c, Handle, std::span<const Value> args, R
                                 out);
                 return;
             }
-            if (data.size() != static_cast<std::size_t>(s.length)) {
+            const auto size = detail::memory_format_size(v.format.back());
+            const auto rhs = roots.root(args[2]);
+            std::string format = "B";
+            if (c.has_layout<MemoryViewObject>(rhs.get(c)))
+                format = c.payload<MemoryViewObject>(rhs).format;
+            auto normalized = [](std::string_view f) {
+                return f.starts_with('@') ? f.substr(1) : f;
+            };
+            if (data.size() != static_cast<std::size_t>(s.length) * size ||
+                normalized(format) != normalized(v.format)) {
                 raise_error(c, CoreObject::ValueErrorType,
                             U"memoryview assignment: lvalue and rvalue have different structures",
                             out);
@@ -188,8 +201,8 @@ template <Op op> void item(Attachment &c, Handle, std::span<const Value> args, R
             locked(c, *token->storage, [&] {
                 auto p = s.length ? v.offset + s.start * v.stride : v.offset;
                 for (std::int64_t i = 0; i < s.length; ++i) {
-                    token->storage->bytes[static_cast<std::size_t>(p)] =
-                        data[static_cast<std::size_t>(i)];
+                    std::memcpy(token->storage->bytes.data() + p,
+                                data.data() + static_cast<std::size_t>(i) * size, size);
                     if (i + 1 < s.length)
                         p += s.step * v.stride;
                 }
@@ -210,39 +223,24 @@ template <Op op> void item(Attachment &c, Handle, std::span<const Value> args, R
     }
     auto p = static_cast<std::size_t>(v.offset + n * v.stride);
     if constexpr (op == Op::Get) {
-        unsigned char b;
+        const auto size = detail::memory_format_size(v.format.back());
+        std::string data(size, '\0');
         if (token->storage)
-            b = locked(c, *token->storage,
-                       [&] { return static_cast<unsigned char>(token->storage->bytes[p]); });
+            locked(c, *token->storage,
+                   [&] { std::memcpy(data.data(), token->storage->bytes.data() + p, size); });
         else {
             ReturnSlot owner(c);
             if (!load_owner(c, self, v, owner, out))
                 return;
-            b = static_cast<unsigned char>(c.payload<BytesObject>(owner.value()).value[p]);
+            std::memcpy(data.data(), c.payload<BytesObject>(owner.value()).value.data() + p, size);
         }
-        if (v.format == 'c')
-            make_bytes(c, std::string(1, static_cast<char>(b)), out);
-        else
-            make_int(c, v.format == 'b' && b >= 128 ? static_cast<int>(b) - 256 : b, out);
+        detail::unpack_memory_format(c, v.format.back(), data, out);
     } else {
-        std::int64_t b;
-        if (v.format == 'c') {
-            std::string data;
-            if (!detail::buffer_bytes(c, roots.root(args[2]), data, out) || data.size() != 1) {
-                if (out.tag() != ResultTag::Raised)
-                    raise_error(c, CoreObject::TypeErrorType, U"expected a byte", out);
-                return;
-            }
-            b = static_cast<unsigned char>(data[0]);
-        } else if (!integer(c, roots.root(args[2]), b, out))
+        std::string data;
+        if (!detail::pack_memory_format(c, v.format.back(), roots.root(args[2]), data, out))
             return;
-        if ((v.format == 'b' && (b < -128 || b > 127)) || (v.format != 'b' && (b < 0 || b > 255))) {
-            raise_error(c, CoreObject::ValueErrorType, U"memoryview: invalid value for format",
-                        out);
-            return;
-        }
         locked(c, *token->storage, [&] {
-            token->storage->bytes[p] = static_cast<char>(b);
+            std::memcpy(token->storage->bytes.data() + p, data.data(), data.size());
             ++token->storage->version;
         });
         out.ok(c.builtin(CoreObject::None));
@@ -293,12 +291,11 @@ void convert(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out
     else if constexpr (kind == 1) {
         auto format = c.payload<MemoryViewObject>(self).format;
         std::vector<Value> values;
-        for (unsigned char b : data) {
+        const auto size = detail::memory_format_size(format.back());
+        for (std::size_t offset = 0; offset < data.size(); offset += size) {
             ReturnSlot value(c);
-            if (format == 'c')
-                make_bytes(c, std::string(1, static_cast<char>(b)), value);
-            else
-                make_int(c, format == 'b' && b >= 128 ? static_cast<int>(b) - 256 : b, value);
+            detail::unpack_memory_format(c, format.back(),
+                                         std::string_view(data).substr(offset, size), value);
             values.push_back(roots.root(value.value()).get(c));
         }
         make_list(c, values, out);
@@ -327,19 +324,34 @@ void cast(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
         return;
     }
     const auto &fmt = c.payload<StrObject>(args[1]).value;
-    if (fmt.size() != 1 || (fmt[0] != U'B' && fmt[0] != U'b' && fmt[0] != U'c')) {
+    if ((fmt.size() != 1 && !(fmt.size() == 2 && fmt[0] == '@')) || fmt.back() > 127 ||
+        !detail::memory_format_size(static_cast<char>(fmt.back()))) {
         raise_error(c, CoreObject::ValueErrorType, U"unsupported memoryview format", out);
         return;
     }
-    if (v.stride != 1 && v.length > 1) {
+    const auto oldsize = detail::memory_format_size(v.format.back());
+    const auto size = detail::memory_format_size(static_cast<char>(fmt.back()));
+    if (v.stride != static_cast<std::int64_t>(oldsize) && v.length > 1) {
         raise_error(c, CoreObject::TypeErrorType,
                     U"memoryview: casts are restricted to C-contiguous views", out);
         return;
     }
+    auto byte_format = [](char format) { return format == 'b' || format == 'B' || format == 'c'; };
+    if (!byte_format(v.format.back()) && !byte_format(static_cast<char>(fmt.back()))) {
+        raise_error(c, CoreObject::TypeErrorType,
+                    U"memoryview: cannot cast between two non-byte formats", out);
+        return;
+    }
+    const auto bytes = static_cast<std::size_t>(v.length) * oldsize;
+    if (bytes % size) {
+        raise_error(c, CoreObject::TypeErrorType,
+                    U"memoryview: length is not a multiple of itemsize", out);
+        return;
+    }
     ReturnSlot owner(c);
     if (load_owner(c, self, v, owner, out))
-        create_view(c, roots.root(owner.value()), token, v.offset, 1, v.length, v.readonly,
-                    static_cast<char>(fmt[0]), out);
+        create_view(c, roots.root(owner.value()), token, v.offset, size, bytes / size, v.readonly,
+                    std::string(fmt.begin(), fmt.end()), out);
 }
 template <bool negate>
 void compare(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
@@ -355,7 +367,7 @@ void compare(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out
         out.ok(c.builtin((equal != negate) ? CoreObject::True : CoreObject::False));
         return;
     }
-    char right_format = 'B';
+    std::string right_format = "B";
     std::string right;
     if (c.has_layout<MemoryViewObject>(other.get(c)) &&
         c.type_of(other) == c.builtin(CoreObject::MemoryViewType)) {
@@ -375,15 +387,22 @@ void compare(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out
     std::string data;
     if (!snapshot(c, self, data, out))
         return;
-    bool equal = data.size() == right.size();
-    if (!data.empty() && (left.format == 'c') != (right_format == 'c'))
-        equal = false;
-    for (std::size_t i = 0; equal && i < data.size(); ++i) {
-        auto a = static_cast<unsigned char>(data[i]);
-        auto b = static_cast<unsigned char>(right[i]);
-        int av = left.format == 'b' && a >= 128 ? static_cast<int>(a) - 256 : a;
-        int bv = right_format == 'b' && b >= 128 ? static_cast<int>(b) - 256 : b;
-        equal = av == bv;
+    const auto a_size = detail::memory_format_size(left.format.back());
+    const auto b_size = detail::memory_format_size(right_format.back());
+    bool equal = data.size() / a_size == right.size() / b_size;
+    for (std::size_t i = 0; equal && i < data.size() / a_size; ++i) {
+        RootScope iteration(c);
+        ReturnSlot a(c), b(c), result(c);
+        detail::unpack_memory_format(c, left.format.back(),
+                                     std::string_view(data).substr(i * a_size, a_size), a);
+        detail::unpack_memory_format(c, right_format.back(),
+                                     std::string_view(right).substr(i * b_size, b_size), b);
+        container_equal(c, iteration.root(a.value()), iteration.root(b.value()), result);
+        if (result.tag() == ResultTag::Raised) {
+            out.raised(result.exception());
+            return;
+        }
+        equal = result.value() == c.builtin(CoreObject::True);
     }
     out.ok(c.builtin((equal != negate) ? CoreObject::True : CoreObject::False));
 }
@@ -398,6 +417,11 @@ void hash_value(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &
         return;
     if (!v.readonly) {
         raise_error(c, CoreObject::ValueErrorType, U"cannot hash writable memoryview object", out);
+        return;
+    }
+    if (v.format.back() != 'b' && v.format.back() != 'B' && v.format.back() != 'c') {
+        raise_error(c, CoreObject::ValueErrorType,
+                    U"memoryview: hashing is restricted to formats 'B', 'b' or 'c'", out);
         return;
     }
     ReturnSlot owner(c), owner_hash(c);
@@ -499,11 +523,13 @@ template <Field field> void attribute(Attachment &c, Value value, ReturnSlot &ou
     if (!live(c, v, out))
         return;
     if constexpr (field == Field::Format)
-        make_str(c, std::u32string(1, v.format), out);
-    else if constexpr (field == Field::Itemsize || field == Field::Ndim)
+        make_str(c, std::u32string(v.format.begin(), v.format.end()), out);
+    else if constexpr (field == Field::Itemsize)
+        make_int(c, detail::memory_format_size(v.format.back()), out);
+    else if constexpr (field == Field::Ndim)
         make_int(c, 1, out);
     else if constexpr (field == Field::Nbytes)
-        make_int(c, v.length, out);
+        make_int(c, v.length * detail::memory_format_size(v.format.back()), out);
     else if constexpr (field == Field::Readonly)
         out.ok(c.builtin(v.readonly ? CoreObject::True : CoreObject::False));
     else if constexpr (field == Field::Obj) {
@@ -511,7 +537,11 @@ template <Field field> void attribute(Attachment &c, Value value, ReturnSlot &ou
         if (load_owner(c, self, v, owner, out))
             out.ok(owner.value());
     } else if constexpr (field == Field::C || field == Field::F || field == Field::Contiguous)
-        out.ok(c.builtin(v.length <= 1 || v.stride == 1 ? CoreObject::True : CoreObject::False));
+        out.ok(
+            c.builtin(v.length <= 1 || v.stride == static_cast<std::int64_t>(
+                                                       detail::memory_format_size(v.format.back()))
+                          ? CoreObject::True
+                          : CoreObject::False));
     else if constexpr (field == Field::Suboffsets)
         cxxpython::core::make_tuple(c, {}, out);
     else {
@@ -543,11 +573,14 @@ bool detail::writable_buffer(Attachment &c, Handle source, WritableBuffer &resul
         auto token = live(c, v, out);
         if (!token)
             return false;
-        if (!v.readonly && token->storage && (v.length <= 1 || v.stride == 1)) {
+        if (!v.readonly && token->storage &&
+            (v.length <= 1 ||
+             v.stride == static_cast<std::int64_t>(memory_format_size(v.format.back())))) {
             if (!load_owner(c, source, v, result.owner, out))
                 return false;
             result.offset = static_cast<std::size_t>(v.offset);
-            result.length = static_cast<std::size_t>(v.length);
+            result.length =
+                static_cast<std::size_t>(v.length) * memory_format_size(v.format.back());
             result.lease = std::move(token);
             return true;
         }
@@ -581,7 +614,8 @@ bool detail::buffer_bytes(Attachment &c, Handle source, std::string &out, Return
         auto &v = c.payload<MemoryViewObject>(source);
         if (!live(c, v, error))
             return false;
-        if (contiguous && v.length > 1 && v.stride != 1) {
+        if (contiguous && v.length > 1 &&
+            v.stride != static_cast<std::int64_t>(memory_format_size(v.format.back()))) {
             raise_error(c, CoreObject::BufferErrorType, U"underlying buffer is not C-contiguous",
                         error);
             return false;

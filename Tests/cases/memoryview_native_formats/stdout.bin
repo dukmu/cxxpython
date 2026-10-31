@@ -1,0 +1,58 @@
+b b True True (3,) True [-2, 0, 127]
+[-2, -2, 127] [127, -2, -2] True True
+equivalent True @b True
+B B True True (3,) True [0, 128, 255]
+[0, 0, 255] [255, 0, 0] True True
+equivalent True @B True
+h h True True (3,) True [-123, 0, 32767]
+[-123, -123, 32767] [32767, -123, -123] True True
+equivalent True @h True
+H H True True (3,) True [0, 1, 65535]
+[0, 0, 65535] [65535, 0, 0] True True
+equivalent True @H True
+i i True True (3,) True [-123, 0, 2147483647]
+[-123, -123, 2147483647] [2147483647, -123, -123] True True
+equivalent True @i True
+I I True True (3,) True [0, 1, 4294967295]
+[0, 0, 4294967295] [4294967295, 0, 0] True True
+equivalent True @I True
+l l True True (3,) True [-123, 0, 456]
+[-123, -123, 456] [456, -123, -123] True True
+equivalent True @l True
+L L True True (3,) True [0, 1, 456]
+[0, 0, 456] [456, 0, 0] True True
+equivalent True @L True
+q q True True (3,) True [-123, 0, 9223372036854775807]
+[-123, -123, 9223372036854775807] [9223372036854775807, -123, -123] True True
+equivalent True @q True
+Q Q True True (3,) True [0, 1, 18446744073709551615]
+[0, 0, 18446744073709551615] [18446744073709551615, 0, 0] True True
+equivalent True @Q True
+n n True True (3,) True [-123, 0, 456]
+[-123, -123, 456] [456, -123, -123] True True
+equivalent True @n True
+N N True True (3,) True [0, 1, 456]
+[0, 0, 456] [456, 0, 0] True True
+equivalent True @N True
+P P True True (3,) True [0, 1, 456]
+[0, 0, 456] [456, 0, 0] True True
+equivalent True @P True
+e e True True (3,) True [-1.5, 0.0, 2.25]
+[-1.5, -1.5, 2.25] [2.25, -1.5, -1.5] True True
+equivalent True @e True
+f f True True (3,) True [-1.5, 0.0, 2.25]
+[-1.5, -1.5, 2.25] [2.25, -1.5, -1.5] True True
+equivalent True @f True
+d d True True (3,) True [-1.5, 0.0, 2.25]
+[-1.5, -1.5, 2.25] [2.25, -1.5, -1.5] True True
+equivalent True @d True
+? ? True True (3,) True [False, True, False]
+[False, False, False] [False, False, False] True True
+equivalent True @? True
+c c True True (3,) True [b'a', b'\x00', b'z']
+[b'a', b'a', b'z'] [b'z', b'a', b'a'] True True
+equivalent True @c True
+slices [1, 2, 3] [1, 3] [1, 2, 3]
+writes [8, 2, 9] True
+empty []
+callbacks 42 [1.25]

@@ -412,7 +412,7 @@ void getbuffer(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &o
         return;
     }
     c.allocate_instance<MemoryViewObject>(roots.root(c.builtin(CoreObject::MemoryViewType)), out,
-                                          self.get(c), std::move(token), 0, 1, length, false, 'B');
+                                          self.get(c), std::move(token), 0, 1, length, false, "B");
 }
 
 void install_bytesio(Attachment &c, std::span<const Handle> core)

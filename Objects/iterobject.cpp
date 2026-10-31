@@ -1,3 +1,4 @@
+#include "cxxpython/calliterobject.hpp"
 #include "cxxpython/protocol.hpp"
 
 #include <limits>
@@ -256,7 +257,50 @@ void stop_value_set(Attachment &context, Value owner, std::optional<Value> value
 void builtin_iter(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
-    get_iter(context, roots.root(args[0]), out);
+    const auto &extra = context.payload<TupleObject>(args[1]).items;
+    if (extra.empty())
+        get_iter(context, roots.root(args[0]), out);
+    else if (extra.size() == 1)
+        detail::make_call_iterator(context, roots.root(args[0]), roots.root(extra[0]), out);
+    else
+        raise_error(context, CoreObject::TypeErrorType, U"iter expected at most 2 arguments", out);
+}
+void calliter_next(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(c);
+    auto self = roots.root(args[0]);
+    auto &state = c.payload<CallIteratorObject>(self);
+    ReturnSlot function(c), sentinel(c), result(c);
+    auto stop = [&] {
+        c.store(self.get(c), state.callable, {});
+        c.store(self.get(c), state.sentinel, {});
+        detail::stop_iteration(c, out);
+    };
+    c.load(self.get(c), state.callable, function);
+    c.load(self.get(c), state.sentinel, sentinel);
+    if (function.tag() == ResultTag::Empty || sentinel.tag() == ResultTag::Empty) {
+        stop();
+        return;
+    }
+    call(c, roots.root(function.value()), {}, out);
+    if (out.tag() == ResultTag::Raised) {
+        if (is_subtype(c, c.type_of(out.exception()), c.builtin(CoreObject::StopIterationType)))
+            stop();
+        return;
+    }
+    auto value = roots.root(out.value());
+    c.load(self.get(c), state.callable, function);
+    if (function.tag() == ResultTag::Empty) {
+        stop();
+        return;
+    }
+    container_equal(c, roots.root(sentinel.value()), value, result);
+    if (result.tag() == ResultTag::Raised)
+        out.raised(result.exception());
+    else if (result.value() == c.builtin(CoreObject::True))
+        stop();
+    else
+        out.ok(value.get(c));
 }
 void builtin_next(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
@@ -330,6 +374,21 @@ void tuple_repeat(Attachment &context, Handle, std::span<const Value> args, Retu
 }
 } // namespace
 namespace detail {
+void make_call_iterator(Attachment &c, Handle callable, Handle sentinel, ReturnSlot &out)
+{
+    const auto type = c.type_of(callable);
+    if (type != c.builtin(CoreObject::FunctionType) &&
+        type != c.builtin(CoreObject::NativeFunctionType) &&
+        type != c.builtin(CoreObject::BoundMethodType) &&
+        type != c.builtin(CoreObject::MethodDescriptorType) &&
+        !type_attribute(c, type, U"__call__")) {
+        raise_error(c, CoreObject::TypeErrorType, U"iter(v, w): v must be callable", out);
+        return;
+    }
+    RootScope roots(c);
+    c.allocate_instance<CallIteratorObject>(roots.root(c.builtin(CoreObject::CallIteratorType)),
+                                            out, callable.get(c), sentinel.get(c));
+}
 void stop_iteration(Attachment &context, ReturnSlot &out)
 {
     RootScope roots(context);
@@ -367,6 +426,10 @@ void install_iteration(Attachment &context, std::span<const Handle> core)
                              sequence_next<StrObject, CoreObject::StrIteratorType>);
     for (auto id : {CoreObject::TupleIteratorType, CoreObject::StrIteratorType})
         install_native_attribute(context, core, at(id), U"__iter__", unary, iterator_self);
+    install_native_attribute(context, core, at(CoreObject::CallIteratorType), U"__iter__", unary,
+                             iterator_self);
+    install_native_attribute(context, core, at(CoreObject::CallIteratorType), U"__next__", unary,
+                             calliter_next);
     install_native_attribute(context, core, at(CoreObject::SequenceIteratorType), U"__iter__",
                              unary, iterator_self);
     install_native_attribute(context, core, at(CoreObject::SequenceIteratorType), U"__next__",
@@ -382,8 +445,7 @@ void install_iterator_builtins(Attachment &context, std::span<const Handle> core
     for (bool next : {false, true}) {
         SignatureLayout signature;
         signature.parameters = {{U"iterator", ParameterKind::PositionalOnly}};
-        if (next)
-            signature.varargs = U"default";
+        signature.varargs = next ? U"default" : U"sentinel";
         context.allocate_instance<NativeFunctionObject>(
             at(CoreObject::NativeFunctionType), function, next ? "next" : "iter", signature,
             next ? builtin_next : builtin_iter, std::vector<Value>{});

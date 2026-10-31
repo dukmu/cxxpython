@@ -1,0 +1,14 @@
+Pattern a+ True
+True True
+False
+A (0, 3)
+(1, 2) ['aa', 'a']
+['a', ',', 'b,c']
+[('', (0, 0)), ('', (1, 1)), ('', (2, 2))]
+(['HI', 12], '!')
+a\+b\ c 10
+error
+error
+ValueError
+TypeError
+ValueError

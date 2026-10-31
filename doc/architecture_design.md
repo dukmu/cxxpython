@@ -126,20 +126,29 @@ prepared short commits restore the list on failure. `sorted` uses the same
 implementation. `Objects/bytearrayobject.cpp` owns mutable byte sequences with
 short versioned commits and rooted iterator reads. Scalar reads/writes and tail
 pop do not copy the whole buffer; append uses prepared amortized growth.
-`Objects/memoryobject.cpp` supplies aliasing byte-oriented memoryviews. Each live
-view traces its exporter and shares a native export token retaining the actual
+`Objects/memoryobject.cpp` supplies one-dimensional native-format memoryviews.
+Offsets and strides are byte-based, lengths are element counts; the immutable
+format determines itemsize. `Objects/memoryformat.cpp` packs/unpacks scalars
+without unaligned loads, sharing binary16 conversion with native struct.
+Each live view traces its exporter and shares a native export token retaining the actual
 bytearray storage. The storage's export count forbids resizing, not same-size
 writes. Release atomically drops both the traced edge and native token; native
 token destruction never accesses a potentially dead managed exporter. Buffer
 consumers copy bytes under short storage locks before callbacks or native waits.
-`Objects/bytesmethods.cpp` shares bytes/bytearray search, partition, strip and
-split algorithms, index/buffer conversion and family-correct result construction.
+`Objects/bytesmethods.cpp` shares bytes/bytearray search, partition, strip,
+split, translation and translation-table construction, with index/buffer
+conversion and family-correct results. str's decoding constructor uses the
+existing codec boundary; int's buffer parsing stays separate from Unicode
+digit parsing and ordinary numeric conversion protocols.
 It consumes existing safe snapshots rather than retaining unleased raw storage
 across callbacks; this is not a path-specific implementation or a claim of the
 complete bytes API/mutation matrix.
 `Objects/enumobject.cpp` owns reversed/list-reverse iterators, enumerate, zip and
 map. Child iterators/callables are traced; ordinary protocol callbacks do not run
 under storage locks. Compound callback sequences are not advertised as atomic.
+The general callable/sentinel iterator uses rooted atomic edges and clears its
+inputs on exhaustion. Native regex finditer uses that same iterator, not a
+regex-only substitute for the missing two-argument iter builtin.
 `Objects/sliceobject.cpp` supplies traced immutable slice fields and normalization;
 sequence owners perform conversions before their rooted snapshots/local commits.
 `Objects/formatobject.cpp` supplies the common format/ascii protocol boundary;
@@ -444,9 +453,24 @@ creation, non-None TypeVar bound checking, substitution, unions and
 TypeVarTuple unpacking call through real imports. Missing imports and errors
 propagate, including for classmethod Generic policy; there is no fabricated
 typing fallback. Generic class compilation is connected, but the actual
-typing/re/warnings dependency closure and acceptance remain open.
+typing/warnings dependency closure and acceptance remain open. The actual
+upstream typing import now passes re and reaches the missing Warning hierarchy.
 Native _opcode.local_names exposes actual VM fast-local slots to dis; those
 indices are not indices into the cell-filtered Python co_varnames tuple.
+
+`Modules/_sre/engine.c` and its adapted upstream matching header keep SRE
+instruction validation, captures, assertions and backtracking in independent C.
+Each operation owns native scratch and polls the attached mutator without letting
+C++ exceptions escape through C; error exits free the repeat/stack pools. Patterns
+own immutable validated instructions and precise managed input edges.
+`Objects/srepatternobject.cpp` and `srematchobject.cpp` supply actual Python
+Pattern/Match/Scanner/template protocols; `Modules/_sre/sre.cpp` exposes native
+factories and shared Unicode properties. Scanner cursors use an operation claim,
+not an interpreter mutex. Immutable subject snapshots are reused; mutable
+exported buffers refresh on their storage version, avoiding whole-subject copies
+for each scanner step. Lib/re remains unchanged Python policy from the pinned
+reference. Full upstream re, mutable-export/release, interrupt/signal and
+performance matrices remain separate acceptance work.
 
 Variable annotations lower through ordinary stores and SETUP_ANNOTATIONS, not a
 second VM evaluation path. Type annotation reflection reuses the own namespace's

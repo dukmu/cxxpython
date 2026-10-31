@@ -1,0 +1,200 @@
+{
+  "kernel": "\nimport _thread\nimport re\nimport sys\nsize, workers = int(sys.argv[1]), int(sys.argv[2])\npattern = re.compile('a*$')\ntext = 'a' * size\ngate = _thread.allocate_lock()\ngate.acquire()\ndone = [_thread.allocate_lock() for _ in range(workers)]\nfor lock in done:\n    lock.acquire()\nresults = [False] * workers\ndef worker(index):\n    try:\n        gate.acquire()\n        gate.release()\n        for _ in range(128 // workers):\n            assert pattern.fullmatch(text).end() == size\n        results[index] = True\n    except BaseException:\n        results[index] = False\n    finally:\n        done[index].release()\nfor index in range(workers):\n    _thread.start_new_thread(worker, (index,))\ngate.release()\nfor lock in done:\n    lock.acquire()\nassert all(results)\nprint(workers)\n",
+  "kernel_sha256": "5fa2bd59a25b862ccf4da32ffee2cfeabba83e6048811035380c43e9122b4987",
+  "includes_startup_and_import": true,
+  "iterations": 128,
+  "commands": [
+    {
+      "command": [
+        "/home/shefrin/repo/cxxpython/build/cxxpython",
+        "-c",
+        "\nimport _thread\nimport re\nimport sys\nsize, workers = int(sys.argv[1]), int(sys.argv[2])\npattern = re.compile('a*$')\ntext = 'a' * size\ngate = _thread.allocate_lock()\ngate.acquire()\ndone = [_thread.allocate_lock() for _ in range(workers)]\nfor lock in done:\n    lock.acquire()\nresults = [False] * workers\ndef worker(index):\n    try:\n        gate.acquire()\n        gate.release()\n        for _ in range(128 // workers):\n            assert pattern.fullmatch(text).end() == size\n        results[index] = True\n    except BaseException:\n        results[index] = False\n    finally:\n        done[index].release()\nfor index in range(workers):\n    _thread.start_new_thread(worker, (index,))\ngate.release()\nfor lock in done:\n    lock.acquire()\nassert all(results)\nprint(workers)\n",
+        "2000000",
+        "1"
+      ],
+      "binary_sha256": "ed4df935ea5bc9b0e83ce9c3f266d10a79e92412cfb7f1103229220d35ef0a32",
+      "raw": ".cache/sre-benchmark/cxx-2000000-1-0.txt",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/home/shefrin/repo/cxxpython/build/cxxpython",
+        "-c",
+        "\nimport _thread\nimport re\nimport sys\nsize, workers = int(sys.argv[1]), int(sys.argv[2])\npattern = re.compile('a*$')\ntext = 'a' * size\ngate = _thread.allocate_lock()\ngate.acquire()\ndone = [_thread.allocate_lock() for _ in range(workers)]\nfor lock in done:\n    lock.acquire()\nresults = [False] * workers\ndef worker(index):\n    try:\n        gate.acquire()\n        gate.release()\n        for _ in range(128 // workers):\n            assert pattern.fullmatch(text).end() == size\n        results[index] = True\n    except BaseException:\n        results[index] = False\n    finally:\n        done[index].release()\nfor index in range(workers):\n    _thread.start_new_thread(worker, (index,))\ngate.release()\nfor lock in done:\n    lock.acquire()\nassert all(results)\nprint(workers)\n",
+        "2000000",
+        "1"
+      ],
+      "binary_sha256": "ed4df935ea5bc9b0e83ce9c3f266d10a79e92412cfb7f1103229220d35ef0a32",
+      "raw": ".cache/sre-benchmark/cxx-2000000-1-1.txt",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/home/shefrin/repo/cxxpython/build/cxxpython",
+        "-c",
+        "\nimport _thread\nimport re\nimport sys\nsize, workers = int(sys.argv[1]), int(sys.argv[2])\npattern = re.compile('a*$')\ntext = 'a' * size\ngate = _thread.allocate_lock()\ngate.acquire()\ndone = [_thread.allocate_lock() for _ in range(workers)]\nfor lock in done:\n    lock.acquire()\nresults = [False] * workers\ndef worker(index):\n    try:\n        gate.acquire()\n        gate.release()\n        for _ in range(128 // workers):\n            assert pattern.fullmatch(text).end() == size\n        results[index] = True\n    except BaseException:\n        results[index] = False\n    finally:\n        done[index].release()\nfor index in range(workers):\n    _thread.start_new_thread(worker, (index,))\ngate.release()\nfor lock in done:\n    lock.acquire()\nassert all(results)\nprint(workers)\n",
+        "2000000",
+        "2"
+      ],
+      "binary_sha256": "ed4df935ea5bc9b0e83ce9c3f266d10a79e92412cfb7f1103229220d35ef0a32",
+      "raw": ".cache/sre-benchmark/cxx-2000000-2-0.txt",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/home/shefrin/repo/cxxpython/build/cxxpython",
+        "-c",
+        "\nimport _thread\nimport re\nimport sys\nsize, workers = int(sys.argv[1]), int(sys.argv[2])\npattern = re.compile('a*$')\ntext = 'a' * size\ngate = _thread.allocate_lock()\ngate.acquire()\ndone = [_thread.allocate_lock() for _ in range(workers)]\nfor lock in done:\n    lock.acquire()\nresults = [False] * workers\ndef worker(index):\n    try:\n        gate.acquire()\n        gate.release()\n        for _ in range(128 // workers):\n            assert pattern.fullmatch(text).end() == size\n        results[index] = True\n    except BaseException:\n        results[index] = False\n    finally:\n        done[index].release()\nfor index in range(workers):\n    _thread.start_new_thread(worker, (index,))\ngate.release()\nfor lock in done:\n    lock.acquire()\nassert all(results)\nprint(workers)\n",
+        "2000000",
+        "2"
+      ],
+      "binary_sha256": "ed4df935ea5bc9b0e83ce9c3f266d10a79e92412cfb7f1103229220d35ef0a32",
+      "raw": ".cache/sre-benchmark/cxx-2000000-2-1.txt",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/home/shefrin/repo/cxxpython/build/cxxpython",
+        "-c",
+        "\nimport _thread\nimport re\nimport sys\nsize, workers = int(sys.argv[1]), int(sys.argv[2])\npattern = re.compile('a*$')\ntext = 'a' * size\ngate = _thread.allocate_lock()\ngate.acquire()\ndone = [_thread.allocate_lock() for _ in range(workers)]\nfor lock in done:\n    lock.acquire()\nresults = [False] * workers\ndef worker(index):\n    try:\n        gate.acquire()\n        gate.release()\n        for _ in range(128 // workers):\n            assert pattern.fullmatch(text).end() == size\n        results[index] = True\n    except BaseException:\n        results[index] = False\n    finally:\n        done[index].release()\nfor index in range(workers):\n    _thread.start_new_thread(worker, (index,))\ngate.release()\nfor lock in done:\n    lock.acquire()\nassert all(results)\nprint(workers)\n",
+        "4000000",
+        "1"
+      ],
+      "binary_sha256": "ed4df935ea5bc9b0e83ce9c3f266d10a79e92412cfb7f1103229220d35ef0a32",
+      "raw": ".cache/sre-benchmark/cxx-4000000-1-0.txt",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/home/shefrin/repo/cxxpython/build/cxxpython",
+        "-c",
+        "\nimport _thread\nimport re\nimport sys\nsize, workers = int(sys.argv[1]), int(sys.argv[2])\npattern = re.compile('a*$')\ntext = 'a' * size\ngate = _thread.allocate_lock()\ngate.acquire()\ndone = [_thread.allocate_lock() for _ in range(workers)]\nfor lock in done:\n    lock.acquire()\nresults = [False] * workers\ndef worker(index):\n    try:\n        gate.acquire()\n        gate.release()\n        for _ in range(128 // workers):\n            assert pattern.fullmatch(text).end() == size\n        results[index] = True\n    except BaseException:\n        results[index] = False\n    finally:\n        done[index].release()\nfor index in range(workers):\n    _thread.start_new_thread(worker, (index,))\ngate.release()\nfor lock in done:\n    lock.acquire()\nassert all(results)\nprint(workers)\n",
+        "4000000",
+        "1"
+      ],
+      "binary_sha256": "ed4df935ea5bc9b0e83ce9c3f266d10a79e92412cfb7f1103229220d35ef0a32",
+      "raw": ".cache/sre-benchmark/cxx-4000000-1-1.txt",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/home/shefrin/repo/cxxpython/build/cxxpython",
+        "-c",
+        "\nimport _thread\nimport re\nimport sys\nsize, workers = int(sys.argv[1]), int(sys.argv[2])\npattern = re.compile('a*$')\ntext = 'a' * size\ngate = _thread.allocate_lock()\ngate.acquire()\ndone = [_thread.allocate_lock() for _ in range(workers)]\nfor lock in done:\n    lock.acquire()\nresults = [False] * workers\ndef worker(index):\n    try:\n        gate.acquire()\n        gate.release()\n        for _ in range(128 // workers):\n            assert pattern.fullmatch(text).end() == size\n        results[index] = True\n    except BaseException:\n        results[index] = False\n    finally:\n        done[index].release()\nfor index in range(workers):\n    _thread.start_new_thread(worker, (index,))\ngate.release()\nfor lock in done:\n    lock.acquire()\nassert all(results)\nprint(workers)\n",
+        "4000000",
+        "2"
+      ],
+      "binary_sha256": "ed4df935ea5bc9b0e83ce9c3f266d10a79e92412cfb7f1103229220d35ef0a32",
+      "raw": ".cache/sre-benchmark/cxx-4000000-2-0.txt",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/home/shefrin/repo/cxxpython/build/cxxpython",
+        "-c",
+        "\nimport _thread\nimport re\nimport sys\nsize, workers = int(sys.argv[1]), int(sys.argv[2])\npattern = re.compile('a*$')\ntext = 'a' * size\ngate = _thread.allocate_lock()\ngate.acquire()\ndone = [_thread.allocate_lock() for _ in range(workers)]\nfor lock in done:\n    lock.acquire()\nresults = [False] * workers\ndef worker(index):\n    try:\n        gate.acquire()\n        gate.release()\n        for _ in range(128 // workers):\n            assert pattern.fullmatch(text).end() == size\n        results[index] = True\n    except BaseException:\n        results[index] = False\n    finally:\n        done[index].release()\nfor index in range(workers):\n    _thread.start_new_thread(worker, (index,))\ngate.release()\nfor lock in done:\n    lock.acquire()\nassert all(results)\nprint(workers)\n",
+        "4000000",
+        "2"
+      ],
+      "binary_sha256": "ed4df935ea5bc9b0e83ce9c3f266d10a79e92412cfb7f1103229220d35ef0a32",
+      "raw": ".cache/sre-benchmark/cxx-4000000-2-1.txt",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/home/shefrin/repo/cxxpython/.cache/cpython31214-build/python",
+        "-c",
+        "\nimport _thread\nimport re\nimport sys\nsize, workers = int(sys.argv[1]), int(sys.argv[2])\npattern = re.compile('a*$')\ntext = 'a' * size\ngate = _thread.allocate_lock()\ngate.acquire()\ndone = [_thread.allocate_lock() for _ in range(workers)]\nfor lock in done:\n    lock.acquire()\nresults = [False] * workers\ndef worker(index):\n    try:\n        gate.acquire()\n        gate.release()\n        for _ in range(128 // workers):\n            assert pattern.fullmatch(text).end() == size\n        results[index] = True\n    except BaseException:\n        results[index] = False\n    finally:\n        done[index].release()\nfor index in range(workers):\n    _thread.start_new_thread(worker, (index,))\ngate.release()\nfor lock in done:\n    lock.acquire()\nassert all(results)\nprint(workers)\n",
+        "2000000",
+        "1"
+      ],
+      "binary_sha256": "06ee6bc43fafd0ddbc5842fc73163dc261b403c08eaacaac1f68a8f840d4277a",
+      "raw": ".cache/sre-benchmark/cpython-2000000-1-0.txt",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/home/shefrin/repo/cxxpython/.cache/cpython31214-build/python",
+        "-c",
+        "\nimport _thread\nimport re\nimport sys\nsize, workers = int(sys.argv[1]), int(sys.argv[2])\npattern = re.compile('a*$')\ntext = 'a' * size\ngate = _thread.allocate_lock()\ngate.acquire()\ndone = [_thread.allocate_lock() for _ in range(workers)]\nfor lock in done:\n    lock.acquire()\nresults = [False] * workers\ndef worker(index):\n    try:\n        gate.acquire()\n        gate.release()\n        for _ in range(128 // workers):\n            assert pattern.fullmatch(text).end() == size\n        results[index] = True\n    except BaseException:\n        results[index] = False\n    finally:\n        done[index].release()\nfor index in range(workers):\n    _thread.start_new_thread(worker, (index,))\ngate.release()\nfor lock in done:\n    lock.acquire()\nassert all(results)\nprint(workers)\n",
+        "2000000",
+        "1"
+      ],
+      "binary_sha256": "06ee6bc43fafd0ddbc5842fc73163dc261b403c08eaacaac1f68a8f840d4277a",
+      "raw": ".cache/sre-benchmark/cpython-2000000-1-1.txt",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/home/shefrin/repo/cxxpython/.cache/cpython31214-build/python",
+        "-c",
+        "\nimport _thread\nimport re\nimport sys\nsize, workers = int(sys.argv[1]), int(sys.argv[2])\npattern = re.compile('a*$')\ntext = 'a' * size\ngate = _thread.allocate_lock()\ngate.acquire()\ndone = [_thread.allocate_lock() for _ in range(workers)]\nfor lock in done:\n    lock.acquire()\nresults = [False] * workers\ndef worker(index):\n    try:\n        gate.acquire()\n        gate.release()\n        for _ in range(128 // workers):\n            assert pattern.fullmatch(text).end() == size\n        results[index] = True\n    except BaseException:\n        results[index] = False\n    finally:\n        done[index].release()\nfor index in range(workers):\n    _thread.start_new_thread(worker, (index,))\ngate.release()\nfor lock in done:\n    lock.acquire()\nassert all(results)\nprint(workers)\n",
+        "2000000",
+        "2"
+      ],
+      "binary_sha256": "06ee6bc43fafd0ddbc5842fc73163dc261b403c08eaacaac1f68a8f840d4277a",
+      "raw": ".cache/sre-benchmark/cpython-2000000-2-0.txt",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/home/shefrin/repo/cxxpython/.cache/cpython31214-build/python",
+        "-c",
+        "\nimport _thread\nimport re\nimport sys\nsize, workers = int(sys.argv[1]), int(sys.argv[2])\npattern = re.compile('a*$')\ntext = 'a' * size\ngate = _thread.allocate_lock()\ngate.acquire()\ndone = [_thread.allocate_lock() for _ in range(workers)]\nfor lock in done:\n    lock.acquire()\nresults = [False] * workers\ndef worker(index):\n    try:\n        gate.acquire()\n        gate.release()\n        for _ in range(128 // workers):\n            assert pattern.fullmatch(text).end() == size\n        results[index] = True\n    except BaseException:\n        results[index] = False\n    finally:\n        done[index].release()\nfor index in range(workers):\n    _thread.start_new_thread(worker, (index,))\ngate.release()\nfor lock in done:\n    lock.acquire()\nassert all(results)\nprint(workers)\n",
+        "2000000",
+        "2"
+      ],
+      "binary_sha256": "06ee6bc43fafd0ddbc5842fc73163dc261b403c08eaacaac1f68a8f840d4277a",
+      "raw": ".cache/sre-benchmark/cpython-2000000-2-1.txt",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/home/shefrin/repo/cxxpython/.cache/cpython31214-build/python",
+        "-c",
+        "\nimport _thread\nimport re\nimport sys\nsize, workers = int(sys.argv[1]), int(sys.argv[2])\npattern = re.compile('a*$')\ntext = 'a' * size\ngate = _thread.allocate_lock()\ngate.acquire()\ndone = [_thread.allocate_lock() for _ in range(workers)]\nfor lock in done:\n    lock.acquire()\nresults = [False] * workers\ndef worker(index):\n    try:\n        gate.acquire()\n        gate.release()\n        for _ in range(128 // workers):\n            assert pattern.fullmatch(text).end() == size\n        results[index] = True\n    except BaseException:\n        results[index] = False\n    finally:\n        done[index].release()\nfor index in range(workers):\n    _thread.start_new_thread(worker, (index,))\ngate.release()\nfor lock in done:\n    lock.acquire()\nassert all(results)\nprint(workers)\n",
+        "4000000",
+        "1"
+      ],
+      "binary_sha256": "06ee6bc43fafd0ddbc5842fc73163dc261b403c08eaacaac1f68a8f840d4277a",
+      "raw": ".cache/sre-benchmark/cpython-4000000-1-0.txt",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/home/shefrin/repo/cxxpython/.cache/cpython31214-build/python",
+        "-c",
+        "\nimport _thread\nimport re\nimport sys\nsize, workers = int(sys.argv[1]), int(sys.argv[2])\npattern = re.compile('a*$')\ntext = 'a' * size\ngate = _thread.allocate_lock()\ngate.acquire()\ndone = [_thread.allocate_lock() for _ in range(workers)]\nfor lock in done:\n    lock.acquire()\nresults = [False] * workers\ndef worker(index):\n    try:\n        gate.acquire()\n        gate.release()\n        for _ in range(128 // workers):\n            assert pattern.fullmatch(text).end() == size\n        results[index] = True\n    except BaseException:\n        results[index] = False\n    finally:\n        done[index].release()\nfor index in range(workers):\n    _thread.start_new_thread(worker, (index,))\ngate.release()\nfor lock in done:\n    lock.acquire()\nassert all(results)\nprint(workers)\n",
+        "4000000",
+        "1"
+      ],
+      "binary_sha256": "06ee6bc43fafd0ddbc5842fc73163dc261b403c08eaacaac1f68a8f840d4277a",
+      "raw": ".cache/sre-benchmark/cpython-4000000-1-1.txt",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/home/shefrin/repo/cxxpython/.cache/cpython31214-build/python",
+        "-c",
+        "\nimport _thread\nimport re\nimport sys\nsize, workers = int(sys.argv[1]), int(sys.argv[2])\npattern = re.compile('a*$')\ntext = 'a' * size\ngate = _thread.allocate_lock()\ngate.acquire()\ndone = [_thread.allocate_lock() for _ in range(workers)]\nfor lock in done:\n    lock.acquire()\nresults = [False] * workers\ndef worker(index):\n    try:\n        gate.acquire()\n        gate.release()\n        for _ in range(128 // workers):\n            assert pattern.fullmatch(text).end() == size\n        results[index] = True\n    except BaseException:\n        results[index] = False\n    finally:\n        done[index].release()\nfor index in range(workers):\n    _thread.start_new_thread(worker, (index,))\ngate.release()\nfor lock in done:\n    lock.acquire()\nassert all(results)\nprint(workers)\n",
+        "4000000",
+        "2"
+      ],
+      "binary_sha256": "06ee6bc43fafd0ddbc5842fc73163dc261b403c08eaacaac1f68a8f840d4277a",
+      "raw": ".cache/sre-benchmark/cpython-4000000-2-0.txt",
+      "exit_code": 0
+    },
+    {
+      "command": [
+        "/home/shefrin/repo/cxxpython/.cache/cpython31214-build/python",
+        "-c",
+        "\nimport _thread\nimport re\nimport sys\nsize, workers = int(sys.argv[1]), int(sys.argv[2])\npattern = re.compile('a*$')\ntext = 'a' * size\ngate = _thread.allocate_lock()\ngate.acquire()\ndone = [_thread.allocate_lock() for _ in range(workers)]\nfor lock in done:\n    lock.acquire()\nresults = [False] * workers\ndef worker(index):\n    try:\n        gate.acquire()\n        gate.release()\n        for _ in range(128 // workers):\n            assert pattern.fullmatch(text).end() == size\n        results[index] = True\n    except BaseException:\n        results[index] = False\n    finally:\n        done[index].release()\nfor index in range(workers):\n    _thread.start_new_thread(worker, (index,))\ngate.release()\nfor lock in done:\n    lock.acquire()\nassert all(results)\nprint(workers)\n",
+        "4000000",
+        "2"
+      ],
+      "binary_sha256": "06ee6bc43fafd0ddbc5842fc73163dc261b403c08eaacaac1f68a8f840d4277a",
+      "raw": ".cache/sre-benchmark/cpython-4000000-2-1.txt",
+      "exit_code": 0
+    }
+  ]
+}

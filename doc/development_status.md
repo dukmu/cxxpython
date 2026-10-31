@@ -1,5 +1,77 @@
 # Development Status
 
+## 2026-10-31 Native SRE, Upstream Re And General Buffer Dependencies
+
+Prepended after 76a677d, preserving earlier entries. Terra supplied the native
+Match protocols, module factory/Unicode bridge and unchanged upstream Python
+package with initial reference fixtures. Parent implemented the independent C
+engine adaptation, Pattern/Scanner/template protocols, native memory formats,
+general builtin dependencies and integration. All workers are closed. This is
+a stable library/type slice, not completion of the active frontend/import/
+library/product/N4-N6/M0-M9 goal or its absolute performance acceptance.
+
+- Lib/re's five files are byte-for-byte CPython 3.12.14 sources. The native _sre
+  module uses the original matching and validation algorithms, with retained
+  provenance/licenses, rather than a different regex dialect or host interpreter.
+  C scratch is private to each operation and has no managed edges. Bounded polls
+  catch C++ interruptions before returning through C; all native repeat/stack
+  pools are freed before the caller propagates the error. Direct malformed code
+  tests cover truncated control flow and out-of-range MARK operands.
+- Immutable Pattern instructions/inputs and Match captures have explicit trace
+  contracts; the lazy regs cache uses the existing rooted atomic-edge contract.
+  Scanner operations claim only their cursor/cache, not the interpreter. A native
+  export lease prevents mutable-buffer resize; versioned snapshots refresh after
+  same-size mutations instead of copying the whole subject at every scanner step.
+  Replacement callbacks run outside storage locks. GenericAlias, weakref,
+  readonly metadata, group selection, templates, zero-width advancement,
+  lookarounds, backreferences and atomic/possessive repeats have focused coverage.
+- memoryview now supports one-dimensional native scalar formats
+  b/B/h/H/i/I/l/L/q/Q/n/N/P/e/f/d/?/c, preserving optional @ prefixes. Format is
+  the sole itemsize authority; offsets/strides are bytes and lengths are elements.
+  Alignment-safe packing/unpacking uses normal Python conversion protocols.
+  Binary16 conversion is shared with _struct, not duplicated. Cross-format value
+  comparison, sliced writes, buffer metadata and GC inside conversions are tested.
+  Multidimensional shapes/casts, general exporters and full release/reflection
+  compatibility remain gates.
+- General iter(callable, sentinel) uses traced atomic inputs and releases them on
+  sentinel/StopIteration exhaustion; other errors remain retriable. Regex finditer
+  reuses it. str.count, str(buffer, encoding, errors), int bytes/base/buffer parsing
+  and bytes/bytearray translate/maketrans close actual upstream dependencies.
+  Numeric conversion precedence and bytes-versus-Unicode digit rules remain
+  distinct. No Lib/re compatibility edits or workload special cases were added.
+- Eleven new direct test.py fixtures have pinned-reference-generated goldens,
+  including shared Pattern/GC worker handoff with caught failures and finally
+  completion gates. stdin.bin remains optional process input, never test source.
+  The requested readline/curses/dis/gc REPL scope remains in Plan 2 section 0.12
+  and the compatibility ledger, including unfinished terminal/interface matrices.
+- Release acceptance passes all 312 portable scripts, 164 affected native/source/
+  dis/GC/terminal checks and eight bootstrap allocation-failure shards. Strict
+  ASan/UBSan/LSan passes 108 affected checks and all eleven new scripts. TSan
+  passes the same 108 checks and eleven scripts after isolated reruns of initial
+  timeout failures: the first concurrent sanitizer campaign passed 107/108 checks
+  but timed out Main.Terminal and five regex scripts. Isolated scripts pass 11/11
+  and Main.Terminal passes at 27.40 seconds with unchanged limits/instrumentation.
+  A sampled import used CPU continuously in keyed dictionary hashing and finished
+  at 27.42 seconds; no race report was emitted. Initial failures are retained,
+  not rewritten. C and C++ engine/wrapper code are both instrumented. Source was
+  frozen before final builds; format-check and diff whitespace checks pass.
+  Raw logs and hashes are retained under .cache/sre-*.
+- Tools/benchmarks/regex.py captures identical fixed-work, one/two-worker probes
+  on product and pinned reference, including complete startup/import cost. Only
+  this new workload was measured; no unchanged performance suite was repeated.
+  Retained raw runs, commands/binary hashes and record.py-generated tables are in
+  doc/benchmarks/regex-2026-10-31/. The native regex workload scales across workers
+  but remains substantially slower in absolute time than CPython. Subject copies,
+  native polling and startup/import costs remain performance work, not a passed
+  CPython-level performance gate or proof about Python-bytecode scaling.
+- A real unchanged upstream typing probe now passes re and reaches warnings.py's
+  missing Warning hierarchy. Next dependencies are warning types/warnings and
+  its actual library/stack metadata requirements, then the real typing/generic
+  class matrix and broader requested libraries. Full upstream re, warnings,
+  mutable-export/release, signals/interrupts and product gates remain unfinished.
+  Origin push still awaits destination authorization; no retry or bypass was
+  attempted. User test2.py and the temporary_plan.md deletion remain excluded.
+
 ## 2026-10-31 Native Type Parameters And Generic Definition Scopes
 
 Prepended after 1ee7661, preserving earlier entries. Parent implemented the

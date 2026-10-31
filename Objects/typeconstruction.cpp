@@ -1,6 +1,8 @@
 #include "cxxpython/genericaliasobject.hpp"
+#include "cxxpython/memoryobject.hpp"
 #include "cxxpython/protocol.hpp"
 #include "cxxpython/unionobject.hpp"
+#include "internal/codecs.hpp"
 #include "internal/exceptions.hpp"
 
 #include <algorithm>
@@ -858,8 +860,19 @@ void string_new(Attachment &context, Handle, std::span<const Value> args, Return
     if (!values[0])
         make_str(context, U"", converted);
     else if (values[1] || values[2]) {
-        type_error(context, U"decoding requires a bytes-like object", out);
-        return;
+        std::string bytes;
+        if (!detail::buffer_bytes(context, roots.root(*values[0]), bytes, converted)) {
+            if (!raised(converted))
+                type_error(context, U"decoding requires a bytes-like object", out);
+            else
+                out.raised(converted.exception());
+            return;
+        }
+        make_bytes(context, std::move(bytes), converted);
+        auto source = roots.root(converted.value());
+        detail::decode_bytes(
+            context, source, roots.root(values[1].value_or(context.builtin(CoreObject::None))),
+            roots.root(values[2].value_or(context.builtin(CoreObject::None))), converted);
     } else
         str(context, roots.root(*values[0]), converted);
     if (raised(converted)) {

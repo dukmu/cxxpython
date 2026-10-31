@@ -197,10 +197,14 @@ the target is `builtins` and the `__builtins__` execution namespace.
   case/casefold mappings use that table; namereplace reuses the existing native
   compressed names. Full str API/diagnostic coverage remains a separate gate.
 - memoryview supports actual bytes/bytearray aliasing, readonly/release/context
-  management, byte-strided slices, B/b/c casts, indexed/slice writes and metadata.
+  management, byte-strided slices, native one-element formats
+  b/B/h/H/i/I/l/L/q/Q/n/N/P/e/f/d/?/c (including @ prefixes), indexed/slice writes
+  and metadata. Element counts and byte offsets/strides remain distinct; scalar
+  packing is alignment-safe and uses Python conversion protocols. Comparisons
+  compare unpacked values across formats; byte-format hash restrictions remain.
   Export tokens keep native storage alive without accessing managed objects at
   destruction, while live views trace exporters. Bytearray resizing is forbidden
-  while exported. Multidimensional/native-format casts, generic exporters and
+  while exported. Multidimensional casts/shapes, generic exporters and
   the complete memoryview reflection/released-hash matrix are not complete.
 - Bytes/bytearray find/rfind/index/rindex/count, partition/rpartition,
   strip/lstrip/rstrip and split/rsplit share native algorithms in
@@ -278,13 +282,27 @@ the target is `builtins` and the `__builtins__` execution namespace.
   unions and TypeVarTuple unpacking. Missing imports propagate instead of using
   fabricated typing policy. Generic function/alias slices are reference-tested,
   not completed generic-class or typing compatibility. A real upstream typing
-  import probe reaches re/_compiler.py and fails at the missing native _sre;
-  the regex engine and warnings closure are the next library dependencies.
+  import probe now passes re and reaches warnings.py's missing Warning hierarchy;
+  warnings and its dependency closure are the next library requirements.
   Omitted/None bounds in the public ParamSpec constructor normalize to NoneType;
   syntax-created ParamSpecs retain the reference's None bound instead.
 - VM dis resolves fast-local names through _opcode.local_names rather than
   indexing the cell-filtered co_varnames with the VM's internal slot number.
   Real generic wrapper graphs exercise these otherwise sparse slot indices.
+- Lib/re's five Python files are unchanged pinned CPython sources. Native _sre
+  adapts the original C matching/validation algorithms, not another regex dialect.
+  Pattern/Match/scanner, replacement templates/callbacks, named groups,
+  lookarounds, backreferences, atomic/possessive repeats, empty-match advancement,
+  Unicode/ASCII/locale bytes modes and buffer subjects have focused reference
+  scripts. Pattern instructions are immutable; match captures are immutable with
+  a rooted atomic regs cache. Native C scratch is per operation and exception-free
+  across its ABI; the attached caller handles GC polling and propagation.
+- The general iter(callable, sentinel) clears atomic input edges on sentinel or
+  StopIteration, preserving other errors/retry. Its ordinary iterable identity
+  is reused by finditer. str.count, str(buffer, encoding, errors), int buffer/base
+  parsing and bytes/bytearray translate/maketrans close actual upstream re
+  dependencies. Full re, warning/deprecation, native-format/exporter, pickle,
+  mutation and diagnostic matrices are not inferred from those passing slices.
 - mappingproxy is constructible over actual mappings, not just exact dicts.
   Reads, length, iteration, views/get/copy, comparison and repr delegate to the
   underlying object, including dict subclass overrides. It remains readonly but

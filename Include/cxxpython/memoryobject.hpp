@@ -24,16 +24,20 @@ struct MemoryViewObject {
     std::shared_ptr<MemoryViewExport> exported;
     const std::int64_t offset, stride, length;
     const bool readonly;
-    const char format;
+    const std::string format;
     MemoryViewObject(InitialType head, Value owner, std::shared_ptr<MemoryViewExport> token,
                      std::int64_t offset, std::int64_t stride, std::int64_t length, bool readonly,
-                     char format = 'B')
+                     std::string format = "B")
         : header(head), owner(owner), exported(std::move(token)), offset(offset), stride(stride),
-          length(length), readonly(readonly), format(format)
+          length(length), readonly(readonly), format(std::move(format))
     {}
     void trace(Tracer &tracer) const noexcept
     {
         tracer.visit(owner);
+    }
+    std::size_t external_bytes() const noexcept
+    {
+        return format.capacity() + 1;
     }
 };
 

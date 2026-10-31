@@ -23,7 +23,7 @@ implemented unary/arithmetic/boolean/comparison protocols, name/attribute
 operations, if/while/for control flow, calls, function definitions/defaults/variadic
 binding, globals/nonlocal, closures, docstrings, tuple expressions, recursive
 recursive/starred unpacking and integer/slice/protocol subscripts. Experimental range,
-tuple/string iteration, iter(obj), next(it[, default]) and exception construction
+tuple/string iteration, iter(obj[, sentinel]), next(it[, default]) and exception construction
 use ordinary object protocols. Raise/reraise/chaining, try/except/else/finally and
 synchronous with use verified regions and the existing frame scheduler.
 Class definitions and decorators use the existing type/descriptor/call machinery
@@ -55,8 +55,27 @@ tails. Byte iterator claims are atomic and tested with two shared-heap workers
 and collection. The immutable payload may be borrowed across NativeWait only
 while its precise owner Handle remains live. Native bytearray and byte-oriented
 memoryview exports now use synchronized storage and scoped native export tokens.
+Native one-element formats preserve byte offsets/strides separately from element
+lengths; scalar conversion supports integer, float/binary16, bool and char without
+unaligned accesses. Runtime/Python callbacks execute outside storage locks.
 The complete buffer-format/exporter/PEP 688 matrix remains a requirement, not
 emulated by iterable conversion or an unrooted pointer.
+
+Native SRE patterns own immutable validated instructions and traced source/group
+metadata. Each operation has independent C scratch, bounded GC polling and full
+cleanup before propagating errors; no Python RC or execution-wide lock is used.
+Scanners claim only their own cursor/cache. Their export token retains mutable
+storage and prevents resizing, while versioned snapshots observe same-size
+updates without copying immutable subjects at every next step. Match captures
+are immutable, with a rooted atomic regs cache. Replacement callbacks run Active
+and unlocked. Python regex parsing, flags, caching and replacement policy remain
+in the unchanged pinned Lib/re package, not C++ policy substitutes.
+
+The callable/sentinel iterator holds rooted atomic edges, clears both after
+exhaustion and preserves retry after other exceptions. Concurrent callbacks are
+not one atomic transaction. It is the real iter builtin's two-argument path and
+is reused by regex finditer. Full pickle/state, regex/warnings, buffer-release and
+platform performance acceptance remain requirements, not implied completion.
 
 Set/frozenset construction, displays and synchronous set comprehensions use the
 same compiler, call and object protocol paths. A SetObject owns a private traced

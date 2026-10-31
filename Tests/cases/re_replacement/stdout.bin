@@ -1,0 +1,11 @@
+abc:[12] def:[]
+('<abc12> def', 1)
+XY XaY
+-a-b--d-
+12/abc/abc12
+ABC DEF ('ABC DEF', 2)
+b'<a>b<a>'
+IndexError
+error
+TypeError
+TypeError
