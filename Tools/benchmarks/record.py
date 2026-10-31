@@ -129,7 +129,7 @@ def main():
     parser.add_argument("--reference", type=Path, help="Also run the captured source kernel on this CPython executable")
     parser.add_argument("--runs", type=int, default=3)
     parser.add_argument("--date", default=date.today().isoformat())
-    parser.add_argument("--output-dir", type=Path, default=Path(__file__).resolve().parents[2] / "doc/benchmarks")
+    parser.add_argument("--output-dir", type=Path, default=Path(__file__).resolve().parents[2] / ".cache/benchmarks")
     args = parser.parse_args()
     if not args.report_only and (not args.series or not re.fullmatch(r"[A-Za-z0-9_.-]+", args.series)):
         parser.error("--series must be a nonempty ASCII label")

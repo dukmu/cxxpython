@@ -196,11 +196,16 @@ TEST_F(CoreScheduling, PreparedTargetOwnsItsSnapshotsInTheCallerRootScope)
     auto prepared = detail::prepare_call(context, fn, {{}, named}, prepared_roots, out);
     ASSERT_TRUE(prepared);
     EXPECT_EQ(out.result().tag(), ResultTag::Empty);
+    const auto function_value = fn.get(context), argument_value = expected.get(context);
+    roots.release(fn);
+    roots.release(expected);
     context.collect();
-    EXPECT_EQ(prepared->function.get(context), fn.get(context));
+    EXPECT_EQ(prepared->function.get(context), function_value);
     EXPECT_FALSE(prepared->receiver);
     ASSERT_EQ(prepared->keywords.size(), 1U);
-    EXPECT_EQ(prepared->keywords[0].value, expected.get(context));
+    EXPECT_EQ(prepared->keywords[0].value, argument_value);
+    EXPECT_EQ(context.payload<StrObject>(argument_value).value, U"rooted keyword");
+    fn = roots.root(prepared->function.get(context));
     {
         RootScope temporary(context);
         ReturnSlot local(context);

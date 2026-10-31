@@ -1,5 +1,70 @@
 # Development Status
 
+## 2026-10-31 Shared Invocation Roots And Benchmark Consolidation Direction
+
+Continues the active performance/cleanup goal after pushed da7136d. The previous
+goal turn made concrete progress; this turn follows the retained CPU profiles.
+Terra added the direct protocol-call fixture and its fixed-reference output;
+parent changed the invocation path and ran acceptance. The worker is closed.
+
+- Ordinary call, special-method and protocol entries now own their inputs before
+  result reset or callbacks. Internal descriptor binding, bound-callable
+  unwrapping and native binding reuse that invocation's RootScope, instead of
+  independently rerooting the same arguments. Protocol invocation lives beside
+  ordinary invocation in Objects/call.cpp; abstract.cpp retains resolution and
+  operator policy. Removed the CallPreparation wrapper and duplicate prepared-call
+  argument roots. Prepared calls still copy borrowed host buffers and retain
+  their function/receiver/arguments in the caller's scope. Callable type is read
+  once for dispatch. Receiver compatibility, native result readiness, recursion
+  limits, type-epoch revalidation and foreign-object rejection remain unchanged.
+- Strengthened the existing prepared-target native test by releasing the original
+  function and argument roots before collection. The new direct Python fixture
+  covers collecting/replacing descriptors, temporary positional/keyword values,
+  native bound/explicit methods, invalid receivers and reflected/in-place
+  fallbacks. Its exact-int/bool/subclass assertions preserve existing conversion
+  semantics. It matches pinned CPython 3.12.14, and the final fixture passes all
+  three builds after restoring the experimental integer change described below.
+- Strict Clang 21.1.8 builds pass. The shared-call revision passes 148 selected
+  call/protocol/scheduling/execution/attribute/layout/import/shared-VM/finalizer
+  contracts on Release, ASan/UBSan/LSan and TSan; Release also passes all 16
+  bootstrap/promotion fault shards. Thirteen affected Python scenarios pass all
+  three builds, including real shared-heap threads and GC callbacks. Formatting
+  and the four host report tests pass. Evidence is retained as .cache/call-roots-*.
+  Unchanged broad acceptance is reused, not rerun for documentation cleanup.
+- With builds/tests stopped, the unmodified local matrix workload at N=64,
+  workers 1-4 and three repetitions has median wall time 865.672 ms at one worker
+  and 340.464 ms at four, versus the retained da7136d medians 1309.610/492.572 ms.
+  Four-worker CPU/wall is 3.536: the absolute multithreaded result improved, not a
+  GIL-based single-thread trade. CPython remains substantially faster in absolute
+  time. Raw captures are .cache/matrix-cxx-n64-call-roots.*. Tables were generated
+  through record.py; their former tracked location was subsequently removed at
+  the user's request. matrix.py remains unmodified and untracked.
+- Used the installed native perf binary, not the broken WSL wrapper. N=128,
+  one-worker sampling retains both self and caller-chain reports under
+  .cache/matrix-n128-call-roots-perf*. Ownership/root/admission remain hot;
+  get_item -> index -> copy_int is one concrete remaining chain. Hardware cycles,
+  instructions and cache events report not supported, so no cache-hit-rate claim
+  is made. Sampling runs are separate from wall-time comparison runs.
+- Tried moving copy_int's existing exact-int identity return before payload/root
+  work. Its focused 61 native contracts and five scripts passed all three builds,
+  but the timing run had a single-worker CPU/wall ratio around 0.43 and cannot
+  support a comparable performance conclusion. The experiment is not shipped:
+  Objects/longobject.cpp is restored to the accepted shared-call revision's
+  original code. Its patch and diagnostic raw capture remain in .cache/. No
+  favorable result is selected from that run and no global safety check is removed.
+- The user requested an engineered benchmark suite instead of scattered manual
+  probes, and permits removing obsolete reports/drivers. Removed 54 generated
+  doc/benchmarks artifacts; a local copy is retained at
+  .cache/benchmarks-legacy-20261031. record.py now defaults to ignored
+  .cache/benchmarks. Plan 2 section 0.13 and AGENTS.md record the next dependency:
+  unify useful Python workloads with calibrated/warmed independent-process runs,
+  fixed-work CPU threading, I/O and allocation/GC cases, reference comparisons
+  and automatic reports. The replacement suite is not yet implemented; existing
+  drivers remain until it is connected. GC/allocator/cache/epoch coordination are
+  eligible optimization targets, not just calls. Measure their actual effects
+  before choosing JVM-inspired mechanisms; no new collector, GIL or RC was added.
+  The active goal remains incomplete, and the full compatibility route stays paused.
+
 ## 2026-10-31 Compound Root Access And Shared Native Errors
 
 Continues the active performance/cleanup goal after 86c2463; the complete

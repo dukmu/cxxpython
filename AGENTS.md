@@ -79,6 +79,12 @@ compiler, VM, and extension platform implemented in a C/C++ mix.
   of `doc/development_status.md`; do not rewrite earlier entries.
 - Generate measurement tables with `Tools/benchmarks/record.py`
   from retained raw runs. Do not hand-copy benchmark rows or derived speedups.
+- Benchmark results belong under ignored `.cache/benchmarks/`, not generated
+  `doc/benchmarks/` snapshots. Consolidate useful Python workloads into a unified
+  reproducible suite with warmups, independent processes, fixed-work threading
+  and reference comparisons; remove obsolete foundation/one-off drivers once
+  their replacement is connected. GC/allocation/coordination optimization is
+  in scope, but genuine shared-heap CPU parallelism must be preserved.
 - Do not rerun the full performance suite for every stable commit. Reuse retained
   baselines; measure affected hot paths, new workloads or concrete regressions.
   Correctness-only changes need relevant regression tests, not unrelated CPU probes.

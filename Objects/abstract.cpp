@@ -331,30 +331,6 @@ ResolvedSlot resolve_protocol(Attachment &context, Handle type, Protocol id, Roo
         std::this_thread::yield();
     }
 }
-ResultView invoke_protocol(Attachment &context, Handle receiver, const ResolvedSlot &slot,
-                           std::span<const Value> args, ReturnSlot &out)
-{
-    return guarded(context, out, [&] {
-        RootScope roots(context);
-        auto self = roots.root(receiver.get(context));
-        for (auto value : args)
-            roots.root(value);
-        if (args.size() != protocol_definition(slot.protocol).arity)
-            throw std::invalid_argument("protocol arity mismatch");
-        const auto original_type = slot.type.get(context);
-        auto current = slot;
-        if (slot.epoch != context.type_epoch() || original_type != context.type_of(self))
-            current = resolve(context, self, slot.protocol, roots);
-        if (current.state != SlotState::Missing)
-            roots.root(current.descriptor.get(context));
-        out.reset(context);
-        if (current.state == SlotState::Missing || current.state == SlotState::Disabled) {
-            type_error(context, U"operation is missing or explicitly disabled", out);
-            return;
-        }
-        detail::invoke_special(context, self, current.descriptor, {args, {}}, out);
-    });
-}
 ResultView index(Attachment &context, Handle value, ReturnSlot &out)
 {
     return guarded(context, out, [&] {

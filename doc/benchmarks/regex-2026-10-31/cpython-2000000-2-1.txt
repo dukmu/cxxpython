@@ -1,1 +1,0 @@
-regex_fullmatch_workers=2 characters=2000000 wall_ns=79241550 process_cpu_ns=74981000

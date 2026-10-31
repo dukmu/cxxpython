@@ -1,0 +1,7 @@
+descriptor: ('argument', 'default', 'keyword') ['bind']
+native descriptors: [1, 2] defaults ok
+native explicit receiver: TypeError
+native bound receiver: TypeError
+reflected: left+right ['add', 'radd']
+inplace fallback: left+right ['iadd', 'add', 'radd']
+integer normalization: identity and exact result type

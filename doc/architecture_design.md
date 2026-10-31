@@ -138,7 +138,14 @@ dictionary is not changed.
 Member access distinguishes a synchronized instance-slot index from a readonly
 native getter in the existing descriptor payload. Function globals/builtins/
 closure fields use the real member-descriptor type, so unchanged types.py derives
-the correct type aliases. `Objects/abstract.cpp` dispatches typed object protocols.
+the correct type aliases. `Objects/abstract.cpp` resolves typed object protocols
+and their arithmetic/sequence policy. `Objects/call.cpp` owns callable and
+protocol invocation: each entry roots all inputs before result reset or callbacks;
+internal descriptor binding, callable unwrapping and native argument binding
+share that invocation-owned scope. Prepared Python calls retain copied host
+argument buffers and borrow roots from their caller's scope. Receiver validation,
+type-epoch revalidation, recursion limits and native return validation remain on
+this same path, not a second protocol-specific executor.
 `Objects/longobject.cpp` provides int/bool
 construction and arithmetic; `Objects/floatobject.cpp` owns the immutable native
 float payload, conversions, representation, arithmetic, comparison and hash. Numeric text
@@ -766,8 +773,11 @@ compiling C++ wrappers. Native tests cover contracts inaccessible from Python.
 contracts that differ from the fixed GIL reference, currently at-most-once
 concurrent atexit dispatch. It is a separate CTest, not a reference-test exclusion.
 `Tools/benchmarks/runtime.cpp` runs the current runtime;
-`Tools/benchmarks/record.py` retains raw runs and generates comparison tables.
+`Tools/benchmarks/record.py` retains raw runs and generates comparison tables under
+ignored .cache/benchmarks by default. The user requested replacing the foundation
+and one-off drivers with a unified Python-workload benchmark suite; old generated
+doc/benchmarks artifacts have been removed, not republished as current results.
 
 The old implementation and its tests are absent, not disabled behind a build
-option. Historical benchmark observations remain evidence of their recorded
-commits, not claims that removed features work in the current executable.
+option. Historical benchmark observations in the development log describe their
+recorded commits, not claims that removed features work in the current executable.
