@@ -275,8 +275,15 @@ struct ThreadRecord {
             bucket.spans = 0;
             bucket.available = nullptr;
         }
-        for (auto &span : spans)
-            ++span_buckets[span.bucket_index].spans;
+        for (auto &span : spans) {
+            auto &bucket = span_buckets[span.bucket_index];
+            ++bucket.spans;
+            span.available_next = nullptr;
+            if (span.available()) {
+                span.available_next = bucket.available;
+                bucket.available = &span;
+            }
+        }
         std::size_t count = 0;
         for (auto &bucket : span_buckets)
             if (bucket.spans)
@@ -291,14 +298,6 @@ struct ThreadRecord {
                 ++index;
             }
         span_buckets.erase(span_buckets.begin() + count, span_buckets.end());
-        for (auto &span : spans) {
-            auto &bucket = span_buckets[span.bucket_index];
-            span.available_next = nullptr;
-            if (span.available()) {
-                span.available_next = bucket.available;
-                bucket.available = &span;
-            }
-        }
     }
     std::size_t pending_bytes = 0;
     std::size_t allocations_since_gc = 0;
@@ -655,8 +654,19 @@ struct State {
             }
         };
         trace_work();
+        auto queue_finalizer = [&](Allocation &allocation) {
+            allocation.finalization = Allocation::Finalization::Queued;
+            allocation.finalizer_next = nullptr;
+            if (finalizer_tail)
+                finalizer_tail->finalizer_next = &allocation;
+            else
+                finalizer_head = &allocation;
+            finalizer_tail = &allocation;
+        };
+        Allocation *native_head = nullptr, *native_tail = nullptr;
         // Weak death is decided from program roots, before quarantine retains
-        // the complete candidate graph. No Python or managed allocation here.
+        // the complete candidate graph. Classify finalizers in the same pass,
+        // but do not mark their graphs until every weak target is checked.
         each_allocation([&](Allocation &allocation) {
             if (allocation.marked)
                 return;
@@ -677,23 +687,18 @@ struct State {
                 }
                 ref = next;
             }
-        });
-        auto queue_finalizer = [&](Allocation &allocation) {
-            allocation.finalization = Allocation::Finalization::Queued;
-            allocation.finalizer_next = nullptr;
-            if (finalizer_tail)
-                finalizer_tail->finalizer_next = &allocation;
-            else
-                finalizer_head = &allocation;
-            finalizer_tail = &allocation;
-        };
-        // Register the complete Python finalizer isolate before tracing it.
-        // Native resources reachable from a potentially resurrected object
-        // must not be disposed in that same finalization batch.
-        each_allocation([&](Allocation &allocation) {
-            if (!allocation.marked && allocation.finalization == Allocation::Finalization::Unseen &&
-                python_finalizer(allocation))
+            if (allocation.finalization != Allocation::Finalization::Unseen)
+                return;
+            if (python_finalizer(allocation))
                 queue_finalizer(allocation);
+            else if (allocation.span->layout.finalize) {
+                allocation.finalizer_next = nullptr;
+                if (native_tail)
+                    native_tail->finalizer_next = &allocation;
+                else
+                    native_head = &allocation;
+                native_tail = &allocation;
+            }
         });
         auto retain = [&](Allocation *finalizers, WeakRefObject *callbacks) {
             for (auto *item = finalizers; item; item = item->finalizer_next)
@@ -705,11 +710,16 @@ struct State {
         for (const auto &thread : threads)
             retain(thread->finalizers, thread->weak_callbacks);
         trace_work();
-        each_allocation([&](Allocation &allocation) {
-            if (!allocation.marked && allocation.finalization == Allocation::Finalization::Unseen &&
-                allocation.span->layout.finalize)
-                queue_finalizer(allocation);
-        });
+        // Quarantine can rescue native resources. Visit only the candidate
+        // chain, whose links are independent of the mark worklist's next field.
+        for (auto *item = native_head; item;) {
+            auto *next = item->finalizer_next;
+            if (!item->marked)
+                queue_finalizer(*item);
+            else
+                item->finalizer_next = nullptr;
+            item = next;
+        }
         retain(finalizer_head, nullptr);
         trace_work();
         std::size_t collected = 0;

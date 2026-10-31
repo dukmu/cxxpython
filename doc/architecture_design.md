@@ -281,9 +281,14 @@ prohibits growing roots. This does not add unchecked payload access or a TLS
 attachment cache.
 Weak targets and intrusive callback/finalizer batches are classified during STW;
 Python runs only after attachments resume. Pending and running batches retain
-their complete strong graphs, and a second mark checks resurrection. Immutable
-type/MRO snapshots supply instance finalizers. `Objects/weakrefobject.cpp` owns
-weak reference protocols; `Objects/weakproxyobject.cpp` forwards proxy operations
+their complete strong graphs, and a second mark checks resurrection. Weak death
+and finalizer candidates share one heap pass before any quarantine marking.
+After tracing Python finalizer/callback graphs, only the native candidate chain
+is checked for resources still unreachable. Its links are separate from the mark
+worklist, and rescued candidates leave the chain without changing finalizer state.
+Immutable type/MRO snapshots supply instance finalizers.
+`Objects/weakrefobject.cpp` owns weak reference protocols;
+`Objects/weakproxyobject.cpp` forwards proxy operations
 through rooted referents. `Modules/_weakref.cpp` exposes that native capability.
 Its _remove_dead_weakref uses a rooted dictionary binding and conditional deletion
 so a dead weakref cannot remove a concurrently replaced entry. Lib/weakref.py and

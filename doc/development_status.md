@@ -1,5 +1,63 @@
 # Development Status
 
+## 2026-11-01 Fused Collector Classification And Resource Quarantine
+
+Continues the active performance/cleanup goal after pushed 345dbb8. The preceding
+goal turn only rechecked completed cache cleanup; this node changes the collector.
+Parent implemented the runtime change; Terra added the native regression and is
+closed. The full compatibility route remains paused.
+
+- Following the retained allocation profile, replaced three whole-heap weak/
+  finalizer classification passes with one. Weak death and Python finalizer
+  registration finish before any quarantine graph is marked. Native candidates
+  use the existing finalizer_next field, not the mark worklist link; after tracing
+  pending/running Python finalizers and weak callbacks, only that candidate chain
+  is checked. Rescued native resources remain Unseen and leave the chain; the
+  others keep their former batch order. No new managed/native allocation, object
+  fields, locks, write barriers, collector framework or Python RC was introduced.
+- Rebuild available-span chains while counting surviving spans, before bucket
+  compaction, instead of traversing spans again afterward. Exact full-layout
+  matching, swept-slot reuse, empty-span release and thread retirement contracts
+  are unchanged. Ordinary Python execution remains genuinely shared-heap parallel.
+- Added FinalizerQuarantine.ResurrectedOwnerRetainsMiddleNativeCandidate: an
+  owner finalizer resurrects through a Transfer, preserving the middle of three
+  native resource candidates while both neighbors finalize/destroy exactly once.
+  A later batch reuses slots safely; dropping the resurrection root releases the
+  middle resource once without repeating the owner finalizer. Automatic GC is
+  disabled only inside this scheduling-controlled native test. Synthetic native
+  lifetimes test the quarantine contract, not CPython socket RC finalization
+  timing; the existing directly executable Python resource tests remain intact.
+- Strict Clang 21.1.8 builds pass. All 96 affected memory/root/span/epoch/layout/
+  readiness/weakref/shared-VM/finalizer contracts plus the new regression pass on
+  Release, ASan/UBSan/LSan and TSan. Fifteen affected Python scripts pass all three
+  builds, covering weak death/resurrection, nested and parallel callbacks,
+  resources, I/O and CPU threads. Release additionally passes all 16 bootstrap/
+  promotion allocation-failure shards. Formatting and diff whitespace checks
+  pass. Evidence is retained as .cache/gc-scan-*. Unrelated library/frontend
+  regression campaigns were not repeated.
+- After builds/tests/agents stopped, captured two independent processes, one
+  warmup and three values per process at one/four workers. Generated allocation
+  medians at size 2000 are 22.951/12.988 ms (retained baseline 23.102/13.381);
+  nbody size 4 is 267.782/110.396 ms (269.841/114.207). Four-worker nbody scaling
+  is 2.426x with CPU/wall 3.175. These small changes overlap run variation and
+  are not a statistically significant speedup claim. Absolute CPython acceptance
+  remains unmet. Auto-GC was enabled for measurement; no reference baseline was
+  rerun and no favorable values were discarded.
+- Raw runs and generated reports/CSV/pyperf files are under .cache/benchmarks/
+  gc-scan-allocation and gc-scan-nbody, with retained-reference comparisons in
+  gc-scan-allocation-comparison and gc-scan-nbody-comparison. The source snapshot
+  warning was audited: only two trailing blank lines in fannkuch.py differ; the
+  compared allocation/nbody source and work are identical. Existing reference
+  short-thread CPU-accounting warnings remain visible.
+- A separate four-thread allocation software-event perf capture is retained in
+  .cache/benchmarks/gc-scan-allocate-profile-4. Its 151 samples still show sweep,
+  malloc/free, ownership/admission and dispatch costs, plus compiler startup.
+  Different sample totals/phase mixes do not prove a sweep-percentage reduction;
+  last-pause snapshots are not pause distributions. Next work should address a
+  substantial remaining hot path, separating kernel and startup costs rather
+  than repeatedly polishing this scan fusion. matrix.py remains unmodified and
+  untracked; the active performance goal is not complete.
+
 ## 2026-11-01 Unified Benchmarks, Standard JSON And Cache Pruning
 
 Continues the active performance/cleanup goal after pushed 62ef5c5, a concrete
