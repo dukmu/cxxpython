@@ -1,0 +1,4 @@
+parallel calendar queries [4, 4, 4, 4] [True, True, True, True]
+callback exception asctime bool callback failed
+callback exception mktime bool callback failed
+queries recover after callbacks

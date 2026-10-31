@@ -250,6 +250,7 @@ void initialize_time(Attachment &ctx, Handle module, ReturnSlot &out)
 #undef ADD_CLOCK
     if (!add("sleep", U"sleep", sleep_entry, true))
         return;
-    add("get_clock_info", U"get_clock_info", clock_info, true);
+    if (add("get_clock_info", U"get_clock_info", clock_info, true))
+        initialize_time_calendar(ctx, module, out);
 }
 } // namespace cxxpython::core::detail

@@ -18,6 +18,7 @@
 #include "internal/hashmodule.hpp"
 #include "internal/iomodule.hpp"
 #include "internal/itertoolsmodule.hpp"
+#include "internal/mathmodule.hpp"
 #include "internal/opcodemodule.hpp"
 #include "internal/operatormodule.hpp"
 #ifdef CXXPYTHON_HAVE_READLINE
@@ -266,6 +267,7 @@ detail::ImportState::ImportState()
                                      {U"_io", detail::initialize_io},
                                      {U"_operator", detail::initialize_operator},
                                      {U"time", detail::initialize_time},
+                                     {U"math", detail::initialize_math},
                                      {U"_opcode", detail::initialize_opcode},
 #ifdef CXXPYTHON_HAVE_READLINE
                                      {U"readline", detail::initialize_readline},

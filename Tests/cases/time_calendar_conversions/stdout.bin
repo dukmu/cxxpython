@@ -1,0 +1,47 @@
+floor -1.25 (1969, 12, 31, 23, 59, 58, 2, 365, 0) GMT 0
+floor -1.0 (1969, 12, 31, 23, 59, 59, 2, 365, 0) GMT 0
+floor -0.001 (1969, 12, 31, 23, 59, 59, 2, 365, 0) GMT 0
+floor -0.0 (1970, 1, 1, 0, 0, 0, 3, 1, 0) GMT 0
+floor 0.999 (1970, 1, 1, 0, 0, 0, 3, 1, 0) GMT 0
+floor 1.999 (1970, 1, 1, 0, 0, 1, 3, 1, 0) GMT 0
+floor 946684800 (2000, 1, 1, 0, 0, 0, 5, 1, 0) GMT 0
+floor 946684800.25 (2000, 1, 1, 0, 0, 0, 5, 1, 0) GMT 0
+floor False (1970, 1, 1, 0, 0, 0, 3, 1, 0) GMT 0
+floor True (1970, 1, 1, 0, 0, 1, 3, 1, 0) GMT 0
+current gmtime True
+current localtime True
+current ctime True
+gmtime text TypeError 'str' object cannot be interpreted as an integer
+gmtime float-only TypeError 'FloatOnly' object cannot be interpreted as an integer
+gmtime bad-index TypeError __index__ returned non-int (type str)
+gmtime raised-index RuntimeError index callback failed
+gmtime nan ValueError Invalid value NaN (not a number)
+gmtime inf OverflowError timestamp out of range for platform time_t
+gmtime negative-inf OverflowError timestamp out of range for platform time_t
+gmtime huge-float OverflowError timestamp out of range for platform time_t
+gmtime negative-huge-float OverflowError timestamp out of range for platform time_t
+gmtime huge-int OverflowError timestamp out of range for platform time_t
+gmtime negative-huge-int OverflowError timestamp out of range for platform time_t
+localtime text TypeError 'str' object cannot be interpreted as an integer
+localtime float-only TypeError 'FloatOnly' object cannot be interpreted as an integer
+localtime bad-index TypeError __index__ returned non-int (type str)
+localtime raised-index RuntimeError index callback failed
+localtime nan ValueError Invalid value NaN (not a number)
+localtime inf OverflowError timestamp out of range for platform time_t
+localtime negative-inf OverflowError timestamp out of range for platform time_t
+localtime huge-float OverflowError timestamp out of range for platform time_t
+localtime negative-huge-float OverflowError timestamp out of range for platform time_t
+localtime huge-int OverflowError timestamp out of range for platform time_t
+localtime negative-huge-int OverflowError timestamp out of range for platform time_t
+ctime text TypeError 'str' object cannot be interpreted as an integer
+ctime float-only TypeError 'FloatOnly' object cannot be interpreted as an integer
+ctime bad-index TypeError __index__ returned non-int (type str)
+ctime raised-index RuntimeError index callback failed
+ctime nan ValueError Invalid value NaN (not a number)
+ctime inf OverflowError timestamp out of range for platform time_t
+ctime negative-inf OverflowError timestamp out of range for platform time_t
+ctime huge-float OverflowError timestamp out of range for platform time_t
+ctime negative-huge-float OverflowError timestamp out of range for platform time_t
+ctime huge-int OverflowError timestamp out of range for platform time_t
+ctime negative-huge-int OverflowError timestamp out of range for platform time_t
+collecting index calls ['index', 'index', 'index']

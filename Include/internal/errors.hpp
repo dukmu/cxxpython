@@ -7,6 +7,7 @@
 namespace cxxpython::core::detail {
 // Native layout is exactly tuple; item order is the CPython struct-sequence order.
 using UnraisableHookArgs = TupleObject;
+std::u32string diagnostic_type_name(Attachment &, Handle type);
 
 void write_unraisable(Attachment &ctx, Handle exception, std::optional<Handle> object,
                       std::optional<Handle> err_msg = {});

@@ -1,0 +1,4 @@
+names ['len', 'iter', 'next', 'print', 'cpu_count', 'gmtime', 'localtime', 'strftime']
+readonly set
+readonly delete
+parallel names True

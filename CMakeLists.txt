@@ -77,6 +77,8 @@ add_library(cxxpython_core
     Modules/posixmodule.cpp
     Modules/errnomodule.cpp
     Modules/signalmodule.cpp
+    Modules/mathmodule.cpp
+    Modules/time_calendar.cpp
     Python/symtable.cpp
     Python/flowgraph.cpp
     Python/ceval.cpp

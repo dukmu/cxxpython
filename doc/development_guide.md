@@ -45,6 +45,10 @@ example `.cache/deps/`, `.cache/cpython31214-build/`, `.cache/build-asan/` and
 Store verification logs under `.cache/` until their results are recorded; retain
 release evidence in the documented tracked artifacts. After resuming work, verify
 live process handles and actual files before continuing or restarting a build.
+The pinned reference must expose its genuine compiled extension modules through
+its generated build/lib.* search directory. A module merely present in Modules/
+is not automatically importable; finish that build setup rather than inserting
+product Lib into the reference path or changing reference/library semantics.
 
 The parser can be built independently with `cmake -S Parser -B .cache/build-parser`
 and `cmake --build .cache/build-parser`, without Python, Boost or GTest. Its fixed

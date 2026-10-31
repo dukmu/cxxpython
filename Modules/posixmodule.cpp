@@ -220,6 +220,19 @@ void fspath(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
     RootScope roots(c);
     path_value(c, roots.root(a[0]), out);
 }
+void cpu_count(Attachment &c, Handle, std::span<const Value>, ReturnSlot &out)
+{
+    long count;
+    {
+        NativeWait wait(c);
+        count = ::sysconf(_SC_NPROCESSORS_ONLN);
+    }
+    // CPython's POSIX API reports an unavailable count as None, not OSError.
+    if (count < 1)
+        out.ok(c.builtin(CoreObject::None));
+    else
+        make_int(c, count, out);
+}
 enum class Op {
     Open,
     Close,
@@ -261,6 +274,15 @@ template <Op op> void entry(Attachment &c, Handle, std::span<const Value> a, Ret
     if constexpr (op == Op::Rename || op == Op::Symlink)
         if (!path(c, a[1], q, out, &filename2))
             return;
+    if constexpr (op == Op::Symlink) {
+        RootScope roots(c);
+        ReturnSlot converted(c);
+        truth(c, roots.root(a[2]), converted);
+        if (failed(converted)) {
+            out.raised(converted.exception());
+            return;
+        }
+    }
     if constexpr (op == Op::Close || op == Op::Read || op == Op::Write || op == Op::Seek ||
                   op == Op::Fchdir)
         if (!descriptor(c, a[0], fd, out))
@@ -1146,6 +1168,11 @@ void install_scandir(Attachment &c, Handle module_dictionary, Handle stat_type, 
 }
 } // namespace
 
+std::mutex &process_environment_lock()
+{
+    return environment_mutex;
+}
+
 bool filesystem_path(Attachment &c, Value value, std::string &result, ReturnSlot &out,
                      ReturnSlot &filename)
 {
@@ -1310,9 +1337,15 @@ void initialize_posix(Attachment &c, Handle module, ReturnSlot &out)
         !install("remove", signature({patharg}), entry<Op::Unlink>) ||
         !install("rename", signature({{U"src", only}, {U"dst", only}}), entry<Op::Rename>) ||
         !install("replace", signature({{U"src", only}, {U"dst", only}}), entry<Op::Rename>) ||
-        !install("symlink", signature({{U"src", only}, {U"dst", only}}), entry<Op::Symlink>) ||
-        !install("getpid", {}, entry<Op::Pid>) || !install("getppid", {}, entry<Op::Ppid>) ||
-        !install("getuid", {}, entry<Op::Uid>) || !install("getgid", {}, entry<Op::Gid>))
+        !install("symlink",
+                 signature({{U"src", only},
+                            {U"dst", only},
+                            {U"target_is_directory", ParameterKind::PositionalOrKeyword,
+                             c.builtin(CoreObject::False)}}),
+                 entry<Op::Symlink>) ||
+        !install("cpu_count", {}, cpu_count) || !install("getpid", {}, entry<Op::Pid>) ||
+        !install("getppid", {}, entry<Op::Ppid>) || !install("getuid", {}, entry<Op::Uid>) ||
+        !install("getgid", {}, entry<Op::Gid>))
         return;
     c.allocate_instance<DictObject>(roots.root(c.builtin(CoreObject::DictType)), value);
     auto environment = roots.root(value.value());

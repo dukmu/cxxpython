@@ -1,0 +1,7 @@
+6
+'hello\n'
+True True True
+['tree/sub/data.txt']
+sub/data.txt True hello
+
+tree/sub/renamed.txt True False

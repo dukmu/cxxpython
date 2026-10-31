@@ -1,5 +1,90 @@
 # Development Status
 
+## 2026-10-31 Logging, Calendar Time, Pathnames And CPU Count
+
+Prepended after 9631d52 without rewriting earlier entries. The previous goal turn
+was progress: its verified unittest/runtime slice is committed. This turn closes
+another actual Plan 2 Base-to-Full dependency slice, not the full active frontend/
+library/product or N4-N6/M0-M9 objective. Terra supplied unchanged library copies,
+math, pathname/symlink work and direct fixtures; parent implemented calendar time,
+CPU count, shared reflection/diagnostics and final integration. All workers are
+closed. No interpreter execution lock or alternate parser/runtime was introduced.
+
+- Added unchanged pinned CPython 3.12.14 logging core, pathlib, ntpath, urllib
+  package/parse and ipaddress sources under the retained PSF license. Actual logger
+  hierarchy/levels/propagation, filters/adapters/factories, formatter styles and
+  timestamps, stream/file handlers, failures and shared-thread collection run as
+  Python policy. unittest.assertLogs/assertNoLogs now use genuine logging. Actual
+  pure Windows/POSIX paths, filesystem reading/writing/globbing, links/rename,
+  URI quoting and IP parsing run over the existing platform APIs. Shared path
+  caches and concurrent independent filesystem work have direct fixtures.
+- Implemented os.cpu_count at the existing POSIX boundary using the real online
+  logical-CPU query, with None for an unavailable count. The current product
+  returned 4; fixtures compare stable API semantics rather than hard-coding the
+  machine's resources. This is not affinity/quota or the later process_cpu_count
+  API. os.symlink now accepts and evaluates target_is_directory on POSIX without
+  falsely advertising dir_fd support. Worker exceptions are explicitly captured
+  in the new concurrent scenarios rather than lost outside the test result.
+- Added native arbitrary-precision math.isqrt for the actual urllib dependency.
+  Normal index conversion runs Active; Newton iteration uses only owned native
+  integers in NativeWait, then publishes through the existing integer boundary.
+  No floating approximation, special-case input range, new number class or fake
+  math import was used. Negative/non-index inputs, huge integers, collecting index
+  callbacks and shared workers with collection have fixed-reference fixtures.
+  The fixed reference's genuine compiled math extension already existed in its
+  Modules directory; its normal build/lib search location now exposes that same
+  artifact. No host-version golden substitution or product-Lib reference path was
+  used. The source copies also pass direct diff comparisons with the pinned tree.
+- Modules/time_calendar.cpp separates calendar work from the existing clock/sleep
+  implementation. struct_time reuses TupleObject, nine visible fields and two
+  precisely traced readonly member fields. Construction follows fast-sequence/
+  iterable materialization and optional dictionary semantics; equality/hash,
+  repr/reduction, callbacks, tail cycles, mutable type attributes and disabled
+  subclassing have direct tests. Hidden fields resolve their frozen layout names,
+  not the order supplied to the native layout builder. No new struct-sequence
+  engine or Python-object ownership system was added.
+- POSIX localtime/gmtime/ctime/asctime/mktime/strftime/tzset use real libc behavior.
+  Inputs and callback conversions remain Active; only owned native tm/zone data
+  enters NativeWait. Calendar and TZ calls share the existing POSIX environment
+  mutex, not a new global execution lock. strftime follows the pinned ASCII-format/
+  literal-segment algorithm, retaining embedded NUL, non-ASCII and surrogate text.
+  Timestamp floor, current/None, bounds/normalization, DST, native zone/offset tails,
+  reentrant collecting index callbacks and parallel queries pass. Timezone module
+  fields remain separate ordinary snapshot assignments, not an atomic multi-key
+  transaction or private per-Interpreter process timezone.
+- The actual time fixtures exposed missing native-function __name__ and several
+  generic reflection/error paths. Native function names now decode their immutable
+  native UTF-8 labels through existing codec/descriptors; no time/logging-specific
+  attributes were added. struct_time uses the correct member-descriptor category
+  and mutable heap-type namespace. A shared diagnostic-name helper uses declared
+  native module metadata while Python class labels remain unqualified. Missing
+  instance attributes, rejected final bases, tuple/string indexing and invalid
+  __index__ results now follow the observed pinned diagnostics. The initial codec
+  result-shape mistake was corrected at its actual tuple-return boundary. No
+  Python policy branch was removed and no silent C++ failure fallback was added.
+- Final Clang 21.1.8 Release, ASan/UBSan/LSan and TSan builds pass strict
+  -Wall -Wextra -Wpedantic -Werror. Release retains 115 unaffected native results
+  plus 13 numeric/constructor and 24 final shared-protocol results; each sanitizer
+  passes those same 152 contracts. All eight final bootstrap allocation-failure
+  shards pass after native-name descriptor registration. Release has passing
+  evidence for 18 new direct scenarios and six relevant existing descriptor/
+  container/frame scenarios; each sanitizer passes all 24. All 18 new goldens also
+  pass the fixed reference. Assertions, race/leak detection and per-script timeouts
+  remain enabled. Formatting, ASDL/244-rule consistency and whitespace checks pass.
+  Passing evidence was reused across the final diagnostic-only correction. Raw
+  builds, differences and acceptance logs remain in .cache/logging-* and the
+  worker evidence directories. No unrelated baseline/performance sweep, new
+  checksum system or hand-filled measurement table was introduced.
+- Remaining dependencies include the rest of math, datetime/calendar/strptime,
+  logging configuration/optional handlers, full filesystem/pathlib and platform
+  operations, native callable reflection and cold native-type/module initializer/
+  heap-inspection/reload publication matrices. Process-global TZ/locale changes by
+  embedding code still need host coordination. These are unfinished acceptance
+  gates, not unsupported final scope. Continue the full Base-to-Full language,
+  extension/import/product and N4-N6/M0-M9/performance route; no whole milestone or
+  absolute-performance completion is claimed. User test2.py and temporary_plan.md
+  deletion remain excluded; the previously denied push was not retried.
+
 ## 2026-10-31 Upstream Unittest, Signals And Filesystem Dependencies
 
 Prepended after 5a909ca, preserving every earlier entry. This closes an actual

@@ -1,0 +1,20 @@
+/a/b/../file.tar.gz ('/', 'a', 'b', '..', 'file.tar.gz')
+ / / file.tar.gz
+.gz ['.tar', '.gz'] file.tar
+/a/b/.. True
+/a/b/../file.tar.gz/child True
+C:\a\b\file.tar.gz ('C:\\', 'a', 'b', 'file.tar.gz')
+C: \ C:\ file.tar.gz
+.gz ['.tar', '.gz'] file.tar
+C:\a\b True
+C:\a\b\file.tar.gz\child True
+\\server\share\dir ('\\\\server\\share\\', 'dir')
+\\server\share \ \\server\share\ dir
+ [] dir
+\\server\share\ True
+\\server\share\dir\child False
+fspath
+folder/file.tar.gz folder/other.txt folder/file.tar.zip
+b/c
+file:///a/b
+ValueError

@@ -4,6 +4,7 @@
 #include "cxxpython/protocol.hpp"
 #include "cxxpython/unionobject.hpp"
 #include "internal/codecs.hpp"
+#include "internal/errors.hpp"
 #include "internal/exceptions.hpp"
 
 #include <algorithm>
@@ -525,8 +526,17 @@ void type_new(Attachment &context, Handle, std::span<const Value> args, ReturnSl
     RootScope roots(context);
     auto named = keywords(context, args[4], roots);
     std::vector<Handle> bases;
-    for (auto base : context.payload<TupleObject>(args[2]).items)
-        bases.push_back(roots.root(base));
+    for (auto base : context.payload<TupleObject>(args[2]).items) {
+        const auto rooted = roots.root(base);
+        if (is_type(context, base) && !context.payload<TypeObject>(rooted).subclassable) {
+            type_error(context,
+                       U"type '" + detail::diagnostic_type_name(context, rooted) +
+                           U"' is not an acceptable base type",
+                       out);
+            return;
+        }
+        bases.push_back(rooted);
+    }
     Handle winner;
     try {
         winner = detail::select_metaclass(context, roots.root(args[0]), bases, roots);

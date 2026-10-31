@@ -1,0 +1,58 @@
+UTC 2000-01-01 00:00:00 001 6 GMT +0000 %
+asctime Sat Jan  1 00:00:00 2000 Sat Jan  1 00:00:00 2000
+special ''
+special '\x00'
+special '\x002000\x0001'
+special '2000\x0001\x00'
+special '\U0001f40d'
+special '\U0001f4bb2000\U0001f40d01'
+special '\ud83d'
+special '\udc0d'
+special '\ud83d2000\udc0d01'
+special '2000\ud83d\udc0d01'
+special '\udcf0\udc9f\udc90\udc8d2000'
+long NUL and locale text preserved
+native tails CUSTOM +0130
+zero fields 2000 01 01 00 00 00 1 001
+leap seconds 60 61
+asctime month -1 ValueError month out of range
+asctime month 13 ValueError month out of range
+asctime day -1 ValueError day of month out of range
+asctime day 32 ValueError day of month out of range
+asctime hour -1 ValueError hour out of range
+asctime hour 24 ValueError hour out of range
+asctime minute -1 ValueError minute out of range
+asctime minute 60 ValueError minute out of range
+asctime second -1 ValueError seconds out of range
+asctime second 62 ValueError seconds out of range
+asctime weekday -2 ValueError day of week out of range
+asctime yearday -1 ValueError day of year out of range
+asctime yearday 367 ValueError day of year out of range
+asctime short TypeError asctime(): illegal time tuple argument
+asctime long TypeError asctime(): illegal time tuple argument
+asctime list TypeError Tuple or struct_time argument required
+asctime None TypeError Tuple or struct_time argument required
+asctime float field TypeError 'float' object cannot be interpreted as an integer
+strftime month -1 ValueError month out of range
+strftime month 13 ValueError month out of range
+strftime day -1 ValueError day of month out of range
+strftime day 32 ValueError day of month out of range
+strftime hour -1 ValueError hour out of range
+strftime hour 24 ValueError hour out of range
+strftime minute -1 ValueError minute out of range
+strftime minute 60 ValueError minute out of range
+strftime second -1 ValueError seconds out of range
+strftime second 62 ValueError seconds out of range
+strftime weekday -2 ValueError day of week out of range
+strftime yearday -1 ValueError day of year out of range
+strftime yearday 367 ValueError day of year out of range
+strftime short TypeError strftime(): illegal time tuple argument
+strftime long TypeError strftime(): illegal time tuple argument
+strftime list TypeError Tuple or struct_time argument required
+strftime None TypeError Tuple or struct_time argument required
+strftime float field TypeError 'float' object cannot be interpreted as an integer
+format bytes TypeError strftime() argument 1 must be str, not bytes
+extreme year Mon Jun  1 00:00:00 2147483647
+extreme year Mon Jun  1 00:00:00 -2147481748
+year 2147483648 OverflowError signed integer is greater than maximum
+year -2147481749 OverflowError year out of range

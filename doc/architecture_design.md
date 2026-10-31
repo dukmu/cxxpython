@@ -289,6 +289,12 @@ uses O(directory-size) memory until iterator collection; fd-based scanning and
 streaming resources remain separate gates. errno constants/errorcode live in
 Modules/errnomodule.cpp; terminal_size uses a native readonly tuple and real ioctl.
 Lib/os.py, genericpath.py and posixpath.py retain upstream environment/path policy.
+os.cpu_count uses the actual POSIX online logical-CPU query, returning None when
+unavailable rather than conflating this count with process affinity/quota.
+Unchanged ntpath/pathlib and urllib.parse/ipaddress now compose path/URI policy
+over those primitives. math.isqrt supplies arbitrary-precision integer square
+root through normal index conversion and owned native arithmetic in NativeWait;
+other math APIs and full pathlib/filesystem matrices remain separate gates.
 Filesystem encoding is currently UTF-8/surrogateescape, not a completed locale or
 installed-runtime configuration system. Other POSIX APIs, Windows portability and
 the complete os/pathlib policy/error matrices remain separate delivery work.
@@ -421,8 +427,23 @@ Modules/timemodule.cpp supplies real POSIX realtime, monotonic, process and
 thread CPU clocks, nanosecond variants and get_clock_info. sleep converts while
 Active, then parks only native timespec/error state. EINTR resumes Active to
 dispatch signals and retries the original absolute monotonic deadline if no
-exception was raised. Calendar/timezone APIs and full platform coverage remain
-separate capabilities.
+exception was raised. Modules/time_calendar.cpp supplies calendar conversion,
+formatting and the native struct_time tuple record. Its nine visible fields and
+two precisely traced readonly tail members share the existing tuple layout and
+member descriptors. The type namespace remains mutable while its native layout
+is fixed and subclassing is disabled, matching the pinned source's heap type.
+Record construction follows fast sequence materialization and ordinary iterable
+callbacks; reduction preserves the hidden zone/offset fields.
+
+localtime/gmtime/ctime and mktime convert managed inputs while Active, then use
+owned native tm/zone snapshots. libc calendar/strftime/tzset calls share POSIX's
+existing process-environment mutex inside NativeWait, never while invoking Python
+or waiting for GC with heap access. strftime delegates ASCII format segments to
+libc and preserves non-ASCII, surrogate and embedded-NUL literals following the
+pinned algorithm. Timezone fields are ordinary module snapshots; they are not a
+multi-key transaction across Interpreters. Host embedding code must coordinate
+its own environment/locale changes. strptime, datetime, locale/platform matrices
+and complete native-module reload/reflection remain gates.
 
 Modules/signalmodule.cpp separates process-owned dispositions from managed
 handlers. Its C signal handler touches only lock-free process-lifetime atomics;
@@ -442,6 +463,12 @@ explicit and Python-library events, not all native operation audit coverage.
 Unchanged unittest, argparse, gettext, fnmatch, locale and shutil use these native
 dependencies and existing Python library policy; no C++ unittest engine or fake
 subprocess module is provided.
+Unchanged logging core likewise owns logger hierarchy, filters, formatters,
+handler locking and file/stream policy. Native function __name__ exposes the
+immutable UTF-8 native label through the existing codec and descriptor paths,
+not a logger/time-specific attribute. Shared attribute errors use declared native
+module metadata while Python class names remain unqualified. Full builtin/method
+reflection and logging.config/network handler dependencies remain unfinished.
 
 Runtime contracts are in `Include/cxxpython/`. Compiler-private implementation
 structures belong in `Include/internal/`. All C++ interfaces remain unstable.

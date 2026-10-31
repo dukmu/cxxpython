@@ -1,0 +1,31 @@
+path 'C:\\folder\\file.txt'
+drive ('C:', '\\folder\\file.txt')
+split ('C:\\folder', 'file.txt')
+norm C:\folder\file.txt
+absolute True
+path '\\\\server\\share\\dir\\file'
+drive ('\\\\server\\share', '\\dir\\file')
+split ('\\\\server\\share\\dir', 'file')
+norm \\server\share\dir\file
+absolute True
+path 'relative/../item'
+drive ('', 'relative/../item')
+split ('relative/..', 'item')
+norm item
+absolute False
+path '\\rooted'
+drive ('', '\\rooted')
+split ('\\', 'rooted')
+norm \rooted
+absolute True
+path ''
+drive ('', '')
+split ('', '')
+norm .
+absolute False
+join C:\one\two\..\three
+join drive D:two
+fspath called
+extension ('C:\\folder\\file', '.txt')
+relative two
+ValueError path is on mount 'D:', start on mount 'C:'

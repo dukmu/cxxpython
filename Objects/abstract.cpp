@@ -1,5 +1,6 @@
 #include "cxxpython/genericaliasobject.hpp"
 #include "cxxpython/protocol.hpp"
+#include "internal/errors.hpp"
 
 namespace cxxpython::core {
 namespace {
@@ -359,11 +360,8 @@ ResultView index(Attachment &context, Handle value, ReturnSlot &out)
         }
         auto slot = resolve(context, self, Protocol::Index, roots);
         if (slot.state == SlotState::Missing || slot.state == SlotState::Disabled) {
-            const auto view = TypeView(context, context.type_of(self));
-            const auto name = view.name();
-            const auto text = std::holds_alternative<Value>(name)
-                                  ? context.payload<StrObject>(std::get<Value>(name)).value
-                                  : std::get<std::u32string>(name);
+            const auto text =
+                detail::diagnostic_type_name(context, roots.root(context.type_of(self)));
             type_error(context, U"'" + text + U"' object cannot be interpreted as an integer", out);
             return;
         }
@@ -374,7 +372,12 @@ ResultView index(Attachment &context, Handle value, ReturnSlot &out)
             return;
         }
         if (!is_int(context, result.value())) {
-            type_error(context, U"__index__ returned a non-int", out);
+            type_error(context,
+                       U"__index__ returned non-int (type " +
+                           detail::diagnostic_type_name(
+                               context, roots.root(context.type_of(result.value()))) +
+                           U")",
+                       out);
             return;
         }
         copy_int(context, result.value(), out);

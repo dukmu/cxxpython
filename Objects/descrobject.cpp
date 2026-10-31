@@ -1,4 +1,5 @@
 #include "cxxpython/protocol.hpp"
+#include "internal/codecs.hpp"
 
 namespace cxxpython::core {
 namespace {
@@ -14,6 +15,19 @@ bool property_check(Attachment &context, Value value, ReturnSlot &out)
         return true;
     type_error(context, U"property descriptor requires a property", out);
     return false;
+}
+void native_name(Attachment &context, Value value, ReturnSlot &out)
+{
+    RootScope roots(context);
+    const auto self = roots.root(value);
+    ReturnSlot bytes(context), decoded(context);
+    make_bytes(context, context.payload<NativeFunctionObject>(self).name, bytes);
+    detail::decode_primitive(context, roots.root(bytes.value()), detail::TextEncoding::Utf8,
+                             roots.root(context.builtin(CoreObject::None)), true, decoded);
+    if (decoded.tag() == ResultTag::Raised)
+        out.raised(decoded.exception());
+    else
+        out.ok(context.payload<TupleObject>(decoded.value()).items[0]);
 }
 void native_self(Attachment &context, Value value, ReturnSlot &out)
 {
@@ -830,6 +844,8 @@ void install_attribute_descriptors(Attachment &context, std::span<const Handle> 
                   U"__self__", method_receiver, nullptr);
     install_field(context, descriptor_type, string_type, at(CoreObject::NativeFunctionType),
                   U"__self__", native_self, nullptr);
+    install_field(context, descriptor_type, string_type, at(CoreObject::NativeFunctionType),
+                  U"__name__", native_name, nullptr);
     install_field(context, descriptor_type, string_type, at(CoreObject::BaseExceptionType),
                   U"__dict__", instance_dict_get, instance_dict_set);
     install_field(context, descriptor_type, string_type, at(CoreObject::StaticMethodType),

@@ -1,0 +1,4 @@
+['INFO:assertlogs.child:hello world', 'WARNING:assertlogs.child:warning']
+['assertlogs.child', 'assertlogs.child']
+assertLogs: no logs of level ERROR or higher triggered on assertlogs
+assertNoLogs: Unexpected logs found: ['ERROR:assertlogs.child:not allowed']

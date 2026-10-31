@@ -1,4 +1,5 @@
 #include "cxxpython/objects.hpp"
+#include "internal/errors.hpp"
 
 #include <algorithm>
 #include <unordered_set>
@@ -493,11 +494,8 @@ void get_default(Attachment &context, Handle object, Handle name, bool type_look
                       out);
         return;
     }
-    const auto metadata = TypeView(context, type_lookup ? value : type);
-    const auto owner_name = metadata.name();
-    const auto label = std::holds_alternative<Value>(owner_name)
-                           ? context.payload<StrObject>(std::get<Value>(owner_name)).value
-                           : std::get<std::u32string>(owner_name);
+    const auto label =
+        detail::diagnostic_type_name(context, roots.root(type_lookup ? value : type));
     raise_error(context, CoreObject::AttributeErrorType,
                 (type_lookup ? U"type object '" : U"'") + label +
                     (type_lookup ? U"' has no attribute '" : U"' object has no attribute '") +
@@ -544,7 +542,12 @@ void change_default(Attachment &context, Handle object, Handle name, std::option
     }
     ReturnSlot dictionary(context);
     if (!dictionary_field(context, target, dictionary)) {
-        raise_error(context, CoreObject::AttributeErrorType, U"object has no instance dictionary",
+        const auto label =
+            detail::diagnostic_type_name(context, roots.root(context.type_of(target)));
+        raise_error(context, CoreObject::AttributeErrorType,
+                    U"'" + label +
+                        (descriptor ? U"' object attribute '" : U"' object has no attribute '") +
+                        text + (descriptor ? U"' is read-only" : U"'"),
                     out);
         return;
     }

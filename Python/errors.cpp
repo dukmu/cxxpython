@@ -13,6 +13,18 @@
 #include <vector>
 
 namespace cxxpython::core::detail {
+std::u32string diagnostic_type_name(Attachment &ctx, Handle type)
+{
+    TypeView view(ctx, type);
+    const auto stored = view.name();
+    auto name = std::holds_alternative<Value>(stored)
+                    ? ctx.payload<StrObject>(std::get<Value>(stored)).value
+                    : std::get<std::u32string>(stored);
+    const auto &module = ctx.payload<TypeObject>(type).declared_module;
+    if (module && *module != U"builtins" && !module->empty())
+        name = *module + U"." + name;
+    return name;
+}
 namespace {
 bool failed(const ReturnSlot &out)
 {

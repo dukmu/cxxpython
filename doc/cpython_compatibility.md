@@ -268,7 +268,7 @@ the target is `builtins` and the `__builtins__` execution namespace.
   stat/lstat accept dir_fd, stat accepts follow_symlinks and file descriptors,
   and chdir/fchdir are present. Only implemented capabilities are advertised to
   os through _have_functions. Other *at variants, complete stat-result reflection/
-  pickle, process/fork facilities and the pathlib closure remain work.
+  pickle, process/fork facilities and complete pathname matrices remain work.
 
 ## Buffers, Unicode And Independent Libraries
 
@@ -583,8 +583,9 @@ the target is `builtins` and the `__builtins__` execution namespace.
   thread clocks and nanoseconds, clock_getres metadata and GC-aware sleep.
   Conversion errors, signed/invalid timeouts and progress while another thread
   sleeps use direct tests. POSIX sleep now checks pending Python signals on EINTR
-  and resumes the same monotonic deadline. Calendar/timezone APIs and other
-  platforms are not implied. Native C qualified diagnostic names are
+  and resumes the same monotonic deadline. The calendar slice below adds actual
+  POSIX conversion/formatting; other platforms are not implied. Native C
+  qualified argument-diagnostic names remain
   a known shared reflection gap: get_clock_info(BytesIO()) currently says
   BytesIO instead of CPython's _io.BytesIO. A separate VM fixture records it;
   remove that difference when canonical native diagnostic names are available,
@@ -599,7 +600,7 @@ the target is `builtins` and the `__builtins__` execution namespace.
 - Unchanged pinned unittest, argparse, gettext, fnmatch, locale, shutil and glob sources
   retain Python policy. Core TestCase/Suite/Loader/Runner, discovery, CLI failures
   and catchbreak use actual runtime dependencies. Copying mock.py and async_case.py
-  does not complete their unfinished asyncio/logging and other dependency suites.
+  does not complete their unfinished asyncio and other dependency suites.
   locale currently uses upstream's C-locale fallback, not a native _locale backend.
   glob's wildcard/hidden/recursive/root_dir/bytes/symlink paths use the real
   directory primitives; fd-relative globbing is not complete.
@@ -641,6 +642,51 @@ the target is `builtins` and the `__builtins__` execution namespace.
   collection even after close, unlike CPython's streaming DIR handle. fd-based
   scandir, native scandir audit events and full live-directory/platform matrices
   remain gates. Resource tests currently use Linux /proc/self/fd.
+
+## Logging And Pathname Closure
+
+- Lib/logging/__init__.py is unchanged pinned 3.12.14 source. Actual hierarchy,
+  levels, propagation, filters/adapters/factories, formatter styles/timestamps,
+  stream/file handlers, error handling and concurrent collection have fixtures.
+  unittest.assertLogs/assertNoLogs run real logging, not a test-only replacement.
+  logging.config, optional handler families, sockets/processes and full upstream
+  suites remain dependencies rather than a full logging compatibility claim.
+- time.struct_time is a nine-element tuple with readonly native member fields and
+  precise tm_zone/tm_gmtoff tails. Construction from sequences/iterables and the
+  optional dictionary, equality/hash, repr/reduction, GC cycles and mutable type
+  attributes use ordinary object contracts. No parallel struct-sequence engine
+  or Python-implemented calendar facade was added. Native field indices follow
+  the frozen layout's actual names, not the input order of __slots__.
+- POSIX localtime/gmtime/ctime/asctime/mktime/strftime/tzset provide real libc
+  behavior, including negative fractional timestamp floor, index callbacks, field
+  bounds and normalization, DST and native zone/offset metadata. strftime follows
+  the pinned literal-segment algorithm for embedded NUL/non-ASCII/surrogates.
+  Only owned native data crosses NativeWait. The existing POSIX environment mutex
+  coordinates process TZ state; no interpreter execution lock covers callbacks.
+  Timezone module fields are separate snapshot assignments, not a multi-key
+  transaction. strptime/datetime, non-C locale policy, complete reload/reflection
+  and other-platform matrices remain acceptance work.
+- Native functions now have a real readonly __name__; full native __qualname__,
+  module/self/text-signature and method-descriptor reflection remain gates.
+  Attribute diagnostics use immutable declared native module metadata rather
+  than class-name special cases. Index callback errors include the actual result
+  type; tuple/string index and rejected-final-base diagnostics follow the pinned
+  semantics. This does not imply every historical native diagnostic is complete.
+- os.cpu_count returns the POSIX online logical count, or None on query failure.
+  It does not report affinity/quota or add the later process_cpu_count API to the
+  3.12 target. os.symlink accepts/evaluates target_is_directory on POSIX; actual
+  dir_fd variants are still separate capabilities.
+- Unchanged pathlib/ntpath and urllib/__init__.py, urllib/parse.py and ipaddress.py
+  retain path, Windows-pure-path and URI/IP policy. Real filesystem reading/
+  writing, globbing, links/rename, URI quoting, shared path caches and concurrent
+  collection have direct fixtures. Full pathlib methods still need their actual
+  POSIX dependencies, fd handling and platform/error matrices; copying source
+  does not make all filesystem operations implemented.
+- Native math currently supplies actual arbitrary-precision isqrt with index/
+  error/callback/GC/parallel coverage. Owned native Newton arithmetic runs in
+  NativeWait, not on a double approximation or a urllib-specific range. Constants,
+  gcd/lcm/factorial, rounding, predicates and the remaining math functions are
+  unfinished; this dependency slice is not the full math module.
 
 The configured source-tree stdlib path is development configuration, not final
 installation, isolation, environment or embedding acceptance. Full stdio/runpy,
@@ -717,7 +763,7 @@ remaining acceptance boundaries are:
   upstream environment/path policy are present. Cached sys.modules aliases such
   as os.path do not require a package __path__. Full POSIX capability/error
   coverage, filesystem configuration, Windows/other platforms, process/fork and
-  dependent pathlib/glob closures remain.
+  complete pathlib/glob capability matrices remain.
 - Enum and type hooks: upstream enum policy uses runtime/core default type docs,
   int.bit_length/bit_count, bin/oct/hex and the original __set_name__ exception
   plus its CPython 3.12 note. The full upstream enum corpus and remaining mixed-

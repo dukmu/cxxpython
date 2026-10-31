@@ -1,0 +1,10 @@
+WARNING value=abc
+WARNING value=abc
+WARNING value=abc
+2000-01-01 00:00:00,125 value=abc
+2000/01/01 00:00:00 value=abc
+default value=abc
+ValueError Invalid format '{message}' for '%' style
+ValueError invalid format: no fields
+ValueError Style must be one of: %,{,$
+ValueError Formatting field not found in record: 'missing'

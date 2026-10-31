@@ -143,7 +143,10 @@ void sequence_item(Attachment &context, Handle, std::span<const Value> args, Ret
     if (position < 0)
         position += static_cast<std::int64_t>(length);
     if (position < 0 || static_cast<std::size_t>(position) >= length) {
-        raise_error(context, CoreObject::IndexErrorType, U"sequence index is out of range", out);
+        raise_error(context, CoreObject::IndexErrorType,
+                    Type == CoreObject::TupleType ? U"tuple index out of range"
+                                                  : U"string index out of range",
+                    out);
         return;
     }
     if constexpr (Type == CoreObject::TupleType)
