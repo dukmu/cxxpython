@@ -234,3 +234,22 @@ container = Container('ignored')
 container[Payload('ignored')] = Payload('ignored')
 assert events[-1] == 'new set'
 print('subscript inplace:', events)
+
+
+class IndependentTruth:
+    __bool__ = gc.isenabled
+
+
+assert bool(IndependentTruth()) is gc.isenabled()
+print('native function special: no implicit receiver')
+
+
+class ForeignInteger:
+    __add__ = int.__add__
+
+
+try:
+    ForeignInteger() + 1
+    assert False
+except TypeError:
+    print('transplanted native descriptor: TypeError')

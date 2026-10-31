@@ -261,10 +261,10 @@ void validate_return(Attachment &context, ReturnSlot &out)
 }
 } // namespace detail
 namespace {
-void invoke_native(Attachment &context, Handle function, CallArgsView args,
-                   std::optional<Value> receiver, ReturnSlot &out, RootScope &roots)
+void invoke_native(Attachment &context, Handle function, const NativeFunctionObject &native,
+                   CallArgsView args, std::optional<Value> receiver, ReturnSlot &out,
+                   RootScope &roots)
 {
-    auto &native = context.payload<NativeFunctionObject>(function);
     std::vector<Value> bound;
     const auto count = args.positional.size() + (receiver ? 1 : 0);
     if (args.keywords.empty() && native.signature.accepts_complete_positional(count)) {
@@ -292,15 +292,35 @@ void invoke_native(Attachment &context, Handle function, CallArgsView args,
     validate_return(context, out);
 }
 
+void invoke_method_descriptor(Attachment &context, Value callable, CallArgsView args,
+                              std::optional<Value> receiver, ReturnSlot &out, RootScope &roots)
+{
+    const auto &descriptor = context.payload<MethodDescriptorObject>(callable);
+    auto self = receiver ? receiver
+                         : (args.positional.empty() ? std::optional<Value>{} : args.positional[0]);
+    if (!self || !is_subtype(context, context.type_of(*self), descriptor.owner)) {
+        type_error(context, U"descriptor requires a compatible receiver", out);
+        return;
+    }
+    auto function = roots.root(descriptor.function);
+    invoke_native(context, function, context.payload<NativeFunctionObject>(function), args,
+                  receiver, out, roots);
+}
+
 struct CallDepth {
     Attachment &context;
-    bool entered;
-    explicit CallDepth(Attachment &c) : context(c), entered(c.enter_call())
+    bool entered = false;
+    CallDepth(Attachment &c, ReturnSlot &out) : context(c)
     {
+        out.reset(context);
+        entered = context.enter_call();
         if (entered && !context.enter_native_call()) {
             context.leave_call();
             entered = false;
         }
+        if (!entered)
+            raise_error(context, CoreObject::RecursionErrorType, U"maximum call depth exceeded",
+                        out);
     }
     ~CallDepth()
     {
@@ -317,11 +337,23 @@ void invoke_special_impl(Attachment &context, Handle self, Handle target, CallAr
     const auto receiver = self.get(context);
     const auto descriptor = target.get(context);
     const auto type = context.type_of(descriptor);
-    if ((type == context.builtin(CoreObject::NativeFunctionType) &&
-         context.payload<NativeFunctionObject>(descriptor).binding ==
-             NativeFunctionBinding::Descriptor) ||
-        type == context.builtin(CoreObject::FunctionType) ||
-        type == context.builtin(CoreObject::MethodDescriptorType))
+    // Reuse this classification; native targets still share the ordinary binder and guards.
+    if (type == context.builtin(CoreObject::NativeFunctionType)) {
+        const auto &native = context.payload<NativeFunctionObject>(descriptor);
+        if (native.binding == NativeFunctionBinding::Descriptor) {
+            CallDepth depth(context, out);
+            if (depth.entered)
+                invoke_native(context, target, native, args, receiver, out, roots);
+            return;
+        }
+    }
+    if (type == context.builtin(CoreObject::MethodDescriptorType)) {
+        CallDepth depth(context, out);
+        if (depth.entered)
+            invoke_method_descriptor(context, descriptor, args, receiver, out, roots);
+        return;
+    }
+    if (type == context.builtin(CoreObject::FunctionType))
         invoke(context, target, args, receiver, out, roots, preparation);
     else {
         ReturnSlot bound(context);
@@ -337,16 +369,14 @@ void invoke(Attachment &context, Handle target, CallArgsView args, std::optional
             ReturnSlot &out, RootScope &roots,
             std::optional<detail::PreparedPythonCall> *preparation)
 {
-    out.reset(context);
-    CallDepth depth(context);
-    if (!depth.entered) {
-        raise_error(context, CoreObject::RecursionErrorType, U"maximum call depth exceeded", out);
+    CallDepth depth(context, out);
+    if (!depth.entered)
         return;
-    }
     Value callable = target.get(context);
     const auto type = context.type_of(callable);
     if (type == context.builtin(CoreObject::NativeFunctionType)) {
-        invoke_native(context, target, args, receiver, out, roots);
+        invoke_native(context, target, context.payload<NativeFunctionObject>(callable), args,
+                      receiver, out, roots);
         return;
     }
     if (type == context.builtin(CoreObject::FunctionType)) {
@@ -376,15 +406,7 @@ void invoke(Attachment &context, Handle target, CallArgsView args, std::optional
         return;
     }
     if (type == context.builtin(CoreObject::MethodDescriptorType)) {
-        auto &descriptor = context.payload<MethodDescriptorObject>(callable);
-        auto self = receiver
-                        ? receiver
-                        : (args.positional.empty() ? std::optional<Value>{} : args.positional[0]);
-        if (!self || !is_subtype(context, context.type_of(*self), descriptor.owner)) {
-            type_error(context, U"descriptor requires a compatible receiver", out);
-            return;
-        }
-        invoke_native(context, roots.root(descriptor.function), args, receiver, out, roots);
+        invoke_method_descriptor(context, callable, args, receiver, out, roots);
         return;
     }
     auto attribute = type_attribute(context, type, U"__call__");

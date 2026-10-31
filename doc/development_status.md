@@ -1,5 +1,76 @@
 # Development Status
 
+## 2026-11-01 Reuse Native Special-Method Classification
+
+Continues the active performance/cleanup goal after pushed 96560fc and cache
+housekeeping. Terra supplied the two native depth-limit cases; parent implemented
+the dispatch refactor, host-fault coverage, Python cases and acceptance. Terra is
+closed. The full compatibility route remains paused.
+
+- Special-method dispatch already recognizes native method descriptors and
+  descriptor-bound NativeFunctionObjects. It now enters the common depth guard
+  and native binder directly, rather than asking generic invoke to classify the
+  same rooted target again. The binder accepts the already checked native
+  payload. Explicit and implicit method-descriptor invocation share one owner/
+  receiver check; result reset and recursion-error construction live in the
+  existing depth guard. No cache, unchecked access, public API, new runtime
+  class, interpreter lock, GC policy or numeric/workload shortcut was added.
+- Ordinary native functions retain no implicit self; Python functions retain
+  prepared-call scheduling; arbitrary descriptors retain their binding callback.
+  Epoch revalidation, defining-owner checks, keywords/defaults/variadics, precise
+  roots, recursion/native limits and native return validation remain in place.
+  New native cases check both depth limits at one, nested failure, direct-call
+  recovery and host-exception unwinding with collect-every-allocation enabled.
+  The direct protocol fixture additionally checks gc.isenabled as __bool__ and
+  int.__add__ transplanted onto an unrelated class; fixed CPython agrees.
+- All 216 selected native call/protocol/numeric/constructor/VM/scheduling/layout/
+  memory/epoch/finalizer/readiness contracts pass Release, ASan/UBSan/LSan and
+  TSan. All 22 selected Python descriptor/callback/formatting/numeric/thread/GC
+  scenarios pass on all three builds. Release passes all 16 bootstrap/promotion
+  allocation-failure shards. Strict Clang 21.1.8, formatting and diff checks pass.
+  Evidence is retained under .cache/native-dispatch-*. No unrelated full library
+  corpus or complete performance campaign was repeated.
+- After builds and correctness runs stopped, measured only matrix N=64 at one/
+  four workers, three independent processes, one warmup and three values/process.
+  New medians are 692.474/275.661 ms versus retained 703.398/277.494. Standard
+  pyperf finds neither difference statistically significant: this node simplifies
+  dispatch but does not establish a performance improvement. Relative scaling
+  remains 2.512x with four-worker CPU/wall 3.302; auto-GC and validation stay on.
+  Raw runs and generated reports/CSV/pyperf suites are native-dispatch-matrix and
+  native-dispatch-matrix-comparison under .cache/benchmarks; no table was hand
+  maintained. matrix.py remains unmodified and untracked.
+- A separate one-worker, sixteen-loop software CPU profile (including startup
+  and warmup, about 2K samples) now puts root acquisition and RootScope teardown
+  at 10.41% and 9.42% self time. Heap-access/handle/admission costs remain large;
+  further native-call branch polishing is not the main next dependency. Retained
+  perf.data/self/caller evidence is native-dispatch-matrix-profile-1. It is not a
+  hardware cache-hit measurement or a GC pause distribution. Absolute CPython
+  acceptance is still far away; the active goal remains incomplete.
+
+## 2026-11-01 Cache Housekeeping
+
+- Removed the consumed 76fb0c6 benchmark executable, unused pyperformance source
+  checkout, broken one-off tokenizer adaptation script, rejected integer-identity
+  experiment patch and duplicate upstream license copy. The vendored benchmark
+  sources and their tracked license remain unchanged.
+- Removed only .o/.a files and the build-only _bootstrap_python executable from
+  the fixed CPython build. Kept its python executable, shared modules, source,
+  configuration and generated module search directory. Rebuilding that reference
+  now requires regenerating its discarded compilation intermediates.
+- Retained Clang 21.1.8, Boost, the benchmark environment, all three current
+  Release/ASan/TSan builds, the 96560fc comparison executable, raw performance
+  runs/profiles and verification logs. No build/test process was active during
+  deletion. Cache apparent bytes decreased from 2279060359 to 2086442470
+  (about 184 MiB); all eleven runs.jsonl files retain their original sizes.
+- Clang version, pyperf/psutil imports, benchmark case listing, reference
+  math/json/threading and product threading/gc startup smokes pass. No runtime
+  source changed and no performance campaign was repeated. Reference inspection
+  also found missing _ssl/_ctypes before cleanup and missing _posixsubprocess;
+  their build/search-path setup remains a separate reference-tooling gap, not
+  evidence of full reference-library acceptance. No shared libraries were deleted.
+- The performance goal remains active. Native dispatch work and its pending
+  depth-limit tests are not claimed complete by this housekeeping entry.
+
 ## 2026-11-01 Checked Numeric Payload Reuse
 
 Continues the active performance/cleanup goal after pushed 76fb0c6. That goal

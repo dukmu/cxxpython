@@ -7,3 +7,5 @@ inplace fallback: left+right ['iadd', 'add', 'radd']
 integer normalization: identity and exact result type
 multiplication exception: ['bind multiply', 'multiply']
 subscript inplace: ['container', 'key', 'bind get', 'get', 'operand', 'bind inplace', 'inplace', 'bind set', 'set', 'new set']
+native function special: no implicit receiver
+transplanted native descriptor: TypeError

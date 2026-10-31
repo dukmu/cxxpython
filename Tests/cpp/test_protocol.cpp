@@ -77,6 +77,100 @@ class CoreProtocols : public testing::Test {
     }
 };
 
+class ProtocolNativeDepth : public testing::TestWithParam<bool> {};
+
+TEST_P(ProtocolNativeDepth, SpecialCallsConsumeAndUnwindDepth)
+{
+    HeapConfig config;
+    config.collect_every_allocation = true;
+    if (GetParam())
+        config.max_native_depth = 1;
+    else
+        config.max_call_depth = 1;
+    Interpreter interpreter{config};
+    Attachment context{interpreter};
+    context.bootstrap_core();
+    RootScope roots{context};
+    ReturnSlot out(context);
+
+    make_int(context, 1, out);
+    auto one = roots.root(out.result().value());
+    make_int(context, 2, out);
+    auto two = roots.root(out.result().value());
+
+    create_type(context, {"DepthTruth", {}}, out);
+    auto cls = roots.root(out.result().value());
+    context.allocate_instance<InstanceObject>(cls, out);
+    auto obj = roots.root(out.result().value());
+    SignatureLayout bool_signature;
+    bool_signature.parameters = {{U"self", ParameterKind::PositionalOnly}};
+    make_native_function(
+        context, "depth bool", bool_signature,
+        [](Attachment &c, Handle, std::span<const Value>, ReturnSlot &result) {
+            result.ok(c.builtin(CoreObject::True));
+        },
+        {}, out);
+    auto bool_fn = roots.root(out.result().value());
+    make_str(context, U"__bool__", out);
+    auto bool_name = roots.root(out.result().value());
+    ASSERT_EQ(set_attribute(context, cls, bool_name, bool_fn, out).tag(), ResultTag::Ok);
+
+    std::array captures{one.get(context), two.get(context), obj.get(context)};
+    make_native_function(
+        context, "outer add", {},
+        [](Attachment &c, Handle fn, std::span<const Value>, ReturnSlot &result) {
+            RootScope scope(c);
+            const auto &captured = c.payload<NativeFunctionObject>(fn).captures;
+            auto left = scope.root(captured[0]);
+            auto right = scope.root(captured[1]);
+            binary(c, left, right, BinaryOp::Add, result);
+        },
+        captures, out);
+    auto outer_add = roots.root(out.result().value());
+    make_native_function(
+        context, "outer truth", {},
+        [](Attachment &c, Handle fn, std::span<const Value>, ReturnSlot &result) {
+            RootScope scope(c);
+            auto object = scope.root(c.payload<NativeFunctionObject>(fn).captures[2]);
+            truth(c, object, result);
+        },
+        captures, out);
+    auto outer_truth = roots.root(out.result().value());
+
+    call(context, outer_add, {}, out);
+    ASSERT_EQ(out.result().tag(), ResultTag::Raised);
+    EXPECT_EQ(context.type_of(out.result().exception()),
+              context.builtin(CoreObject::RecursionErrorType));
+    binary(context, one, two, BinaryOp::Add, out);
+    ASSERT_EQ(out.result().tag(), ResultTag::Ok);
+    EXPECT_EQ(int_decimal(context, out.result().value()), "3");
+
+    call(context, outer_truth, {}, out);
+    ASSERT_EQ(out.result().tag(), ResultTag::Raised);
+    EXPECT_EQ(context.type_of(out.result().exception()),
+              context.builtin(CoreObject::RecursionErrorType));
+    truth(context, obj, out);
+    ASSERT_EQ(out.result().tag(), ResultTag::Ok);
+    EXPECT_EQ(out.result().value(), context.builtin(CoreObject::True));
+
+    make_native_function(
+        context, "host fault bool", bool_signature,
+        [](Attachment &, Handle, std::span<const Value>, ReturnSlot &) {
+            throw std::runtime_error("host fault");
+        },
+        {}, out);
+    auto host_fault = roots.root(out.result().value());
+    ASSERT_EQ(set_attribute(context, cls, bool_name, host_fault, out).tag(), ResultTag::Ok);
+    EXPECT_THROW(truth(context, obj, out), std::runtime_error);
+    EXPECT_EQ(out.result().tag(), ResultTag::Empty);
+    ASSERT_EQ(set_attribute(context, cls, bool_name, bool_fn, out).tag(), ResultTag::Ok);
+    truth(context, obj, out);
+    ASSERT_EQ(out.result().tag(), ResultTag::Ok);
+    EXPECT_EQ(out.result().value(), context.builtin(CoreObject::True));
+}
+
+INSTANTIATE_TEST_SUITE_P(CallAndNativeLimits, ProtocolNativeDepth, testing::Bool());
+
 TEST_F(CoreProtocols, TruthUsesTypeMethodsAndChecksBooleanBeforeLength)
 {
     auto cls = type();

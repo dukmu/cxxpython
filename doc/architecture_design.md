@@ -146,6 +146,10 @@ share that invocation-owned scope. ObjectOps that already own their operands
 also lend their protocol-resolution scope to invocation instead of rooting the
 same inputs again. The public protocol entry still owns borrowed inputs; both
 entries use the same epoch/receiver revalidation and descriptor dispatch.
+Freshly classified native special methods enter the shared call-depth guard and
+native binder directly, without classifying the callable again. Explicit and
+implicit method-descriptor calls share one defining-owner receiver check;
+ordinary native functions still follow descriptor binding without implicit self.
 Prepared Python calls retain copied host argument buffers and borrow roots from
 their caller's scope. Receiver validation,
 type-epoch revalidation, recursion limits and native return validation remain on
