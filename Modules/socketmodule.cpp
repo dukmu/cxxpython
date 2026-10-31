@@ -8,6 +8,7 @@
 #include "cxxpython/protocol.hpp"
 #include "cxxpython/type.hpp"
 #include "internal/iomodule.hpp"
+#include "internal/pytime.hpp"
 #include "internal/signalmodule.hpp"
 #include "internal/socket_addresses.hpp"
 
@@ -16,7 +17,6 @@
 #include <cerrno>
 #include <chrono>
 #include <climits>
-#include <cmath>
 #include <cstring>
 #include <fcntl.h>
 #include <limits>
@@ -174,35 +174,9 @@ bool timeout_value(Attachment &c, Value value, std::int64_t &result, ReturnSlot 
         result = -1;
         return true;
     }
-    constexpr std::int64_t billion = 1000000000;
-    if (is_float(c, value)) {
-        const double seconds = c.payload<FloatObject>(value).value;
-        if (std::isnan(seconds)) {
-            raise_error(c, CoreObject::ValueErrorType, U"Invalid value NaN (not a number)", out);
-            return false;
-        }
-        const long double rounded =
-            seconds < 0 ? std::floor(seconds * billion) : std::ceil(seconds * billion);
-        if (!std::isfinite(seconds) ||
-            rounded > static_cast<long double>(std::numeric_limits<std::int64_t>::max()) ||
-            rounded < static_cast<long double>(std::numeric_limits<std::int64_t>::min())) {
-            raise_error(c, CoreObject::OverflowErrorType,
-                        U"timestamp out of range for platform time_t", out);
-            return false;
-        }
-        result = static_cast<std::int64_t>(rounded);
-    } else {
-        std::int64_t seconds;
-        if (!number(c, value, seconds, out))
-            return false;
-        if (seconds > std::numeric_limits<std::int64_t>::max() / billion ||
-            seconds < std::numeric_limits<std::int64_t>::min() / billion) {
-            raise_error(c, CoreObject::OverflowErrorType,
-                        U"timestamp out of range for platform time_t", out);
-            return false;
-        }
-        result = seconds * billion;
-    }
+    RootScope roots(c);
+    if (!seconds_to_nanoseconds(c, roots.root(value), result, out))
+        return false;
     if (result < 0) {
         raise_error(c, CoreObject::ValueErrorType, U"Timeout value out of range", out);
         return false;

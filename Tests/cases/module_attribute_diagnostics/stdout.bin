@@ -1,0 +1,11 @@
+AttributeError module 'example.module' has no attribute 'feature'
+AttributeError module 'renamed'quoted' has no attribute 'not'present'
+AttributeError module has no attribute 'feature'
+AttributeError module has no attribute 'feature'
+AttributeError partially initialized module 'example.module' has no attribute 'feature' (most likely due to a circular import)
+AttributeError cannot access submodule 'child' of module 'example.module' (most likely due to a circular import)
+AttributeError module 'example.module' has no attribute 'other'
+AttributeError module 'example.module' has no attribute 'feature'
+AttributeError partially initialized module 'example.module' has no attribute 'feature' (most likely due to a circular import)
+7
+AttributeError from user hook: feature

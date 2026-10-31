@@ -26,6 +26,7 @@ endif()
 
 add_library(cxxpython_core
     Python/gc.cpp
+    Python/pytime.cpp
     Python/errors.cpp
     Python/pylifecycle.cpp
     Python/pythonrun.cpp

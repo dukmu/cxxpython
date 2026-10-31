@@ -386,6 +386,47 @@ TEST(FoundationMemory, ConstructorFailureReusesPrivateSlotsWithoutPublishing)
     EXPECT_EQ(context.stats().reserved_bytes, 0U);
 }
 
+TEST(FoundationMemory, AlternatingLayoutsReuseSweptSpansAndFailedConstructions)
+{
+    Interpreter interpreter;
+    Attachment context(interpreter);
+    context.set_gc_enabled(false);
+    RootScope roots(context);
+    ReturnSlot out(context);
+    std::vector<Handle> survivors;
+    for (int i = 0; i < 1200; ++i) {
+        context.allocate<Node>(out);
+        if (i % 40 == 0)
+            survivors.push_back(roots.root(out.value()));
+        context.allocate<AlignedLeaf>(out);
+        if (i % 40 == 0)
+            survivors.push_back(roots.root(out.value()));
+        EXPECT_THROW(context.allocate<FailingNode>(out), std::bad_alloc);
+    }
+    out.reset();
+    context.collect();
+    const auto before = context.stats();
+    EXPECT_EQ(before.objects, survivors.size());
+    for (int i = 0; i < 600; ++i) {
+        context.allocate<AlignedLeaf>(out);
+        context.allocate<Node>(out);
+    }
+    EXPECT_EQ(context.stats().spans, before.spans);
+    EXPECT_EQ(context.stats().reserved_bytes, before.reserved_bytes);
+    out.reset();
+    context.collect();
+    EXPECT_EQ(context.stats().objects, survivors.size());
+    for (auto survivor : survivors)
+        roots.release(survivor);
+    context.collect();
+    EXPECT_EQ(context.stats().spans, 0U);
+    EXPECT_EQ(context.stats().reserved_bytes, 0U);
+    // Empty-layout pruning must not leave stale cursor or span identities.
+    context.allocate<AlignedLeaf>(out);
+    context.allocate<Node>(out);
+    EXPECT_EQ(context.stats().objects, 2U);
+}
+
 TEST(FoundationMemory, LargeOveralignedStorageUsesIndependentSpans)
 {
     Interpreter interpreter;

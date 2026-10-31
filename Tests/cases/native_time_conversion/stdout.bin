@@ -1,0 +1,24 @@
+sleep None
+sleep ValueError sleep length must be non-negative
+sleep ValueError sleep length must be non-negative
+sleep ValueError Invalid value NaN (not a number)
+sleep OverflowError timestamp out of range for platform time_t
+sleep OverflowError timestamp too large to convert to C _PyTime_t
+sleep conversion callback failed
+select ([], [], [])
+select ValueError timeout must be non-negative
+select ValueError timeout must be non-negative
+select ValueError Invalid value NaN (not a number)
+select OverflowError timestamp out of range for platform time_t
+select OverflowError timestamp too large to convert to C _PyTime_t
+select timeout must be a float or None
+socket None
+socket ValueError Timeout value out of range
+socket ValueError Timeout value out of range
+socket ValueError Invalid value NaN (not a number)
+socket OverflowError timestamp out of range for platform time_t
+socket OverflowError timestamp too large to convert to C _PyTime_t
+socket conversion callback failed
+1e-09
+None
+([], [], [])

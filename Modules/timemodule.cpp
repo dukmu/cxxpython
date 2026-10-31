@@ -9,9 +9,9 @@
 #include "cxxpython/protocol.hpp"
 #include "cxxpython/type.hpp"
 #include "internal/iomodule.hpp"
+#include "internal/pytime.hpp"
 
 #include <cerrno>
-#include <cmath>
 #include <cstdint>
 #include <limits>
 #include <time.h>
@@ -49,39 +49,8 @@ void sleep_entry(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlo
 {
     RootScope roots(ctx);
     std::int64_t nanos;
-    if (is_float(ctx, args[0])) {
-        const double value = ctx.payload<FloatObject>(args[0]).value;
-        if (std::isnan(value)) {
-            raise_error(ctx, CoreObject::ValueErrorType, U"Invalid value NaN (not a number)", out);
-            return;
-        }
-        const double scaled = value * billion;
-        const long double rounded = value < 0 ? std::floor(scaled) : std::ceil(scaled);
-        if (!std::isfinite(value) ||
-            rounded > static_cast<long double>(std::numeric_limits<std::int64_t>::max()) ||
-            rounded < static_cast<long double>(std::numeric_limits<std::int64_t>::min())) {
-            raise_error(ctx, CoreObject::OverflowErrorType,
-                        U"timestamp out of range for platform time_t", out);
-            return;
-        }
-        nanos = static_cast<std::int64_t>(rounded);
-    } else {
-        ReturnSlot converted(ctx);
-        index(ctx, roots.root(args[0]), converted);
-        if (converted.tag() == ResultTag::Raised) {
-            out.raised(converted.exception());
-            return;
-        }
-        std::int64_t seconds;
-        if (!int_fits_signed(ctx, converted.value(), seconds) ||
-            seconds > std::numeric_limits<std::int64_t>::max() / billion ||
-            seconds < std::numeric_limits<std::int64_t>::min() / billion) {
-            raise_error(ctx, CoreObject::OverflowErrorType,
-                        U"timestamp out of range for platform time_t", out);
-            return;
-        }
-        nanos = seconds * billion;
-    }
+    if (!seconds_to_nanoseconds(ctx, roots.root(args[0]), nanos, out))
+        return;
     if (nanos < 0) {
         raise_error(ctx, CoreObject::ValueErrorType, U"sleep length must be non-negative", out);
         return;

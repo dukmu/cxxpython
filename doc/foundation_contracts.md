@@ -681,6 +681,16 @@ bytecode and object protocols in one heap. An attachment owns roots, active
 Frames, span allocation/pressure batches and protocol caches. Normal access does
 not consult a mutable global heap map or a whole-interpreter execution mutex.
 
+Allocation cursors index available spans by the complete immutable LayoutDescriptor,
+including instance fields, not just the C++ family. A thread-local 64-entry hint
+checks exact layout equality before selecting its bucket; misses search layouts,
+not every occupied span. Full spans leave the available chain, and existing swept
+slots are reused without scanning unrelated storage. The acknowledged collector
+rebuilds chains and compacts dead layout buckets without allocation. Empty spans
+still release their storage; no new retention policy or lifetime authority is added.
+Cache storage is included in native metadata accounting and is retired with its
+thread. These cursors are not shared execution caches or another heap lock.
+
 GC coordinates request/ack/completed epochs; attach, retirement and NativeWait
 resume share the epoch gate. Only acknowledged frozen roots are scanned. VM
 dispatch polls periodically, including allocation-free loops. NativeWait freezes

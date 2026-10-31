@@ -2,10 +2,10 @@
 // PSF license: doc/licenses/python-3.12.14.txt.
 #include "internal/selectmodule.hpp"
 
-#include "cxxpython/floatobject.hpp"
 #include "cxxpython/moduleobject.hpp"
 #include "cxxpython/protocol.hpp"
 #include "internal/iomodule.hpp"
+#include "internal/pytime.hpp"
 #include "internal/signalmodule.hpp"
 
 #include <algorithm>
@@ -13,7 +13,6 @@
 #include <cerrno>
 #include <chrono>
 #include <climits>
-#include <cmath>
 #include <limits>
 #include <sys/select.h>
 
@@ -66,43 +65,13 @@ bool file_descriptor(Attachment &c, Handle object, int &fd, ReturnSlot &out)
 
 bool timeout_value(Attachment &c, Handle value, std::int64_t &nanos, ReturnSlot &out)
 {
-    constexpr std::int64_t billion = 1000000000;
-    if (is_float(c, value.get(c))) {
-        const double seconds = c.payload<FloatObject>(value).value;
-        if (std::isnan(seconds)) {
-            raise_error(c, CoreObject::ValueErrorType, U"Invalid value NaN (not a number)", out);
-            return false;
-        }
-        const long double rounded =
-            seconds < 0 ? std::floor(seconds * billion) : std::ceil(seconds * billion);
-        if (!std::isfinite(seconds) ||
-            rounded > static_cast<long double>(std::numeric_limits<std::int64_t>::max()) ||
-            rounded < static_cast<long double>(std::numeric_limits<std::int64_t>::min())) {
-            raise_error(c, CoreObject::OverflowErrorType,
-                        U"timestamp out of range for platform time_t", out);
-            return false;
-        }
-        nanos = static_cast<std::int64_t>(rounded);
-    } else {
-        ReturnSlot converted(c);
-        index(c, value, converted);
-        if (converted.tag() == ResultTag::Raised) {
-            if (is_subtype(c, c.type_of(converted.exception()),
-                           c.builtin(CoreObject::TypeErrorType)))
-                raise_error(c, CoreObject::TypeErrorType, U"timeout must be a float or None", out);
-            else
-                out.raised(converted.exception());
-            return false;
-        }
-        std::int64_t seconds;
-        if (!int_fits_signed(c, converted.value(), seconds) ||
-            seconds > std::numeric_limits<std::int64_t>::max() / billion ||
-            seconds < std::numeric_limits<std::int64_t>::min() / billion) {
-            raise_error(c, CoreObject::OverflowErrorType,
-                        U"timestamp out of range for platform time_t", out);
-            return false;
-        }
-        nanos = seconds * billion;
+    ReturnSlot converted(c);
+    if (!seconds_to_nanoseconds(c, value, nanos, converted)) {
+        if (is_subtype(c, c.type_of(converted.exception()), c.builtin(CoreObject::TypeErrorType)))
+            raise_error(c, CoreObject::TypeErrorType, U"timeout must be a float or None", out);
+        else
+            out.raised(converted.exception());
+        return false;
     }
     if (nanos < 0) {
         raise_error(c, CoreObject::ValueErrorType, U"timeout must be non-negative", out);

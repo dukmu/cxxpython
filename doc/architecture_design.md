@@ -248,11 +248,24 @@ namespace, including descriptor lookup and module-level __getattr__. Module
 payloads add no second dictionary or lifetime manager. The CLI now executes in
 the actual registered __main__ namespace; RunRequest accepts a builtins module
 or dictionary and binds functions to that module's actual dictionary.
+Missing module attributes report the actual module/name and upstream circular-import
+context. Module __getattr__ runs first; optional spec diagnostics retain precise
+roots across user callbacks and do not replace the hook's own errors. A None spec
+has no diagnostic context and does not create temporary missing-attribute errors.
+
+`Python/pytime.cpp` owns the common float/index-to-nanosecond conversion used by
+time, select and socket. The small internal header only forward-declares runtime
+handles. None handling, nonnegative policies and contextual errors remain with
+their callers rather than growing a configurable argument-conversion framework.
 
 `Python/gc.cpp` owns the precise heap, adjacent allocation metadata, thread-local
 spans/root arenas, attachment/parking, epoch rendezvous, transfer roots and core
 image lifecycle. These coupled lifetime operations remain in one translation
 unit; moving them does not introduce an extra lifetime authority or new locking.
+Per-thread full-layout buckets and available-span chains avoid the former scan
+of every span on layout switches. A small exact-match hint cache accelerates hot
+layout pairs; STW rebuild/pruning performs no allocation and retains the existing
+empty-span release policy. The buckets own native cursor metadata, not Python roots.
 Weak targets and intrusive callback/finalizer batches are classified during STW;
 Python runs only after attachments resume. Pending and running batches retain
 their complete strong graphs, and a second mark checks resurrection. Immutable

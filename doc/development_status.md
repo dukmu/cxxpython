@@ -1,5 +1,64 @@
 # Development Status
 
+## 2026-10-31 Layout Allocation Index And First Cleanup Stable Point
+
+Prepended after the pushed network node 11a3ae2. At the user's direction the
+original full-compatibility goal was paused, not completed. The user replaced it
+with the now-active performance/cleanup goal. No further library expansion is
+part of this turn. Terra extracted the duplicated native time conversion; parent
+integrated it, implemented diagnostics and allocation indexing, captured profiles
+and performed acceptance. All workers are closed.
+
+- Ran the user's unmodified matrix.py at N=32 for initial orientation, then N=64,
+  workers 1-4 and three repetitions with the same script on pinned CPython and
+  cxxpython. A local ignored wrapper records each bench_once wall/process CPU
+  time without changing its computation. The original per-row correctness checks
+  remain. matrix.py and the wrapper are not committed. The retained raw captures
+  feed Tools/benchmarks/record.py; generated JSONL/CSV/Markdown are checked in at
+  doc/benchmarks/matrix-span-cache/. No table rows or speedups were hand-written.
+- Native CPU sampling identified reserve_storage as 43.59% of baseline samples:
+  every layout switch scanned the thread's entire span list. The main thread's
+  accumulated layouts/spans made its scalar loop disproportionately slow. The
+  allocator now selects complete-layout buckets through a thread-private exact
+  hint cache and intrusive available-span chains. GC compacts dead buckets and
+  rebuilds chains without allocating; constructors, full layout identity, empty
+  span release, STW epochs and ownership checks retain their original contracts.
+  Cache native memory is accounted. No GIL, RC, benchmark-specific arithmetic or
+  extra collector was added.
+- Isolated N=64 median wall time changed from 3499.778 ms to 1617.543 ms at one
+  worker and 647.410 ms to 556.890 ms at four. The allocator is absent from the
+  optimized profile's >=1% self-overhead list. Raw profiles/reports are retained
+  as .cache/matrix-n64*-perf*. An earlier overlapping diagnostic run is not used
+  in the generated result table. The inflated old relative speedup is not an
+  acceptance result; CPython remains much faster in absolute time. This is a
+  measured first optimization, not CPython-level performance or goal completion.
+- Module missing-attribute diagnostics now match pinned moduleobject.c's module
+  name, attribute and circular-import context, including missing/non-string names,
+  collecting spec properties and module __getattr__ precedence. Removed the vague
+  module attribute not found message. A missing/None spec does no diagnostic work.
+  AttributeError's full native field/context matrix remains separate work.
+- Removed three copies of float/index seconds conversion from time/select/socket
+  into Python/pytime.cpp with a small forward-declaration-only internal header.
+  Caller-specific None, negative and TypeError behavior stays local. Fixed the
+  observed huge-integer diagnostic to pinned _PyTime_t wording instead of exposing
+  an unrelated native integer conversion error. No generic parser/configuration
+  framework or public extension ABI was introduced.
+- The new alternating-layout/failed-constructor native test covers reuse, swept
+  holes, cache pruning and fresh allocation after every span is released. Release
+  passes 72 memory/epoch/thread/VM/source-import contracts plus 42 layout/module/
+  finalization/bootstrap/promotion contracts; both sanitizer builds pass the same
+  98 affected contracts excluding the 16 expensive bootstrap shards. Seven focused
+  script scenarios pass Release, ASan/UBSan/LSan and TSan; the final None-spec fast
+  path has a targeted module-diagnostic recheck. Strict Clang 21.1.8 is used.
+  Evidence is retained in .cache/cleanup-*; formatter/generated consistency is
+  checked before commit. Earlier failing diagnostic output is retained, not counted
+  as a passing run.
+- Next work remains the measured root/ownership/protocol/call overhead, allocation
+  and cache behavior at additional sizes, and remaining Modules/header duplication.
+  Do not weaken validation or resume full compatibility delivery to chase these
+  timings. The performance/cleanup goal stays active; the earlier full route is
+  still paused in Plan 2 section 0.13.
+
 ## 2026-10-31 Network Foundation And User-Directed Route Pause
 
 Prepended after aca6804 without rewriting earlier entries. The previous goal turn

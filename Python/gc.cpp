@@ -7,6 +7,7 @@
 #include "internal/import.hpp"
 
 #include <algorithm>
+#include <array>
 #include <atomic>
 #include <bit>
 #include <cassert>
@@ -141,8 +142,9 @@ struct Allocation {
     }
 };
 struct AllocationSpan {
-    AllocationSpan(State *owner, LayoutDescriptor layout, std::size_t target_bytes)
-        : owner(owner), layout(layout)
+    AllocationSpan(State *owner, LayoutDescriptor layout, std::size_t target_bytes,
+                   std::size_t bucket)
+        : owner(owner), layout(layout), bucket_index(bucket)
     {
         const auto alignment = layout.storage_alignment();
         const auto limit = std::numeric_limits<std::size_t>::max();
@@ -207,8 +209,15 @@ struct AllocationSpan {
     std::size_t object_offset, stride, capacity, reserved_bytes;
     std::size_t extent = 0, live_count = 0;
     Allocation *free = nullptr;
+    std::size_t bucket_index;
+    AllocationSpan *available_next = nullptr;
 };
 struct ThreadRecord {
+    struct SpanBucket {
+        LayoutDescriptor layout;
+        AllocationSpan *available = nullptr;
+        std::size_t spans = 0, next_index = 0;
+    };
     struct ProtocolEntry {
         ObjectHeader *type = nullptr, *owner = nullptr, *descriptor = nullptr;
         Protocol protocol = Protocol::Count;
@@ -217,14 +226,72 @@ struct ThreadRecord {
     };
     explicit ThreadRecord(std::uint64_t identity)
         : owner(std::this_thread::get_id()), roots(identity)
-    {}
+    {
+        span_cache.fill(std::numeric_limits<std::size_t>::max());
+    }
     const std::thread::id owner;
     RootArena roots;
     std::atomic<MutatorState> state{MutatorState::PendingAttach};
     std::uint64_t observed_epoch = 0, ack_epoch = 0, wait_epoch = 0;
     std::size_t collection_result = 0;
     std::list<AllocationSpan> spans;
+    std::vector<SpanBucket> span_buckets;
+    std::array<std::size_t, 64> span_cache;
     AllocationSpan *current_span = nullptr;
+    std::size_t span_bucket(const LayoutDescriptor &layout)
+    {
+        const auto family = reinterpret_cast<std::uintptr_t>(layout.native_family);
+        const auto hash = (family ^ (family >> 6) ^ (layout.fields.slots * 17) ^
+                           (layout.fields.dictionary * 13) ^ (layout.fields.weakrefs * 7)) %
+                          span_cache.size();
+        auto &cached = span_cache[hash];
+        if (cached != std::numeric_limits<std::size_t>::max() &&
+            span_buckets[cached].layout == layout)
+            return cached;
+        const auto found =
+            std::find_if(span_buckets.begin(), span_buckets.end(),
+                         [&](const auto &bucket) { return bucket.layout == layout; });
+        const auto index = static_cast<std::size_t>(found - span_buckets.begin());
+        if (found == span_buckets.end())
+            span_buckets.push_back({layout});
+        cached = index;
+        return index;
+    }
+    // Only the acknowledged collector rebuilds these native cursors. Compact
+    // dead layout buckets without allocating or retaining erased spans.
+    void rebuild_span_buckets() noexcept
+    {
+        current_span = nullptr;
+        span_cache.fill(std::numeric_limits<std::size_t>::max());
+        for (auto &bucket : span_buckets) {
+            bucket.spans = 0;
+            bucket.available = nullptr;
+        }
+        for (auto &span : spans)
+            ++span_buckets[span.bucket_index].spans;
+        std::size_t count = 0;
+        for (auto &bucket : span_buckets)
+            if (bucket.spans)
+                bucket.next_index = count++;
+        for (auto &span : spans)
+            span.bucket_index = span_buckets[span.bucket_index].next_index;
+        std::size_t index = 0;
+        for (std::size_t old = 0; old < span_buckets.size(); ++old)
+            if (span_buckets[old].spans) {
+                if (index != old)
+                    span_buckets[index] = span_buckets[old];
+                ++index;
+            }
+        span_buckets.erase(span_buckets.begin() + count, span_buckets.end());
+        for (auto &span : spans) {
+            auto &bucket = span_buckets[span.bucket_index];
+            span.available_next = nullptr;
+            if (span.available()) {
+                span.available_next = bucket.available;
+                bucket.available = &span;
+            }
+        }
+    }
     std::size_t pending_bytes = 0;
     std::size_t allocations_since_gc = 0;
     bool collecting_callbacks = false;
@@ -288,6 +355,9 @@ struct State {
                          last_rendezvous_ns,
                          max_rendezvous_ns};
         result.transfer_roots = transfer_count;
+        for (const auto &thread : threads)
+            result.metadata_bytes +=
+                thread->span_buckets.capacity() * sizeof(ThreadRecord::SpanBucket);
         result.reclaimed_objects = reclaimed_objects;
         result.allocated_bytes = allocated_since_gc.load(std::memory_order_relaxed);
         result.gc_budget = budget;
@@ -670,8 +740,8 @@ struct State {
         };
         sweep_spans(retired_spans);
         for (const auto &thread : threads) {
-            thread->current_span = nullptr;
             sweep_spans(thread->spans);
+            thread->rebuild_span_buckets();
             thread->pending_bytes = 0;
             thread->allocations_since_gc = 0;
         }
@@ -1126,19 +1196,16 @@ void *Attachment::reserve_storage(LayoutDescriptor layout)
     if (!thread.current_span || thread.current_span->layout != layout ||
         !thread.current_span->available()) {
         thread.current_span = nullptr;
-        std::size_t target_bytes = 4096;
-        for (auto &span : thread.spans)
-            if (span.layout == layout) {
-                if (span.available()) {
-                    thread.current_span = &span;
-                    break;
-                }
-                target_bytes = 64 * 1024;
-            }
-        if (!thread.current_span) {
-            thread.spans.emplace_back(state_.get(), layout, target_bytes);
-            thread.current_span = &thread.spans.back();
+        const auto index = thread.span_bucket(layout);
+        auto &bucket = thread.span_buckets[index];
+        while (bucket.available && !bucket.available->available())
+            bucket.available = bucket.available->available_next;
+        if (!bucket.available) {
+            thread.spans.emplace_back(state_.get(), layout, bucket.spans ? 64 * 1024 : 4096, index);
+            ++bucket.spans;
+            bucket.available = &thread.spans.back();
         }
+        thread.current_span = bucket.available;
     }
     return thread.current_span->take().object();
 }
