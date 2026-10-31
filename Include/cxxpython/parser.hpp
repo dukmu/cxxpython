@@ -18,7 +18,12 @@ struct Span {
 };
 enum class ErrorKind { Syntax, Indentation, Tab, Encoding, Incomplete };
 enum class InputMode { File, Eval, Single, Interactive, FunctionType };
-enum class ParseFlags : unsigned { None = 0, DontImplyDedent = 1, AllowIncompleteInput = 2 };
+enum class ParseFlags : unsigned {
+    None = 0,
+    DontImplyDedent = 1,
+    AllowIncompleteInput = 2,
+    TypeComments = 4
+};
 constexpr ParseFlags operator|(ParseFlags left, ParseFlags right)
 {
     return static_cast<ParseFlags>(static_cast<unsigned>(left) | static_cast<unsigned>(right));
@@ -39,6 +44,7 @@ struct Token {
     TokenKind kind;
     Span span;
     std::u32string text;
+    std::size_t lineno = 0;
 };
 struct LexicalToken {
     Token token;
@@ -89,6 +95,7 @@ struct Node {
 struct Tree {
     std::vector<Token> tokens;
     NodePtr root;
+    std::vector<Token> type_ignores = {};
 };
 std::vector<Token> tokenize(std::string_view source, InputMode mode = InputMode::File,
                             ParseFlags flags = ParseFlags::None);

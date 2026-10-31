@@ -1,0 +1,176 @@
+case 0
+Module(body=[Assign(targets=[Name(id='a', ctx=Store(), lineno=1, col_offset=0, end_lineno=1, end_col_offset=1)], value=Constant(value=0, lineno=1, col_offset=4, end_lineno=1, end_col_offset=5), type_comment='int', lineno=1, col_offset=0, end_lineno=1, end_col_offset=18), Assign(targets=[Name(id='a', ctx=Store(), lineno=2, col_offset=0, end_lineno=2, end_col_offset=1), Name(id='b', ctx=Store(), lineno=2, col_offset=4, end_lineno=2, end_col_offset=5)], value=Constant(value=1, lineno=2, col_offset=8, end_lineno=2, end_col_offset=9), type_comment='int', lineno=2, col_offset=0, end_lineno=2, end_col_offset=22), Assign(targets=[Tuple(elts=[Name(id='a', ctx=Store(), lineno=3, col_offset=1, end_lineno=3, end_col_offset=2), Name(id='b', ctx=Store(), lineno=3, col_offset=4, end_lineno=3, end_col_offset=5)], ctx=Store(), lineno=3, col_offset=0, end_lineno=3, end_col_offset=6)], value=Tuple(elts=[Constant(value=1, lineno=3, col_offset=10, end_lineno=3, end_col_offset=11), Constant(value=2, lineno=3, col_offset=13, end_lineno=3, end_col_offset=14)], ctx=Load(), lineno=3, col_offset=9, end_lineno=3, end_col_offset=15), type_comment='tuple[int, int]', lineno=3, col_offset=0, end_lineno=3, end_col_offset=40)], type_ignores=[])
+compiled True
+case 1
+Module(body=[For(target=Name(id='a', ctx=Store(), lineno=1, col_offset=4, end_lineno=1, end_col_offset=5), iter=List(elts=[], ctx=Load(), lineno=1, col_offset=9, end_lineno=1, end_col_offset=11), body=[Pass(lineno=2, col_offset=4, end_lineno=2, end_col_offset=8)], orelse=[Pass(lineno=4, col_offset=4, end_lineno=4, end_col_offset=8)], type_comment='int', lineno=1, col_offset=0, end_lineno=4, end_col_offset=8)], type_ignores=[])
+compiled True
+case 2
+Module(body=[With(items=[withitem(context_expr=Call(func=Name(id='context', ctx=Load(), lineno=1, col_offset=5, end_lineno=1, end_col_offset=12), args=[], keywords=[], lineno=1, col_offset=5, end_lineno=1, end_col_offset=14), optional_vars=Name(id='a', ctx=Store(), lineno=1, col_offset=18, end_lineno=1, end_col_offset=19))], body=[Pass(lineno=2, col_offset=4, end_lineno=2, end_col_offset=8)], type_comment='int', lineno=1, col_offset=0, end_lineno=2, end_col_offset=8)], type_ignores=[])
+compiled True
+case 3
+Module(body=[With(items=[withitem(context_expr=Call(func=Name(id='a', ctx=Load(), lineno=1, col_offset=5, end_lineno=1, end_col_offset=6), args=[], keywords=[], lineno=1, col_offset=5, end_lineno=1, end_col_offset=8), optional_vars=Name(id='x', ctx=Store(), lineno=1, col_offset=12, end_lineno=1, end_col_offset=13)), withitem(context_expr=Call(func=Name(id='b', ctx=Load(), lineno=1, col_offset=15, end_lineno=1, end_col_offset=16), args=[], keywords=[], lineno=1, col_offset=15, end_lineno=1, end_col_offset=18), optional_vars=Name(id='y', ctx=Store(), lineno=1, col_offset=22, end_lineno=1, end_col_offset=23))], body=[Pass(lineno=2, col_offset=4, end_lineno=2, end_col_offset=8)], type_comment='tuple[A, B]', lineno=1, col_offset=0, end_lineno=2, end_col_offset=8)], type_ignores=[])
+compiled True
+case 4
+Module(body=[FunctionDef(name='foo', args=arguments(posonlyargs=[], args=[], kwonlyargs=[], kw_defaults=[], defaults=[]), body=[Pass(lineno=3, col_offset=4, end_lineno=3, end_col_offset=8)], decorator_list=[], type_comment='() -> int', type_params=[], lineno=1, col_offset=0, end_lineno=3, end_col_offset=8), FunctionDef(name='bar', args=arguments(posonlyargs=[], args=[], kwonlyargs=[], kw_defaults=[], defaults=[]), body=[Pass(lineno=6, col_offset=4, end_lineno=6, end_col_offset=8)], decorator_list=[], type_comment='() -> None', type_params=[], lineno=5, col_offset=0, end_lineno=6, end_col_offset=8)], type_ignores=[])
+compiled True
+case 5
+Module(body=[AsyncFunctionDef(name='foo', args=arguments(posonlyargs=[], args=[], kwonlyargs=[], kw_defaults=[], defaults=[]), body=[Return(value=Await(value=Call(func=Name(id='bar', ctx=Load(), lineno=3, col_offset=17, end_lineno=3, end_col_offset=20), args=[], keywords=[], lineno=3, col_offset=17, end_lineno=3, end_col_offset=22), lineno=3, col_offset=11, end_lineno=3, end_col_offset=22), lineno=3, col_offset=4, end_lineno=3, end_col_offset=22)], decorator_list=[], type_comment='() -> int', type_params=[], lineno=1, col_offset=0, end_lineno=3, end_col_offset=22), AsyncFunctionDef(name='bar', args=arguments(posonlyargs=[], args=[], kwonlyargs=[], kw_defaults=[], defaults=[]), body=[Return(value=Await(value=Call(func=Name(id='bar', ctx=Load(), lineno=6, col_offset=17, end_lineno=6, end_col_offset=20), args=[], keywords=[], lineno=6, col_offset=17, end_lineno=6, end_col_offset=22), lineno=6, col_offset=11, end_lineno=6, end_col_offset=22), lineno=6, col_offset=4, end_lineno=6, end_col_offset=22)], decorator_list=[], type_comment='() -> int', type_params=[], lineno=5, col_offset=0, end_lineno=6, end_col_offset=22)], type_ignores=[])
+compiled True
+case 6
+Module(body=[AsyncFunctionDef(name='foo', args=arguments(posonlyargs=[], args=[arg(arg='xs', lineno=1, col_offset=14, end_lineno=1, end_col_offset=16)], kwonlyargs=[], kw_defaults=[], defaults=[]), body=[AsyncFor(target=Name(id='a', ctx=Store(), lineno=2, col_offset=14, end_lineno=2, end_col_offset=15), iter=Name(id='xs', ctx=Load(), lineno=2, col_offset=19, end_lineno=2, end_col_offset=21), body=[Pass(lineno=3, col_offset=8, end_lineno=3, end_col_offset=12)], orelse=[], type_comment='int', lineno=2, col_offset=4, end_lineno=3, end_col_offset=12), AsyncWith(items=[withitem(context_expr=Call(func=Name(id='context', ctx=Load(), lineno=4, col_offset=15, end_lineno=4, end_col_offset=22), args=[], keywords=[], lineno=4, col_offset=15, end_lineno=4, end_col_offset=24), optional_vars=Name(id='a', ctx=Store(), lineno=4, col_offset=28, end_lineno=4, end_col_offset=29))], body=[Pass(lineno=5, col_offset=8, end_lineno=5, end_col_offset=12)], type_comment='int', lineno=4, col_offset=4, end_lineno=5, end_col_offset=12)], decorator_list=[], type_params=[], lineno=1, col_offset=0, end_lineno=5, end_col_offset=12)], type_ignores=[])
+compiled True
+case 7
+Module(body=[FunctionDef(name='foo', args=arguments(posonlyargs=[], args=[], kwonlyargs=[], kw_defaults=[], defaults=[]), body=[Pass(lineno=3, col_offset=4, end_lineno=3, end_col_offset=8)], decorator_list=[], type_comment='() -> àçčéñt', type_params=[], lineno=1, col_offset=0, end_lineno=3, end_col_offset=8)], type_ignores=[])
+compiled True
+case 8
+Module(body=[FunctionDef(name='foo', args=arguments(posonlyargs=[arg(arg='a', annotation=Name(id='int', ctx=Load(), lineno=2, col_offset=7, end_lineno=2, end_col_offset=10), type_comment='A', lineno=2, col_offset=4, end_lineno=2, end_col_offset=10)], args=[arg(arg='b', type_comment='B', lineno=4, col_offset=4, end_lineno=4, end_col_offset=5)], vararg=arg(arg='args', annotation=Starred(value=Name(id='Ts', ctx=Load(), lineno=5, col_offset=12, end_lineno=5, end_col_offset=14), ctx=Load(), lineno=5, col_offset=11, end_lineno=5, end_col_offset=14), type_comment='V', lineno=5, col_offset=5, end_lineno=5, end_col_offset=14), kwonlyargs=[arg(arg='c', type_comment='C', lineno=6, col_offset=4, end_lineno=6, end_col_offset=5), arg(arg='d', type_comment='D', lineno=7, col_offset=4, end_lineno=7, end_col_offset=5)], kw_defaults=[Constant(value=3, lineno=6, col_offset=8, end_lineno=6, end_col_offset=9), None], kwarg=arg(arg='kw', annotation=Name(id='str', ctx=Load(), lineno=8, col_offset=10, end_lineno=8, end_col_offset=13), type_comment='K', lineno=8, col_offset=6, end_lineno=8, end_col_offset=13), defaults=[Constant(value=1, lineno=2, col_offset=13, end_lineno=2, end_col_offset=14), Constant(value=2, lineno=4, col_offset=8, end_lineno=4, end_col_offset=9)]), body=[Pass(lineno=10, col_offset=4, end_lineno=10, end_col_offset=8)], decorator_list=[], type_comment='(...) -> Result', type_params=[], lineno=1, col_offset=0, end_lineno=10, end_col_offset=8)], type_ignores=[])
+compiled True
+case 9
+Module(body=[FunctionDef(name='foo', args=arguments(posonlyargs=[], args=[], kwonlyargs=[], kw_defaults=[], defaults=[]), body=[Pass(lineno=5, col_offset=4, end_lineno=5, end_col_offset=8)], decorator_list=[], type_comment='() -> int', type_params=[], lineno=1, col_offset=0, end_lineno=5, end_col_offset=8)], type_ignores=[])
+compiled True
+case 10
+Module(body=[Assign(targets=[Name(id='x', ctx=Store(), lineno=2, col_offset=0, end_lineno=2, end_col_offset=1)], value=Constant(value=1, lineno=2, col_offset=4, end_lineno=2, end_col_offset=5), lineno=2, col_offset=0, end_lineno=2, end_col_offset=5)], type_ignores=[TypeIgnore(lineno=1, tag='\n'), TypeIgnore(lineno=2, tag='[attr-defined]'), TypeIgnore(lineno=3, tag='=excuse\n'), TypeIgnore(lineno=4, tag=' [excuse]\n'), TypeIgnore(lineno=5, tag=' whatever\n')])
+compiled True
+case 11
+Module(body=[FunctionDef(name='foo', args=arguments(posonlyargs=[], args=[], kwonlyargs=[], kw_defaults=[], defaults=[]), body=[Pass(lineno=2, col_offset=4, end_lineno=2, end_col_offset=8)], decorator_list=[], type_params=[], lineno=1, col_offset=0, end_lineno=2, end_col_offset=8), FunctionDef(name='bar', args=arguments(posonlyargs=[], args=[], kwonlyargs=[], kw_defaults=[], defaults=[]), body=[Assign(targets=[Name(id='x', ctx=Store(), lineno=5, col_offset=4, end_lineno=5, end_col_offset=5)], value=Constant(value=1, lineno=5, col_offset=8, end_lineno=5, end_col_offset=9), lineno=5, col_offset=4, end_lineno=5, end_col_offset=9)], decorator_list=[], type_params=[], lineno=4, col_offset=0, end_lineno=5, end_col_offset=9), FunctionDef(name='baz', args=arguments(posonlyargs=[], args=[], kwonlyargs=[], kw_defaults=[], defaults=[]), body=[Pass(lineno=8, col_offset=4, end_lineno=8, end_col_offset=8), Pass(lineno=9, col_offset=4, end_lineno=9, end_col_offset=8), Pass(lineno=10, col_offset=4, end_lineno=10, end_col_offset=8), Assign(targets=[Name(id='x', ctx=Store(), lineno=11, col_offset=4, end_lineno=11, end_col_offset=5)], value=Constant(value=1, lineno=11, col_offset=8, end_lineno=11, end_col_offset=9), lineno=11, col_offset=4, end_lineno=11, end_col_offset=9)], decorator_list=[], type_params=[], lineno=7, col_offset=0, end_lineno=11, end_col_offset=9)], type_ignores=[TypeIgnore(lineno=2, tag=''), TypeIgnore(lineno=5, tag=''), TypeIgnore(lineno=8, tag='[excuse]'), TypeIgnore(lineno=9, tag='=excuse'), TypeIgnore(lineno=10, tag=' [excuse]'), TypeIgnore(lineno=11, tag=' whatever')])
+compiled True
+case 12
+Module(body=[Assign(targets=[Name(id='x', ctx=Store(), lineno=1, col_offset=0, end_lineno=1, end_col_offset=1)], value=Constant(value=1, lineno=1, col_offset=4, end_lineno=1, end_col_offset=5), type_comment='', lineno=1, col_offset=0, end_lineno=1, end_col_offset=14), Assign(targets=[Name(id='y', ctx=Store(), lineno=2, col_offset=0, end_lineno=2, end_col_offset=1)], value=Constant(value=2, lineno=2, col_offset=4, end_lineno=2, end_col_offset=5), type_comment='int  ', lineno=2, col_offset=0, end_lineno=2, end_col_offset=21)], type_ignores=[])
+compiled True
+case 13
+Module(body=[Assign(targets=[Name(id='é', ctx=Store(), lineno=1, col_offset=0, end_lineno=1, end_col_offset=2)], value=Constant(value=1, lineno=1, col_offset=5, end_lineno=1, end_col_offset=6), type_comment='类型', lineno=1, col_offset=0, end_lineno=1, end_col_offset=22), Assign(targets=[Name(id='é', ctx=Store(), lineno=2, col_offset=0, end_lineno=2, end_col_offset=2)], value=Constant(value=2, lineno=2, col_offset=5, end_lineno=2, end_col_offset=6), lineno=2, col_offset=0, end_lineno=2, end_col_offset=6)], type_ignores=[TypeIgnore(lineno=2, tag='[说明]')])
+compiled True
+case 14
+Module(body=[FunctionDef(name='type', args=arguments(posonlyargs=[], args=[], kwonlyargs=[], kw_defaults=[], defaults=[]), body=[Return(value=Constant(value=1, lineno=2, col_offset=11, end_lineno=2, end_col_offset=12), lineno=2, col_offset=4, end_lineno=2, end_col_offset=12)], decorator_list=[], type_comment='() -> int', type_params=[], lineno=1, col_offset=0, end_lineno=2, end_col_offset=12)], type_ignores=[])
+compiled True
+case 15
+Module(body=[If(test=Constant(value=True, lineno=1, col_offset=3, end_lineno=1, end_col_offset=7), body=[Assign(targets=[Name(id='x', ctx=Store(), lineno=2, col_offset=4, end_lineno=2, end_col_offset=5)], value=Constant(value=1, lineno=2, col_offset=8, end_lineno=2, end_col_offset=9), type_comment='int', lineno=2, col_offset=4, end_lineno=2, end_col_offset=22)], orelse=[], lineno=1, col_offset=0, end_lineno=2, end_col_offset=22)], type_ignores=[TypeIgnore(lineno=3, tag='[tag]\n'), TypeIgnore(lineno=4, tag='[end]\n')])
+compiled True
+case 16
+Module(body=[], type_ignores=[TypeIgnore(lineno=1, tag='[only]\n'), TypeIgnore(lineno=2, tag='\n')])
+compiled True
+case 17
+Module(body=[FunctionDef(name='foo', args=arguments(posonlyargs=[], args=[arg(arg='a', lineno=2, col_offset=4, end_lineno=2, end_col_offset=5), arg(arg='b', type_comment='B', lineno=3, col_offset=4, end_lineno=3, end_col_offset=5)], kwonlyargs=[], kw_defaults=[], defaults=[]), body=[Pass(lineno=5, col_offset=4, end_lineno=5, end_col_offset=8)], decorator_list=[], type_params=[], lineno=1, col_offset=0, end_lineno=5, end_col_offset=8)], type_ignores=[TypeIgnore(lineno=2, tag='[arg]'), TypeIgnore(lineno=4, tag='[function]')])
+compiled True
+case 18
+Module(body=[FunctionDef(name='foo', args=arguments(posonlyargs=[], args=[arg(arg='a', type_comment='A', lineno=2, col_offset=4, end_lineno=2, end_col_offset=5)], kwonlyargs=[], kw_defaults=[], defaults=[Constant(value=1, lineno=2, col_offset=8, end_lineno=2, end_col_offset=9)]), body=[Pass(lineno=4, col_offset=4, end_lineno=4, end_col_offset=8)], decorator_list=[], type_params=[], lineno=1, col_offset=0, end_lineno=4, end_col_offset=8)], type_ignores=[])
+compiled True
+case 19
+Module(body=[FunctionDef(name='foo', args=arguments(posonlyargs=[], args=[arg(arg='a', type_comment='A', lineno=2, col_offset=4, end_lineno=2, end_col_offset=5)], kwonlyargs=[], kw_defaults=[], defaults=[Constant(value=1, lineno=2, col_offset=8, end_lineno=2, end_col_offset=9)]), body=[Pass(lineno=4, col_offset=4, end_lineno=4, end_col_offset=8)], decorator_list=[], type_params=[], lineno=1, col_offset=0, end_lineno=4, end_col_offset=8)], type_ignores=[])
+compiled True
+case 20
+Module(body=[FunctionDef(name='foo', args=arguments(posonlyargs=[arg(arg='a', type_comment='A', lineno=2, col_offset=4, end_lineno=2, end_col_offset=5)], args=[], kwonlyargs=[], kw_defaults=[], defaults=[Constant(value=1, lineno=2, col_offset=8, end_lineno=2, end_col_offset=9)]), body=[Pass(lineno=5, col_offset=4, end_lineno=5, end_col_offset=8)], decorator_list=[], type_params=[], lineno=1, col_offset=0, end_lineno=5, end_col_offset=8)], type_ignores=[])
+compiled True
+case 21
+Module(body=[FunctionDef(name='foo', args=arguments(posonlyargs=[], args=[arg(arg='a', type_comment='A', lineno=2, col_offset=4, end_lineno=2, end_col_offset=5), arg(arg='b', type_comment='B', lineno=3, col_offset=4, end_lineno=3, end_col_offset=5)], kwonlyargs=[], kw_defaults=[], defaults=[]), body=[Pass(lineno=5, col_offset=4, end_lineno=5, end_col_offset=8)], decorator_list=[], type_params=[], lineno=1, col_offset=0, end_lineno=5, end_col_offset=8)], type_ignores=[])
+compiled True
+case 22
+Module(body=[FunctionDef(name='foo', args=arguments(posonlyargs=[arg(arg='a', type_comment='A', lineno=2, col_offset=4, end_lineno=2, end_col_offset=5)], args=[arg(arg='b', type_comment='B', lineno=4, col_offset=4, end_lineno=4, end_col_offset=5)], kwonlyargs=[], kw_defaults=[], defaults=[]), body=[Pass(lineno=6, col_offset=4, end_lineno=6, end_col_offset=8)], decorator_list=[], type_params=[], lineno=1, col_offset=0, end_lineno=6, end_col_offset=8)], type_ignores=[])
+compiled True
+case 23
+Module(body=[FunctionDef(name='foo', args=arguments(posonlyargs=[], args=[arg(arg='a', type_comment='A', lineno=2, col_offset=4, end_lineno=2, end_col_offset=5), arg(arg='b', type_comment='B', lineno=3, col_offset=4, end_lineno=3, end_col_offset=5)], kwonlyargs=[], kw_defaults=[], defaults=[]), body=[Pass(lineno=5, col_offset=4, end_lineno=5, end_col_offset=8)], decorator_list=[], type_params=[], lineno=1, col_offset=0, end_lineno=5, end_col_offset=8)], type_ignores=[])
+compiled True
+case 24
+Module(body=[FunctionDef(name='foo', args=arguments(posonlyargs=[], args=[], vararg=arg(arg='v', type_comment='V', lineno=2, col_offset=5, end_lineno=2, end_col_offset=6), kwonlyargs=[], kw_defaults=[], defaults=[]), body=[Pass(lineno=4, col_offset=4, end_lineno=4, end_col_offset=8)], decorator_list=[], type_params=[], lineno=1, col_offset=0, end_lineno=4, end_col_offset=8)], type_ignores=[])
+compiled True
+case 25
+Module(body=[FunctionDef(name='foo', args=arguments(posonlyargs=[], args=[], vararg=arg(arg='v', type_comment='V', lineno=2, col_offset=5, end_lineno=2, end_col_offset=6), kwonlyargs=[], kw_defaults=[], defaults=[]), body=[Pass(lineno=4, col_offset=4, end_lineno=4, end_col_offset=8)], decorator_list=[], type_params=[], lineno=1, col_offset=0, end_lineno=4, end_col_offset=8)], type_ignores=[])
+compiled True
+case 26
+Module(body=[FunctionDef(name='foo', args=arguments(posonlyargs=[], args=[], kwonlyargs=[], kw_defaults=[], kwarg=arg(arg='k', type_comment='K', lineno=2, col_offset=6, end_lineno=2, end_col_offset=7), defaults=[]), body=[Pass(lineno=4, col_offset=4, end_lineno=4, end_col_offset=8)], decorator_list=[], type_params=[], lineno=1, col_offset=0, end_lineno=4, end_col_offset=8)], type_ignores=[])
+compiled True
+case 27
+Module(body=[FunctionDef(name='foo', args=arguments(posonlyargs=[], args=[], kwonlyargs=[], kw_defaults=[], kwarg=arg(arg='k', type_comment='K', lineno=2, col_offset=6, end_lineno=2, end_col_offset=7), defaults=[]), body=[Pass(lineno=4, col_offset=4, end_lineno=4, end_col_offset=8)], decorator_list=[], type_params=[], lineno=1, col_offset=0, end_lineno=4, end_col_offset=8)], type_ignores=[])
+compiled True
+case 28
+Module(body=[FunctionDef(name='foo', args=arguments(posonlyargs=[], args=[], vararg=arg(arg='v', type_comment='V', lineno=2, col_offset=5, end_lineno=2, end_col_offset=6), kwonlyargs=[], kw_defaults=[], kwarg=arg(arg='k', type_comment='K', lineno=3, col_offset=6, end_lineno=3, end_col_offset=7), defaults=[]), body=[Pass(lineno=5, col_offset=4, end_lineno=5, end_col_offset=8)], decorator_list=[], type_params=[], lineno=1, col_offset=0, end_lineno=5, end_col_offset=8)], type_ignores=[])
+compiled True
+case 29
+Module(body=[FunctionDef(name='foo', args=arguments(posonlyargs=[], args=[], vararg=arg(arg='v', type_comment='V', lineno=2, col_offset=5, end_lineno=2, end_col_offset=6), kwonlyargs=[], kw_defaults=[], kwarg=arg(arg='k', type_comment='K', lineno=3, col_offset=6, end_lineno=3, end_col_offset=7), defaults=[]), body=[Pass(lineno=5, col_offset=4, end_lineno=5, end_col_offset=8)], decorator_list=[], type_params=[], lineno=1, col_offset=0, end_lineno=5, end_col_offset=8)], type_ignores=[])
+compiled True
+case 30
+Module(body=[FunctionDef(name='foo', args=arguments(posonlyargs=[], args=[arg(arg='a', type_comment='A', lineno=2, col_offset=4, end_lineno=2, end_col_offset=5)], vararg=arg(arg='v', type_comment='V', lineno=3, col_offset=5, end_lineno=3, end_col_offset=6), kwonlyargs=[], kw_defaults=[], defaults=[]), body=[Pass(lineno=5, col_offset=4, end_lineno=5, end_col_offset=8)], decorator_list=[], type_params=[], lineno=1, col_offset=0, end_lineno=5, end_col_offset=8)], type_ignores=[])
+compiled True
+case 31
+Module(body=[FunctionDef(name='foo', args=arguments(posonlyargs=[arg(arg='a', type_comment='A', lineno=2, col_offset=4, end_lineno=2, end_col_offset=5)], args=[], vararg=arg(arg='v', type_comment='V', lineno=4, col_offset=5, end_lineno=4, end_col_offset=6), kwonlyargs=[], kw_defaults=[], defaults=[]), body=[Pass(lineno=6, col_offset=4, end_lineno=6, end_col_offset=8)], decorator_list=[], type_params=[], lineno=1, col_offset=0, end_lineno=6, end_col_offset=8)], type_ignores=[])
+compiled True
+case 32
+Module(body=[FunctionDef(name='foo', args=arguments(posonlyargs=[], args=[arg(arg='a', type_comment='A', lineno=2, col_offset=4, end_lineno=2, end_col_offset=5)], vararg=arg(arg='v', type_comment='V', lineno=3, col_offset=5, end_lineno=3, end_col_offset=6), kwonlyargs=[], kw_defaults=[], defaults=[]), body=[Pass(lineno=5, col_offset=4, end_lineno=5, end_col_offset=8)], decorator_list=[], type_params=[], lineno=1, col_offset=0, end_lineno=5, end_col_offset=8)], type_ignores=[])
+compiled True
+case 33
+Module(body=[FunctionDef(name='foo', args=arguments(posonlyargs=[], args=[arg(arg='a', type_comment='A', lineno=2, col_offset=4, end_lineno=2, end_col_offset=5)], kwonlyargs=[], kw_defaults=[], kwarg=arg(arg='k', type_comment='K', lineno=3, col_offset=6, end_lineno=3, end_col_offset=7), defaults=[]), body=[Pass(lineno=5, col_offset=4, end_lineno=5, end_col_offset=8)], decorator_list=[], type_params=[], lineno=1, col_offset=0, end_lineno=5, end_col_offset=8)], type_ignores=[])
+compiled True
+case 34
+Module(body=[FunctionDef(name='foo', args=arguments(posonlyargs=[arg(arg='a', type_comment='A', lineno=2, col_offset=4, end_lineno=2, end_col_offset=5)], args=[], kwonlyargs=[], kw_defaults=[], kwarg=arg(arg='k', type_comment='K', lineno=4, col_offset=6, end_lineno=4, end_col_offset=7), defaults=[]), body=[Pass(lineno=6, col_offset=4, end_lineno=6, end_col_offset=8)], decorator_list=[], type_params=[], lineno=1, col_offset=0, end_lineno=6, end_col_offset=8)], type_ignores=[])
+compiled True
+case 35
+Module(body=[FunctionDef(name='foo', args=arguments(posonlyargs=[], args=[arg(arg='a', type_comment='A', lineno=2, col_offset=4, end_lineno=2, end_col_offset=5)], kwonlyargs=[], kw_defaults=[], kwarg=arg(arg='k', type_comment='K', lineno=3, col_offset=6, end_lineno=3, end_col_offset=7), defaults=[]), body=[Pass(lineno=5, col_offset=4, end_lineno=5, end_col_offset=8)], decorator_list=[], type_params=[], lineno=1, col_offset=0, end_lineno=5, end_col_offset=8)], type_ignores=[])
+compiled True
+case 36
+Module(body=[FunctionDef(name='foo', args=arguments(posonlyargs=[], args=[arg(arg='a', type_comment='A', lineno=2, col_offset=4, end_lineno=2, end_col_offset=5)], vararg=arg(arg='v', type_comment='V', lineno=3, col_offset=5, end_lineno=3, end_col_offset=6), kwonlyargs=[], kw_defaults=[], kwarg=arg(arg='k', type_comment='K', lineno=4, col_offset=6, end_lineno=4, end_col_offset=7), defaults=[]), body=[Pass(lineno=6, col_offset=4, end_lineno=6, end_col_offset=8)], decorator_list=[], type_params=[], lineno=1, col_offset=0, end_lineno=6, end_col_offset=8)], type_ignores=[])
+compiled True
+case 37
+Module(body=[FunctionDef(name='foo', args=arguments(posonlyargs=[arg(arg='a', type_comment='A', lineno=2, col_offset=4, end_lineno=2, end_col_offset=5)], args=[], vararg=arg(arg='v', type_comment='V', lineno=4, col_offset=5, end_lineno=4, end_col_offset=6), kwonlyargs=[], kw_defaults=[], kwarg=arg(arg='k', type_comment='K', lineno=5, col_offset=6, end_lineno=5, end_col_offset=7), defaults=[]), body=[Pass(lineno=7, col_offset=4, end_lineno=7, end_col_offset=8)], decorator_list=[], type_params=[], lineno=1, col_offset=0, end_lineno=7, end_col_offset=8)], type_ignores=[])
+compiled True
+case 38
+Module(body=[FunctionDef(name='foo', args=arguments(posonlyargs=[], args=[arg(arg='a', type_comment='A', lineno=2, col_offset=4, end_lineno=2, end_col_offset=5)], vararg=arg(arg='v', type_comment='V', lineno=3, col_offset=5, end_lineno=3, end_col_offset=6), kwonlyargs=[], kw_defaults=[], kwarg=arg(arg='k', type_comment='K', lineno=4, col_offset=6, end_lineno=4, end_col_offset=7), defaults=[]), body=[Pass(lineno=6, col_offset=4, end_lineno=6, end_col_offset=8)], decorator_list=[], type_params=[], lineno=1, col_offset=0, end_lineno=6, end_col_offset=8)], type_ignores=[])
+compiled True
+invalid 0
+SyntaxError invalid syntax
+SyntaxError invalid syntax
+invalid 1
+SyntaxError invalid syntax
+SyntaxError invalid syntax
+invalid 2
+SyntaxError invalid syntax
+SyntaxError invalid syntax
+invalid 3
+SyntaxError invalid syntax
+SyntaxError invalid syntax
+invalid 4
+SyntaxError invalid syntax
+SyntaxError invalid syntax
+invalid 5
+SyntaxError invalid syntax
+SyntaxError invalid syntax
+invalid 6
+SyntaxError invalid syntax
+SyntaxError invalid syntax
+invalid 7
+SyntaxError invalid syntax
+SyntaxError invalid syntax
+invalid 8
+SyntaxError invalid syntax
+SyntaxError invalid syntax
+invalid 9
+SyntaxError invalid syntax
+SyntaxError invalid syntax
+invalid 10
+SyntaxError Cannot have two type comments on def
+SyntaxError Cannot have two type comments on def
+invalid 11
+SyntaxError Cannot have two type comments on def
+SyntaxError Cannot have two type comments on def
+invalid 12
+IndentationError expected an indented block after function definition on line 1
+IndentationError expected an indented block after function definition on line 1
+invalid 13
+SyntaxError bare * has associated type comment
+SyntaxError bare * has associated type comment
+invalid 14
+SyntaxError invalid syntax
+SyntaxError invalid syntax
+invalid 15
+SyntaxError invalid syntax
+SyntaxError invalid syntax
+invalid 16
+SyntaxError invalid syntax
+SyntaxError invalid syntax
+invalid 17
+SyntaxError invalid syntax
+SyntaxError invalid syntax
+executed 10
+executed 10
+single Interactive(body=[Assign(targets=[Name(id='x', ctx=Store(), lineno=1, col_offset=0, end_lineno=1, end_col_offset=1)], value=Constant(value=1, lineno=1, col_offset=4, end_lineno=1, end_col_offset=5), type_comment='int', lineno=1, col_offset=0, end_lineno=1, end_col_offset=18)])
+eval Expression(body=Constant(value=1))
+function type FunctionType(argtypes=[Name(id='int', ctx=Load()), Name(id='str', ctx=Load()), Name(id='Any', ctx=Load())], returns=Name(id='float', ctx=Load()))

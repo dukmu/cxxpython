@@ -2167,14 +2167,7 @@ void install_execution(Attachment &context, std::span<const Handle> core)
     auto at = [&](CoreObject id) { return core[static_cast<std::size_t>(id)]; };
     auto field = [&](CoreObject kind, std::u32string name, NativeGetter getter,
                      NativeSetter setter = nullptr) {
-        RootScope roots(context);
-        ReturnSlot out(context);
-        context.allocate_instance<GetSetDescriptorObject>(at(CoreObject::GetSetDescriptorType), out,
-                                                          at(kind).get(context), getter, setter);
-        auto descriptor = roots.root(out.value());
-        context.allocate_instance<StrObject>(at(CoreObject::StrType), out, std::move(name));
-        name_store(context, *TypeView(context, at(kind)).dictionary(), out.value(),
-                   descriptor.get(context));
+        install_native_field(context, core, at(kind), std::move(name), getter, setter);
     };
     field(CoreObject::CodeType, U"co_name", code_name);
     field(CoreObject::CodeType, U"co_qualname", code_qualname);

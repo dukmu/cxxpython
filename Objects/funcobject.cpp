@@ -126,9 +126,11 @@ void detail::install_function_descriptors(Attachment &context, std::span<const H
         install_native_field(context, core, owner, name, getter, setter);
     };
     field(U"__code__", fixed_field<&FunctionObject::code>);
-    field(U"__globals__", fixed_field<&FunctionObject::globals>);
-    field(U"__builtins__", fixed_field<&FunctionObject::builtins>);
-    field(U"__closure__", function_closure);
+    install_native_member(context, core, owner, U"__globals__",
+                          fixed_field<&FunctionObject::globals>);
+    install_native_member(context, core, owner, U"__builtins__",
+                          fixed_field<&FunctionObject::builtins>);
+    install_native_member(context, core, owner, U"__closure__", function_closure);
     field(U"__name__", get_field<&FunctionObject::name>, set_field<&FunctionObject::name>);
     field(U"__qualname__", get_field<&FunctionObject::qualname>,
           set_field<&FunctionObject::qualname>);

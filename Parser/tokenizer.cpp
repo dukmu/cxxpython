@@ -938,6 +938,8 @@ again:
                     if (blankline) {
                         tok_nextc(tok);
                         tok->atbol = 1;
+                        // pegen retains this consumed newline in a standalone ignore tag.
+                        p_end = tok->cur;
                     }
                     return MAKE_TYPE_COMMENT_TOKEN(TYPE_IGNORE, ignore_end_col_offset,
                                                    tok->col_offset);
@@ -1793,6 +1795,7 @@ struct TokenStream::Impl {
         state.tok_extra_tokens = extra;
         state.prompt = mode == InputMode::Interactive ? "" : nullptr;
         state.allow_incomplete = enabled(flags, ParseFlags::AllowIncompleteInput);
+        state.type_comments = enabled(flags, ParseFlags::TypeComments);
         state.no_implicit_newline =
             mode == InputMode::Single || mode == InputMode::Eval || mode == InputMode::FunctionType;
     }
@@ -1883,6 +1886,7 @@ std::optional<LexicalToken> TokenStream::next(const ReadLine &reader, const Poll
             result.token.text = decode_utf8(std::string_view(raw.start, raw.end - raw.start));
         }
         result.lineno = ISSTRINGLIT(kind) ? s.first_lineno : s.lineno;
+        result.token.lineno = static_cast<std::size_t>(result.lineno);
         result.end_lineno = s.lineno;
         const auto *line = ISSTRINGLIT(kind) ? s.multi_line_start : s.line_start;
         result.trailing = kind == ENDMARKER || (kind == DEDENT && s.done == E_EOF);

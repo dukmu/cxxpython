@@ -1,0 +1,4 @@
+Child(x=1, items=[3], label='child') Child(x=2, items=[], label='child') False
+[('x', True, True), ('items', True, True), ('label', True, True)]
+Defaults(x=[1]) [7] ['called']
+TypeError non-default argument 'y' follows default argument

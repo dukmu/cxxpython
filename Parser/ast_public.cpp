@@ -82,6 +82,15 @@ class Adapter {
                 return p;
         return nullptr;
     }
+    Field type_comment(const Node &node) const
+    {
+        if (auto function_comment = find(node, Rule::func_type_comment))
+            return type_comment(*function_comment);
+        for (auto part : children(node))
+            if (part->rule == Rule::Token && token(*part).kind == TokenKind::TYPE_COMMENT)
+                return token(*part).text;
+        return std::monostate{};
+    }
     std::u32string identifier(const Node &node) const
     {
         return syntax::normalize_identifier(token(node).text);
@@ -233,7 +242,7 @@ class Adapter {
             else if (auto a = find(*p, Rule::star_annotation))
                 annotation = expression(*rules(*a).at(0));
             auto arg = make(Kind::arg, span(*p), identifier(*name), std::move(annotation),
-                            std::monostate{});
+                            type_comment(n));
             NodePtr value;
             if (auto def = find(n, Rule::default_))
                 value = expression(*rules(*def).at(0));
@@ -1168,7 +1177,7 @@ class Adapter {
                                   span(n), definition_name(n, U"def"),
                                   arguments_node(find(n, Rule::params)), suite(*block), Nodes{},
                                   ret ? Field(expression(*ret)) : Field(std::monostate{}),
-                                  std::monostate{}, type_parameters(n)));
+                                  type_comment(n), type_parameters(n)));
             break;
         }
         case Rule::class_def_raw: {
@@ -1233,7 +1242,7 @@ class Adapter {
             result.push_back(make(has(n, U"async") ? Kind::AsyncFor : Kind::For, span(n),
                                   std::move(target), expression(*find(n, Rule::star_expressions)),
                                   suite(*find(n, Rule::block)), std::move(otherwise),
-                                  std::monostate{}));
+                                  type_comment(n)));
             break;
         }
         case Rule::with_stmt: {
@@ -1252,8 +1261,7 @@ class Adapter {
                                          std::move(binding)));
                 }
             result.push_back(make(has(n, U"async") ? Kind::AsyncWith : Kind::With, span(n),
-                                  std::move(items), suite(*find(n, Rule::block)),
-                                  std::monostate{}));
+                                  std::move(items), suite(*find(n, Rule::block)), type_comment(n)));
             break;
         }
         case Rule::try_stmt: {
@@ -1372,7 +1380,7 @@ class Adapter {
                 if (targets.empty())
                     unsupported(n);
                 result.push_back(make(Kind::Assign, span(n), std::move(targets),
-                                      expression(*r.back()), std::monostate{}));
+                                      expression(*r.back()), type_comment(n)));
             }
             break;
         }
@@ -1437,7 +1445,14 @@ class Adapter {
         auto body = suite(*tree_.root);
         if (mode == syntax::InputMode::Single || mode == syntax::InputMode::Interactive)
             return make(Kind::Interactive, span(*tree_.root), std::move(body));
-        return make(Kind::Module, span(*tree_.root), std::move(body), Nodes{});
+        Nodes ignores;
+        ignores.reserve(tree_.type_ignores.size());
+        for (const auto &item : tree_.type_ignores) {
+            Span where{item.span.begin, item.span.end};
+            ignores.push_back(make(Kind::TypeIgnore, where,
+                                   std::int64_t(source_.position(where).line), item.text));
+        }
+        return make(Kind::Module, span(*tree_.root), std::move(body), std::move(ignores));
     }
 };
 } // namespace
@@ -1450,6 +1465,8 @@ NodePtr parse(const SourceBuffer &source, syntax::InputMode mode, std::uint32_t 
             options = options | syntax::ParseFlags::AllowIncompleteInput;
         if (flags & compile_dont_imply_dedent)
             options = options | syntax::ParseFlags::DontImplyDedent;
+        if (flags & compile_type_comments)
+            options = options | syntax::ParseFlags::TypeComments;
         return Adapter(source, syntax::parse(source.text(), mode, options)).run(mode);
     } catch (const syntax::Error &error) {
         if (error.kind == syntax::ErrorKind::Incomplete)

@@ -61,6 +61,29 @@ TEST(Tokenizer, IdentifiersUseXidAndKeepRawLexeme)
                           "a = 1"),
                  Error);
 }
+TEST(Tokenizer, TypeCommentsAreExplicitAndIgnoreRecordsDoNotEnterPegLookahead)
+{
+    const auto source = "# type: ignore[attr]\nx = 1 # type: int\n";
+    auto ordinary = parse(source);
+    EXPECT_TRUE(ordinary.type_ignores.empty());
+    auto annotated = parse(source, InputMode::File, ParseFlags::TypeComments);
+    ASSERT_EQ(annotated.type_ignores.size(), 1u);
+    EXPECT_EQ(annotated.type_ignores[0].text, U"[attr]\n");
+    unsigned comments = 0;
+    for (const auto &token : annotated.tokens) {
+        EXPECT_NE(token.kind, TokenKind::TYPE_IGNORE);
+        if (token.kind == TokenKind::TYPE_COMMENT) {
+            ++comments;
+            EXPECT_EQ(token.text, U"int");
+        }
+    }
+    EXPECT_EQ(comments, 1u);
+    auto ignores =
+        parse("# type: ignore\n# type: ignore[tag]\n", InputMode::File, ParseFlags::TypeComments);
+    ASSERT_EQ(ignores.type_ignores.size(), 2u);
+    EXPECT_EQ(ignores.type_ignores[0].text, U"\n");
+    EXPECT_EQ(ignores.type_ignores[1].text, U"[tag]\n");
+}
 TEST(TokenizerStream, ReadsLazilyAndSharesLongUnicodeLines)
 {
     TokenStream stream(true);

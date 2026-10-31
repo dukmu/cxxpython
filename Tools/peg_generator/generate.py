@@ -31,9 +31,17 @@ def cpp_text(text):
         else f'\\u{ord(ch):04x}' for ch in text) + '"'
 
 
-def diagnostic(alt):
+def diagnostic(alt, rule):
     # Only unconditional, literal-only actions are safe without evaluating C AST actions.
     action = alt.action or ''
+    if rule == 'invalid_def_raw':
+        match = re.fullmatch(r'\s*RAISE_INDENTATION_ERROR\s*\(\s*("(?:[^"\\]|\\.)*")\s*,\s*(\w+)\s*->\s*lineno\s*\)\s*', action)
+        if match:
+            literal, name = match.groups()
+            message = ast.literal_eval(literal)
+            indexes = {item.name: index for index, item in enumerate(alt.items) if item.name}
+            if name in indexes and message.count('%d') == 1 and '%' not in message.replace('%d', ''):
+                return '_INDENTATION', message, [indexes[name]]
     match = re.fullmatch(r'RAISE_SYNTAX_ERROR(_KNOWN_LOCATION|_KNOWN_RANGE|_STARTING_FROM|_ON_NEXT_TOKEN)?\s*\(\s*(.*?)\s*\)', action)
     if not match:
         return None
@@ -117,7 +125,7 @@ class Generator:
         raise TypeError(type(item))
 
     def choice(self, rhs, name):
-        alternatives = [(index, alt, diagnostic(alt)) for index, alt in enumerate(rhs.alts)]
+        alternatives = [(index, alt, diagnostic(alt, name)) for index, alt in enumerate(rhs.alts)]
         if name.startswith('invalid_'):
             alternatives = [item for item in alternatives if item[2]]
         if not alternatives:
@@ -132,7 +140,10 @@ class Generator:
                 args = ', '.join(f'children[{i}]' for i in indexes)
                 args = (', ' + args) if args else ''
                 next_token = 'true' if kind == '_ON_NEXT_TOKEN' else 'false'
-                action = f'if (diagnostics_) diagnostic({cpp_text(message)}, {next_token}{args});'
+                if kind == '_INDENTATION':
+                    action = f'if (diagnostics_) indentation_diagnostic({cpp_text(message)}{args});'
+                else:
+                    action = f'if (diagnostics_) diagnostic({cpp_text(message)}, {next_token}{args});'
                 if name.startswith('invalid_'):
                     action += ' return {};'
                 else:
@@ -196,7 +207,10 @@ class Generator:
                   'try {',
                   'return run(false);',
                   '} catch (const Error &first) {',
-                  'if (first.kind != ErrorKind::Syntax || std::string_view(first.what()) != "invalid syntax") throw;',
+                  'const std::string_view message = first.what();',
+                  'if (!((first.kind == ErrorKind::Syntax && message == "invalid syntax") ||',
+                  '      (enabled(flags, ParseFlags::TypeComments) && first.kind == ErrorKind::Indentation &&',
+                  '       message == "expected an indented block"))) throw;',
                   'try {',
                   'run(true);',
                   '} catch (const LiteralDiagnostic &) { throw; }',

@@ -348,15 +348,19 @@ using NativeGetter = void (*)(Attachment &, Value, ReturnSlot &);
 using NativeSetter = void (*)(Attachment &, Value, std::optional<Value>, ReturnSlot &);
 struct GetSetDescriptorObject {
     ObjectHeader header;
-    const Value owner;
+    const Value owner, name;
+    AtomicGcEdge qualname;
     const NativeGetter getter;
     const NativeSetter setter;
-    GetSetDescriptorObject(InitialType head, Value owner_in, NativeGetter get, NativeSetter set)
-        : header(head), owner(owner_in), getter(get), setter(set)
+    GetSetDescriptorObject(InitialType head, Value owner_in, Value name_in, NativeGetter get,
+                           NativeSetter set)
+        : header(head), owner(owner_in), name(name_in), getter(get), setter(set)
     {}
     void trace(Tracer &tracer) const noexcept
     {
         tracer.visit(owner);
+        tracer.visit(name);
+        tracer.visit(qualname);
     }
 };
 struct MappingProxyObject {
@@ -396,14 +400,20 @@ struct ClassMethodObject {
 };
 struct MemberDescriptorObject {
     ObjectHeader header;
-    const Value owner;
-    const std::size_t index;
-    MemberDescriptorObject(InitialType head, Value type, std::size_t slot)
-        : header(head), owner(type), index(slot)
+    const Value owner, name;
+    AtomicGcEdge qualname;
+    const std::variant<std::size_t, NativeGetter> access;
+    MemberDescriptorObject(InitialType head, Value type, Value name_in, std::size_t slot)
+        : header(head), owner(type), name(name_in), access(slot)
+    {}
+    MemberDescriptorObject(InitialType head, Value type, Value name_in, NativeGetter getter)
+        : header(head), owner(type), name(name_in), access(getter)
     {}
     void trace(Tracer &tracer) const noexcept
     {
         tracer.visit(owner);
+        tracer.visit(name);
+        tracer.visit(qualname);
     }
 };
 struct CellObject {
@@ -512,6 +522,8 @@ void install_native_attribute(Attachment &context, std::span<const Handle> core,
                               NativeSlotKind kind = NativeSlotKind::Ordinary);
 void install_native_field(Attachment &context, std::span<const Handle> core, Handle owner,
                           std::u32string name, NativeGetter getter, NativeSetter setter = nullptr);
+void install_native_member(Attachment &context, std::span<const Handle> core, Handle owner,
+                           std::u32string name, NativeGetter getter);
 void install_iteration(Attachment &context, std::span<const Handle> core);
 void install_ranges(Attachment &context, std::span<const Handle> core);
 void install_iterator_builtins(Attachment &context, std::span<const Handle> core, Value mapping);

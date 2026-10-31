@@ -1,0 +1,6 @@
+{'inner': {'value': 3}, 'items': [{'value': 4}], 'cache': 9}
+((3,), [(4,)], 9)
+Outer(inner=Inner(value=5), items=[Inner(value=4)], cache=9)
+ValueError field cache is declared with init=False, it cannot be specified with replace()
+Point(x=1, y=2) ('x', 'y', '__weakref__') True False
+TypeError weakref_slot is True but slots is False

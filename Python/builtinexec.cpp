@@ -352,7 +352,8 @@ void compile_builtin(Attachment &context, Handle, std::span<const Value> args, R
         !integer_arg(context, args[6], feature, out))
         return;
     constexpr auto accepted_flags = supported_future_flags | compile_dont_imply_dedent |
-                                    compile_allow_incomplete_input | 0x400ULL | 0x2000ULL | 0x10ULL;
+                                    compile_allow_incomplete_input | compile_type_comments |
+                                    0x400ULL | 0x2000ULL | 0x10ULL;
     if (flags < 0 || (static_cast<std::uint64_t>(flags) & ~accepted_flags)) {
         raise_error(context, CoreObject::ValueErrorType, U"compile(): unrecognised flags", out);
         return;

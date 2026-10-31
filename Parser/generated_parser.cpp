@@ -8428,7 +8428,68 @@ return {};
 NodePtr rule_invalid_def_raw() {
 if (!diagnostics_) return {};
 return memo(Rule::invalid_def_raw, false, false, [&]() -> NodePtr {
-return NodePtr{};
+return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, optional([&] { return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(TokenKind::ASYNC))) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}(); })) &&
+append(children, expect(U"def")) &&
+append(children, expect(TokenKind::NAME)) &&
+append(children, optional([&] { return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, rule_type_params())) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}(); })) &&
+append(children, expect(U"(")) &&
+append(children, optional([&] { return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, rule_params())) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}(); })) &&
+append(children, expect(U")")) &&
+append(children, optional([&] { return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"->")) &&
+append(children, rule_expression())) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}(); })) &&
+append(children, expect(U":")) &&
+append(children, expect(TokenKind::NEWLINE)) &&
+append(children, lookahead(false, [&] { return expect(TokenKind::INDENT); }))) { if (diagnostics_) indentation_diagnostic(U"expected an indented block after function definition on line %d", children[1]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}();
 });
 }
 NodePtr rule_invalid_class_def_raw() {
@@ -8701,7 +8762,10 @@ return parser.finish(std::move(root), mode);
 try {
 return run(false);
 } catch (const Error &first) {
-if (first.kind != ErrorKind::Syntax || std::string_view(first.what()) != "invalid syntax") throw;
+const std::string_view message = first.what();
+if (!((first.kind == ErrorKind::Syntax && message == "invalid syntax") ||
+      (enabled(flags, ParseFlags::TypeComments) && first.kind == ErrorKind::Indentation &&
+       message == "expected an indented block"))) throw;
 try {
 run(true);
 } catch (const LiteralDiagnostic &) { throw; }

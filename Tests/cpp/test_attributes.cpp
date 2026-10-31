@@ -289,6 +289,7 @@ TEST_F(CoreAttributes, GetSetDescriptorUsesGenericBindingAndChecksItsOwner)
     ReturnSlot out(context);
     auto descriptor_type = roots.root(context.builtin(CoreObject::GetSetDescriptorType));
     context.allocate_instance<GetSetDescriptorObject>(descriptor_type, out, cls.get(context),
+                                                      text(U"field").get(context),
                                                       collected_identity, nullptr);
     auto descriptor = roots.root(out.result().value());
     set(cls, U"field", descriptor);
@@ -314,11 +315,18 @@ TEST_F(CoreAttributes, GetSetDescriptorTracesOwnerWithoutDependingOnSweepOrder)
         create_type(context, {"TemporaryOwner"}, out);
         auto cls = local.root(out.result().value());
         auto descriptor_type = local.root(context.builtin(CoreObject::GetSetDescriptorType));
+        ReturnSlot name(context);
+        make_str(context, U"temporary_field", name);
         context.allocate_instance<GetSetDescriptorObject>(descriptor_type, out, cls.get(context),
-                                                          identity, nullptr);
+                                                          name.value(), identity, nullptr);
     }
     context.collect();
     const auto owner = context.payload<GetSetDescriptorObject>(out.result().value()).owner;
+    EXPECT_EQ(
+        context
+            .payload<StrObject>(context.payload<GetSetDescriptorObject>(out.result().value()).name)
+            .value,
+        U"temporary_field");
     EXPECT_EQ(context.payload<StrObject>(std::get<Value>(TypeView(context, owner).name())).value,
               U"TemporaryOwner");
     out.reset();
@@ -339,10 +347,10 @@ TEST_F(CoreAttributes, GetterCanRemoveItsOwnDescriptorBeforeCollecting)
             (void)c.payload<GetSetDescriptorObject>(field);
             out.ok(receiver);
         };
+        auto key = text(U"field");
         context.allocate_instance<GetSetDescriptorObject>(
             roots.root(context.builtin(CoreObject::GetSetDescriptorType)), temporary,
-            cls.get(context), callback, nullptr);
-        auto key = text(U"field");
+            cls.get(context), key.get(context), callback, nullptr);
         detail::name_store(context, *TypeView(context, cls).dictionary(), key.get(context),
                            temporary.result().value());
     }

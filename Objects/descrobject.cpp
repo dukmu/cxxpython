@@ -212,6 +212,39 @@ GetSetDescriptorObject *descriptor(Attachment &context, Value value, ReturnSlot 
     }
     return &context.payload<GetSetDescriptorObject>(value);
 }
+template <class T> void descriptor_name(Attachment &context, Value value, ReturnSlot &out)
+{
+    out.ok(context.payload<T>(value).name);
+}
+template <class T> void descriptor_owner(Attachment &context, Value value, ReturnSlot &out)
+{
+    out.ok(context.payload<T>(value).owner);
+}
+template <class T> void descriptor_qualname(Attachment &context, Value value, ReturnSlot &out)
+{
+    RootScope roots(context);
+    auto self = roots.root(value);
+    auto &field = context.payload<T>(self);
+    context.load(self.get(context), field.qualname, out);
+    if (out.tag() == ResultTag::Ok)
+        return;
+    make_str(context, U"__qualname__", out);
+    get_attribute(context, roots.root(field.owner), roots.root(out.value()), out);
+    if (out.tag() == ResultTag::Raised)
+        return;
+    if (!context.has_layout<StrObject>(out.value()) ||
+        !is_subtype(context, context.type_of(out.value()), context.builtin(CoreObject::StrType))) {
+        raise_error(context, CoreObject::TypeErrorType,
+                    U"<descriptor>.__objclass__.__qualname__ is not a unicode object", out);
+        return;
+    }
+    auto result = context.payload<StrObject>(out.value()).value;
+    result += U".";
+    result += context.payload<StrObject>(field.name).value;
+    make_str(context, std::move(result), out);
+    if (!context.compare_exchange(self.get(context), field.qualname, {}, out.value()))
+        context.load(self.get(context), field.qualname, out);
+}
 bool compatible(Attachment &context, const GetSetDescriptorObject &field, Value receiver,
                 ReturnSlot &out)
 {
@@ -284,7 +317,12 @@ void member_change(Attachment &context, std::span<const Value> args, bool erase,
     auto *field = member(context, args[0], out);
     if (!field || !member_receiver(context, *field, args[1], out))
         return;
-    auto &slot = context.instance_slot(args[1], field->index);
+    const auto *index = std::get_if<std::size_t>(&field->access);
+    if (!index) {
+        raise_error(context, CoreObject::AttributeErrorType, U"readonly attribute", out);
+        return;
+    }
+    auto &slot = context.instance_slot(args[1], *index);
     if (erase) {
         context.exchange(args[1], slot, {}, out);
         if (out.tag() == ResultTag::Empty) {
@@ -575,11 +613,12 @@ void install_field(Attachment &context, Handle descriptor_type, Handle string_ty
 {
     RootScope roots(context);
     ReturnSlot out(context);
-    context.allocate_instance<GetSetDescriptorObject>(descriptor_type, out, owner.get(context),
-                                                      getter, setter);
-    auto field = roots.root(out.value());
     context.allocate_instance<StrObject>(string_type, out, std::move(name));
-    detail::name_store(context, *TypeView(context, owner).dictionary(), out.value(),
+    auto label = roots.root(out.value());
+    context.allocate_instance<GetSetDescriptorObject>(descriptor_type, out, owner.get(context),
+                                                      label.get(context), getter, setter);
+    auto field = roots.root(out.value());
+    detail::name_store(context, *TypeView(context, owner).dictionary(), label.get(context),
                        field.get(context));
 }
 } // namespace
@@ -590,6 +629,19 @@ void install_native_field(Attachment &context, std::span<const Handle> core, Han
     install_field(context, core[static_cast<std::size_t>(CoreObject::GetSetDescriptorType)],
                   core[static_cast<std::size_t>(CoreObject::StrType)], owner, std::move(name),
                   getter, setter);
+}
+void install_native_member(Attachment &context, std::span<const Handle> core, Handle owner,
+                           std::u32string name, NativeGetter getter)
+{
+    RootScope roots(context);
+    ReturnSlot out(context);
+    context.allocate_instance<StrObject>(core[static_cast<std::size_t>(CoreObject::StrType)], out,
+                                         std::move(name));
+    auto label = roots.root(out.value());
+    context.allocate_instance<MemberDescriptorObject>(
+        core[static_cast<std::size_t>(CoreObject::MemberDescriptorType)], out, owner.get(context),
+        label.get(context), getter);
+    name_store(context, *TypeView(context, owner).dictionary(), label.get(context), out.value());
 }
 void get_native_member(Attachment &context, Value value, std::optional<Value> receiver,
                        ReturnSlot &out)
@@ -606,9 +658,12 @@ void get_native_member(Attachment &context, Value value, std::optional<Value> re
     roots.root(*receiver);
     if (!member_receiver(context, *field, *receiver, out))
         return;
-    context.load(*receiver, context.instance_slot(*receiver, field->index), out);
-    if (out.tag() == ResultTag::Empty)
-        raise_error(context, CoreObject::AttributeErrorType, U"slot is unbound", out);
+    if (const auto *index = std::get_if<std::size_t>(&field->access)) {
+        context.load(*receiver, context.instance_slot(*receiver, *index), out);
+        if (out.tag() == ResultTag::Empty)
+            raise_error(context, CoreObject::AttributeErrorType, U"slot is unbound", out);
+    } else
+        std::get<NativeGetter>(field->access)(context, *receiver, out);
 }
 void install_slot_descriptors(Attachment &context, Handle type, std::size_t first)
 {
@@ -617,11 +672,12 @@ void install_slot_descriptors(Attachment &context, Handle type, std::size_t firs
     const auto &payload = context.payload<TypeObject>(type);
     ReturnSlot out(context);
     for (std::size_t i = first; i < payload.slot_names.size(); ++i) {
-        context.allocate_instance<MemberDescriptorObject>(descriptor_type, out, type.get(context),
-                                                          i);
-        auto field = roots.root(out.value());
         make_str(context, payload.slot_names[i], out);
-        name_store(context, *payload.dictionary, out.value(), field.get(context));
+        auto label = roots.root(out.value());
+        context.allocate_instance<MemberDescriptorObject>(descriptor_type, out, type.get(context),
+                                                          label.get(context), i);
+        auto field = roots.root(out.value());
+        name_store(context, *payload.dictionary, label.get(context), field.get(context));
     }
 }
 void get_native_field(Attachment &context, Value value, std::optional<Value> receiver,
@@ -722,6 +778,18 @@ void install_attribute_descriptors(Attachment &context, std::span<const Handle> 
     get.parameters.push_back({U"value", ParameterKind::PositionalOnly});
     install_native_attribute(context, core, property_type, U"__set__", get, property_set);
     auto string_type = at(CoreObject::StrType);
+    install_field(context, descriptor_type, string_type, descriptor_type, U"__name__",
+                  descriptor_name<GetSetDescriptorObject>, nullptr);
+    install_field(context, descriptor_type, string_type, descriptor_type, U"__objclass__",
+                  descriptor_owner<GetSetDescriptorObject>, nullptr);
+    install_field(context, descriptor_type, string_type, descriptor_type, U"__qualname__",
+                  descriptor_qualname<GetSetDescriptorObject>, nullptr);
+    install_field(context, descriptor_type, string_type, member_type, U"__name__",
+                  descriptor_name<MemberDescriptorObject>, nullptr);
+    install_field(context, descriptor_type, string_type, member_type, U"__objclass__",
+                  descriptor_owner<MemberDescriptorObject>, nullptr);
+    install_field(context, descriptor_type, string_type, member_type, U"__qualname__",
+                  descriptor_qualname<MemberDescriptorObject>, nullptr);
     install_field(context, descriptor_type, string_type, property_type, U"fget",
                   property_field<&PropertyObject::getter>, nullptr);
     install_field(context, descriptor_type, string_type, property_type, U"fset",

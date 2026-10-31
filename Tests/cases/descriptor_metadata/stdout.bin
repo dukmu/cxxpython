@@ -1,0 +1,36 @@
+__dict__ True Plain.__dict__
+True
+readonly name
+__weakref__ True Plain.__weakref__
+True
+readonly name
+value True Slotted.value
+True
+readonly name
+__code__ True function.__code__
+True
+readonly name
+__globals__ True function.__globals__
+True
+readonly name
+True
+True
+Plain.__dict__
+BeforeFirstRead.value
+BeforeFirstRead.value
+<descriptor>.__objclass__.__qualname__ is not a unicode object
+Valid.value
+Valid.value
+'missing' {}
+None {}
+42 {}
+'other' {}
+explicit {'__module__': 'explicit'}
+descriptor types True True
+__globals__ readonly attribute
+__globals__ readonly attribute
+__builtins__ readonly attribute
+__builtins__ readonly attribute
+__closure__ readonly attribute
+__closure__ readonly attribute
+shared qualname True

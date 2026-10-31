@@ -1,0 +1,6 @@
+nonfrozen TypeError cannot inherit non-frozen dataclass from a frozen one
+frozen TypeError cannot inherit frozen dataclass from a non-frozen one
+replace-initvar ValueError InitVar 'y' must be specified with replace()
+replace-initvar-value WithInit(x=4, z=7)
+field-conflict ValueError cannot specify both default and default_factory
+slot-inheritance ('y',) SlotChild(x=1, y=2)

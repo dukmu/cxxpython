@@ -42,6 +42,12 @@ only the subsequent managed Code freeze runs Active. `Lib/codeop.py` and
 `Lib/code.py` retain upstream completion and console policy, rather than adding
 another native interactive parser.
 
+The independent type-comment flag enables the same lexer's TYPE_COMMENT and
+TYPE_IGNORE events. PEG lookahead retains grammar comments and diverts ignore
+records into the owning Tree; the CST-to-ASDL adapter materializes all comment
+fields and Module.type_ignores. No source rescanner or second comment parser is
+used, and the flag does not become a future feature or Code trait.
+
 `Parser/source.cpp` owns the runtime's SourceBuffer decoding and diagnostics.
 `Grammar/Python.asdl` and the fixed upstream ASDL reader feed
 `Tools/asdl_generator/`, generating native node kinds, field families, hierarchy
@@ -116,8 +122,19 @@ readiness/bootstrap boundaries. Descriptor __set_name__ failures preserve the
 original exception and add the CPython 3.12 context note rather than wrapping it
 in RuntimeError; enum is not special-cased in class creation.
 `Objects/descrobject.cpp` and `Objects/call.cpp` implement descriptors, attribute
-lookup, argument binding and the shared call boundary. `Objects/abstract.cpp`
-dispatches typed object protocols. `Objects/longobject.cpp` provides int/bool
+lookup, argument binding and the shared call boundary.
+Getset/member descriptors retain immutable precise owner/name edges and an
+AtomicGcEdge for the first successfully computed __qualname__, matching
+CPython's lazy cache without serializing descriptor calls. Native field
+installation shares the same named descriptor path during bootstrap and later
+module setup. Dynamic type construction privately copies a supplied namespace
+when adding a missing __module__ from the active frame's globals; the caller's
+dictionary is not changed.
+Member access distinguishes a synchronized instance-slot index from a readonly
+native getter in the existing descriptor payload. Function globals/builtins/
+closure fields use the real member-descriptor type, so unchanged types.py derives
+the correct type aliases. `Objects/abstract.cpp` dispatches typed object protocols.
+`Objects/longobject.cpp` provides int/bool
 construction and arithmetic; `Objects/floatobject.cpp` owns the immutable native
 float payload, conversions, representation, arithmetic, comparison and hash. Numeric text
 conversion shares Unicode decimal/whitespace helpers in `Include/internal/long.hpp`.
@@ -460,6 +477,8 @@ without adding runtime closures. Unused local-annotation scopes have no emitted
 graph and do not get a Code object. BoolExpr keeps an explicit operand vector,
 and FormattedExpr preserves format-spec presence so canonical output does not
 lose grouping or empty format specifications.
+Eager starred vararg annotations use the existing exact-one sequence unpack
+operation; postponed annotations remain canonical strings in that same path.
 
 Type-alias lowering creates a lazy evaluator in an annotation scope. Generic
 functions, aliases and classes additionally use a distinct AnnotationRole

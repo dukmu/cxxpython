@@ -1,0 +1,5 @@
+Point(x=1, y=2) True True True True
+FrozenInstanceError cannot assign to field 'x'
+FrozenInstanceError cannot delete field 'y'
+TypeError
+ValueError eq must be true if order is true

@@ -48,6 +48,7 @@ class SourceError final : public std::invalid_argument {
 enum class InputMode { Exec, Eval, Single };
 inline constexpr std::uint32_t compile_dont_imply_dedent = 0x200;
 inline constexpr std::uint32_t compile_allow_incomplete_input = 0x4000;
+inline constexpr std::uint32_t compile_type_comments = 0x1000;
 enum class ScopeKind { Module, Function, Class, Annotation };
 enum class NameClass { Local, Namespace, GlobalExplicit, GlobalImplicit, Free, Cell };
 enum class AnnotationRole { None, TypeAlias, TypeVarBound, TypeVarConstraints, TypeParameters };

@@ -1,3 +1,4 @@
+#include "cxxpython/execution.hpp"
 #include "cxxpython/genericaliasobject.hpp"
 #include "cxxpython/memoryobject.hpp"
 #include "cxxpython/protocol.hpp"
@@ -560,6 +561,27 @@ void type_new(Attachment &context, Handle, std::span<const Value> args, ReturnSl
         return;
     }
     auto space = roots.root(args[3]);
+    if (!detail::name_lookup(context, space.get(context), U"__module__")) {
+        if (auto frame = context.current_frame()) {
+            auto current = roots.root(*frame);
+            auto globals = roots.root(
+                context.payload<FunctionObject>(context.payload<FrameObject>(current).function)
+                    .globals);
+            if (auto module = detail::name_lookup(context, globals.get(context), U"__name__")) {
+                auto module_name = roots.root(*module);
+                ReturnSlot copied(context), key(context);
+                context.allocate_instance<DictObject>(
+                    roots.root(context.builtin(CoreObject::DictType)), copied);
+                auto dictionary = roots.root(copied.value());
+                DictView source(context, space.get(context));
+                detail::copy_dictionary_entries(context, dictionary.get(context), source.entries());
+                make_str(context, U"__module__", key);
+                detail::name_store(context, dictionary.get(context), key.value(),
+                                   module_name.get(context));
+                space = dictionary;
+            }
+        }
+    }
     TypeSpec spec{name, bases, winner};
     spec.module.reset();
     spec.dictionary = space;

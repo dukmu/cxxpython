@@ -1,5 +1,69 @@
 # Development Status
 
+## 2026-10-31 Type Comments, Descriptor Identity And Upstream Dataclasses
+
+Prepended after fffb10c without changing earlier entries. This is a verified
+frontend/library slice within the active Plan 2 goal, not completion of all
+frontend, library, product or N4-N6/M0-M9 gates. Terra supplied comment-to-ASDL
+mapping, upstream dataclasses fixtures and bounded generated-parser diagnostics;
+parent implemented flag/token ownership, generic descriptor/type corrections,
+starred annotation compilation and final integration. Both workers are closed.
+
+- Enabled PyCF_TYPE_COMMENTS through the existing compiler and shared lexer.
+  Per-parse Tree owns TYPE_IGNORE records outside PEG lookahead; CST-to-ASDL
+  supplies assignment, for/async-for, with/async-with, function/async-function
+  and argument comments plus Module.type_ignores. Standalone ignore tags retain
+  the upstream newline. The flag is not inherited as a future feature or Code
+  trait, and ordinary parsing remains unchanged. No comment rescanner was added.
+- Extended the existing generator's diagnostic action translation only for the
+  observed function-indentation case. Token line metadata comes from lexical
+  state, not source rescanning. Duplicate/adjacent function comments now retain
+  their actual SyntaxError/IndentationError diagnostics. The direct fixture
+  covers 39 legal AST/position/source-versus-AST compilation samples, 18 illegal
+  diagnostics, default-disabled parsing and exec/single/eval/function-type modes.
+- Source/AST vararg annotations such as *args: *Ts now emit the existing exact-one
+  sequence unpack, following pinned compile.c. No new opcode or alternate
+  annotation evaluator was introduced. Direct tests cover evaluation once,
+  unpack errors, callbacks and postponed annotation strings.
+- Getset/member descriptors own immutable precise owner/name edges and share the
+  existing AtomicGcEdge mechanism for first-successful __qualname__ publication.
+  Failed or non-string owner lookups do not poison the cache; custom metaclass
+  callbacks, collection, name identity and concurrent reads have direct tests.
+  The existing member payload distinguishes a synchronized slot index from a
+  readonly native getter. Function globals/builtins/closure are genuine member
+  descriptors, so unchanged types.py derives the correct MemberDescriptorType.
+  This fixes inherited-slot field defaults without library/type-name special
+  cases. Execution metadata now uses the same named native-field installer.
+- Dynamic type construction fills a missing __module__ from actual frame globals,
+  including explicit None/non-string values, using a private namespace copy.
+  Missing globals do not fabricate __main__, and the caller's input dictionary
+  is unchanged. Correct descriptor metadata also closes unchanged inspect's
+  static dictionary lookup used by dataclass auto-documentation.
+- Added byte-for-byte pinned CPython 3.12.14 Lib/dataclasses.py under the retained
+  PSF license. Seven direct fixtures exercise real decorator/code generation,
+  fields/default factories, annotations and InitVar/ClassVar/KW_ONLY, frozen/
+  order/hash, conversions/replace/make_dataclass, inherited slots/weakrefs, errors,
+  collecting descriptor callbacks and parallel class construction. No C++
+  dataclasses replacement or Python-policy bypass was introduced.
+- Clang 21.1.8 Release and both sanitizer builds pass -Wall -Wextra -Wpedantic
+  -Werror. Release retains 135 unaffected passing native results plus the final
+  corrected tokenizer assertion, and 17 unaffected script results plus the final
+  descriptor fixture using supported _thread rather than missing threading.
+  All eight bootstrap allocation-failure shards pass. Each final strict
+  ASan/UBSan/LSan and TSan run passes all 136 selected native checks and all 18
+  selected scripts. Assertions, race/leak detection and script timeouts remain
+  enabled. Formatting, ASDL/244-rule generation and whitespace checks pass.
+  Raw failures, builds and passing evidence are retained in .cache/type-comments-*;
+  no unrelated baseline/performance campaign or new checksum system was added.
+- Remaining gates include historical grammar versions, full AST validation/
+  constructor/diagnostic matrices, non-positive AST source lines, full native
+  descriptor reflection and upstream library suites. Continue Base-to-Full
+  dependency closure, including threading/queue and unittest for broader actual
+  upstream tests, alongside the remaining language/product/performance roadmap.
+  No full milestone or absolute-performance completion is claimed. User test2.py
+  and temporary_plan.md deletion remain excluded; the previously denied remote
+  push was not retried.
+
 ## 2026-10-31 Unified ASDL Frontend, Unicode And Introspection
 
 Prepended after 507a73c, preserving earlier entries. This is substantial progress

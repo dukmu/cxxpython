@@ -287,7 +287,11 @@ class GraphPass final {
         const auto flags = function_defaults(node, span, prepared);
         std::vector<std::u32string> annotations;
         for (const auto &annotation : node.annotations) {
-            expression(*annotation.second);
+            if (const auto *star = std::get_if<StarredExpr>(&annotation.second->node)) {
+                expression(*star->value);
+                emit(Opcode::UnpackSequence, annotation.second->span, 1);
+            } else
+                expression(*annotation.second);
             annotations.push_back(annotation.first);
         }
         if (!annotations.empty()) {

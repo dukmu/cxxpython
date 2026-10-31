@@ -36,7 +36,7 @@ class ParserBase {
             ++mark_;
         if (ensure(mark_))
             error();
-        return {std::move(tokens_), std::move(root)};
+        return {std::move(tokens_), std::move(root), std::move(type_ignores_)};
     }
 
   protected:
@@ -57,6 +57,16 @@ class ParserBase {
         throw LiteralDiagnostic(span, std::move(text));
     }
     virtual bool reserved(std::u32string_view) const = 0;
+    [[noreturn]] void indentation_diagnostic(std::u32string_view message, NodePtr first) const
+    {
+        const auto line = tokens_.at(first->begin).lineno;
+        std::string text;
+        for (auto ch : message)
+            text.push_back(static_cast<char>(ch));
+        text.replace(text.find("%d"), 2, std::to_string(line));
+        throw LiteralDiagnostic(tokens_[std::min(mark_, tokens_.size() - 1)].span, std::move(text),
+                                ErrorKind::Indentation);
+    }
     [[noreturn]] void error() const
     {
         const auto at = std::min(farthest_, tokens_.size() - 1);
@@ -292,6 +302,10 @@ class ParserBase {
             if (!token)
                 ended_ = true;
             else {
+                if (token->kind == TokenKind::TYPE_IGNORE) {
+                    type_ignores_.push_back(std::move(*token));
+                    continue;
+                }
                 ended_ = token->kind == TokenKind::ENDMARKER;
                 tokens_.push_back(std::move(*token));
             }
@@ -314,6 +328,7 @@ class ParserBase {
         std::size_t end;
     };
     std::vector<Token> tokens_;
+    std::vector<Token> type_ignores_;
     const TokenStream &stream_;
     TokenReader reader_;
     std::unordered_map<Key, Memo, KeyHash> memo_;

@@ -148,8 +148,11 @@ the target is `builtins` and the `__builtins__` execution namespace.
   unparse and actual compile(AST) have direct source/reference tests. Managed
   conversion honors attribute callbacks, list synchronization, mutable AST class
   identity, native constants and explicit positions. No unparse-to-source compile
-  fallback or missing-module policy edits exist. Type comments, historical
-  feature_version grammars, complete AST constructor/validation/module-lifecycle
+  fallback or missing-module policy edits exist. The explicit PyCF_TYPE_COMMENTS
+  flag uses the shared lexer/PEG/CST pipeline for assignment, loop, with,
+  function/argument comments and Module.type_ignores; default parsing ignores
+  those comments. Historical feature_version grammars, complete AST constructor/
+  validation/module-lifecycle
   and upstream test matrices remain acceptance work. The current verified VM's
   positive-source-line requirement rejects non-positive AST lines with a tested
   ValueError; CPython accepts them. This explicit representation limit, like the
@@ -161,6 +164,16 @@ the target is `builtins` and the `__builtins__` execution namespace.
   annotations, documentation, wrapping and cached-source workflows. Complete
   native callable text signatures, code replacement, frame APIs and inspect's
   remaining matrices are not claimed.
+- `Lib/dataclasses.py` is unchanged CPython 3.12.14 source under the retained PSF
+  license, not a native replacement. Its decorator/code generation, fields,
+  inheritance, frozen/order/hash, InitVar/ClassVar/KW_ONLY, conversion, replace,
+  slots and weakrefs use ordinary runtime protocols. Getset/member descriptors
+  expose precise owner/name metadata and a shared first-successful __qualname__
+  cache. Function globals/builtins/closure are readonly member descriptors,
+  distinct from getsets; unchanged types.py therefore classifies inherited slots
+  correctly. type(name, bases, namespace) fills a missing __module__ from current
+  globals without mutating the input namespace. Full upstream dataclasses
+  tests and unsupported serialization dependencies remain acceptance work.
 - sys.float_info is a readonly native tuple record backed by actual float.h
   values, with all eleven fields, tuple protocols and sequence construction.
   Its metadata/repr helpers are shared with version_info, not a partial namespace

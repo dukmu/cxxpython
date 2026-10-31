@@ -1,0 +1,4 @@
+Item(name='a', scale=4, result=12) item 12
+['name', 'scale', 'result']
+('name', 'count')
+TypeError

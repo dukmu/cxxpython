@@ -255,6 +255,12 @@ handwritten parser and its dedicated parser tests have been removed; compiler,
 execution and precise-root tests remain on the new frontend. The native parser's
 generic syntax errors do not claim CPython's invalid_* second-pass wording.
 
+An explicit TypeComments parse flag enables comments in the same lexer.
+TYPE_IGNORE records are retained separately by the owning Tree, never inserted
+into PEG grammar lookahead. CST-to-ASDL mapping supplies type_comment fields and
+Module.type_ignores; default parsing remains unchanged. Parser-only flags do not
+become inherited future flags or Code traits.
+
 The pinned Python.asdl schema and upstream ASDL reader generate all native AST
 node/field/hierarchy metadata. Public Python nodes use ordinary traced instance
 dictionaries and attributes. Each owns its immutable canonical type table; the

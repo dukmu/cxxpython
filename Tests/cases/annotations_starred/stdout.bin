@@ -1,0 +1,7 @@
+{'args': <class 'int'>} (1, 2)
+{'args': <class 'int'>} (1, 2)
+ValueError
+ValueError
+TypeError
+{'args': '*Ts'}
+['iter'] {'args': <class 'str'>}
