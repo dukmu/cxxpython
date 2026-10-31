@@ -1111,7 +1111,7 @@ TEST(CompilerDiagnostics, ScopeAndControlFlowErrorsRemainCompileTimeErrors)
 }
 TEST(CompilerDiagnostics, RecognizedUnimplementedFeaturesAreExplicitCapabilities)
 {
-    for (auto source : {"class X[T]: pass", "try:\n    pass\nexcept* Exception:\n    pass"}) {
+    for (auto source : {"class X[T]: pass"}) {
         SCOPED_TRACE(source);
         try {
             SourceUnit unit{SourceBuffer(source)};

@@ -1,4 +1,5 @@
 #include "cxxpython/execution.hpp"
+#include "internal/exceptiongroup.hpp"
 
 #include <gtest/gtest.h>
 
@@ -521,6 +522,120 @@ TEST_F(CoreExecution, AsyncIterationReusesDelegationAndVerifiesBothBranchStacks)
     const auto program = code(valid);
     EXPECT_EQ(context.payload<CodeObject>(program).program.max_stack(), 2U);
     EXPECT_NE(disassemble(context, program).find("FOR_AWAIT"), std::string::npos);
+}
+
+TEST_F(CoreExecution, ExceptionGroupOpcodesUseVerifiedHandlerStacksAndReraiseArity)
+{
+    for (auto op : {Opcode::CheckEgMatch, Opcode::PrepReraiseStar}) {
+        const auto effect = instruction_effect({op, 0});
+        EXPECT_EQ(effect.inputs, 2U);
+        EXPECT_EQ(effect.pops, 2U);
+        EXPECT_EQ(effect.pushes, op == Opcode::CheckEgMatch ? 2U : 1U);
+        EXPECT_TRUE(opcode_definition(op).may_raise);
+        EXPECT_TRUE(opcode_definition(op).safepoint);
+        CodeBuilder outside(context);
+        outside.emit(op);
+        invalid(outside, CodeErrorKind::RegionStructure);
+    }
+    EXPECT_EQ(instruction_effect({Opcode::Reraise, 0}).inputs, 0U);
+    EXPECT_EQ(instruction_effect({Opcode::Reraise, 1}).inputs, 1U);
+    EXPECT_EQ(instruction_effect({Opcode::Reraise, 1}).pops, 1U);
+    CodeBuilder arity(context);
+    arity.emit(Opcode::Reraise, 2);
+    invalid(arity, CodeErrorKind::Operand);
+    CodeBuilder missing(context);
+    missing.emit(Opcode::Reraise, 1);
+    invalid(missing, CodeErrorKind::StackUnderflow);
+    CodeBuilder builder(context);
+    const auto region = builder.region(RegionKind::Except);
+    const auto value = builder.constant(builtin(CoreObject::None));
+    builder.enter(region);
+    builder.emit(Opcode::LoadConst, value);
+    builder.emit(Opcode::RaiseInstance);
+    builder.leave(region);
+    builder.handler(region);
+    builder.emit(Opcode::BuildList);
+    builder.emit(Opcode::Copy, 2);
+    builder.emit(Opcode::LoadConst, value);
+    builder.emit(Opcode::CheckEgMatch);
+    builder.emit(Opcode::PopTop);
+    builder.emit(Opcode::ListAppend);
+    builder.emit(Opcode::PrepReraiseStar);
+    builder.emit(Opcode::Reraise, 1);
+    builder.end_handler(region);
+    builder.emit(Opcode::LoadConst, value);
+    builder.emit(Opcode::Return);
+    const auto program = code(builder);
+    EXPECT_EQ(context.payload<CodeObject>(program).program.max_stack(), 4U);
+    const auto listing = disassemble(context, program);
+    EXPECT_NE(listing.find("CHECK_EG_MATCH"), listing.npos);
+    EXPECT_NE(listing.find("PREP_RERAISE_STAR"), listing.npos);
+}
+
+TEST_F(CoreExecution, GroupSplitAndProjectionKeepRootsAcrossEveryAllocationFailure)
+{
+    ReturnSlot out(context), match(context), rest(context), source(context);
+    call(context, builtin(CoreObject::ValueErrorType), {}, out);
+    auto left = roots.root(out.value());
+    call(context, builtin(CoreObject::TypeErrorType), {}, out);
+    auto right = roots.root(out.value());
+    const Value leaves[] = {left.get(context), right.get(context)};
+    cxxpython::core::make_tuple(context, leaves, source);
+    const Value arguments[] = {text(U"quota").get(context), source.value()};
+    call(context, builtin(CoreObject::BaseExceptionGroupType), {arguments}, out);
+    auto original = roots.root(out.value());
+    detail::exception_group_match(context, original, builtin(CoreObject::ValueErrorType), match,
+                                  rest);
+    ASSERT_EQ(match.tag(), ResultTag::Ok);
+    ASSERT_EQ(rest.tag(), ResultTag::Ok);
+    const Value parts[] = {match.value(), rest.value()};
+    make_list(context, parts, source);
+    auto results = roots.root(source.value());
+    for (bool projection : {false, true}) {
+        SCOPED_TRACE(projection);
+        bool succeeded = false;
+        for (std::size_t quota = 0; quota < 256; ++quota) {
+            SCOPED_TRACE(quota);
+            out.reset();
+            rest.reset();
+            context.set_allocation_limit(quota);
+            bool exhausted = false;
+            try {
+                if (projection)
+                    detail::prepare_reraise_star(context, original, results, out);
+                else
+                    detail::exception_group_match(context, original,
+                                                  builtin(CoreObject::ValueErrorType), out, rest);
+            } catch (const std::bad_alloc &) {
+                exhausted = true;
+            }
+            context.set_allocation_limit(std::numeric_limits<std::size_t>::max());
+            context.collect();
+            if (!exhausted && out.tag() == ResultTag::Ok) {
+                succeeded = true;
+                EXPECT_TRUE(context.has_layout<ExceptionObject>(out.value()));
+                break;
+            }
+            if (out.tag() == ResultTag::Raised) {
+                EXPECT_EQ(context.type_of(out.exception()),
+                          context.builtin(CoreObject::MemoryErrorType));
+            }
+            EXPECT_EQ(interpreter.gc_state().phase, GcPhase::Running);
+            EXPECT_TRUE(context.has_layout<ExceptionObject>(original.get(context)));
+        }
+        EXPECT_TRUE(succeeded);
+    }
+    detail::prepare_reraise_star(context, original, results, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    auto combined = roots.root(out.value());
+    context.load(
+        combined.get(context),
+        context.instance_slot(combined.get(context), detail::exception_group_exceptions_slot),
+        source);
+    const auto &values = context.payload<TupleObject>(source.value()).items;
+    ASSERT_EQ(values.size(), 2U);
+    EXPECT_EQ(values[0], left.get(context));
+    EXPECT_EQ(values[1], right.get(context));
 }
 
 TEST_F(CoreExecution, IterationAndUnpackOpcodesVerifyBothBranchStackEffects)

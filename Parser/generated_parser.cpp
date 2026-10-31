@@ -6141,7 +6141,7 @@ if (cut) return {};
 }
 {
 std::vector<NodePtr> children;
-if (append(children, expect(U"*"))) return make(Rule::starred_expression, 2, start, std::move(children));
+if (append(children, expect(U"*"))) { if (diagnostics_) diagnostic(U"Invalid star expression", false); return make(Rule::starred_expression, 2, start, std::move(children)); }
 mark_ = start;
 if (cut) return {};
 }
@@ -6826,10 +6826,187 @@ return {};
 });
 }
 NodePtr rule_invalid_arguments() {
+if (!diagnostics_) return {};
+return memo(Rule::invalid_arguments, false, false, [&]() -> NodePtr {
+return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, gather([&] { return expect(U","); }, [&] { return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, rule_starred_expression())) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, rule_assignment_expression())) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, rule_expression()) &&
+append(children, lookahead(false, [&] { return expect(U":="); }))) return make(Rule::Group, 1, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
 return {};
+}()) &&
+append(children, lookahead(false, [&] { return expect(U"="); }))) return make(Rule::Group, 1, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}(); })) &&
+append(children, expect(U",")) &&
+append(children, rule_kwargs())) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}())) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, rule_kwargs())) return make(Rule::Group, 1, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}()) &&
+append(children, expect(U",")) &&
+append(children, gather([&] { return expect(U","); }, [&] { return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, rule_starred_expression()) &&
+append(children, lookahead(false, [&] { return expect(U"="); }))) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}(); }))) { if (diagnostics_) diagnostic(U"iterable argument unpacking follows keyword argument unpacking", false, children[1]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(TokenKind::NAME)) &&
+append(children, expect(U"=")) &&
+append(children, rule_expression()) &&
+append(children, rule_for_if_clauses())) { if (diagnostics_) diagnostic(U"invalid syntax. Maybe you meant '==' or ':=' instead of '='?", false, children[0], children[1]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, optional([&] { return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, rule_args()) &&
+append(children, expect(U","))) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}(); })) &&
+append(children, expect(TokenKind::NAME)) &&
+append(children, expect(U"=")) &&
+append(children, lookahead(true, [&] { return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U","))) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U")"))) return make(Rule::Group, 1, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}(); }))) { if (diagnostics_) diagnostic(U"expected argument value expression", false, children[1], children[2]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}();
+});
 }
 NodePtr rule_invalid_kwarg() {
+if (!diagnostics_) return {};
+return memo(Rule::invalid_kwarg, false, false, [&]() -> NodePtr {
+return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(TokenKind::NAME)) &&
+append(children, expect(U"=")) &&
+append(children, rule_expression()) &&
+append(children, rule_for_if_clauses())) { if (diagnostics_) diagnostic(U"invalid syntax. Maybe you meant '==' or ':=' instead of '='?", false, children[0], children[1]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, lookahead(false, [&] { return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(TokenKind::NAME)) &&
+append(children, expect(U"="))) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
 return {};
+}(); })) &&
+append(children, rule_expression()) &&
+append(children, expect(U"="))) { if (diagnostics_) diagnostic(U"expression cannot contain assignment, perhaps you meant \"==\"?", false, children[1], children[2]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"**")) &&
+append(children, rule_expression()) &&
+append(children, expect(U"=")) &&
+append(children, rule_expression())) { if (diagnostics_) diagnostic(U"cannot assign to keyword argument unpacking", false, children[0], children[3]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}();
+});
 }
 NodePtr rule_expression_without_invalid() {
 return memo(Rule::expression_without_invalid, false, false, [&]() -> NodePtr {
@@ -6863,154 +7040,1670 @@ return {};
 });
 }
 NodePtr rule_invalid_legacy_expression() {
-return {};
+if (!diagnostics_) return {};
+return memo(Rule::invalid_legacy_expression, false, false, [&]() -> NodePtr {
+return NodePtr{};
+});
 }
 NodePtr rule_invalid_expression() {
+if (!diagnostics_) return {};
+return memo(Rule::invalid_expression, false, false, [&]() -> NodePtr {
+return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, rule_disjunction()) &&
+append(children, expect(U"if")) &&
+append(children, rule_disjunction()) &&
+append(children, lookahead(false, [&] { return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"else"))) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U":"))) return make(Rule::Group, 1, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
 return {};
+}(); }))) { if (diagnostics_) diagnostic(U"expected 'else' after 'if' expression", false, children[0], children[2]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"lambda")) &&
+append(children, optional([&] { return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, rule_lambda_params())) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}(); })) &&
+append(children, expect(U":")) &&
+append(children, lookahead(true, [&] { return expect(TokenKind::FSTRING_MIDDLE); }))) { if (diagnostics_) diagnostic(U"f-string: lambda expressions are not allowed without parentheses", false, children[0], children[2]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}();
+});
 }
 NodePtr rule_invalid_named_expression() {
+if (!diagnostics_) return {};
+return memo(Rule::invalid_named_expression, false, false, [&]() -> NodePtr {
+return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(TokenKind::NAME)) &&
+append(children, expect(U"=")) &&
+append(children, rule_bitwise_or()) &&
+append(children, lookahead(false, [&] { return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"="))) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U":="))) return make(Rule::Group, 1, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
 return {};
+}(); }))) { if (diagnostics_) diagnostic(U"invalid syntax. Maybe you meant '==' or ':=' instead of '='?", false, children[0], children[2]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}();
+});
 }
 NodePtr rule_invalid_assignment() {
+if (!diagnostics_) return {};
+return memo(Rule::invalid_assignment, false, false, [&]() -> NodePtr {
+return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, rule_star_named_expression()) &&
+append(children, expect(U",")) &&
+append(children, repeat([&] { return rule_star_named_expressions(); }, 0)) &&
+append(children, expect(U":")) &&
+append(children, rule_expression())) { if (diagnostics_) diagnostic(U"only single target (not tuple) can be annotated", false, children[0]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, rule_expression()) &&
+append(children, expect(U":")) &&
+append(children, rule_expression())) { if (diagnostics_) diagnostic(U"illegal target for annotation", false, children[0]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, repeat([&] { return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, rule_star_targets()) &&
+append(children, expect(U"="))) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
 return {};
+}(); }, 0)) &&
+append(children, rule_yield_expr()) &&
+append(children, expect(U"="))) { if (diagnostics_) diagnostic(U"assignment to yield expression not possible", false, children[1]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}();
+});
 }
 NodePtr rule_invalid_ann_assign_target() {
-return {};
+if (!diagnostics_) return {};
+return memo(Rule::invalid_ann_assign_target, false, false, [&]() -> NodePtr {
+return NodePtr{};
+});
 }
 NodePtr rule_invalid_del_stmt() {
-return {};
+if (!diagnostics_) return {};
+return memo(Rule::invalid_del_stmt, false, false, [&]() -> NodePtr {
+return NodePtr{};
+});
 }
 NodePtr rule_invalid_block() {
-return {};
+if (!diagnostics_) return {};
+return memo(Rule::invalid_block, false, false, [&]() -> NodePtr {
+return NodePtr{};
+});
 }
 NodePtr rule_invalid_comprehension() {
+if (!diagnostics_) return {};
+return memo(Rule::invalid_comprehension, false, false, [&]() -> NodePtr {
+return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"["))) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"("))) return make(Rule::Group, 1, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"{"))) return make(Rule::Group, 2, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
 return {};
+}()) &&
+append(children, rule_starred_expression()) &&
+append(children, rule_for_if_clauses())) { if (diagnostics_) diagnostic(U"iterable unpacking cannot be used in comprehension", false, children[1]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"["))) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"{"))) return make(Rule::Group, 1, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}()) &&
+append(children, rule_star_named_expression()) &&
+append(children, expect(U",")) &&
+append(children, rule_for_if_clauses())) { if (diagnostics_) diagnostic(U"did you forget parentheses around the comprehension target?", false, children[1], children[2]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}();
+});
 }
 NodePtr rule_invalid_dict_comprehension() {
+if (!diagnostics_) return {};
+return memo(Rule::invalid_dict_comprehension, false, false, [&]() -> NodePtr {
+return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"{")) &&
+append(children, expect(U"**")) &&
+append(children, rule_bitwise_or()) &&
+append(children, rule_for_if_clauses()) &&
+append(children, expect(U"}"))) { if (diagnostics_) diagnostic(U"dict unpacking cannot be used in dict comprehension", false, children[1]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
 return {};
+}();
+});
 }
 NodePtr rule_invalid_parameters() {
+if (!diagnostics_) return {};
+return memo(Rule::invalid_parameters, false, false, [&]() -> NodePtr {
+return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"/")) &&
+append(children, expect(U","))) { if (diagnostics_) diagnostic(U"at least one argument must precede /", false, children[0]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, rule_slash_no_default())) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, rule_slash_with_default())) return make(Rule::Group, 1, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
 return {};
+}()) &&
+append(children, repeat([&] { return rule_param_maybe_default(); }, 0)) &&
+append(children, expect(U"/"))) { if (diagnostics_) diagnostic(U"/ may appear only once", false, children[2]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, optional([&] { return rule_slash_no_default(); })) &&
+append(children, repeat([&] { return rule_param_no_default(); }, 0)) &&
+append(children, rule_invalid_parameters_helper()) &&
+append(children, rule_param_no_default())) { if (diagnostics_) diagnostic(U"parameter without a default follows parameter with a default", false, children[3]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, repeat([&] { return rule_param_no_default(); }, 0)) &&
+append(children, expect(U"(")) &&
+append(children, repeat([&] { return rule_param_no_default(); }, 1)) &&
+append(children, optional([&] { return expect(U","); })) &&
+append(children, expect(U")"))) { if (diagnostics_) diagnostic(U"Function parameters cannot be parenthesized", false, children[1], children[4]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, optional([&] { return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, rule_slash_no_default())) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, rule_slash_with_default())) return make(Rule::Group, 1, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}(); })) &&
+append(children, repeat([&] { return rule_param_maybe_default(); }, 0)) &&
+append(children, expect(U"*")) &&
+append(children, [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U","))) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, rule_param_no_default())) return make(Rule::Group, 1, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}()) &&
+append(children, repeat([&] { return rule_param_maybe_default(); }, 0)) &&
+append(children, expect(U"/"))) { if (diagnostics_) diagnostic(U"/ must be ahead of *", false, children[5]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, repeat([&] { return rule_param_maybe_default(); }, 1)) &&
+append(children, expect(U"/")) &&
+append(children, expect(U"*"))) { if (diagnostics_) diagnostic(U"expected comma between / and *", false, children[2]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}();
+});
 }
 NodePtr rule_invalid_default() {
+if (!diagnostics_) return {};
+return memo(Rule::invalid_default, false, false, [&]() -> NodePtr {
+return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"=")) &&
+append(children, lookahead(true, [&] { return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U")"))) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U","))) return make(Rule::Group, 1, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
 return {};
+}(); }))) { if (diagnostics_) diagnostic(U"expected default value expression", false, children[0]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}();
+});
 }
 NodePtr rule_invalid_star_etc() {
+if (!diagnostics_) return {};
+return memo(Rule::invalid_star_etc, false, false, [&]() -> NodePtr {
+return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"*")) &&
+append(children, [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U")"))) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U",")) &&
+append(children, [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U")"))) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"**"))) return make(Rule::Group, 1, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
 return {};
+}())) return make(Rule::Group, 1, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}())) { if (diagnostics_) diagnostic(U"named arguments must follow bare *", false, children[0]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"*")) &&
+append(children, expect(U",")) &&
+append(children, expect(TokenKind::TYPE_COMMENT))) { if (diagnostics_) diagnostic(U"bare * has associated type comment", false); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"*")) &&
+append(children, rule_param()) &&
+append(children, expect(U"="))) { if (diagnostics_) diagnostic(U"var-positional argument cannot have default value", false, children[2]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"*")) &&
+append(children, [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, rule_param_no_default())) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U","))) return make(Rule::Group, 1, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}()) &&
+append(children, repeat([&] { return rule_param_maybe_default(); }, 0)) &&
+append(children, expect(U"*")) &&
+append(children, [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, rule_param_no_default())) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U","))) return make(Rule::Group, 1, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}())) { if (diagnostics_) diagnostic(U"* argument may appear only once", false, children[3]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}();
+});
 }
 NodePtr rule_invalid_kwds() {
+if (!diagnostics_) return {};
+return memo(Rule::invalid_kwds, false, false, [&]() -> NodePtr {
+return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"**")) &&
+append(children, rule_param()) &&
+append(children, expect(U"="))) { if (diagnostics_) diagnostic(U"var-keyword argument cannot have default value", false, children[2]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"**")) &&
+append(children, rule_param()) &&
+append(children, expect(U",")) &&
+append(children, rule_param())) { if (diagnostics_) diagnostic(U"arguments cannot follow var-keyword argument", false, children[3]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"**")) &&
+append(children, rule_param()) &&
+append(children, expect(U",")) &&
+append(children, [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"*"))) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"**"))) return make(Rule::Group, 1, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"/"))) return make(Rule::Group, 2, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
 return {};
+}())) { if (diagnostics_) diagnostic(U"arguments cannot follow var-keyword argument", false, children[3]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}();
+});
 }
 NodePtr rule_invalid_parameters_helper() {
-return {};
+if (!diagnostics_) return {};
+return memo(Rule::invalid_parameters_helper, false, false, [&]() -> NodePtr {
+return NodePtr{};
+});
 }
 NodePtr rule_invalid_lambda_parameters() {
+if (!diagnostics_) return {};
+return memo(Rule::invalid_lambda_parameters, false, false, [&]() -> NodePtr {
+return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"/")) &&
+append(children, expect(U","))) { if (diagnostics_) diagnostic(U"at least one argument must precede /", false, children[0]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, rule_lambda_slash_no_default())) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, rule_lambda_slash_with_default())) return make(Rule::Group, 1, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
 return {};
+}()) &&
+append(children, repeat([&] { return rule_lambda_param_maybe_default(); }, 0)) &&
+append(children, expect(U"/"))) { if (diagnostics_) diagnostic(U"/ may appear only once", false, children[2]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, optional([&] { return rule_lambda_slash_no_default(); })) &&
+append(children, repeat([&] { return rule_lambda_param_no_default(); }, 0)) &&
+append(children, rule_invalid_lambda_parameters_helper()) &&
+append(children, rule_lambda_param_no_default())) { if (diagnostics_) diagnostic(U"parameter without a default follows parameter with a default", false, children[3]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, repeat([&] { return rule_lambda_param_no_default(); }, 0)) &&
+append(children, expect(U"(")) &&
+append(children, gather([&] { return expect(U","); }, [&] { return rule_lambda_param(); })) &&
+append(children, optional([&] { return expect(U","); })) &&
+append(children, expect(U")"))) { if (diagnostics_) diagnostic(U"Lambda expression parameters cannot be parenthesized", false, children[1], children[4]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, optional([&] { return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, rule_lambda_slash_no_default())) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, rule_lambda_slash_with_default())) return make(Rule::Group, 1, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}(); })) &&
+append(children, repeat([&] { return rule_lambda_param_maybe_default(); }, 0)) &&
+append(children, expect(U"*")) &&
+append(children, [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U","))) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, rule_lambda_param_no_default())) return make(Rule::Group, 1, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}()) &&
+append(children, repeat([&] { return rule_lambda_param_maybe_default(); }, 0)) &&
+append(children, expect(U"/"))) { if (diagnostics_) diagnostic(U"/ must be ahead of *", false, children[5]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, repeat([&] { return rule_lambda_param_maybe_default(); }, 1)) &&
+append(children, expect(U"/")) &&
+append(children, expect(U"*"))) { if (diagnostics_) diagnostic(U"expected comma between / and *", false, children[2]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}();
+});
 }
 NodePtr rule_invalid_lambda_parameters_helper() {
-return {};
+if (!diagnostics_) return {};
+return memo(Rule::invalid_lambda_parameters_helper, false, false, [&]() -> NodePtr {
+return NodePtr{};
+});
 }
 NodePtr rule_invalid_lambda_star_etc() {
+if (!diagnostics_) return {};
+return memo(Rule::invalid_lambda_star_etc, false, false, [&]() -> NodePtr {
+return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"*")) &&
+append(children, [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U":"))) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U",")) &&
+append(children, [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U":"))) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"**"))) return make(Rule::Group, 1, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
 return {};
+}())) return make(Rule::Group, 1, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}())) { if (diagnostics_) diagnostic(U"named arguments must follow bare *", false); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"*")) &&
+append(children, rule_lambda_param()) &&
+append(children, expect(U"="))) { if (diagnostics_) diagnostic(U"var-positional argument cannot have default value", false, children[2]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"*")) &&
+append(children, [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, rule_lambda_param_no_default())) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U","))) return make(Rule::Group, 1, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}()) &&
+append(children, repeat([&] { return rule_lambda_param_maybe_default(); }, 0)) &&
+append(children, expect(U"*")) &&
+append(children, [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, rule_lambda_param_no_default())) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U","))) return make(Rule::Group, 1, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}())) { if (diagnostics_) diagnostic(U"* argument may appear only once", false, children[3]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}();
+});
 }
 NodePtr rule_invalid_lambda_kwds() {
+if (!diagnostics_) return {};
+return memo(Rule::invalid_lambda_kwds, false, false, [&]() -> NodePtr {
+return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"**")) &&
+append(children, rule_lambda_param()) &&
+append(children, expect(U"="))) { if (diagnostics_) diagnostic(U"var-keyword argument cannot have default value", false, children[2]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"**")) &&
+append(children, rule_lambda_param()) &&
+append(children, expect(U",")) &&
+append(children, rule_lambda_param())) { if (diagnostics_) diagnostic(U"arguments cannot follow var-keyword argument", false, children[3]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"**")) &&
+append(children, rule_lambda_param()) &&
+append(children, expect(U",")) &&
+append(children, [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"*"))) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"**"))) return make(Rule::Group, 1, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"/"))) return make(Rule::Group, 2, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
 return {};
+}())) { if (diagnostics_) diagnostic(U"arguments cannot follow var-keyword argument", false, children[3]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}();
+});
 }
 NodePtr rule_invalid_double_type_comments() {
+if (!diagnostics_) return {};
+return memo(Rule::invalid_double_type_comments, false, false, [&]() -> NodePtr {
+return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(TokenKind::TYPE_COMMENT)) &&
+append(children, expect(TokenKind::NEWLINE)) &&
+append(children, expect(TokenKind::TYPE_COMMENT)) &&
+append(children, expect(TokenKind::NEWLINE)) &&
+append(children, expect(TokenKind::INDENT))) { if (diagnostics_) diagnostic(U"Cannot have two type comments on def", false); return {}; }
+mark_ = start;
+if (cut) return {};
+}
 return {};
+}();
+});
 }
 NodePtr rule_invalid_with_item() {
-return {};
+if (!diagnostics_) return {};
+return memo(Rule::invalid_with_item, false, false, [&]() -> NodePtr {
+return NodePtr{};
+});
 }
 NodePtr rule_invalid_for_target() {
-return {};
+if (!diagnostics_) return {};
+return memo(Rule::invalid_for_target, false, false, [&]() -> NodePtr {
+return NodePtr{};
+});
 }
 NodePtr rule_invalid_group() {
+if (!diagnostics_) return {};
+return memo(Rule::invalid_group, false, false, [&]() -> NodePtr {
+return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"(")) &&
+append(children, rule_starred_expression()) &&
+append(children, expect(U")"))) { if (diagnostics_) diagnostic(U"cannot use starred expression here", false, children[1]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"(")) &&
+append(children, expect(U"**")) &&
+append(children, rule_expression()) &&
+append(children, expect(U")"))) { if (diagnostics_) diagnostic(U"cannot use double starred expression here", false, children[1]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
 return {};
+}();
+});
 }
 NodePtr rule_invalid_import() {
+if (!diagnostics_) return {};
+return memo(Rule::invalid_import, false, false, [&]() -> NodePtr {
+return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"import")) &&
+append(children, gather([&] { return expect(U","); }, [&] { return rule_dotted_name(); })) &&
+append(children, expect(U"from")) &&
+append(children, rule_dotted_name())) { if (diagnostics_) diagnostic(U"Did you mean to use 'from ... import ...' instead?", false, children[0]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
 return {};
+}();
+});
 }
 NodePtr rule_invalid_import_from_targets() {
+if (!diagnostics_) return {};
+return memo(Rule::invalid_import_from_targets, false, false, [&]() -> NodePtr {
+return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, rule_import_from_as_names()) &&
+append(children, expect(U",")) &&
+append(children, expect(TokenKind::NEWLINE))) { if (diagnostics_) diagnostic(U"trailing comma not allowed without surrounding parentheses", false); return {}; }
+mark_ = start;
+if (cut) return {};
+}
 return {};
+}();
+});
 }
 NodePtr rule_invalid_with_stmt() {
+if (!diagnostics_) return {};
+return memo(Rule::invalid_with_stmt, false, false, [&]() -> NodePtr {
+return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, optional([&] { return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(TokenKind::ASYNC))) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
 return {};
+}(); })) &&
+append(children, expect(U"with")) &&
+append(children, gather([&] { return expect(U","); }, [&] { return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, rule_expression()) &&
+append(children, optional([&] { return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"as")) &&
+append(children, rule_star_target())) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}(); }))) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}(); })) &&
+append(children, expect(TokenKind::NEWLINE))) { if (diagnostics_) diagnostic(U"expected ':'", false); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, optional([&] { return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(TokenKind::ASYNC))) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}(); })) &&
+append(children, expect(U"with")) &&
+append(children, expect(U"(")) &&
+append(children, gather([&] { return expect(U","); }, [&] { return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, rule_expressions()) &&
+append(children, optional([&] { return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"as")) &&
+append(children, rule_star_target())) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}(); }))) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}(); })) &&
+append(children, optional([&] { return expect(U","); })) &&
+append(children, expect(U")")) &&
+append(children, expect(TokenKind::NEWLINE))) { if (diagnostics_) diagnostic(U"expected ':'", false); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}();
+});
 }
 NodePtr rule_invalid_with_stmt_indent() {
-return {};
+if (!diagnostics_) return {};
+return memo(Rule::invalid_with_stmt_indent, false, false, [&]() -> NodePtr {
+return NodePtr{};
+});
 }
 NodePtr rule_invalid_try_stmt() {
+if (!diagnostics_) return {};
+return memo(Rule::invalid_try_stmt, false, false, [&]() -> NodePtr {
+return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"try")) &&
+append(children, expect(U":")) &&
+append(children, rule_block()) &&
+append(children, lookahead(false, [&] { return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"except"))) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"finally"))) return make(Rule::Group, 1, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
 return {};
+}(); }))) { if (diagnostics_) diagnostic(U"expected 'except' or 'finally' block", false); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"try")) &&
+append(children, expect(U":")) &&
+append(children, repeat([&] { return rule_block(); }, 0)) &&
+append(children, repeat([&] { return rule_except_block(); }, 1)) &&
+append(children, expect(U"except")) &&
+append(children, expect(U"*")) &&
+append(children, rule_expression()) &&
+append(children, optional([&] { return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"as")) &&
+append(children, expect(TokenKind::NAME))) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}(); })) &&
+append(children, expect(U":"))) { if (diagnostics_) diagnostic(U"cannot have both 'except' and 'except*' on the same 'try'", false, children[4], children[5]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"try")) &&
+append(children, expect(U":")) &&
+append(children, repeat([&] { return rule_block(); }, 0)) &&
+append(children, repeat([&] { return rule_except_star_block(); }, 1)) &&
+append(children, expect(U"except")) &&
+append(children, optional([&] { return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, rule_expression()) &&
+append(children, optional([&] { return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"as")) &&
+append(children, expect(TokenKind::NAME))) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}(); }))) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}(); })) &&
+append(children, expect(U":"))) { if (diagnostics_) diagnostic(U"cannot have both 'except' and 'except*' on the same 'try'", false, children[4]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}();
+});
 }
 NodePtr rule_invalid_except_stmt() {
+if (!diagnostics_) return {};
+return memo(Rule::invalid_except_stmt, false, false, [&]() -> NodePtr {
+return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"except")) &&
+append(children, optional([&] { return expect(U"*"); })) &&
+append(children, rule_expression()) &&
+append(children, expect(U",")) &&
+append(children, rule_expressions()) &&
+append(children, optional([&] { return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"as")) &&
+append(children, expect(TokenKind::NAME))) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
 return {};
+}(); })) &&
+append(children, expect(U":"))) { if (diagnostics_) diagnostic(U"multiple exception types must be parenthesized", false, children[2]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"except")) &&
+append(children, optional([&] { return expect(U"*"); })) &&
+append(children, rule_expression()) &&
+append(children, optional([&] { return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"as")) &&
+append(children, expect(TokenKind::NAME))) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}(); })) &&
+append(children, expect(TokenKind::NEWLINE))) { if (diagnostics_) diagnostic(U"expected ':'", false); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"except")) &&
+append(children, expect(TokenKind::NEWLINE))) { if (diagnostics_) diagnostic(U"expected ':'", false); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"except")) &&
+append(children, expect(U"*")) &&
+append(children, [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(TokenKind::NEWLINE))) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U":"))) return make(Rule::Group, 1, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}())) { if (diagnostics_) diagnostic(U"expected one or more exception types", false); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}();
+});
 }
 NodePtr rule_invalid_finally_stmt() {
-return {};
+if (!diagnostics_) return {};
+return memo(Rule::invalid_finally_stmt, false, false, [&]() -> NodePtr {
+return NodePtr{};
+});
 }
 NodePtr rule_invalid_except_stmt_indent() {
-return {};
+if (!diagnostics_) return {};
+return memo(Rule::invalid_except_stmt_indent, false, false, [&]() -> NodePtr {
+return NodePtr{};
+});
 }
 NodePtr rule_invalid_except_star_stmt_indent() {
-return {};
+if (!diagnostics_) return {};
+return memo(Rule::invalid_except_star_stmt_indent, false, false, [&]() -> NodePtr {
+return NodePtr{};
+});
 }
 NodePtr rule_invalid_match_stmt() {
-return {};
+if (!diagnostics_) return {};
+return memo(Rule::invalid_match_stmt, false, false, [&]() -> NodePtr {
+return NodePtr{};
+});
 }
 NodePtr rule_invalid_case_block() {
+if (!diagnostics_) return {};
+return memo(Rule::invalid_case_block, false, false, [&]() -> NodePtr {
+return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"case")) &&
+append(children, rule_patterns()) &&
+append(children, optional([&] { return rule_guard(); })) &&
+append(children, expect(TokenKind::NEWLINE))) { if (diagnostics_) diagnostic(U"expected ':'", false); return {}; }
+mark_ = start;
+if (cut) return {};
+}
 return {};
+}();
+});
 }
 NodePtr rule_invalid_as_pattern() {
+if (!diagnostics_) return {};
+return memo(Rule::invalid_as_pattern, false, false, [&]() -> NodePtr {
+return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, rule_or_pattern()) &&
+append(children, expect(U"as")) &&
+append(children, expect(U"_"))) { if (diagnostics_) diagnostic(U"cannot use '_' as a target", false, children[2]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, rule_or_pattern()) &&
+append(children, expect(U"as")) &&
+append(children, lookahead(false, [&] { return expect(TokenKind::NAME); })) &&
+append(children, rule_expression())) { if (diagnostics_) diagnostic(U"invalid pattern target", false, children[3]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
 return {};
+}();
+});
 }
 NodePtr rule_invalid_class_pattern() {
-return {};
+if (!diagnostics_) return {};
+return memo(Rule::invalid_class_pattern, false, false, [&]() -> NodePtr {
+return NodePtr{};
+});
 }
 NodePtr rule_invalid_class_argument_pattern() {
-return {};
+if (!diagnostics_) return {};
+return memo(Rule::invalid_class_argument_pattern, false, false, [&]() -> NodePtr {
+return NodePtr{};
+});
 }
 NodePtr rule_invalid_if_stmt() {
+if (!diagnostics_) return {};
+return memo(Rule::invalid_if_stmt, false, false, [&]() -> NodePtr {
+return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"if")) &&
+append(children, rule_named_expression()) &&
+append(children, expect(TokenKind::NEWLINE))) { if (diagnostics_) diagnostic(U"expected ':'", false); return {}; }
+mark_ = start;
+if (cut) return {};
+}
 return {};
+}();
+});
 }
 NodePtr rule_invalid_elif_stmt() {
+if (!diagnostics_) return {};
+return memo(Rule::invalid_elif_stmt, false, false, [&]() -> NodePtr {
+return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"elif")) &&
+append(children, rule_named_expression()) &&
+append(children, expect(TokenKind::NEWLINE))) { if (diagnostics_) diagnostic(U"expected ':'", false); return {}; }
+mark_ = start;
+if (cut) return {};
+}
 return {};
+}();
+});
 }
 NodePtr rule_invalid_else_stmt() {
-return {};
+if (!diagnostics_) return {};
+return memo(Rule::invalid_else_stmt, false, false, [&]() -> NodePtr {
+return NodePtr{};
+});
 }
 NodePtr rule_invalid_while_stmt() {
+if (!diagnostics_) return {};
+return memo(Rule::invalid_while_stmt, false, false, [&]() -> NodePtr {
+return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"while")) &&
+append(children, rule_named_expression()) &&
+append(children, expect(TokenKind::NEWLINE))) { if (diagnostics_) diagnostic(U"expected ':'", false); return {}; }
+mark_ = start;
+if (cut) return {};
+}
 return {};
+}();
+});
 }
 NodePtr rule_invalid_for_stmt() {
+if (!diagnostics_) return {};
+return memo(Rule::invalid_for_stmt, false, false, [&]() -> NodePtr {
+return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, optional([&] { return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(TokenKind::ASYNC))) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
 return {};
+}(); })) &&
+append(children, expect(U"for")) &&
+append(children, rule_star_targets()) &&
+append(children, expect(U"in")) &&
+append(children, rule_star_expressions()) &&
+append(children, expect(TokenKind::NEWLINE))) { if (diagnostics_) diagnostic(U"expected ':'", false); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}();
+});
 }
 NodePtr rule_invalid_def_raw() {
-return {};
+if (!diagnostics_) return {};
+return memo(Rule::invalid_def_raw, false, false, [&]() -> NodePtr {
+return NodePtr{};
+});
 }
 NodePtr rule_invalid_class_def_raw() {
+if (!diagnostics_) return {};
+return memo(Rule::invalid_class_def_raw, false, false, [&]() -> NodePtr {
+return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"class")) &&
+append(children, expect(TokenKind::NAME)) &&
+append(children, optional([&] { return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, rule_type_params())) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
 return {};
+}(); })) &&
+append(children, optional([&] { return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"(")) &&
+append(children, optional([&] { return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, rule_arguments())) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}(); })) &&
+append(children, expect(U")"))) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}(); })) &&
+append(children, expect(TokenKind::NEWLINE))) { if (diagnostics_) diagnostic(U"expected ':'", false); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}();
+});
 }
 NodePtr rule_invalid_double_starred_kvpairs() {
+if (!diagnostics_) return {};
+return memo(Rule::invalid_double_starred_kvpairs, false, false, [&]() -> NodePtr {
+return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, rule_expression()) &&
+append(children, expect(U":")) &&
+append(children, expect(U"*")) &&
+append(children, rule_bitwise_or())) { if (diagnostics_) diagnostic(U"cannot use a starred expression in a dictionary value", false, children[2]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, rule_expression()) &&
+append(children, expect(U":")) &&
+append(children, lookahead(true, [&] { return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"}"))) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U","))) return make(Rule::Group, 1, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
 return {};
+}(); }))) { if (diagnostics_) diagnostic(U"expression expected after dictionary key and ':'", false, children[1]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}();
+});
 }
 NodePtr rule_invalid_kvpair() {
+if (!diagnostics_) return {};
+return memo(Rule::invalid_kvpair, false, false, [&]() -> NodePtr {
+return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, rule_expression()) &&
+append(children, expect(U":")) &&
+append(children, expect(U"*")) &&
+append(children, rule_bitwise_or())) { if (diagnostics_) diagnostic(U"cannot use a starred expression in a dictionary value", false, children[2]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, rule_expression()) &&
+append(children, expect(U":")) &&
+append(children, lookahead(true, [&] { return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"}"))) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U","))) return make(Rule::Group, 1, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
 return {};
+}(); }))) { if (diagnostics_) diagnostic(U"expression expected after dictionary key and ':'", false, children[1]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}();
+});
 }
 NodePtr rule_invalid_starred_expression() {
+if (!diagnostics_) return {};
+return memo(Rule::invalid_starred_expression, false, false, [&]() -> NodePtr {
+return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"*")) &&
+append(children, rule_expression()) &&
+append(children, expect(U"=")) &&
+append(children, rule_expression())) { if (diagnostics_) diagnostic(U"cannot assign to iterable argument unpacking", false, children[0], children[3]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
 return {};
+}();
+});
 }
 NodePtr rule_invalid_replacement_field() {
+if (!diagnostics_) return {};
+return memo(Rule::invalid_replacement_field, false, false, [&]() -> NodePtr {
+return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"{")) &&
+append(children, expect(U"="))) { if (diagnostics_) diagnostic(U"f-string: valid expression required before '='", false, children[1]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"{")) &&
+append(children, expect(U"!"))) { if (diagnostics_) diagnostic(U"f-string: valid expression required before '!'", false, children[1]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"{")) &&
+append(children, expect(U":"))) { if (diagnostics_) diagnostic(U"f-string: valid expression required before ':'", false, children[1]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"{")) &&
+append(children, expect(U"}"))) { if (diagnostics_) diagnostic(U"f-string: valid expression required before '}'", false, children[1]); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"{")) &&
+append(children, lookahead(false, [&] { return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, rule_yield_expr())) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, rule_star_expressions())) return make(Rule::Group, 1, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
 return {};
+}(); }))) { if (diagnostics_) diagnostic(U"f-string: expecting a valid expression after '{'", true); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}();
+});
 }
 NodePtr rule_invalid_conversion_character() {
+if (!diagnostics_) return {};
+return memo(Rule::invalid_conversion_character, false, false, [&]() -> NodePtr {
+return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"!")) &&
+append(children, lookahead(true, [&] { return [&]() -> NodePtr {
+const auto start = mark_;
+bool cut = false;
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U":"))) return make(Rule::Group, 0, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"}"))) return make(Rule::Group, 1, start, std::move(children));
+mark_ = start;
+if (cut) return {};
+}
 return {};
+}(); }))) { if (diagnostics_) diagnostic(U"f-string: missing conversion character", true); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+{
+std::vector<NodePtr> children;
+if (append(children, expect(U"!")) &&
+append(children, lookahead(false, [&] { return expect(TokenKind::NAME); }))) { if (diagnostics_) diagnostic(U"f-string: invalid conversion character", true); return {}; }
+mark_ = start;
+if (cut) return {};
+}
+return {};
+}();
+});
 }
 };
 } // namespace
 Tree parse(std::string_view source, InputMode mode, bool allow_incomplete) {
+try {
 GeneratedParser parser(tokenize(source, mode, allow_incomplete), allow_incomplete);
 auto root = parser.start(mode);
 return parser.finish(std::move(root));
+} catch (const Error &first) {
+if (first.kind != ErrorKind::Syntax || std::string_view(first.what()) != "invalid syntax") throw;
+try {
+GeneratedParser parser(tokenize(source, mode, allow_incomplete), allow_incomplete, true);
+auto root = parser.start(mode);
+parser.finish(std::move(root));
+} catch (const LiteralDiagnostic &) { throw; }
+catch (const Error &) {}
+throw;
+}
 }
 } // namespace cxxpython::syntax

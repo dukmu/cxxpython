@@ -9,6 +9,7 @@ import argparse
 import ast
 import hashlib
 import io
+import re
 from pathlib import Path
 import tokenize
 
@@ -28,6 +29,31 @@ def cpp_text(text):
     return 'U"' + ''.join(
         '\\' + ch if ch in '\\"' else ch if 32 <= ord(ch) < 127
         else f'\\u{ord(ch):04x}' for ch in text) + '"'
+
+
+def diagnostic(alt):
+    # Only unconditional, literal-only actions are safe without evaluating C AST actions.
+    action = alt.action or ''
+    match = re.fullmatch(r'RAISE_SYNTAX_ERROR(_KNOWN_LOCATION|_KNOWN_RANGE|_STARTING_FROM|_ON_NEXT_TOKEN)?\s*\(\s*(.*?)\s*\)', action)
+    if not match:
+        return None
+    kind, args = match.groups()
+    parts = re.fullmatch(r'(?:(\w+)\s*,\s*)?(?:(\w+)\s*,\s*)?("(?:[^"\\]|\\.)*")', args)
+    if not parts:
+        return None
+    first, last, literal = parts.groups()
+    message = ast.literal_eval(literal)
+    if '%' in message:
+        return None
+    count = {None: 0, '_ON_NEXT_TOKEN': 0, '_KNOWN_LOCATION': 1,
+             '_STARTING_FROM': 1, '_KNOWN_RANGE': 2}[kind]
+    names = [name for name in (first, last) if name]
+    if len(names) != count:
+        return None
+    indexes = {item.name: index for index, item in enumerate(alt.items) if item.name}
+    if any(name not in indexes for name in names):
+        return None
+    return kind, message, [indexes[name] for name in names]
 
 
 class Generator:
@@ -91,12 +117,30 @@ class Generator:
         raise TypeError(type(item))
 
     def choice(self, rhs, name):
+        alternatives = [(index, alt, diagnostic(alt)) for index, alt in enumerate(rhs.alts)]
+        if name.startswith('invalid_'):
+            alternatives = [item for item in alternatives if item[2]]
+        if not alternatives:
+            return 'NodePtr{}'
         lines = ['[&]() -> NodePtr {', 'const auto start = mark_;', 'bool cut = false;']
-        for index, alt in enumerate(rhs.alts):
+        for index, alt, diag in alternatives:
             lines += ['{', 'std::vector<NodePtr> children;']
             condition = ' &&\n'.join(f'append(children, {self.expression(child.item)})'
                                       for child in alt.items) or 'true'
-            lines += [f'if ({condition}) return make(Rule::{rule_id(name)}, {index}, start, std::move(children));',
+            if diag:
+                kind, message, indexes = diag
+                args = ', '.join(f'children[{i}]' for i in indexes)
+                args = (', ' + args) if args else ''
+                next_token = 'true' if kind == '_ON_NEXT_TOKEN' else 'false'
+                action = f'if (diagnostics_) diagnostic({cpp_text(message)}, {next_token}{args});'
+                if name.startswith('invalid_'):
+                    action += ' return {};'
+                else:
+                    action += f' return make(Rule::{rule_id(name)}, {index}, start, std::move(children));'
+                result = '{ ' + action + ' }'
+            else:
+                result = f'return make(Rule::{rule_id(name)}, {index}, start, std::move(children));'
+            lines += [f'if ({condition}) {result}',
                       'mark_ = start;', 'if (cut) return {};', '}']
         lines += ['return {};', '}()']
         return '\n'.join(lines)
@@ -135,19 +179,26 @@ class Generator:
         for name, rule in self.grammar.rules.items():
             lines += [f'NodePtr rule_{name}() {{']
             if name.startswith('invalid_'):
-                # The invalid_* pass only supplies CPython-specific diagnostics.
-                # It must never turn an invalid construct into an accepted CST.
-                lines += ['return {};']
-            else:
-                left, leader = str(rule.left_recursive).lower(), str(rule.leader).lower()
-                lines += [f'return memo(Rule::{rule_id(name)}, {left}, {leader}, [&]() -> NodePtr {{',
-                          f'return {self.choice(rule.rhs, name)};', '});']
+                lines += ['if (!diagnostics_) return {};']
+            left, leader = str(rule.left_recursive).lower(), str(rule.leader).lower()
+            lines += [f'return memo(Rule::{rule_id(name)}, {left}, {leader}, [&]() -> NodePtr {{',
+                      f'return {self.choice(rule.rhs, name)};', '});']
             lines += ['}']
         lines += ['};', '} // namespace',
                   'Tree parse(std::string_view source, InputMode mode, bool allow_incomplete) {',
+                  'try {',
                   'GeneratedParser parser(tokenize(source, mode, allow_incomplete), allow_incomplete);',
                   'auto root = parser.start(mode);',
-                  'return parser.finish(std::move(root));', '}',
+                  'return parser.finish(std::move(root));',
+                  '} catch (const Error &first) {',
+                  'if (first.kind != ErrorKind::Syntax || std::string_view(first.what()) != "invalid syntax") throw;',
+                  'try {',
+                  'GeneratedParser parser(tokenize(source, mode, allow_incomplete), allow_incomplete, true);',
+                  'auto root = parser.start(mode);',
+                  'parser.finish(std::move(root));',
+                  '} catch (const LiteralDiagnostic &) { throw; }',
+                  'catch (const Error &) {}',
+                  'throw;', '}', '}',
                   '} // namespace cxxpython::syntax', '']
         return '\n'.join(lines)
 

@@ -1,0 +1,14 @@
+('yield', ('ExceptionGroup', 'g', [('ValueError', 'v')]), True)
+resumed True
+later ('ExceptionGroup', 'g', [('TypeError', 't')])
+caller exception None
+close ('yield', ('ExceptionGroup', 'g', [('ValueError', 'v')]), True)
+later ('ExceptionGroup', 'g', [('TypeError', 't')])
+throw ('yield', ('ExceptionGroup', 'g', [('ValueError', 'v')]), True)
+later ('ExceptionGroup', 'g', [('TypeError', 't')])
+throw result ('RuntimeError', 'injected')
+await before True
+await yielded pause
+await after ready True
+await finished
+shared [(('ExceptionGroup', 'shared', [('ValueError', 'v')]), True), (('ExceptionGroup', 'shared', [('ValueError', 'v')]), True)] ('ExceptionGroup', 'shared', [('ValueError', 'v'), ('TypeError', 't')])

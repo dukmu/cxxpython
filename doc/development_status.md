@@ -1,5 +1,78 @@
 # Development Status
 
+## 2026-10-31 Executable Except-Star And Grammar-Derived Diagnostics
+
+Prepended after 6a30783 without rewriting previous evidence. Parent work completed
+the compiler/VM and integration; terra supplied fixed-reference script cases,
+group helper groundwork and the generator's literal-diagnostic pass. All workers
+were closed before final acceptance. No sol/astra, host-Python guest execution,
+new Python storage type, Frame continuation state, unwind engine or execution
+mutex was introduced. The complete frontend/import/library/product goal remains
+active, not complete on this language slice.
+
+- except* now lowers through the generated CST adapter and existing scope/CFG/
+  Except/Finally machinery. The ordinary traced operand stack owns original,
+  raised-result list and remainder. Nested ordinary Except regions capture body
+  failures after alias-finally cleanup, so later handlers still run. Matching
+  uses None identity, not user-defined group truth. Nested loops/functions retain
+  their control flow; escaping return/break/continue are compile-time errors.
+  else/finally, alias deletion, handled-exception restoration, generator/coroutine
+  suspension, close/throw and cross-OS-thread continuation use existing paths.
+- CHECK_EG_MATCH has 2->2 rest/match effects and publishes handled state;
+  PREP_RERAISE_STAR has 2->1 exception-or-None effects. Both are rooted, raising,
+  safepoint-bearing operations restricted to verified Except handlers. RERAISE
+  now explicitly accepts arity 0/1, retaining active or stack-provided exceptions
+  without a synthetic traceback/context link. IR tests cover arity, underflow,
+  handler boundaries, protected-stack effects and disassembly; opcode/dis expose
+  actual instructions/effects, not a CPython-bytecode facade.
+- Native group matching validates classes even for an empty remainder, honors
+  overridden split methods and accepts the reference's extra tuple entries.
+  derive handles subgroup creation/projection; duplicate leaf identities and new
+  failures retain reference ordering. Malformed callback values get Python errors,
+  not invalid handled state/host faults. Metadata classification compares actual
+  traceback/cause/context identity: the fixed reference's unused C notes field
+  must not be confused with its independent __notes__ dictionary attribute.
+  Naked wrapping now owns a current-handler traceback and preserves the original
+  tuple source in args; a differential first caught the list/tuple mismatch.
+- The standalone generator now extracts safe unconditional literal diagnostics
+  from fixed CPython grammar actions, including named-node ranges. Generic syntax
+  failure alone enables a fresh diagnostic pass; valid input does not copy tokens
+  or execute it. Unsupported invalid actions cannot create accepted CSTs; missing
+  diagnostics preserve the first failure/location. Both except/except* mixing
+  directions, missing handlers, typeless except* and legal nesting have native
+  grammar tests. Dynamic formatting/conditional C actions remain a stated gap.
+- Four new test.py fixtures and fixed 3.12.14 goldens cover recombination,
+  notes/cause/context/traceback, subclass split/derive callbacks collecting GC,
+  false-valued groups, duplicate leaves, matcher errors, syntax restrictions,
+  yield/await, close/throw and shared groups across threads. Worker entry points
+  use try/except/finally and existing _thread gates, not missing threading/time
+  modules or unhandled lambda entries. Python-visible checks remain scripts;
+  native additions are IR and precise-root/allocation-quota contracts. The latter
+  force collection at every allocation and fail each allocation through first
+  successful split/projection, then verify root survival/retry and leaf identity.
+- Normal acceptance passes all 279 portable fixtures and covers 139 selected
+  native/source/disassembly contracts across the 138-test batch and new quota
+  test. Strict ASan/UBSan/LSan passes 67 selected native contracts and nine affected
+  scripts; TSan passes the same 67 contracts and all four new scripts. No timeout
+  or sanitizer was relaxed. The independent parser build, parser-generated-check,
+  format-check and retained source/binary hashes pass. Evidence and initial failed
+  runs remain under .cache/except-star-*; no unrelated performance suite or
+  manually copied benchmark table was added.
+- Integration fixed strict-warning failures in empty generated diagnostic rules
+  and test macros without weakening -Werror, plus an unqualified make_tuple ADL
+  collision. One sanitizer driver used an inaccurate old related-fixture name
+  after the four additions passed; the five actual related fixtures then passed.
+  These are retained failures, not claims of a passing aborted full driver.
+- Remaining language gates include match/case, type/annotation scopes and other
+  unimplemented AST capabilities, full upstream tests, traceback/group rendering
+  and further library/reflection compatibility. typing/regex, requested standard
+  libraries, complete terminal/GC policy and N4-N6/M0-M9 release/performance gates
+  remain in the full route. The next dependency is executable structural patterns
+  and the remaining type/annotation scope foundation, not repeated stabilization
+  of already-passing slices. Origin push still awaits the previously requested
+  destination authorization; no bypass was attempted. The user's root test2.py
+  and temporary_plan.md deletion remain excluded from this stable node.
+
 ## 2026-10-31 Shared-Heap GC Inspection, Callbacks And Native Curses
 
 Prepended after 0f8614b without rewriting earlier records. Terra supplied the

@@ -1,0 +1,17 @@
+matched false group False ('CollectingGroup', 'root', [('ValueError', 'duplicate'), ('ExceptionGroup', 'inner', [('ValueError', 'duplicate')])]) True
+projected ('CollectingGroup', 'root', [('ValueError', 'duplicate'), ('ExceptionGroup', 'inner', [('ValueError', 'duplicate'), ('TypeError', 't')])])
+duplicate identity True
+derive failure derive failed BrokenGroup
+invalid derive derive must return an instance of BaseExceptionGroup
+first active True
+later type active ExceptionGroup
+second active True
+split override ValueError
+overridden values ('ExceptionGroup', 'overridden', [('ValueError', 'v')])
+overridden types ('ExceptionGroup', 'overridden', [('TypeError', 't')])
+bad split BadSplit.split must return a tuple, not str
+bad split BadSplit.split must return a 2-tuple, got tuple of size 1
+notes reraised ('ExceptionGroup', 'notes', [('ValueError', 'v'), ('TypeError', 't')]) ['original']
+naked trace True False
+naked args tuple True
+naked reraised ('ExceptionGroup', '', [('ValueError', 'naked trace')])

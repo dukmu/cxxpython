@@ -28,7 +28,7 @@ constexpr std::array definitions{
                      false},
     OpcodeDefinition{"CONTINUE_LOOP", 0, 0, 0, OperandDomain::Region, FlowKind::LoopControl, false,
                      false},
-    OpcodeDefinition{"RERAISE", 0, 0, 0, OperandDomain::None, FlowKind::Stop, true, true},
+    OpcodeDefinition{"RERAISE", 0, 0, 0, OperandDomain::RaiseArity, FlowKind::Stop, true, true},
     OpcodeDefinition{"LOAD_EXCEPTION", 0, 0, 1, OperandDomain::None, FlowKind::Next, false, false},
     OpcodeDefinition{"EXCEPTION_MATCH", 2, 2, 1, OperandDomain::None, FlowKind::Next, true, true},
     OpcodeDefinition{"PREPARE_WITH", 1, 1, 2, OperandDomain::None, FlowKind::Next, true, true},
@@ -96,6 +96,8 @@ constexpr std::array definitions{
     OpcodeDefinition{"ASYNC_YIELD_VALUE", 1, 1, 1, OperandDomain::None, FlowKind::Next, true, true},
     OpcodeDefinition{"GET_AITER", 1, 1, 1, OperandDomain::None, FlowKind::Next, true, true},
     OpcodeDefinition{"FOR_AWAIT", 1, 0, 1, OperandDomain::Target, FlowKind::IterBranch, true, true},
+    OpcodeDefinition{"CHECK_EG_MATCH", 2, 2, 2, OperandDomain::None, FlowKind::Next, true, true},
+    OpcodeDefinition{"PREP_RERAISE_STAR", 2, 2, 1, OperandDomain::None, FlowKind::Next, true, true},
 };
 static_assert(definitions.size() == static_cast<std::size_t>(Opcode::Count));
 [[noreturn]] void invalid(CodeErrorKind kind, const char *message,
@@ -193,6 +195,11 @@ std::size_t verify(const CodeSpec &spec, std::span<const Instruction> instructio
         if (opcode == Opcode::LoadClassDeref &&
             (spec.kind != CodeKind::ClassBody || operand < spec.cellvars.size()))
             invalid(CodeErrorKind::CellBounds, "LOAD_CLASS_DEREF requires a class free cell", pc);
+        if ((opcode == Opcode::CheckEgMatch || opcode == Opcode::PrepReraiseStar) &&
+            (!scopes[pc] || scopes[pc]->phase != RegionPhase::Handler ||
+             regions[scopes[pc]->region].kind != RegionKind::Except))
+            invalid(CodeErrorKind::RegionStructure,
+                    "exception group opcode requires an except handler", pc);
         switch (definition.operand) {
         case OperandDomain::None:
             if (operand)
@@ -244,7 +251,7 @@ std::size_t verify(const CodeSpec &spec, std::span<const Instruction> instructio
         case OperandDomain::Count:
             break;
         case OperandDomain::RaiseArity:
-            if (operand != 1 && operand != 2)
+            if (opcode == Opcode::Reraise ? operand > 1 : (operand != 1 && operand != 2))
                 invalid(CodeErrorKind::Operand, "raise expects an exception and optional cause",
                         pc);
             break;
@@ -467,8 +474,13 @@ StackEffect instruction_effect(Instruction instruction, std::span<const CallLayo
     if ((instruction.opcode == Opcode::ForIter || instruction.opcode == Opcode::ForAwait) &&
         jump_taken)
         return {1, 0, 0};
-    if (instruction.opcode == Opcode::Raise)
+    if (instruction.opcode == Opcode::Raise || instruction.opcode == Opcode::Reraise) {
+        if (instruction.opcode == Opcode::Reraise
+                ? instruction.operand > 1
+                : (instruction.operand < 1 || instruction.operand > 2))
+            invalid(CodeErrorKind::Operand, "invalid raise arity");
         return {instruction.operand, instruction.operand, 0};
+    }
     if (instruction.opcode == Opcode::UnpackSequence)
         return {1, 1, instruction.operand};
     if (instruction.opcode == Opcode::UnpackEx)

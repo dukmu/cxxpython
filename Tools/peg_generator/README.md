@@ -9,8 +9,12 @@ product. Host Python is needed only to regenerate or check generated files.
 reader and SCC/left-recursion analysis, preserves ordered choice, lookahead,
 repetition, gathering, forced tokens and cuts, and replaces CPython-specific C
 AST actions with immutable native concrete-syntax nodes. `invalid_*` diagnostic
-rules never accept input; the ordinary grammar decides recognition. Detailed
-CPython second-pass error wording is not claimed.
+rules never accept input; the ordinary grammar decides recognition. After a
+generic first-pass syntax failure, a separate parser evaluates safe literal
+diagnostic actions extracted from the fixed grammar, including named-node ranges.
+Valid input does not incur that pass or token-vector copying. Dynamic formatting,
+conditional C actions and complete CPython diagnostic wording remain work; when
+no extracted diagnostic applies, the original failure and location are preserved.
 
 `Parser/generated_parser.cpp` and `Include/cxxpython/grammar.hpp` are checked in.
 Run `python3 Tools/peg_generator/generate.py` to regenerate; `--check` detects

@@ -1272,9 +1272,8 @@ class Adapter {
                 unsupported(n);
             s.body = suite(*block);
             for (auto p : r) {
-                if (p->rule == Rule::except_star_block)
-                    unsupported(*p);
-                if (p->rule == Rule::except_block) {
+                if (p->rule == Rule::except_block || p->rule == Rule::except_star_block) {
+                    s.starred = p->rule == Rule::except_star_block;
                     ExceptHandler h;
                     h.span = span(*p);
                     if (auto e = find(*p, Rule::expression))

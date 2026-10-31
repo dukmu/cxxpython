@@ -846,6 +846,31 @@ constructor results raise TypeError. Both source operands are evaluated before
 normalization. RERAISE retains the active exception without adding a synthetic
 traceback node. Called functions inherit and restore handled state.
 
+except* lowers to the ordinary Except/Finally region engine with the original
+exception, raised-result list and remainder on the traced operand stack, not
+hidden Python locals or a separate Frame scheduler. CHECK_EG_MATCH consumes
+(remainder, matcher) and produces (rest, match), publishing a non-None match as
+the handled exception. Partial group matches honor overridden split methods;
+subgroup creation and projection use derive. Both results remain rooted before
+any following instruction. The compiler uses identity comparison with None,
+not a subgroup's user-defined truth protocol. Handler-body failures are caught
+by a nested ordinary Except region after alias-finally cleanup, appended in
+order, and do not skip later starred clauses.
+
+PREP_RERAISE_STAR consumes (original, results) and produces an exception or None.
+It classifies raised versus reraised entries by actual traceback/cause/context
+identity, projects duplicate leaf identities back into the original group tree,
+and preserves ordering of genuinely new exceptions. Python __notes__ copies are
+not CPython 3.12's unused native notes field and do not determine reraising.
+RERAISE 0 uses the active exception; RERAISE 1 consumes an explicit exception
+without adding a traceback or relinking its context. Arity, handler boundaries,
+protected stack prefixes and exceptional edges are verified; opcode/dis expose
+these real effects and operands. A naked exception's wrapper gets the current
+handler frame traceback rather than borrowing the child's traceback chain.
+All suspension/handoff state remains in existing Frame roots and handled-state
+restoration. return and escaping break/continue are rejected inside starred
+handlers, while nested loops/functions keep their ordinary control contracts.
+
 The compiler lays out CFG blocks in lexical region-phase order and replays the
 same CodeBuilder region operations used by native tests. It does not recreate
 unwind in generated Python calls or hidden native state. Except clauses test

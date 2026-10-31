@@ -80,6 +80,27 @@ async_bytecode = dis.Bytecode(async_loop)
 assert async_bytecode.stack_effect(awaits[0].offset, jump=False) == 1
 assert async_bytecode.stack_effect(awaits[0].offset, jump=True) == 0
 
+def grouped():
+    try:
+        raise ExceptionGroup('group', [ValueError('v')])
+    except* ValueError:
+        pass
+
+grouped_ops = list(dis.get_instructions(grouped))
+assert any(i.opname == 'CHECK_EG_MATCH' for i in grouped_ops)
+assert any(i.opname == 'PREP_RERAISE_STAR' for i in grouped_ops)
+assert any(i.opname == 'RERAISE' and i.arg == 1 for i in grouped_ops)
+assert opcode.stack_effect(opcode.opmap['CHECK_EG_MATCH']) == 0
+assert opcode.stack_effect(opcode.opmap['PREP_RERAISE_STAR']) == -1
+assert opcode.stack_effect(opcode.opmap['RERAISE'], 0) == 0
+assert opcode.stack_effect(opcode.opmap['RERAISE'], 1) == -1
+try:
+    opcode.stack_effect(opcode.opmap['RERAISE'], 2)
+except ValueError:
+    pass
+else:
+    assert False
+
 class Index:
     def __init__(self, value):
         self.value = value

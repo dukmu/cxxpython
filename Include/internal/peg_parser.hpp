@@ -7,11 +7,16 @@
 #include <utility>
 
 namespace cxxpython::syntax {
+class LiteralDiagnostic : public Error {
+  public:
+    using Error::Error;
+};
 // Native per-parse state. The generated rules never access the Python heap.
 class ParserBase {
   public:
-    explicit ParserBase(std::vector<Token> tokens, bool allow_incomplete = false)
-        : tokens_(std::move(tokens)), allow_incomplete_(allow_incomplete)
+    explicit ParserBase(std::vector<Token> tokens, bool allow_incomplete = false,
+                        bool diagnostics = false)
+        : diagnostics_(diagnostics), tokens_(std::move(tokens)), allow_incomplete_(allow_incomplete)
     {}
     virtual ~ParserBase() = default;
     Tree finish(NodePtr root)
@@ -24,6 +29,22 @@ class ParserBase {
     }
 
   protected:
+    [[noreturn]] void diagnostic(std::u32string_view message, bool next, NodePtr first = {},
+                                 NodePtr last = {}) const
+    {
+        auto at = std::min(next ? mark_ : (mark_ ? mark_ - 1 : 0), tokens_.size() - 1);
+        Span span = tokens_[at].span;
+        if (first && first->begin < tokens_.size()) {
+            span = tokens_[first->begin].span;
+            const auto &end = last ? last : first;
+            if (end->end > end->begin && end->end <= tokens_.size())
+                span.end = tokens_[end->end - 1].span.end;
+        }
+        std::string text;
+        for (char32_t ch : message)
+            text.push_back(static_cast<char>(ch));
+        throw LiteralDiagnostic(span, std::move(text));
+    }
     virtual bool reserved(std::u32string_view) const = 0;
     [[noreturn]] void error() const
     {
@@ -227,6 +248,7 @@ class ParserBase {
         return best;
     }
     std::size_t mark_ = 0;
+    bool diagnostics_ = false;
 
   private:
     struct Key {

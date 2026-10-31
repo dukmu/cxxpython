@@ -5,6 +5,7 @@
 #include "cxxpython/setobject.hpp"
 #include "internal/aiterobject.hpp"
 #include "internal/errors.hpp"
+#include "internal/exceptiongroup.hpp"
 #include "internal/setobject.hpp"
 #include "internal/sysmodule.hpp"
 
@@ -1467,7 +1468,15 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                     data.handled_exception.value_or(context.builtin(CoreObject::None));
                 break;
             case Opcode::Reraise:
-                if (data.handled_exception)
+                if (operand) {
+                    const auto exception = data.operands[data.sp - 1];
+                    if (!kind<ExceptionObject, CoreObject::BaseExceptionType>(context, exception)) {
+                        raise_error(context, CoreObject::TypeErrorType,
+                                    U"exceptions must derive from BaseException", result);
+                        activation.raising(result.exception());
+                    } else
+                        activation.raising(exception, false);
+                } else if (data.handled_exception)
                     activation.raising(*data.handled_exception, false);
                 else {
                     raise_error(context, CoreObject::RuntimeErrorType,
@@ -1475,6 +1484,36 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                     activation.raising(result.exception());
                 }
                 break;
+            case Opcode::CheckEgMatch: {
+                RootScope roots(context);
+                ReturnSlot match(context), rest(context);
+                detail::exception_group_match(context, roots.root(data.operands[data.sp - 2]),
+                                              roots.root(data.operands[data.sp - 1]), match, rest);
+                if (raised(match)) {
+                    activation.raising(match.exception());
+                    break;
+                }
+                data.operands[data.sp - 2] = rest.value();
+                data.operands[data.sp - 1] = match.value();
+                if (match.value() != context.builtin(CoreObject::None)) {
+                    data.handled_exception = match.value();
+                    data.handled_inherited = false;
+                    activation.sync();
+                }
+                break;
+            }
+            case Opcode::PrepReraiseStar: {
+                RootScope roots(context);
+                detail::prepare_reraise_star(context, roots.root(data.operands[data.sp - 2]),
+                                             roots.root(data.operands[data.sp - 1]), result);
+                if (raised(result)) {
+                    activation.raising(result.exception());
+                    break;
+                }
+                data.operands[data.sp - 2] = result.value();
+                data.operands[--data.sp] = context.builtin(CoreObject::None);
+                break;
+            }
             case Opcode::ExceptionMatch:
                 detail::exception_match(context, data.operands[data.sp - 2],
                                         data.operands[data.sp - 1], result);

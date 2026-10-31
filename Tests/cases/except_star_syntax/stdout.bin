@@ -1,0 +1,11 @@
+return SyntaxError 'break', 'continue' and 'return' cannot appear in an except* block
+break SyntaxError 'break', 'continue' and 'return' cannot appear in an except* block
+continue SyntaxError 'break', 'continue' and 'return' cannot appear in an except* block
+nested loop ok
+nested function ok
+mixed SyntaxError cannot have both 'except' and 'except*' on the same 'try'
+mixed reverse SyntaxError cannot have both 'except' and 'except*' on the same 'try'
+integer TypeError catching classes that do not inherit from BaseException is not allowed
+object class TypeError catching classes that do not inherit from BaseException is not allowed
+group class TypeError catching ExceptionGroup with except* is not allowed. Use except instead.
+group tuple TypeError catching ExceptionGroup with except* is not allowed. Use except instead.

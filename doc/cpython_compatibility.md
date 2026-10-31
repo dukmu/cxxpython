@@ -453,9 +453,15 @@ message/exceptions, derive/subgroup/split and metadata/notes preservation; custo
 derive and error paths remain observable. ExceptionGroup keeps the reference's
 mutable heap-type behavior, unlike immutable BaseExceptionGroup. Async with uses
 the existing Frame's awaited cleanup, including cancellation, suppression,
-return/break/continue and cross-thread suspension handoff. Full upstream suites,
-except* compiler lowering, group tree diagnostics and serialization remain work;
-contextlib import alone is not their acceptance evidence.
+return/break/continue and cross-thread suspension handoff. except* uses existing
+Except/Finally regions and traced operand stacks rather than a second Frame
+state machine: ordered matching, overridden split/derive, naked wrapping,
+metadata-aware leaf projection and handler failures compose with suspension.
+CPython 3.12's unused C notes field is not the ordinary Python __notes__ attribute;
+copying/comparing that attribute must not classify bare reraises as new errors.
+Malformed split results receive Python TypeError rather than introducing invalid
+handled-exception state. Full upstream suites, group tree diagnostics and
+serialization remain work; contextlib import alone is not their acceptance.
 
 ## Requested Library Delivery
 

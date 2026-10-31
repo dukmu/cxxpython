@@ -55,4 +55,29 @@ TEST(GeneratedParser, TreesOwnTokenTextAndParsesAreReentrant)
     EXPECT_TRUE(worker());
     EXPECT_TRUE(other.get());
 }
+TEST(GeneratedParser, LiteralDiagnosticsUseSecondPass)
+{
+    const auto check = [](std::string_view source, std::string_view message,
+                          std::string_view location = {}) {
+        try {
+            parse(source);
+            FAIL() << "expected syntax error";
+        } catch (const Error &error) {
+            EXPECT_EQ(error.kind, ErrorKind::Syntax);
+            EXPECT_EQ(error.what(), message);
+            if (!location.empty()) {
+                EXPECT_EQ(source.substr(error.span.begin, error.span.end - error.span.begin),
+                          location);
+            }
+        }
+    };
+    constexpr auto mixed = "cannot have both 'except' and 'except*' on the same 'try'";
+    check("try:\n pass\nexcept ValueError:\n pass\nexcept* TypeError:\n pass\n", mixed, "except*");
+    check("try:\n pass\nexcept* ValueError:\n pass\nexcept TypeError:\n pass\n", mixed, "except");
+    check("try:\n pass\nx = 1\n", "expected 'except' or 'finally' block");
+    check("try:\n pass\nexcept*:\n pass\n", "expected one or more exception types");
+    check("x = 1 +\n", "invalid syntax");
+    EXPECT_NO_THROW(parse("try:\n try:\n  pass\n except* ValueError:\n  pass\n"
+                          "except TypeError:\n pass\n"));
+}
 } // namespace

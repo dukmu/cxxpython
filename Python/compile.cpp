@@ -111,11 +111,13 @@ class GraphPass final {
     {
         const auto parent_scope = scope_, parent_block = block_;
         auto parent_loops = std::move(loops_);
+        auto parent_star_handlers = std::move(star_handlers_);
         const auto *parent_first = first_statement_;
         function(scope, body, definition);
         scope_ = parent_scope;
         block_ = parent_block;
         loops_ = std::move(parent_loops);
+        star_handlers_ = std::move(parent_star_handlers);
         first_statement_ = parent_first;
     }
     void make_function(std::size_t child, Span span, std::uint32_t flags = 0)
@@ -532,6 +534,10 @@ class GraphPass final {
     }
     void try_except(const TryStmt &node, Span span)
     {
+        if (node.starred) {
+            try_star_except(node, span);
+            return;
+        }
         if (node.handlers.empty()) {
             suite(node.body);
             return;
@@ -586,6 +592,87 @@ class GraphPass final {
         current().exit = FlowBlock::Exit::EndHandler;
         current().target = id;
         current().span = span;
+        select(block());
+        jump(done, span);
+        select(normal);
+        suite(node.alternative);
+        if (current().exit == FlowBlock::Exit::Open)
+            jump(done, span);
+        select(done);
+    }
+    void try_star_except(const TryStmt &node, Span span)
+    {
+        const auto id = region(RegionKind::Except, span);
+        const auto normal = block(), done = block();
+        program_.graphs[scope_].regions[id].normal_target = normal;
+        suite(node.body);
+        close_protected(id, span);
+        select(block());
+        current().handler = id;
+        // The existing traced operand stack owns original, results, remainder.
+        emit(Opcode::BuildList, span);
+        emit(Opcode::Copy, span, 2);
+        for (const auto &handler : node.handlers) {
+            expression(*handler.type);
+            emit(Opcode::CheckEgMatch, handler.span);
+            emit(Opcode::DupTop, handler.span);
+            none(handler.span);
+            emit(Opcode::Compare, handler.span, static_cast<std::uint32_t>(CompareOp::Is));
+            const auto unmatched = block(), matched = block(), next = block();
+            branch(unmatched, matched, handler.span);
+            select(unmatched);
+            emit(Opcode::PopTop, handler.span);
+            jump(next, handler.span);
+            select(matched);
+            if (handler.name) {
+                const auto &[text, location] = *handler.name;
+                name(text, location, Opcode::StoreFast, Opcode::StoreGlobal);
+            } else
+                emit(Opcode::PopTop, handler.span);
+            const auto capture = region(RegionKind::Except, handler.span);
+            std::optional<std::size_t> cleanup;
+            if (handler.name)
+                cleanup = region(RegionKind::Finally, handler.span);
+            star_handlers_.push_back(loops_.size());
+            suite(handler.body);
+            star_handlers_.pop_back();
+            if (cleanup) {
+                close_protected(*cleanup, handler.span);
+                select(block());
+                current().handler = *cleanup;
+                const auto &[text, location] = *handler.name;
+                none(location);
+                name(text, location, Opcode::StoreFast, Opcode::StoreGlobal);
+                name(text, location, Opcode::DeleteFast, Opcode::DeleteGlobal);
+                close_handler(*cleanup, handler.span);
+                select(block());
+            }
+            close_protected(capture, handler.span);
+            select(block());
+            current().handler = capture;
+            // Capture through ordinary unwind; the remainder stays below the error.
+            emit(Opcode::Copy, handler.span, 3);
+            emit(Opcode::Swap, handler.span, 2);
+            emit(Opcode::ListAppend, handler.span);
+            emit(Opcode::PopTop, handler.span);
+            close_handler(capture, handler.span);
+            select(block());
+            jump(next, handler.span);
+            select(next);
+        }
+        emit(Opcode::ListAppend, span);
+        emit(Opcode::PrepReraiseStar, span);
+        emit(Opcode::DupTop, span);
+        none(span);
+        emit(Opcode::Compare, span, static_cast<std::uint32_t>(CompareOp::Is));
+        const auto handled = block(), reraised = block();
+        branch(handled, reraised, span);
+        select(reraised);
+        emit(Opcode::Reraise, span, 1);
+        current().exit = FlowBlock::Exit::Stop;
+        select(handled);
+        emit(Opcode::PopTop, span);
+        close_handler(id, span);
         select(block());
         jump(done, span);
         select(normal);
@@ -726,6 +813,9 @@ class GraphPass final {
                         jump(done, span);
                         select(done);
                     } else if constexpr (std::is_same_v<T, ReturnStmt>) {
+                        if (!star_handlers_.empty())
+                            error(span, "'break', 'continue' and 'return' cannot appear in an "
+                                        "except* block");
                         if (node.value && program_.scopes[scope_].coroutine &&
                             program_.scopes[scope_].generator)
                             error(span, "'return' with value in async generator");
@@ -775,6 +865,9 @@ class GraphPass final {
                     } else if constexpr (std::is_same_v<T, ControlStmt>) {
                         if (node == ControlStmt::Pass)
                             return;
+                        if (!star_handlers_.empty() && loops_.size() <= star_handlers_.back())
+                            error(span, "'break', 'continue' and 'return' cannot appear in an "
+                                        "except* block");
                         if (loops_.empty())
                             error(span, "'break'/'continue' outside loop");
                         emit(node == ControlStmt::Break ? Opcode::BreakLoop : Opcode::ContinueLoop,
@@ -923,6 +1016,7 @@ class GraphPass final {
         scope_ = scope;
         select(block());
         loops_.clear();
+        star_handlers_.clear();
         first_statement_ = nullptr;
         if (!body.empty() && !(scope == 0 && program_.mode == InputMode::Single))
             if (const auto *expression = std::get_if<ExprStmt>(&body.front()->node))
@@ -964,6 +1058,7 @@ class GraphPass final {
     SourceProgram &program_;
     std::size_t scope_ = 0, block_ = 0;
     std::vector<std::size_t> loops_;
+    std::vector<std::size_t> star_handlers_;
     const Stmt *first_statement_ = nullptr;
 };
 

@@ -89,6 +89,8 @@ enum class Opcode : std::uint8_t {
     AsyncYieldValue,
     GetAiter,
     ForAwait,
+    CheckEgMatch,
+    PrepReraiseStar,
     Count,
 };
 enum class OperandDomain {

@@ -7,6 +7,8 @@
 #include "cxxpython/genericaliasobject.hpp"
 #include "cxxpython/protocol.hpp"
 
+#include <unordered_set>
+
 namespace cxxpython::core::detail {
 namespace {
 bool raised(const ReturnSlot &out)
@@ -291,7 +293,7 @@ void subset(Attachment &ctx, Handle original, std::span<const Value> children, R
     }
     out.ok(derived.get(ctx));
 }
-enum class Matcher { Type, Predicate };
+enum class Matcher { Type, Predicate, LeafIds };
 bool matcher(Attachment &ctx, Value condition, Matcher &kind, ReturnSlot &out)
 {
     if (ctx.type_of(condition) == ctx.builtin(CoreObject::FunctionType)) {
@@ -323,7 +325,8 @@ struct SplitDepth {
     }
 };
 bool split_recursive(Attachment &ctx, Handle exc, Handle condition, Matcher kind,
-                     bool construct_rest, ReturnSlot &match, ReturnSlot &rest)
+                     bool construct_rest, ReturnSlot &match, ReturnSlot &rest,
+                     const std::unordered_set<ObjectHeader *> *leaf_ids = nullptr)
 {
     SplitDepth depth(ctx);
     if (!depth.entered) {
@@ -338,6 +341,9 @@ bool split_recursive(Attachment &ctx, Handle exc, Handle condition, Matcher kind
     rest.ok(none);
     if (kind == Matcher::Type)
         exception_match(ctx, exc.get(ctx), condition.get(ctx), checked);
+    else if (kind == Matcher::LeafIds)
+        checked.ok(ctx.builtin(leaf_ids->contains(exc.get(ctx).object()) ? CoreObject::True
+                                                                         : CoreObject::False));
     else {
         const std::array values{exc.get(ctx)};
         call(ctx, condition, {values}, checked);
@@ -366,7 +372,7 @@ bool split_recursive(Attachment &ctx, Handle exc, Handle condition, Matcher kind
     for (auto child : ctx.payload<TupleObject>(children.value()).items) {
         ReturnSlot child_match(ctx), child_rest(ctx);
         if (!split_recursive(ctx, roots.root(child), condition, kind, construct_rest, child_match,
-                             child_rest)) {
+                             child_rest, leaf_ids)) {
             match.raised(child_match.exception());
             return false;
         }
@@ -386,6 +392,57 @@ bool split_recursive(Attachment &ctx, Handle exc, Handle condition, Matcher kind
         }
     }
     return true;
+}
+bool collect_leaves(Attachment &ctx, Handle exc, std::unordered_set<ObjectHeader *> &ids,
+                    ReturnSlot &out)
+{
+    if (exc.get(ctx) == ctx.builtin(CoreObject::None))
+        return true;
+    if (!group(ctx, exc.get(ctx))) {
+        ids.insert(exc.get(ctx).object());
+        return true;
+    }
+    RootScope roots(ctx);
+    ReturnSlot children(ctx);
+    field<exception_group_exceptions_slot>(ctx, exc.get(ctx), children);
+    if (raised(children)) {
+        out.raised(children.exception());
+        return false;
+    }
+    for (auto child : ctx.payload<TupleObject>(children.value()).items) {
+        SplitDepth depth(ctx);
+        if (!depth.entered) {
+            raise_error(ctx, CoreObject::RecursionErrorType,
+                        U"maximum recursion depth exceeded in collect_exception_group_leaf_ids",
+                        out);
+            return false;
+        }
+        if (!collect_leaves(ctx, roots.root(child), ids, out))
+            return false;
+    }
+    return true;
+}
+bool same_metadata(Attachment &ctx, Handle left, Handle right)
+{
+    // CPython 3.12's C notes field remains null; __notes__ is a distinct dict
+    // attribute. Comparing copied Python notes lists would break bare reraises.
+    ReturnSlot a(ctx), b(ctx);
+    for (auto member :
+         {&ExceptionObject::traceback, &ExceptionObject::cause, &ExceptionObject::context}) {
+        ctx.load(left.get(ctx), ctx.payload<ExceptionObject>(left).*member, a);
+        ctx.load(right.get(ctx), ctx.payload<ExceptionObject>(right).*member, b);
+        if (a.tag() != b.tag() || (a.tag() == ResultTag::Ok && a.value() != b.value()))
+            return false;
+    }
+    return true;
+}
+void create_group(Attachment &ctx, Handle children, ReturnSlot &out)
+{
+    RootScope roots(ctx);
+    ReturnSlot message(ctx);
+    make_str(ctx, U"", message);
+    const std::array args{message.value(), children.get(ctx)};
+    call(ctx, roots.root(ctx.builtin(CoreObject::BaseExceptionGroupType)), {args}, out);
 }
 template <bool Rest>
 void split(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
@@ -433,6 +490,186 @@ void wrap(Attachment &ctx, std::span<const Handle> core, Handle owner, const std
     name_store(ctx, dictionary.get(ctx), key.value(), wrapper.value());
 }
 } // namespace
+void exception_group_match(Attachment &ctx, Handle exception, Handle condition, ReturnSlot &match,
+                           ReturnSlot &rest)
+{
+    RootScope roots(ctx);
+    const auto none = ctx.builtin(CoreObject::None);
+    rest.ok(none);
+    const auto validate = [&](Value type) {
+        if (!exception_class(ctx, type)) {
+            raise_error(ctx, CoreObject::TypeErrorType,
+                        U"catching classes that do not inherit from BaseException is not allowed",
+                        match);
+            return false;
+        }
+        return true;
+    };
+    const auto value = condition.get(ctx);
+    if (ctx.has_layout<TupleObject>(value) &&
+        is_subtype(ctx, ctx.type_of(value), ctx.builtin(CoreObject::TupleType))) {
+        for (auto item : ctx.payload<TupleObject>(value).items)
+            if (!validate(item))
+                return;
+        for (auto item : ctx.payload<TupleObject>(value).items)
+            if (is_subtype(ctx, item, ctx.builtin(CoreObject::BaseExceptionGroupType))) {
+                raise_error(
+                    ctx, CoreObject::TypeErrorType,
+                    U"catching ExceptionGroup with except* is not allowed. Use except instead.",
+                    match);
+                return;
+            }
+    } else {
+        if (!validate(value))
+            return;
+        if (is_subtype(ctx, value, ctx.builtin(CoreObject::BaseExceptionGroupType))) {
+            raise_error(ctx, CoreObject::TypeErrorType,
+                        U"catching ExceptionGroup with except* is not allowed. Use except instead.",
+                        match);
+            return;
+        }
+    }
+    if (exception.get(ctx) == none) {
+        match.ok(none);
+        return;
+    }
+    if (!ctx.has_layout<ExceptionObject>(exception.get(ctx)) ||
+        !is_subtype(ctx, ctx.type_of(exception), ctx.builtin(CoreObject::BaseExceptionType))) {
+        raise_error(ctx, CoreObject::TypeErrorType, U"except* expected an exception", match);
+        return;
+    }
+    ReturnSlot checked(ctx);
+    exception_match(ctx, exception.get(ctx), condition.get(ctx), checked);
+    if (raised(checked)) {
+        match.raised(checked.exception());
+        return;
+    }
+    if (checked.value() == ctx.builtin(CoreObject::True)) {
+        if (group(ctx, exception.get(ctx))) {
+            match.ok(exception.get(ctx));
+            return;
+        }
+        ReturnSlot children(ctx);
+        const std::array child{exception.get(ctx)};
+        cxxpython::core::make_tuple(ctx, child, children);
+        create_group(ctx, roots.root(children.value()), match);
+        if (raised(match))
+            return;
+        const auto wrapped = roots.root(match.value());
+        if (auto frame = ctx.current_frame()) {
+            ReturnSlot tb(ctx);
+            append_traceback(ctx, wrapped, roots.root(*frame), tb);
+            if (tb.exception() != wrapped.get(ctx))
+                match.raised(tb.exception());
+        }
+        return;
+    }
+    if (!group(ctx, exception.get(ctx))) {
+        match.ok(none);
+        rest.ok(exception.get(ctx));
+        return;
+    }
+    ReturnSlot key(ctx), method(ctx), result(ctx);
+    make_str(ctx, U"split", key);
+    get_attribute(ctx, exception, roots.root(key.value()), method);
+    if (raised(method)) {
+        match.raised(method.exception());
+        return;
+    }
+    const std::array args{condition.get(ctx)};
+    call(ctx, roots.root(method.value()), {args}, result);
+    if (raised(result)) {
+        match.raised(result.exception());
+        return;
+    }
+    const auto prefix = type_name(ctx, ctx.type_of(exception)) + U".split must return ";
+    if (ctx.type_of(result.value()) != ctx.builtin(CoreObject::TupleType)) {
+        raise_error(ctx, CoreObject::TypeErrorType,
+                    prefix + U"a tuple, not " + type_name(ctx, ctx.type_of(result.value())), match);
+        return;
+    }
+    const auto &parts = ctx.payload<TupleObject>(result.value()).items;
+    if (parts.size() < 2) {
+        raise_error(ctx, CoreObject::TypeErrorType,
+                    prefix + U"a 2-tuple, got tuple of size " + decimal(parts.size()), match);
+        return;
+    }
+    for (std::size_t i = 0; i < 2; ++i) {
+        if (parts[i] != none &&
+            (!ctx.has_layout<ExceptionObject>(parts[i]) ||
+             !is_subtype(ctx, ctx.type_of(parts[i]), ctx.builtin(CoreObject::BaseExceptionType)))) {
+            raise_error(ctx, CoreObject::TypeErrorType, prefix + U"exceptions or None", match);
+            return;
+        }
+    }
+    match.ok(parts[0]);
+    rest.ok(parts[1]);
+}
+void prepare_reraise_star(Attachment &ctx, Handle original, Handle exception_list, ReturnSlot &out)
+{
+    RootScope roots(ctx);
+    if (!ctx.has_layout<ExceptionObject>(original.get(ctx)) ||
+        !is_subtype(ctx, ctx.type_of(original), ctx.builtin(CoreObject::BaseExceptionType))) {
+        raise_error(ctx, CoreObject::TypeErrorType, U"except* expected an original exception", out);
+        return;
+    }
+    if (!ctx.has_layout<ListObject>(exception_list.get(ctx)) ||
+        !is_subtype(ctx, ctx.type_of(exception_list), ctx.builtin(CoreObject::ListType))) {
+        raise_error(ctx, CoreObject::TypeErrorType, U"except* expected a list of exceptions", out);
+        return;
+    }
+    std::vector<Value> entries;
+    list_snapshot(ctx, exception_list, roots, entries);
+    const auto none = ctx.builtin(CoreObject::None);
+    for (auto entry : entries) {
+        if (entry != none &&
+            (!ctx.has_layout<ExceptionObject>(entry) ||
+             !is_subtype(ctx, ctx.type_of(entry), ctx.builtin(CoreObject::BaseExceptionType)))) {
+            raise_error(ctx, CoreObject::TypeErrorType, U"except* list contains a non-exception",
+                        out);
+            return;
+        }
+    }
+    if (entries.empty()) {
+        out.ok(none);
+        return;
+    }
+    if (!group(ctx, original.get(ctx))) {
+        out.ok(entries.front());
+        return;
+    }
+    std::vector<Value> raised_exceptions;
+    std::unordered_set<ObjectHeader *> leaves;
+    for (auto entry : entries) {
+        if (entry == none)
+            continue;
+        const auto item = roots.root(entry);
+        if (same_metadata(ctx, item, original)) {
+            if (!collect_leaves(ctx, item, leaves, out))
+                return;
+        } else
+            raised_exceptions.push_back(entry);
+    }
+    ReturnSlot projected(ctx), unused(ctx);
+    if (!split_recursive(ctx, original, original, Matcher::LeafIds, false, projected, unused,
+                         &leaves)) {
+        out.raised(projected.exception());
+        return;
+    }
+    if (raised_exceptions.empty()) {
+        out.ok(projected.value());
+        return;
+    }
+    if (projected.value() != none)
+        raised_exceptions.push_back(roots.root(projected.value()).get(ctx));
+    if (raised_exceptions.size() == 1)
+        out.ok(raised_exceptions.front());
+    else {
+        ReturnSlot children(ctx);
+        make_list(ctx, raised_exceptions, children);
+        create_group(ctx, roots.root(children.value()), out);
+    }
+}
 void install_exception_groups(Attachment &ctx, std::span<const Handle> core)
 {
     const auto owner = core[static_cast<std::size_t>(CoreObject::BaseExceptionGroupType)];

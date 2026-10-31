@@ -179,6 +179,7 @@ struct TryStmt {
     Suite body;
     std::vector<ExceptHandler> handlers;
     Suite alternative, cleanup;
+    bool starred = false;
 };
 struct WithItem {
     ExprPtr context, target;

@@ -1,0 +1,19 @@
+values ('Tagged', 'root', [('ValueError', 'v'), ('ExceptionGroup', 'inner', [('ValueError', 'w')])]) tag ['root note']
+metadata True True True
+active True True
+types ('Tagged', 'root', [('ExceptionGroup', 'inner', [('TypeError', 't')])]) tag
+finally True
+combined ('ExceptionGroup', '', [('RuntimeError', 'new'), ('Tagged', 'root', [('ExceptionGroup', 'inner', [('TypeError', 't')]), ('KeyError', "'k'")])])
+new metadata Tagged True True
+remainder metadata tag ['root note'] True True
+cleared None None
+alias deleted
+wrapped ('ExceptionGroup', '', [('ValueError', 'naked')])
+nested ('ExceptionGroup', 'nested', [('KeyError', "'c'")])
+nested finally
+outer type
+outer finally
+normal else
+normal finally
+changed reraised ('ExceptionGroup', '', [('ExceptionGroup', 'original', [('ValueError', 'x')]), ('ExceptionGroup', 'original', [('TypeError', 'y')])])
+changed metadata ['changed'] RuntimeError True
