@@ -124,6 +124,10 @@ startup and warmup: increase loops to focus sampling on kernel work. Use
 `--perf /path/to/working/perf` when the system wrapper does not match the kernel.
 The default software event is cpu-clock:u. Hardware cache/cycle conclusions need
 available PMU events, not just software CPU samples.
+Call graphs use DWARF unwinding; retain the matching executable/build ID for
+later reports. Check runtime caller chains, not just symbolized self samples:
+the tested perf 5.15 reader lost C++ callers that perf 6.8 recovered from the
+same retained capture. `--perf` selects the working reader/recorder.
 
 Methodology and file/API compatibility are based on the primary
 [pyperf benchmark guide](https://pyperf.readthedocs.io/en/latest/run_benchmark.html),

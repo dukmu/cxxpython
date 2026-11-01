@@ -755,6 +755,32 @@ void call_bridge(Attachment &context, Handle function, std::span<const Value> ar
     RootScope roots(context);
     call(context, roots.root(args[0]), {positional, keywords}, out);
 }
+void invoke_protocol_impl(Attachment &context, Handle self, const ResolvedSlot &slot,
+                          std::span<const Value> args, ReturnSlot &out, RootScope &roots,
+                          bool own_descriptor)
+{
+    if (args.size() != protocol_definition(slot.protocol).arity)
+        throw std::invalid_argument("protocol arity mismatch");
+    const auto original_type = slot.type.get(context);
+    const auto receiver_type = context.type_of(self);
+    std::optional<ResolvedSlot> refreshed;
+    if (slot.epoch != context.type_epoch() || original_type != receiver_type)
+        refreshed = detail::resolve_protocol(context, receiver_type, slot.protocol, roots);
+    const auto &current = refreshed ? *refreshed : slot;
+    auto target = current.descriptor;
+    if (current.state != SlotState::Missing) {
+        const auto descriptor = target.get(context);
+        // Internal ObjectOps keeps the snapshot scope alive; public inputs may be released.
+        if (own_descriptor)
+            target = roots.root(descriptor);
+    }
+    out.reset(context);
+    if (current.state == SlotState::Missing || current.state == SlotState::Disabled) {
+        type_error(context, U"operation is missing or explicitly disabled", out);
+        return;
+    }
+    invoke_special_impl(context, self, target, {args, {}}, out, roots);
+}
 } // namespace
 
 ResultView call(Attachment &context, Handle callable, CallArgsView args, ReturnSlot &out)
@@ -769,20 +795,7 @@ ResultView call(Attachment &context, Handle callable, CallArgsView args, ReturnS
 void detail::invoke_protocol(Attachment &context, Handle self, const ResolvedSlot &slot,
                              std::span<const Value> args, ReturnSlot &out, RootScope &roots)
 {
-    if (args.size() != protocol_definition(slot.protocol).arity)
-        throw std::invalid_argument("protocol arity mismatch");
-    const auto original_type = slot.type.get(context);
-    auto current = slot;
-    if (slot.epoch != context.type_epoch() || original_type != context.type_of(self))
-        current = detail::resolve_protocol(context, context.type_of(self), slot.protocol, roots);
-    if (current.state != SlotState::Missing)
-        current.descriptor = roots.root(current.descriptor.get(context));
-    out.reset(context);
-    if (current.state == SlotState::Missing || current.state == SlotState::Disabled) {
-        type_error(context, U"operation is missing or explicitly disabled", out);
-        return;
-    }
-    invoke_special_impl(context, self, current.descriptor, {args, {}}, out, roots);
+    invoke_protocol_impl(context, self, slot, args, out, roots, false);
 }
 ResultView invoke_protocol(Attachment &context, Handle receiver, const ResolvedSlot &slot,
                            std::span<const Value> args, ReturnSlot &out)
@@ -791,7 +804,7 @@ ResultView invoke_protocol(Attachment &context, Handle receiver, const ResolvedS
         RootScope roots(context);
         auto self = roots.root(receiver.get(context));
         root_arguments(roots, {args, {}});
-        detail::invoke_protocol(context, self, slot, args, out, roots);
+        invoke_protocol_impl(context, self, slot, args, out, roots, true);
     });
 }
 ResultView get_attribute(Attachment &context, Handle object, Handle name, ReturnSlot &out)

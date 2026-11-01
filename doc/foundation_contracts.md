@@ -839,6 +839,12 @@ ObjectOps caller and shares the resolution scope for binding. It does not create
 a second input-root set. Public invoke_protocol still roots caller-supplied
 receiver/arguments before resetting output. Both entries revalidate stale slots
 and retain the selected descriptor across collecting/replacing callbacks.
+The internal caller keeps its resolved snapshot scope alive, including after
+stale slot refresh, so it reuses that descriptor root rather than inserting
+another copy. Public invocation independently snapshots the descriptor as well
+as its operands, so callbacks may release caller-owned input roots.
+The checked Value subtype path admits local initialized type metadata before an
+identity result; identical operands need no second payload check or MRO scan.
 
 Native sequence slot definitions retain their defining Type as a traced immutable
 edge. Arithmetic tries numeric/reflected methods before concatenation/repetition

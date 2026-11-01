@@ -331,6 +331,10 @@ TEST_F(CoreProtocols, NotImplementedAndNoneAndMissingHaveDistinctDispatchMeaning
     EXPECT_EQ(slot.state, SlotState::Disabled);
     auto missing = resolve_protocol(context, cls, Protocol::Len, roots);
     EXPECT_EQ(missing.state, SlotState::Missing);
+    invoke_protocol(context, a, slot, {}, out);
+    error(out, CoreObject::TypeErrorType);
+    invoke_protocol(context, a, missing, {}, out);
+    error(out, CoreObject::TypeErrorType);
 }
 
 TEST_F(CoreProtocols, ReflectedOverrideUsesClassDescriptorBindingAndRichInequality)
@@ -454,6 +458,76 @@ TEST_F(CoreProtocols, FullMroAndEpochRevalidationUseCurrentClassDefinitions)
     ReturnSlot out(context);
     invoke_protocol(context, obj, slot, {}, out);
     EXPECT_EQ(out.result().value(), replacement.get(context));
+}
+
+TEST_F(CoreProtocols, ResolvedDescriptorSurvivesReplacementDuringNativeCallback)
+{
+    for (bool stale : {false, true}) {
+        auto cls = type();
+        auto obj = instance(cls);
+        auto name = text(U"__len__");
+        RootScope snapshots(context);
+        ReturnSlot out(context);
+        if (stale)
+            method(cls, U"__len__", integer(1));
+        auto slot = resolve_protocol(context, cls, Protocol::Len, snapshots);
+
+        RootScope temporary(context);
+        make_str(context, U"selected result", out);
+        auto marker = temporary.root(out.value());
+        SignatureLayout signature;
+        signature.parameters = {{U"self"}};
+        std::array captures{cls.get(context), name.get(context), marker.get(context)};
+        make_native_function(
+            context, "replace selected protocol", signature,
+            [](Attachment &c, Handle fn, std::span<const Value>, ReturnSlot &result) {
+                RootScope local(c);
+                const auto &captured = c.payload<NativeFunctionObject>(fn).captures;
+                auto owner = local.root(captured[0]);
+                auto name = local.root(captured[1]);
+                auto none = local.root(c.builtin(CoreObject::None));
+                ReturnSlot mutation(c);
+                set_attribute(c, owner, name, none, mutation);
+                ASSERT_EQ(mutation.tag(), ResultTag::Ok);
+                c.collect();
+                result.ok(c.payload<NativeFunctionObject>(fn).captures[2]);
+            },
+            captures, out);
+        auto selected = temporary.root(out.value());
+        set_attribute(context, cls, name, selected, out);
+        ASSERT_EQ(out.tag(), ResultTag::Ok);
+        temporary.release(marker);
+        temporary.release(selected);
+        if (!stale)
+            slot = resolve_protocol(context, cls, Protocol::Len, snapshots);
+
+        invoke_protocol(context, obj, slot, {}, out);
+        ASSERT_EQ(out.tag(), ResultTag::Ok);
+        context.collect();
+        EXPECT_EQ(context.payload<StrObject>(out.value()).value, U"selected result");
+        if (!stale) {
+            const auto &captured = context.payload<NativeFunctionObject>(slot.descriptor).captures;
+            EXPECT_EQ(captured[2], out.value());
+        }
+        invoke_protocol(context, obj, slot, {}, out);
+        error(out, CoreObject::TypeErrorType);
+    }
+}
+
+TEST_F(CoreProtocols, ResolvedSlotUsesReceiverCurrentClass)
+{
+    auto original = type();
+    auto replacement = type();
+    method(original, U"__len__", integer(3));
+    method(replacement, U"__len__", integer(8));
+    auto obj = instance(original);
+    auto slot = resolve_protocol(context, original, Protocol::Len, roots);
+    ReturnSlot out(context);
+    set_attribute(context, obj, text(U"__class__"), replacement, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    invoke_protocol(context, obj, slot, {}, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(int_decimal(context, out.value()), "8");
 }
 
 TEST_F(CoreProtocols, ThreadPrivateCacheIncludesMissingSlotsAndInvalidatesOnBaseMutation)

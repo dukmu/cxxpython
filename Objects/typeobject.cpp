@@ -326,8 +326,12 @@ bool is_subtype(Attachment &context, Handle type, Handle base)
 bool is_subtype(Attachment &context, Value type, Value base)
 {
     auto &left = context.payload<TypeObject>(type);
+    if (left.state == TypeState::Building)
+        throw std::logic_error("subtype check requires initialized type metadata");
+    if (type == base)
+        return true;
     auto &right = context.payload<TypeObject>(base);
-    if (left.state == TypeState::Building || right.state == TypeState::Building)
+    if (right.state == TypeState::Building)
         throw std::logic_error("subtype check requires initialized type metadata");
     return std::find(left.mro.begin(), left.mro.end(), base) != left.mro.end();
 }

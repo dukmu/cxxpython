@@ -1,5 +1,76 @@
 # Development Status
 
+## 2026-11-01 Reuse Resolved Protocol Roots And Recover Perf Callers
+
+Continues the performance/cleanup goal after pushed dcc86c8. The preceding cache
+cleanup removed the consumed 63b1426 executable, installed wheel downloads,
+package index and empty report logs, preserving active builds/tools/evidence.
+Terra added focused protocol tests and independently inspected retained samples;
+parent owns the runtime changes, measurements and verification. Both agents are
+closed. The full compatibility route remains paused, not complete.
+
+- Internal protocol invocation now borrows the descriptor root already owned by
+  its live ObjectOps snapshot scope. Public invocation still independently owns
+  descriptor/receiver/arguments before output reset, so callbacks may release
+  caller input roots. Both entries share the existing dispatch implementation,
+  revalidate epoch and receiver class, and retain binder, native receiver checks,
+  depth limits and return validation. Only stale slots construct a refreshed
+  snapshot; the normal path no longer copies all three metadata Handles.
+- Value subtype identity admits local initialized type metadata before returning
+  true, avoiding a second identical payload check and MRO scan. Different types
+  still validate both payloads/states. Tests cover structural/ready identity,
+  Building types, wrong layouts, foreign values and NativeWait rejection.
+  Protocol tests replace a selected descriptor during its collecting native
+  callback, exercise refreshed slots and current __class__, and distinguish
+  missing/disabled calls. Existing direct Python lifetime/descriptor fixtures
+  remain unchanged. No GC policy, allocator, public ABI, GIL, Python RC, type-
+  specific arithmetic or additional metadata cache was introduced.
+- Strict Clang 21.1.8 IPO Release passes 361 relevant native contracts, including
+  bootstrap/promotion fault shards. ASan/UBSan/LSan and TSan each pass 345 relevant
+  native contracts. Release and ASan each pass 31 direct Python fixtures; TSan
+  passes 13 targeted scripts. No sanitizer report, timeout or budget change.
+  Format and diff checks pass. Evidence is .cache/dispatch-reuse-{release,asan,
+  tsan}-*.log. An initial four-case check preceded the final dispatch refactor;
+  the final native selections include those cases again on the final binaries.
+- Reused dcc86c8 raw baselines; after every build/test/analysis process exited,
+  measured only dict_int=512, allocate=100000 and user matrix N=64, one/four
+  workers, three processes, one warmup and three values/process. Natural GC and
+  result validation remain enabled. Raw runs and generated reports/pyperf files
+  are .cache/benchmarks/dispatch-reuse{,-baseline,-comparison}; standard pyperf
+  comparison is .cache/dispatch-reuse-pyperf.log. All six comparisons are not
+  significant; this is ownership/copy cleanup, not a measured speedup claim.
+  Matrix medians are 400.559/175.455 ms versus 399.642/158.961, with 4.2%/8.9%
+  variation. Four-worker scaling remains 2.283x and CPU/wall 2.915; its higher
+  median is retained, not replaced with a favorable rerun. Absolute CPython
+  performance acceptance and the overall goal remain unfinished.
+  The combined header adds external_matrix to the old integer/allocation source
+  metadata; all shared source contents and the old matrix snapshot are identical.
+  The generated source-snapshot warning is retained, not suppressed.
+- A separate 32 KiB DWARF capture did not repair perf 5.15's truncated C++
+  callers. The sample stack and matching FDE recovered four direct callers,
+  logged in .cache/dispatch-reuse-recovered-callers.log; these few samples alone
+  do not establish a distribution. A locally extracted Ubuntu perf 6.8.12 and
+  libtraceevent reader recover full C++
+  chains from both retained 8 KiB and 32 KiB captures. Old perf 5.15 still loses
+  callers when given the same matching ELF/build-id cache. This isolates the
+  reader difference, not an insufficient-stack-only explanation; no recorder
+  API/flags or runtime build options were changed to work around the tool.
+- Recovered aggregate reports are *-perf68.txt beside the original raw profiles.
+  The original 945-sample capture attributes inclusive samples to dictionary
+  access (39.05%), protocol invocation (59.37%) and collection (7.20%); these
+  overlap and include actual native work/startup/warmup, not independent overhead
+  or GC pause percentages. Roots account for 8.15% inclusive in the Value acquire
+  symbol. The former unknown PLT target resolves as pthread_self. The next step
+  is to use these actual caller/callee chains to consolidate dispatch/admission
+  costs, rather than enlarging weak caches or repacking dictionary nodes from
+  self percentages. matrix.py remains unchanged and untracked.
+
+The reusable perf binary/license/dependency stay under .cache/deps/perf-6.8;
+download packages were removed. The matching dcc86c8 executable/build-id hardlink
+and original 8 KiB raw capture remain for report regeneration. Retired the consumed
+larger-stack experiment's raw perf.data, keeping its commands, sample diagnostics
+and self/caller reports; no historical timing or verification evidence was removed.
+
 ## 2026-11-01 Dictionary Identity Hits And Collision Revalidation
 
 Continues the active performance/cleanup goal after pushed 63b1426. Parent owns

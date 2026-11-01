@@ -84,6 +84,40 @@ TEST(FoundationTypes, BootstrapIsIdempotentAndSurvivesAllTemporaryRoots)
     EXPECT_EQ(context.stats().live_bytes, bytes);
 }
 
+TEST(FoundationTypes, IdenticalValueSubtypeChecksStillValidateDomainAndReadiness)
+{
+    Interpreter interpreter;
+    Attachment context(interpreter);
+    context.bootstrap();
+    RootScope roots(context);
+    const auto type = context.type_type();
+    EXPECT_TRUE(is_subtype(context, type, type));
+    EXPECT_TRUE(is_subtype(context, type, context.object_type()));
+    EXPECT_FALSE(is_subtype(context, context.object_type(), type));
+
+    ReturnSlot out(context);
+    context.allocate<TypeObject>(out, U"Building", LayoutDescriptor::of<InstanceObject>());
+    const auto building = roots.root(out.value()).get(context);
+    EXPECT_THROW(is_subtype(context, building, building), std::logic_error);
+    EXPECT_THROW(is_subtype(context, building, type), std::logic_error);
+    EXPECT_THROW(is_subtype(context, type, building), std::logic_error);
+    context.allocate<InstanceObject>(out);
+    EXPECT_THROW(is_subtype(context, out.value(), out.value()), std::logic_error);
+
+    Interpreter other;
+    Attachment foreign(other);
+    foreign.bootstrap();
+    const auto foreign_type = foreign.type_type();
+    EXPECT_THROW(is_subtype(context, foreign_type, foreign_type), std::logic_error);
+    EXPECT_THROW(is_subtype(context, type, foreign_type), std::logic_error);
+    {
+        NativeWait wait(context);
+        EXPECT_THROW(is_subtype(context, type, type), std::logic_error);
+    }
+    context.bootstrap_core();
+    EXPECT_TRUE(is_subtype(context, type, type));
+}
+
 TEST(FoundationTypes, BootstrapRollsBackEachManagedAllocationFailureAndCanRetry)
 {
     for (std::size_t limit = 0; limit < 2; ++limit) {
