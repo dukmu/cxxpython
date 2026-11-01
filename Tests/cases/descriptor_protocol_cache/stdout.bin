@@ -1,0 +1,12 @@
+old old
+set
+deleted
+new new
+new set
+new deleted
+instance new
+instance Descriptor
+none raises TypeError
+none raises TypeError
+none raises TypeError
+threads [None, None, None, None]

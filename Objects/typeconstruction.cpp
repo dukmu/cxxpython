@@ -86,7 +86,7 @@ void object_new(Attachment &context, Value, std::span<const Value> args, ReturnS
     RootScope roots(context);
     TypeView metadata(context, args[0]);
     if (metadata.snapshot() && context.payload<TypeSnapshot>(*metadata.snapshot()).abstract) {
-        auto methods = DictView(context, metadata.storage()).find(U"__abstractmethods__");
+        auto methods = metadata.namespace_data()->find(U"__abstractmethods__");
         ReturnSlot result(context);
         get_iter(context, roots.root(*methods), result);
         if (raised(result)) {
@@ -557,13 +557,11 @@ void finish_class(Attachment &context, Handle cls, std::span<const KeywordArg> n
     // Callbacks may resize/replace the namespace and collect removed
     // entries. Snapshot and root the original key/value pairs first.
     TypeView metadata(context, cls.get(context));
-    DictView namespace_view(context, metadata.storage());
-    auto entries = namespace_view.entries();
+    const auto *namespace_data = metadata.namespace_data();
+    const auto entries = namespace_data
+                             ? std::span<const DictObject::Entry>{namespace_data->entries}
+                             : std::span<const DictObject::Entry>{};
     RootScope roots(context);
-    for (const auto &entry : entries) {
-        roots.root(entry.key);
-        roots.root(entry.value);
-    }
     ReturnSlot callback(context);
     for (const auto &entry : entries) {
         if (!detail::type_attribute(context, context.type_of(entry.value), U"__set_name__"))
@@ -600,8 +598,8 @@ void finish_class(Attachment &context, Handle cls, std::span<const KeywordArg> n
     const auto &mro = context.payload<TypeObject>(cls).mro;
     for (auto base : std::span(mro).subspan(1)) {
         TypeView base_metadata(context, base);
-        DictView dictionary(context, base_metadata.storage());
-        auto hook = dictionary.find(U"__init_subclass__");
+        const auto *dictionary = base_metadata.namespace_data();
+        auto hook = dictionary ? dictionary->find(U"__init_subclass__") : std::nullopt;
         if (!hook)
             continue;
         detail::bind_descriptor(context, *hook, cls.get(context), cls.get(context), callback);

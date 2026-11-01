@@ -2,7 +2,6 @@
 #include "cxxpython/memoryobject.hpp"
 #include "cxxpython/protocol.hpp"
 #include "internal/abstract.hpp"
-#include "internal/ceval.hpp"
 #include "internal/long.hpp"
 
 #include <bit>

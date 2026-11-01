@@ -77,6 +77,37 @@ TEST_F(CoreAttributes, ClassDescriptorUsesTheActualHeaderType)
     EXPECT_EQ(get(none, U"__class__").get(context), context.builtin(CoreObject::NoneType));
 }
 
+TEST_F(CoreAttributes, BorrowedNamespaceStorageRetainsOldEntriesWithoutAdditionalRoots)
+{
+    auto cls = type("SnapshotOwner");
+    const auto key = text(U"field");
+    ReturnSlot value(context), out(context);
+    make_str(context, U"only retained by the old type snapshot", value);
+    const auto previous = value.value();
+    const auto argument = roots.root(previous);
+    ASSERT_EQ(set_attribute(context, cls, key, argument, out).tag(), ResultTag::Ok);
+    TypeView old(context, cls);
+    const auto *storage = old.namespace_data();
+    ASSERT_NE(storage, nullptr);
+    EXPECT_EQ(storage->find(U"field"), previous);
+    roots.release(argument);
+    value.reset();
+    ASSERT_EQ(del_attribute(context, cls, key, out).tag(), ResultTag::Ok);
+    TypeView current(context, cls);
+    if (const auto *updated = current.namespace_data())
+        EXPECT_FALSE(updated->find(U"field"));
+    context.collect();
+    EXPECT_EQ(context.payload<StrObject>(*storage->find(U"field")).value,
+              U"only retained by the old type snapshot");
+    const auto count = context.stats().roots;
+    {
+        NoSafepoint read(context);
+        EXPECT_EQ(old.namespace_data(), storage);
+        EXPECT_EQ(storage->find(U"field"), previous);
+    }
+    EXPECT_EQ(context.stats().roots, count);
+}
+
 TEST_F(CoreAttributes, EmptyPropertyIsDataDescriptorAndDocIsWritable)
 {
     ReturnSlot out(context);

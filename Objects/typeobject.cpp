@@ -63,6 +63,11 @@ std::optional<Value> TypeView::storage() const
     }
     return {};
 }
+const DictStorage *TypeView::namespace_data() const
+{
+    const auto value = storage();
+    return value ? &context_.payload<DictStorage>(*value) : nullptr;
+}
 
 namespace {
 TypeObject &ready_type(Attachment &context, Handle handle)

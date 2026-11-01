@@ -146,6 +146,16 @@ original exception and add the CPython 3.12 context note rather than wrapping it
 in RuntimeError; enum is not special-cased in class creation.
 `Objects/descrobject.cpp` and `Objects/call.cpp` implement descriptors, attribute
 lookup, argument binding and the shared call boundary.
+TypeView lends its retained immutable DictStorage to native namespace readers;
+ordinary attributes with exact string names and exact-string tables read that
+index directly. String subclasses and mixed-key tables retain the general hash/
+equality path. Reentrant equality may publish unrelated type metadata without
+invalidating a successful key comparison or an unchanged missed hash bucket.
+The reader rebinds a surviving key to its latest value, and writers publish
+against that latest rooted snapshot; removed/replaced candidates still retry.
+Descriptor get/set/delete share the existing weak protocol cache and refresh,
+including None-method errors and native field/member fast paths. Class callbacks
+retain their original namespace through TypeView, not duplicate per-entry roots.
 Getset/member descriptors retain immutable precise owner/name edges and an
 AtomicGcEdge for the first successfully computed __qualname__, matching
 CPython's lazy cache without serializing descriptor calls. Native field

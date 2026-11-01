@@ -60,8 +60,8 @@ std::optional<TypeAttribute> find_type_attribute(Attachment &context, Value type
             std::optional<TypeAttribute> result;
             for (auto base : context.payload<TypeObject>(type).mro) {
                 TypeView metadata(context, base);
-                DictView dictionary(context, metadata.storage());
-                if (auto value = dictionary.find(name)) {
+                const auto *dictionary = metadata.namespace_data();
+                if (auto value = dictionary ? dictionary->find(name) : std::nullopt) {
                     result = TypeAttribute{base, *value};
                     break;
                 }
@@ -127,12 +127,13 @@ void bind_descriptor(Attachment &context, Value descriptor, std::optional<Value>
         bind_native_callable(context, descriptor, receiver, out);
         return;
     }
-    if (!type_attribute(context, type, U"__get__")) {
+    auto slot = detail::resolve_protocol(context, type, Protocol::DescriptorGet, roots);
+    if (slot.state == SlotState::Missing) {
         out.ok(descriptor);
         return;
     }
     std::array args{receiver.value_or(context.builtin(CoreObject::None)), owner};
-    special(context, descriptor, U"__get__", {args, {}}, out);
+    detail::invoke_protocol(context, descriptor, slot, args, out, roots);
 }
 } // namespace detail
 namespace detail {
@@ -445,9 +446,13 @@ void invoke(Attachment &context, Handle target, CallArgsView args, std::optional
 
 bool data_descriptor(Attachment &context, Value attribute)
 {
+    RootScope roots(context);
+    roots.root(attribute);
     auto type = context.type_of(attribute);
-    return type_attribute(context, type, U"__set__").has_value() ||
-           type_attribute(context, type, U"__delete__").has_value();
+    return detail::resolve_protocol(context, type, Protocol::DescriptorSet, roots).state !=
+               SlotState::Missing ||
+           detail::resolve_protocol(context, type, Protocol::DescriptorDelete, roots).state !=
+               SlotState::Missing;
 }
 bool dictionary_field(Attachment &context, Value object, ReturnSlot &out)
 {
@@ -477,8 +482,23 @@ void lookup_attribute(Attachment &context, Value type, Handle name, ReturnSlot &
     RootScope roots(context);
     roots.root(type);
     out.reset(context);
+    const auto *text = context.type_of(name) == context.builtin(CoreObject::StrType)
+                           ? &context.payload<StrObject>(name).value
+                           : nullptr;
     for (auto base : context.payload<TypeObject>(type).mro) {
         TypeView view(context, base);
+        if (text) {
+            const auto *data = view.namespace_data();
+            if (!data)
+                continue;
+            if (data->exact_string_keys) {
+                if (auto value = data->find(*text)) {
+                    out.ok(*value);
+                    return;
+                }
+                continue;
+            }
+        }
         if (auto dictionary = view.dictionary()) {
             dict_lookup(context, roots.root(*dictionary), name, out);
             if (out.tag() != ResultTag::Empty)
@@ -504,7 +524,9 @@ void get_default(Attachment &context, Handle object, Handle name, bool type_look
     if (attribute)
         roots.root(*attribute);
     if (attribute && data_descriptor(context, *attribute) &&
-        type_attribute(context, context.type_of(*attribute), U"__get__")) {
+        detail::resolve_protocol(context, context.type_of(*attribute), Protocol::DescriptorGet,
+                                 roots)
+                .state != SlotState::Missing) {
         bind_descriptor(context, *attribute, value, type, out);
         return;
     }
@@ -568,15 +590,18 @@ void change_default(Attachment &context, Handle object, Handle name, std::option
     if (descriptor)
         roots.root(*descriptor);
     if (descriptor && data_descriptor(context, *descriptor)) {
-        const auto method = value ? U"__set__" : U"__delete__";
-        if (!type_attribute(context, context.type_of(*descriptor), method)) {
-            raise_error(context, CoreObject::AttributeErrorType, method, out);
+        const auto protocol = value ? Protocol::DescriptorSet : Protocol::DescriptorDelete;
+        auto slot =
+            detail::resolve_protocol(context, context.type_of(*descriptor), protocol, roots);
+        if (slot.state == SlotState::Missing) {
+            raise_error(context, CoreObject::AttributeErrorType,
+                        std::u32string(protocol_definition(protocol).name), out);
             return;
         }
         std::vector<Value> args{target};
         if (value)
             args.push_back(value->get(context));
-        special(context, *descriptor, method, {args, {}}, out);
+        detail::invoke_protocol(context, *descriptor, slot, args, out, roots);
         if (!raised(out))
             out.ok(context.builtin(CoreObject::None));
         return;

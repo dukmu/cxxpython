@@ -8,6 +8,4 @@ namespace cxxpython::core::detail {
 // A miss leaves the operand stack unchanged for ordinary boxed dispatch.
 bool try_vm_numeric(Attachment &, FrameObject &, Opcode, std::uint32_t, ReturnSlot &method,
                     ReturnSlot &error);
-bool float_binary_scalar(Attachment &, BinaryOp, double, double, double &, ReturnSlot &);
-bool small_int_binary(BinaryOp, std::int64_t, std::int64_t, std::int64_t &) noexcept;
 } // namespace cxxpython::core::detail

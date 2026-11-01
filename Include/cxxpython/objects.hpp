@@ -220,6 +220,11 @@ struct DictStorage {
         : header(head), entries(std::move(entries)), index(std::move(index)),
           exact_string_keys(exact_string_keys)
     {}
+    std::optional<Value> find(std::u32string_view name) const
+    {
+        const auto found = index.find(name);
+        return found == index.end() ? std::optional<Value>{} : entries[found->second].value;
+    }
     void trace(Tracer &tracer) const noexcept;
     std::size_t external_bytes() const noexcept;
 };

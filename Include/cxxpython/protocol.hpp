@@ -73,6 +73,9 @@ enum class Protocol : std::size_t {
     GetAttr,
     SetAttribute,
     DelAttribute,
+    DescriptorGet,
+    DescriptorSet,
+    DescriptorDelete,
     Count,
 };
 enum class ProtocolResult { Any, Boolean, Length, Integer, String, Hash };

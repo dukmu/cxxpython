@@ -1,5 +1,76 @@
 # Development Status
 
+## 2026-11-01 Borrow Type Namespaces And Terminate Reentrant Lookups
+
+Continues the active performance/cleanup goal after 1f806cc, using its general
+object profile rather than introducing more numeric cases. Parent implemented
+snapshot reads and reentrant lookup; one Terra worker supplied descriptor-cache
+integration and its direct reference fixture. Worker is closed.
+
+- TypeView lends its retained immutable DictStorage to native readers. MRO/name
+  lookup, class construction and type-owned dictionary operations no longer wrap
+  that storage in another DictView. Class callbacks retain original entries
+  through the view's precise roots instead of duplicating every key/value root.
+  Ordinary exact-string attributes use the immutable index directly. String
+  subclasses and mixed-key tables keep the general hash/equality path, including
+  callback errors. No object layout, Value representation or new cache layer.
+- Descriptor __get__/__set__/__delete__ now share existing protocol resolution,
+  weak-cache promotion, epoch refresh and invocation. Data-descriptor precedence,
+  None-method errors, metaclasses and native member/getset paths remain covered.
+  Shared numeric-kernel declarations moved from the VM header to the internal
+  abstract boundary; Objects no longer imports ceval just for scalar helpers.
+- The new standard-semantics fixture exposed an existing live lock in 1f806cc:
+  __eq__ repeatedly publishing an unrelated class attribute made namespace reads
+  restart forever. The retained .cache/type-views-before-case.log records its
+  unchanged 30-second timeout. A successful comparison now rebinds the same key
+  identity to its current value; a miss remains valid when its entire hash bucket
+  is unchanged. Removed/replaced candidates still retry. Writes publish against
+  the latest rooted snapshot, preserving callback changes instead of overwriting
+  them. No timeout, lock or Python callback was suppressed to make it pass.
+- Direct fixtures cover repeated unrelated publication, misses, current-value
+  updates, removed/replaced keys, hash failures, string subclasses, mixed keys,
+  __set_name__ mutation/GC, descriptor replacement and shared-heap workers. One
+  deletion assertion initially hit CPython's hot attribute cache rather than its
+  intended __eq__; an unrelated metadata write now explicitly makes that lookup
+  cold. The final fixed-reference fixture passes without runtime-specific output.
+  The native test proves borrowed old storage survives publication/GC and needs
+  no extra root cells when read inside NoSafepoint.
+- Strict Clang 21.1.8 Release passes 504 selected native tests and all 540 direct
+  scripts; the final enlarged namespace fixture passes separately. ASan/UBSan/
+  LSan passes 53 affected native contracts and nine direct scripts; TSan passes
+  the same nine script scenarios. No sanitizer, expectation or budget changed.
+  Formatting/diff checks pass. Logs are .cache/type-views-*.log. Sanitizer builds
+  were limited to the ownership/concurrency targets needed for this node, not
+  another complete three-build regression campaign.
+- After builds/tests stopped, only object_protocol, allocate and file_io were
+  measured at one/four workers, natural GC, three processes and nine values per
+  configuration. All 18 planned runs pass. Reused 1f806cc and fixed CPython raw
+  references; no historical rebuild, repeated Matrix/nbody campaign or new
+  benchmark driver. Generated evidence is .cache/benchmarks/type-views and
+  type-views-comparison; standard pyperf analysis is .cache/type-views-pyperf.log.
+- Pyperf finds object one/four-worker improvements of 1.51x/1.44x, allocation
+  1.41x/1.28x and file I/O 1.29x/1.18x versus 1f806cc. Generated object medians are
+  74.499/35.183 ms, scaling 2.117x with four-worker CPU/wall 2.130; allocation
+  scales 2.209x. Object/file-I/O four-worker RSDs of 13.9%/10.1% remain with every
+  sample and warning. The one-worker created-object counts are unchanged for
+  object_protocol and allocate: these gains are generic execution/read-path
+  savings, not fewer benchmark results or disabled collection. Absolute generic
+  object ratios to the retained CPython reference remain 40.139/13.952, not parity.
+- Separate perf capture .cache/benchmarks/type-views-object-profile retains 569
+  software CPU samples and zero losses. Dictionary access is 1.93% self and the
+  immutable index lookup 1.41%; root acquisition, VM dispatch, malloc and Frame
+  creation remain visible. Sampling covers the worker, not only its kernel, and
+  these percentages are not hardware-cache or cumulative-pause measurements.
+  Matching final ELF 99a1b397... is retained. Recompressed regenerated sanitizer
+  debug sections; focused compressed-product checks pass. Useful dependencies,
+  builds, tools and raw evidence remain at about 1.7 GiB. matrix.py is unchanged,
+  untracked and excluded.
+
+The goal remains active. Next target general call/Frame/root traffic exposed by
+the updated profile; do not trade away shared-heap CPU parallelism. The broader
+compatibility route remains paused, and dill still requires real marshal/CodeType
+and process dependencies documented in the preceding entry.
+
 ## 2026-11-01 General Protocol Cache, VM Temporaries And Context Variables
 
 Continues the performance/cleanup goal after 9894244. The user explicitly requires

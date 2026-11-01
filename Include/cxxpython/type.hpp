@@ -16,6 +16,7 @@ struct InstanceObject {
 };
 
 enum class TypeState { Building, Structural, Ready };
+struct DictStorage;
 
 struct TypeSnapshot {
     ObjectHeader header;
@@ -83,6 +84,8 @@ class TypeView final {
     std::variant<std::u32string, Value> qualname() const;
     std::optional<Value> dictionary() const;
     std::optional<Value> storage() const;
+    // Borrowed immutable storage, retained by this view across publication/GC.
+    const DictStorage *namespace_data() const;
     std::optional<Value> snapshot() const;
 
   private:

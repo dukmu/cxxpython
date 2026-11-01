@@ -99,9 +99,7 @@ std::optional<Value> DictView::find(const std::u32string &name) const
                 return entry.value;
         return {};
     }
-    const auto &data = context_.payload<DictStorage>(storage_.value());
-    auto found = data.index.find(name);
-    return found == data.index.end() ? std::optional<Value>{} : data.entries[found->second].value;
+    return context_.payload<DictStorage>(storage_.value()).find(name);
 }
 
 std::size_t DictStorage::external_bytes() const noexcept
@@ -400,15 +398,15 @@ ResultView access_dictionary(Attachment &context, Handle dictionary, Handle key,
                 hash_value = detail::name_hash(context, *text);
             for (;;) {
                 TypeView metadata(context, owner.value());
-                DictView snapshot(context, metadata.storage());
-                const auto entries = snapshot.entries();
+                const auto *table = metadata.namespace_data();
+                auto entries = table ? std::span<const DictObject::Entry>{table->entries}
+                                     : std::span<const DictObject::Entry>{};
                 std::optional<std::size_t> found;
                 bool compare = true;
-                if (string && metadata.storage()) {
-                    const auto &table = context.payload<DictStorage>(*metadata.storage());
-                    if (table.exact_string_keys) {
-                        const auto at = table.index.find(*text);
-                        if (at != table.index.end())
+                if (string && table) {
+                    if (table->exact_string_keys) {
+                        const auto at = table->index.find(*text);
+                        if (at != table->index.end())
                             found = at->second;
                         compare = false;
                     }
@@ -430,10 +428,51 @@ ResultView access_dictionary(Attachment &context, Handle dictionary, Handle key,
                         }
                     }
                 }
-                // Equality may reenter Python and publish another namespace.
-                if (TypeView(context, owner.value()).snapshot() != metadata.snapshot()) {
-                    context.poll();
-                    continue;
+                TypeView current(context, owner.value());
+                if (current.snapshot() != metadata.snapshot()) {
+                    const auto *storage = current.namespace_data();
+                    const auto updated = storage
+                                             ? std::span<const DictObject::Entry>{storage->entries}
+                                             : std::span<const DictObject::Entry>{};
+                    bool stable = true;
+                    if (found) {
+                        // Unrelated publication must not repeat a successful __eq__.
+                        // Keep the same key identity, but observe its current value.
+                        const auto key = entries[*found].key;
+                        const auto at =
+                            std::find_if(updated.begin(), updated.end(), [&](const auto &entry) {
+                                return entry.hash == hash_value && entry.key == key;
+                            });
+                        stable = at != updated.end();
+                        if (stable)
+                            found = static_cast<std::size_t>(at - updated.begin());
+                    } else {
+                        // A miss remains valid if its complete hash bucket is unchanged.
+                        auto before = entries.begin(), after = updated.begin();
+                        for (;;) {
+                            before = std::find_if(before, entries.end(), [&](const auto &entry) {
+                                return entry.hash == hash_value;
+                            });
+                            after = std::find_if(after, updated.end(), [&](const auto &entry) {
+                                return entry.hash == hash_value;
+                            });
+                            if (before == entries.end() || after == updated.end()) {
+                                stable = before == entries.end() && after == updated.end();
+                                break;
+                            }
+                            if (before->key != after->key) {
+                                stable = false;
+                                break;
+                            }
+                            ++before;
+                            ++after;
+                        }
+                    }
+                    if (!stable) {
+                        context.poll();
+                        continue;
+                    }
+                    entries = updated;
                 }
                 if (operation == DictOperation::Lookup ||
                     (operation == DictOperation::SetDefault && found) ||
@@ -450,7 +489,7 @@ ResultView access_dictionary(Attachment &context, Handle dictionary, Handle key,
                 else
                     changed.push_back({key.get(context), value->get(context), hash_value});
                 detail::copy_dictionary_storage(context, changed, temporary);
-                if (detail::publish_type_dictionary(context, owner.value(), *metadata.snapshot(),
+                if (detail::publish_type_dictionary(context, owner.value(), *current.snapshot(),
                                                     temporary.value())) {
                     out.ok(operation == DictOperation::Erase ? entries[*found].value
                            : operation == DictOperation::SetDefault

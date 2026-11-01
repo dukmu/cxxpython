@@ -48,6 +48,8 @@ bool try_native_operation(Attachment &, const BuiltinSlot &, std::span<const Val
                           NativeEntry expected, NativeEntry kernel, ReturnSlot &);
 bool try_int_binary(Attachment &, Value, Value, BinaryOp, const BuiltinSlot &, ReturnSlot &);
 bool try_float_binary(Attachment &, Value, Value, BinaryOp, const BuiltinSlot &, ReturnSlot &);
+bool float_binary_scalar(Attachment &, BinaryOp, double, double, double &, ReturnSlot &);
+bool small_int_binary(BinaryOp, std::int64_t, std::int64_t, std::int64_t &) noexcept;
 bool try_list_item(Attachment &, const BuiltinSlot &, std::span<const Value>, ReturnSlot &);
 bool try_sequence_item(Attachment &, const BuiltinSlot &, std::span<const Value>, ReturnSlot &);
 bool try_dict_item(Attachment &, const BuiltinSlot &, std::span<const Value>, ReturnSlot &);

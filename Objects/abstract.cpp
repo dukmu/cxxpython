@@ -75,6 +75,9 @@ constexpr std::array definitions{
     ProtocolDefinition{U"__getattr__", 1, ProtocolResult::Any},
     ProtocolDefinition{U"__setattr__", 2, ProtocolResult::Any},
     ProtocolDefinition{U"__delattr__", 1, ProtocolResult::Any},
+    ProtocolDefinition{U"__get__", 2, ProtocolResult::Any},
+    ProtocolDefinition{U"__set__", 2, ProtocolResult::Any},
+    ProtocolDefinition{U"__delete__", 1, ProtocolResult::Any},
 };
 static_assert(definitions.size() == static_cast<std::size_t>(Protocol::Count));
 constexpr std::array comparisons{Protocol::Eq, Protocol::Ne, Protocol::Lt,
