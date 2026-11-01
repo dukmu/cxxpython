@@ -724,6 +724,100 @@ TEST_F(CoreProtocols, ValueCacheLookupChecksOwnershipStateAndRootGrowth)
     EXPECT_EQ(cls.get(context), value);
 }
 
+TEST(ProtocolCache, HitRootsInAnotherAttachmentSurviveInputScopeAndCollection)
+{
+    Interpreter interpreter;
+    Attachment context(interpreter);
+    context.bootstrap_core();
+    context.set_gc_enabled(false);
+    Attachment receiver(interpreter);
+    RootScope results(receiver);
+    std::optional<ResolvedSlot> cached;
+    std::optional<Value> type_value;
+    std::optional<Value> owner_value;
+    std::optional<Value> descriptor_value;
+    {
+        RootScope input(context);
+        ReturnSlot out(context);
+        create_type(context, {U"Owner"}, out);
+        auto owner = input.root(out.value());
+        std::array bases{owner};
+        create_type(context, {U"Child", bases}, out);
+        auto type = input.root(out.value());
+        SignatureLayout signature;
+        signature.parameters = {{U"self", ParameterKind::PositionalOnly}};
+        make_native_function(
+            context, "length", signature,
+            [](Attachment &c, Handle, std::span<const Value>, ReturnSlot &result) {
+                result.ok(c.builtin(CoreObject::None));
+            },
+            {}, out);
+        auto descriptor = input.root(out.value());
+        make_str(context, U"__len__", out);
+        auto name = input.root(out.value());
+        set_attribute(context, owner, name, descriptor, out);
+        ASSERT_EQ(out.result().tag(), ResultTag::Ok);
+
+        auto resolved = resolve_protocol(context, type, Protocol::Len, input);
+        ASSERT_EQ(resolved.state, SlotState::Native);
+        type_value = type.get(context);
+        owner_value = owner.get(context);
+        descriptor_value = descriptor.get(context);
+        cached = context.cached_protocol(*type_value, Protocol::Len, results);
+        ASSERT_TRUE(cached);
+    }
+    {
+        NativeWait wait(context);
+        receiver.collect();
+    }
+    EXPECT_EQ(cached->type.get(receiver), *type_value);
+    EXPECT_EQ(cached->owner.get(receiver), *owner_value);
+    EXPECT_EQ(cached->descriptor.get(receiver), *descriptor_value);
+    EXPECT_EQ(receiver.payload<TypeObject>(cached->type).state, TypeState::Ready);
+    EXPECT_EQ(receiver.payload<TypeObject>(cached->owner).state, TypeState::Ready);
+    EXPECT_EQ(receiver.payload<NativeFunctionObject>(cached->descriptor).name, "length");
+    results.release(cached->type);
+    EXPECT_EQ(cached->owner.get(receiver), *owner_value);
+    results.release(cached->owner);
+    EXPECT_EQ(cached->descriptor.get(receiver), *descriptor_value);
+    results.release(cached->descriptor);
+}
+
+TEST_F(CoreProtocols, HitRejectsInvalidDestinationScopeWithoutChangingItsRoots)
+{
+    context.set_gc_enabled(false);
+    auto cls = type();
+    method(cls, U"__len__", integer(7));
+    resolve_protocol(context, cls, Protocol::Len, roots);
+    const auto value = cls.get(context);
+
+    Interpreter other;
+    Attachment foreign(other);
+    foreign.bootstrap_core();
+    RootScope foreign_roots(foreign);
+    auto sentinel = foreign_roots.root(foreign.builtin(CoreObject::IntType));
+    EXPECT_THROW(context.cached_protocol(value, Protocol::Len, foreign_roots), std::logic_error);
+    EXPECT_EQ(sentinel.get(foreign), foreign.builtin(CoreObject::IntType));
+    EXPECT_EQ(cls.get(context), value);
+
+    Attachment receiver(interpreter);
+    RootScope receiver_roots(receiver);
+    auto existing = receiver_roots.root(value);
+    {
+        NativeWait wait(receiver);
+        EXPECT_THROW(context.cached_protocol(value, Protocol::Len, receiver_roots),
+                     std::logic_error);
+    }
+    {
+        NoSafepoint guard(receiver);
+        EXPECT_THROW(context.cached_protocol(value, Protocol::Len, receiver_roots),
+                     std::logic_error);
+        EXPECT_EQ(existing.get(receiver), value);
+    }
+    EXPECT_EQ(existing.get(receiver), value);
+    ASSERT_TRUE(context.cached_protocol(value, Protocol::Len, receiver_roots));
+}
+
 TEST(ProtocolCache, CachedClassesDoNotBecomePermanentRoots)
 {
     Interpreter interpreter;

@@ -256,7 +256,7 @@ void sequence_next(Attachment &context, Handle, std::span<const Value> args, Ret
     if (!sequence<SequenceIteratorObject, Iterator>(context, args[0], out))
         return;
     auto &iterator = context.payload<SequenceIteratorObject>(args[0]);
-    ReturnSlot owner(context), item(context);
+    ReturnSlot owner(context);
     for (;;) {
         context.load(args[0], iterator.owner, owner);
         if (owner.tag() == ResultTag::Empty) {
@@ -277,14 +277,12 @@ void sequence_next(Attachment &context, Handle, std::span<const Value> args, Ret
             return;
         }
         if constexpr (Iterator == CoreObject::TupleIteratorType)
-            item.ok(data.items[position]);
+            out.ok(data.items[position]);
         else
-            make_str(context, std::u32string(1, data.value[position]), item);
-        if (iterator.index.compare_exchange_weak(position, position + 1,
-                                                 std::memory_order_relaxed)) {
-            out.ok(item.value());
+            make_str(context, std::u32string(1, data.value[position]), out);
+        if (iterator.index.compare_exchange_weak(position, position + 1, std::memory_order_relaxed))
             return;
-        }
+        out.reset();
         context.poll();
     }
 }

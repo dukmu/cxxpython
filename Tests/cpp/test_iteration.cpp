@@ -69,6 +69,24 @@ TEST_F(CoreIteration, NativeSequencesAreLazyAndExhaustionRemainsDistinctFromFail
     EXPECT_EQ(int_decimal(context, out.value()), "1");
 }
 
+TEST_F(CoreIteration, StringAllocationFailureDoesNotConsumeTheNextCharacter)
+{
+    ReturnSlot out(context);
+    eval("iter('a\\U0001f600')", out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    const auto iterator = roots.root(out.value());
+    for (const auto &expected : {U"a", U"\U0001f600"}) {
+        context.set_allocation_limit(0);
+        EXPECT_EQ(iter_next(context, iterator, out), NextStatus::Raised);
+        ASSERT_EQ(out.tag(), ResultTag::Raised);
+        EXPECT_EQ(context.type_of(out.exception()), context.builtin(CoreObject::MemoryErrorType));
+        context.set_allocation_limit(std::numeric_limits<std::size_t>::max());
+        EXPECT_EQ(iter_next(context, iterator, out), NextStatus::Item);
+        EXPECT_EQ(context.payload<StrObject>(out.value()).value, expected);
+    }
+    EXPECT_EQ(iter_next(context, iterator, out), NextStatus::Done);
+}
+
 TEST_F(CoreIteration, UserProtocolsPreserveStopIterationValuesAndOtherExceptions)
 {
     ReturnSlot out(context);

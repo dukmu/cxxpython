@@ -1924,18 +1924,29 @@ std::optional<ResolvedSlot> Attachment::cached_protocol(Value value, Protocol pr
                                                         RootScope &roots)
 {
     require_owns(value);
-    const auto epoch = type_epoch();
+    const auto epoch = state_->type_epoch.load(std::memory_order_acquire);
     const auto entry = thread_record_->protocol_entry(value, protocol);
     if ((epoch & 1) || entry.type != value.object() || entry.protocol != protocol ||
         entry.epoch != epoch)
         return {};
-    // Root insertion never polls. This Active owner cannot be swept while
-    // promoting a borrowed entry; every real sweep clears the whole cache.
+    auto &destination = roots.context_;
+    destination.require_safepoint();
+    if (destination.state_.get() != state_.get())
+        invalid_heap_access("value does not belong to this interpreter");
+    // A hit contains admitted local identities; sweep clears every weak entry.
+    // Promotion never polls. Validate the destination once, but own each root.
+    const auto promote = [&](ObjectHeader *object) {
+        if (!object)
+            return Handle{};
+        auto handle = destination.acquire_cell(&roots, object, roots.head_);
+        roots.head_ = handle.cell_;
+        return handle;
+    };
     return ResolvedSlot{protocol,
                         entry.state,
-                        roots.root(value),
-                        entry.owner ? roots.root(Value(*entry.owner)) : Handle{},
-                        entry.descriptor ? roots.root(Value(*entry.descriptor)) : Handle{},
+                        promote(value.object()),
+                        promote(entry.owner),
+                        promote(entry.descriptor),
                         epoch,
                         entry.native_kind,
                         entry.native_call};

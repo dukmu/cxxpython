@@ -857,10 +857,14 @@ ResolvedSlot retains that derived NativeSlotKind in the existing type-epoch
 snapshot/cache; it is scalar metadata, not another managed edge or cache layer.
 The lookup's defining owner controls inherited/copied sequence roles. The checked
 Value cache overload validates attachment/domain/live state before reading the
-cache, and promotion owns fresh type/owner/descriptor roots. Handle-based public
-resolution keeps result roots independent of its input Handle, including when
-both belong to the same RootScope. Internal Value resolution avoids only the
-temporary input-type root; it does not borrow the result's lifetime.
+cache, and promotion owns fresh type/owner/descriptor roots. Cache hits validate
+the actual destination arena's attachment and heap domain once before promoting
+these already-admitted local identities without polling.
+Each promoted role still has its own cell/generation and scope lifetime, including
+when the destination belongs to another active attachment on the same host thread.
+Handle-based public resolution keeps result roots independent of its input Handle,
+including when both belong to the same RootScope. Internal Value resolution
+avoids only the temporary input-type root; it does not borrow the result's lifetime.
 
 ResolvedSlot also retains NativeCallKind: generic descriptor, native function,
 binding native descriptor or owner-checked method descriptor. Lookup derives this
@@ -886,6 +890,10 @@ owning/validating the iterator, and poll before lookup: even a
 native iterator returning permanent objects without allocation must acknowledge
 collection requests. Reusable reduction result slots are cleared before the next
 callback and after exhaustion; they do not retain the previous item/exception.
+Native tuple/string iteration prepares its candidate in the existing output
+slot while retaining a separate rooted owner read. A lost atomic index claim
+clears that candidate before polling/retrying; allocation failure does not consume
+a character. It does not add a per-item temporary result cell.
 
 Ordinary native type methods publish owner-bearing MethodDescriptorObjects;
 protocol lookup preserves their native/sequence role and invokes the underlying

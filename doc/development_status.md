@@ -1,5 +1,55 @@
 # Development Status
 
+## 2026-11-01 Protocol Root Promotion And Native Iterator Output Reuse
+
+Continues the performance/cleanup goal after pushed a765f6a. Terra supplied the
+destination-scope contract tests; parent owns runtime changes, integration and
+verification. The agent is closed. No compatibility milestone is marked complete.
+
+- A protocol-cache hit admits its actual destination RootScope attachment,
+  safepoint state and heap domain once, then promotes the already-admitted local
+  weak identities directly into that existing arena. Type/owner/descriptor still
+  receive independent cells and generations; no root or descriptor lifetime is
+  borrowed. Input domain/live checks and epoch/class revalidation remain. Promotion
+  cannot poll, and every actual sweep clears the weak cache before reuse. There
+  is no new unchecked public API, cache, managed class, global lock or Python RC.
+- Native tuple/string next uses the existing caller result instead of creating
+  another per-item ReturnSlot. The owner read remains independently rooted and
+  atomic index claims remain unchanged; a lost claim clears its candidate before
+  polling. The initial suspected string allocation error was not reproduced:
+  existing bad_alloc unwinding already becomes MemoryError. A regression test
+  locks down failed ASCII/non-BMP allocation followed by retry without advancing
+  the cursor; no redundant exception branch was added.
+- New cache tests preserve same-interpreter/same-host-thread destination scopes
+  belonging to another Attachment, reject foreign heaps and inactive/protected
+  destination attachments without changing existing roots, and inspect all three
+  metadata payloads after input-scope release and explicit GC. Initial versions
+  of the three tests passed against the previous runtime before optimization;
+  .cache/root-promotion-before-native.log retains that baseline evidence.
+- Final Clang 21.1.8 -Werror builds pass. Release native acceptance is 372/372;
+  ASan/UBSan/LSan and TSan are each 356/356. Relevant Python fixtures pass 55/55
+  on Release and ASan, 23/23 on TSan. Formatting and diff checks pass. Logs are
+  .cache/root-promotion-*. Existing direct fixtures/reference outputs are reused;
+  no unrelated library or I/O regression campaign was added.
+- Quiet fixed-work measurements reused a765f6a raw data, with three independent
+  processes, nine values per configuration and natural GC. Generated reports/raw
+  runs are in .cache/benchmarks/root-promotion and root-promotion-comparison.
+  Standard pyperf comparison reports math_reduce one worker 1.10x faster and
+  matrix one worker 1.04x faster; the remaining six comparisons are not
+  significant. Matrix medians are 378.763/166.417 ms, scaling 2.276x with four-
+  worker CPU/wall 3.034. dict_int four-worker RSD is 12.4%; all values and its
+  warning remain, with no favorable rerun or discarded samples.
+- Separate perf 6.8 Matrix sampling (16 loops) retains commands, loss-free raw
+  samples, full callers and the matching build-id image under
+  .cache/benchmarks/root-promotion-matrix-profile-1 and .cache/perf-buildid.
+  Protocol invocation is 53.76% inclusive, get_item 22.94%, binary 13.00%, and
+  collect 6.43%; Value root acquisition is 8.11% self. These overlap and include
+  startup/warmup, not independent overhead or pause percentages. The next
+  dependency is generic sequence/index conversion and native dispatch/root
+  redundancy visible in these chains, not workload-specific arithmetic or a
+  speculative collector replacement. Absolute CPython performance gaps remain;
+  the service goal stays active and the full compatibility route stays paused.
+
 ## 2026-11-01 Owned Iteration And Reduction Result Reuse
 
 Continues the active performance/cleanup goal after pushed a230e7a. Terra
