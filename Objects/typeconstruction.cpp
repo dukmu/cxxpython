@@ -1,6 +1,7 @@
 #include "cxxpython/execution.hpp"
 #include "cxxpython/genericaliasobject.hpp"
 #include "cxxpython/memoryobject.hpp"
+#include "cxxpython/moduleobject.hpp"
 #include "cxxpython/protocol.hpp"
 #include "cxxpython/unionobject.hpp"
 #include "internal/codecs.hpp"
@@ -437,6 +438,95 @@ void cell_new(Attachment &context, Value, std::span<const Value> args, ReturnSlo
     RootScope roots(context);
     context.allocate_instance<CellObject>(roots.root(args[0]), out,
                                           items.empty() ? std::optional<Value>{} : items[0]);
+}
+// Based on CPython 3.12.14 Objects/funcobject.c, func_new_impl (PSF license).
+void function_new(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
+{
+    const auto none = context.builtin(CoreObject::None);
+    RootScope roots(context);
+    auto type_name = [&](Value value) {
+        return detail::diagnostic_type_name(context, roots.root(context.type_of(value)));
+    };
+    if (args[0] != context.builtin(CoreObject::FunctionType)) {
+        type_error(context, U"function.__new__ requires function", out);
+        return;
+    }
+    if (context.type_of(args[1]) != context.builtin(CoreObject::CodeType)) {
+        type_error(context, U"function() argument 'code' must be code, not " + type_name(args[1]),
+                   out);
+        return;
+    }
+    if (!is_instance(context, args[2], CoreObject::DictType) ||
+        !context.has_layout<DictObject>(args[2])) {
+        type_error(context,
+                   U"function() argument 'globals' must be dict, not " + type_name(args[2]), out);
+        return;
+    }
+    if (args[3] != none && !context.has_layout<StrObject>(args[3])) {
+        type_error(context, U"arg 3 (name) must be None or string", out);
+        return;
+    }
+    if (args[4] != none && !is_instance(context, args[4], CoreObject::TupleType)) {
+        type_error(context, U"arg 4 (defaults) must be None or tuple", out);
+        return;
+    }
+    const auto &code = context.payload<CodeObject>(args[1]);
+    const auto count = code.program.free_names().size();
+    if (args[5] != none && !is_instance(context, args[5], CoreObject::TupleType)) {
+        type_error(context, U"arg 5 (closure) must be None or tuple", out);
+        return;
+    }
+    if (args[5] == none && count) {
+        type_error(context, U"arg 5 (closure) must be tuple", out);
+        return;
+    }
+    if (args[5] != none) {
+        const auto &cells = context.payload<TupleObject>(args[5]).items;
+        if (cells.size() != count) {
+            const auto expected = std::to_string(count), actual = std::to_string(cells.size());
+            raise_error(context, CoreObject::ValueErrorType,
+                        context.payload<StrObject>(code.name).value +
+                            U" requires closure of length " +
+                            std::u32string(expected.begin(), expected.end()) + U", not " +
+                            std::u32string(actual.begin(), actual.end()),
+                        out);
+            return;
+        }
+        for (auto cell : cells) {
+            if (!is_instance(context, cell, CoreObject::CellType)) {
+                type_error(context, U"arg 5 (closure) expected cell, found " + type_name(cell),
+                           out);
+                return;
+            }
+        }
+    }
+    auto code_handle = roots.root(args[1]);
+    auto globals = roots.root(args[2]);
+    ReturnSlot key(context), found(context);
+    make_str(context, U"__builtins__", key);
+    dict_lookup(context, globals, roots.root(key.value()), found);
+    if (raised(found)) {
+        out.raised(found.exception());
+        return;
+    }
+    Value builtins = context.builtin(CoreObject::Builtins);
+    if (found.tag() == ResultTag::Ok) {
+        builtins = found.value();
+        if (is_module(context, builtins))
+            builtins = module_dict(context, builtins);
+    } else if (auto frame = context.current_frame()) {
+        builtins =
+            context.payload<FunctionObject>(context.payload<FrameObject>(*frame).function).builtins;
+    }
+    FunctionSpec spec{code_handle, globals};
+    spec.builtins = roots.root(builtins);
+    if (args[4] != none)
+        spec.defaults = roots.root(args[4]);
+    if (args[5] != none)
+        spec.closure = roots.root(args[5]);
+    make_function(context, spec, out);
+    if (!raised(out) && args[3] != none)
+        context.store(out.value(), context.payload<FunctionObject>(out.value()).name, args[3]);
 }
 void wrap_definition(Attachment &context, Handle cls, const std::u32string &name, bool class_method)
 {
@@ -1062,6 +1152,15 @@ void install_construction(Attachment &context, std::span<const Handle> core)
     cell.parameters = {{U"cls", ParameterKind::PositionalOnly}};
     cell.varargs = U"contents";
     install(at(CoreObject::CellType), U"__new__", cell, cell_new, Binding::Static);
+    SignatureLayout function;
+    function.parameters = {
+        {U"cls", ParameterKind::PositionalOnly},
+        {U"code"},
+        {U"globals"},
+        {U"name", ParameterKind::PositionalOrKeyword, at(CoreObject::None).get(context)},
+        {U"argdefs", ParameterKind::PositionalOrKeyword, at(CoreObject::None).get(context)},
+        {U"closure", ParameterKind::PositionalOrKeyword, at(CoreObject::None).get(context)}};
+    install(at(CoreObject::FunctionType), U"__new__", function, function_new, Binding::Static);
 }
 } // namespace detail
 } // namespace cxxpython::core

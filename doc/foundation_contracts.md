@@ -830,6 +830,16 @@ caches guard on Type identity, typed protocol and matching publication epoch.
 They hold borrowed identities, are cleared before sweep/address reuse and root
 entries before a safepoint. Shared Code does not contain mutable execution caches.
 
+FunctionType's Python constructor uses the existing make_function allocation and
+closure validation path, not a second Function layout. Its code is an already
+verified Code object; globals remain the supplied dictionary. Builtins are selected
+once from globals or the active caller and rooted before construction. A module
+contributes its dictionary; any other supplied value is retained for normal
+mapping lookup at execution, including its eventual Python exception. Replacing
+globals['__builtins__'] later does not retarget an existing function. Name overrides
+update only the name edge, not the code's qualname. Implicit constructor audit
+events and reconstruction from serialized Code bytes remain compatibility gates.
+
 All call shapes use the same binder and caller-owned result boundary. Complete
 positional native calls borrow spans or prefix a receiver in bounded stack
 storage, with a vector for larger arities. Defaults, keyword-only/variadic cases,

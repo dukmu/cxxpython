@@ -689,6 +689,12 @@ registration, not inferred from physical layout or __getitem__ availability.
 owns construction and call binding, not a second metadata dictionary. Independently
 assigned defaults and keyword defaults are not a multi-field transaction.
 Writable __code__ and Code.replace remain separate compatibility work.
+The Python FunctionType constructor in Objects/typeconstruction.cpp delegates to
+make_function with an existing verified Code, rooted globals/defaults/closure and
+the selected builtins environment. It does not construct or reinterpret code
+bytes. Its direct GC/concurrency fixture is separate from optional unchanged-dill
+acceptance under Tests/third_party/dill; that package's native imports and CodeType
+serialization contract are still missing.
 
 Non-generic function annotations evaluate in the defining scope after defaults
 and are carried by MAKE_FUNCTION's annotation flag. Their mutable dictionary edge uses

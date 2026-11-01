@@ -479,7 +479,8 @@ struct FunctionObject {
 struct FunctionSpec {
     Handle code, globals;
     std::optional<Handle> defaults = {}, kwdefaults = {};
-    // Host execution environment; source/loader policy selects this mapping.
+    // Execution environment selected by source/loader policy or FunctionType.
+    // Modules are normalized by the caller; other values use mapping lookup.
     std::optional<Handle> builtins = {};
     std::optional<Handle> closure = {};
     std::optional<Handle> annotations = {};

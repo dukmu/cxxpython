@@ -2082,12 +2082,11 @@ void make_function(Attachment &context, const FunctionSpec &spec, ReturnSlot &ou
         return;
     }
     if (!kind<DictObject, CoreObject::DictType>(context, globals.get(context)) ||
-        !kind<DictObject, CoreObject::DictType>(context, builtins.get(context)) ||
         (defaults && !kind<TupleObject, CoreObject::TupleType>(context, *defaults)) ||
         (keywords && !kind<DictObject, CoreObject::DictType>(context, *keywords)) ||
         (annotations && !kind<DictObject, CoreObject::DictType>(context, *annotations))) {
         type_error(context,
-                   U"function requires globals/builtins dicts, defaults tuple and optional "
+                   U"function requires globals dict, defaults tuple and optional "
                    U"kwdefaults dict",
                    out);
         return;

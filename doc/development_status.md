@@ -1,5 +1,51 @@
 # Development Status
 
+## 2026-11-01 FunctionType Construction And Unmodified Dill Probe
+
+After publishing shared kernels as 3b4bc99, investigated the user's optional
+unchanged-dill request. One Terra worker inspected code/function reconstruction
+and implemented the bounded constructor gap; parent reviewed, added GC/parallel
+coverage, recorded the dependencies and verified the final changes. Worker closed.
+
+- FunctionType now accepts code/globals/name/argdefs/closure through the ordinary
+  binder, delegating creation to make_function. It retains the verified Code and
+  actual globals/defaults/cells, preserves code qualname under a name override,
+  and follows the reference closure diagnostics. No new object, layout, code
+  parser, collector, lock or serialization facade was added.
+- Constructor builtins come from the globals entry or the active caller. Modules
+  contribute their real dictionary; other values retain ordinary mapping lookup
+  and Python failure semantics. make_function no longer rejects non-dict builtins
+  that the VM already knows how to access. Replacing the globals entry does not
+  retarget an existing function. Implicit function.__new__ audit emission remains
+  a documented gap rather than a claim of complete constructor compatibility.
+- Added a direct CPython-generated script fixture for binding, metadata, closure
+  shape, retained environments, invalid mappings, collection and four concurrent
+  function creators collecting in one heap. Strict Clang 21.1.8 Release passes
+  131 related native tests, including all eight core-bootstrap allocation-failure
+  shards. ASan/UBSan/LSan and TSan each pass the other 123 native tests. All three
+  builds pass the same 12 affected scripts; no sanitizer or timeout was weakened.
+  Evidence is .cache/dill-function-{release,asan,tsan}-*.log.
+- Official dill 0.4.1 remains unchanged outside Lib, with its license retained.
+  Tests/third_party/dill/test.py and reference stdout cover values, graph identity,
+  Code, functions/defaults, closures and class instances. Fixed CPython 3.12.14
+  passes; the product still fails at mandatory _contextvars.Context import. This
+  is opt-in failing acceptance, not a default-suite expected failure or supported
+  package. Mandatory marshal/multiprocessing imports and real executable CodeType
+  reconstruction remain dependencies; ctypes is optional on this import path.
+  Diagnostics and the reusable package remain under .cache/dill-compatibility
+  and .cache/deps/dill-0.4.1-wheel. No guest execution falls back to CPython.
+- Recompressed regenerated sanitizer DWARF with the same timestamp-preserving
+  standard ELF compression after tests. Both compressed interpreters pass the
+  new constructor fixture, and total .cache remains about 1.6 GiB. Code, symbols,
+  toolchains, active builds, raw measurements and verification evidence remain.
+  Formatting and diff checks pass. No unrelated benchmark campaign was repeated;
+  shared-kernel performance measurements still describe 3b4bc99, not this new node.
+
+The performance/cleanup goal stays active; the full compatibility expansion stays
+paused. This small runtime prerequisite does not establish dill compatibility or
+complete the separate executable-byte serialization contract. matrix.py remains
+unmodified, untracked and excluded from the commit.
+
 ## 2026-11-01 Shared Builtin ObjectOps Kernels And Debug Cache Compression
 
 The user resumed the performance/cleanup goal after ec93ee1 and requested whole

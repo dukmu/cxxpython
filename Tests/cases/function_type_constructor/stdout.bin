@@ -1,0 +1,35 @@
+42 renamed original example doc
+True (2,) None
+43 original True
+42 True
+True
+True
+42
+True
+42
+True
+True
+True
+not a mapping
+True
+not a mapping
+42 False
+True 42
+TypeError
+TypeError
+TypeError
+TypeError
+TypeError
+TypeError
+TypeError
+ValueError
+TypeError
+ValueError
+TypeError
+TypeError
+function() argument 'code' must be code, not int
+function() argument 'globals' must be dict, not list
+arg 5 (closure) expected cell, found int
+inner requires closure of length 1, not 0
+gc roots True True
+parallel construction True True
