@@ -1,9 +1,11 @@
 #include "cxxpython/execution.hpp"
 #include "cxxpython/typealiasobject.hpp"
 #include "cxxpython/typevarobject.hpp"
+#include "internal/abstract.hpp"
 #include "internal/exceptiongroup.hpp"
 #include "internal/patternmatching.hpp"
 
+#include <cmath>
 #include <gtest/gtest.h>
 
 namespace {
@@ -69,6 +71,91 @@ class CoreExecution : public testing::Test {
         EXPECT_EQ(out.result().tag(), ResultTag::Empty);
     }
 };
+
+TEST_F(CoreExecution, ScalarOperandsAreNotGcPointersAndTrimRestoresBoxedSlots)
+{
+    CodeBuilder builder(context);
+    const auto one = builder.constant(integer(1));
+    for (int i = 0; i < 3; ++i)
+        builder.emit(Opcode::LoadConst, one);
+    builder.emit(Opcode::Binary, static_cast<std::uint32_t>(BinaryOp::Add));
+    builder.emit(Opcode::Binary, static_cast<std::uint32_t>(BinaryOp::Add));
+    builder.emit(Opcode::Return);
+    const auto program = code(builder), callable = function(program);
+    ReturnSlot out(context);
+    context.allocate_instance<FrameObject>(builtin(CoreObject::FrameType), out,
+                                           callable.get(context), program.get(context), 0, 3,
+                                           context.builtin(CoreObject::None), 0);
+    const auto frame = roots.root(out.value());
+    auto &data = context.payload<FrameObject>(frame);
+    data.operands[0] = OperandSlot::integer(std::numeric_limits<std::int64_t>::min());
+    data.operands[1] = OperandSlot::floating(std::numeric_limits<double>::quiet_NaN());
+    make_str(context, U"only retained by the operand stack", out);
+    data.operands[2] = out.value();
+    data.sp = 3;
+    data.scalar_operands = 2;
+    out.reset();
+    context.collect();
+    EXPECT_EQ(data.operands[0].integer(), std::numeric_limits<std::int64_t>::min());
+    EXPECT_TRUE(std::isnan(data.operands[1].floating()));
+    EXPECT_EQ(context.payload<StrObject>(data.operands[2].boxed()).value,
+              U"only retained by the operand stack");
+    EXPECT_THROW(data.operands[0].boxed(), std::logic_error);
+    data.trim_stack(context, 0);
+    EXPECT_EQ(data.scalar_operands, 0U);
+    for (const auto &slot : data.operands)
+        EXPECT_EQ(slot.boxed(), context.builtin(CoreObject::None));
+}
+
+TEST_F(CoreExecution, NumericLeaseUsesActualDefinitionAndExistingRootSlot)
+{
+    context.set_gc_enabled(false);
+    RootScope cold(context);
+    detail::resolve_builtin_slot(context, CoreObject::FloatType, Protocol::Add, cold);
+    detail::resolve_builtin_slot(context, CoreObject::FloatType, Protocol::IAdd, cold);
+    ReturnSlot lease(context), out(context);
+    const auto count = context.stats().roots;
+    auto kind =
+        context.lease_builtin_numeric(CoreObject::FloatType, Protocol::Add, Protocol::IAdd, lease);
+    ASSERT_TRUE(kind);
+    EXPECT_EQ(*kind, NativeNumericKind::FloatAdd);
+    EXPECT_EQ(context.stats().roots, count);
+    const auto descriptor = roots.root(lease.value());
+    const auto &method = context.payload<MethodDescriptorObject>(descriptor);
+    const auto &native = context.payload<NativeFunctionObject>(method.function);
+    EXPECT_EQ(native.numeric_kind, NativeNumericKind::FloatAdd);
+    context.invalidate_types();
+    EXPECT_FALSE(context.lease_builtin_numeric(CoreObject::FloatType, Protocol::Add, {}, lease));
+    EXPECT_EQ(lease.tag(), ResultTag::Empty);
+
+    const auto cls = builtin(CoreObject::FloatType);
+    const auto space = roots.root(*TypeView(context, cls).dictionary());
+    const auto key = text(U"__add__");
+    SignatureLayout signature;
+    signature.parameters = {{U"self", ParameterKind::PositionalOnly},
+                            {U"other", ParameterKind::KeywordOnly}};
+    detail::allocate_function(context, builtin(CoreObject::NativeFunctionType), "tagged add",
+                              signature, native.entry, {}, out, {},
+                              NativeFunctionBinding::Descriptor, {}, NativeNumericKind::FloatAdd);
+    make_method_descriptor(context, cls, roots.root(out.value()), out);
+    detail::name_store(context, space.get(context), key.get(context), out.value());
+    detail::resolve_builtin_slot(context, CoreObject::FloatType, Protocol::Add, cold);
+    kind = context.lease_builtin_numeric(CoreObject::FloatType, Protocol::Add, {}, lease);
+    ASSERT_TRUE(kind);
+    EXPECT_EQ(*kind, NativeNumericKind::None);
+    EXPECT_EQ(lease.tag(), ResultTag::Empty);
+    detail::name_store(context, space.get(context), key.get(context), descriptor.get(context));
+    const auto inplace = text(U"__iadd__");
+    detail::name_store(context, space.get(context), inplace.get(context), descriptor.get(context));
+    detail::resolve_builtin_slot(context, CoreObject::FloatType, Protocol::Add, cold);
+    detail::resolve_builtin_slot(context, CoreObject::FloatType, Protocol::IAdd, cold);
+    kind =
+        context.lease_builtin_numeric(CoreObject::FloatType, Protocol::Add, Protocol::IAdd, lease);
+    ASSERT_TRUE(kind);
+    EXPECT_EQ(*kind, NativeNumericKind::None);
+    EXPECT_EQ(lease.tag(), ResultTag::Empty);
+    ASSERT_TRUE(detail::name_erase(context, space.get(context), U"__iadd__"));
+}
 
 TEST_F(CoreExecution, VerificationRejectsEmptyUnknownAndUnexpectedOperands)
 {
@@ -1508,7 +1595,7 @@ TEST_F(CoreExecution, RunningFrameSlotsSurviveCallbacksGcAndCompletedFrameObserv
             auto &data = c.payload<FrameObject>(frame);
             EXPECT_EQ(data.state.load(), FrameState::Running);
             EXPECT_EQ(data.sp, 2U);
-            EXPECT_EQ(data.operands[0], args[0]);
+            EXPECT_EQ(data.operands[0].boxed(), args[0]);
             auto *address = data.operands.data();
             write_cell(c, c.payload<NativeFunctionObject>(fn).captures[0], frame);
             c.collect();
@@ -1547,7 +1634,7 @@ TEST_F(CoreExecution, RunningFrameSlotsSurviveCallbacksGcAndCompletedFrameObserv
     EXPECT_EQ(data.sp, 0U);
     EXPECT_EQ(data.locals[0], self.get(context));
     for (auto value : data.operands)
-        EXPECT_EQ(value, context.builtin(CoreObject::None));
+        EXPECT_EQ(value.boxed(), context.builtin(CoreObject::None));
     get_attribute(context, frame, text(U"f_code"), out);
     EXPECT_EQ(out.result().value(), program.get(context));
     get_attribute(context, frame, text(U"f_globals"), out);

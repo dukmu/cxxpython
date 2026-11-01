@@ -770,6 +770,21 @@ the target is `builtins` and the `__builtins__` execution namespace.
   APIs include pow/atan2, isclose, erf/erfc and nextafter/ulp;
   complete accuracy/error/performance matrices are still acceptance gates.
 
+## Context Variables
+
+- `Lib/contextvars.py` is unchanged CPython 3.12.14 source. The native
+  `_contextvars` module implements Context, ContextVar, Token and copy_context.
+  Each attached thread owns a traced current-context root; Context.run restores
+  it on success, Python exceptions and native unwinding. Atomic entry claims
+  reject recursive/concurrent entry of the same Context, not execution elsewhere.
+- Context snapshots use immutable tuples of variable/value pairs. Copy is O(1);
+  lookup and update are currently O(n), unlike CPython's HAMT. Replacements and
+  tokens are allocated outside a short per-context commit lock; commit checks the
+  source snapshot and retries if a GC callback changed it. Token reset checks
+  variable/context/used state and marks used only with a successful publication.
+  Iterators retain their original snapshots. Full upstream-suite and asymptotic
+  performance acceptance remain open; this is not completion of dill support.
+
 ## Random And Date Policy
 
 - Lib/random.py, datetime.py, _pydatetime.py, calendar.py and _strptime.py are

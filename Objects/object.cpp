@@ -181,7 +181,8 @@ namespace detail {
 void allocate_function(Attachment &context, Handle type, std::string name,
                        SignatureLayout signature, NativeEntry entry, std::vector<Value> captures,
                        ReturnSlot &out, std::optional<Value> sequence_owner,
-                       NativeFunctionBinding binding, std::optional<Value> bound_self)
+                       NativeFunctionBinding binding, std::optional<Value> bound_self,
+                       NativeNumericKind numeric)
 {
     out.reset(context);
     signature.validate();
@@ -189,7 +190,7 @@ void allocate_function(Attachment &context, Handle type, std::string name,
         throw std::invalid_argument("native function requires an entrypoint");
     context.allocate_instance<NativeFunctionObject>(
         type, out, std::move(name), std::move(signature), entry, std::move(captures),
-        sequence_owner, binding, bound_self);
+        sequence_owner, binding, bound_self, numeric);
 }
 } // namespace detail
 

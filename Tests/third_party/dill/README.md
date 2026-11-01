@@ -19,8 +19,9 @@ third-party acceptance test, not a default CTest fixture, expected failure or
 claim that dill is supported. Do not modify dill, inject substitute modules or
 invoke host CPython to execute guest code to make it pass.
 
-Current first failure is the mandatory `_contextvars.Context` import. Mandatory
-`marshal` and `multiprocessing.reduction` imports also need real implementations;
+Context/ContextVar/Token and unchanged `contextvars.py` now pass the focused
+product fixtures. The unchanged dill probe advances to missing `marshal`;
+`marshal` and `multiprocessing.reduction` imports still need real implementations.
 `ctypes` is optional at import. Function/code reconstruction has additional
 runtime requirements beyond successful imports. Compatibility work must preserve
 the shared-heap, no-GIL, precise-root and thread-state contracts.

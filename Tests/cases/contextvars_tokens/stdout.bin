@@ -1,0 +1,15 @@
+LookupError
+None
+True True
+outer
+ValueError
+ValueError
+inner
+outer
+RuntimeError
+unset
+RuntimeError
+ValueError
+outer inside
+unset
+True

@@ -73,6 +73,7 @@ add_library(cxxpython_core
     Modules/itertools_combinatorics.cpp
     Modules/itertools_groups.cpp
     Modules/_collectionsmodule.cpp
+    Modules/_contextvarsmodule.cpp
     Modules/binascii.cpp
     Modules/main.cpp
     Modules/sysmodule.cpp
@@ -99,6 +100,7 @@ add_library(cxxpython_core
     Python/symtable.cpp
     Python/flowgraph.cpp
     Python/ceval.cpp
+    Python/specialize.cpp
     Python/traceback.cpp
     Python/unwind.cpp
     Parser/ast_lower.cpp

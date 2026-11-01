@@ -16,10 +16,13 @@ compiler, VM, and extension platform implemented in a C/C++ mix.
   `doc/architecture_design.md`. Legacy source, libraries, tests and extension
   APIs have been deleted at the user's request; do not bring them back as a
   fallback or expose the old interpreter's capabilities as current support.
-- The first foundation uses boxed values, immutable native layouts, stable
+- The first foundation uses boxed public values, immutable native layouts, stable
   precise roots, caller-owned result slots, tracing GC without Python object
   reference counting. Multiple OS threads must execute Python bytecode and
   object protocols simultaneously in one Interpreter and one shared heap.
+  Plan 2 section 0.14 permits explicitly tagged native int64/double VM temporaries;
+  escape/identity/ordinary-call boundaries materialize them. Do not pass unboxed
+  operands as Value/Handle or trace numeric bits as managed pointers.
 - Follow N0 -> N1 -> N2 -> N3 before expanding the remaining M0-M9 capabilities.
   Use thread-owned root arenas, request/ack/completed GC epochs, rooted shared
   reads, explicit field synchronization and immutable metadata snapshots.
@@ -99,6 +102,11 @@ compiler, VM, and extension platform implemented in a C/C++ mix.
 - Do not rerun the full performance suite for every stable commit. Reuse retained
   baselines; measure affected hot paths, new workloads or concrete regressions.
   Correctness-only changes need relevant regression tests, not unrelated CPU probes.
+  Following the latest user correction, form complete VM/dill dependency slices
+  before validation: one primary Clang build during development, then targeted
+  sanitizer targets/scenarios for changed ownership/concurrency, not repeated
+  full multi-build campaigns for each local edit. Check global VM allocation and
+  dispatch costs rather than substituting another metadata micro-optimization.
 - The user authorizes timely stable-point commits after verification. Commit
   completed vertical slices promptly, excluding unrelated user changes.
 

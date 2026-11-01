@@ -1,0 +1,15 @@
+from contextvars import Context, ContextVar
+
+var = ContextVar('var')
+ctx = Context()
+ctx.run(var.set, 10)
+keys = ctx.keys()
+values = ctx.values()
+items = ctx.items()
+print(type(keys).__name__, type(values).__name__, type(items).__name__)
+print(type(iter(ctx)).__name__)
+print(iter(keys) is keys, len(keys), len(values), len(items))
+ctx.run(var.set, 20)
+print(next(keys) is var, next(values), next(items) == (var, 10))
+print(len(keys), list(keys), list(values), list(items))
+print(list(ctx.values()))

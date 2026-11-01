@@ -3,6 +3,25 @@
 #include "cxxpython/protocol.hpp"
 
 namespace cxxpython::core::detail {
+struct NativeCallScope {
+    Attachment &context;
+    bool entered = false;
+    NativeCallScope(Attachment &c, ReturnSlot &out) : context(c)
+    {
+        out.reset(context);
+        entered = context.enter_native_scope();
+        if (!entered)
+            raise_error(context, CoreObject::RecursionErrorType, U"maximum call depth exceeded",
+                        out);
+    }
+    ~NativeCallScope()
+    {
+        if (entered) {
+            context.leave_native_call();
+            context.leave_call();
+        }
+    }
+};
 // The Interpreter retains the builtin type and its immutable MRO. The actual
 // descriptor owns its function/lease and has an independent root in the caller's
 // scope, even if an internal namespace update removes or replaces the method.

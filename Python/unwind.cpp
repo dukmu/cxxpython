@@ -28,7 +28,8 @@ void FrameObject::trace(Tracer &tracer) const noexcept
     for (auto cell : cells)
         tracer.visit(cell);
     for (std::size_t i = 0; i < sp; ++i)
-        tracer.visit(operands[i]);
+        if (operands[i].kind() == OperandSlot::Kind::Boxed)
+            tracer.visit(operands[i].boxed());
     if (handled_exception)
         tracer.visit(*handled_exception);
     if (resume_value)
@@ -50,8 +51,15 @@ void FrameObject::trace(Tracer &tracer) const noexcept
 }
 void FrameObject::trim_stack(Attachment &context, std::size_t size) noexcept
 {
-    while (sp > size)
-        operands[--sp] = context.builtin(CoreObject::None);
+    if (sp <= size)
+        return;
+    const auto none = context.builtin(CoreObject::None);
+    while (sp > size) {
+        auto &slot = operands[--sp];
+        if (slot.kind() != OperandSlot::Kind::Boxed)
+            --scalar_operands;
+        slot = none;
+    }
 }
 bool FrameObject::unwind(Attachment &context)
 {

@@ -281,6 +281,7 @@ struct NativeFunctionObject {
     const std::string name;
     const SignatureLayout signature;
     const NativeEntry entry;
+    const NativeNumericKind numeric_kind;
     const std::vector<Value> captures;
     const std::optional<Value> sequence_owner;
     const NativeFunctionBinding binding;
@@ -291,10 +292,11 @@ struct NativeFunctionObject {
                          NativeEntry entry_in, std::vector<Value> captures_in,
                          std::optional<Value> sequence = {},
                          NativeFunctionBinding binding_in = NativeFunctionBinding::Function,
-                         std::optional<Value> self_in = {})
+                         std::optional<Value> self_in = {},
+                         NativeNumericKind numeric = NativeNumericKind::None)
         : header(head), name(std::move(name_in)), signature(std::move(signature_in)),
-          entry(entry_in), captures(std::move(captures_in)), sequence_owner(sequence),
-          binding(binding_in), bound_self(self_in)
+          entry(entry_in), numeric_kind(numeric), captures(std::move(captures_in)),
+          sequence_owner(sequence), binding(binding_in), bound_self(self_in)
     {}
     void trace(Tracer &tracer) const noexcept;
     std::size_t external_bytes() const noexcept;
@@ -505,7 +507,8 @@ void invoke_special(Attachment &context, Handle receiver, Handle descriptor, Cal
 void install_native_attribute(Attachment &context, std::span<const Handle> core, Handle owner,
                               std::u32string name, SignatureLayout signature, NativeEntry entry,
                               std::vector<Value> captures = {},
-                              NativeSlotKind kind = NativeSlotKind::Ordinary);
+                              NativeSlotKind kind = NativeSlotKind::Ordinary,
+                              NativeNumericKind numeric = NativeNumericKind::None);
 void install_native_field(Attachment &context, std::span<const Handle> core, Handle owner,
                           std::u32string name, NativeGetter getter, NativeSetter setter = nullptr);
 void install_native_member(Attachment &context, std::span<const Handle> core, Handle owner,
@@ -561,6 +564,7 @@ void allocate_function(Attachment &context, Handle type, std::string name,
                        SignatureLayout signature, NativeEntry entry, std::vector<Value> captures,
                        ReturnSlot &out, std::optional<Value> sequence_owner = {},
                        NativeFunctionBinding binding = NativeFunctionBinding::Descriptor,
-                       std::optional<Value> bound_self = {});
+                       std::optional<Value> bound_self = {},
+                       NativeNumericKind numeric = NativeNumericKind::None);
 } // namespace detail
 } // namespace cxxpython::core

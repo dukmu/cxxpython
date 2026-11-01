@@ -69,6 +69,10 @@ enum class Protocol : std::size_t {
     RMatrixMultiply,
     IMatrixMultiply,
     Contains,
+    GetAttribute,
+    GetAttr,
+    SetAttribute,
+    DelAttribute,
     Count,
 };
 enum class ProtocolResult { Any, Boolean, Length, Integer, String, Hash };

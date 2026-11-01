@@ -30,6 +30,18 @@ class Handle;
 class RootScope;
 struct WeakRefObject;
 enum class Protocol : std::size_t;
+enum class NativeNumericKind : std::uint8_t {
+    None,
+    IntAdd,
+    IntSubtract,
+    IntMultiply,
+    FloatAdd,
+    FloatSubtract,
+    FloatMultiply,
+    FloatTrueDivide,
+    FloatFloorDivide,
+    FloatModulo
+};
 struct ResolvedSlot;
 namespace detail {
 struct BuiltinSlot;
@@ -646,6 +658,8 @@ class Attachment final {
     void publish_signal_state(Handle candidate, ReturnSlot &);
     void load_audit_hooks(ReturnSlot &);
     void publish_audit_hooks(Handle candidate, ReturnSlot &);
+    void load_context(ReturnSlot &);
+    void set_context(std::optional<Handle>);
     void load_sys_dictionary(ReturnSlot &);
     void set_sys_dictionary(Handle dictionary);
     // Native resource release only, after roots/Frames retire. No allocation or Python calls.
@@ -658,7 +672,10 @@ class Attachment final {
     std::optional<ResolvedSlot> cached_protocol(Value type, Protocol protocol, RootScope &roots);
     std::optional<detail::BuiltinSlot> cached_builtin_protocol(CoreObject type, Protocol protocol,
                                                                RootScope &roots);
-    void cache_protocol(const ResolvedSlot &slot);
+    std::optional<NativeNumericKind> lease_builtin_numeric(CoreObject, Protocol,
+                                                           std::optional<Protocol>, ReturnSlot &);
+    void cache_protocol(const ResolvedSlot &slot,
+                        NativeNumericKind numeric = NativeNumericKind::None);
     std::uint64_t publication_epoch(PublicationDomain domain) const;
     bool begin_publication(PublicationDomain domain, std::uint64_t epoch);
     void end_publication(PublicationDomain domain, std::uint64_t epoch);
@@ -666,6 +683,7 @@ class Attachment final {
     std::size_t call_depth_limit() const;
     void leave_call() noexcept;
     bool enter_native_call();
+    bool enter_native_scope();
     void leave_native_call() noexcept;
     CallExecutor call_executor() const;
     std::optional<Value> current_frame() const;

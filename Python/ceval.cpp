@@ -1,5 +1,7 @@
+#include "internal/ceval.hpp"
 #include "cxxpython/asyncgenobject.hpp"
 #include "cxxpython/execution.hpp"
+#include "cxxpython/floatobject.hpp"
 #include "cxxpython/genobject.hpp"
 #include "cxxpython/import.hpp"
 #include "cxxpython/setobject.hpp"
@@ -66,6 +68,26 @@ class FrameActivation final {
     const CodeObject &code() const noexcept
     {
         return *code_;
+    }
+    std::span<const Value> constants() const noexcept
+    {
+        return constants_;
+    }
+    std::span<const Value> names() const noexcept
+    {
+        return names_;
+    }
+    std::span<const Value> cellvars() const noexcept
+    {
+        return cellvars_;
+    }
+    std::span<const Value> freevars() const noexcept
+    {
+        return freevars_;
+    }
+    std::span<const Value> call_keywords() const noexcept
+    {
+        return call_keywords_;
     }
     void sync()
     {
@@ -177,6 +199,12 @@ class FrameActivation final {
         current_ = value;
         frame_ = &context_.payload<FrameObject>(value);
         code_ = &context_.payload<CodeObject>(frame_->code);
+        // Code owns these immutable tuples for the entire activation.
+        constants_ = context_.payload<TupleObject>(code_->constants).items;
+        names_ = context_.payload<TupleObject>(code_->names).items;
+        cellvars_ = context_.payload<TupleObject>(code_->cellvars).items;
+        freevars_ = context_.payload<TupleObject>(code_->freevars).items;
+        call_keywords_ = context_.payload<TupleObject>(code_->call_keywords).items;
         context_.current_frame_ = value;
         sync();
     }
@@ -203,6 +231,7 @@ class FrameActivation final {
     Value current_;
     FrameObject *frame_ = nullptr;
     const CodeObject *code_ = nullptr;
+    std::span<const Value> constants_, names_, cellvars_, freevars_, call_keywords_;
     std::optional<Value> previous_;
     std::optional<Value> previous_exception_;
     bool generator_ = false;
@@ -588,7 +617,8 @@ DelegateResult delegate_step(Attachment &context, Value frame_value, FrameObject
 }
 void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &out)
 {
-    ReturnSlot result(context);
+    ReturnSlot result(context), numeric_method(context);
+    std::vector<Value> boxed_inputs;
     std::size_t poll_budget = 1;
     for (;;) {
         if (!--poll_budget) {
@@ -620,10 +650,40 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
             }
             data.last_instruction.store(data.pc, std::memory_order_release);
             const auto [opcode, operand] = code.program.instructions()[data.pc++];
+            if (opcode == Opcode::Binary || opcode == Opcode::Inplace) {
+                const bool numeric =
+                    detail::try_vm_numeric(context, data, opcode, operand, numeric_method, result);
+                numeric_method.reset();
+                if (numeric) {
+                    if (raised(result))
+                        activation.raising(result.exception());
+                    continue;
+                }
+            }
+            if (data.scalar_operands && opcode != Opcode::LoadConst && opcode != Opcode::LoadFast) {
+                bool boxing_failed = false;
+                for (std::size_t i = 0; i < data.sp; ++i) {
+                    auto &slot = data.operands[i];
+                    if (slot.kind() == OperandSlot::Kind::Boxed)
+                        continue;
+                    if (slot.kind() == OperandSlot::Kind::Integer)
+                        make_int(context, slot.integer(), result);
+                    else
+                        make_float(context, slot.floating(), result);
+                    if (raised(result)) {
+                        activation.raising(result.exception());
+                        boxing_failed = true;
+                        break;
+                    }
+                    slot = result.value();
+                    --data.scalar_operands;
+                }
+                if (boxing_failed)
+                    continue;
+            }
             switch (opcode) {
             case Opcode::LoadConst:
-                data.operands[data.sp++] =
-                    context.payload<TupleObject>(code.constants).items[operand];
+                data.operands[data.sp++] = activation.constants()[operand];
                 break;
             case Opcode::LoadFast:
                 if (!data.locals[operand]) {
@@ -638,7 +698,7 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 break;
             case Opcode::LoadClassDeref: {
                 const auto offset = operand - code.program.cell_names().size();
-                const auto key = context.payload<TupleObject>(code.freevars).items[offset];
+                const auto key = activation.freevars()[offset];
                 namespace_lookup(context, *data.namespace_mapping, key, result);
                 if (result.tag() == ResultTag::Empty)
                     read_cell(context, data.cells[operand], result);
@@ -676,12 +736,11 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 auto mapping = roots.root(data.operands[data.sp - 1]);
                 Value key = context.builtin(CoreObject::None);
                 if (opcode == Opcode::LoadFromDictOrGlobals)
-                    key = context.payload<TupleObject>(code.names).items[operand];
+                    key = activation.names()[operand];
                 else if (operand < code.program.cell_names().size())
-                    key = context.payload<TupleObject>(code.cellvars).items[operand];
+                    key = activation.cellvars()[operand];
                 else
-                    key = context.payload<TupleObject>(code.freevars)
-                              .items[operand - code.program.cell_names().size()];
+                    key = activation.freevars()[operand - code.program.cell_names().size()];
                 auto name = roots.root(key);
                 namespace_lookup(context, mapping.get(context), key, result);
                 if (result.tag() == ResultTag::Empty) {
@@ -747,8 +806,8 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 break;
             }
             case Opcode::SetFunctionTypeParams: {
-                const auto function = data.operands[data.sp - 2],
-                           parameters = data.operands[data.sp - 1];
+                const Value function = data.operands[data.sp - 2],
+                            parameters = data.operands[data.sp - 1];
                 if (context.type_of(function) != context.builtin(CoreObject::FunctionType) ||
                     !context.has_layout<FunctionObject>(function) ||
                     !kind<TupleObject, CoreObject::TupleType>(context, parameters)) {
@@ -798,9 +857,9 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                     activation.raising(result.exception());
                     break;
                 }
-                const std::array arguments{context.payload<TupleObject>(code.names).items[operand],
-                                           function.globals, result.value(),
-                                           data.operands[data.sp - 1], data.operands[data.sp - 2]};
+                const std::array<Value, 5> arguments{activation.names()[operand], function.globals,
+                                                     result.value(), data.operands[data.sp - 1],
+                                                     data.operands[data.sp - 2]};
                 call(context, callable, {arguments}, result);
                 if (raised(result))
                     activation.raising(result.exception());
@@ -813,8 +872,7 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
             case Opcode::ImportFrom: {
                 RootScope roots(context);
                 import_from(context, roots.root(data.operands[data.sp - 1]),
-                            roots.root(context.payload<TupleObject>(code.names).items[operand]),
-                            result);
+                            roots.root(activation.names()[operand]), result);
                 if (raised(result))
                     activation.raising(result.exception());
                 else
@@ -849,7 +907,7 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
             case Opcode::StoreName:
             case Opcode::DeleteName: {
                 const auto mapping = *data.namespace_mapping;
-                const auto key = context.payload<TupleObject>(code.names).items[operand];
+                const auto key = activation.names()[operand];
                 const auto &name = context.payload<StrObject>(key).value;
                 if (opcode == Opcode::LoadName) {
                     namespace_lookup(context, mapping, key, result);
@@ -896,7 +954,7 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
             case Opcode::SetupAnnotations: {
                 RootScope roots(context);
                 auto mapping = roots.root(*data.namespace_mapping);
-                auto key = roots.root(context.payload<TupleObject>(code.names).items[operand]);
+                auto key = roots.root(activation.names()[operand]);
                 namespace_lookup(context, mapping.get(context), key.get(context), result);
                 if (result.tag() == ResultTag::Empty) {
                     ReturnSlot dictionary(context);
@@ -916,7 +974,7 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
             case Opcode::StoreGlobal:
             case Opcode::DeleteGlobal: {
                 const auto &function = context.payload<FunctionObject>(data.function);
-                const auto key = context.payload<TupleObject>(code.names).items[operand];
+                const auto key = activation.names()[operand];
                 const auto &name = context.payload<StrObject>(key).value;
                 if (opcode == Opcode::LoadGlobal) {
                     namespace_lookup(context, function.globals, key, result);
@@ -1275,7 +1333,7 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
             case Opcode::StoreItem:
             case Opcode::DeleteItem: {
                 const auto base = data.sp - (opcode == Opcode::StoreItem ? 3 : 2);
-                const auto owner = data.operands[base], key = data.operands[base + 1];
+                const Value owner = data.operands[base], key = data.operands[base + 1];
                 if (opcode == Opcode::StoreItem)
                     detail::set_item_owned(context, owner, key, data.operands[base + 2], result);
                 else
@@ -1294,22 +1352,20 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                                        ? code.program.calls()[operand].keywords
                                        : operand;
                 const auto base = data.sp - count;
+                boxed_inputs.clear();
+                for (std::size_t i = 0; i < count; ++i)
+                    boxed_inputs.push_back(data.operands[base + i].boxed());
                 if (opcode == Opcode::BuildTuple)
-                    cxxpython::core::make_tuple(
-                        context, std::span<const Value>{data.operands.data() + base, count},
-                        result);
+                    cxxpython::core::make_tuple(context, boxed_inputs, result);
                 else if (opcode == Opcode::BuildList)
-                    cxxpython::core::make_list(
-                        context, std::span<const Value>{data.operands.data() + base, count},
-                        result);
+                    cxxpython::core::make_list(context, boxed_inputs, result);
                 else if (opcode == Opcode::BuildSet)
-                    make_set(context, std::span<const Value>{data.operands.data() + base, count},
-                             result);
+                    make_set(context, boxed_inputs, result);
                 else {
                     RootScope roots(context);
                     context.allocate_instance<DictObject>(
                         roots.root(context.builtin(CoreObject::DictType)), result);
-                    const auto &table = context.payload<TupleObject>(code.call_keywords).items;
+                    const auto table = activation.call_keywords();
                     const auto &names = context.payload<TupleObject>(table[operand]).items;
                     for (std::size_t i = 0; i < names.size(); ++i)
                         detail::name_store(context, result.value(), names[i],
@@ -1336,8 +1392,7 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
             case Opcode::StoreAttr:
             case Opcode::DeleteAttr: {
                 RootScope roots(context);
-                const auto name =
-                    roots.root(context.payload<TupleObject>(code.names).items[operand]);
+                const auto name = roots.root(activation.names()[operand]);
                 const auto base = data.sp - (opcode == Opcode::StoreAttr ? 2 : 1);
                 const auto object = roots.root(data.operands[base]);
                 if (opcode == Opcode::LoadAttr)
@@ -1360,8 +1415,8 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
             case Opcode::Inplace:
             case Opcode::LoadItem:
             case Opcode::Compare: {
-                const auto left = data.operands[data.sp - 2];
-                const auto right = data.operands[data.sp - 1];
+                const Value left = data.operands[data.sp - 2];
+                const Value right = data.operands[data.sp - 1];
                 if (opcode == Opcode::Binary)
                     detail::binary_owned(context, left, right, static_cast<BinaryOp>(operand),
                                          result);
@@ -1411,7 +1466,7 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 const auto exception = roots.root(result.value());
                 if (operand == 2) {
                     std::optional<Value> cause;
-                    if (data.operands[base + 1] != context.builtin(CoreObject::None)) {
+                    if (data.operands[base + 1].boxed() != context.builtin(CoreObject::None)) {
                         ReturnSlot converted(context);
                         detail::normalize_exception(context, roots.root(data.operands[base + 1]),
                                                     converted);
@@ -1430,7 +1485,7 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 break;
             }
             case Opcode::RaiseInstance: {
-                auto exception = data.operands[data.sp - 1];
+                Value exception = data.operands[data.sp - 1];
                 if (!kind<ExceptionObject, CoreObject::BaseExceptionType>(context, exception)) {
                     type_error(context, U"RAISE_INSTANCE requires a BaseException instance",
                                result);
@@ -1476,14 +1531,14 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                     }
                 } else {
                     const auto &keywords =
-                        context
-                            .payload<TupleObject>(
-                                context.payload<TupleObject>(code.call_keywords).items[operand])
-                            .items;
+                        context.payload<TupleObject>(activation.call_keywords()[operand]).items;
                     for (std::size_t i = 0; i < keywords.size(); ++i)
                         named.push_back(
                             {keywords[i], data.operands[base + 1 + layout.positional + i]});
-                    positional = {data.operands.data() + base + 1, layout.positional};
+                    boxed_inputs.clear();
+                    for (std::size_t i = 0; i < layout.positional; ++i)
+                        boxed_inputs.push_back(data.operands[base + 1 + i].boxed());
+                    positional = boxed_inputs;
                 }
                 CallArgsView args{positional, named};
                 data.pending_call = base;
@@ -1611,7 +1666,7 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 break;
             case Opcode::Reraise:
                 if (operand) {
-                    const auto exception = data.operands[data.sp - 1];
+                    const Value exception = data.operands[data.sp - 1];
                     if (!kind<ExceptionObject, CoreObject::BaseExceptionType>(context, exception)) {
                         raise_error(context, CoreObject::TypeErrorType,
                                     U"exceptions must derive from BaseException", result);
@@ -1807,6 +1862,7 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 throw std::logic_error("unverified opcode reached execution");
             }
         } catch (const std::bad_alloc &) {
+            numeric_method.reset();
             activation.raising(context.builtin(CoreObject::MemoryError));
         }
     }

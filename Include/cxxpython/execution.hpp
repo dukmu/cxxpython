@@ -3,6 +3,7 @@
 #include "cxxpython/protocol.hpp"
 
 #include <limits>
+#include <stdexcept>
 #include <string_view>
 #include <variant>
 
@@ -486,6 +487,61 @@ struct FunctionSpec {
     std::optional<Handle> annotations = {};
 };
 enum class FrameState { Created, Running, Suspended, Completed };
+class OperandSlot {
+  public:
+    enum class Kind : std::uint8_t { Boxed, Integer, Float };
+    OperandSlot(Value value) noexcept : object_(value.object()) {}
+    OperandSlot &operator=(Value value) noexcept
+    {
+        object_ = value.object();
+        kind_ = Kind::Boxed;
+        return *this;
+    }
+    static OperandSlot integer(std::int64_t value) noexcept
+    {
+        return OperandSlot(value);
+    }
+    static OperandSlot floating(double value) noexcept
+    {
+        return OperandSlot(value);
+    }
+    Kind kind() const noexcept
+    {
+        return kind_;
+    }
+    Value boxed() const
+    {
+        if (kind_ != Kind::Boxed)
+            throw std::logic_error("unboxed VM operand");
+        return Value(*object_);
+    }
+    std::int64_t integer() const
+    {
+        if (kind_ != Kind::Integer)
+            throw std::logic_error("VM operand is not an integer");
+        return integer_;
+    }
+    double floating() const
+    {
+        if (kind_ != Kind::Float)
+            throw std::logic_error("VM operand is not a float");
+        return floating_;
+    }
+    operator Value() const
+    {
+        return boxed();
+    }
+
+  private:
+    explicit OperandSlot(std::int64_t value) noexcept : integer_(value), kind_(Kind::Integer) {}
+    explicit OperandSlot(double value) noexcept : floating_(value), kind_(Kind::Float) {}
+    union {
+        ObjectHeader *object_;
+        std::int64_t integer_;
+        double floating_;
+    };
+    Kind kind_ = Kind::Boxed;
+};
 struct TracebackObject {
     ObjectHeader header;
     AtomicGcEdge next;
@@ -509,12 +565,12 @@ struct FrameObject {
     AtomicGcEdge back;
     AtomicGcEdge delegate;
     std::vector<std::optional<Value>> locals;
-    std::vector<Value> operands;
+    std::vector<OperandSlot> operands;
     std::vector<Value> cells;
     const std::optional<Value> namespace_mapping;
     // Lazily refreshed reflection snapshot, never the fast-local/Cell authority.
     std::optional<Value> locals_snapshot;
-    std::size_t pc = 0, sp = 0;
+    std::size_t pc = 0, sp = 0, scalar_operands = 0;
     std::atomic<std::size_t> last_instruction{std::numeric_limits<std::size_t>::max()};
     std::optional<std::size_t> pending_call;
     std::vector<ActiveRegion> regions;
@@ -542,7 +598,7 @@ struct FrameObject {
     std::size_t external_bytes() const noexcept
     {
         return locals.capacity() * sizeof(std::optional<Value>) +
-               (operands.capacity() + cells.capacity()) * sizeof(Value) +
+               operands.capacity() * sizeof(OperandSlot) + cells.capacity() * sizeof(Value) +
                regions.capacity() * sizeof(ActiveRegion) +
                cleanups.capacity() * sizeof(CleanupContinuation);
     }

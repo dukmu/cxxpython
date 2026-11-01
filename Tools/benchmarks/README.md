@@ -59,6 +59,10 @@ CPU utilization in CPU workloads are reported rather than silently removed.
   Size counts complete reductions, partitioned across workers rather than repeated
   per thread. It measures native iteration/coercion and reduction with natural GC,
   not pure Python bytecode parallelism; matrix/nbody remain separate CPU evidence.
+- `object_protocol` exercises instance construction, Python method calls, property
+  descriptors, attribute reads/writes/deletes and identity with a non-numeric
+  payload. Each job performs 32 rounds; total jobs stay fixed across workers.
+  Class setup and final correctness checks are outside the kernel clock.
 - `file_io` creates/writes/reads/unlinks the same total number of files for every
   thread count. It measures filesystem/page-cache workflows, not durable storage
   or device throughput; it does not call fsync.
@@ -76,7 +80,10 @@ case and size at one worker; compare absolute times against the reference as wel
 I/O concurrency alone is not evidence of parallel Python CPU execution.
 
 GC snapshots cover the entire worker, including warmups and validation. The
-optional native heap snapshot is absent on CPython, not fabricated. Last STW and
+Created Objects column uses the change in native live plus lifetime-reclaimed
+objects; it includes snapshot overhead and is not a kernel-only allocation count.
+Missing/unusable counters remain absent (`-`), including on CPython.
+The optional native heap snapshot is absent on CPython, not fabricated. Last STW and
 rendezvous values are last-event observations; max rendezvous is a lifetime maximum.
 They are not cumulative pause time or a pause distribution. The collector is not
 disabled to improve a score. If the counter did not advance, old setup pause

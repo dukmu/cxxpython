@@ -2,6 +2,7 @@
 #include "cxxpython/memoryobject.hpp"
 #include "cxxpython/protocol.hpp"
 #include "internal/abstract.hpp"
+#include "internal/ceval.hpp"
 #include "internal/long.hpp"
 
 #include <bit>
@@ -202,6 +203,16 @@ void true_divide_kernel(Attachment &context, const IntObject &a, const IntObject
     make_float(context, negative ? -result : result, out);
 }
 template <BinaryOp Op>
+bool small_int_scalar(std::int64_t a, std::int64_t b, std::int64_t &out) noexcept
+{
+    if constexpr (Op == BinaryOp::Add)
+        return !__builtin_add_overflow(a, b, &out);
+    else if constexpr (Op == BinaryOp::Subtract)
+        return !__builtin_sub_overflow(a, b, &out);
+    else
+        return !__builtin_mul_overflow(a, b, &out);
+}
+template <BinaryOp Op>
 void arithmetic_kernel(Attachment &context, const IntObject &a, const IntObject &b, ReturnSlot &out)
 {
     if constexpr (Op == BinaryOp::FloorDivide || Op == BinaryOp::Modulo)
@@ -213,12 +224,8 @@ void arithmetic_kernel(Attachment &context, const IntObject &a, const IntObject 
     if (!a.large && !b.large) {
         std::int64_t result = 0;
         bool overflow = false;
-        if constexpr (Op == BinaryOp::Add)
-            overflow = __builtin_add_overflow(a.small, b.small, &result);
-        if constexpr (Op == BinaryOp::Subtract)
-            overflow = __builtin_sub_overflow(a.small, b.small, &result);
-        if constexpr (Op == BinaryOp::Multiply)
-            overflow = __builtin_mul_overflow(a.small, b.small, &result);
+        if constexpr (Op == BinaryOp::Add || Op == BinaryOp::Subtract || Op == BinaryOp::Multiply)
+            overflow = !small_int_scalar<Op>(a.small, b.small, result);
         if constexpr (Op == BinaryOp::FloorDivide || Op == BinaryOp::Modulo) {
             overflow = a.small == std::numeric_limits<std::int64_t>::min() && b.small == -1;
             if (!overflow) {
@@ -1230,6 +1237,19 @@ void copy_int(Attachment &context, Value value, ReturnSlot &out)
         make_int(context, data.small, out);
 }
 namespace detail {
+bool small_int_binary(BinaryOp op, std::int64_t a, std::int64_t b, std::int64_t &out) noexcept
+{
+    switch (op) {
+    case BinaryOp::Add:
+        return small_int_scalar<BinaryOp::Add>(a, b, out);
+    case BinaryOp::Subtract:
+        return small_int_scalar<BinaryOp::Subtract>(a, b, out);
+    case BinaryOp::Multiply:
+        return small_int_scalar<BinaryOp::Multiply>(a, b, out);
+    default:
+        return false;
+    }
+}
 std::int64_t int_hash_value(Attachment &context, Value value)
 {
     constexpr std::uint64_t modulus =
@@ -1255,19 +1275,23 @@ void install_numbers(Attachment &context, std::span<const Handle> core)
     unary.parameters = {{U"self", ParameterKind::PositionalOnly}};
     SignatureLayout pair = unary;
     pair.parameters.push_back({U"other", ParameterKind::PositionalOnly});
-    auto install = [&](std::u32string name, NativeEntry entry, bool binary = false) {
+    auto install = [&](std::u32string name, NativeEntry entry, bool binary = false,
+                       NativeNumericKind numeric = NativeNumericKind::None) {
         install_native_attribute(context, core, at(CoreObject::IntType), std::move(name),
-                                 binary ? pair : unary, entry);
+                                 binary ? pair : unary, entry, {}, NativeSlotKind::Ordinary,
+                                 numeric);
     };
     auto round_signature = unary;
     round_signature.varargs = U"args";
     install_native_attribute(context, core, at(CoreObject::IntType), U"__round__", round_signature,
                              integer_round);
-    install(U"__add__", arithmetic<BinaryOp::Add, false>, true);
+    install(U"__add__", arithmetic<BinaryOp::Add, false>, true, NativeNumericKind::IntAdd);
     install(U"__radd__", arithmetic<BinaryOp::Add, true>, true);
-    install(U"__sub__", arithmetic<BinaryOp::Subtract, false>, true);
+    install(U"__sub__", arithmetic<BinaryOp::Subtract, false>, true,
+            NativeNumericKind::IntSubtract);
     install(U"__rsub__", arithmetic<BinaryOp::Subtract, true>, true);
-    install(U"__mul__", arithmetic<BinaryOp::Multiply, false>, true);
+    install(U"__mul__", arithmetic<BinaryOp::Multiply, false>, true,
+            NativeNumericKind::IntMultiply);
     install(U"__rmul__", arithmetic<BinaryOp::Multiply, true>, true);
     install(U"__truediv__", true_divide<false>, true);
     install(U"__rtruediv__", true_divide<true>, true);

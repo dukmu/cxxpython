@@ -3,6 +3,7 @@
 #include "cxxpython/memoryobject.hpp"
 #include "cxxpython/protocol.hpp"
 #include "internal/abstract.hpp"
+#include "internal/ceval.hpp"
 #include "internal/errors.hpp"
 #include "internal/long.hpp"
 
@@ -398,22 +399,57 @@ bool operand_double(Attachment &context, Value value, double &number, ReturnSlot
     return false;
 }
 
-template <BinaryOp Op> void float_kernel(Attachment &context, double a, double b, ReturnSlot &out)
+template <BinaryOp Op>
+bool float_scalar(Attachment &context, double a, double b, double &result, ReturnSlot &error)
 {
     if constexpr (Op == BinaryOp::TrueDivide || Op == BinaryOp::FloorDivide ||
                   Op == BinaryOp::Modulo)
         if (b == 0.0) {
             raise_error(context, CoreObject::ZeroDivisionErrorType,
-                        U"float division or modulo by zero", out);
-            return;
+                        U"float division or modulo by zero", error);
+            return false;
         }
-    double result;
     if constexpr (Op == BinaryOp::Add)
         result = a + b;
     if constexpr (Op == BinaryOp::Subtract)
         result = a - b;
     if constexpr (Op == BinaryOp::Multiply)
         result = a * b;
+    if constexpr (Op == BinaryOp::TrueDivide)
+        result = a / b;
+    if constexpr (Op == BinaryOp::FloorDivide || Op == BinaryOp::Modulo) {
+        double remainder = std::fmod(a, b);
+        double quotient = (a - remainder) / b;
+        if (remainder != 0.0) {
+            if ((remainder < 0) != (b < 0)) {
+                remainder += b;
+                quotient -= 1.0;
+            }
+        } else
+            remainder = std::copysign(0.0, b);
+        if constexpr (Op == BinaryOp::Modulo)
+            result = remainder;
+        else {
+            if (quotient != 0.0) {
+                result = std::floor(quotient);
+                // Recover an integral quotient rounded just below its exact value.
+                if (quotient - result > 0.5)
+                    result += 1.0;
+            } else
+                result = std::copysign(0.0, a / b);
+        }
+    }
+    return true;
+}
+
+template <BinaryOp Op> void float_kernel(Attachment &context, double a, double b, ReturnSlot &out)
+{
+    double result;
+    if constexpr (Op != BinaryOp::Power) {
+        if (float_scalar<Op>(context, a, b, result, out))
+            make_float(context, result, out);
+        return;
+    }
     if constexpr (Op == BinaryOp::Power) {
         if (b == 0.0)
             result = 1.0;
@@ -449,30 +485,6 @@ template <BinaryOp Op> void float_kernel(Attachment &context, double a, double b
                             U"numerical result out of range", out);
                 return;
             }
-        }
-    }
-    if constexpr (Op == BinaryOp::TrueDivide)
-        result = a / b;
-    if constexpr (Op == BinaryOp::FloorDivide || Op == BinaryOp::Modulo) {
-        double remainder = std::fmod(a, b);
-        double quotient = (a - remainder) / b;
-        if (remainder != 0.0) {
-            if ((remainder < 0) != (b < 0)) {
-                remainder += b;
-                quotient -= 1.0;
-            }
-        } else
-            remainder = std::copysign(0.0, b);
-        if constexpr (Op == BinaryOp::Modulo)
-            result = remainder;
-        else {
-            if (quotient != 0.0) {
-                result = std::floor(quotient);
-                // Recover an integral quotient rounded just below its exact value.
-                if (quotient - result > 0.5)
-                    result += 1.0;
-            } else
-                result = std::copysign(0.0, a / b);
         }
     }
     make_float(context, result, out);
@@ -826,6 +838,27 @@ void make_float(Attachment &context, double value, ReturnSlot &out)
                                            value);
 }
 
+bool detail::float_binary_scalar(Attachment &context, BinaryOp op, double a, double b, double &out,
+                                 ReturnSlot &error)
+{
+    switch (op) {
+    case BinaryOp::Add:
+        return float_scalar<BinaryOp::Add>(context, a, b, out, error);
+    case BinaryOp::Subtract:
+        return float_scalar<BinaryOp::Subtract>(context, a, b, out, error);
+    case BinaryOp::Multiply:
+        return float_scalar<BinaryOp::Multiply>(context, a, b, out, error);
+    case BinaryOp::TrueDivide:
+        return float_scalar<BinaryOp::TrueDivide>(context, a, b, out, error);
+    case BinaryOp::FloorDivide:
+        return float_scalar<BinaryOp::FloorDivide>(context, a, b, out, error);
+    case BinaryOp::Modulo:
+        return float_scalar<BinaryOp::Modulo>(context, a, b, out, error);
+    default:
+        return false;
+    }
+}
+
 void detail::install_floats(Attachment &context, std::span<const Handle> core)
 {
     auto at = [&](CoreObject id) { return core[static_cast<std::size_t>(id)]; };
@@ -835,9 +868,11 @@ void detail::install_floats(Attachment &context, std::span<const Handle> core)
                              integer_float);
     auto pair = unary;
     pair.parameters.push_back({U"other", ParameterKind::PositionalOnly});
-    auto install = [&](std::u32string name, NativeEntry entry, bool binary = false) {
+    auto install = [&](std::u32string name, NativeEntry entry, bool binary = false,
+                       NativeNumericKind numeric = NativeNumericKind::None) {
         install_native_attribute(context, core, at(CoreObject::FloatType), std::move(name),
-                                 binary ? pair : unary, entry);
+                                 binary ? pair : unary, entry, {}, NativeSlotKind::Ordinary,
+                                 numeric);
     };
     auto round_signature = unary;
     round_signature.parameters.push_back(
@@ -863,19 +898,24 @@ void detail::install_floats(Attachment &context, std::span<const Handle> core)
     install(U"__le__", float_compare<CompareOp::Le>, true);
     install(U"__gt__", float_compare<CompareOp::Gt>, true);
     install(U"__ge__", float_compare<CompareOp::Ge>, true);
-    install(U"__add__", float_arithmetic<BinaryOp::Add, false>, true);
+    install(U"__add__", float_arithmetic<BinaryOp::Add, false>, true, NativeNumericKind::FloatAdd);
     install(U"__radd__", float_arithmetic<BinaryOp::Add, true>, true);
-    install(U"__sub__", float_arithmetic<BinaryOp::Subtract, false>, true);
+    install(U"__sub__", float_arithmetic<BinaryOp::Subtract, false>, true,
+            NativeNumericKind::FloatSubtract);
     install(U"__rsub__", float_arithmetic<BinaryOp::Subtract, true>, true);
-    install(U"__mul__", float_arithmetic<BinaryOp::Multiply, false>, true);
+    install(U"__mul__", float_arithmetic<BinaryOp::Multiply, false>, true,
+            NativeNumericKind::FloatMultiply);
     install(U"__rmul__", float_arithmetic<BinaryOp::Multiply, true>, true);
-    install(U"__truediv__", float_arithmetic<BinaryOp::TrueDivide, false>, true);
+    install(U"__truediv__", float_arithmetic<BinaryOp::TrueDivide, false>, true,
+            NativeNumericKind::FloatTrueDivide);
     install(U"__rtruediv__", float_arithmetic<BinaryOp::TrueDivide, true>, true);
     install(U"__pow__", float_arithmetic<BinaryOp::Power, false>, true);
     install(U"__rpow__", float_arithmetic<BinaryOp::Power, true>, true);
-    install(U"__floordiv__", float_arithmetic<BinaryOp::FloorDivide, false>, true);
+    install(U"__floordiv__", float_arithmetic<BinaryOp::FloorDivide, false>, true,
+            NativeNumericKind::FloatFloorDivide);
     install(U"__rfloordiv__", float_arithmetic<BinaryOp::FloorDivide, true>, true);
-    install(U"__mod__", float_arithmetic<BinaryOp::Modulo, false>, true);
+    install(U"__mod__", float_arithmetic<BinaryOp::Modulo, false>, true,
+            NativeNumericKind::FloatModulo);
     install(U"__rmod__", float_arithmetic<BinaryOp::Modulo, true>, true);
     install(U"__divmod__", float_divmod<false>, true);
     install(U"__rdivmod__", float_divmod<true>, true);

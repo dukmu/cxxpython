@@ -118,6 +118,31 @@ def _math_reduce(size):
     return _prepare(size, job, sum(values) * size)
 
 
+def _object_protocol(size):
+    class Record:
+        def __init__(self, value):
+            self.value = value
+
+        @property
+        def current(self):
+            return self.value
+
+        def read(self):
+            return self.current
+
+    marker = object()
+
+    def job(index):
+        obj = Record(marker)
+        for unused in range(32):
+            value = obj.read()
+            del obj.value
+            obj.value = value
+        return obj.current is marker
+
+    return _prepare(size, job, size)
+
+
 def _cycles(size):
     def job(index):
         obj = [index]
@@ -219,6 +244,7 @@ CASES = {
     'allocate': {'group': 'gc', 'size': 100000, 'description': 'Short-lived containers with natural GC', 'prepare': _allocate},
     'dict_int': {'group': 'gc', 'size': 512, 'description': 'Independent 64-key integer dictionaries: construct, update, delete, sum; natural GC', 'prepare': _dict_int},
     'math_reduce': {'group': 'library', 'size': 128, 'description': 'math.fsum over 256 integer values per fixed-total job; natural GC', 'prepare': _math_reduce},
+    'object_protocol': {'group': 'cpu', 'size': 512, 'description': 'Generic instance attributes, property descriptors and Python method calls; fixed-total jobs', 'prepare': _object_protocol},
     'cycles': {'group': 'gc', 'size': 100000, 'description': 'Self-cycles followed by explicit gc.collect', 'prepare': _cycles},
     'file_io': {'group': 'io', 'size': 128, 'description': 'Create, write, read and unlink files in cwd; page cache, not durable storage', 'prepare': _file_io},
     'regex': {'group': 'library', 'size': 128, 'description': 'Shared compiled regex full matches', 'prepare': _regex},

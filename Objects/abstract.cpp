@@ -71,6 +71,10 @@ constexpr std::array definitions{
     ProtocolDefinition{U"__rmatmul__", 1, ProtocolResult::Any},
     ProtocolDefinition{U"__imatmul__", 1, ProtocolResult::Any},
     ProtocolDefinition{U"__contains__", 1, ProtocolResult::Any},
+    ProtocolDefinition{U"__getattribute__", 1, ProtocolResult::Any},
+    ProtocolDefinition{U"__getattr__", 1, ProtocolResult::Any},
+    ProtocolDefinition{U"__setattr__", 2, ProtocolResult::Any},
+    ProtocolDefinition{U"__delattr__", 1, ProtocolResult::Any},
 };
 static_assert(definitions.size() == static_cast<std::size_t>(Protocol::Count));
 constexpr std::array comparisons{Protocol::Eq, Protocol::Ne, Protocol::Lt,
@@ -347,6 +351,7 @@ ResolvedSlot detail::resolve_protocol(Attachment &context, Value value, Protocol
                                  : SlotState::PythonDescriptor;
                 auto kind = NativeSlotKind::Ordinary;
                 auto native_call = NativeCallKind::Generic;
+                auto numeric = NativeNumericKind::None;
                 if (state == SlotState::Native) {
                     const auto function_value =
                         attribute_type == context.builtin(CoreObject::MethodDescriptorType)
@@ -362,6 +367,11 @@ ResolvedSlot detail::resolve_protocol(Attachment &context, Value value, Protocol
                     if (function.sequence_owner &&
                         is_subtype(context, attribute->owner, *function.sequence_owner))
                         kind = NativeSlotKind::Sequence;
+                    if (native_call == NativeCallKind::MethodDescriptor &&
+                        context.payload<MethodDescriptorObject>(attribute->value).owner == value &&
+                        function.binding == NativeFunctionBinding::Descriptor &&
+                        function.signature.accepts_complete_positional(definition.arity + 1))
+                        numeric = function.numeric_kind;
                 }
                 ResolvedSlot slot{id,
                                   state,
@@ -371,7 +381,7 @@ ResolvedSlot detail::resolve_protocol(Attachment &context, Value value, Protocol
                                   epoch,
                                   kind,
                                   native_call};
-                context.cache_protocol(slot);
+                context.cache_protocol(slot, numeric);
                 return slot;
             }
         }

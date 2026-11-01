@@ -158,6 +158,19 @@ def sample_rows(records):
     return rows
 
 
+def created_objects(before, after):
+    snapshots = [snapshot.get('heap_stats', {}) for snapshot in (before, after)]
+    counts = [[heap.get(key) for key in ('objects', 'reclaimed_objects')]
+              for heap in snapshots]
+    if any(type(value) is not int or value < 0 for pair in counts for value in pair):
+        return '-'
+    (live_before, reclaimed_before), (live_after, reclaimed_after) = counts
+    if reclaimed_after < reclaimed_before or reclaimed_after >= (1 << 64) - 1:
+        return '-'
+    created = live_after + reclaimed_after - live_before - reclaimed_before
+    return created if created >= 0 else '-'
+
+
 def render_report(records, reference=None):
     groups = {}
     for row in sample_rows(records):
@@ -197,9 +210,9 @@ def render_report(records, reference=None):
             warnings.append('%s/%s size=%d workers=%d: low CPU/wall; investigate waits, scheduling or CPU accounting.' % key[:4])
     lines += ['', '## Diagnostics', ''] + (warnings or ['No configured variation/utilization warnings. This is not a statistical significance claim.'])
     lines += ['', '## GC Observations', '',
-              'Whole worker, including warmups and validation. Native pause fields are last-event/lifetime-max snapshots, not pause totals or percentiles.', '',
-              '| Runtime | Case | Size | Workers | Process | Collections | Last STW ns | Last rendezvous ns | Max rendezvous ns |',
-              '| --- | --- | --- | --- | --- | --- | --- | --- | --- |']
+              'Whole worker, including warmups, validation and snapshot overhead; created objects are not kernel-only allocations. Native pause fields are last-event/lifetime-max snapshots, not pause totals or percentiles.', '',
+              '| Runtime | Case | Size | Workers | Process | Collections | Created Objects | Last STW ns | Last rendezvous ns | Max rendezvous ns |',
+              '| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |']
     observed = []
     for record in records:
         if record['kind'] != 'run' or record.get('error'):
@@ -210,13 +223,15 @@ def render_report(records, reference=None):
         before, after = data['gc_before'], data['gc_after']
         count = sum(item['collections'] for item in after['stats']) - sum(item['collections'] for item in before['stats'])
         heap = after.get('heap_stats', {})
-        if 'heap_stats' in before and heap:
+        if 'collections' in before.get('heap_stats', {}) and 'collections' in heap:
             count = heap['collections'] - before['heap_stats']['collections']
         observed.append((record['runtime'], data['case'], data['size'], data['workers'], record['process'], count,
+                         created_objects(before, after),
                          heap.get('last_pause_ns', '-') if count else '-',
                          heap.get('last_rendezvous_ns', '-') if count else '-',
                          heap.get('max_rendezvous_ns', '-') if count else '-'))
-    lines += ['| ' + ' | '.join(map(str, row)) + ' |' for row in sorted(observed)]
+    lines += ['| ' + ' | '.join(map(str, row)) + ' |'
+              for row in sorted(observed, key=lambda row: (row[:5], tuple(map(str, row[5:]))))]
     return '\n'.join(lines) + '\n'
 
 

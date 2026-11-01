@@ -10,6 +10,7 @@
 #include "internal/codecregistry.hpp"
 #include "internal/collectionsmodule.hpp"
 #include "internal/compiler.hpp"
+#include "internal/contextvars.hpp"
 #include "internal/errnomodule.hpp"
 #include "internal/signalmodule.hpp"
 #ifdef CXXPYTHON_HAVE_CURSES
@@ -293,6 +294,7 @@ detail::ImportState::ImportState()
                                      {U"_string", detail::initialize_string},
                                      {U"itertools", detail::initialize_itertools},
                                      {U"_collections", detail::initialize_collections},
+                                     {U"_contextvars", detail::initialize_contextvars},
                                      {U"binascii", detail::install_binascii},
                                      {U"posix", detail::initialize_posix},
                                      {U"errno", detail::initialize_errno},

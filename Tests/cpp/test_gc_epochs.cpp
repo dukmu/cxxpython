@@ -441,6 +441,11 @@ TEST(FoundationEpochs, NoSafepointRejectsStoppingAndGrowingRootsWithoutChangingO
         EXPECT_THROW(entered = context.enter_call(), std::logic_error);
         if (entered)
             context.leave_call();
+        EXPECT_THROW(entered = context.enter_native_scope(), std::logic_error);
+        if (entered) {
+            context.leave_native_call();
+            context.leave_call();
+        }
         EXPECT_EQ(keep.get(context), original);
     }
     EXPECT_NO_THROW(context.poll());

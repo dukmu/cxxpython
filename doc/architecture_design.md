@@ -88,6 +88,24 @@ cleanup continuations. `Python/traceback.cpp` owns traceback operations.
 functions bind/create an ordinary Frame without executing its body; yield and
 yield-from suspend that same Frame/operand stack/cleanup state. Resumption is
 still ceval, not another interpreter or source execution path.
+
+Frame operand slots distinguish boxed objects from private int64/double arithmetic
+temporaries. The tracer visits only boxed slots. Locals and public Value remain
+boxed; copying, identity-visible operations, calls, stores, suspension, returns
+and generic fallback materialize operands first. Python numeric methods and
+`Python/specialize.cpp` share checked scalar kernels, including overflow fallback
+and floating exceptions. Immutable native definitions declare numeric capability;
+the existing thread-private weak protocol cache admits only matching owner,
+binding and complete signature. Epoch invalidation and sweep clearing still
+apply, and the actual descriptor remains rooted during execution. This is not a
+second executor, a public tagged Value ABI or a workload-specific opcode.
+
+Frame activation also retains immutable Code tuple views for constants/names/
+closure metadata. Attribute special methods share the ordinary protocol cache,
+descriptor binding and epoch refresh; user methods do not become numeric entries.
+Native calls admit both recursion budgets together, without a global lock or
+removing their limits.
+
 frame.clear rejects executing frames, releases completed local/Cell edges and
 shares generator.close's FrameClaim/GeneratorExit cleanup for suspended ordinary
 generators/coroutines. It does not clear the contents of externally shared Cells

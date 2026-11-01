@@ -343,29 +343,7 @@ void invoke_method_descriptor(Attachment &context, Value callable, CallArgsView 
                   receiver, out, roots);
 }
 
-struct CallDepth {
-    Attachment &context;
-    bool entered = false;
-    CallDepth(Attachment &c, ReturnSlot &out) : context(c)
-    {
-        out.reset(context);
-        entered = context.enter_call();
-        if (entered && !context.enter_native_call()) {
-            context.leave_call();
-            entered = false;
-        }
-        if (!entered)
-            raise_error(context, CoreObject::RecursionErrorType, U"maximum call depth exceeded",
-                        out);
-    }
-    ~CallDepth()
-    {
-        if (entered) {
-            context.leave_native_call();
-            context.leave_call();
-        }
-    }
-};
+using CallDepth = detail::NativeCallScope;
 void invoke_special_impl(Attachment &context, Value receiver, Handle target, CallArgsView args,
                          ReturnSlot &out, RootScope &roots,
                          std::optional<detail::PreparedPythonCall> *preparation,
@@ -872,18 +850,25 @@ ResultView invoke_protocol(Attachment &context, Handle receiver, const ResolvedS
 ResultView get_attribute(Attachment &context, Handle object, Handle name, ReturnSlot &out)
 {
     return guarded(context, out, [&] {
+        RootScope roots(context);
+        auto self = roots.root(object.get(context));
+        auto rooted_name = roots.root(name.get(context));
         out.reset(context);
-        if (!attribute_name(context, name, out))
+        if (!attribute_name(context, rooted_name, out))
             return;
-        auto value = object.get(context);
+        auto value = self.get(context);
         auto type = context.type_of(value);
-        std::array args{name.get(context)};
-        special(context, value, U"__getattribute__", {args, {}}, out);
-        if (raised(out) &&
-            is_subtype(context, context.type_of(out.exception()),
-                       context.builtin(CoreObject::AttributeErrorType)) &&
-            type_attribute(context, type, U"__getattr__")) {
-            special(context, value, U"__getattr__", {args, {}}, out);
+        std::array args{rooted_name.get(context)};
+        auto slot = detail::resolve_protocol(context, type, Protocol::GetAttribute, roots);
+        if (slot.state == SlotState::Missing)
+            type_error(context, U"missing special method", out);
+        else
+            detail::invoke_protocol(context, value, slot, args, out, roots);
+        if (raised(out) && is_subtype(context, context.type_of(out.exception()),
+                                      context.builtin(CoreObject::AttributeErrorType))) {
+            auto fallback = detail::resolve_protocol(context, type, Protocol::GetAttr, roots);
+            if (fallback.state != SlotState::Missing)
+                detail::invoke_protocol(context, value, fallback, args, out, roots);
         }
     });
 }
@@ -891,12 +876,20 @@ ResultView set_attribute(Attachment &context, Handle object, Handle name, Handle
                          ReturnSlot &out)
 {
     return guarded(context, out, [&] {
+        RootScope roots(context);
+        auto self = roots.root(object.get(context));
+        auto rooted_name = roots.root(name.get(context));
+        auto rooted_value = roots.root(value.get(context));
         out.reset(context);
-        if (!attribute_name(context, name, out))
+        if (!attribute_name(context, rooted_name, out))
             return;
-        (void)value.get(context);
-        std::array args{name.get(context), value.get(context)};
-        special(context, object.get(context), U"__setattr__", {args, {}}, out);
+        std::array args{rooted_name.get(context), rooted_value.get(context)};
+        auto slot =
+            detail::resolve_protocol(context, context.type_of(self), Protocol::SetAttribute, roots);
+        if (slot.state == SlotState::Missing)
+            type_error(context, U"missing special method", out);
+        else
+            detail::invoke_protocol(context, self, slot, args, out, roots);
         if (!raised(out))
             out.ok(context.builtin(CoreObject::None));
     });
@@ -904,11 +897,19 @@ ResultView set_attribute(Attachment &context, Handle object, Handle name, Handle
 ResultView del_attribute(Attachment &context, Handle object, Handle name, ReturnSlot &out)
 {
     return guarded(context, out, [&] {
+        RootScope roots(context);
+        auto self = roots.root(object.get(context));
+        auto rooted_name = roots.root(name.get(context));
         out.reset(context);
-        if (!attribute_name(context, name, out))
+        if (!attribute_name(context, rooted_name, out))
             return;
-        std::array args{name.get(context)};
-        special(context, object.get(context), U"__delattr__", {args, {}}, out);
+        std::array args{rooted_name.get(context)};
+        auto slot =
+            detail::resolve_protocol(context, context.type_of(self), Protocol::DelAttribute, roots);
+        if (slot.state == SlotState::Missing)
+            type_error(context, U"missing special method", out);
+        else
+            detail::invoke_protocol(context, self, slot, args, out, roots);
         if (!raised(out))
             out.ok(context.builtin(CoreObject::None));
     });
@@ -917,7 +918,8 @@ ResultView del_attribute(Attachment &context, Handle object, Handle name, Return
 namespace detail {
 void install_native_attribute(Attachment &context, std::span<const Handle> core, Handle owner,
                               std::u32string name, SignatureLayout signature, NativeEntry entry,
-                              std::vector<Value> captures, NativeSlotKind kind)
+                              std::vector<Value> captures, NativeSlotKind kind,
+                              NativeNumericKind numeric)
 {
     auto at = [&](CoreObject id) { return core[static_cast<std::size_t>(id)]; };
     RootScope roots(context);
@@ -927,7 +929,7 @@ void install_native_attribute(Attachment &context, std::span<const Handle> core,
         std::move(signature), entry, std::move(captures), function,
         kind == NativeSlotKind::Sequence ? std::optional<Value>{owner.get(context)} : std::nullopt,
         NativeFunctionBinding::Descriptor,
-        name == U"__new__" ? std::optional<Value>{owner.get(context)} : std::nullopt);
+        name == U"__new__" ? std::optional<Value>{owner.get(context)} : std::nullopt, numeric);
     auto callable = roots.root(function.value());
     if (name != U"__new__") {
         context.allocate_instance<MethodDescriptorObject>(at(CoreObject::MethodDescriptorType),

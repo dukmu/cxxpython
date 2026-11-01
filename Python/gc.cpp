@@ -240,6 +240,7 @@ struct ThreadRecord {
         SlotState state = SlotState::Missing;
         NativeSlotKind native_kind = NativeSlotKind::Ordinary;
         NativeCallKind native_call = NativeCallKind::Generic;
+        NativeNumericKind numeric_kind = NativeNumericKind::None;
         std::uint64_t epoch = 0;
     };
     explicit ThreadRecord(std::uint64_t identity)
@@ -316,6 +317,7 @@ struct ThreadRecord {
     Allocation *finalizers = nullptr;
     WeakRefObject *weak_callbacks = nullptr;
     ObjectHeader *exit_sentinel = nullptr;
+    ObjectHeader *current_context = nullptr;
     void (*release_exit_sentinel)(ObjectHeader *) noexcept = nullptr;
     // Borrowed identities, not roots. Sweep clears them before reuse.
     std::array<ProtocolEntry, 64> protocols;
@@ -640,6 +642,7 @@ struct State {
         for (const auto &thread : threads) {
             thread->protocols.fill({});
             mark(thread->exit_sentinel);
+            mark(thread->current_context);
             for (const auto &cell : thread->roots.cells)
                 if (cell.scope && cell.tag != ResultTag::Empty)
                     mark(cell.object);
@@ -1862,6 +1865,18 @@ void Attachment::publish_audit_hooks(Handle candidate, ReturnSlot &out)
         state_->audit_hooks = value.object();
     out.ok(Value(*state_->audit_hooks));
 }
+void Attachment::load_context(ReturnSlot &out)
+{
+    out.check_caller(*this);
+    require_safepoint();
+    auto *context = thread_record_->current_context;
+    out.store_root_noexcept(context ? ResultTag::Ok : ResultTag::Empty, context);
+}
+void Attachment::set_context(std::optional<Handle> context)
+{
+    require_safepoint();
+    thread_record_->current_context = context ? context->get(*this).object() : nullptr;
+}
 void Attachment::load_sys_dictionary(ReturnSlot &out)
 {
     out.reset(*this);
@@ -1973,15 +1988,44 @@ Attachment::cached_builtin_protocol(CoreObject type, Protocol protocol, RootScop
     return detail::BuiltinSlot{type,  protocol,          entry.state,      descriptor,
                                epoch, entry.native_kind, entry.native_call};
 }
-void Attachment::cache_protocol(const ResolvedSlot &slot)
+std::optional<NativeNumericKind> Attachment::lease_builtin_numeric(CoreObject type,
+                                                                   Protocol protocol,
+                                                                   std::optional<Protocol> inplace,
+                                                                   ReturnSlot &method)
+{
+    method.check_caller(*this);
+    require_safepoint();
+    method.reset(*this);
+    const auto value = builtin(type);
+    const auto epoch = state_->type_epoch.load(std::memory_order_acquire);
+    if (epoch & 1)
+        return {};
+    const auto matches = [&](const detail::ThreadRecord::ProtocolEntry &entry, Protocol id) {
+        return entry.type == value.object() && entry.protocol == id && entry.epoch == epoch;
+    };
+    if (inplace) {
+        const auto &entry = thread_record_->protocol_entry(value, *inplace);
+        if (!matches(entry, *inplace))
+            return {};
+        if (entry.state != SlotState::Missing)
+            return NativeNumericKind::None;
+    }
+    const auto entry = thread_record_->protocol_entry(value, protocol);
+    if (!matches(entry, protocol))
+        return {};
+    if (entry.numeric_kind != NativeNumericKind::None)
+        method.store_root_noexcept(ResultTag::Ok, entry.descriptor);
+    return entry.numeric_kind;
+}
+void Attachment::cache_protocol(const ResolvedSlot &slot, NativeNumericKind numeric)
 {
     const auto type = slot.type.get(*this);
     const auto owner = slot.state != SlotState::Missing ? slot.owner.get(*this).object() : nullptr;
     const auto descriptor =
         slot.state != SlotState::Missing ? slot.descriptor.get(*this).object() : nullptr;
     thread_record_->protocol_entry(type, slot.protocol) = {
-        type.object(),    owner,     descriptor, slot.protocol, slot.state, slot.native_kind,
-        slot.native_call, slot.epoch};
+        type.object(),    owner,   descriptor, slot.protocol, slot.state, slot.native_kind,
+        slot.native_call, numeric, slot.epoch};
 }
 void Attachment::invalidate_types()
 {
@@ -2021,6 +2065,16 @@ bool Attachment::enter_native_call()
     require_safepoint();
     if (native_depth_ >= state_->config.max_native_depth)
         return false;
+    ++native_depth_;
+    return true;
+}
+bool Attachment::enter_native_scope()
+{
+    require_safepoint();
+    if (call_depth_ >= state_->config.max_call_depth ||
+        native_depth_ >= state_->config.max_native_depth)
+        return false;
+    ++call_depth_;
     ++native_depth_;
     return true;
 }

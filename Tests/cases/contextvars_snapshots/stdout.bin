@@ -1,0 +1,10 @@
+var default override
+0 None absent False
+changed changed first first
+2 True True second
+True
+True
+True
+changed duplicate first
+default False True
+default second 0

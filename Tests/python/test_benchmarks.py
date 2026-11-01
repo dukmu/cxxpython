@@ -130,7 +130,62 @@ class BenchmarkReportTests(unittest.TestCase):
         data['payload']['gc_after'] = copy.deepcopy(snapshot)
         self.assertNotIn('999999', record.render_report([data]))
         data['payload']['gc_after']['heap_stats']['collections'] += 1
-        self.assertIn('| 1 | 999999 | 100 | 100 |', record.render_report([data]))
+        self.assertIn('| 1 | - | 999999 | 100 | 100 |', record.render_report([data]))
+
+    def test_gc_created_objects_uses_live_and_reclaimed_deltas_without_mutation(self):
+        data = result()
+        data['payload']['gc_before'] = {'stats': [{'collections': 2}],
+                                        'heap_stats': {'collections': 5, 'objects': 100,
+                                                       'reclaimed_objects': 50}}
+        data['payload']['gc_after'] = {'stats': [{'collections': 3}],
+                                       'heap_stats': {'collections': 6, 'objects': 80,
+                                                      'reclaimed_objects': 90}}
+        original = copy.deepcopy(data)
+        report = record.render_report([data])
+        self.assertIn('| cxx | nbody | 4 | 1 | 0 | 1 | 20 | - | - | - |', report)
+        self.assertEqual(data, original)
+
+    def test_gc_created_objects_missing_invalid_and_old_snapshots(self):
+        before = {'stats': [{'collections': 1}],
+                  'heap_stats': {'collections': 2, 'objects': 10, 'reclaimed_objects': 5}}
+        after = {'stats': [{'collections': 2}],
+                 'heap_stats': {'collections': 3, 'objects': 12, 'reclaimed_objects': 8}}
+        cases = []
+        for snapshot, key in ((0, 'objects'), (0, 'reclaimed_objects'),
+                              (1, 'objects'), (1, 'reclaimed_objects')):
+            pair = copy.deepcopy([before, after])
+            del pair[snapshot]['heap_stats'][key]
+            cases.append(pair)
+        cases.append([{'stats': before['stats']}, {'stats': after['stats']}])
+        pair = copy.deepcopy([before, after])
+        pair[1]['heap_stats']['objects'] = 0
+        cases.append(pair)
+        pair = copy.deepcopy([before, after])
+        pair[1]['heap_stats']['reclaimed_objects'] = 4
+        cases.append(pair)
+        pair = copy.deepcopy([before, after])
+        pair[1]['heap_stats']['reclaimed_objects'] = (1 << 64) - 1
+        cases.append(pair)
+        for snapshots in cases:
+            with self.subTest(snapshots=snapshots):
+                data = result('cpython' if 'heap_stats' not in snapshots[0] else 'cxx')
+                data['payload']['gc_before'], data['payload']['gc_after'] = snapshots
+                original = copy.deepcopy(data)
+                report = record.render_report([data])
+                self.assertIn('| 1 | - | - | - | - |', report)
+                self.assertEqual(data, original)
+
+    def test_gc_report_mixes_old_and_new_records_and_preserves_zero(self):
+        new = result()
+        snapshot = {'stats': [{'collections': 0}],
+                    'heap_stats': {'collections': 0, 'objects': 10, 'reclaimed_objects': 5}}
+        new['payload']['gc_before'] = copy.deepcopy(snapshot)
+        new['payload']['gc_after'] = copy.deepcopy(snapshot)
+        old = copy.deepcopy(new)
+        del old['payload']['gc_before']['heap_stats']['objects']
+        report = record.render_report([new, old])
+        self.assertIn('| 0 | 0 | - | - | - |', report)
+        self.assertIn('| 0 | - | - | - | - |', report)
 
     @unittest.skipUnless(importlib.util.find_spec('pyperf'), 'optional host pyperf dependency')
     def test_standard_pyperf_export_preserves_independent_runs(self):
@@ -148,7 +203,7 @@ class BenchmarkReportTests(unittest.TestCase):
     def test_target_worker_checks_results_across_threads(self):
         worker = Path(__file__).resolve().parents[2] / 'Tools/benchmarks/workloads.py'
         with tempfile.TemporaryDirectory() as folder:
-            for case in ('allocate', 'dict_int', 'math_reduce', 'cycles', 'file_io'):
+            for case in ('allocate', 'dict_int', 'math_reduce', 'object_protocol', 'cycles', 'file_io'):
                 command = [sys.executable, str(worker), '--case', case, '--size', '5',
                            '--workers', '2', '--loops', '1', '--warmups', '0', '--values', '1']
                 child = subprocess.run(command, cwd=folder, capture_output=True, text=True, timeout=15)
