@@ -853,6 +853,16 @@ The internal caller keeps its resolved snapshot scope alive, including after
 stale slot refresh, so it reuses that descriptor root rather than inserting
 another copy. Public invocation independently snapshots the descriptor as well
 as its operands, so callbacks may release caller-owned input roots.
+The VM uses the same owned ObjectOps bodies for arithmetic, comparison, truth and
+item operations with borrowed Values from its running Frame. The traced operand
+slots remain unchanged until the complete operation returns, including descriptor
+binding, Python/native reentry, collection and exceptions. Running frames reject
+clear; namespace/code edges likewise retain the mapping and names during stores.
+The VM's existing instruction boundary translates allocation failure. Public
+entries still independently validate/root all input snapshots before resetting
+out. A borrowed operation must never rely only on out or on a caller scope that
+callbacks can release. This does not remove protocol snapshot roots, publication
+epoch revalidation, synchronized container reads or any call/return guard.
 The checked Value subtype path admits local initialized type metadata before an
 identity result; identical operands need no second payload check or MRO scan.
 

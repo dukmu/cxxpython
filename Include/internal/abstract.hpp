@@ -3,6 +3,10 @@
 #include "cxxpython/protocol.hpp"
 
 namespace cxxpython::core::detail {
+// Receiver/arguments belong to the caller's independent roots or running Frame;
+// slot roots remain in roots. Revalidation and binding keep the same contract.
+void invoke_protocol(Attachment &, Value, const ResolvedSlot &, std::span<const Value>,
+                     ReturnSlot &, RootScope &);
 // Inputs and the resolved descriptor remain independently rooted by the caller.
 // Only the actual canonical method, complete signature and current receiver/epoch
 // may use its shared builtin kernel; otherwise dispatch has no side effects.
@@ -13,12 +17,22 @@ bool try_float_binary(Attachment &, Value, Value, BinaryOp, const ResolvedSlot &
 bool try_list_item(Attachment &, const ResolvedSlot &, std::span<const Value>, ReturnSlot &);
 bool try_sequence_item(Attachment &, const ResolvedSlot &, std::span<const Value>, ReturnSlot &);
 bool try_dict_item(Attachment &, const ResolvedSlot &, std::span<const Value>, ReturnSlot &);
-// Internal callers retain operands in independent live roots until return.
+// Internal callers retain operands in independent live roots or a running Frame
+// until return. These owners must not be cleared by resetting out or callbacks.
 // No operand may depend on out, which these operations reset. Public entries
 // snapshot their inputs first; native callers may reuse their existing roots.
+// Callers translate allocation failures (the VM uses its instruction boundary).
+void binary_owned(Attachment &, Value, Value, BinaryOp, ReturnSlot &);
+void inplace_owned(Attachment &, Value, Value, BinaryOp, ReturnSlot &);
+void unary_owned(Attachment &, Value, UnaryOp, ReturnSlot &);
+void get_item_owned(Attachment &, Value, Value, ReturnSlot &);
+void set_item_owned(Attachment &, Value, Value, Value, ReturnSlot &);
+void del_item_owned(Attachment &, Value, Value, ReturnSlot &);
 void index_owned(Attachment &, Handle, ReturnSlot &);
 void truth_owned(Attachment &, Handle, ReturnSlot &);
+void truth_owned(Attachment &, Value, ReturnSlot &);
 void rich_compare_owned(Attachment &, Handle, Handle, CompareOp, ReturnSlot &);
+void rich_compare_owned(Attachment &, Value, Value, CompareOp, ReturnSlot &);
 void container_equal_owned(Attachment &, Handle, Handle, ReturnSlot &);
 NextStatus iter_next_owned(Attachment &, Handle, ReturnSlot &);
 // Owns its input; success leaves out Empty. No overflow exception means clipping;

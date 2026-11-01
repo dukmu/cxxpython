@@ -147,7 +147,7 @@ also lend their protocol-resolution scope to invocation instead of rooting the
 same inputs again. The public protocol entry still owns borrowed inputs; both
 entries use the same epoch/receiver revalidation and descriptor dispatch.
 Private abstract operations in `Include/internal/abstract.hpp` likewise borrow
-independent live operand Handles from their callers. Public index/truth/comparison
+independent live operand roots from their callers. Public index/truth/comparison
 and dictionary entries snapshot their inputs before resetting an output slot;
 native container methods can reuse roots they already own. Derived protocol
 metadata/results still have operation-local roots, and no operand may depend on
@@ -157,11 +157,15 @@ length slot, with the ordinary invocation revalidation. Native dictionary/set
 hash consumers reuse the normalized native hash rather than box it only to
 immediately unbox it; the public hash operation still returns a managed int.
 The same callbacks, normalization/errors and short synchronized commits apply.
-Common VM ObjectOps also accept Value inputs. Their entry snapshots operands
-before any output reset/callback; Handle forms validate and delegate to that same
-implementation. The VM can therefore pass its precisely traced operand stack
-without first building Handles that the entry would immediately copy. The stack
-is not trimmed or overwritten until the operation returns. Iteration resolves
+Public ObjectOps snapshot Value inputs before any output reset/callback; Handle
+forms validate and delegate. Arithmetic, unary, comparison, truth and item bodies
+also have private owned entries that borrow Values from the running VM Frame
+instead of registering a duplicate input-root set. The Frame's traced operand
+stack is not trimmed or overwritten until the complete operation returns, and a
+running frame cannot be cleared. Namespace stores borrow their Frame/Code-owned
+mapping/name edges under the same rule. Descriptor snapshot roots, callbacks,
+epoch revalidation, depth/return checks and the VM instruction exception boundary
+are unchanged; no borrowed operand may rely on the output being reset. Iteration resolves
 directly from the checked type Value and lends its owning operation scope to
 invocation, like arithmetic. Prepared calls snapshot a Value target into their
 existing caller-owned root scope, retaining the copied argument buffers needed

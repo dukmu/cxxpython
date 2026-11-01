@@ -1,0 +1,18 @@
+add 5
+reflected 9
+inplace 13
+unary -8
+get 9
+set 10 11
+delete 12
+truth True
+false True
+compare True
+replaced 12
+exception add failure
+exception compare failure
+exception item failure
+exception truth failure
+running frame 17
+threads [390, 390, 390, 390]
+thread errors []

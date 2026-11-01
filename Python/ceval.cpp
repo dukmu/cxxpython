@@ -877,9 +877,10 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                     }
                 } else {
                     if (opcode == Opcode::StoreName)
-                        set_item(context, mapping, key, data.operands[data.sp - 1], result);
+                        detail::set_item_owned(context, mapping, key, data.operands[data.sp - 1],
+                                               result);
                     else {
-                        del_item(context, mapping, key, result);
+                        detail::del_item_owned(context, mapping, key, result);
                         if (raised(result) &&
                             is_subtype(context, context.type_of(result.exception()),
                                        context.builtin(CoreObject::KeyErrorType)))
@@ -1276,9 +1277,9 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 const auto base = data.sp - (opcode == Opcode::StoreItem ? 3 : 2);
                 const auto owner = data.operands[base], key = data.operands[base + 1];
                 if (opcode == Opcode::StoreItem)
-                    set_item(context, owner, key, data.operands[base + 2], result);
+                    detail::set_item_owned(context, owner, key, data.operands[base + 2], result);
                 else
-                    del_item(context, owner, key, result);
+                    detail::del_item_owned(context, owner, key, result);
                 if (raised(result))
                     activation.raising(result.exception());
                 else
@@ -1323,7 +1324,8 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 break;
             }
             case Opcode::Unary: {
-                unary(context, data.operands[data.sp - 1], static_cast<UnaryOp>(operand), result);
+                detail::unary_owned(context, data.operands[data.sp - 1],
+                                    static_cast<UnaryOp>(operand), result);
                 if (raised(result))
                     activation.raising(result.exception());
                 else
@@ -1361,13 +1363,16 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 const auto left = data.operands[data.sp - 2];
                 const auto right = data.operands[data.sp - 1];
                 if (opcode == Opcode::Binary)
-                    binary(context, left, right, static_cast<BinaryOp>(operand), result);
+                    detail::binary_owned(context, left, right, static_cast<BinaryOp>(operand),
+                                         result);
                 else if (opcode == Opcode::Inplace)
-                    inplace(context, left, right, static_cast<BinaryOp>(operand), result);
+                    detail::inplace_owned(context, left, right, static_cast<BinaryOp>(operand),
+                                          result);
                 else if (opcode == Opcode::LoadItem)
-                    get_item(context, left, right, result);
+                    detail::get_item_owned(context, left, right, result);
                 else
-                    rich_compare(context, left, right, static_cast<CompareOp>(operand), result);
+                    detail::rich_compare_owned(context, left, right,
+                                               static_cast<CompareOp>(operand), result);
                 if (raised(result)) {
                     activation.raising(result.exception());
                     break;
@@ -1380,7 +1385,7 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 data.pc = operand;
                 break;
             case Opcode::JumpIfFalse: {
-                truth(context, data.operands[data.sp - 1], result);
+                detail::truth_owned(context, data.operands[data.sp - 1], result);
                 if (raised(result)) {
                     activation.raising(result.exception());
                     break;
@@ -1573,8 +1578,7 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
             }
             case Opcode::WithResult: {
                 if (std::holds_alternative<ExceptionRaise>(data.cleanups.back().saved_reason)) {
-                    RootScope roots(context);
-                    truth(context, roots.root(data.operands[data.sp - 1]), result);
+                    detail::truth_owned(context, data.operands[data.sp - 1], result);
                     if (raised(result)) {
                         activation.raising(result.exception());
                         break;

@@ -1,5 +1,64 @@
 # Development Status
 
+## 2026-11-01 Borrow Frame-Owned Operands Through ObjectOps
+
+Continues the active performance/cleanup goal after 6097832. Fresh shared-kernel
+sampling still showed root registration in the VM arithmetic/item path. Parent
+refactored the shared ObjectOps/dispatch bodies; one Terra worker migrated VM
+callers and supplied the direct reference fixture. Worker closed; parent reviewed
+ownership, added explicit thread-failure capture and ran final acceptance.
+
+- Arithmetic, in-place, unary, truth, comparison and item operations have private
+  Value-borrowing entries in the existing internal abstract boundary. The running
+  Frame already traces their operands; VM slots remain intact until the operation
+  returns, including callbacks, allocation, collection and exceptions. Namespace
+  stores borrow Frame/Code-owned mapping/name edges. Running-frame clear remains
+  rejected, and the existing VM instruction boundary translates allocation faults.
+- Public operations still validate/root independent input snapshots before out
+  reset, so callbacks may release their original caller scopes. Protocol snapshot
+  roots, stale epoch/receiver revalidation, descriptor/function ownership, native
+  call-depth/return checks and synchronized container access are unchanged. Shared
+  operation bodies remain the only algorithms. No object/class, cache layer,
+  opcode, Python RC, collector policy or global execution lock was introduced.
+- The new CPython-generated fixture covers collecting/reflected/in-place/unary/
+  comparison/item callbacks, dynamic method replacement, exceptions, rejection of
+  caller-frame clear and four workers sharing code/heap. Existing native execution
+  tests force GC at every allocation and observe live operand slots. Public alias,
+  caller-scope release, foreign/protected roots and native kernel contracts remain.
+- Strict Clang 21.1.8 Release, ASan/UBSan/LSan and TSan each pass 494 affected native
+  tests. This selection excludes unchanged bootstrap/readiness and exhaustive cold
+  import allocation-failure shards, not their earlier evidence. Release passes all
+  530 direct scripts; ASan passes 115 affected scripts and TSan passes 50. No
+  timeout, sanitizer or output expectation was weakened. Formatting/diff checks
+  pass; logs are .cache/frame-owned-{release,asan,tsan}-*.log.
+- After all builds/tests exited, five same-session old/new fixed-work workloads
+  ran sequentially with one/four workers, three processes and nine values/config.
+  The unchanged 6097832 executable is retained through perf-buildid (c820edd8...);
+  no historical checkout/rebuild or new CPython campaign was needed. All 60 planned
+  worker runs complete successfully with natural GC and result validation. Raw
+  runs, generated tables and pyperf exports are .cache/benchmarks/frame-owned-paired.
+- Standard pyperf finds Matrix one/four-worker 1.12x/1.18x faster, nbody 1.10x/1.07x
+  and allocate 1.05x/1.06x. Both dict_int and file_io comparisons are not significant;
+  no significant regression was found. Generated Matrix medians are 265.657 and
+  112.824 ms, scaling 2.355x with four-worker CPU/wall 2.833. Its 10.3% four-worker
+  RSD and the old file-I/O variation warning remain with all unfavorable samples;
+  no selective rerun replaced them. Analysis is .cache/frame-owned-pyperf.log.
+- A separate fresh Matrix capture retains 937 software CPU samples with zero
+  losses. Value-root acquisition is now 2.03% self; cached protocol resolution is
+  6.72%, while VM dispatch and allocation/storage remain visible. These are sampled
+  self percentages, not additive caller totals, hardware cache metrics or summed
+  GC pauses. The capture, callers and matching Release ELF remain available under
+  .cache/benchmarks/frame-owned-matrix-profile and perf-buildid.
+- Recompressed regenerated sanitizer debug sections without removing code,
+  symbols, tools, raw evidence or build state. Both compressed interpreters pass
+  the new Frame fixture; .cache remains about 1.6 GiB. matrix.py stays unmodified,
+  untracked and excluded. No unrelated standard-library expansion was started.
+
+The performance goal stays active and absolute CPython acceptance is not claimed.
+The next measured execution-path dependency is remaining protocol metadata/cache
+overhead; allocation/GC coordination remain in scope under the existing no-GIL,
+precise-root and epoch contracts. The full compatibility route remains paused.
+
 ## 2026-11-01 FunctionType Construction And Unmodified Dill Probe
 
 After publishing shared kernels as 3b4bc99, investigated the user's optional

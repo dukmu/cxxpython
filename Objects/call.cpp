@@ -11,7 +11,7 @@ namespace {
 // Internal binding and callable unwrapping share that same scope.
 void invoke(Attachment &, Handle, CallArgsView, std::optional<Value>, ReturnSlot &, RootScope &,
             std::optional<detail::PreparedPythonCall> * = nullptr);
-void invoke_special_impl(Attachment &, Handle, Handle, CallArgsView, ReturnSlot &, RootScope &,
+void invoke_special_impl(Attachment &, Value, Handle, CallArgsView, ReturnSlot &, RootScope &,
                          std::optional<detail::PreparedPythonCall> * = nullptr,
                          NativeCallKind = NativeCallKind::Generic);
 void bind_native_callable(Attachment &, Value, std::optional<Value>, ReturnSlot &);
@@ -91,7 +91,7 @@ void special(Attachment &context, Value receiver, const std::u32string &name, Ca
         return;
     }
     auto target = roots.root(*attribute);
-    invoke_special_impl(context, self, target, args, out, roots);
+    invoke_special_impl(context, self.get(context), target, args, out, roots);
 }
 void invoke_special(Attachment &context, Handle self, Handle target, CallArgsView args,
                     ReturnSlot &out)
@@ -100,7 +100,7 @@ void invoke_special(Attachment &context, Handle self, Handle target, CallArgsVie
     auto receiver = roots.root(self.get(context));
     auto descriptor = roots.root(target.get(context));
     root_arguments(roots, args);
-    invoke_special_impl(context, receiver, descriptor, args, out, roots);
+    invoke_special_impl(context, receiver.get(context), descriptor, args, out, roots);
 }
 void bind_descriptor(Attachment &context, Value descriptor, std::optional<Value> receiver,
                      Value owner, ReturnSlot &out)
@@ -366,12 +366,11 @@ struct CallDepth {
         }
     }
 };
-void invoke_special_impl(Attachment &context, Handle self, Handle target, CallArgsView args,
+void invoke_special_impl(Attachment &context, Value receiver, Handle target, CallArgsView args,
                          ReturnSlot &out, RootScope &roots,
                          std::optional<detail::PreparedPythonCall> *preparation,
                          NativeCallKind native_call)
 {
-    const auto receiver = self.get(context);
     const auto descriptor = target.get(context);
     std::optional<Value> type;
     if (native_call == NativeCallKind::Generic) {
@@ -462,7 +461,8 @@ void invoke(Attachment &context, Handle target, CallArgsView args, std::optional
         type_error(context, U"'" + text + U"' object is not callable", out);
         return;
     }
-    invoke_special_impl(context, target, roots.root(*attribute), args, out, roots, preparation);
+    invoke_special_impl(context, target.get(context), roots.root(*attribute), args, out, roots,
+                        preparation);
 }
 
 bool data_descriptor(Attachment &context, Value attribute)
@@ -764,7 +764,7 @@ void call_bridge(Attachment &context, Value function, std::span<const Value> arg
     RootScope roots(context);
     call(context, roots.root(args[0]), {positional, keywords}, out);
 }
-void invoke_protocol_impl(Attachment &context, Handle self, const ResolvedSlot &slot,
+void invoke_protocol_impl(Attachment &context, Value self, const ResolvedSlot &slot,
                           std::span<const Value> args, ReturnSlot &out, RootScope &roots,
                           bool own_descriptor)
 {
@@ -831,6 +831,11 @@ ResultView call(Attachment &context, Handle callable, CallArgsView args, ReturnS
 void detail::invoke_protocol(Attachment &context, Handle self, const ResolvedSlot &slot,
                              std::span<const Value> args, ReturnSlot &out, RootScope &roots)
 {
+    detail::invoke_protocol(context, self.get(context), slot, args, out, roots);
+}
+void detail::invoke_protocol(Attachment &context, Value self, const ResolvedSlot &slot,
+                             std::span<const Value> args, ReturnSlot &out, RootScope &roots)
+{
     invoke_protocol_impl(context, self, slot, args, out, roots, false);
 }
 ResultView invoke_protocol(Attachment &context, Handle receiver, const ResolvedSlot &slot,
@@ -840,7 +845,7 @@ ResultView invoke_protocol(Attachment &context, Handle receiver, const ResolvedS
         RootScope roots(context);
         auto self = roots.root(receiver.get(context));
         root_arguments(roots, {args, {}});
-        invoke_protocol_impl(context, self, slot, args, out, roots, true);
+        invoke_protocol_impl(context, self.get(context), slot, args, out, roots, true);
     });
 }
 ResultView get_attribute(Attachment &context, Handle object, Handle name, ReturnSlot &out)
