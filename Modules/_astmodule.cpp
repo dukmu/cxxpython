@@ -39,7 +39,7 @@ std::u32string type_name(Attachment &c, Value value)
     return std::holds_alternative<Value>(name) ? c.payload<StrObject>(std::get<Value>(name)).value
                                                : std::get<std::u32string>(name);
 }
-void ast_new(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+void ast_new(Attachment &c, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto cls = roots.root(args[0]);
@@ -51,7 +51,7 @@ void ast_new(Attachment &c, Handle function, std::span<const Value> args, Return
     }
     c.allocate_instance<AstObject>(cls, out, types.get(c));
 }
-void ast_init(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void ast_init(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto self = roots.root(args[0]), positional = roots.root(args[1]),
@@ -114,7 +114,7 @@ void ast_init(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &ou
     } catch (const Raised &) {
     }
 }
-void ast_reduce(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void ast_reduce(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto self = roots.root(args[0]);
@@ -135,7 +135,7 @@ bool singleton(ast::Kind kind)
     return base == Kind::expr_context || base == Kind::boolop || base == Kind::operator_ ||
            base == Kind::unaryop || base == Kind::cmpop;
 }
-void state_anchor(Attachment &c, Handle, std::span<const Value>, ReturnSlot &out)
+void state_anchor(Attachment &c, Value, std::span<const Value>, ReturnSlot &out)
 {
     out.ok(c.builtin(CoreObject::None));
 }

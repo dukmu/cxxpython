@@ -61,12 +61,12 @@ std::u32string display_type(Attachment &context, Value type)
                context.payload<StrObject>(std::get<Value>(data.qualname())).value;
     return context.payload<StrObject>(std::get<Value>(data.name())).value;
 }
-void object_hash(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void object_hash(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     make_int(context, signed_hash(std::rotr(reinterpret_cast<std::uintptr_t>(args[0].object()), 4)),
              out);
 }
-void object_sizeof(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void object_sizeof(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     const auto bytes = context.object_size(roots.root(args[0]));
@@ -77,19 +77,19 @@ void object_sizeof(Attachment &context, Handle, std::span<const Value> args, Ret
     }
     make_int(context, static_cast<std::int64_t>(bytes), out);
 }
-void object_repr(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void object_repr(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     make_str(context,
              U"<" + display_type(context, context.type_of(args[0])) + U" object at " +
                  pointer_text(args[0]) + U">",
              out);
 }
-void object_str(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void object_str(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     repr(context, roots.root(args[0]), out);
 }
-void type_repr(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void type_repr(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!context.has_layout<TypeObject>(args[0]) ||
         !is_subtype(context, context.type_of(args[0]), context.type_type())) {
@@ -98,7 +98,7 @@ void type_repr(Attachment &context, Handle, std::span<const Value> args, ReturnS
     }
     make_str(context, U"<class '" + display_type(context, args[0]) + U"'>", out);
 }
-void singleton_repr(Attachment &context, Handle fn, std::span<const Value> args, ReturnSlot &out)
+void singleton_repr(Attachment &context, Value fn, std::span<const Value> args, ReturnSlot &out)
 {
     const auto &captures = context.payload<NativeFunctionObject>(fn).captures;
     if (args[0] != captures[0]) {
@@ -107,7 +107,7 @@ void singleton_repr(Attachment &context, Handle fn, std::span<const Value> args,
     }
     out.ok(captures[1]);
 }
-void none_hash(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void none_hash(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (args[0] != context.builtin(CoreObject::None)) {
         type_error(context, out);
@@ -115,7 +115,7 @@ void none_hash(Attachment &context, Handle, std::span<const Value> args, ReturnS
     }
     make_int(context, static_cast<std::intptr_t>(0xfca86420U), out);
 }
-void string_hash(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void string_hash(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!string_value(context, args[0])) {
         type_error(context, out);
@@ -124,7 +124,7 @@ void string_hash(Attachment &context, Handle, std::span<const Value> args, Retur
     const auto &text = context.payload<StrObject>(args[0]).value;
     make_int(context, detail::name_hash(context, text), out);
 }
-void string_str(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void string_str(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!string_value(context, args[0])) {
         type_error(context, out);
@@ -135,7 +135,7 @@ void string_str(Attachment &context, Handle, std::span<const Value> args, Return
     else
         make_str(context, context.payload<StrObject>(args[0]).value, out);
 }
-void string_contains(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void string_contains(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     for (auto value : args) {
         if (!context.has_layout<StrObject>(value) ||
@@ -149,7 +149,7 @@ void string_contains(Attachment &context, Handle, std::span<const Value> args, R
     const auto &part = context.payload<StrObject>(args[1]).value;
     out.ok(context.builtin(text.find(part) == text.npos ? CoreObject::False : CoreObject::True));
 }
-void string_rpartition(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void string_rpartition(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!string_value(context, args[0]) || !string_value(context, args[1])) {
         type_error(context, out);
@@ -177,7 +177,7 @@ void string_rpartition(Attachment &context, Handle, std::span<const Value> args,
     const std::array values{first.get(context), second.get(context), third.get(context)};
     cxxpython::core::make_tuple(context, values, out);
 }
-void string_join(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void string_join(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!string_value(context, args[0])) {
         type_error(context, out);
@@ -229,7 +229,7 @@ bool printable(char32_t point)
                                  [](auto value, auto range) { return value < range.first; });
     return next == std::begin(non_printable) || point > (next - 1)->second;
 }
-void string_repr(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void string_repr(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!string_value(context, args[0])) {
         type_error(context, out);
@@ -281,7 +281,7 @@ template <CompareOp Op> void order_result(Attachment &context, int order, Return
     out.ok(context.builtin(result ? CoreObject::True : CoreObject::False));
 }
 template <CompareOp Op>
-void string_compare(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void string_compare(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!string_value(context, args[0])) {
         type_error(context, out);
@@ -309,7 +309,7 @@ struct ReprGuard {
             context.leave_repr(object);
     }
 };
-void tuple_repr(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void tuple_repr(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!instance_of<TupleObject, CoreObject::TupleType>(context, args[0])) {
         type_error(context, out);
@@ -340,7 +340,7 @@ void tuple_repr(Attachment &context, Handle, std::span<const Value> args, Return
     result += U')';
     make_str(context, std::move(result), out);
 }
-void list_repr(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void list_repr(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!instance_of<ListObject, CoreObject::ListType>(context, args[0])) {
         type_error(context, out);
@@ -372,7 +372,7 @@ void list_repr(Attachment &context, Handle, std::span<const Value> args, ReturnS
     result += U']';
     make_str(context, std::move(result), out);
 }
-void tuple_hash(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void tuple_hash(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!instance_of<TupleObject, CoreObject::TupleType>(context, args[0])) {
         type_error(context, out);
@@ -406,7 +406,7 @@ void tuple_hash(Attachment &context, Handle, std::span<const Value> args, Return
                                                                        : signed_hash(accumulator),
              out);
 }
-void dictionary_repr(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void dictionary_repr(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     const auto self = roots.root(args[0]);
@@ -477,7 +477,7 @@ void dictionary_repr(Attachment &context, Handle, std::span<const Value> args, R
     make_str(context, std::move(result), out);
 }
 template <CompareOp Op>
-void tuple_compare(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void tuple_compare(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!instance_of<TupleObject, CoreObject::TupleType>(context, args[0])) {
         type_error(context, out);
@@ -510,7 +510,7 @@ void tuple_compare(Attachment &context, Handle, std::span<const Value> args, Ret
     order_result<Op>(context, (left.size() > right.size()) - (left.size() < right.size()), out);
 }
 template <bool NotEqual>
-void method_compare(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void method_compare(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!instance_of<BoundMethodObject, CoreObject::BoundMethodType>(c, args[0])) {
         type_error(c, out);
@@ -533,7 +533,7 @@ void method_compare(Attachment &c, Handle, std::span<const Value> args, ReturnSl
     const bool equal = compared.value() == c.builtin(CoreObject::True) && left.self == right.self;
     out.ok(c.builtin(equal != NotEqual ? CoreObject::True : CoreObject::False));
 }
-void method_hash(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void method_hash(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!instance_of<BoundMethodObject, CoreObject::BoundMethodType>(c, args[0])) {
         type_error(c, out);
@@ -556,7 +556,7 @@ void method_hash(Attachment &c, Handle, std::span<const Value> args, ReturnSlot 
     make_int(c, result == -1 ? -2 : result, out);
 }
 template <CompareOp Op>
-void cell_compare(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void cell_compare(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!instance_of<CellObject, CoreObject::CellType>(context, args[0])) {
         type_error(context, out);
@@ -575,7 +575,7 @@ void cell_compare(Attachment &context, Handle, std::span<const Value> args, Retu
     } else
         order_result<Op>(context, static_cast<int>(has_left) - static_cast<int>(has_right), out);
 }
-void cell_repr(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void cell_repr(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!instance_of<CellObject, CoreObject::CellType>(context, args[0])) {
         type_error(context, out);
@@ -590,7 +590,7 @@ void cell_repr(Attachment &context, Handle, std::span<const Value> args, ReturnS
     result += U'>';
     make_str(context, std::move(result), out);
 }
-void proxy_hash(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void proxy_hash(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!instance_of<MappingProxyObject, CoreObject::MappingProxyType>(context, args[0])) {
         type_error(context, out);
@@ -600,7 +600,7 @@ void proxy_hash(Attachment &context, Handle, std::span<const Value> args, Return
     cxxpython::core::hash(context, roots.root(context.payload<MappingProxyObject>(args[0]).mapping),
                           out);
 }
-void string_add(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void string_add(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!string_value(context, args[0])) {
         type_error(context, out);
@@ -615,7 +615,7 @@ void string_add(Attachment &context, Handle, std::span<const Value> args, Return
              context.payload<StrObject>(args[0]).value + context.payload<StrObject>(args[1]).value,
              out);
 }
-void exception_repr(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void exception_repr(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!instance_of<ExceptionObject, CoreObject::BaseExceptionType>(context, args[0])) {
         type_error(context, out);
@@ -644,7 +644,7 @@ void exception_repr(Attachment &context, Handle, std::span<const Value> args, Re
     make_str(context, std::move(name), out);
 }
 template <bool KeyError>
-void exception_str(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void exception_str(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!instance_of < ExceptionObject,
         KeyError ? CoreObject::KeyErrorType : CoreObject::BaseExceptionType > (context, args[0])) {

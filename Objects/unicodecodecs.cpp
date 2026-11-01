@@ -201,7 +201,7 @@ void set_field(Attachment &ctx, Value owner, std::optional<Value> value, ReturnS
 }
 
 template <bool Encode>
-void error_init(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void error_init(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     Value self = args[0];
     auto type = Encode ? CoreObject::UnicodeEncodeErrorType : CoreObject::UnicodeDecodeErrorType;
@@ -230,7 +230,7 @@ void error_init(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot
 }
 
 template <bool Encode>
-void error_str(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void error_str(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto self = roots.root(args[0]);
@@ -302,7 +302,7 @@ void error_str(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot 
     make_str(ctx, std::move(message), out);
 }
 
-void string_encode(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void string_encode(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!string_value(ctx, args[1]) || !string_value(ctx, args[2])) {
         raise_error(ctx, CoreObject::TypeErrorType, U"encoding and errors must be strings", out);

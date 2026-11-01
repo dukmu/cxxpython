@@ -19,7 +19,7 @@ template <bool Keywords> bool receiver(Attachment &c, Value value, ReturnSlot &o
 }
 
 template <bool Keywords>
-void view_new(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void view_new(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (args[0] != c.builtin(view_type<Keywords>)) {
         raise_error(c, CoreObject::TypeErrorType, U"invalid ParamSpec view type", out);
@@ -36,7 +36,7 @@ template <bool Keywords> void view_origin(Attachment &c, Value self, ReturnSlot 
 }
 
 template <bool Keywords>
-void view_repr(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void view_repr(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver<Keywords>(c, args[0], out))
         return;
@@ -59,7 +59,7 @@ void view_repr(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &o
 }
 
 template <bool Keywords, CompareOp Op>
-void view_compare(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void view_compare(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver<Keywords>(c, args[0], out))
         return;
@@ -75,7 +75,7 @@ void view_compare(Attachment &c, Handle, std::span<const Value> args, ReturnSlot
 }
 
 template <bool Keywords>
-void view_mro_entries(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void view_mro_entries(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver<Keywords>(c, args[0], out))
         return;

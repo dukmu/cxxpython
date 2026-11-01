@@ -227,7 +227,7 @@ bool arguments(Attachment &c, Value positional, Value named, RootScope &roots,
     }
     return true;
 }
-void create(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void create(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     if (!c.has_layout<TypeObject>(args[0]) ||
@@ -237,7 +237,7 @@ void create(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
     }
     c.allocate_instance<ByteArrayObject>(roots.root(args[0]), out);
 }
-void initialize(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void initialize(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -305,7 +305,7 @@ void initialize(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &
         return;
     out.ok(c.builtin(CoreObject::None));
 }
-void representation(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void representation(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -342,7 +342,7 @@ void representation(Attachment &c, Handle, std::span<const Value> args, ReturnSl
     text += U')';
     make_str(c, std::move(text), out);
 }
-void size(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void size(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -352,7 +352,7 @@ void size(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
     make_int(c, n, out);
 }
 enum class ItemOp { Get, Set, Delete, Pop };
-template <ItemOp Op> void item(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+template <ItemOp Op> void item(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -532,7 +532,7 @@ template <ItemOp Op> void item(Attachment &c, Handle, std::span<const Value> arg
         }
     }
 }
-void append(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void append(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -545,7 +545,7 @@ void append(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
         return;
     out.ok(c.builtin(CoreObject::None));
 }
-void extend(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void extend(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -558,7 +558,7 @@ void extend(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
         return;
     out.ok(c.builtin(CoreObject::None));
 }
-void insert(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void insert(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -581,7 +581,7 @@ void insert(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
         return;
     out.ok(c.builtin(CoreObject::None));
 }
-void remove(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void remove(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -613,7 +613,7 @@ void remove(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
     }
 }
 template <int Operation>
-void simple(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void simple(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -653,8 +653,7 @@ void simple(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
         out.ok(c.builtin(CoreObject::None));
     }
 }
-template <bool Inplace>
-void add(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+template <bool Inplace> void add(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -692,7 +691,7 @@ void add(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
     }
 }
 template <bool Inplace>
-void repeat(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void repeat(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -723,7 +722,7 @@ void repeat(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
         make_bytearray(c, std::move(data), out);
     }
 }
-void contains(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void contains(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -742,7 +741,7 @@ void contains(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &ou
     out.ok(c.builtin(found ? CoreObject::True : CoreObject::False));
 }
 template <CompareOp Op>
-void compare(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void compare(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -764,7 +763,7 @@ void compare(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out
                                         : order >= 0;
     out.ok(c.builtin(result ? CoreObject::True : CoreObject::False));
 }
-void iterator(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void iterator(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -772,11 +771,11 @@ void iterator(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &ou
     c.allocate_instance<SequenceIteratorObject>(
         roots.root(c.builtin(CoreObject::ByteArrayIteratorType)), out, args[0]);
 }
-void iterator_self(Attachment &, Handle, std::span<const Value> args, ReturnSlot &out)
+void iterator_self(Attachment &, Value, std::span<const Value> args, ReturnSlot &out)
 {
     out.ok(args[0]);
 }
-void next(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void next(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!c.has_layout<SequenceIteratorObject>(args[0]) ||
         c.type_of(args[0]) != c.builtin(CoreObject::ByteArrayIteratorType)) {
@@ -816,7 +815,7 @@ void next(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
         return;
     }
 }
-void decode(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void decode(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;

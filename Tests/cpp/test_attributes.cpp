@@ -264,7 +264,7 @@ TEST_F(CoreAttributes, BoundMethodReflectionReturnsTracedCallableAndReceiver)
     ReturnSlot out(context);
     make_native_function(
         context, "method", signature,
-        [](Attachment &, Handle, std::span<const Value> args, ReturnSlot &result) {
+        [](Attachment &, Value, std::span<const Value> args, ReturnSlot &result) {
             result.ok(args[0]);
         },
         {}, out);

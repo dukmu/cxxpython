@@ -32,7 +32,7 @@ void set_syntax_field(Attachment &context, Value exception, std::optional<Value>
 }
 
 // CPython 3.12.14 Objects/exceptions.c SyntaxError_init; tail slots are sorted by name.
-void syntax_init(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void syntax_init(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!context.has_layout<ExceptionObject>(args[0]) ||
         !is_subtype(context, context.type_of(args[0]),
@@ -85,7 +85,7 @@ void syntax_init(Attachment &context, Handle, std::span<const Value> args, Retur
     out.ok(context.builtin(CoreObject::None));
 }
 
-void syntax_str(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void syntax_str(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!context.has_layout<ExceptionObject>(args[0]) ||
         !is_subtype(context, context.type_of(args[0]),
@@ -332,7 +332,7 @@ bool integer_arg(Attachment &context, Value value, std::int64_t &number, ReturnS
     return true;
 }
 
-void compile_builtin(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void compile_builtin(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!context.has_layout<StrObject>(args[1]) || !context.has_layout<StrObject>(args[2])) {
         raise_error(context, CoreObject::TypeErrorType,
@@ -413,7 +413,7 @@ void compile_builtin(Attachment &context, Handle, std::span<const Value> args, R
 }
 
 template <bool Eval>
-void execute_builtin(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void execute_builtin(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     auto source = roots.root(args[0]);
@@ -499,7 +499,7 @@ void execute_builtin(Attachment &context, Handle, std::span<const Value> args, R
             out.ok(none);
     }
 }
-void locals_builtin(Attachment &context, Handle, std::span<const Value>, ReturnSlot &out)
+void locals_builtin(Attachment &context, Value, std::span<const Value>, ReturnSlot &out)
 {
     const auto frame = context.current_frame();
     if (!frame) {
@@ -510,7 +510,7 @@ void locals_builtin(Attachment &context, Handle, std::span<const Value>, ReturnS
     detail::frame_locals(context, roots.root(*frame), out);
 }
 
-void globals_builtin(Attachment &context, Handle, std::span<const Value>, ReturnSlot &out)
+void globals_builtin(Attachment &context, Value, std::span<const Value>, ReturnSlot &out)
 {
     const auto frame = context.current_frame();
     if (!frame) {
@@ -521,7 +521,7 @@ void globals_builtin(Attachment &context, Handle, std::span<const Value>, Return
     out.ok(context.payload<FunctionObject>(data.function).globals);
 }
 
-void vars_builtin(Attachment &context, Handle self, std::span<const Value> args, ReturnSlot &out)
+void vars_builtin(Attachment &context, Value self, std::span<const Value> args, ReturnSlot &out)
 {
     const auto &arguments = context.payload<TupleObject>(args[0]).items;
     if (arguments.empty()) {
@@ -544,7 +544,7 @@ void vars_builtin(Attachment &context, Handle self, std::span<const Value> args,
                     U"vars() argument must have __dict__ attribute", out);
 }
 
-void dir_builtin(Attachment &context, Handle self, std::span<const Value> args, ReturnSlot &out)
+void dir_builtin(Attachment &context, Value self, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     const auto arguments = roots.root(args[0]);

@@ -111,7 +111,7 @@ void default_state(Attachment &c, Handle self, bool required, ReturnSlot &out)
     } else
         out.ok(state.value());
 }
-void object_getstate(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void object_getstate(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     default_state(c, roots.root(args[0]), false, out);
@@ -239,12 +239,12 @@ void common_reduce(Attachment &c, Handle self, std::int64_t protocol, ReturnSlot
                             pairs.value()};
     cxxpython::core::make_tuple(c, result, out);
 }
-void object_reduce(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void object_reduce(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     common_reduce(c, roots.root(args[0]), 0, out);
 }
-void object_reduce_ex(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+void object_reduce_ex(Attachment &c, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto self = roots.root(args[0]);
@@ -300,7 +300,7 @@ void getattr_reduction(Attachment &c, Handle receiver, Handle name, ReturnSlot &
     const Value result[] = {reconstruct.get(c), arguments.value()};
     cxxpython::core::make_tuple(c, result, out);
 }
-void native_reduce(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void native_reduce(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (c.type_of(args[0]) != c.builtin(CoreObject::NativeFunctionType)) {
         raise_error(c, CoreObject::TypeErrorType, U"__reduce__ requires a native function", out);
@@ -319,7 +319,7 @@ void native_reduce(Attachment &c, Handle, std::span<const Value> args, ReturnSlo
     else
         getattr_reduction(c, roots.root(*function.bound_self), roots.root(name.value()), out);
 }
-void bound_method_reduce(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void bound_method_reduce(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (c.type_of(args[0]) != c.builtin(CoreObject::BoundMethodType)) {
         raise_error(c, CoreObject::TypeErrorType, U"__reduce__ requires a bound method", out);
@@ -336,7 +336,7 @@ void bound_method_reduce(Attachment &c, Handle, std::span<const Value> args, Ret
     }
     getattr_reduction(c, roots.root(method.self), roots.root(name.value()), out);
 }
-void method_descriptor_reduce(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void method_descriptor_reduce(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (c.type_of(args[0]) != c.builtin(CoreObject::MethodDescriptorType)) {
         raise_error(c, CoreObject::TypeErrorType, U"__reduce__ requires a method descriptor", out);

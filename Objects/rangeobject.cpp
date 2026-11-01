@@ -17,7 +17,7 @@ const RangeObject *range(Attachment &context, Value value, ReturnSlot &out)
     }
     return &context.payload<RangeObject>(value);
 }
-void range_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void range_new(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     const auto &values = context.payload<TupleObject>(args[1]).items;
     if (args[0] != context.builtin(CoreObject::RangeType) || values.empty() || values.size() > 3) {
@@ -54,7 +54,7 @@ void range_new(Attachment &context, Handle, std::span<const Value> args, ReturnS
     context.allocate_instance<RangeObject>(roots.root(context.builtin(CoreObject::RangeType)), out,
                                            start, stop, step, converted.value());
 }
-void range_repr(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void range_repr(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     const auto *value = range(context, args[0], out);
     if (!value)
@@ -64,7 +64,7 @@ void range_repr(Attachment &context, Handle, std::span<const Value> args, Return
     const auto text = "range(" + a + ", " + b + (step == "1" ? "" : ", " + step) + ")";
     make_str(context, {text.begin(), text.end()}, out);
 }
-void range_reduce(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void range_reduce(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     const auto self = roots.root(args[0]);
@@ -77,7 +77,7 @@ void range_reduce(Attachment &context, Handle, std::span<const Value> args, Retu
     const std::array result{context.type_of(self), arguments.value()};
     cxxpython::core::make_tuple(context, result, out);
 }
-void range_bool(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void range_bool(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     const auto *value = range(context, args[0], out);
     if (!value)
@@ -85,7 +85,7 @@ void range_bool(Attachment &context, Handle, std::span<const Value> args, Return
     out.ok(
         context.builtin(int_sign(context, value->length) ? CoreObject::True : CoreObject::False));
 }
-void range_len(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void range_len(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     const auto *value = range(context, args[0], out);
     if (!value)
@@ -99,7 +99,7 @@ void range_len(Attachment &context, Handle, std::span<const Value> args, ReturnS
     }
     out.ok(value->length);
 }
-void range_item(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void range_item(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     const auto *value = range(context, args[0], out);
     if (!value)
@@ -149,7 +149,7 @@ void range_item(Attachment &context, Handle, std::span<const Value> args, Return
         context, number(context, value->start) + number(context, value->step) * position, out);
 }
 template <bool Negate>
-void range_equal(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void range_equal(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     const auto *a = range(context, args[0], out);
     if (!a)
@@ -166,7 +166,7 @@ void range_equal(Attachment &context, Handle, std::span<const Value> args, Retur
                          (length == 1 || number(context, a->step) == number(context, b.step))));
     out.ok(context.builtin(equal != Negate ? CoreObject::True : CoreObject::False));
 }
-void range_hash(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void range_hash(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     const auto *value = range(context, args[0], out);
     if (!value)
@@ -180,7 +180,7 @@ void range_hash(Attachment &context, Handle, std::span<const Value> args, Return
     cxxpython::core::make_tuple(context, values, tuple);
     hash(context, roots.root(tuple.value()), out);
 }
-void range_iter(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void range_iter(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     const auto *value = range(context, args[0], out);
     if (!value)
@@ -191,7 +191,7 @@ void range_iter(Attachment &context, Handle, std::span<const Value> args, Return
         int_sign(context, value->length) ? std::optional<Value>{value->start}
                                          : std::optional<Value>{});
 }
-void range_next(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void range_next(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (context.type_of(args[0]) != context.builtin(CoreObject::RangeIteratorType) ||
         !context.has_layout<RangeIteratorObject>(args[0])) {
@@ -221,7 +221,7 @@ void range_next(Attachment &context, Handle, std::span<const Value> args, Return
         context.poll();
     }
 }
-void iterator_self(Attachment &, Handle, std::span<const Value> args, ReturnSlot &out)
+void iterator_self(Attachment &, Value, std::span<const Value> args, ReturnSlot &out)
 {
     out.ok(args[0]);
 }

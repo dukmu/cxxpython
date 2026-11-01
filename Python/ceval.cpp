@@ -1879,7 +1879,7 @@ void code_nlocals(Attachment &c, Value value, ReturnSlot &out)
              out);
 }
 template <bool Lines>
-void code_locations(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void code_locations(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto self = roots.root(args[0]);
@@ -1980,7 +1980,7 @@ void frame_lasti(Attachment &c, Value value, ReturnSlot &out)
         c, lasti == std::numeric_limits<std::size_t>::max() ? -1 : static_cast<std::int64_t>(lasti),
         out);
 }
-void frame_clear(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void frame_clear(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!kind<FrameObject, CoreObject::FrameType>(c, args[0])) {
         type_error(c, U"clear requires a frame", out);
@@ -2039,7 +2039,7 @@ std::u32string address(Value value)
                    .ptr;
     return U"0x" + std::u32string(buffer, end);
 }
-void execution_repr(Attachment &c, Handle fn, std::span<const Value> args, ReturnSlot &out)
+void execution_repr(Attachment &c, Value fn, std::span<const Value> args, ReturnSlot &out)
 {
     const auto owner = c.payload<NativeFunctionObject>(fn).captures[0];
     if (c.type_of(args[0]) != owner) {

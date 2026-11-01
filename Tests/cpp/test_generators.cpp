@@ -24,9 +24,9 @@ TEST_F(GeneratorProtocol, HostFaultsAndManagedAllocationFailureCompleteTheExecut
         SCOPED_TRACE(host_fault);
         ReturnSlot out(context);
         NativeEntry entry =
-            host_fault ? +[](Attachment &, Handle, std::span<const Value>,
+            host_fault ? +[](Attachment &, Value, std::span<const Value>,
                              ReturnSlot &) { throw std::runtime_error("generator host fault"); }
-                       : +[](Attachment &context, Handle, std::span<const Value>, ReturnSlot &out) {
+                       : +[](Attachment &context, Value, std::span<const Value>, ReturnSlot &out) {
                              context.set_allocation_limit(0);
                              out.ok(context.builtin(CoreObject::None));
                          };

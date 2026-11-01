@@ -60,7 +60,7 @@ class CoreProtocols : public testing::Test {
         ReturnSlot out(context);
         make_native_function(
             context, "protocol", signature,
-            [](Attachment &c, Handle fn, std::span<const Value>, ReturnSlot &out) {
+            [](Attachment &c, Value fn, std::span<const Value>, ReturnSlot &out) {
                 c.collect();
                 out.ok(c.payload<NativeFunctionObject>(fn).captures[0]);
             },
@@ -117,7 +117,7 @@ TEST_P(ProtocolNativeDepth, SpecialCallsConsumeAndUnwindDepth)
     bool_signature.parameters = {{U"self", ParameterKind::PositionalOnly}};
     make_native_function(
         context, "depth bool", bool_signature,
-        [](Attachment &c, Handle, std::span<const Value>, ReturnSlot &result) {
+        [](Attachment &c, Value, std::span<const Value>, ReturnSlot &result) {
             result.ok(c.builtin(CoreObject::True));
         },
         {}, out);
@@ -129,7 +129,7 @@ TEST_P(ProtocolNativeDepth, SpecialCallsConsumeAndUnwindDepth)
     std::array captures{one.get(context), two.get(context), obj.get(context)};
     make_native_function(
         context, "outer add", {},
-        [](Attachment &c, Handle fn, std::span<const Value>, ReturnSlot &result) {
+        [](Attachment &c, Value fn, std::span<const Value>, ReturnSlot &result) {
             RootScope scope(c);
             const auto &captured = c.payload<NativeFunctionObject>(fn).captures;
             auto left = scope.root(captured[0]);
@@ -140,7 +140,7 @@ TEST_P(ProtocolNativeDepth, SpecialCallsConsumeAndUnwindDepth)
     auto outer_add = roots.root(out.result().value());
     make_native_function(
         context, "outer truth", {},
-        [](Attachment &c, Handle fn, std::span<const Value>, ReturnSlot &result) {
+        [](Attachment &c, Value fn, std::span<const Value>, ReturnSlot &result) {
             RootScope scope(c);
             auto object = scope.root(c.payload<NativeFunctionObject>(fn).captures[2]);
             truth(c, object, result);
@@ -166,7 +166,7 @@ TEST_P(ProtocolNativeDepth, SpecialCallsConsumeAndUnwindDepth)
 
     make_native_function(
         context, "host fault bool", bool_signature,
-        [](Attachment &, Handle, std::span<const Value>, ReturnSlot &) {
+        [](Attachment &, Value, std::span<const Value>, ReturnSlot &) {
             throw std::runtime_error("host fault");
         },
         {}, out);
@@ -356,7 +356,7 @@ TEST_F(CoreProtocols, ReflectedOverrideUsesClassDescriptorBindingAndRichInequali
     ReturnSlot out(context);
     make_native_function(
         context, "__get__", signature,
-        [](Attachment &c, Handle fn, std::span<const Value>, ReturnSlot &out) {
+        [](Attachment &c, Value fn, std::span<const Value>, ReturnSlot &out) {
             c.collect();
             out.ok(c.payload<NativeFunctionObject>(fn).captures[0]);
         },
@@ -382,7 +382,7 @@ TEST_F(CoreProtocols, ReflectedFallbackResolvesAgainAfterLeftCallbackMutatesRigh
     ReturnSlot out(context);
     make_native_function(
         context, "mutate", signature,
-        [](Attachment &c, Handle fn, std::span<const Value>, ReturnSlot &out) {
+        [](Attachment &c, Value fn, std::span<const Value>, ReturnSlot &out) {
             RootScope roots(c);
             auto captures = c.payload<NativeFunctionObject>(fn).captures;
             set_attribute(c, roots.root(captures[0]), roots.root(captures[1]),
@@ -431,7 +431,7 @@ TEST_F(CoreProtocols, SameTypeArithmeticDoesNotTryReflectedButEqualityDoes)
     std::array captures{b.get(context)};
     make_native_function(
         context, "eq", signature,
-        [](Attachment &c, Handle fn, std::span<const Value> args, ReturnSlot &out) {
+        [](Attachment &c, Value fn, std::span<const Value> args, ReturnSlot &out) {
             out.ok(c.builtin(args[0] == c.payload<NativeFunctionObject>(fn).captures[0]
                                  ? CoreObject::True
                                  : CoreObject::NotImplemented));
@@ -480,7 +480,7 @@ TEST_F(CoreProtocols, ResolvedDescriptorSurvivesReplacementDuringNativeCallback)
         std::array captures{cls.get(context), name.get(context), marker.get(context)};
         make_native_function(
             context, "replace selected protocol", signature,
-            [](Attachment &c, Handle fn, std::span<const Value>, ReturnSlot &result) {
+            [](Attachment &c, Value fn, std::span<const Value>, ReturnSlot &result) {
                 RootScope local(c);
                 const auto &captured = c.payload<NativeFunctionObject>(fn).captures;
                 auto owner = local.root(captured[0]);
@@ -624,7 +624,7 @@ TEST_F(CoreProtocols, CachedNativeCallKindsPreserveBindingAndReceiverChecks)
         ReturnSlot out(context);
         make_native_function(
             context, "cached binding", signature,
-            [](Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &result) {
+            [](Attachment &c, Value function, std::span<const Value> args, ReturnSlot &result) {
                 const auto &captured = c.payload<NativeFunctionObject>(function).captures;
                 EXPECT_EQ(args.size(), captured[1] == c.builtin(CoreObject::True) ? 1U : 0U);
                 c.collect();
@@ -748,7 +748,7 @@ TEST(ProtocolCache, HitRootsInAnotherAttachmentSurviveInputScopeAndCollection)
         signature.parameters = {{U"self", ParameterKind::PositionalOnly}};
         make_native_function(
             context, "length", signature,
-            [](Attachment &c, Handle, std::span<const Value>, ReturnSlot &result) {
+            [](Attachment &c, Value, std::span<const Value>, ReturnSlot &result) {
                 result.ok(c.builtin(CoreObject::None));
             },
             {}, out);
@@ -867,7 +867,7 @@ TEST_F(CoreProtocols, ValueOperandsSurviveOutputReuseDuringCollectingProtocols)
         std::array captures{cls.get(context), result.get(context)};
         make_native_function(
             context, "collecting protocol", signature,
-            [](Attachment &c, Handle fn, std::span<const Value> args, ReturnSlot &result) {
+            [](Attachment &c, Value fn, std::span<const Value> args, ReturnSlot &result) {
                 c.collect();
                 const auto &captured = c.payload<NativeFunctionObject>(fn).captures;
                 for (auto arg : args)
@@ -1016,7 +1016,7 @@ TEST_F(CoreProtocols, RecursiveProtocolReentryUsesTheExistingCallDepthLimit)
     ReturnSlot out(context);
     make_native_function(
         context, "recursive bool", signature,
-        [](Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out) {
+        [](Attachment &c, Value, std::span<const Value> args, ReturnSlot &out) {
             RootScope roots(c);
             truth(c, roots.root(args[0]), out);
         },
@@ -1092,7 +1092,7 @@ TEST_F(CoreProtocols, FormatBindsCustomDescriptorsBeforeCallingWithOnlySpec)
     ReturnSlot out(context);
     make_native_function(
         context, "format callback", callable_signature,
-        [](Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out) {
+        [](Attachment &c, Value, std::span<const Value> args, ReturnSlot &out) {
             c.collect();
             out.ok(args[0]);
         },
@@ -1104,7 +1104,7 @@ TEST_F(CoreProtocols, FormatBindsCustomDescriptorsBeforeCallingWithOnlySpec)
     std::array captures{callback.get(context), obj.get(context), cls.get(context)};
     make_native_function(
         context, "format descriptor", get_signature,
-        [](Attachment &c, Handle fn, std::span<const Value> args, ReturnSlot &out) {
+        [](Attachment &c, Value fn, std::span<const Value> args, ReturnSlot &out) {
             c.collect();
             const auto &captured = c.payload<NativeFunctionObject>(fn).captures;
             EXPECT_EQ(args[1], captured[1]);

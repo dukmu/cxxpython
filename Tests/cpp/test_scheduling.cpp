@@ -124,7 +124,7 @@ TEST_F(CoreScheduling, PythonAndNativeCallsUseOneDispatchAndKeywordBinder)
     signature.parameters = {{U"value"}};
     make_native_function(
         context, "native identity", signature,
-        [](Attachment &c, Handle, std::span<const Value> values, ReturnSlot &out) {
+        [](Attachment &c, Value, std::span<const Value> values, ReturnSlot &out) {
             c.collect();
             out.ok(values[0]);
         },
@@ -234,7 +234,7 @@ TEST_F(CoreScheduling, ChildFrameBackEdgesKeepParkedOperandsAndContinuationsRoot
     std::array captures{observed.get(context)};
     make_native_function(
         context, "observe child", {},
-        [](Attachment &c, Handle fn, std::span<const Value>, ReturnSlot &out) {
+        [](Attachment &c, Value fn, std::span<const Value>, ReturnSlot &out) {
             const auto child = *c.current_frame();
             const auto &data = c.payload<FrameObject>(child);
             ReturnSlot back(c);
@@ -301,7 +301,7 @@ TEST_F(CoreScheduling, RaisedAndHostFaultsCompleteEveryParkedFrame)
     std::array captures{saved.get(context)};
     make_native_function(
         context, "host fault", {},
-        [](Attachment &c, Handle fn, std::span<const Value>, ReturnSlot &) {
+        [](Attachment &c, Value fn, std::span<const Value>, ReturnSlot &) {
             write_cell(c, c.payload<NativeFunctionObject>(fn).captures[0], *c.current_frame());
             throw std::runtime_error("scheduled host fault");
         },
@@ -442,7 +442,7 @@ TEST(CoreSchedulingDepth, LogicalRecursionLimitUnwindsAndNativeReentryHasItsOwnL
     std::array captures{shared.get(context)};
     make_native_function(
         context, "native recursion", {},
-        [](Attachment &c, Handle function, std::span<const Value>, ReturnSlot &out) {
+        [](Attachment &c, Value function, std::span<const Value>, ReturnSlot &out) {
             RootScope roots(c);
             const auto cell = c.payload<NativeFunctionObject>(function).captures[0];
             ReturnSlot contents(c);

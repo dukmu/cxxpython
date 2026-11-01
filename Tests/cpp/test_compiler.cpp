@@ -1044,7 +1044,7 @@ TEST_F(CoreSource, NestedBooleanAndCompareConditionsDoNotRepeatTruthCallbacks)
     std::array captures{counter.get(context)};
     make_native_function(
         context, "count bool", signature,
-        [](Attachment &context, Handle fn, std::span<const Value>, ReturnSlot &out) {
+        [](Attachment &context, Value fn, std::span<const Value>, ReturnSlot &out) {
             const auto cell = context.payload<NativeFunctionObject>(fn).captures[0];
             ReturnSlot previous(context);
             read_cell(context, cell, previous);

@@ -20,7 +20,7 @@ bool type_object(Attachment &context, Value value)
            is_subtype(context, context.type_of(value), context.type_type());
 }
 template <unsigned Bits>
-void builtin_radix(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void builtin_radix(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     ReturnSlot converted(c);
@@ -47,7 +47,7 @@ bool failed(const ReturnSlot &out)
 {
     return out.tag() == ResultTag::Raised;
 }
-void builtin_input(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void builtin_input(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     auto arguments = roots.root(args[0]);
@@ -162,7 +162,7 @@ void builtin_input(Attachment &context, Handle, std::span<const Value> args, Ret
                     out);
     }
 }
-void builtin_abs(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void builtin_abs(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     auto value = roots.root(args[0]);
@@ -173,7 +173,7 @@ void builtin_abs(Attachment &context, Handle, std::span<const Value> args, Retur
     }
     detail::invoke_special(context, value, roots.root(*method), {{}, {}}, out);
 }
-void builtin_round(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void builtin_round(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     auto value = roots.root(args[0]);
@@ -196,12 +196,12 @@ void builtin_round(Attachment &context, Handle, std::span<const Value> args, Ret
         detail::invoke_special(context, value, callable, {arguments, {}}, out);
     }
 }
-void builtin_id(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void builtin_id(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     make_int(context, static_cast<std::int64_t>(reinterpret_cast<std::uintptr_t>(args[0].object())),
              out);
 }
-void builtin_chr(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void builtin_chr(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     ReturnSlot converted(context);
@@ -223,7 +223,7 @@ void builtin_chr(Attachment &context, Handle, std::span<const Value> args, Retur
     }
     make_str(context, std::u32string(1, static_cast<char32_t>(value.small)), out);
 }
-void builtin_callable(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void builtin_callable(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     auto type = context.type_of(args[0]);
     bool result = type == context.builtin(CoreObject::NativeFunctionType) ||
@@ -233,7 +233,7 @@ void builtin_callable(Attachment &context, Handle, std::span<const Value> args, 
                   detail::type_attribute(context, type, U"__call__").has_value();
     out.ok(context.builtin(result ? CoreObject::True : CoreObject::False));
 }
-void builtin_sorted(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void builtin_sorted(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     ReturnSlot list(context), reverse(context), sorted(context);
@@ -256,7 +256,7 @@ void builtin_sorted(Attachment &context, Handle, std::span<const Value> args, Re
         out.ok(result.get(context));
 }
 template <bool Minimum>
-void builtin_min_max(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void builtin_min_max(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     auto positional = roots.root(args[0]);
@@ -341,17 +341,17 @@ void builtin_min_max(Attachment &context, Handle, std::span<const Value> args, R
     } else
         out.ok(best.value());
 }
-void builtin_divmod(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void builtin_divmod(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     divmod(context, roots.root(args[0]), roots.root(args[1]), out);
 }
-void builtin_pow(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void builtin_pow(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     power(context, roots.root(args[0]), roots.root(args[1]), roots.root(args[2]), out);
 }
-void builtin_sum(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void builtin_sum(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     ReturnSlot iterator_result(context), result(context);
@@ -441,7 +441,7 @@ void builtin_sum(Attachment &context, Handle, std::span<const Value> args, Retur
             mode = Mode::General;
     }
 }
-void builtin_ord(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void builtin_ord(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     const auto value = args[0];
     if (context.has_layout<StrObject>(value) &&
@@ -461,7 +461,7 @@ void builtin_ord(Attachment &context, Handle, std::span<const Value> args, Retur
     raise_error(context, CoreObject::TypeErrorType, U"ord() expected a character", out);
 }
 template <bool Any>
-void builtin_all_any(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void builtin_all_any(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     ReturnSlot iterator_result(context);
@@ -582,17 +582,17 @@ void class_check(Attachment &context, Handle subject, Handle candidate, bool ins
                                ? CoreObject::True
                                : CoreObject::False));
 }
-void builtin_isinstance(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void builtin_isinstance(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     instance_check(context, roots.root(args[0]), roots.root(args[1]), out);
 }
-void builtin_issubclass(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void builtin_issubclass(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     class_check(context, roots.root(args[0]), roots.root(args[1]), false, out);
 }
-void attribute_get(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void attribute_get(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     const auto &defaults = context.payload<TupleObject>(args[2]).items;
@@ -607,7 +607,7 @@ void attribute_get(Attachment &context, Handle, std::span<const Value> args, Ret
                    context.builtin(CoreObject::AttributeErrorType)))
         out.ok(defaults[0]);
 }
-void attribute_has(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void attribute_has(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     get_attribute(context, roots.root(args[0]), roots.root(args[1]), out);
@@ -619,22 +619,22 @@ void attribute_has(Attachment &context, Handle, std::span<const Value> args, Ret
     } else
         out.ok(context.builtin(CoreObject::True));
 }
-void attribute_set(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void attribute_set(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     set_attribute(context, roots.root(args[0]), roots.root(args[1]), roots.root(args[2]), out);
 }
-void attribute_delete(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void attribute_delete(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     del_attribute(context, roots.root(args[0]), roots.root(args[1]), out);
 }
-void builtin_format(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void builtin_format(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     format(context, roots.root(args[0]), roots.root(args[1]), out);
 }
-void builtin_ascii(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void builtin_ascii(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     ascii(context, roots.root(args[0]), out);
@@ -652,7 +652,7 @@ void mapping_store(Attachment &context, Handle mapping, std::u32string name, Val
     } else
         set_item(context, mapping, roots.root(key.value()), item, out);
 }
-void build_class(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void build_class(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (context.type_of(args[0]) != context.builtin(CoreObject::FunctionType) ||
         !context.has_layout<FunctionObject>(args[0]) || !context.has_layout<StrObject>(args[1]) ||

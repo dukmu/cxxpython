@@ -108,7 +108,7 @@ void descriptor_module(Attachment &context, Value, ReturnSlot &out)
 {
     raise_error(context, CoreObject::AttributeErrorType, U"__module__", out);
 }
-void property_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void property_new(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!context.has_layout<TypeObject>(args[0]) ||
         !is_subtype(context, args[0], context.builtin(CoreObject::PropertyType))) {
@@ -118,7 +118,7 @@ void property_new(Attachment &context, Handle, std::span<const Value> args, Retu
     RootScope roots(context);
     context.allocate_instance<PropertyObject>(roots.root(args[0]), out);
 }
-void property_init(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void property_init(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!property_check(context, args[0], out))
         return;
@@ -182,7 +182,7 @@ void property_invoke(Attachment &context, std::span<const Value> args, ReturnSlo
     }
     call(context, roots.root(callback.value()), {args.subspan(1), {}}, out);
 }
-void property_get(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void property_get(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (args[1] == context.builtin(CoreObject::None)) {
         if (property_check(context, args[0], out))
@@ -191,16 +191,16 @@ void property_get(Attachment &context, Handle, std::span<const Value> args, Retu
     }
     property_invoke<&PropertyObject::getter>(context, args.first(2), out);
 }
-void property_set(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void property_set(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     property_invoke<&PropertyObject::setter>(context, args, out);
 }
-void property_delete(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void property_delete(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     property_invoke<&PropertyObject::deleter>(context, args, out);
 }
 template <AtomicGcEdge PropertyObject::*Field>
-void property_clone(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void property_clone(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!property_check(context, args[0], out))
         return;
@@ -350,7 +350,7 @@ bool compatible(Attachment &context, const GetSetDescriptorObject &field, Value 
     type_error(context, U"descriptor does not apply to this receiver", out);
     return false;
 }
-void descriptor_get(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void descriptor_get(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (args[1] == context.builtin(CoreObject::None) &&
         args[2] == context.builtin(CoreObject::None)) {
@@ -373,11 +373,11 @@ void descriptor_change(Attachment &context, std::span<const Value> args, bool er
     }
     field->setter(context, args[1], erase ? std::optional<Value>{} : args[2], out);
 }
-void descriptor_set(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void descriptor_set(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     descriptor_change(context, args, false, out);
 }
-void descriptor_delete(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void descriptor_delete(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     descriptor_change(context, args, true, out);
 }
@@ -398,7 +398,7 @@ bool member_receiver(Attachment &context, const MemberDescriptorObject &field, V
     type_error(context, U"member descriptor does not apply to this receiver", out);
     return false;
 }
-void member_get(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void member_get(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (args[1] == context.builtin(CoreObject::None) &&
         args[2] == context.builtin(CoreObject::None)) {
@@ -430,11 +430,11 @@ void member_change(Attachment &context, std::span<const Value> args, bool erase,
         context.store(args[1], slot, args[2]);
     out.ok(context.builtin(CoreObject::None));
 }
-void member_set(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void member_set(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     member_change(context, args, false, out);
 }
-void member_delete(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void member_delete(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     member_change(context, args, true, out);
 }

@@ -40,7 +40,7 @@
 namespace cxxpython::core::detail {
 namespace {
 template <Protocol Operation>
-void builtin_protocol(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void builtin_protocol(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     auto value = roots.root(args[0]);

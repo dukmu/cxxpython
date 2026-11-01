@@ -523,7 +523,7 @@ TEST(ParallelImports, PerModuleLeasesAndCrossThreadCyclesParkForGc)
         auto control = roots.root(out.value());
         make_native_function(
             owner, "gate", {},
-            +[](Attachment &actor, Handle function, std::span<const Value>, ReturnSlot &result) {
+            +[](Attachment &actor, Value function, std::span<const Value>, ReturnSlot &result) {
                 const auto &captures = actor.payload<NativeFunctionObject>(function).captures;
                 auto &gate = *actor.payload<GateObject>(captures[0]).gate;
                 gate.calls.fetch_add(1);

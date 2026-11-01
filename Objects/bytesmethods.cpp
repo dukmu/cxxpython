@@ -58,7 +58,7 @@ template <CoreObject Type> void result_bytes(Attachment &c, std::string data, Re
 
 // CPython 3.12.14 Objects/bytes_methods.c: only ASCII letters are case-mapped.
 template <CoreObject Type, bool Upper>
-void change_case(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void change_case(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto self = roots.root(args[0]);
@@ -86,7 +86,7 @@ void change_case(Attachment &c, Handle, std::span<const Value> args, ReturnSlot 
 }
 
 template <CoreObject Type>
-void translate(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void translate(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto self = roots.root(args[0]), mapping = roots.root(args[1]), removed = roots.root(args[2]);
@@ -119,7 +119,7 @@ void translate(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &o
         }
     result_bytes<Type>(c, std::move(result), out);
 }
-void make_translation(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void make_translation(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     std::string from, to;
@@ -141,7 +141,7 @@ void make_translation(Attachment &c, Handle, std::span<const Value> args, Return
 
 enum class Search { Find, RFind, Index, RIndex, Count };
 template <CoreObject Type, Search Mode>
-void search(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void search(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto self = roots.root(args[0]);
@@ -222,7 +222,7 @@ void search(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
 }
 
 template <CoreObject Type, bool Reverse>
-void partition(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void partition(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto self = roots.root(args[0]);
@@ -260,7 +260,7 @@ bool whitespace(unsigned char ch)
     return ch == ' ' || (ch >= '\t' && ch <= '\r');
 }
 template <CoreObject Type, bool Left, bool Right>
-void strip(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void strip(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto self = roots.root(args[0]);
@@ -287,7 +287,7 @@ void strip(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
 }
 
 template <CoreObject Type, bool Reverse>
-void split(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void split(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto self = roots.root(args[0]);

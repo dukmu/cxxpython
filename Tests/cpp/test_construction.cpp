@@ -80,21 +80,21 @@ class CoreConstruction : public testing::Test {
         context.collect();
         EXPECT_NO_THROW(validate_exception(context, out.result().exception()));
     }
-    static void captured(Attachment &c, Handle fn, std::span<const Value>, ReturnSlot &out)
+    static void captured(Attachment &c, Value fn, std::span<const Value>, ReturnSlot &out)
     {
         c.collect();
         out.ok(c.payload<NativeFunctionObject>(fn).captures[0]);
     }
-    static void none(Attachment &c, Handle, std::span<const Value>, ReturnSlot &out)
+    static void none(Attachment &c, Value, std::span<const Value>, ReturnSlot &out)
     {
         c.collect();
         out.ok(c.builtin(CoreObject::None));
     }
-    static void fail(Attachment &c, Handle, std::span<const Value>, ReturnSlot &out)
+    static void fail(Attachment &c, Value, std::span<const Value>, ReturnSlot &out)
     {
         raise_error(c, CoreObject::RuntimeErrorType, U"constructor failed", out);
     }
-    static void allocate(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+    static void allocate(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
     {
         RootScope scope(c);
         c.allocate_instance<InstanceObject>(scope.root(args[0]), out);
@@ -126,15 +126,14 @@ TEST_F(CoreConstruction, InitReceivesKeywordsAndMayReenterAttributeOperations)
     auto name = text(U"value");
     SignatureLayout signature;
     signature.parameters = {{U"self", Kind::PositionalOnly}, {U"value", Kind::KeywordOnly}};
-    auto init =
-        function(signature,
-                 [](Attachment &c, Handle fn, std::span<const Value> args, ReturnSlot &out) {
-                     RootScope scope(c);
-                     auto key = scope.root(c.payload<NativeFunctionObject>(fn).captures[0]);
-                     set_attribute(c, scope.root(args[0]), key, scope.root(args[1]), out);
-                     c.collect();
-                 },
-                 {name.get(context)});
+    auto init = function(signature,
+                         [](Attachment &c, Value fn, std::span<const Value> args, ReturnSlot &out) {
+                             RootScope scope(c);
+                             auto key = scope.root(c.payload<NativeFunctionObject>(fn).captures[0]);
+                             set_attribute(c, scope.root(args[0]), key, scope.root(args[1]), out);
+                             c.collect();
+                         },
+                         {name.get(context)});
     set(cls, U"__init__", init);
     std::array keywords{KeywordArg{name.get(context), expected.get(context)}};
     ReturnSlot out(context);
@@ -168,7 +167,7 @@ TEST_F(CoreConstruction, NewReturningASubclassUsesTheReturnedObjectsInit)
     set(base, U"__init__", function({{{U"self"}}, {}, {}}, fail));
     set(child, U"__init__",
         function({{{U"self"}}, {}, {}},
-                 [](Attachment &c, Handle fn, std::span<const Value> args, ReturnSlot &result) {
+                 [](Attachment &c, Value fn, std::span<const Value> args, ReturnSlot &result) {
                      RootScope scope(c);
                      auto value = scope.root(c.payload<NativeFunctionObject>(fn).captures[0]);
                      ReturnSlot key(c);
@@ -328,7 +327,7 @@ TEST_F(CoreConstruction, TypeDefinitionFailuresDoNotHideHostFaults)
     auto cls = type("Factory");
     set(cls, U"__new__",
         function({{{U"cls"}}, {}, {}},
-                 [](Attachment &, Handle, std::span<const Value>, ReturnSlot &) {
+                 [](Attachment &, Value, std::span<const Value>, ReturnSlot &) {
                      throw std::invalid_argument("host invariant, not a definition error");
                  }));
     ReturnSlot out(context);
@@ -354,7 +353,7 @@ TEST_F(CoreConstruction, StaticAndClassMethodsBindThroughTheirOwnDescriptors)
     auto self = roots.root(out.result().value());
     EXPECT_EQ(get(self, U"static").get(context), fn.get(context));
     auto owner =
-        function({{{U"cls"}}, {}, {}}, [](Attachment &, Handle, std::span<const Value> bound,
+        function({{{U"cls"}}, {}, {}}, [](Attachment &, Value, std::span<const Value> bound,
                                           ReturnSlot &result) { result.ok(bound[0]); });
     std::array class_args{owner.get(context)};
     call(context, class_type, {class_args, {}}, out);
@@ -396,7 +395,7 @@ TEST_F(CoreConstruction, SetNameSnapshotsSurviveNamespaceMutationBeforeInitSubcl
     auto descriptor_type = type("Naming");
     auto naming =
         function({{{U"self"}, {U"owner"}, {U"name"}}, {}, {}},
-                 [](Attachment &c, Handle fn, std::span<const Value> args, ReturnSlot &out) {
+                 [](Attachment &c, Value fn, std::span<const Value> args, ReturnSlot &out) {
                      const auto &captures = c.payload<NativeFunctionObject>(fn).captures;
                      const auto target_space = *TypeView(c, args[1]).dictionary();
                      for (auto key : {U"first", U"second"}) {
@@ -422,15 +421,14 @@ TEST_F(CoreConstruction, SetNameSnapshotsSurviveNamespaceMutationBeforeInitSubcl
     auto marker = text(U"init");
     SignatureLayout init;
     init.parameters = {{U"cls", Kind::PositionalOnly}, {U"token", Kind::KeywordOnly}};
-    auto hook =
-        function(init,
-                 [](Attachment &c, Handle fn, std::span<const Value> args, ReturnSlot &out) {
-                     const auto &captures = c.payload<NativeFunctionObject>(fn).captures;
-                     cxxpython::core::make_tuple(c, args, out);
-                     detail::name_store(c, captures[0], captures[1], out.result().value());
-                     out.ok(c.builtin(CoreObject::None));
-                 },
-                 {events.get(context), marker.get(context)});
+    auto hook = function(init,
+                         [](Attachment &c, Value fn, std::span<const Value> args, ReturnSlot &out) {
+                             const auto &captures = c.payload<NativeFunctionObject>(fn).captures;
+                             cxxpython::core::make_tuple(c, args, out);
+                             detail::name_store(c, captures[0], captures[1], out.result().value());
+                             out.ok(c.builtin(CoreObject::None));
+                         },
+                         {events.get(context), marker.get(context)});
     auto base_space = dictionary();
     put(base_space, U"__init_subclass__", hook);
     ReturnSlot out(context);
@@ -555,7 +553,7 @@ TEST_F(CoreConstruction, UserNewUsesMetaclassLookupButDefaultObjectNewDoesNot)
     auto default_get = get(type_type, U"__getattribute__");
     auto hook =
         function({{{U"cls"}, {U"name"}}, {}, {}},
-                 [](Attachment &c, Handle fn, std::span<const Value> args, ReturnSlot &result) {
+                 [](Attachment &c, Value fn, std::span<const Value> args, ReturnSlot &result) {
                      const auto &captures = c.payload<NativeFunctionObject>(fn).captures;
                      if (c.payload<StrObject>(args[1]).value == U"__new__") {
                          result.ok(captures[0]);
@@ -580,7 +578,7 @@ TEST_F(CoreConstruction, ClassmethodCanWrapAnArbitraryCallable)
     auto owner = type("Owner");
     set(callable_type, U"__call__",
         function({{{U"self"}, {U"owner"}}, {}, {}},
-                 [](Attachment &, Handle, std::span<const Value> args, ReturnSlot &out) {
+                 [](Attachment &, Value, std::span<const Value> args, ReturnSlot &out) {
                      out.ok(args[1]);
                  }));
     ReturnSlot out(context);

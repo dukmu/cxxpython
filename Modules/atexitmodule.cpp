@@ -104,12 +104,12 @@ class RunClaim {
     }
 };
 
-Handle owner(Attachment &c, Handle function, RootScope &roots)
+Handle owner(Attachment &c, Value function, RootScope &roots)
 {
     return roots.root(c.payload<NativeFunctionObject>(function).captures[0]);
 }
 
-void register_callback(Attachment &c, Handle function, std::span<const Value> a, ReturnSlot &out)
+void register_callback(Attachment &c, Value function, std::span<const Value> a, ReturnSlot &out)
 {
     if (!type_attribute(c, c.type_of(a[0]), U"__call__")) {
         raise_error(c, CoreObject::TypeErrorType, U"the first argument must be callable", out);
@@ -131,7 +131,7 @@ void register_callback(Attachment &c, Handle function, std::span<const Value> a,
     out.ok(callback.get(c));
 }
 
-void unregister_callback(Attachment &c, Handle function, std::span<const Value> a, ReturnSlot &out)
+void unregister_callback(Attachment &c, Value function, std::span<const Value> a, ReturnSlot &out)
 {
     RootScope roots(c);
     auto self = owner(c, function, roots);
@@ -207,14 +207,14 @@ void clear_state(Attachment &c, Handle self)
         c.account_external(self, state.external_bytes());
     });
 }
-void clear(Attachment &c, Handle function, std::span<const Value>, ReturnSlot &out)
+void clear(Attachment &c, Value function, std::span<const Value>, ReturnSlot &out)
 {
     RootScope roots(c);
     auto self = owner(c, function, roots);
     clear_state(c, self);
     out.ok(c.builtin(CoreObject::None));
 }
-void count(Attachment &c, Handle function, std::span<const Value>, ReturnSlot &out)
+void count(Attachment &c, Value function, std::span<const Value>, ReturnSlot &out)
 {
     RootScope roots(c);
     auto self = owner(c, function, roots);
@@ -273,7 +273,7 @@ void run(Attachment &c, Handle self, ReturnSlot &out)
     clear_state(c, self);
     out.ok(c.builtin(CoreObject::None));
 }
-void run_method(Attachment &c, Handle function, std::span<const Value>, ReturnSlot &out)
+void run_method(Attachment &c, Value function, std::span<const Value>, ReturnSlot &out)
 {
     RootScope roots(c);
     run(c, owner(c, function, roots), out);

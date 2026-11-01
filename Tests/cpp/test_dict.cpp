@@ -340,7 +340,7 @@ TEST_F(CoreDict, OwnedOperationsKeepCallerRootsThroughCollectingCallbacks)
         std::array captures{result.get(context)};
         make_native_function(
             context, "collecting dict protocol", signature,
-            [](Attachment &c, Handle fn, std::span<const Value>, ReturnSlot &result) {
+            [](Attachment &c, Value fn, std::span<const Value>, ReturnSlot &result) {
                 c.collect();
                 result.ok(c.payload<NativeFunctionObject>(fn).captures[0]);
             },

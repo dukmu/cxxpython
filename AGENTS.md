@@ -40,8 +40,10 @@ compiler, VM, and extension platform implemented in a C/C++ mix.
   Do not mark a whole milestone complete based on a narrower passing slice.
 - The user has directed a route pause after the current network stable point.
   The full frontend/import/library/product/N4-N6 route is now paused, not complete.
-  The active service goal is performance and code cleanup, not expansion of more
-  libraries. Retain the full delivery scope in Plan 2 sections
+  Performance and code cleanup replaced library expansion. The user now requests
+  pausing that goal after publishing the current native-callback stable point;
+  stop implementation after its commit/push until the user resumes work. Neither
+  pause means completion. Retain the full delivery scope in Plan 2 sections
   0.8 and 11.2. Improve Python exception diagnostics, repeated Modules conversion/
   installation code, header boundaries, measured cache locality and allocation
   reuse while preserving semantics, precise roots and shared-heap CPU parallelism.

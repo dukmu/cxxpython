@@ -96,7 +96,7 @@ template <class T> bool check_self(Attachment &ctx, Value value, ReturnSlot &out
     return false;
 }
 template <class T>
-void iterator_self(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void iterator_self(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (check_self<T>(ctx, args[0], out))
         out.ok(args[0]);
@@ -151,7 +151,7 @@ bool vector_size(Attachment &ctx, std::size_t count, ReturnSlot &out)
     return false;
 }
 
-void product_new(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void product_new(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check_class<Product>(ctx, args[0], out))
         return;
@@ -202,7 +202,7 @@ void product_new(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlo
     ctx.allocate_instance<Product>(type, out, tuple.value(), std::move(positions));
 }
 
-void product_next(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void product_next(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check_self<Product>(ctx, args[0], out))
         return;
@@ -254,7 +254,7 @@ void product_next(Attachment &ctx, Handle, std::span<const Value> args, ReturnSl
 }
 
 template <bool Replacement>
-void combinations_new(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void combinations_new(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     using State = Combinations<Replacement>;
     if (!check_class<State>(ctx, args[0], out))
@@ -286,7 +286,7 @@ void combinations_new(Attachment &ctx, Handle, std::span<const Value> args, Retu
 }
 
 template <bool Replacement>
-void combinations_next(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void combinations_next(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     using State = Combinations<Replacement>;
     if (!check_self<State>(ctx, args[0], out))
@@ -335,7 +335,7 @@ void combinations_next(Attachment &ctx, Handle, std::span<const Value> args, Ret
     }
 }
 
-void permutations_new(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void permutations_new(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check_class<Permutations>(ctx, args[0], out))
         return;
@@ -375,7 +375,7 @@ void permutations_new(Attachment &ctx, Handle, std::span<const Value> args, Retu
                                         std::move(cycles), count > n);
 }
 
-void permutations_next(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void permutations_next(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check_self<Permutations>(ctx, args[0], out))
         return;
@@ -423,7 +423,7 @@ void permutations_next(Attachment &ctx, Handle, std::span<const Value> args, Ret
     }
 }
 
-void state_anchor(Attachment &ctx, Handle, std::span<const Value>, ReturnSlot &out)
+void state_anchor(Attachment &ctx, Value, std::span<const Value>, ReturnSlot &out)
 {
     out.ok(ctx.builtin(CoreObject::None));
 }

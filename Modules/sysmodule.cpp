@@ -33,7 +33,7 @@ template <std::size_t I> void info_field(Attachment &ctx, Value self, ReturnSlot
     out.ok(ctx.payload<TupleObject>(self).items[I]);
 }
 template <bool Float>
-void info_repr(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void info_repr(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto self = roots.root(args[0]);
@@ -56,11 +56,11 @@ void info_repr(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot 
     text += U")";
     make_str(ctx, std::move(text), out);
 }
-void version_new(Attachment &ctx, Handle, std::span<const Value>, ReturnSlot &out)
+void version_new(Attachment &ctx, Value, std::span<const Value>, ReturnSlot &out)
 {
     raise_error(ctx, CoreObject::TypeErrorType, U"cannot create 'sys.version_info' instances", out);
 }
-void float_info_new(Attachment &ctx, Handle function, std::span<const Value> args, ReturnSlot &out)
+void float_info_new(Attachment &ctx, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto type = roots.root(args[0]);
@@ -198,21 +198,21 @@ void make_float_info(Attachment &ctx, ReturnSlot &out)
     ctx.allocate_instance<TupleObject>(type, out, std::move(items));
 }
 template <bool Errors>
-void filesystem_encoding(Attachment &ctx, Handle, std::span<const Value>, ReturnSlot &out)
+void filesystem_encoding(Attachment &ctx, Value, std::span<const Value>, ReturnSlot &out)
 {
     make_str(ctx, Errors ? U"surrogateescape" : U"utf-8", out);
 }
 
-void sys_exception(Attachment &ctx, Handle, std::span<const Value>, ReturnSlot &out)
+void sys_exception(Attachment &ctx, Value, std::span<const Value>, ReturnSlot &out)
 {
     out.ok(ctx.handled_exception().value_or(ctx.builtin(CoreObject::None)));
 }
-void recursion_limit(Attachment &ctx, Handle, std::span<const Value>, ReturnSlot &out)
+void recursion_limit(Attachment &ctx, Value, std::span<const Value>, ReturnSlot &out)
 {
     make_int(ctx, static_cast<std::int64_t>(ctx.call_depth_limit()), out);
 }
 
-void sys_exc_info(Attachment &ctx, Handle, std::span<const Value>, ReturnSlot &out)
+void sys_exc_info(Attachment &ctx, Value, std::span<const Value>, ReturnSlot &out)
 {
     RootScope roots(ctx);
     const auto none = ctx.builtin(CoreObject::None);
@@ -232,7 +232,7 @@ void sys_exc_info(Attachment &ctx, Handle, std::span<const Value>, ReturnSlot &o
     cxxpython::core::make_tuple(ctx, values, out);
 }
 
-void system_exit_init(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void system_exit_init(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!ctx.has_layout<ExceptionObject>(args[0]) ||
         !is_subtype(ctx, ctx.type_of(args[0]), ctx.builtin(CoreObject::SystemExitType))) {
@@ -258,7 +258,7 @@ void code_set(Attachment &ctx, Value self, std::optional<Value> value, ReturnSlo
     ctx.store(self, ctx.instance_slot(self, 0), value);
     out.ok(ctx.builtin(CoreObject::None));
 }
-void sys_exit(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void sys_exit(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto code = roots.root(args[0]);
@@ -295,7 +295,7 @@ bool attribute(Attachment &ctx, Handle object, const char32_t *name, ReturnSlot 
 }
 
 // CPython 3.12.14 Python/sysmodule.c: only exact str objects may be interned.
-void sys_intern(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void sys_intern(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto value = roots.root(args[0]);
@@ -318,7 +318,7 @@ void sys_intern(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot
 }
 
 // Match _PySys_GetSizeOf: use the type's special method, not an instance attribute.
-void sys_getsizeof(Attachment &ctx, Handle function, std::span<const Value> args, ReturnSlot &out)
+void sys_getsizeof(Attachment &ctx, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto object = roots.root(args[0]);
@@ -393,7 +393,7 @@ void find_frame(Attachment &ctx, int depth, ReturnSlot &out)
     out.ok(frame.get(ctx));
 }
 
-void sys_getframe(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void sys_getframe(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     int depth;
     if (!frame_depth(ctx, args[0], depth, out))
@@ -406,7 +406,7 @@ void sys_getframe(Attachment &ctx, Handle, std::span<const Value> args, ReturnSl
         out.ok(frame.value());
 }
 
-void sys_getframemodulename(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void sys_getframemodulename(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     int depth;
     if (!frame_depth(ctx, args[0], depth, out))
@@ -483,7 +483,7 @@ bool display_unencodable(Attachment &ctx, Handle stream, Handle value, ReturnSlo
     return write_value(ctx, stream, roots.root(text.value()), out);
 }
 // CPython 3.12.14 Python/sysmodule.c sys_displayhook: clear _, repr, write twice, restore _.
-void sys_displayhook(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void sys_displayhook(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (args[0] == ctx.builtin(CoreObject::None)) {
         out.ok(ctx.builtin(CoreObject::None));
@@ -633,13 +633,13 @@ void audit_event(Attachment &ctx, Handle event, Handle arguments, ReturnSlot &ou
     out.ok(ctx.builtin(CoreObject::None));
 }
 
-void sys_audit(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void sys_audit(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     audit_event(ctx, roots.root(args[0]), roots.root(args[1]), out);
 }
 
-void sys_addaudithook(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void sys_addaudithook(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto hook = roots.root(args[0]);

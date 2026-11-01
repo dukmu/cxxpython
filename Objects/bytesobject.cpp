@@ -49,7 +49,7 @@ bool match_bound(Attachment &c, Handle value, std::int64_t &number, ReturnSlot &
     return true;
 }
 template <CoreObject Type, bool Suffix>
-void tailmatch(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void tailmatch(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     const auto self = roots.root(args[0]), candidates = roots.root(args[1]);
@@ -130,7 +130,7 @@ bool text_argument(Attachment &c, Handle value, ReturnSlot &out)
 }
 // CPython bytes_new_impl: __bytes__ precedes index/iterable conversion, and
 // subtype construction copies into the requested immutable native layout.
-void create(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void create(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     const auto type = roots.root(args[0]);
@@ -257,7 +257,7 @@ void create(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
     }
     finish(std::move(data));
 }
-void bytes_value(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void bytes_value(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -266,7 +266,7 @@ void bytes_value(Attachment &c, Handle, std::span<const Value> args, ReturnSlot 
     else
         make_bytes(c, c.payload<BytesObject>(args[0]).value, out);
 }
-void bytes_getnewargs(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void bytes_getnewargs(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -277,7 +277,7 @@ void bytes_getnewargs(Attachment &c, Handle, std::span<const Value> args, Return
     const std::array arguments{value.value()};
     cxxpython::core::make_tuple(c, arguments, out);
 }
-void representation(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void representation(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -306,12 +306,12 @@ void representation(Attachment &c, Handle, std::span<const Value> args, ReturnSl
     text += quote;
     make_str(c, std::move(text), out);
 }
-void size(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void size(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (receiver(c, args[0], out))
         make_int(c, c.payload<BytesObject>(args[0]).value.size(), out);
 }
-void hash_value(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void hash_value(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -323,7 +323,7 @@ void hash_value(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &
     make_int(c, value == -1 ? -2 : value, out);
 }
 template <CompareOp Op>
-void compare(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void compare(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -341,7 +341,7 @@ void compare(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out
                                               : order >= 0;
     out.ok(c.builtin(result ? CoreObject::True : CoreObject::False));
 }
-void item(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void item(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -386,7 +386,7 @@ void item(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
     }
     make_int(c, static_cast<unsigned char>(data[position]), out);
 }
-void add(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void add(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -418,7 +418,7 @@ void add(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
     data += extra;
     make_bytes(c, std::move(data), out);
 }
-void repeat(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void repeat(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -449,7 +449,7 @@ void repeat(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
     }
     make_bytes(c, std::move(result), out);
 }
-void contains(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void contains(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -472,7 +472,7 @@ void contains(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &ou
     }
     out.ok(c.builtin(found ? CoreObject::True : CoreObject::False));
 }
-void iterator(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void iterator(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -480,7 +480,7 @@ void iterator(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &ou
     c.allocate_instance<SequenceIteratorObject>(
         roots.root(c.builtin(CoreObject::BytesIteratorType)), out, args[0]);
 }
-void next(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void next(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!c.has_layout<SequenceIteratorObject>(args[0]) ||
         c.type_of(args[0]) != c.builtin(CoreObject::BytesIteratorType)) {
@@ -510,11 +510,11 @@ void next(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
         c.poll();
     }
 }
-void iterator_self(Attachment &, Handle, std::span<const Value> args, ReturnSlot &out)
+void iterator_self(Attachment &, Value, std::span<const Value> args, ReturnSlot &out)
 {
     out.ok(args[0]);
 }
-void decode(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void decode(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -523,7 +523,7 @@ void decode(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
         return;
     detail::decode_bytes(c, roots.root(args[0]), roots.root(args[1]), roots.root(args[2]), out);
 }
-void join(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void join(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -555,7 +555,7 @@ void join(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
     }
     make_bytes(c, std::move(result), out);
 }
-void fromhex(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void fromhex(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     const auto cls = roots.root(args[0]);
@@ -608,7 +608,7 @@ void fromhex(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out
     }
     c.allocate_instance<BytesObject>(cls, out, std::move(data));
 }
-void hex(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void hex(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -704,14 +704,14 @@ bool bytearray_reduce_receiver(Attachment &c, Value self, ReturnSlot &out)
     raise_error(c, CoreObject::TypeErrorType, U"bytearray descriptor requires bytearray", out);
     return false;
 }
-void bytearray_reduce(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void bytearray_reduce(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!bytearray_reduce_receiver(c, args[0], out))
         return;
     RootScope roots(c);
     bytearray_reduce_common(c, roots.root(args[0]), 2, out);
 }
-void bytearray_reduce_ex(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void bytearray_reduce_ex(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!bytearray_reduce_receiver(c, args[0], out))
         return;

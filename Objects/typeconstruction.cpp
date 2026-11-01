@@ -71,7 +71,7 @@ bool object_default(Attachment &context, Value type, const std::u32string &name)
                unwrapped(context, *detail::type_attribute(context, context.object_type(), name),
                          roots);
 }
-void object_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void object_new(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_type(context, args[0])) {
         type_error(context, U"object.__new__ requires a type", out);
@@ -134,7 +134,7 @@ void object_new(Attachment &context, Handle, std::span<const Value> args, Return
     }
     context.allocate_instance<InstanceObject>(roots.root(args[0]), out);
 }
-void object_init(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void object_init(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     auto type = context.type_of(args[0]);
     if (excess(context, args) && (!object_default(context, type, U"__init__") ||
@@ -144,7 +144,7 @@ void object_init(Attachment &context, Handle, std::span<const Value> args, Retur
     }
     out.ok(context.builtin(CoreObject::None));
 }
-void exception_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void exception_new(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_type(context, args[0]) ||
         !is_subtype(context, args[0], context.builtin(CoreObject::BaseExceptionType))) {
@@ -154,7 +154,7 @@ void exception_new(Attachment &context, Handle, std::span<const Value> args, Ret
     RootScope roots(context);
     context.allocate_instance<ExceptionObject>(roots.root(args[0]), out, args[1]);
 }
-void exception_init(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void exception_init(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_instance(context, args[0], CoreObject::BaseExceptionType) ||
         !context.has_layout<ExceptionObject>(args[0])) {
@@ -164,7 +164,7 @@ void exception_init(Attachment &context, Handle, std::span<const Value> args, Re
     context.store(args[0], context.payload<ExceptionObject>(args[0]).args, args[1]);
     out.ok(context.builtin(CoreObject::None));
 }
-void stop_init(Attachment &context, Handle fn, std::span<const Value> args, ReturnSlot &out)
+void stop_init(Attachment &context, Value fn, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_instance(context, args[0], CoreObject::StopIterationType)) {
         type_error(context, U"StopIteration.__init__ requires StopIteration", out);
@@ -178,7 +178,7 @@ void stop_init(Attachment &context, Handle fn, std::span<const Value> args, Retu
                   items.empty() ? context.builtin(CoreObject::None) : items[0]);
 }
 // CPython 3.12.14 Objects/exceptions.c ImportError_init, using traced tail slots.
-void import_error_init(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void import_error_init(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_instance(context, args[0], CoreObject::ImportErrorType)) {
         type_error(context, U"ImportError.__init__ requires ImportError", out);
@@ -193,7 +193,7 @@ void import_error_init(Attachment &context, Handle, std::span<const Value> args,
                   items.size() == 1 ? items[0] : context.builtin(CoreObject::None));
     out.ok(context.builtin(CoreObject::None));
 }
-void name_error_init(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void name_error_init(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_instance(context, args[0], CoreObject::NameErrorType)) {
         type_error(context, U"NameError.__init__ requires NameError", out);
@@ -214,7 +214,7 @@ void name_error_set(Attachment &context, Value self, std::optional<Value> value,
     context.store(self, context.instance_slot(self, 0), value);
     out.ok(context.builtin(CoreObject::None));
 }
-void type_call(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void type_call(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_type(context, args[0])) {
         type_error(context, U"type.__call__ requires a type", out);
@@ -280,7 +280,7 @@ void type_call(Attachment &context, Handle, std::span<const Value> args, ReturnS
     }
     out.ok(self.get(context));
 }
-void type_subclasses(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void type_subclasses(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_type(context, args[0])) {
         type_error(context, U"type.__subclasses__ requires a type", out);
@@ -289,7 +289,7 @@ void type_subclasses(Attachment &context, Handle, std::span<const Value> args, R
     RootScope roots(context);
     detail::direct_subclasses(context, roots.root(args[0]), out);
 }
-void static_get(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void static_get(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_instance(context, args[0], CoreObject::StaticMethodType)) {
         type_error(context, U"staticmethod descriptor requires a staticmethod", out);
@@ -309,7 +309,7 @@ void static_get(Attachment &context, Handle, std::span<const Value> args, Return
         raise_error(context, CoreObject::RuntimeErrorType, U"uninitialized staticmethod object",
                     out);
 }
-void class_get(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void class_get(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_instance(context, args[0], CoreObject::ClassMethodType)) {
         type_error(context, U"classmethod descriptor requires a classmethod", out);
@@ -343,7 +343,7 @@ void class_get(Attachment &context, Handle, std::span<const Value> args, ReturnS
     context.allocate_instance<BoundMethodObject>(
         roots.root(context.builtin(CoreObject::BoundMethodType)), out, callable, owner);
 }
-void static_call(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void static_call(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_instance(context, args[0], CoreObject::StaticMethodType)) {
         type_error(context, U"staticmethod call requires a staticmethod", out);
@@ -365,7 +365,7 @@ void static_call(Attachment &context, Handle, std::span<const Value> args, Retur
     call(context, roots.root(loaded.value()), {context.payload<TupleObject>(args[1]).items, named},
          out);
 }
-void static_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void static_new(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_type(context, args[0]) ||
         !is_subtype(context, args[0], context.builtin(CoreObject::StaticMethodType))) {
@@ -375,7 +375,7 @@ void static_new(Attachment &context, Handle, std::span<const Value> args, Return
     RootScope roots(context);
     context.allocate_instance<StaticMethodObject>(roots.root(args[0]), out);
 }
-void class_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void class_new(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_type(context, args[0]) ||
         !is_subtype(context, args[0], context.builtin(CoreObject::ClassMethodType))) {
@@ -386,7 +386,7 @@ void class_new(Attachment &context, Handle, std::span<const Value> args, ReturnS
     context.allocate_instance<ClassMethodObject>(roots.root(args[0]), out);
 }
 template <class Wrapper>
-void wrapper_init(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void wrapper_init(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!context.has_layout<Wrapper>(args[0])) {
         type_error(context, U"wrapper descriptor requires a matching instance", out);
@@ -423,7 +423,7 @@ void wrapper_init(Attachment &context, Handle, std::span<const Value> args, Retu
     }
     out.ok(context.builtin(CoreObject::None));
 }
-void cell_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void cell_new(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (args[0] != context.builtin(CoreObject::CellType)) {
         type_error(context, U"cell.__new__ requires cell", out);
@@ -526,7 +526,7 @@ void finish_class(Attachment &context, Handle cls, std::span<const KeywordArg> n
     }
     throw std::logic_error("object has no __init_subclass__");
 }
-void type_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void type_new(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_type(context, args[0]) || !is_subtype(context, args[0], context.type_type()) ||
         !is_instance(context, args[1], CoreObject::StrType) ||
@@ -711,7 +711,7 @@ void type_new(Attachment &context, Handle, std::span<const Value> args, ReturnSl
     }
     finish_class(context, cls, named, out);
 }
-void type_init(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void type_init(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     auto size = context.payload<TupleObject>(args[1]).items.size();
     if (!is_type(context, args[0]) || (size != 1 && size != 3) ||
@@ -721,7 +721,7 @@ void type_init(Attachment &context, Handle, std::span<const Value> args, ReturnS
     }
     out.ok(context.builtin(CoreObject::None));
 }
-void type_prepare(Attachment &context, Handle, std::span<const Value>, ReturnSlot &out)
+void type_prepare(Attachment &context, Value, std::span<const Value>, ReturnSlot &out)
 {
     RootScope roots(context);
     context.allocate_instance<DictObject>(roots.root(context.builtin(CoreObject::DictType)), out);
@@ -788,7 +788,7 @@ std::optional<std::size_t> detail::length_hint(Attachment &context, Handle sourc
     return static_cast<std::size_t>(value);
 }
 namespace {
-void tuple_getnewargs(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void tuple_getnewargs(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!context.has_layout<TupleObject>(args[0]) ||
         !is_subtype(context, context.type_of(args[0]), context.builtin(CoreObject::TupleType))) {
@@ -805,7 +805,7 @@ void tuple_getnewargs(Attachment &context, Handle, std::span<const Value> args, 
     const std::array result{value.value()};
     cxxpython::core::make_tuple(context, result, out);
 }
-void tuple_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void tuple_new(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_type(context, args[0]) ||
         !is_subtype(context, args[0], context.builtin(CoreObject::TupleType))) {
@@ -869,7 +869,7 @@ void tuple_new(Attachment &context, Handle, std::span<const Value> args, ReturnS
     else
         context.allocate_instance<TupleObject>(cls, out, std::move(items));
 }
-void string_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void string_new(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_type(context, args[0]) ||
         !is_subtype(context, args[0], context.builtin(CoreObject::StrType))) {
@@ -929,7 +929,7 @@ void string_new(Attachment &context, Handle, std::span<const Value> args, Return
         context.allocate_instance<StrObject>(roots.root(args[0]), out,
                                              context.payload<StrObject>(converted.value()).value);
 }
-void object_subclass(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void object_subclass(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_type(context, args[0])) {
         type_error(context, U"__init_subclass__ requires a type", out);
@@ -937,17 +937,17 @@ void object_subclass(Attachment &context, Handle, std::span<const Value> args, R
     }
     out.ok(context.builtin(CoreObject::None));
 }
-void object_subclasshook(Attachment &context, Handle, std::span<const Value>, ReturnSlot &out)
+void object_subclasshook(Attachment &context, Value, std::span<const Value>, ReturnSlot &out)
 {
     out.ok(context.builtin(CoreObject::NotImplemented));
 }
-void class_getitem(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void class_getitem(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     make_generic_alias(context, roots.root(args[0]), roots.root(args[1]), out);
 }
 template <bool reverse>
-void type_union(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void type_union(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     make_union(context, roots.root(args[reverse ? 1 : 0]), roots.root(args[reverse ? 0 : 1]), out);

@@ -112,7 +112,7 @@ void position(Attachment &c, int row, int column, ReturnSlot &out)
     const std::array pair{first.value(), second.value()};
     cxxpython::core::make_tuple(c, pair, out);
 }
-void tokenizer_new(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+void tokenizer_new(Attachment &c, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto cls = roots.root(args[0]);
@@ -168,11 +168,11 @@ void tokenizer_new(Attachment &c, Handle function, std::span<const Value> args, 
         cls, out, reader.get(c), encoding ? std::optional<Value>{encoding->get(c)} : std::nullopt,
         strict.get(c), replace.get(c), flag.value() == c.builtin(CoreObject::True));
 }
-void iterator_self(Attachment &, Handle, std::span<const Value> args, ReturnSlot &out)
+void iterator_self(Attachment &, Value, std::span<const Value> args, ReturnSlot &out)
 {
     out.ok(args[0]);
 }
-void iterator_next(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void iterator_next(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto self = roots.root(args[0]);

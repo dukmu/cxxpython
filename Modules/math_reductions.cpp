@@ -71,7 +71,7 @@ double rounded_dot(TripleLength total)
     return total.tiny + last.lo + last.hi;
 }
 
-void math_fsum(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void math_fsum(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     ReturnSlot item(c);
@@ -208,7 +208,7 @@ void publish_norm(Attachment &c, std::vector<double> &values, double maximum, bo
     make_float(c, result, out);
 }
 
-void math_hypot(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void math_hypot(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     const auto coordinates = roots.root(args[0]);
@@ -241,7 +241,7 @@ void point_tuple(Attachment &c, Handle value, ReturnSlot &out)
     call(c, roots.root(c.builtin(CoreObject::TupleType)), {args, {}}, out);
 }
 
-void math_dist(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void math_dist(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     const auto p = roots.root(args[0]);
@@ -282,7 +282,7 @@ void math_dist(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &o
     publish_norm(c, differences, maximum, found_nan, out);
 }
 
-void math_prod(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void math_prod(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     ReturnSlot iterator_result(c), total(c);
@@ -385,7 +385,7 @@ bool add_term(Attachment &c, ReturnSlot &total, Handle term, ReturnSlot &out)
     return true;
 }
 
-void math_sumprod(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void math_sumprod(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     const auto p = roots.root(args[0]);

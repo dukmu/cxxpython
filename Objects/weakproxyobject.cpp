@@ -34,7 +34,7 @@ bool unwrap(Attachment &c, Value value, ReturnSlot &out)
                 out);
     return false;
 }
-void attribute_get(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void attribute_get(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -46,7 +46,7 @@ void attribute_get(Attachment &c, Handle, std::span<const Value> args, ReturnSlo
         out.raised(target.exception());
 }
 template <bool Delete>
-void attribute_set(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void attribute_set(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -62,7 +62,7 @@ void attribute_set(Attachment &c, Handle, std::span<const Value> args, ReturnSlo
         set_attribute(c, roots.root(target.value()), roots.root(args[1]), roots.root(args[2]), out);
 }
 template <Protocol Op>
-void unary_proxy(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void unary_proxy(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -94,7 +94,7 @@ void unary_proxy(Attachment &c, Handle, std::span<const Value> args, ReturnSlot 
               out);
 }
 template <BinaryOp Op, bool Reverse, bool InPlace>
-void binary_proxy(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void binary_proxy(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -116,7 +116,7 @@ void binary_proxy(Attachment &c, Handle, std::span<const Value> args, ReturnSlot
         binary(c, left, right, Op, out);
 }
 template <CompareOp Op>
-void compare_proxy(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void compare_proxy(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -132,7 +132,7 @@ void compare_proxy(Attachment &c, Handle, std::span<const Value> args, ReturnSlo
     }
     rich_compare(c, roots.root(left.value()), roots.root(right.value()), Op, out);
 }
-void contains(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void contains(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -146,7 +146,7 @@ void contains(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &ou
 }
 enum class ItemOp { Get, Set, Delete };
 template <ItemOp Operation>
-void item_proxy(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void item_proxy(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -171,7 +171,7 @@ void item_proxy(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &
         if (out.tag() != ResultTag::Raised)
             out.ok(c.builtin(CoreObject::None));
 }
-void call_proxy(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void call_proxy(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -190,7 +190,7 @@ void call_proxy(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &
 }
 enum class Method { Bytes, Reversed, Abs, Int, Float };
 template <bool Power, bool Reverse>
-void numeric_call(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void numeric_call(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -212,7 +212,7 @@ void numeric_call(Attachment &c, Handle, std::span<const Value> args, ReturnSlot
         divmod(c, first, second, out);
 }
 template <Method Name>
-void method_proxy(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void method_proxy(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -256,7 +256,7 @@ std::u32string address(Value value)
     std::snprintf(buffer, sizeof(buffer), "%p", static_cast<void *>(value.object()));
     return {buffer, buffer + std::char_traits<char>::length(buffer)};
 }
-void repr_proxy(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void repr_proxy(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;

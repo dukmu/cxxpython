@@ -61,7 +61,7 @@ bool number(Attachment &c, Handle value, std::int64_t min, std::int64_t max, std
     return true;
 }
 
-void compile_pattern(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void compile_pattern(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     std::vector<Handle> held;
@@ -118,7 +118,7 @@ void compile_pattern(Attachment &c, Handle, std::span<const Value> args, ReturnS
                                           kind, std::move(code));
 }
 
-void make_template(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void make_template(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto list = roots.root(args[1]);
@@ -168,12 +168,12 @@ void make_template(Attachment &c, Handle, std::span<const Value> args, ReturnSlo
                                            owned.get(c));
 }
 
-void getcodesize(Attachment &c, Handle, std::span<const Value>, ReturnSlot &out)
+void getcodesize(Attachment &c, Value, std::span<const Value>, ReturnSlot &out)
 {
     make_int(c, sizeof(std::uint32_t), out);
 }
 template <int mode>
-void character(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void character(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     std::int64_t n;

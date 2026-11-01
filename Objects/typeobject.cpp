@@ -406,7 +406,7 @@ struct SubclassBinding {
         tracer.visit(dictionary);
     }
 };
-void remove_subclass(Attachment &context, Handle function, std::span<const Value> args,
+void remove_subclass(Attachment &context, Value function, std::span<const Value> args,
                      ReturnSlot &out)
 {
     RootScope roots(context);

@@ -271,7 +271,8 @@ struct CallArgsView {
     std::span<const Value> positional = {};
     std::span<const KeywordArg> keywords = {};
 };
-using NativeEntry = void (*)(Attachment &, Handle function, std::span<const Value>, ReturnSlot &);
+// Dispatch owns the function and argument lifetimes; retaining either needs a root/transfer.
+using NativeEntry = void (*)(Attachment &, Value function, std::span<const Value>, ReturnSlot &);
 enum class NativeSlotKind { Ordinary, Sequence };
 
 enum class NativeFunctionBinding { Function, Descriptor };

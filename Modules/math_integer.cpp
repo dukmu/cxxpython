@@ -84,11 +84,11 @@ void aggregate(Attachment &c, std::span<const Value> args, ReturnSlot &out, bool
     publish_integer(c, std::move(result), out);
 }
 
-void math_gcd(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void math_gcd(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     aggregate(c, args, out, false);
 }
-void math_lcm(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void math_lcm(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     aggregate(c, args, out, true);
 }
@@ -121,7 +121,7 @@ void factorial(Attachment &c, Handle arg, ReturnSlot &out)
     }
     publish_integer(c, std::move(result), out);
 }
-void math_factorial(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void math_factorial(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     factorial(c, roots.root(args[0]), out);
@@ -168,11 +168,11 @@ void choose(Attachment &c, std::span<const Value> args, ReturnSlot &out, bool co
     }
     publish_integer(c, std::move(result), out);
 }
-void math_comb(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void math_comb(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     choose(c, args, out, true);
 }
-void math_perm(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void math_perm(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     choose(c, args, out, false);
 }

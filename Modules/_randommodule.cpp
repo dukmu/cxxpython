@@ -132,7 +132,7 @@ bool as_index(Attachment &c, Handle value, Integer &number, ReturnSlot &out)
     return true;
 }
 
-void create(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void create(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!c.has_layout<TypeObject>(args[0]) ||
         c.payload<TypeObject>(args[0]).instance_layout.native_family !=
@@ -144,7 +144,7 @@ void create(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
     c.allocate_instance<RandomObject>(roots.root(args[0]), out);
 }
 
-void seed(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void seed(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -204,7 +204,7 @@ void seed(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
     out.ok(c.builtin(CoreObject::None));
 }
 
-void initialize(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+void initialize(Attachment &c, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -219,7 +219,7 @@ void initialize(Attachment &c, Handle function, std::span<const Value> args, Ret
         const bool inherited =
             initializer && (c.has_layout<MethodDescriptorObject>(initializer->value)
                                 ? c.payload<MethodDescriptorObject>(initializer->value).function
-                                : initializer->value) == function.get(c);
+                                : initializer->value) == function;
         // CPython random_init rejects keywords only for the base type or a
         // subtype whose effective tp_init is still this native initializer.
         if (type.get(c) == base.get(c) || inherited) {
@@ -234,10 +234,10 @@ void initialize(Attachment &c, Handle function, std::span<const Value> args, Ret
     }
     const std::array seed_args{self.get(c), count ? c.payload<TupleObject>(positional).items[0]
                                                   : c.builtin(CoreObject::None)};
-    seed(c, {}, seed_args, out);
+    seed(c, function, seed_args, out);
 }
 
-void random_value(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void random_value(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -250,7 +250,7 @@ void random_value(Attachment &c, Handle, std::span<const Value> args, ReturnSlot
     make_float(c, value, out);
 }
 
-void getrandbits(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void getrandbits(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -292,7 +292,7 @@ void getrandbits(Attachment &c, Handle, std::span<const Value> args, ReturnSlot 
     publish_integer(c, std::move(result), out);
 }
 
-void getstate(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void getstate(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -328,7 +328,7 @@ void getstate(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &ou
     cxxpython::core::make_tuple(c, values, out);
 }
 
-void setstate(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void setstate(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;

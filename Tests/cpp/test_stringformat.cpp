@@ -217,7 +217,7 @@ TEST_F(StringFormat, PercentUsesIndexProtocolForBaseAndCharacter)
     const std::array captures{ordinal.get(context)};
     make_native_function(
         context, "index", signature,
-        [](Attachment &ctx, Handle function, std::span<const Value>, ReturnSlot &result) {
+        [](Attachment &ctx, Value function, std::span<const Value>, ReturnSlot &result) {
             ctx.collect();
             result.ok(ctx.payload<NativeFunctionObject>(function).captures[0]);
         },

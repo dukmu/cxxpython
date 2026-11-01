@@ -119,7 +119,7 @@ bool string_value(Attachment &ctx, Value value)
            is_subtype(ctx, ctx.type_of(value), ctx.builtin(CoreObject::StrType));
 }
 
-void complex_new(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void complex_new(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!ctx.has_layout<TypeObject>(args[0]) ||
         !is_subtype(ctx, args[0], ctx.builtin(CoreObject::ComplexType))) {
@@ -220,7 +220,7 @@ void complex_field_imag(Attachment &ctx, Value value, ReturnSlot &out)
     if (require_complex(ctx, value, p, out))
         make_float(ctx, p.imag, out);
 }
-void complex_getnewargs(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void complex_getnewargs(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     Parts parts;
     if (!require_complex(ctx, args[0], parts, out))
@@ -236,7 +236,7 @@ void complex_getnewargs(Attachment &ctx, Handle, std::span<const Value> args, Re
 
 enum class Unary { Bool, Pos, Neg, Abs, Conjugate, Identity };
 template <Unary Op>
-void complex_unary(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void complex_unary(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     Parts p;
     if (!require_complex(ctx, args[0], p, out))
@@ -282,7 +282,7 @@ bool divide(Parts a, Parts b, Parts &result)
 }
 
 template <BinaryOp Op, bool Reflected>
-void complex_binary(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void complex_binary(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     Parts a, b, result;
     if (!require_complex(ctx, args[0], a, out))
@@ -346,7 +346,7 @@ void complex_binary(Attachment &ctx, Handle, std::span<const Value> args, Return
 }
 
 template <bool NotEqual>
-void complex_compare(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void complex_compare(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     Parts a;
     if (!require_complex(ctx, args[0], a, out))
@@ -386,7 +386,7 @@ bool render_float(Attachment &ctx, double number, std::u32string &result, Return
     return true;
 }
 
-void complex_repr(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void complex_repr(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     Parts p;
     if (!require_complex(ctx, args[0], p, out))
@@ -427,7 +427,7 @@ bool hash_part(Attachment &ctx, Value owner, double number, std::uint64_t &resul
     return true;
 }
 
-void complex_hash(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void complex_hash(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     Parts p;
     if (!require_complex(ctx, args[0], p, out))

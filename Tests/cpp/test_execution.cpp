@@ -1219,7 +1219,7 @@ TEST_F(CoreExecution, GlobalStoreUsesNoManagedAllocationAndRhsFailurePreservesBi
     detail::name_store(context, globals.get(context), name.get(context), old.get(context));
     make_native_function(
         context, "exhaust allocation quota", {},
-        [](Attachment &context, Handle, std::span<const Value>, ReturnSlot &out) {
+        [](Attachment &context, Value, std::span<const Value>, ReturnSlot &out) {
             context.set_allocation_limit(0);
             out.ok(context.builtin(CoreObject::IntOne));
         },
@@ -1241,7 +1241,7 @@ TEST_F(CoreExecution, GlobalStoreUsesNoManagedAllocationAndRhsFailurePreservesBi
     detail::name_store(context, globals.get(context), name.get(context), old.get(context));
     make_native_function(
         context, "fail before store", {},
-        [](Attachment &actor, Handle, std::span<const Value>, ReturnSlot &result) {
+        [](Attachment &actor, Value, std::span<const Value>, ReturnSlot &result) {
             actor.set_allocation_limit(0);
             make_str(actor, U"new value", result);
         },
@@ -1503,7 +1503,7 @@ TEST_F(CoreExecution, RunningFrameSlotsSurviveCallbacksGcAndCompletedFrameObserv
     std::array captures{observed.get(context)};
     make_native_function(
         context, "observe", signature,
-        [](Attachment &c, Handle fn, std::span<const Value> args, ReturnSlot &out) {
+        [](Attachment &c, Value fn, std::span<const Value> args, ReturnSlot &out) {
             auto frame = *c.current_frame();
             auto &data = c.payload<FrameObject>(frame);
             EXPECT_EQ(data.state.load(), FrameState::Running);
@@ -1719,7 +1719,7 @@ TEST_F(CoreExecution, NativeReentryRestoresFramesAndHostFaultsUnwindThem)
     std::array captures{outer_cell.get(context), inner_cell.get(context), inner.get(context)};
     make_native_function(
         context, "reenter", signature,
-        [](Attachment &c, Handle fn, std::span<const Value> args, ReturnSlot &out) {
+        [](Attachment &c, Value fn, std::span<const Value> args, ReturnSlot &out) {
             const auto &captures = c.payload<NativeFunctionObject>(fn).captures;
             const auto frame = *c.current_frame();
             ReturnSlot back(c);
@@ -1758,7 +1758,7 @@ TEST_F(CoreExecution, NativeReentryRestoresFramesAndHostFaultsUnwindThem)
     EXPECT_FALSE(context.current_frame());
     make_native_function(
         context, "host fault", signature,
-        [](Attachment &c, Handle fn, std::span<const Value>, ReturnSlot &) {
+        [](Attachment &c, Value fn, std::span<const Value>, ReturnSlot &) {
             write_cell(c, c.payload<NativeFunctionObject>(fn).captures[0], *c.current_frame());
             throw std::runtime_error("native host fault");
         },

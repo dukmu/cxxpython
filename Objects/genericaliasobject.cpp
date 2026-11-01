@@ -37,7 +37,7 @@ void allocate_alias(Attachment &context, Handle type, Handle origin, Handle argu
                                                   items.get(context), starred);
 }
 
-void alias_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void alias_new(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!context.has_layout<TypeObject>(args[0]) ||
         !is_subtype(context, args[0], context.builtin(CoreObject::GenericAliasType))) {
@@ -188,7 +188,7 @@ bool repr_item(Attachment &context, Handle item, std::u32string &text, ReturnSlo
     return true;
 }
 
-void alias_repr(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void alias_repr(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!alias_receiver(context, args[0], out))
         return;
@@ -225,7 +225,7 @@ void alias_repr(Attachment &context, Handle, std::span<const Value> args, Return
     make_str(context, text + U"]", out);
 }
 
-void alias_mro_entries(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void alias_mro_entries(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!alias_receiver(context, args[0], out))
         return;
@@ -253,11 +253,11 @@ void alias_unpacked_tuple_args(Attachment &context, Value self, ReturnSlot &out)
                : context.builtin(CoreObject::None));
 }
 
-void alias_iterator_iter(Attachment &, Handle, std::span<const Value>, ReturnSlot &);
-void alias_iterator_next(Attachment &, Handle, std::span<const Value>, ReturnSlot &);
-void alias_iterator_reduce(Attachment &, Handle, std::span<const Value>, ReturnSlot &);
+void alias_iterator_iter(Attachment &, Value, std::span<const Value>, ReturnSlot &);
+void alias_iterator_next(Attachment &, Value, std::span<const Value>, ReturnSlot &);
+void alias_iterator_reduce(Attachment &, Value, std::span<const Value>, ReturnSlot &);
 
-void alias_iter(Attachment &context, Handle function, std::span<const Value> args, ReturnSlot &out)
+void alias_iter(Attachment &context, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     if (!alias_receiver(context, args[0], out))
         return;
@@ -267,7 +267,7 @@ void alias_iter(Attachment &context, Handle function, std::span<const Value> arg
     context.allocate_instance<GenericAliasIteratorObject>(iterator_type, out, self.get(context));
 }
 
-void alias_iterator_iter(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void alias_iterator_iter(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!context.has_layout<GenericAliasIteratorObject>(args[0])) {
         raise_error(context, CoreObject::TypeErrorType, U"expected generic alias iterator", out);
@@ -276,7 +276,7 @@ void alias_iterator_iter(Attachment &context, Handle, std::span<const Value> arg
     out.ok(args[0]);
 }
 
-void alias_iterator_next(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void alias_iterator_next(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!context.has_layout<GenericAliasIteratorObject>(args[0])) {
         raise_error(context, CoreObject::TypeErrorType, U"expected generic alias iterator", out);
@@ -302,8 +302,7 @@ void alias_iterator_next(Attachment &context, Handle, std::span<const Value> arg
     out.ok(result.value());
 }
 
-void alias_iterator_reduce(Attachment &context, Handle, std::span<const Value> args,
-                           ReturnSlot &out)
+void alias_iterator_reduce(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!context.has_layout<GenericAliasIteratorObject>(args[0])) {
         raise_error(context, CoreObject::TypeErrorType, U"expected generic alias iterator", out);
@@ -332,7 +331,7 @@ void alias_iterator_reduce(Attachment &context, Handle, std::span<const Value> a
     cxxpython::core::make_tuple(context, values, out);
 }
 
-void alias_reduce(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void alias_reduce(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!alias_receiver(context, args[0], out))
         return;
@@ -368,7 +367,7 @@ void alias_reduce(Attachment &context, Handle, std::span<const Value> args, Retu
     cxxpython::core::make_tuple(context, values, out);
 }
 
-void alias_getattribute(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void alias_getattribute(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!alias_receiver(context, args[0], out))
         return;
@@ -449,7 +448,8 @@ bool unpack_substitution(Attachment &context, Handle item, RootScope &roots,
     return true;
 }
 
-void alias_getitem(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void alias_getitem(Attachment &context, Value function, std::span<const Value> args,
+                   ReturnSlot &out)
 {
     if (!alias_receiver(context, args[0], out))
         return;
@@ -467,7 +467,7 @@ void alias_getitem(Attachment &context, Handle, std::span<const Value> args, Ret
     const auto &params = context.payload<TupleObject>(parameters).items;
     if (params.empty()) {
         ReturnSlot description(context);
-        alias_repr(context, {}, std::span<const Value>(&args[0], 1), description);
+        alias_repr(context, function, std::span<const Value>(&args[0], 1), description);
         if (description.tag() == ResultTag::Raised) {
             out.raised(description.exception());
             return;
@@ -516,7 +516,7 @@ void alias_getitem(Attachment &context, Handle, std::span<const Value> args, Ret
         roots.root(value);
     if (replacements.size() != params.size()) {
         ReturnSlot description(context);
-        alias_repr(context, {}, std::span<const Value>(&args[0], 1), description);
+        alias_repr(context, function, std::span<const Value>(&args[0], 1), description);
         if (description.tag() == ResultTag::Raised) {
             out.raised(description.exception());
             return;
@@ -627,7 +627,7 @@ void alias_getitem(Attachment &context, Handle, std::span<const Value> args, Ret
 }
 
 template <bool Instance>
-void alias_check(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void alias_check(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!alias_receiver(context, args[0], out))
         return;
@@ -638,7 +638,7 @@ void alias_check(Attachment &context, Handle, std::span<const Value> args, Retur
 }
 
 template <bool Negate>
-void alias_compare(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void alias_compare(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!alias_receiver(context, args[0], out))
         return;
@@ -670,7 +670,7 @@ void alias_compare(Attachment &context, Handle, std::span<const Value> args, Ret
                  Negate ? CompareOp::Ne : CompareOp::Eq, out);
 }
 
-void alias_hash(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void alias_hash(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!alias_receiver(context, args[0], out))
         return;
@@ -696,7 +696,7 @@ void alias_hash(Attachment &context, Handle, std::span<const Value> args, Return
     make_int(context, value == -1 ? -2 : value, out);
 }
 
-void alias_call(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void alias_call(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!alias_receiver(context, args[0], out))
         return;

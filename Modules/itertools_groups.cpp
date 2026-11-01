@@ -100,12 +100,12 @@ template <class T> bool receiver(Attachment &c, Value value, ReturnSlot &out)
     return false;
 }
 template <class T>
-void iter_self(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void iter_self(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (receiver<T>(c, args[0], out))
         out.ok(args[0]);
 }
-void groupby_new(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void groupby_new(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     if (!c.has_layout<TypeObject>(args[0]) ||
@@ -171,7 +171,7 @@ bool group_equal(Attachment &c, Handle left, Handle right, bool &equal, ReturnSl
     return true;
 }
 
-void groupby_next(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+void groupby_next(Attachment &c, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver<GroupBy>(c, args[0], out))
         return;
@@ -220,7 +220,7 @@ void groupby_next(Attachment &c, Handle function, std::span<const Value> args, R
     cxxpython::core::make_tuple(c, std::span<const Value>(pair, 2), out);
 }
 
-void grouper_next(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void grouper_next(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver<Grouper>(c, args[0], out))
         return;
@@ -261,7 +261,7 @@ void grouper_next(Attachment &c, Handle, std::span<const Value> args, ReturnSlot
     c.clear(owner, group.current_value);
 }
 
-void grouper_new(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+void grouper_new(Attachment &c, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     if (!receiver<GroupBy>(c, args[1], out))
@@ -277,7 +277,7 @@ void grouper_new(Attachment &c, Handle function, std::span<const Value> args, Re
     c.allocate_instance<Grouper>(type, out, owner.get(c), key.get(c), group.generation);
 }
 
-void tee_copy(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void tee_copy(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver<Tee>(c, args[0], out))
         return;
@@ -289,7 +289,7 @@ void tee_copy(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &ou
     c.allocate_instance<Tee>(roots.root(c.type_of(self)), out, node.get(c));
 }
 
-void tee_next(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void tee_next(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver<Tee>(c, args[0], out))
         return;
@@ -366,7 +366,7 @@ void make_tee(Attachment &c, Handle input, Handle tee_type, Handle data_type, Ha
     c.allocate_instance<Tee>(tee_type, out, first.get(c));
 }
 
-void tee_new(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+void tee_new(Attachment &c, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     const auto &captures = c.payload<NativeFunctionObject>(function).captures;
@@ -378,7 +378,7 @@ void tee_new(Attachment &c, Handle function, std::span<const Value> args, Return
              roots.root(captures[2]), out);
 }
 
-void tee_function(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+void tee_function(Attachment &c, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto input = roots.root(args[0]);
@@ -428,7 +428,7 @@ void tee_function(Attachment &c, Handle function, std::span<const Value> args, R
     cxxpython::core::make_tuple(c, std::span<const Value>(result), out);
 }
 
-void tee_data_new(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+void tee_data_new(Attachment &c, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     if (!c.has_layout<ListObject>(args[2])) {
@@ -481,7 +481,7 @@ void tee_data_new(Attachment &c, Handle function, std::span<const Value> args, R
     out.ok(tail.value());
 }
 
-void state_anchor(Attachment &c, Handle, std::span<const Value>, ReturnSlot &out)
+void state_anchor(Attachment &c, Value, std::span<const Value>, ReturnSlot &out)
 {
     out.ok(c.builtin(CoreObject::None));
 }

@@ -85,7 +85,7 @@ bool callable(Attachment &ctx, Value value, ReturnSlot &out)
                 U"codec search functions and handlers must be callable", out);
     return false;
 }
-Handle registry(Attachment &ctx, Handle function, RootScope &roots)
+Handle registry(Attachment &ctx, Value function, RootScope &roots)
 {
     return roots.root(ctx.payload<NativeFunctionObject>(function).captures[0]);
 }
@@ -105,7 +105,7 @@ std::u32string normalized(std::u32string_view name)
     }
     return result;
 }
-void register_search(Attachment &ctx, Handle function, std::span<const Value> args, ReturnSlot &out)
+void register_search(Attachment &ctx, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     if (!callable(ctx, args[0], out))
         return;
@@ -129,7 +129,7 @@ void register_search(Attachment &ctx, Handle function, std::span<const Value> ar
         prepared.reserve(needed);
     out.ok(ctx.builtin(CoreObject::None));
 }
-void unregister_search(Attachment &ctx, Handle function, std::span<const Value> args,
+void unregister_search(Attachment &ctx, Value function, std::span<const Value> args,
                        ReturnSlot &out)
 {
     RootScope roots(ctx);
@@ -147,7 +147,7 @@ void unregister_search(Attachment &ctx, Handle function, std::span<const Value> 
     });
     out.ok(ctx.builtin(CoreObject::None));
 }
-void lookup(Attachment &ctx, Handle function, std::span<const Value> args, ReturnSlot &out)
+void lookup(Attachment &ctx, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     if (!text(ctx, args[0], out))
         return;
@@ -228,7 +228,7 @@ void lookup(Attachment &ctx, Handle function, std::span<const Value> args, Retur
     }
     raise_error(ctx, CoreObject::LookupErrorType, U"unknown encoding: " + original, out);
 }
-void register_error(Attachment &ctx, Handle function, std::span<const Value> args, ReturnSlot &out)
+void register_error(Attachment &ctx, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     if (!text(ctx, args[0], out) || !callable(ctx, args[1], out))
         return;
@@ -247,7 +247,7 @@ void register_error(Attachment &ctx, Handle function, std::span<const Value> arg
     });
     out.ok(ctx.builtin(CoreObject::None));
 }
-void lookup_error(Attachment &ctx, Handle function, std::span<const Value> args, ReturnSlot &out)
+void lookup_error(Attachment &ctx, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     if (!text(ctx, args[0], out))
         return;
@@ -266,7 +266,7 @@ void lookup_error(Attachment &ctx, Handle function, std::span<const Value> args,
                     out);
 }
 template <bool Encode>
-void generic(Attachment &ctx, Handle function, std::span<const Value> args, ReturnSlot &out)
+void generic(Attachment &ctx, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     const auto input = roots.root(args[0]), encoding = roots.root(args[1]),
@@ -297,7 +297,7 @@ void generic(Attachment &ctx, Handle function, std::span<const Value> args, Retu
     out.ok(ctx.payload<TupleObject>(entry.value()).items[0]);
 }
 template <TextEncoding Encoding, bool Encode>
-void primitive(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void primitive(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     const auto input = roots.root(args[0]), errors = roots.root(args[1]);
@@ -315,7 +315,7 @@ void primitive(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot 
     }
 }
 template <TextEncoding Encoding>
-void extended(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void extended(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     ReturnSlot order(ctx), final(ctx);
@@ -338,14 +338,14 @@ void extended(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &
                     static_cast<int>(byteorder), final.value() == ctx.builtin(CoreObject::True),
                     out);
 }
-void error_handler(Attachment &ctx, Handle function, std::span<const Value> args, ReturnSlot &out)
+void error_handler(Attachment &ctx, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     const auto name = roots.root(ctx.payload<NativeFunctionObject>(function).captures[0]);
     builtin_codec_error(ctx, ctx.payload<StrObject>(name).value, roots.root(args[0]), out);
 }
 template <bool Encode>
-void charmap(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void charmap(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     if constexpr (Encode)
@@ -353,7 +353,7 @@ void charmap(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &o
     else
         decode_charmap(ctx, roots.root(args[0]), roots.root(args[1]), roots.root(args[2]), out);
 }
-void charmap_build(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void charmap_build(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     build_charmap(ctx, roots.root(args[0]), out);

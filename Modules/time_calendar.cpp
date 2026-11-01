@@ -44,7 +44,7 @@ bool failed(const ReturnSlot &out)
 {
     return out.tag() == ResultTag::Raised;
 }
-Handle calendar_type(Attachment &c, Handle function, RootScope &roots)
+Handle calendar_type(Attachment &c, Value function, RootScope &roots)
 {
     return roots.root(c.payload<NativeFunctionObject>(function).captures[0]);
 }
@@ -139,7 +139,7 @@ void make_record(Attachment &c, Handle type, const NativeTime &native, ReturnSlo
     c.store(record.get(c), c.instance_slot(record.get(c), extra_slot(c, record.get(c), 10)),
             value.value());
 }
-void record_new(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+void record_new(Attachment &c, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     const auto type = calendar_type(c, function, roots), sequence = roots.root(args[1]),
@@ -204,14 +204,14 @@ void record_new(Attachment &c, Handle function, std::span<const Value> args, Ret
     }
     out.ok(record.get(c));
 }
-bool record_receiver(Attachment &c, Handle function, Handle self, ReturnSlot &out)
+bool record_receiver(Attachment &c, Value function, Handle self, ReturnSlot &out)
 {
     if (c.type_of(self) == c.payload<NativeFunctionObject>(function).captures[0])
         return true;
     raise_error(c, CoreObject::TypeErrorType, U"descriptor requires a time.struct_time", out);
     return false;
 }
-void record_repr(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+void record_repr(Attachment &c, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     const auto self = roots.root(args[0]);
@@ -230,7 +230,7 @@ void record_repr(Attachment &c, Handle function, std::span<const Value> args, Re
     }
     make_str(c, text + U")", out);
 }
-void record_reduce(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+void record_reduce(Attachment &c, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     const auto self = roots.root(args[0]);
@@ -375,7 +375,7 @@ bool parse_tuple(Attachment &c, Handle input, Handle type, std::u32string_view m
     return true;
 }
 template <bool Utc>
-void convert_time(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+void convert_time(Attachment &c, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     time_t seconds;
@@ -384,7 +384,7 @@ void convert_time(Attachment &c, Handle function, std::span<const Value> args, R
         native_time(c, seconds, Utc, native, out))
         make_record(c, calendar_type(c, function, roots), native, out);
 }
-bool tuple_or_current(Attachment &c, Handle function, Value input, std::u32string_view method,
+bool tuple_or_current(Attachment &c, Value function, Value input, std::u32string_view method,
                       NativeTime &native, ReturnSlot &out)
 {
     RootScope roots(c);
@@ -393,7 +393,7 @@ bool tuple_or_current(Attachment &c, Handle function, Value input, std::u32strin
         return native_time(c, ::time(nullptr), false, native, out);
     return parse_tuple(c, roots.root(input), roots.root(captures[0]), method, true, native, out);
 }
-void format_time(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+void format_time(Attachment &c, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     const auto format = roots.root(args[0]);
@@ -461,13 +461,13 @@ void ascii_time(Attachment &c, const NativeTime &native, ReturnSlot &out)
                  SourceBuffer("", std::string(buffer.data(), static_cast<std::size_t>(size)))),
              out);
 }
-void asctime_entry(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+void asctime_entry(Attachment &c, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     NativeTime native;
     if (tuple_or_current(c, function, args[0], U"asctime", native, out))
         ascii_time(c, native, out);
 }
-void ctime_entry(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void ctime_entry(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     time_t seconds;
@@ -476,7 +476,7 @@ void ctime_entry(Attachment &c, Handle, std::span<const Value> args, ReturnSlot 
         native_time(c, seconds, false, native, out))
         ascii_time(c, native, out);
 }
-void mktime_entry(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+void mktime_entry(Attachment &c, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     NativeTime native;
@@ -552,13 +552,13 @@ void timezone_fields(Attachment &c, Handle module, ReturnSlot &out)
     if (put(U"tzname"))
         out.ok(c.builtin(CoreObject::None));
 }
-void tzset_entry(Attachment &c, Handle function, std::span<const Value>, ReturnSlot &out)
+void tzset_entry(Attachment &c, Value function, std::span<const Value>, ReturnSlot &out)
 {
     RootScope roots(c);
     timezone_fields(c, roots.root(c.payload<NativeFunctionObject>(function).captures[0]), out);
 }
 
-void strptime_entry(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void strptime_entry(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     const auto text = roots.root(args[0]);

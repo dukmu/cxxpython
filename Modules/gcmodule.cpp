@@ -3,7 +3,7 @@
 
 namespace cxxpython::core::detail {
 namespace {
-void collect(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void collect(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     index(context, roots.root(args[0]), out);
@@ -20,27 +20,27 @@ void collect(Attachment &context, Handle, std::span<const Value> args, ReturnSlo
     make_int(context, count, out);
 }
 template <bool Enabled>
-void set_enabled(Attachment &context, Handle, std::span<const Value>, ReturnSlot &out)
+void set_enabled(Attachment &context, Value, std::span<const Value>, ReturnSlot &out)
 {
     context.set_gc_enabled(Enabled);
     out.ok(context.builtin(CoreObject::None));
 }
-void is_enabled(Attachment &context, Handle, std::span<const Value>, ReturnSlot &out)
+void is_enabled(Attachment &context, Value, std::span<const Value>, ReturnSlot &out)
 {
     out.ok(context.builtin(context.gc_enabled() ? CoreObject::True : CoreObject::False));
 }
-void is_finalized(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void is_finalized(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     out.ok(context.builtin(context.is_finalized(roots.root(args[0])) ? CoreObject::True
                                                                      : CoreObject::False));
 }
-void is_tracked(Attachment &context, Handle, std::span<const Value>, ReturnSlot &out)
+void is_tracked(Attachment &context, Value, std::span<const Value>, ReturnSlot &out)
 {
     // Every Python object participates in this runtime's tracing heap, including leaves.
     out.ok(context.builtin(CoreObject::True));
 }
-void get_objects(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void get_objects(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     if (args[0] != context.builtin(CoreObject::None)) {
@@ -64,7 +64,7 @@ void get_objects(Attachment &context, Handle, std::span<const Value> args, Retur
     make_list(context, objects, out);
 }
 template <HeapInspection Kind>
-void inspect_edges(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void inspect_edges(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     const auto targets = context.payload<TupleObject>(args[0]).items;
@@ -90,7 +90,7 @@ void counter_dictionary(Attachment &context,
     }
     out.ok(result.get(context));
 }
-void get_stats(Attachment &context, Handle, std::span<const Value>, ReturnSlot &out)
+void get_stats(Attachment &context, Value, std::span<const Value>, ReturnSlot &out)
 {
     const auto stats = context.stats();
     RootScope roots(context);
@@ -107,7 +107,7 @@ void get_stats(Attachment &context, Handle, std::span<const Value>, ReturnSlot &
     }
     make_list(context, generations, out);
 }
-void get_count(Attachment &context, Handle, std::span<const Value>, ReturnSlot &out)
+void get_count(Attachment &context, Value, std::span<const Value>, ReturnSlot &out)
 {
     const auto stats = context.stats();
     RootScope roots(context);
@@ -117,7 +117,7 @@ void get_count(Attachment &context, Handle, std::span<const Value>, ReturnSlot &
                               context.builtin(CoreObject::IntZero)};
     make_tuple(context, counters, out);
 }
-void get_heap_stats(Attachment &context, Handle, std::span<const Value>, ReturnSlot &out)
+void get_heap_stats(Attachment &context, Value, std::span<const Value>, ReturnSlot &out)
 {
     const auto s = context.stats();
     counter_dictionary(context,

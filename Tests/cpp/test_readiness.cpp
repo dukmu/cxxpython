@@ -186,7 +186,7 @@ TEST(CoreReadiness, ABuildingTypeCannotEscapeAsANativeReturnValue)
     ReturnSlot out(context);
     make_native_function(
         context, "broken builder", {},
-        [](Attachment &c, Handle, std::span<const Value>, ReturnSlot &result) {
+        [](Attachment &c, Value, std::span<const Value>, ReturnSlot &result) {
             RootScope roots(c);
             c.allocate_instance<TypeObject>(roots.root(c.type_type()), result, U"Unready",
                                             LayoutDescriptor::of<InstanceObject>());

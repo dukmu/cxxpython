@@ -82,7 +82,7 @@ void abstract(Attachment &ctx, Handle object, ReturnSlot &out)
     }
     truth(ctx, roots.root(value.value()), out);
 }
-bool impl(Attachment &ctx, Handle function, Handle cls, ReturnSlot &out)
+bool impl(Attachment &ctx, Value function, Handle cls, ReturnSlot &out)
 {
     attribute(ctx, cls, U"_abc_impl", out);
     if (failed(out))
@@ -94,7 +94,7 @@ bool impl(Attachment &ctx, Handle function, Handle cls, ReturnSlot &out)
     }
     return true;
 }
-void discard_dead(Attachment &ctx, Handle function, std::span<const Value> args, ReturnSlot &out)
+void discard_dead(Attachment &ctx, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto set = roots.root(ctx.payload<NativeFunctionObject>(function).captures[0]);
@@ -247,12 +247,12 @@ void negative_prepare(Attachment &ctx, Handle data, std::uint64_t epoch, ReturnS
         }
     }
 }
-void token(Attachment &ctx, Handle function, std::span<const Value>, ReturnSlot &out)
+void token(Attachment &ctx, Value function, std::span<const Value>, ReturnSlot &out)
 {
     auto state = ctx.payload<NativeFunctionObject>(function).captures[0];
     make_int_decimal(ctx, std::to_string(ctx.payload<AbcData>(state).counter.load()), out);
 }
-void reset_registry(Attachment &ctx, Handle function, std::span<const Value> args, ReturnSlot &out)
+void reset_registry(Attachment &ctx, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     ReturnSlot data(ctx);
@@ -264,7 +264,7 @@ void reset_registry(Attachment &ctx, Handle function, std::span<const Value> arg
     ctx.clear(owner, ctx.payload<AbcData>(owner).registry);
     out.ok(ctx.builtin(CoreObject::None));
 }
-void reset_caches(Attachment &ctx, Handle function, std::span<const Value> args, ReturnSlot &out)
+void reset_caches(Attachment &ctx, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     ReturnSlot data(ctx);
@@ -298,7 +298,7 @@ void subclass_of(Attachment &ctx, Handle child, Handle parent, ReturnSlot &out)
     }
     boolean(ctx, is_subtype(ctx, child, parent), out);
 }
-void subclasscheck(Attachment &ctx, Handle function, std::span<const Value> args, ReturnSlot &out)
+void subclasscheck(Attachment &ctx, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto cls = roots.root(args[0]);
@@ -465,7 +465,7 @@ void set_collection_kind(Attachment &ctx, Handle type, CollectionKind kind)
             pending.push_back(roots.root(child));
     }
 }
-void register_class(Attachment &ctx, Handle function, std::span<const Value> args, ReturnSlot &out)
+void register_class(Attachment &ctx, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto cls = roots.root(args[0]);
@@ -511,7 +511,7 @@ void register_class(Attachment &ctx, Handle function, std::span<const Value> arg
         set_collection_kind(ctx, child, kind);
     out.ok(child.get(ctx));
 }
-void instancecheck(Attachment &ctx, Handle function, std::span<const Value> args, ReturnSlot &out)
+void instancecheck(Attachment &ctx, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto cls = roots.root(args[0]);
@@ -553,8 +553,7 @@ void instancecheck(Attachment &ctx, Handle function, std::span<const Value> args
     argument[0] = ctx.type_of(instance);
     method(ctx, cls, U"__subclasscheck__", argument, out);
 }
-void initialize_class(Attachment &ctx, Handle function, std::span<const Value> args,
-                      ReturnSlot &out)
+void initialize_class(Attachment &ctx, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto cls = roots.root(args[0]);
@@ -719,7 +718,7 @@ void initialize_class(Attachment &ctx, Handle function, std::span<const Value> a
     }
     out.ok(ctx.builtin(CoreObject::None));
 }
-void dump(Attachment &ctx, Handle function, std::span<const Value> args, ReturnSlot &out)
+void dump(Attachment &ctx, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     ReturnSlot result(ctx), snapshot(ctx);

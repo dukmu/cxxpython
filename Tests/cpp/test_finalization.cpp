@@ -108,7 +108,7 @@ TEST(FinalizerQuarantine, ResurrectedOwnerRetainsMiddleNativeCandidate)
     signature.parameters = {{U"self", ParameterKind::PositionalOnly}};
     make_native_function(
         context, "__del__", signature,
-        [](Attachment &c, Handle, std::span<const Value> args, ReturnSlot &result) {
+        [](Attachment &c, Value, std::span<const Value> args, ReturnSlot &result) {
             RootScope local(c);
             const auto self = local.root(args[0]);
             auto &owner = c.payload<ResourceOwner>(self);

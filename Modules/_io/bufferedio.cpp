@@ -221,13 +221,13 @@ std::int64_t fill(Attachment &c, Handle self, BufferedIOObject &s, ReturnSlot &o
     account(c, self, s);
     return count;
 }
-template <Kind kind> void create(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+template <Kind kind> void create(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     RootScope roots(c);
     c.allocate_instance<BufferedIOObject>(roots.root(a[0]), out, c.builtin(CoreObject::None));
 }
 template <Kind kind>
-void initialize(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void initialize(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;
@@ -305,7 +305,7 @@ void initialize(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out
 }
 
 enum class ReadMode { All, One, Line, Peek };
-template <ReadMode mode> void read(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+template <ReadMode mode> void read(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;
@@ -374,7 +374,7 @@ template <ReadMode mode> void read(Attachment &c, Handle, std::span<const Value>
     }
     make_bytes(c, std::move(result), out);
 }
-void write(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void write(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;
@@ -438,8 +438,7 @@ void write(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
     account(c, self, s);
     make_int(c, static_cast<std::int64_t>(data.size()), out);
 }
-template <bool One>
-void readinto(Attachment &c, Handle h, std::span<const Value> a, ReturnSlot &out)
+template <bool One> void readinto(Attachment &c, Value h, std::span<const Value> a, ReturnSlot &out)
 {
     RootScope roots(c);
     auto self = roots.root(a[0]);
@@ -468,7 +467,7 @@ void readinto(Attachment &c, Handle h, std::span<const Value> a, ReturnSlot &out
     detail::write_buffer(c, buffer, data);
     make_int(c, static_cast<std::int64_t>(data.size()), out);
 }
-void flush(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void flush(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;
@@ -484,7 +483,7 @@ void flush(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
         return;
     out.ok(c.builtin(CoreObject::None));
 }
-void tell(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void tell(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;
@@ -508,7 +507,7 @@ void tell(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
                  static_cast<std::int64_t>(s.output.size()),
              out);
 }
-void seek(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void seek(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;
@@ -536,7 +535,7 @@ void seek(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
     s.input.clear();
     s.position = 0;
 }
-void detach(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void detach(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;
@@ -556,7 +555,7 @@ void detach(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
     c.store(self.get(c), s.writer, c.builtin(CoreObject::None));
     out.ok(stream.get(c));
 }
-void truncate(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void truncate(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;
@@ -575,7 +574,7 @@ void truncate(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
     Value value = arg.get(c);
     detail::io_call(c, stream, U"truncate", {&value, 1}, out);
 }
-void close(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void close(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;
@@ -701,7 +700,7 @@ template <bool Mode> void raw_attribute_get(Attachment &c, Value value, ReturnSl
     get_attribute(c, raw_stream, roots.root(name.value()), out);
 }
 template <bool Read>
-void capability(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void capability(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;
@@ -713,8 +712,7 @@ void capability(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out
         return;
     out.ok(c.builtin((Read ? s.can_read : s.can_write) ? CoreObject::True : CoreObject::False));
 }
-void delegate(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out,
-              const char32_t *name)
+void delegate(Attachment &c, std::span<const Value> a, ReturnSlot &out, const char32_t *name)
 {
     if (!receiver(c, a[0], out))
         return;
@@ -727,17 +725,17 @@ void delegate(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out,
     auto stream = raw(c, self, s.can_read ? s.reader : s.writer, roots);
     detail::io_call(c, stream, name, {}, out);
 }
-void fileno(Attachment &c, Handle h, std::span<const Value> a, ReturnSlot &out)
+void fileno(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
-    delegate(c, h, a, out, U"fileno");
+    delegate(c, a, out, U"fileno");
 }
-void seekable(Attachment &c, Handle h, std::span<const Value> a, ReturnSlot &out)
+void seekable(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
-    delegate(c, h, a, out, U"seekable");
+    delegate(c, a, out, U"seekable");
 }
-void isatty(Attachment &c, Handle h, std::span<const Value> a, ReturnSlot &out)
+void isatty(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
-    delegate(c, h, a, out, U"isatty");
+    delegate(c, a, out, U"isatty");
 }
 
 } // namespace

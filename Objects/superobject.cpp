@@ -20,7 +20,7 @@ bool receiver(Attachment &c, Value value, ReturnSlot &out)
     error(c, CoreObject::TypeErrorType, U"super descriptor requires a super object", out);
     return false;
 }
-void super_new(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void super_new(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!c.has_layout<TypeObject>(args[0]) ||
         !is_subtype(c, args[0], c.builtin(CoreObject::SuperType))) {
@@ -110,7 +110,7 @@ bool implicit_args(Attachment &c, ReturnSlot &type, ReturnSlot &object, ReturnSl
     }
     return true;
 }
-void super_init(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void super_init(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -157,7 +157,7 @@ template <std::size_t Index> void super_field(Attachment &c, Value self, ReturnS
                ? c.builtin(CoreObject::None)
                : c.payload<TupleObject>(binding.value()).items[Index]);
 }
-void super_get(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void super_get(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -189,7 +189,7 @@ void super_get(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &o
     c.store(result.value(), c.payload<SuperObject>(result.value()).binding, tuple.value());
     out.ok(result.value());
 }
-void super_getattribute(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void super_getattribute(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -234,7 +234,7 @@ std::u32string type_name(Attachment &c, Value type)
         return *text;
     return c.payload<StrObject>(std::get<Value>(name)).value;
 }
-void super_repr(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void super_repr(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;

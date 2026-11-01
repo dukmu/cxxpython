@@ -157,7 +157,7 @@ TEST(ParallelVm, TypeMutationSlotsAndDictionaryStaySafeAcrossCollectingCallbacks
         std::array captures{source.builtin(i ? CoreObject::True : CoreObject::False)};
         make_native_function(
             source, "collecting method", signature,
-            [](Attachment &context, Handle fn, std::span<const Value>, ReturnSlot &result) {
+            [](Attachment &context, Value fn, std::span<const Value>, ReturnSlot &result) {
                 context.collect();
                 result.ok(context.payload<NativeFunctionObject>(fn).captures[0]);
             },
@@ -320,7 +320,7 @@ TEST(ParallelVm, SharedExceptionSurvivesOrdinaryCallsWithAndFinally)
     const auto error = roots.root(out.result().exception());
     make_native_function(
         source, "collect in cleanup", {},
-        [](Attachment &context, Handle, std::span<const Value>, ReturnSlot &result) {
+        [](Attachment &context, Value, std::span<const Value>, ReturnSlot &result) {
             context.collect();
             result.ok(context.builtin(CoreObject::None));
         },
@@ -336,7 +336,7 @@ TEST(ParallelVm, SharedExceptionSurvivesOrdinaryCallsWithAndFinally)
                 signature.parameters.push_back({name});
         make_native_function(
             source, "manager protocol", signature,
-            [](Attachment &context, Handle, std::span<const Value> args, ReturnSlot &result) {
+            [](Attachment &context, Value, std::span<const Value> args, ReturnSlot &result) {
                 context.collect();
                 if (args.size() == 4) {
                     EXPECT_EQ(context.type_of(args[3]), context.builtin(CoreObject::TracebackType));
@@ -418,7 +418,7 @@ TEST(ParallelVm, AllocationFreeBytecodeLoopAcknowledgesCollectionAndPublishesFra
     std::array captures{seen.get(source), stop.get(source)};
     make_native_function(
         source, "observe loop", {},
-        [](Attachment &context, Handle fn, std::span<const Value>, ReturnSlot &result) {
+        [](Attachment &context, Value fn, std::span<const Value>, ReturnSlot &result) {
             const auto &captures = context.payload<NativeFunctionObject>(fn).captures;
             write_cell(context, captures[0], context.current_frame());
             read_cell(context, captures[1], result);

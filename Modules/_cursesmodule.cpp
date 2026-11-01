@@ -164,7 +164,7 @@ enum class ModuleOp {
     PairNumber
 };
 template <ModuleOp op>
-void module_call(Attachment &c, Handle fn, std::span<const Value> a, ReturnSlot &out)
+void module_call(Attachment &c, Value fn, std::span<const Value> a, ReturnSlot &out)
 {
     RootScope roots(c);
     auto error_type = roots.root(c.payload<NativeFunctionObject>(fn).captures[2]);
@@ -414,7 +414,7 @@ enum class WinOp {
     NoutRefresh
 };
 template <WinOp op>
-void window_call(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void window_call(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     RootScope roots(c);
     auto self = roots.root(a[0]);

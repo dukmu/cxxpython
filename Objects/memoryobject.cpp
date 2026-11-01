@@ -83,7 +83,7 @@ void create_view(Attachment &c, Handle owner, std::shared_ptr<MemoryViewExport> 
                                           owner.get(c), std::move(token), offset, stride, length,
                                           readonly, std::move(format), data.value());
 }
-void create(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void create(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     const auto &pos = c.payload<TupleObject>(args[1]).items;
@@ -143,7 +143,7 @@ bool snapshot(Attachment &c, Handle self, std::string &data, ReturnSlot &out)
     }
     return true;
 }
-void memory_length(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void memory_length(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!view(c, args[0], out))
         return;
@@ -152,7 +152,7 @@ void memory_length(Attachment &c, Handle, std::span<const Value> args, ReturnSlo
         make_int(c, v.length, out);
 }
 enum class Op { Get, Set };
-template <Op op> void item(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+template <Op op> void item(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!view(c, args[0], out))
         return;
@@ -258,7 +258,7 @@ template <Op op> void item(Attachment &c, Handle, std::span<const Value> args, R
         out.ok(c.builtin(CoreObject::None));
     }
 }
-void release(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void release(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!view(c, args[0], out))
         return;
@@ -286,12 +286,12 @@ void release(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out
     }
     out.ok(c.builtin(CoreObject::None));
 }
-void enter(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void enter(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (view(c, args[0], out) && live(c, c.payload<MemoryViewObject>(args[0]), out))
         out.ok(args[0]);
 }
-void readonly_view(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void readonly_view(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!view(c, args[0], out))
         return;
@@ -304,8 +304,7 @@ void readonly_view(Attachment &c, Handle, std::span<const Value> args, ReturnSlo
         create_view(c, roots.root(owner.value()), token, v.offset, v.stride, v.length, true,
                     v.format, out);
 }
-template <int kind>
-void convert(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+template <int kind> void convert(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!view(c, args[0], out))
         return;
@@ -337,7 +336,7 @@ void convert(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out
         make_str(c, std::move(result), out);
     }
 }
-void cast(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void cast(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!view(c, args[0], out))
         return;
@@ -382,7 +381,7 @@ void cast(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
                     std::string(fmt.begin(), fmt.end()), out);
 }
 template <bool negate>
-void compare(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void compare(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!view(c, args[0], out))
         return;
@@ -434,7 +433,7 @@ void compare(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out
     }
     out.ok(c.builtin((equal != negate) ? CoreObject::True : CoreObject::False));
 }
-void hash_value(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void hash_value(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!view(c, args[0], out))
         return;
@@ -469,7 +468,7 @@ void hash_value(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &
     auto value = std::bit_cast<std::int64_t>(word);
     make_int(c, value == -1 ? -2 : value, out);
 }
-void representation(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void representation(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!view(c, args[0], out))
         return;
@@ -485,7 +484,7 @@ void representation(Attachment &c, Handle, std::span<const Value> args, ReturnSl
     text += U'>';
     make_str(c, std::move(text), out);
 }
-void iter(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void iter(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!view(c, args[0], out) || !live(c, c.payload<MemoryViewObject>(args[0]), out))
         return;
@@ -493,11 +492,11 @@ void iter(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
     c.allocate_instance<SequenceIteratorObject>(
         roots.root(c.builtin(CoreObject::MemoryViewIteratorType)), out, args[0]);
 }
-void iter_self(Attachment &, Handle, std::span<const Value> args, ReturnSlot &out)
+void iter_self(Attachment &, Value, std::span<const Value> args, ReturnSlot &out)
 {
     out.ok(args[0]);
 }
-void next(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void next(Attachment &c, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     if (!c.has_layout<SequenceIteratorObject>(args[0]) ||
         c.type_of(args[0]) != c.builtin(CoreObject::MemoryViewIteratorType)) {
@@ -525,7 +524,7 @@ void next(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
     ReturnSlot index_value(c);
     make_int(c, n, index_value);
     std::array<Value, 2> values{h.get(c), index_value.value()};
-    item<Op::Get>(c, self, values, out);
+    item<Op::Get>(c, function, values, out);
 }
 enum class Field {
     Format,

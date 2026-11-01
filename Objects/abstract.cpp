@@ -216,14 +216,14 @@ bool sequence_binary(Attachment &context, Handle a, Handle b, BinaryOp op, bool 
         return true;
     return op == BinaryOp::Multiply && attempt(context, b, a, ids[1], out, SlotPhase::Sequence);
 }
-void object_eq(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void object_eq(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (args[0] == args[1])
         boolean(context, true, out);
     else
         out.ok(context.builtin(CoreObject::NotImplemented));
 }
-void object_ne(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void object_ne(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     auto self = roots.root(args[0]);
@@ -245,7 +245,7 @@ void object_ne(Attachment &context, Handle, std::span<const Value> args, ReturnS
     else
         boolean(context, converted.value() == context.builtin(CoreObject::False), out);
 }
-void none_bool(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void none_bool(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (args[0] != context.builtin(CoreObject::None)) {
         type_error(context, U"NoneType.__bool__ requires None", out);
@@ -254,7 +254,7 @@ void none_bool(Attachment &context, Handle, std::span<const Value> args, ReturnS
     boolean(context, false, out);
 }
 template <class T, CoreObject Type>
-void native_len(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void native_len(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_subtype(context, context.type_of(args[0]), context.builtin(Type)) ||
         !context.has_layout<T>(args[0])) {

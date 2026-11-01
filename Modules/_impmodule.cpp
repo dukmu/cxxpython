@@ -58,8 +58,7 @@ struct LoaderBinding {
 };
 enum class LoaderOperation { Execute, Source, Code };
 template <LoaderOperation Operation>
-void loader_entry(Attachment &context, Handle function, std::span<const Value> args,
-                  ReturnSlot &out)
+void loader_entry(Attachment &context, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     const auto capture = context.payload<NativeFunctionObject>(function).captures[0];
     const auto &binding = context.payload<LoaderBinding>(capture);
@@ -87,7 +86,7 @@ void loader_entry(Attachment &context, Handle function, std::span<const Value> a
                      detail::decode_source(unit.source(), {0, unit.source().text().size()}), out);
     }
 }
-void exec_code(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void exec_code(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_module(context, args[1])) {
         raise_error(context, CoreObject::TypeErrorType, U"exec_code requires a module", out);
@@ -96,7 +95,7 @@ void exec_code(Attachment &context, Handle, std::span<const Value> args, ReturnS
     RootScope roots(context);
     run(context, {roots.root(args[0]), roots.root(module_dict(context, args[1]))}, out);
 }
-void source_to_code(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void source_to_code(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!string(context, args[0], out) || !string(context, args[1], out))
         return;
@@ -113,7 +112,7 @@ void source_to_code(Attachment &context, Handle, std::span<const Value> args, Re
         detail::raise_source_error(context, error, out);
     }
 }
-void file_source(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void file_source(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!string(context, args[0], out))
         return;
@@ -122,7 +121,7 @@ void file_source(Attachment &context, Handle, std::span<const Value> args, Retur
     if (buffer)
         make_str(context, detail::decode_source(*buffer, {0, buffer->text().size()}), out);
 }
-void registered_data(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void registered_data(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!string(context, args[0], out))
         return;
@@ -133,7 +132,7 @@ void registered_data(Attachment &context, Handle, std::span<const Value> args, R
     else
         out.ok(context.builtin(CoreObject::None));
 }
-void extension_data(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void extension_data(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!string(context, args[0], out) || !string(context, args[1], out))
         return;
@@ -152,7 +151,7 @@ void extension_data(Attachment &context, Handle, std::span<const Value> args, Re
                 : std::vector<std::string>{}});
     detail::loader_arguments(context, name, definition, out);
 }
-void path_absolute(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void path_absolute(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!string(context, args[0], out))
         return;
@@ -176,7 +175,7 @@ void path_absolute(Attachment &context, Handle, std::span<const Value> args, Ret
     }
     make_str(context, detail::decode_filename(SourceBuffer("", absolute)), out);
 }
-void is_directory(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void is_directory(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!string(context, args[0], out))
         return;
@@ -189,7 +188,7 @@ void is_directory(Attachment &context, Handle, std::span<const Value> args, Retu
     }
     out.ok(context.builtin(found ? CoreObject::True : CoreObject::False));
 }
-void is_file(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void is_file(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!string(context, args[0], out))
         return;
@@ -202,7 +201,7 @@ void is_file(Attachment &context, Handle, std::span<const Value> args, ReturnSlo
     }
     out.ok(context.builtin(found ? CoreObject::True : CoreObject::False));
 }
-void create_builtin(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void create_builtin(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!string(context, args[0], out))
         return;
@@ -213,7 +212,7 @@ void create_builtin(Attachment &context, Handle, std::span<const Value> args, Re
     RootScope roots(context);
     make_module(context, U"builtins", out, roots.root(context.builtin(CoreObject::Builtins)));
 }
-void gcd_import(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void gcd_import(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!string(context, args[0], out))
         return;
@@ -230,14 +229,14 @@ void gcd_import(Attachment &context, Handle, std::span<const Value> args, Return
         import_name(context, name, globals, roots.root(context.builtin(CoreObject::EmptyTuple)),
                     level, out, true);
 }
-void reload(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void reload(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!string(context, args[1], out))
         return;
     RootScope roots(context);
     reload_module(context, roots.root(args[0]), context.payload<StrObject>(args[1]).value, out);
 }
-void is_builtin(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void is_builtin(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!string(context, args[0], out))
         return;
@@ -257,7 +256,7 @@ void is_builtin(Attachment &context, Handle, std::span<const Value> args, Return
     }
     make_int(context, builtin ? 1 : 0, out);
 }
-void suffixes(Attachment &context, Handle, std::span<const Value>, ReturnSlot &out)
+void suffixes(Attachment &context, Value, std::span<const Value>, ReturnSlot &out)
 {
     RootScope roots(context);
     make_str(context, U".cxxpy.so", out);

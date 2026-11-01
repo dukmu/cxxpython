@@ -226,7 +226,7 @@ void initialize_stdio(Attachment &ctx, Handle module, ReturnSlot &out)
     }
     out.ok(ctx.builtin(CoreObject::None));
 }
-void print_builtin(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void print_builtin(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto none = ctx.builtin(CoreObject::None);

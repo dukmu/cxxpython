@@ -178,6 +178,11 @@ Freshly classified native special methods enter the shared call-depth guard and
 native binder directly, without classifying the callable again. Explicit and
 implicit method-descriptor calls share one defining-owner receiver check;
 ordinary native functions still follow descriptor binding without implicit self.
+NativeEntry borrows its function Value from this dispatch-owned snapshot, just
+like its arguments. An immutable method descriptor's traced function edge keeps
+the metadata and code lease alive without an additional function root. Retaining
+either input beyond the callback requires a root/transfer. This internal C++ ABI
+change requires rebuilding native C++ modules; the versioned C11 ABI is unchanged.
 Rejected method-descriptor calls and binding share a cold diagnostic formatter
 that names the method, owner and actual receiver, or identifies a missing self.
 Native method names retain their UTF-8 decoding and precise roots while errors

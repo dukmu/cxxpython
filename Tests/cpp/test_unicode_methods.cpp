@@ -86,7 +86,7 @@ TEST_F(UnicodeMethods, IndexCallbackSurvivesCollection)
     std::array captures{result.get(context)};
     make_native_function(
         context, "index", signature,
-        [](Attachment &c, Handle fn, std::span<const Value>, ReturnSlot &out) {
+        [](Attachment &c, Value fn, std::span<const Value>, ReturnSlot &out) {
             c.collect();
             out.ok(c.payload<NativeFunctionObject>(fn).captures[0]);
         },

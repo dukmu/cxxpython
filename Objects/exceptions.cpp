@@ -16,7 +16,7 @@ bool default_attribute(Attachment &c, Value type, const std::u32string &name)
     const auto candidate = roots.root(*method);
     return type_attribute(c, c.object_type(), name) == candidate.get(c);
 }
-void add_note(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void add_note(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     add_exception_note(c, roots.root(args[0]), roots.root(args[1]), out);
@@ -111,7 +111,7 @@ bool use_init(Attachment &ctx, Value type)
     return type_attribute(ctx, type, U"__init__") != type_attribute(ctx, base, U"__init__") &&
            type_attribute(ctx, type, U"__new__") == type_attribute(ctx, base, U"__new__");
 }
-void os_new(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void os_new(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto type = roots.root(args[0]);
@@ -179,7 +179,7 @@ void os_values(Attachment &ctx, Value receiver, Value arguments, ReturnSlot &out
     ctx.store(self.get(ctx), ctx.payload<ExceptionObject>(self).args, stored);
     out.ok(none);
 }
-void os_init(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void os_init(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (use_init(ctx, ctx.type_of(args[0])))
         os_values(ctx, args[0], args[1], out);
@@ -198,7 +198,7 @@ void os_set(Attachment &ctx, Value self, std::optional<Value> value, ReturnSlot 
     ctx.store(self, os_field(ctx, self, Field), value);
     out.ok(ctx.builtin(CoreObject::None));
 }
-void os_str(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void os_str(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     const auto self = roots.root(args[0]);

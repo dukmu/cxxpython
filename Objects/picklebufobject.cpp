@@ -12,7 +12,7 @@ bool receiver(Attachment &c, Value value, ReturnSlot &out)
     raise_error(c, CoreObject::TypeErrorType, U"expected PickleBuffer", out);
     return false;
 }
-void create(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void create(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     const auto type = roots.root(args[0]);
@@ -24,7 +24,7 @@ void create(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
     }
     c.allocate_instance<PickleBufferObject>(type, out, buffer.exporter.value(), buffer.lease);
 }
-void raw(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void raw(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -33,7 +33,7 @@ void raw(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
     if (detail::export_buffer(c, roots.root(args[0]), buffer, out))
         detail::memoryview_from_buffer(c, buffer, out, true);
 }
-void release(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void release(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;

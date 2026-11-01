@@ -95,7 +95,7 @@ void clear_list(Attachment &context, Handle self)
         context.account_external(self, sizeof(ListObject::Storage));
     });
 }
-void list_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void list_new(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     if (!context.has_layout<TypeObject>(args[0]) ||
@@ -162,7 +162,7 @@ bool extend_list(Attachment &context, Handle self, Handle source, ReturnSlot &ou
     out.ok(context.builtin(CoreObject::None));
     return true;
 }
-void list_init(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void list_init(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(context, args[0], out))
         return;
@@ -171,7 +171,7 @@ void list_init(Attachment &context, Handle, std::span<const Value> args, ReturnS
     clear_list(context, self);
     extend_list(context, self, source, out);
 }
-void append(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void append(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(context, args[0], out))
         return;
@@ -179,14 +179,14 @@ void append(Attachment &context, Handle, std::span<const Value> args, ReturnSlot
     insert_values(context, roots.root(args[0]), args.subspan(1));
     out.ok(context.builtin(CoreObject::None));
 }
-void extend(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void extend(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(context, args[0], out))
         return;
     RootScope roots(context);
     extend_list(context, roots.root(args[0]), roots.root(args[1]), out);
 }
-void insert(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void insert(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(context, args[0], out))
         return;
@@ -381,7 +381,7 @@ void slice_item(Attachment &context, Handle self, Handle key, std::optional<Hand
     }
 }
 template <ItemOperation Operation>
-void item(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void item(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(context, args[0], out))
         return;
@@ -431,14 +431,14 @@ void item(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &
     else if constexpr (Operation == ItemOperation::Delete)
         out.ok(context.builtin(CoreObject::None));
 }
-void size(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void size(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(context, args[0], out))
         return;
     RootScope roots(context);
     make_int(context, detail::list_size(context, roots.root(args[0])), out);
 }
-void clear(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void clear(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(context, args[0], out))
         return;
@@ -446,7 +446,7 @@ void clear(Attachment &context, Handle, std::span<const Value> args, ReturnSlot 
     clear_list(context, roots.root(args[0]));
     out.ok(context.builtin(CoreObject::None));
 }
-void copy(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void copy(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(context, args[0], out))
         return;
@@ -455,7 +455,7 @@ void copy(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &
     detail::list_snapshot(context, roots.root(args[0]), roots, values);
     make_list(context, values, out);
 }
-void reverse(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void reverse(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(context, args[0], out))
         return;
@@ -466,7 +466,7 @@ void reverse(Attachment &context, Handle, std::span<const Value> args, ReturnSlo
     });
     out.ok(context.builtin(CoreObject::None));
 }
-void sort(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void sort(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(context, args[0], out))
         return;
@@ -481,7 +481,7 @@ void sort(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &
     detail::sort_list(context, self, key, converted.value() == context.builtin(CoreObject::True),
                       out);
 }
-void iterator(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void iterator(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(context, args[0], out))
         return;
@@ -489,7 +489,7 @@ void iterator(Attachment &context, Handle, std::span<const Value> args, ReturnSl
     context.allocate_instance<SequenceIteratorObject>(
         roots.root(context.builtin(CoreObject::ListIteratorType)), out, args[0]);
 }
-void iterator_self(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void iterator_self(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!context.has_layout<SequenceIteratorObject>(args[0]) ||
         context.type_of(args[0]) != context.builtin(CoreObject::ListIteratorType)) {
@@ -498,9 +498,9 @@ void iterator_self(Attachment &context, Handle, std::span<const Value> args, Ret
     }
     out.ok(args[0]);
 }
-void next(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void next(Attachment &context, Value function, std::span<const Value> args, ReturnSlot &out)
 {
-    iterator_self(context, {}, args, out);
+    iterator_self(context, function, args, out);
     if (failed(out))
         return;
     RootScope roots(context);
@@ -531,7 +531,7 @@ void next(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &
         detail::stop_iteration(context, out);
 }
 template <CompareOp Op>
-void compare(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void compare(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(context, args[0], out))
         return;
@@ -583,7 +583,7 @@ void compare(Attachment &context, Handle, std::span<const Value> args, ReturnSlo
 }
 enum class Search { Count, Index, Remove, Contains };
 template <Search Mode>
-void search(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void search(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(context, args[0], out))
         return;
@@ -658,7 +658,7 @@ void search(Attachment &context, Handle, std::span<const Value> args, ReturnSlot
                         context.payload<StrObject>(value.value()).value + U" is not in list", out);
     }
 }
-void add(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void add(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(context, args[0], out))
         return;
@@ -677,7 +677,7 @@ void add(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &o
     a.insert(a.end(), b.begin(), b.end());
     make_list(context, a, out);
 }
-void inplace_add(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void inplace_add(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(context, args[0], out))
         return;
@@ -686,7 +686,7 @@ void inplace_add(Attachment &context, Handle, std::span<const Value> args, Retur
         out.ok(args[0]);
 }
 template <bool Inplace>
-void repeat(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void repeat(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(context, args[0], out))
         return;

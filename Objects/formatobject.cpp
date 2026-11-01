@@ -204,7 +204,7 @@ std::u32string number_field(Attachment &context, std::u32string digits, std::u32
     }
     return padded(prefix + digits + remainder, spec, prefix_length);
 }
-void object_format(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void object_format(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!string_value(context, args[1])) {
         error(context, U"format_spec must be a string", out, CoreObject::TypeErrorType);
@@ -218,7 +218,7 @@ void object_format(Attachment &context, Handle, std::span<const Value> args, Ret
     RootScope roots(context);
     str(context, roots.root(args[0]), out);
 }
-void string_format(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void string_format(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!string_value(context, args[0]) || !string_value(context, args[1])) {
         error(context, U"str.__format__ requires strings", out, CoreObject::TypeErrorType);
@@ -366,7 +366,7 @@ void render_float(Attachment &context, double value, const FormatSpec &spec, Ret
     const std::u32string remainder(text.begin() + count, text.end());
     make_str(context, number_field(context, digits, remainder, negative, {}, spec), out);
 }
-void float_format(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void float_format(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_float(context, args[0]) || !string_value(context, args[1])) {
         error(context, U"float.__format__ requires a float and string", out,
@@ -383,7 +383,7 @@ void float_format(Attachment &context, Handle, std::span<const Value> args, Retu
     if (parse_spec(context, text, spec, out))
         render_float(context, context.payload<FloatObject>(args[0]).value, spec, out);
 }
-void complex_format(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void complex_format(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_complex(context, args[0]) || !string_value(context, args[1])) {
         error(context, U"complex.__format__ requires a complex and string", out,
@@ -440,7 +440,7 @@ void complex_format(Attachment &context, Handle, std::span<const Value> args, Re
         result = U"(" + result + U")";
     make_str(context, padded(std::move(result), spec), out);
 }
-void integer_format(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void integer_format(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_int(context, args[0]) || !string_value(context, args[1])) {
         error(context, U"int.__format__ requires an int and string", out,
@@ -533,7 +533,7 @@ void integer_format(Attachment &context, Handle, std::span<const Value> args, Re
              out);
 }
 template <NativeEntry Entry>
-void format_method(Attachment &context, Handle function, std::span<const Value> args,
+void format_method(Attachment &context, Value function, std::span<const Value> args,
                    ReturnSlot &out)
 {
     guarded(context, out, [&] { Entry(context, function, args, out); });

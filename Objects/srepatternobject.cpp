@@ -207,7 +207,7 @@ bool bounds(Attachment &c, std::span<const Value> args, Subject &subject, std::p
     return true;
 }
 template <int Mode>
-void pattern_match(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void pattern_match(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto pattern = roots.root(args[0]), source = roots.root(args[1]);
@@ -235,7 +235,7 @@ void make_scanner(Attachment &c, std::span<const Value> args, ReturnSlot &out)
         subject.buffer.offset, std::move(subject.text), subject.version);
 }
 template <bool Iterator>
-void scanner(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void scanner(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     make_scanner(c, args, out);
@@ -252,7 +252,7 @@ void scanner(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out
     }
 }
 template <bool Search>
-void scanner_next(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void scanner_next(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto self = roots.root(args[0]);
@@ -305,7 +305,7 @@ void scanner_next(Attachment &c, Handle, std::span<const Value> args, ReturnSlot
     match_object(c, pattern, source, scanner.pos, scanner.endpos, std::move(captures), out);
 }
 template <bool Split>
-void scan_list(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void scan_list(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto pattern = roots.root(args[0]), source = roots.root(args[1]);
@@ -458,7 +458,7 @@ void expand_compiled(Attachment &c, Handle match, Handle compiled, ReturnSlot &o
     join(c, !c.has_layout<StrObject>(items[0]), pieces, out);
 }
 template <bool Count>
-void substitute(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void substitute(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto pattern = roots.root(args[0]), replacement = roots.root(args[1]),
@@ -543,16 +543,16 @@ void substitute(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &
         cxxpython::core::make_tuple(c, pair, out);
     }
 }
-void copy(Attachment &, Handle, std::span<const Value> args, ReturnSlot &out)
+void copy(Attachment &, Value, std::span<const Value> args, ReturnSlot &out)
 {
     out.ok(args[0]);
 }
-void class_getitem(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void class_getitem(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     make_generic_alias(c, roots.root(args[0]), roots.root(args[1]), out);
 }
-void no_constructor(Attachment &c, Handle, std::span<const Value>, ReturnSlot &out)
+void no_constructor(Attachment &c, Value, std::span<const Value>, ReturnSlot &out)
 {
     raise_error(c, CoreObject::TypeErrorType, U"cannot create regex instances directly", out);
 }
@@ -579,7 +579,7 @@ void scanner_pattern(Attachment &c, Value self, ReturnSlot &out)
 {
     out.ok(c.payload<SreScannerObject>(self).pattern);
 }
-void pattern_hash(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void pattern_hash(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto self = roots.root(args[0]);
@@ -597,7 +597,7 @@ void pattern_hash(Attachment &c, Handle, std::span<const Value> args, ReturnSlot
     make_int(c, h == -1 ? -2 : h, out);
 }
 template <bool Negate>
-void pattern_compare(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void pattern_compare(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (c.type_of(args[1]) != c.builtin(CoreObject::SrePatternType)) {
         out.ok(c.builtin(CoreObject::NotImplemented));
@@ -616,7 +616,7 @@ void pattern_compare(Attachment &c, Handle, std::span<const Value> args, ReturnS
                                                                             : CoreObject::True));
     }
 }
-void pattern_repr(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void pattern_repr(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto self = roots.root(args[0]);

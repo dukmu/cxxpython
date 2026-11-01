@@ -86,7 +86,7 @@ bool timeout_value(Attachment &c, Handle value, std::int64_t &nanos, ReturnSlot 
     return true;
 }
 
-void select_entry(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void select_entry(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     std::int64_t timeout = 0;

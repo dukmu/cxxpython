@@ -102,7 +102,8 @@ TEST(FileIOContracts, AllocationFailureDuringFlushLookupStillClosesDescriptor)
     const auto entry = context.payload<NativeFunctionObject>(close).entry;
     const Value arguments[] = {file.get(context)};
     context.set_allocation_limit(0);
-    EXPECT_THROW(entry(context, close, std::span<const Value>(arguments, 1), out), std::bad_alloc);
+    EXPECT_THROW(entry(context, close.get(context), std::span<const Value>(arguments, 1), out),
+                 std::bad_alloc);
     context.set_allocation_limit(std::numeric_limits<std::size_t>::max());
     EXPECT_EQ(::fcntl(descriptor, F_GETFD), -1);
     EXPECT_EQ(errno, EBADF);

@@ -99,7 +99,7 @@ void new_evp(Attachment &c, std::string name, Value data, bool security, ReturnS
         c.payload<HashObject>(out.value()).state->evp = state.release();
 }
 template <int Id>
-void constructor(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void constructor(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     static constexpr const char *names[] = {"md5",      "sha1",     "sha224",    "sha256",
                                             "sha384",   "sha512",   "sha3_224",  "sha3_256",
@@ -113,7 +113,7 @@ void constructor(Attachment &c, Handle, std::span<const Value> args, ReturnSlot 
     }
     new_evp(c, names[Id], args[0], security.value() == c.builtin(CoreObject::True), out);
 }
-void new_hash(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void new_hash(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     std::string name;
     if (!text(c, args[0], name, out))
@@ -134,7 +134,7 @@ bool hash_receiver(Attachment &c, Value value, ReturnSlot &out)
     raise_error(c, CoreObject::TypeErrorType, U"hash descriptor requires a hash object", out);
     return false;
 }
-void update(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void update(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto self = roots.root(args[0]);
@@ -161,7 +161,7 @@ void update(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
         return error(c, out);
     out.ok(c.builtin(CoreObject::None));
 }
-void copy(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void copy(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto self = roots.root(args[0]);
@@ -196,7 +196,7 @@ void copy(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
         return error(c, out);
     out.ok(target.get(c));
 }
-template <bool Hex> void digest(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+template <bool Hex> void digest(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto self = roots.root(args[0]);
@@ -270,8 +270,7 @@ template <bool Block> void get_size(Attachment &c, Value value, ReturnSlot &out)
     make_int(c, Block ? obj.block_size : obj.digest_size, out);
 }
 
-template <bool Small>
-void blake_new(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+template <bool Small> void blake_new(Attachment &c, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     std::string data, key, salt, person;
@@ -368,15 +367,15 @@ void blake_new(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &o
     out.ok(self.get(c));
 }
 template <bool Small>
-void blake_type_new(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+void blake_type_new(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (args[0] != c.builtin(Small ? CoreObject::Blake2sType : CoreObject::Blake2bType)) {
         raise_error(c, CoreObject::TypeErrorType, U"invalid BLAKE2 type", out);
         return;
     }
-    blake_new<Small>(c, function, args.subspan(1), out);
+    blake_new<Small>(c, args.subspan(1), out);
 }
-void pbkdf2(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void pbkdf2(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     std::string name, password, salt;
@@ -416,7 +415,7 @@ void pbkdf2(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
         return error(c, out);
     make_bytes(c, std::move(result), out);
 }
-void scrypt(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void scrypt(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     std::string password, salt;

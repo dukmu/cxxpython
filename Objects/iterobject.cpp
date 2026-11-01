@@ -103,7 +103,7 @@ template <class T, CoreObject Type> bool sequence(Attachment &context, Value val
     return false;
 }
 template <class T, CoreObject Type>
-void sequence_item(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void sequence_item(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!sequence<T, Type>(context, args[0], out))
         return;
@@ -175,7 +175,7 @@ void sequence_item(Attachment &context, Handle, std::span<const Value> args, Ret
         make_str(context, std::u32string(1, data.value[position]), out);
 }
 template <class T, CoreObject Type, CoreObject Iterator>
-void sequence_iter(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void sequence_iter(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!sequence<T, Type>(context, args[0], out))
         return;
@@ -184,7 +184,7 @@ void sequence_iter(Attachment &context, Handle, std::span<const Value> args, Ret
                                                       args[0]);
 }
 template <bool Count>
-void tuple_search(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void tuple_search(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!sequence<TupleObject, CoreObject::TupleType>(context, args[0], out))
         return;
@@ -244,7 +244,7 @@ void tuple_search(Attachment &context, Handle, std::span<const Value> args, Retu
         raise_error(context, CoreObject::ValueErrorType, U"tuple.index(x): x not in tuple", out);
 }
 template <class T, CoreObject Iterator>
-void sequence_next(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void sequence_next(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!sequence<SequenceIteratorObject, Iterator>(context, args[0], out))
         return;
@@ -279,11 +279,11 @@ void sequence_next(Attachment &context, Handle, std::span<const Value> args, Ret
         context.poll();
     }
 }
-void iterator_self(Attachment &, Handle, std::span<const Value> args, ReturnSlot &out)
+void iterator_self(Attachment &, Value, std::span<const Value> args, ReturnSlot &out)
 {
     out.ok(args[0]);
 }
-void indexed_next(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void indexed_next(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!sequence<SequenceIteratorObject, CoreObject::SequenceIteratorType>(context, args[0], out))
         return;
@@ -336,7 +336,7 @@ void stop_value_set(Attachment &context, Value owner, std::optional<Value> value
                   value.value_or(context.builtin(CoreObject::None)));
     out.ok(context.builtin(CoreObject::None));
 }
-void builtin_iter(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void builtin_iter(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     const auto &extra = context.payload<TupleObject>(args[1]).items;
@@ -347,7 +347,7 @@ void builtin_iter(Attachment &context, Handle, std::span<const Value> args, Retu
     else
         raise_error(context, CoreObject::TypeErrorType, U"iter expected at most 2 arguments", out);
 }
-void calliter_next(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void calliter_next(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto self = roots.root(args[0]);
@@ -384,7 +384,7 @@ void calliter_next(Attachment &c, Handle, std::span<const Value> args, ReturnSlo
     else
         out.ok(value.get(c));
 }
-void builtin_next(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void builtin_next(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     const auto &defaults = context.payload<TupleObject>(args[1]).items;
     if (defaults.size() > 1) {
@@ -396,7 +396,7 @@ void builtin_next(Attachment &context, Handle, std::span<const Value> args, Retu
     if (status == NextStatus::Done && !defaults.empty())
         out.ok(defaults[0]);
 }
-void tuple_add(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void tuple_add(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!sequence<TupleObject, CoreObject::TupleType>(context, args[0], out) ||
         !sequence<TupleObject, CoreObject::TupleType>(context, args[1], out))
@@ -421,7 +421,7 @@ void tuple_add(Attachment &context, Handle, std::span<const Value> args, ReturnS
     values.insert(values.end(), b.begin(), b.end());
     cxxpython::core::make_tuple(context, values, out);
 }
-void tuple_repeat(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void tuple_repeat(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!sequence<TupleObject, CoreObject::TupleType>(context, args[0], out))
         return;

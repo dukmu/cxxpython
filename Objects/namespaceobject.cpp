@@ -28,7 +28,7 @@ void namespace_dict(Attachment &context, Value self, ReturnSlot &out)
     context.load(self, *context.instance_dictionary(self), out);
 }
 
-void namespace_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void namespace_new(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     auto type = roots.root(args[0]);
@@ -48,7 +48,7 @@ void namespace_new(Attachment &context, Handle, std::span<const Value> args, Ret
     out.ok(self.get(context));
 }
 
-void namespace_init(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void namespace_init(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(context, args[0], out))
         return;
@@ -79,7 +79,7 @@ struct ReprGuard {
     }
 };
 
-void namespace_repr(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void namespace_repr(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(context, args[0], out))
         return;
@@ -131,7 +131,7 @@ void namespace_repr(Attachment &context, Handle, std::span<const Value> args, Re
 }
 
 template <CompareOp Op>
-void namespace_compare(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void namespace_compare(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(context, args[0], out))
         return;
@@ -154,7 +154,7 @@ void namespace_compare(Attachment &context, Handle, std::span<const Value> args,
     rich_compare(context, roots.root(left.value()), roots.root(right.value()), Op, out);
 }
 
-void namespace_reduce(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void namespace_reduce(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(context, args[0], out))
         return;

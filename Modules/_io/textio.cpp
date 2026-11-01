@@ -99,12 +99,12 @@ Handle decoder(Attachment &c, Handle self, NewlineDecoder &s, RootScope &roots)
     c.load(self.get(c), s.decoder, value);
     return roots.root(value.value());
 }
-void create(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void create(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     RootScope roots(c);
     c.allocate_instance<NewlineDecoder>(roots.root(a[0]), out, c.builtin(CoreObject::None));
 }
-void init(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void init(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;
@@ -129,7 +129,7 @@ void init(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
     out.ok(c.builtin(CoreObject::None));
 }
 
-void decode(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void decode(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;
@@ -196,7 +196,7 @@ void decode(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
     }
     make_str(c, std::move(result), out);
 }
-void reset(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void reset(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;
@@ -218,7 +218,7 @@ void reset(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
     s.seen = 0;
     out.ok(c.builtin(CoreObject::None));
 }
-void getstate(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void getstate(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;
@@ -268,7 +268,7 @@ void getstate(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
     std::array<Value, 2> items{buffer.get(c), combined.value()};
     make_tuple(c, std::span<const Value>(items), out);
 }
-void setstate(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void setstate(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;
@@ -625,12 +625,12 @@ bool flag(Attachment &c, Value v, bool &result, ReturnSlot &out)
     result = b.value() != c.builtin(CoreObject::False);
     return true;
 }
-void create(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void create(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     RootScope r(c);
     c.allocate_instance<Stream>(r.root(a[0]), out, c.builtin(CoreObject::None));
 }
-void init(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void init(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;
@@ -865,7 +865,7 @@ bool fill(Attachment &c, Handle self, Stream &s, ReturnSlot &out)
     account(c, self, s);
     return true;
 }
-template <bool line> void read(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+template <bool line> void read(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;
@@ -929,7 +929,7 @@ template <bool line> void read(Attachment &c, Handle, std::span<const Value> a, 
     }
     make_str(c, std::move(result), out);
 }
-void write(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void write(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;
@@ -1006,7 +1006,7 @@ void write(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
     make_int(c, static_cast<std::int64_t>(length), out);
 }
 template <int operation>
-void action(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void action(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;
@@ -1112,7 +1112,7 @@ template <int which> void property(Attachment &c, Value value, ReturnSlot &out)
         attribute(c, b, U"name", out);
     }
 }
-template <int which> void delegate(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+template <int which> void delegate(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;
@@ -1148,7 +1148,7 @@ Handle integer(Attachment &c, RootScope &r, std::int64_t n)
     make_int(c, n, value);
     return r.root(value.value());
 }
-void tell(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void tell(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;
@@ -1243,7 +1243,7 @@ bool cookie_field(Attachment &c, RootScope &r, Handle cookie, int shift, int bit
         return false;
     return detail::index_as_int64(c, shifted, value, out);
 }
-void seek(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void seek(Attachment &c, Value function, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;
@@ -1262,7 +1262,7 @@ void seek(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
             return;
         }
         std::array<Value, 1> self_arg{self.get(c)};
-        tell(c, self, self_arg, out);
+        tell(c, function, self_arg, out);
         return;
     }
     auto &s = c.payload<Stream>(self);

@@ -206,7 +206,7 @@ bool log_value(Attachment &c, Handle value, LogKind kind, double &result, Return
 }
 
 template <LogKind kind>
-void logarithm(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void logarithm(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto input = roots.root(args[0]);
@@ -235,7 +235,7 @@ void logarithm(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &o
 }
 
 template <LogKind kind>
-void single_logarithm(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void single_logarithm(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     double result;
@@ -269,7 +269,7 @@ enum class Op {
     Log1p,
     Fabs
 };
-template <Op op> void unary(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+template <Op op> void unary(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     double x;
@@ -359,7 +359,7 @@ template <Op op> void unary(Attachment &c, Handle, std::span<const Value> args, 
 
 enum class Binary { Fmod, Remainder, Copysign, Ldexp };
 template <Binary op>
-void binary_math(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void binary_math(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto first = roots.root(args[0]);
@@ -415,7 +415,7 @@ void binary_math(Attachment &c, Handle, std::span<const Value> args, ReturnSlot 
 }
 
 template <int mode>
-void rounding(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void rounding(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto value = roots.root(args[0]);
@@ -443,7 +443,7 @@ void rounding(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &ou
     const std::array values{rounded.value()};
     call(c, roots.root(c.builtin(CoreObject::IntType)), {values, {}}, out);
 }
-void math_isqrt(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void math_isqrt(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     ReturnSlot indexed(c);

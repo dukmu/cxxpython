@@ -68,7 +68,7 @@ TEST_F(Modules, NamespaceGetattrReceivesOnlyName)
     signature.parameters = {{U"name", ParameterKind::PositionalOnly}};
     context.allocate_instance<NativeFunctionObject>(
         roots.root(context.builtin(CoreObject::NativeFunctionType)), out, "fallback", signature,
-        +[](Attachment &, Handle, std::span<const Value> args, ReturnSlot &result) {
+        +[](Attachment &, Value, std::span<const Value> args, ReturnSlot &result) {
             result.ok(args[0]);
         },
         std::vector<Value>{});

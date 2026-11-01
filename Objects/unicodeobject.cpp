@@ -30,7 +30,7 @@ bool is_string(Attachment &context, Value value)
     return context.has_layout<StrObject>(value) &&
            is_subtype(context, context.type_of(value), context.builtin(CoreObject::StrType));
 }
-void unicode_getnewargs(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void unicode_getnewargs(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_string(context, args[0])) {
         raise_error(context, CoreObject::TypeErrorType, U"str descriptor requires a str", out);
@@ -44,7 +44,7 @@ void unicode_getnewargs(Attachment &context, Handle, std::span<const Value> args
     cxxpython::core::make_tuple(context, arguments, out);
 }
 // CPython 3.12.14 unicode_repeat: convert the count before testing for empty output.
-void repeat(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void repeat(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_string(context, args[0])) {
         raise_error(context, CoreObject::TypeErrorType, U"str descriptor requires a str", out);
@@ -99,7 +99,7 @@ void repeat(Attachment &context, Handle, std::span<const Value> args, ReturnSlot
     }
     make_str(context, std::move(result), out);
 }
-void join(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void join(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     const auto separator = roots.root(args[0]);
@@ -160,7 +160,7 @@ bool bound(Attachment &context, Handle value, std::intptr_t &number, ReturnSlot 
 }
 
 // Adapted from CPython 3.12.14 unicode_expandtabs_impl and its C int converter.
-void expandtabs(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void expandtabs(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     const auto self = roots.root(args[0]), tabsize_arg = roots.root(args[1]);
@@ -257,7 +257,7 @@ void expandtabs(Attachment &context, Handle, std::span<const Value> args, Return
 enum class Padding { LeftJustify, RightJustify, Center, ZeroFill };
 
 template <Padding Mode>
-void pad(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void pad(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     const auto self = roots.root(args[0]), width_arg = roots.root(args[1]);
@@ -334,7 +334,7 @@ void pad(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &o
 }
 
 template <bool Reverse, bool Raising, bool Count = false>
-void find(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void find(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     const auto self = roots.root(args[0]), part = roots.root(args[1]);
@@ -382,7 +382,7 @@ void find(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &
 }
 
 template <bool Suffix>
-void tailmatch(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void tailmatch(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_string(context, args[0])) {
         raise_error(context, CoreObject::TypeErrorType, U"str descriptor requires a str", out);
@@ -444,7 +444,7 @@ void tailmatch(Attachment &context, Handle, std::span<const Value> args, ReturnS
     out.ok(context.builtin(match(value) ? CoreObject::True : CoreObject::False));
 }
 template <bool Suffix>
-void remove_affix(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void remove_affix(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     const auto self = roots.root(args[0]), candidate = roots.root(args[1]);
@@ -482,7 +482,7 @@ bool string_space(char32_t value)
 
 enum class Predicate { Ascii, Alnum, Alpha, Space, Decimal, Digit, Numeric, Identifier };
 template <Predicate Kind>
-void predicate(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void predicate(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_string(context, args[0])) {
         raise_error(context, CoreObject::TypeErrorType, U"str descriptor requires a str", out);
@@ -522,7 +522,7 @@ void predicate(Attachment &context, Handle, std::span<const Value> args, ReturnS
 // CPython 3.12.14 unicode_{islower,isupper,istitle}_impl and unicodectype.c masks.
 enum class CasePredicate { Lower, Upper, Title };
 template <CasePredicate Kind>
-void case_predicate(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void case_predicate(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     const auto self = roots.root(args[0]);
@@ -587,7 +587,7 @@ void case_predicate(Attachment &context, Handle, std::span<const Value> args, Re
 }
 
 // Follows CPython 3.12's charmap translation, including its ASCII cache.
-void translate(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void translate(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_string(context, args[0])) {
         raise_error(context, CoreObject::TypeErrorType, U"str descriptor requires a str", out);
@@ -673,7 +673,7 @@ void translate(Attachment &context, Handle, std::span<const Value> args, ReturnS
     make_str(context, std::move(result), out);
 }
 
-void maketrans(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void maketrans(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     const auto arguments = roots.root(args[0]);
@@ -782,7 +782,7 @@ void maketrans(Attachment &context, Handle, std::span<const Value> args, ReturnS
 
 enum class Case { Lower, Upper, Fold };
 template <Case Kind>
-void change_case(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void change_case(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_string(context, args[0])) {
         raise_error(context, CoreObject::TypeErrorType, U"str descriptor requires a str", out);
@@ -828,7 +828,7 @@ void change_case(Attachment &context, Handle, std::span<const Value> args, Retur
     make_str(context, std::move(result), out);
 }
 
-void replace(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void replace(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     auto self = roots.root(args[0]), old = roots.root(args[1]), replacement = roots.root(args[2]);
@@ -871,7 +871,7 @@ void replace(Attachment &context, Handle, std::span<const Value> args, ReturnSlo
 }
 
 template <bool Left, bool Right>
-void strip(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void strip(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_string(context, args[0]) ||
         (args[1] != context.builtin(CoreObject::None) && !is_string(context, args[1]))) {
@@ -896,7 +896,7 @@ void strip(Attachment &context, Handle, std::span<const Value> args, ReturnSlot 
 }
 
 template <bool Reverse>
-void partition(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void partition(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     auto self = roots.root(args[0]), sep = roots.root(args[1]);
@@ -929,7 +929,7 @@ void partition(Attachment &context, Handle, std::span<const Value> args, ReturnS
     cxxpython::core::make_tuple(context, values, out);
 }
 
-void splitlines(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void splitlines(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     auto self = roots.root(args[0]);
@@ -966,7 +966,7 @@ void splitlines(Attachment &context, Handle, std::span<const Value> args, Return
     make_list(context, items, out);
 }
 template <bool Reverse>
-void split(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void split(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     const auto self = roots.root(args[0]), separator = roots.root(args[1]);

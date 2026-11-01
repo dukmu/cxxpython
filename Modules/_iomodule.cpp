@@ -8,7 +8,7 @@
 
 namespace cxxpython::core::detail {
 namespace {
-void state_anchor(Attachment &c, Handle, std::span<const Value>, ReturnSlot &out)
+void state_anchor(Attachment &c, Value, std::span<const Value>, ReturnSlot &out)
 {
     out.ok(c.builtin(CoreObject::None));
 }

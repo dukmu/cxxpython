@@ -230,7 +230,7 @@ bool number(Attachment &c, Value value, int &result, ReturnSlot &out)
     result = static_cast<int>(n);
     return true;
 }
-Handle state_of(Attachment &c, Handle function, RootScope &roots)
+Handle state_of(Attachment &c, Value function, RootScope &roots)
 {
     return roots.root(c.payload<NativeFunctionObject>(function).captures[0]);
 }
@@ -263,7 +263,7 @@ enum class Op {
 };
 
 template <Op op>
-void method(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+void method(Attachment &c, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto owner = state_of(c, function, roots);

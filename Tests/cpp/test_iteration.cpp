@@ -98,7 +98,7 @@ TEST_F(CoreIteration, UserProtocolsPreserveStopIterationValuesAndOtherExceptions
     unary.parameters = {{U"self", ParameterKind::PositionalOnly}};
     make_native_function(
         context, "self", unary,
-        [](Attachment &, Handle, std::span<const Value> args, ReturnSlot &out) { out.ok(args[0]); },
+        [](Attachment &, Value, std::span<const Value> args, ReturnSlot &out) { out.ok(args[0]); },
         {}, out);
     set_attribute(context, type, text(U"__iter__"), roots.root(out.value()), out);
     eval("StopIteration(73)", out);
@@ -107,7 +107,7 @@ TEST_F(CoreIteration, UserProtocolsPreserveStopIterationValuesAndOtherExceptions
     std::array captures{stop.get(context)};
     make_native_function(
         context, "stop", unary,
-        [](Attachment &c, Handle fn, std::span<const Value>, ReturnSlot &out) {
+        [](Attachment &c, Value fn, std::span<const Value>, ReturnSlot &out) {
             c.collect();
             out.raised(c.payload<NativeFunctionObject>(fn).captures[0]);
         },
@@ -122,7 +122,7 @@ TEST_F(CoreIteration, UserProtocolsPreserveStopIterationValuesAndOtherExceptions
     EXPECT_EQ(int_decimal(context, out.value()), "73");
     make_native_function(
         context, "error", unary,
-        [](Attachment &c, Handle, std::span<const Value>, ReturnSlot &out) {
+        [](Attachment &c, Value, std::span<const Value>, ReturnSlot &out) {
             raise_error(c, CoreObject::ValueErrorType, U"not exhaustion", out);
         },
         {}, out);
@@ -146,7 +146,7 @@ TEST_F(CoreIteration, ValueIteratorSurvivesAliasedOutputAndSeesNextReplacement)
     unary.parameters = {{U"self", ParameterKind::PositionalOnly}};
     make_native_function(
         context, "self", unary,
-        [](Attachment &c, Handle, std::span<const Value> args, ReturnSlot &result) {
+        [](Attachment &c, Value, std::span<const Value> args, ReturnSlot &result) {
             c.collect();
             result.ok(args[0]);
         },
@@ -165,7 +165,7 @@ TEST_F(CoreIteration, ValueIteratorSurvivesAliasedOutputAndSeesNextReplacement)
     ReturnSlot update(context);
     make_native_function(
         context, "stop", unary,
-        [](Attachment &c, Handle, std::span<const Value>, ReturnSlot &result) {
+        [](Attachment &c, Value, std::span<const Value>, ReturnSlot &result) {
             c.collect();
             raise_error(c, CoreObject::StopIterationType, U"finished", result);
         },
@@ -176,7 +176,7 @@ TEST_F(CoreIteration, ValueIteratorSurvivesAliasedOutputAndSeesNextReplacement)
 
     make_native_function(
         context, "error", unary,
-        [](Attachment &c, Handle, std::span<const Value>, ReturnSlot &result) {
+        [](Attachment &c, Value, std::span<const Value>, ReturnSlot &result) {
             c.collect();
             raise_error(c, CoreObject::ValueErrorType, U"failure", result);
         },
@@ -198,7 +198,7 @@ TEST_F(CoreIteration, OwnedIteratorRevalidatesAndReusesResultSlot)
     unary.parameters = {{U"self", ParameterKind::PositionalOnly}};
     make_native_function(
         context, "item", unary,
-        [](Attachment &c, Handle, std::span<const Value> args, ReturnSlot &result) {
+        [](Attachment &c, Value, std::span<const Value> args, ReturnSlot &result) {
             c.collect();
             result.ok(args[0]);
         },
@@ -211,7 +211,7 @@ TEST_F(CoreIteration, OwnedIteratorRevalidatesAndReusesResultSlot)
 
     make_native_function(
         context, "stop", unary,
-        [](Attachment &c, Handle, std::span<const Value>, ReturnSlot &result) {
+        [](Attachment &c, Value, std::span<const Value>, ReturnSlot &result) {
             c.collect();
             raise_error(c, CoreObject::StopIterationType, U"finished", result);
         },
@@ -222,7 +222,7 @@ TEST_F(CoreIteration, OwnedIteratorRevalidatesAndReusesResultSlot)
 
     make_native_function(
         context, "error", unary,
-        [](Attachment &c, Handle, std::span<const Value>, ReturnSlot &result) {
+        [](Attachment &c, Value, std::span<const Value>, ReturnSlot &result) {
             c.collect();
             raise_error(c, CoreObject::ValueErrorType, U"failure", result);
         },
@@ -255,7 +255,7 @@ TEST_F(CoreIteration, OwnedNativeNextAllowsConcurrentCollectionProgress)
     unary.parameters = {{U"self", ParameterKind::PositionalOnly}};
     make_native_function(
         context, "next", unary,
-        [](Attachment &c, Handle, std::span<const Value>, ReturnSlot &result) {
+        [](Attachment &c, Value, std::span<const Value>, ReturnSlot &result) {
             result.ok(c.builtin(CoreObject::False));
         },
         {}, out);
@@ -319,7 +319,7 @@ TEST_F(CoreIteration, NextDropsPreviousOutputBeforeAcknowledgingCollection)
     unary.parameters = {{U"self", ParameterKind::PositionalOnly}};
     make_native_function(
         context, "next", unary,
-        [](Attachment &c, Handle, std::span<const Value>, ReturnSlot &result) {
+        [](Attachment &c, Value, std::span<const Value>, ReturnSlot &result) {
             result.ok(c.builtin(CoreObject::False));
         },
         {}, out);

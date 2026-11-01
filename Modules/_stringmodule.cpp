@@ -226,13 +226,13 @@ template <class T> bool receiver(Attachment &ctx, Value value, ReturnSlot &out)
     return false;
 }
 
-template <class T> void iter(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+template <class T> void iter(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (receiver<T>(ctx, args[0], out))
         out.ok(args[0]);
 }
 
-void no_new(Attachment &ctx, Handle, std::span<const Value>, ReturnSlot &out)
+void no_new(Attachment &ctx, Value, std::span<const Value>, ReturnSlot &out)
 {
     raise_error(ctx, CoreObject::TypeErrorType, U"cannot create formatter iterator instances", out);
 }
@@ -242,7 +242,7 @@ void slice(Attachment &ctx, std::u32string_view text, Slice part, ReturnSlot &ou
     make_str(ctx, std::u32string(text.substr(part.start, part.end - part.start)), out);
 }
 
-void markup_iter_next(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void markup_iter_next(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver<Markup>(ctx, args[0], out))
         return;
@@ -301,7 +301,7 @@ void markup_iter_next(Attachment &ctx, Handle, std::span<const Value> args, Retu
     cxxpython::core::make_tuple(ctx, values, out);
 }
 
-void field_iter_next(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void field_iter_next(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver<Fields>(ctx, args[0], out))
         return;
@@ -356,7 +356,7 @@ bool check_text(Attachment &ctx, Handle value, ReturnSlot &out)
 }
 
 template <bool Field>
-void factory(Attachment &ctx, Handle function, std::span<const Value> args, ReturnSlot &out)
+void factory(Attachment &ctx, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto source = roots.root(args[0]);

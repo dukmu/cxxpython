@@ -245,7 +245,7 @@ struct NativeBinding {
         tracer.visit(module);
     }
 };
-void bound_method(Attachment &actor, Handle function, std::span<const Value> args, ReturnSlot &out)
+void bound_method(Attachment &actor, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     const auto capture = actor.payload<NativeFunctionObject>(function).captures[0];
     const auto &binding = actor.payload<NativeBinding>(capture);

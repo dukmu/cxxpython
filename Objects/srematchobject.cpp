@@ -53,7 +53,7 @@ void pair(Attachment &c, std::pair<std::ptrdiff_t, std::ptrdiff_t> mark, ReturnS
     cxxpython::core::make_tuple(c, values, out);
 }
 
-void group(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void group(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto self = roots.root(args[0]);
@@ -78,7 +78,7 @@ void group(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
     else
         cxxpython::core::make_tuple(c, values, out);
 }
-void getitem(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void getitem(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto self = roots.root(args[0]);
@@ -86,7 +86,7 @@ void getitem(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out
     if (group_index(c, self, roots.root(args[1]), i, out))
         detail::sre_group_slice(c, self, i, roots.root(c.builtin(CoreObject::None)), out);
 }
-void groups(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void groups(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto self = roots.root(args[0]), fallback = roots.root(args[1]);
@@ -100,7 +100,7 @@ void groups(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
     }
     cxxpython::core::make_tuple(c, values, out);
 }
-void groupdict(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void groupdict(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto self = roots.root(args[0]), fallback = roots.root(args[1]);
@@ -126,7 +126,7 @@ void groupdict(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &o
     out.ok(result.get(c));
 }
 template <int Which>
-void position(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void position(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto self = roots.root(args[0]);
@@ -139,16 +139,16 @@ void position(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &ou
     else
         make_int(c, Which == 0 ? mark.first : mark.second, out);
 }
-void expand(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void expand(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     detail::sre_expand(c, roots.root(args[0]), roots.root(args[1]), out);
 }
-void copy(Attachment &, Handle, std::span<const Value> args, ReturnSlot &out)
+void copy(Attachment &, Value, std::span<const Value> args, ReturnSlot &out)
 {
     out.ok(args[0]);
 }
-void class_getitem(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void class_getitem(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     make_generic_alias(c, roots.root(args[0]), roots.root(args[1]), out);
@@ -197,7 +197,7 @@ void regs(Attachment &c, Value value, ReturnSlot &out)
     if (!c.compare_exchange(self.get(c), m.regs, {}, out.value()))
         c.load(self.get(c), m.regs, out);
 }
-void match_repr(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void match_repr(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto self = roots.root(args[0]);

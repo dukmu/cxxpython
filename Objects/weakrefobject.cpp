@@ -26,7 +26,7 @@ std::u32string type_name(Attachment &c, Value value)
     return c.payload<StrObject>(std::get<Value>(name)).value;
 }
 
-void ref_new(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+void ref_new(Attachment &c, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto type = roots.root(args[0]);
@@ -75,7 +75,7 @@ void ref_new(Attachment &c, Handle function, std::span<const Value> args, Return
     c.register_weakref(self, target, cache, out);
 }
 
-void ref_init(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void ref_init(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -91,7 +91,7 @@ void ref_init(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &ou
     out.ok(c.builtin(CoreObject::None));
 }
 
-void ref_call(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void ref_call(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -109,7 +109,7 @@ void ref_callback(Attachment &c, Value self, ReturnSlot &out)
         out.ok(c.builtin(CoreObject::None));
 }
 
-void ref_hash(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void ref_hash(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -140,7 +140,7 @@ void ref_hash(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &ou
 }
 
 template <CompareOp Op>
-void ref_compare(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void ref_compare(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -172,7 +172,7 @@ std::u32string address(Value value)
     return {text.begin(), text.end()};
 }
 
-void ref_repr(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void ref_repr(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;

@@ -68,7 +68,7 @@ class CoreUnwind : public testing::Test {
                             handled ? handled->get(context) : context.builtin(CoreObject::None)};
         make_native_function(
             context, "unwind probe", {},
-            [](Attachment &c, Handle fn, std::span<const Value>, ReturnSlot &out) {
+            [](Attachment &c, Value fn, std::span<const Value>, ReturnSlot &out) {
                 const auto &captures = c.payload<NativeFunctionObject>(fn).captures;
                 EXPECT_EQ(c.handled_exception().value_or(c.builtin(CoreObject::None)), captures[2]);
                 const auto cell = captures[0];
@@ -342,7 +342,7 @@ TEST_F(CoreUnwind, NestedCleanupKeepsPendingReturnAcrossGcAndInternallyCaughtErr
     ReturnSlot out(context);
     make_native_function(
         context, "fresh return", {},
-        [](Attachment &c, Handle, std::span<const Value>, ReturnSlot &out) {
+        [](Attachment &c, Value, std::span<const Value>, ReturnSlot &out) {
             make_str(c, U"transient return", out);
         },
         {}, out);
@@ -533,7 +533,7 @@ TEST_F(CoreUnwind, CalleesInheritHandledStateAndBareRaiseDoesNotAddTheirFrame)
             std::array captures{target.get(context)};
             make_native_function(
                 context, "bare raise bridge", {},
-                [](Attachment &c, Handle fn, std::span<const Value>, ReturnSlot &out) {
+                [](Attachment &c, Value fn, std::span<const Value>, ReturnSlot &out) {
                     RootScope roots(c);
                     call(c, roots.root(c.payload<NativeFunctionObject>(fn).captures[0]), {}, out);
                 },

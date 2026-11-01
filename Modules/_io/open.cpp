@@ -35,7 +35,7 @@ bool attribute(Attachment &c, Handle object, std::u32string_view name, ReturnSlo
     get_attribute(c, object, roots.root(key.value()), out);
     return !failed(out);
 }
-void open_code(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+void open_code(Attachment &c, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     if (!c.has_layout<StrObject>(args[0]) ||
         !is_subtype(c, c.type_of(args[0]), c.builtin(CoreObject::StrType))) {
@@ -52,7 +52,7 @@ void open_code(Attachment &c, Handle function, std::span<const Value> args, Retu
                             none,    none,          c.builtin(CoreObject::True), none};
     io_open(c, function, values, out);
 }
-void text_encoding(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void text_encoding(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (args[0] == c.builtin(CoreObject::None))
         make_str(c, U"utf-8", out);
@@ -61,12 +61,11 @@ void text_encoding(Attachment &c, Handle, std::span<const Value> args, ReturnSlo
 }
 } // namespace
 
-void io_open(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+void io_open(Attachment &c, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto file = roots.root(args[0]), mode = roots.root(args[1]);
-    const auto target = roots.root(function.get(c));
-    const auto &types = c.payload<NativeFunctionObject>(target).captures;
+    const auto &types = c.payload<NativeFunctionObject>(function).captures;
     ReturnSlot module(c), type(c), raw_result(c), value(c), result(c);
     if (types.empty()) {
         import_module(c, U"_io", module);
@@ -81,7 +80,8 @@ void io_open(Attachment &c, Handle function, std::span<const Value> args, Return
             raise_error(c, CoreObject::RuntimeErrorType, U"_io open state is unavailable", out);
             return;
         }
-        io_open(c, roots.root(*implementation), args, out);
+        auto implementation_root = roots.root(*implementation);
+        io_open(c, implementation_root.get(c), args, out);
         return;
     }
     if (!c.has_layout<StrObject>(mode.get(c)) ||

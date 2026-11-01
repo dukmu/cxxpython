@@ -51,7 +51,7 @@ bool descriptor(Attachment &c, Value value, int &fd, ReturnSlot &out)
 }
 
 template <bool Set>
-void inheritable_entry(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void inheritable_entry(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     int fd;
     if (!descriptor(c, args[0], fd, out))
@@ -88,7 +88,7 @@ void inheritable_entry(Attachment &c, Handle, std::span<const Value> args, Retur
         out.ok(c.builtin((flags & FD_CLOEXEC) ? CoreObject::False : CoreObject::True));
 }
 
-void urandom_entry(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void urandom_entry(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     std::int64_t size;
     if (!index_as_int64(c, args[0], size, out))
@@ -126,7 +126,7 @@ template <std::size_t I> void terminal_field(Attachment &c, Value self, ReturnSl
     out.ok(c.payload<TupleObject>(self).items[I]);
 }
 
-void terminal_repr(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void terminal_repr(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto self = roots.root(args[0]);
@@ -144,7 +144,7 @@ void terminal_repr(Attachment &c, Handle, std::span<const Value> args, ReturnSlo
     make_str(c, text + U")", out);
 }
 
-void terminal_new(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+void terminal_new(Attachment &c, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto type = roots.root(args[0]);
@@ -176,7 +176,7 @@ void terminal_new(Attachment &c, Handle function, std::span<const Value> args, R
     c.allocate_instance<TupleObject>(type, out, items);
 }
 
-void get_terminal_size(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+void get_terminal_size(Attachment &c, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     int fd;
     if (!descriptor(c, args[0], fd, out))
@@ -250,12 +250,12 @@ bool path(Attachment &c, Value value, std::string &result, ReturnSlot &out,
     }
     return true;
 }
-void fspath(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void fspath(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     RootScope roots(c);
     path_value(c, roots.root(a[0]), out);
 }
-void cpu_count(Attachment &c, Handle, std::span<const Value>, ReturnSlot &out)
+void cpu_count(Attachment &c, Value, std::span<const Value>, ReturnSlot &out)
 {
     long count;
     {
@@ -286,7 +286,7 @@ enum class Op {
     Uid,
     Gid
 };
-template <Op op> void entry(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+template <Op op> void entry(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     ReturnSlot filename(c), filename2(c);
     int fd = 0, error = 0;
@@ -470,7 +470,7 @@ std::u32string fs_decode(const std::string &s)
     }
     return result;
 }
-void cwd(Attachment &c, Handle function, std::span<const Value>, ReturnSlot &out)
+void cwd(Attachment &c, Value function, std::span<const Value>, ReturnSlot &out)
 {
     bool bytes = c.payload<NativeFunctionObject>(function).name == "getcwdb";
     std::string result;
@@ -491,7 +491,7 @@ void cwd(Attachment &c, Handle function, std::span<const Value>, ReturnSlot &out
     else
         make_str(c, fs_decode(result), out);
 }
-void listdir(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void listdir(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     RootScope roots(c);
     ReturnSlot converted(c);
@@ -544,7 +544,7 @@ void listdir(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
     }
     make_list(c, items, out);
 }
-void readlink_entry(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void readlink_entry(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     RootScope roots(c);
     ReturnSlot converted(c);
@@ -584,7 +584,7 @@ void readlink_entry(Attachment &c, Handle, std::span<const Value> a, ReturnSlot 
 
 std::mutex environment_mutex;
 template <bool Set>
-void environment_change(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void environment_change(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     std::string key, value;
     if (!path(c, a[0], key, out))
@@ -661,7 +661,7 @@ template <std::size_t I> void stat_extra_field(Attachment &c, Value self, Return
 {
     c.load(self, c.instance_slot(self, stat_slot(c, self, stat_extra_names[I])), out);
 }
-void stat_new(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void stat_new(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     RootScope roots(c);
     ReturnSlot iterator(c), item(c);
@@ -700,7 +700,7 @@ void stat_new(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
     }
     out.ok(object.get(c));
 }
-void access_entry(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void access_entry(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     std::string target;
@@ -740,7 +740,7 @@ void access_entry(Attachment &c, Handle, std::span<const Value> args, ReturnSlot
 
 void make_stat_result(Attachment &, Handle, const struct stat &, ReturnSlot &);
 
-void stat_entry(Attachment &c, Handle function, std::span<const Value> a, ReturnSlot &out)
+void stat_entry(Attachment &c, Value function, std::span<const Value> a, ReturnSlot &out)
 {
     RootScope roots(c);
     ReturnSlot filename(c);
@@ -895,17 +895,17 @@ template <class T> bool scan_receiver(Attachment &c, Value self, ReturnSlot &out
     raise_error(c, CoreObject::TypeErrorType, U"invalid directory iterator or entry receiver", out);
     return false;
 }
-void scan_new(Attachment &c, Handle, std::span<const Value>, ReturnSlot &out)
+void scan_new(Attachment &c, Value, std::span<const Value>, ReturnSlot &out)
 {
     raise_error(c, CoreObject::TypeErrorType,
                 U"cannot create directory iterator or entry instances", out);
 }
-void scan_iter(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void scan_iter(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (scan_receiver<ScandirObject>(c, args[0], out))
         out.ok(args[0]);
 }
-void scan_close(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void scan_close(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!scan_receiver<ScandirObject>(c, args[0], out))
         return;
@@ -913,7 +913,7 @@ void scan_close(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &
     self.position.store(self.snapshot.names.size(), std::memory_order_relaxed);
     out.ok(c.builtin(CoreObject::None));
 }
-void scan_next(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void scan_next(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!scan_receiver<ScandirObject>(c, args[0], out))
         return;
@@ -946,7 +946,7 @@ void scan_next(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &o
                                         path.value(), self.stat_type, std::move(filename),
                                         entry.inode, entry.kind);
 }
-void scan_entry(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+void scan_entry(Attachment &c, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     ReturnSlot converted(c);
@@ -1011,12 +1011,12 @@ void direntry_path(Attachment &c, Value self, ReturnSlot &out)
 {
     out.ok(c.payload<DirEntryObject>(self).path);
 }
-void direntry_fspath(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void direntry_fspath(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (scan_receiver<DirEntryObject>(c, args[0], out))
         direntry_path(c, args[0], out);
 }
-void direntry_repr(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void direntry_repr(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!scan_receiver<DirEntryObject>(c, args[0], out))
         return;
@@ -1026,7 +1026,7 @@ void direntry_repr(Attachment &c, Handle, std::span<const Value> args, ReturnSlo
     if (!failed(out))
         make_str(c, U"<DirEntry " + c.payload<StrObject>(out.value()).value + U">", out);
 }
-void direntry_inode(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void direntry_inode(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (scan_receiver<DirEntryObject>(c, args[0], out))
         publish_integer(c, Integer(c.payload<DirEntryObject>(args[0]).inode), out);
@@ -1084,7 +1084,7 @@ bool entry_follow(Attachment &c, Value value, bool &follow, ReturnSlot &out)
     follow = out.value() == c.builtin(CoreObject::True);
     return true;
 }
-void direntry_stat(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void direntry_stat(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!scan_receiver<DirEntryObject>(c, args[0], out))
         return;
@@ -1095,7 +1095,7 @@ void direntry_stat(Attachment &c, Handle, std::span<const Value> args, ReturnSlo
         entry_stat(c, self, follow, out);
 }
 template <unsigned short Mode>
-void direntry_test(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void direntry_test(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!scan_receiver<DirEntryObject>(c, args[0], out))
         return;

@@ -97,7 +97,7 @@ int replace(Attachment &c, FileIOObject::State &s, int fd, bool closefd = true,
     lock.unlock();
     return old >= 0 && ::close(old) < 0 ? errno : 0;
 }
-void create(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void create(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     RootScope roots(c);
     if (!c.has_layout<TypeObject>(a[0]) ||
@@ -107,7 +107,7 @@ void create(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
     }
     c.allocate_instance<FileIOObject>(roots.root(a[0]), out);
 }
-void initialize(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void initialize(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;
@@ -248,7 +248,7 @@ void initialize(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out
     else
         out.ok(c.builtin(CoreObject::None));
 }
-void close(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void close(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;
@@ -281,7 +281,7 @@ void close(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
         out.ok(c.builtin(CoreObject::None));
 }
 enum class Method { Readable, Writable, Seekable, Fileno, Isatty, Tell };
-template <Method M> void method(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+template <Method M> void method(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;
@@ -317,7 +317,7 @@ template <Method M> void method(Attachment &c, Handle, std::span<const Value> a,
     else
         out.ok(c.builtin(result ? CoreObject::True : CoreObject::False));
 }
-template <bool Truncate> void seek(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+template <bool Truncate> void seek(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;
@@ -365,7 +365,7 @@ template <bool Truncate> void seek(Attachment &c, Handle, std::span<const Value>
     else
         make_int(c, result, out);
 }
-template <bool All> void read(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+template <bool All> void read(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;
@@ -416,7 +416,7 @@ template <bool All> void read(Attachment &c, Handle, std::span<const Value> a, R
     else
         make_bytes(c, std::move(data), out);
 }
-void write(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void write(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;
@@ -462,7 +462,7 @@ void write(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
     else
         make_int(c, n, out);
 }
-void readinto(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void readinto(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;
@@ -528,7 +528,7 @@ template <int Field> void field(Attachment &c, Value value, ReturnSlot &out)
     if constexpr (Field == 3)
         make_int(c, static_cast<std::int64_t>(block), out);
 }
-void representation(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void representation(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;

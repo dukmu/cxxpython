@@ -63,7 +63,7 @@ class CoreRepresentation : public testing::Test {
         ReturnSlot out(context);
         make_native_function(
             context, "method", signature,
-            [](Attachment &c, Handle fn, std::span<const Value>, ReturnSlot &out) {
+            [](Attachment &c, Value fn, std::span<const Value>, ReturnSlot &out) {
                 c.collect();
                 out.ok(c.payload<NativeFunctionObject>(fn).captures[0]);
             },
@@ -309,7 +309,7 @@ TEST_F(CoreRepresentation, TupleReprGuardIsContainerSpecificAndUnwindsOnError)
     ReturnSlot out(context);
     make_native_function(
         context, "recursive element repr", signature,
-        [](Attachment &c, Handle fn, std::span<const Value>, ReturnSlot &out) {
+        [](Attachment &c, Value fn, std::span<const Value>, ReturnSlot &out) {
             RootScope roots(c);
             repr(c, roots.root(c.payload<NativeFunctionObject>(fn).captures[0]), out);
         },
@@ -426,7 +426,7 @@ TEST_F(CoreRepresentation, UserReprRecursionRaisesInsteadOfUsingTheContainerElli
     ReturnSlot out(context);
     make_native_function(
         context, "recursive repr", signature,
-        [](Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out) {
+        [](Attachment &c, Value, std::span<const Value> args, ReturnSlot &out) {
             RootScope roots(c);
             repr(c, roots.root(args[0]), out);
         },

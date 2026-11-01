@@ -171,7 +171,7 @@ TEST_F(CoreNumbers, ValueIndexConversionKeepsSoleOutputInputAcrossCollection)
     const std::array captures{cls.get(context), marker.get(context)};
     make_native_function(
         context, "collecting index", signature,
-        [](Attachment &c, Handle fn, std::span<const Value> args, ReturnSlot &result) {
+        [](Attachment &c, Value fn, std::span<const Value> args, ReturnSlot &result) {
             c.collect();
             const auto &captured = c.payload<NativeFunctionObject>(fn).captures;
             EXPECT_EQ(c.type_of(args[0]), captured[0]);
@@ -201,7 +201,7 @@ TEST_F(CoreNumbers, ValueDoubleConversionKeepsSoleOutputInputAcrossCollection)
     const std::array captures{cls.get(context), marker.get(context)};
     make_native_function(
         context, "collecting float", signature,
-        [](Attachment &c, Handle fn, std::span<const Value> args, ReturnSlot &result) {
+        [](Attachment &c, Value fn, std::span<const Value> args, ReturnSlot &result) {
             c.collect();
             const auto &captured = c.payload<NativeFunctionObject>(fn).captures;
             EXPECT_EQ(c.type_of(args[0]), captured[0]);
@@ -503,7 +503,7 @@ TEST_F(CoreNumbers, IntConversionHonorsSubclassIntOverrideButIndexDoesNot)
     std::array captures{converted.get(context)};
     make_native_function(
         context, "__int__", signature,
-        [](Attachment &c, Handle fn, std::span<const Value>, ReturnSlot &out) {
+        [](Attachment &c, Value fn, std::span<const Value>, ReturnSlot &out) {
             c.collect();
             out.ok(c.payload<NativeFunctionObject>(fn).captures[0]);
         },

@@ -100,7 +100,7 @@ void missing_key(Attachment &ctx, Handle key, ReturnSlot &out)
     if (out.tag() != ResultTag::Raised)
         out.raised(out.value());
 }
-void repr_set(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void repr_set(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(ctx, args[0], out))
         return;
@@ -162,7 +162,7 @@ void repr_set(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &
     text += exact ? U"}" : U"})";
     make_str(ctx, std::move(text), out);
 }
-void set_reduce(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void set_reduce(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(ctx, args[0], out))
         return;
@@ -191,7 +191,7 @@ void set_reduce(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot
     const std::array result{ctx.type_of(self), arguments.value(), state.value()};
     cxxpython::core::make_tuple(ctx, result, out);
 }
-void frozen_hash(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void frozen_hash(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(ctx, args[0], out) ||
         !is_subtype(ctx, ctx.type_of(args[0]), ctx.builtin(CoreObject::FrozenSetType))) {
@@ -222,7 +222,7 @@ void frozen_hash(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlo
 }
 enum class Comparison { Eq, Ne, Lt, Le, Gt, Ge };
 template <Comparison op>
-void compare_set(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void compare_set(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(ctx, args[0], out))
         return;
@@ -277,7 +277,7 @@ void compare_set(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlo
         included = !included;
     out.ok(ctx.builtin(included ? CoreObject::True : CoreObject::False));
 }
-void copy(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void copy(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(ctx, args[0], out))
         return;
@@ -294,7 +294,7 @@ void copy(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
             out);
 }
 template <bool Required>
-void remove_key(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void remove_key(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(ctx, args[0], out, true))
         return;
@@ -311,7 +311,7 @@ void remove_key(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot
     }
     out.ok(ctx.builtin(CoreObject::None));
 }
-void pop(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void pop(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(ctx, args[0], out, true))
         return;
@@ -323,7 +323,7 @@ void pop(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
         raise_error(ctx, CoreObject::KeyErrorType, U"pop from an empty set", out);
 }
 template <bool Frozen>
-void create(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void create(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto type = roots.root(args[0]);
@@ -366,7 +366,7 @@ void create(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &ou
         return;
     ctx.allocate_instance<SetObject>(type, out, table.get(ctx));
 }
-void init(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void init(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(ctx, args[0], out, true))
         return;
@@ -387,12 +387,12 @@ void init(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
         return;
     out.ok(ctx.builtin(CoreObject::None));
 }
-void add(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void add(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     set_add(ctx, roots.root(args[0]), roots.root(args[1]), out);
 }
-void contains(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void contains(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(ctx, args[0], out))
         return;
@@ -403,13 +403,13 @@ void contains(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &
     if (out.tag() != ResultTag::Raised)
         out.ok(ctx.builtin(out.tag() == ResultTag::Ok ? CoreObject::True : CoreObject::False));
 }
-void length(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void length(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(ctx, args[0], out))
         return;
     make_int(ctx, detail::dictionary_size(ctx, ctx.payload<SetObject>(args[0]).table), out);
 }
-void clear(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void clear(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(ctx, args[0], out, true))
         return;
@@ -417,7 +417,7 @@ void clear(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out
     auto self = roots.root(args[0]);
     dict_clear(ctx, roots.root(ctx.payload<SetObject>(self).table), out);
 }
-void iterator(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void iterator(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(ctx, args[0], out))
         return;
@@ -427,7 +427,7 @@ void iterator(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &
                                DictViewKind::Keys, out,
                                roots.root(ctx.builtin(CoreObject::SetIteratorType)));
 }
-void iter_self(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void iter_self(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!ctx.has_layout<DictIteratorObject>(args[0]) ||
         ctx.type_of(args[0]) != ctx.builtin(CoreObject::SetIteratorType)) {
@@ -436,16 +436,16 @@ void iter_self(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot 
     }
     out.ok(args[0]);
 }
-void next(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void next(Attachment &ctx, Value function, std::span<const Value> args, ReturnSlot &out)
 {
-    iter_self(ctx, {}, args, out);
+    iter_self(ctx, function, args, out);
     if (out.tag() == ResultTag::Raised)
         return;
     RootScope roots(ctx);
     detail::next_dict_item(ctx, roots.root(args[0]), out);
 }
 template <CoreObject Base, NativeEntry Entry, bool Constructor = false>
-void typed_entry(Attachment &ctx, Handle function, std::span<const Value> args, ReturnSlot &out)
+void typed_entry(Attachment &ctx, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     const bool valid =
         Constructor

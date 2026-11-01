@@ -63,7 +63,7 @@ void boolean(Attachment &context, bool value, ReturnSlot &out)
 {
     out.ok(context.builtin(value ? CoreObject::True : CoreObject::False));
 }
-void integer_round(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void integer_round(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_int(context, args[0])) {
         type_error(context, out);
@@ -125,7 +125,7 @@ void integer_round(Attachment &context, Handle, std::span<const Value> args, Ret
     publish(context, negative ? -value : value, out);
 }
 template <bool Count>
-void int_bits(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void int_bits(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     const auto *data = maybe_integer(context, args[0]);
     if (!data) {
@@ -147,7 +147,7 @@ void int_bits(Attachment &context, Handle, std::span<const Value> args, ReturnSl
     publish(context, std::move(result), out);
 }
 template <bool Reflected>
-void true_divide(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void true_divide(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     const auto *self = maybe_integer(context, args[0]);
     if (!self) {
@@ -211,7 +211,7 @@ void true_divide(Attachment &context, Handle, std::span<const Value> args, Retur
     make_float(context, negative ? -result : result, out);
 }
 template <BinaryOp Op, bool Reflected>
-void arithmetic(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void arithmetic(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     const auto *self = maybe_integer(context, args[0]);
     if (!self) {
@@ -285,7 +285,7 @@ void arithmetic(Attachment &context, Handle, std::span<const Value> args, Return
     publish(context, std::move(result), out);
 }
 template <BinaryOp Op, bool Reflected>
-void integer_extended(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void integer_extended(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     const auto *self = maybe_integer(context, args[0]);
     if (!self) {
@@ -366,8 +366,7 @@ void integer_extended(Attachment &context, Handle, std::span<const Value> args, 
     publish(context, std::move(result), out);
 }
 template <BinaryOp Op>
-void bool_bitwise(Attachment &context, Handle function, std::span<const Value> args,
-                  ReturnSlot &out)
+void bool_bitwise(Attachment &context, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     const auto yes = context.builtin(CoreObject::True), no = context.builtin(CoreObject::False);
     if ((args[0] != yes && args[0] != no) || (args[1] != yes && args[1] != no)) {
@@ -383,7 +382,7 @@ void bool_bitwise(Attachment &context, Handle function, std::span<const Value> a
         boolean(context, a || b, out);
 }
 template <bool Reflected>
-void integer_power(Attachment &context, Handle function, std::span<const Value> args,
+void integer_power(Attachment &context, Value function, std::span<const Value> args,
                    ReturnSlot &out)
 {
     if (args[2] == context.builtin(CoreObject::None)) {
@@ -451,7 +450,7 @@ void integer_power(Attachment &context, Handle function, std::span<const Value> 
     publish(context, std::move(result), out);
 }
 template <CompareOp Op>
-void compare(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void compare(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     const auto *self = maybe_integer(context, args[0]);
     if (!self) {
@@ -486,7 +485,7 @@ void compare(Attachment &context, Handle, std::span<const Value> args, ReturnSlo
     if constexpr (Op == CompareOp::Ge)
         boolean(context, order >= 0, out);
 }
-void int_bool(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void int_bool(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     const auto *data = maybe_integer(context, args[0]);
     if (!data) {
@@ -495,7 +494,7 @@ void int_bool(Attachment &context, Handle, std::span<const Value> args, ReturnSl
     }
     boolean(context, data->large ? data->large->value != 0 : data->small != 0, out);
 }
-void int_identity(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void int_identity(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_int(context, args[0])) {
         type_error(context, out);
@@ -503,7 +502,7 @@ void int_identity(Attachment &context, Handle, std::span<const Value> args, Retu
     }
     copy_int(context, args[0], out);
 }
-void int_getnewargs(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void int_getnewargs(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_int(context, args[0])) {
         type_error(context, out);
@@ -546,7 +545,7 @@ bool byte_order(Attachment &context, Handle value, bool from, bool &little, Retu
     }
     return true;
 }
-void int_from_bytes(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void int_from_bytes(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     auto cls = roots.root(args[0]);
@@ -656,7 +655,7 @@ void int_from_bytes(Attachment &context, Handle, std::span<const Value> args, Re
     const std::array converted{temp.value()};
     call(context, cls, {converted, {}}, out);
 }
-void int_to_bytes(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void int_to_bytes(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     auto self = roots.root(args[0]);
@@ -731,7 +730,7 @@ void int_to_bytes(Attachment &context, Handle, std::span<const Value> args, Retu
             static_cast<char>(negative ? static_cast<unsigned char>(~bytes[i]) : bytes[i]);
     make_bytes(context, std::move(data), out);
 }
-void int_hash(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void int_hash(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_int(context, args[0])) {
         type_error(context, out);
@@ -739,7 +738,7 @@ void int_hash(Attachment &context, Handle, std::span<const Value> args, ReturnSl
     }
     make_int(context, detail::int_hash_value(context, args[0]), out);
 }
-void int_repr(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void int_repr(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_int(context, args[0])) {
         type_error(context, out);
@@ -748,7 +747,7 @@ void int_repr(Attachment &context, Handle, std::span<const Value> args, ReturnSl
     auto text = int_decimal(context, args[0]);
     make_str(context, {text.begin(), text.end()}, out);
 }
-void bool_repr(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void bool_repr(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (context.type_of(args[0]) != context.builtin(CoreObject::BoolType)) {
         type_error(context, out);
@@ -874,7 +873,7 @@ void parse_object(Attachment &context, Handle value, int base, bool explicit_bas
     }
     publish(context, std::move(parsed), out);
 }
-void int_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void int_new(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!context.has_layout<TypeObject>(args[0]) ||
         !is_subtype(context, args[0], context.builtin(CoreObject::IntType)) ||
@@ -988,7 +987,7 @@ void int_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlo
         context.allocate_instance<IntObject>(cls, out, source.small);
 }
 template <UnaryOp Op>
-void int_unary(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void int_unary(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     const auto *data = maybe_integer(context, args[0]);
     if (!data) {
@@ -1002,7 +1001,7 @@ void int_unary(Attachment &context, Handle, std::span<const Value> args, ReturnS
         value = ~value;
     publish(context, std::move(value), out);
 }
-void int_absolute(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void int_absolute(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     const auto *data = maybe_integer(context, args[0]);
     if (!data) {
@@ -1015,7 +1014,7 @@ void int_absolute(Attachment &context, Handle, std::span<const Value> args, Retu
     publish(context, std::move(value), out);
 }
 template <bool Reflected>
-void int_divmod(Attachment &context, Handle function, std::span<const Value> args, ReturnSlot &out)
+void int_divmod(Attachment &context, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     ReturnSlot quotient(context), remainder(context);
@@ -1036,7 +1035,7 @@ void int_divmod(Attachment &context, Handle function, std::span<const Value> arg
     const std::array values{quotient.value(), remainder.value()};
     cxxpython::core::make_tuple(context, values, out);
 }
-void bool_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void bool_new(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (args[0] != context.builtin(CoreObject::BoolType)) {
         type_error(context, out);

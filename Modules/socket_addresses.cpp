@@ -76,7 +76,7 @@ bool string_value(Attachment &c, Value value, std::string &s, ReturnSlot &out, b
     }
     return true;
 }
-Handle capture(Attachment &c, Handle function, std::size_t i, RootScope &roots)
+Handle capture(Attachment &c, Value function, std::size_t i, RootScope &roots)
 {
     return roots.root(c.payload<NativeFunctionObject>(function).captures[i]);
 }
@@ -93,7 +93,7 @@ bool bounded(Attachment &c, Value value, std::int64_t max, int &n, ReturnSlot &o
     return true;
 }
 template <bool wide, bool host>
-void byteorder(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void byteorder(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     std::int64_t n;
     if constexpr (wide) {
@@ -117,7 +117,7 @@ void byteorder(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
                  host ? htons(static_cast<std::uint16_t>(n)) : ntohs(static_cast<std::uint16_t>(n)),
                  out);
 }
-void hostname(Attachment &c, Handle, std::span<const Value>, ReturnSlot &out)
+void hostname(Attachment &c, Value, std::span<const Value>, ReturnSlot &out)
 {
     char name[1025]{};
     int rc, error;
@@ -281,7 +281,7 @@ void socket_address_value(Attachment &c, const sockaddr *address, socklen_t size
 }
 
 namespace {
-void inet_aton_entry(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void inet_aton_entry(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     std::string text;
     if (!string_value(c, a[0], text, out, false))
@@ -294,7 +294,7 @@ void inet_aton_entry(Attachment &c, Handle, std::span<const Value> a, ReturnSlot
     }
     make_bytes(c, std::string(reinterpret_cast<const char *>(&address), sizeof(address)), out);
 }
-void inet_ntoa_entry(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void inet_ntoa_entry(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     RootScope roots(c);
     std::string data;
@@ -316,7 +316,7 @@ void inet_ntoa_entry(Attachment &c, Handle, std::span<const Value> a, ReturnSlot
     }
     make_str(c, decode_filename(SourceBuffer("", text)), out);
 }
-void inet_pton_entry(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void inet_pton_entry(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     int family;
     std::string text;
@@ -335,7 +335,7 @@ void inet_pton_entry(Attachment &c, Handle, std::span<const Value> a, ReturnSlot
     }
     make_bytes(c, std::string(reinterpret_cast<char *>(bytes), family == AF_INET ? 4 : 16), out);
 }
-void inet_ntop_entry(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void inet_ntop_entry(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     RootScope roots(c);
     int family;
@@ -371,7 +371,7 @@ struct AddressInfo {
     SocketAddress address;
     std::string canonical;
 };
-void getaddrinfo_entry(Attachment &c, Handle function, std::span<const Value> a, ReturnSlot &out)
+void getaddrinfo_entry(Attachment &c, Value function, std::span<const Value> a, ReturnSlot &out)
 {
     RootScope roots(c);
     auto error_type = capture(c, function, 0, roots);
@@ -449,7 +449,7 @@ void getaddrinfo_entry(Attachment &c, Handle function, std::span<const Value> a,
     }
     make_list(c, values, out);
 }
-void getnameinfo_entry(Attachment &c, Handle function, std::span<const Value> a, ReturnSlot &out)
+void getnameinfo_entry(Attachment &c, Value function, std::span<const Value> a, ReturnSlot &out)
 {
     RootScope roots(c);
     auto error_type = capture(c, function, 0, roots);
@@ -486,7 +486,7 @@ void getnameinfo_entry(Attachment &c, Handle function, std::span<const Value> a,
     const Value values[] = {h.value(), s.value()};
     make_tuple(c, values, out);
 }
-void gethostbyname_entry(Attachment &c, Handle function, std::span<const Value> a, ReturnSlot &out)
+void gethostbyname_entry(Attachment &c, Value function, std::span<const Value> a, ReturnSlot &out)
 {
     RootScope roots(c);
     auto error_type = capture(c, function, 0, roots);

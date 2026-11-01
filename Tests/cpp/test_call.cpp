@@ -3,6 +3,7 @@
 #include <gtest/gtest.h>
 
 #include <limits>
+#include <memory>
 
 namespace {
 using namespace cxxpython::core;
@@ -61,28 +62,28 @@ class CoreCalls : public testing::Test {
         context.collect();
         EXPECT_NO_THROW(validate_exception(context, out.result().exception()));
     }
-    static void return_first(Attachment &, Handle, std::span<const Value> args, ReturnSlot &out)
+    static void return_first(Attachment &, Value, std::span<const Value> args, ReturnSlot &out)
     {
         out.ok(args[0]);
     }
-    static void return_all(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+    static void return_all(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
     {
         cxxpython::core::make_tuple(c, args, out);
     }
-    static void captured(Attachment &c, Handle fn, std::span<const Value>, ReturnSlot &out)
+    static void captured(Attachment &c, Value fn, std::span<const Value>, ReturnSlot &out)
     {
         c.collect();
         out.ok(c.payload<NativeFunctionObject>(fn).captures[0]);
     }
-    static void attribute_error(Attachment &c, Handle, std::span<const Value>, ReturnSlot &out)
+    static void attribute_error(Attachment &c, Value, std::span<const Value>, ReturnSlot &out)
     {
         raise_error(c, CoreObject::AttributeErrorType, U"getter failed", out);
     }
-    static void type_error(Attachment &c, Handle, std::span<const Value>, ReturnSlot &out)
+    static void type_error(Attachment &c, Value, std::span<const Value>, ReturnSlot &out)
     {
         raise_error(c, CoreObject::TypeErrorType, U"getter failed", out);
     }
-    static void recurse(Attachment &c, Handle fn, std::span<const Value>, ReturnSlot &out)
+    static void recurse(Attachment &c, Value fn, std::span<const Value>, ReturnSlot &out)
     {
         RootScope scope(c);
         auto self = scope.root(c.payload<NativeFunctionObject>(fn).captures[0]);
@@ -154,7 +155,7 @@ TEST_F(CoreCalls, CompletePositionalNativeCallsRetainArgumentsThroughCollection)
             signature.parameters.push_back(
                 {U"arg" + std::u32string(i + 1, U'x'), Kind::PositionalOnly});
         auto fn = function(signature,
-                           [](Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out) {
+                           [](Attachment &c, Value, std::span<const Value> args, ReturnSlot &out) {
                                c.collect();
                                cxxpython::core::make_tuple(c, args, out);
                            });
@@ -293,6 +294,56 @@ TEST_F(CoreCalls, NativeMethodDescriptorsValidateBoundAndExplicitReceivers)
     std::array args{wrong.get(context)};
     call(context, descriptor, {args, {}}, out);
     expect_error(out, CoreObject::TypeErrorType);
+}
+
+TEST_F(CoreCalls, PublicNativeCallsKeepInputsAliveAfterCallerRootsAreReleased)
+{
+    static thread_local std::unique_ptr<RootScope> *input_roots = nullptr;
+    for (bool descriptor : {false, true}) {
+        auto cls = type("Owner");
+        auto name = text(U"method");
+        auto inputs = std::make_unique<RootScope>(context);
+        input_roots = &inputs;
+        ReturnSlot out(context);
+        context.allocate_instance<InstanceObject>(cls, out);
+        auto self = inputs->root(out.value());
+        make_str(context, U"captured result", out);
+        auto marker = inputs->root(out.value());
+        std::array captures{cls.get(context), name.get(context), marker.get(context)};
+        SignatureLayout signature;
+        signature.parameters = {{U"self", Kind::PositionalOnly}};
+        make_native_function(
+            context, "rooted native", signature,
+            [](Attachment &c, Value fn, std::span<const Value> args, ReturnSlot &result) {
+                RootScope local(c);
+                const auto &captures = c.payload<NativeFunctionObject>(fn).captures;
+                auto owner = local.root(captures[0]);
+                auto name = local.root(captures[1]);
+                input_roots->reset();
+                ReturnSlot mutation(c);
+                del_attribute(c, owner, name, mutation);
+                ASSERT_EQ(mutation.tag(), ResultTag::Ok);
+                c.collect();
+                const auto &function = c.payload<NativeFunctionObject>(fn);
+                EXPECT_EQ(function.name, "rooted native");
+                EXPECT_TRUE(c.has_layout<InstanceObject>(args[0]));
+                result.ok(function.captures[2]);
+            },
+            captures, out);
+        auto fn = inputs->root(out.value());
+        auto callable = fn;
+        if (descriptor) {
+            make_method_descriptor(context, cls, fn, out);
+            callable = inputs->root(out.value());
+        }
+        set_attribute(context, cls, name, callable, out);
+        ASSERT_EQ(out.tag(), ResultTag::Ok);
+        std::array args{self.get(context)};
+        call(context, callable, {args, {}}, out);
+        ASSERT_EQ(out.tag(), ResultTag::Ok);
+        EXPECT_EQ(context.payload<StrObject>(out.value()).value, U"captured result");
+        input_roots = nullptr;
+    }
 }
 
 TEST_F(CoreCalls, UserDescriptorUsesItsOwnTypeAndDataDescriptorWins)
@@ -521,13 +572,13 @@ TEST_F(CoreCalls, LayoutAloneDoesNotBypassAnIndependentTypesCallProtocol)
 
 TEST_F(CoreCalls, NativeHostFaultsAreNotDisguisedAsPythonExceptions)
 {
-    auto fn = function({}, [](Attachment &, Handle, std::span<const Value>, ReturnSlot &) {
+    auto fn = function({}, [](Attachment &, Value, std::span<const Value>, ReturnSlot &) {
         throw std::runtime_error("host fault");
     });
     ReturnSlot out(context);
     EXPECT_THROW(call(context, fn, {}, out), std::runtime_error);
     EXPECT_EQ(out.result().tag(), ResultTag::Empty);
-    auto missing = function({}, [](Attachment &, Handle, std::span<const Value>, ReturnSlot &) {});
+    auto missing = function({}, [](Attachment &, Value, std::span<const Value>, ReturnSlot &) {});
     EXPECT_THROW(call(context, missing, {}, out), std::logic_error);
 }
 

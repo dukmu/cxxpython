@@ -263,7 +263,7 @@ void validate_return(Attachment &context, ReturnSlot &out)
 }
 } // namespace detail
 namespace {
-void invoke_native(Attachment &context, Handle function, const NativeFunctionObject &native,
+void invoke_native(Attachment &context, Value function, const NativeFunctionObject &native,
                    CallArgsView args, std::optional<Value> receiver, ReturnSlot &out,
                    RootScope &roots)
 {
@@ -338,7 +338,7 @@ void invoke_method_descriptor(Attachment &context, Value callable, CallArgsView 
         method_descriptor_error(context, descriptor, self, out);
         return;
     }
-    auto function = roots.root(descriptor.function);
+    const auto function = descriptor.function;
     invoke_native(context, function, context.payload<NativeFunctionObject>(function), args,
                   receiver, out, roots);
 }
@@ -391,10 +391,10 @@ void invoke_special_impl(Attachment &context, Handle self, Handle target, CallAr
         if (native_call == NativeCallKind::MethodDescriptor)
             invoke_method_descriptor(context, descriptor, args, receiver, out, roots);
         else
-            invoke_native(context, target, context.payload<NativeFunctionObject>(descriptor), args,
-                          native_call == NativeCallKind::Descriptor ? std::optional{receiver}
-                                                                    : std::nullopt,
-                          out, roots);
+            invoke_native(
+                context, descriptor, context.payload<NativeFunctionObject>(descriptor), args,
+                native_call == NativeCallKind::Descriptor ? std::optional{receiver} : std::nullopt,
+                out, roots);
         return;
     }
     if (*type == context.builtin(CoreObject::FunctionType))
@@ -419,7 +419,7 @@ void invoke(Attachment &context, Handle target, CallArgsView args, std::optional
     Value callable = target.get(context);
     const auto type = context.type_of(callable);
     if (type == context.builtin(CoreObject::NativeFunctionType)) {
-        invoke_native(context, target, context.payload<NativeFunctionObject>(callable), args,
+        invoke_native(context, callable, context.payload<NativeFunctionObject>(callable), args,
                       receiver, out, roots);
         return;
     }
@@ -651,7 +651,7 @@ bool type_receiver(Attachment &context, Value value)
 }
 
 enum class AttributeOperation { Get, Set, Delete };
-void attribute_bridge(Attachment &context, Handle function, std::span<const Value> args,
+void attribute_bridge(Attachment &context, Value function, std::span<const Value> args,
                       AttributeOperation operation, ReturnSlot &out)
 {
     const auto owner = context.payload<NativeFunctionObject>(function).captures[0];
@@ -674,15 +674,15 @@ void attribute_bridge(Attachment &context, Handle function, std::span<const Valu
                                                                : roots.root(args[2]),
                        type_mode, out);
 }
-void attribute_get(Attachment &context, Handle fn, std::span<const Value> args, ReturnSlot &out)
+void attribute_get(Attachment &context, Value fn, std::span<const Value> args, ReturnSlot &out)
 {
     attribute_bridge(context, fn, args, AttributeOperation::Get, out);
 }
-void attribute_set(Attachment &context, Handle fn, std::span<const Value> args, ReturnSlot &out)
+void attribute_set(Attachment &context, Value fn, std::span<const Value> args, ReturnSlot &out)
 {
     attribute_bridge(context, fn, args, AttributeOperation::Set, out);
 }
-void attribute_del(Attachment &context, Handle fn, std::span<const Value> args, ReturnSlot &out)
+void attribute_del(Attachment &context, Value fn, std::span<const Value> args, ReturnSlot &out)
 {
     attribute_bridge(context, fn, args, AttributeOperation::Delete, out);
 }
@@ -712,7 +712,7 @@ void bind_native_callable(Attachment &context, Value callable, std::optional<Val
         roots.root(context.builtin(CoreObject::BoundMethodType)), out, callable, *receiver,
         context.type_of(callable) != context.builtin(CoreObject::FunctionType));
 }
-void function_get(Attachment &context, Handle wrapper, std::span<const Value> args, ReturnSlot &out)
+void function_get(Attachment &context, Value wrapper, std::span<const Value> args, ReturnSlot &out)
 {
     if (context.type_of(args[0]) != context.payload<NativeFunctionObject>(wrapper).captures[0]) {
         type_error(context, U"function descriptor requires a function", out);
@@ -722,7 +722,7 @@ void function_get(Attachment &context, Handle wrapper, std::span<const Value> ar
         context, args[0],
         args[1] == context.builtin(CoreObject::None) ? std::optional<Value>{} : args[1], out);
 }
-void method_get(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void method_get(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (context.type_of(args[0]) != context.builtin(CoreObject::MethodDescriptorType)) {
         type_error(context, U"method descriptor requires a descriptor", out);
@@ -732,7 +732,7 @@ void method_get(Attachment &context, Handle, std::span<const Value> args, Return
         context, args[0],
         args[1] == context.builtin(CoreObject::None) ? std::optional<Value>{} : args[1], out);
 }
-void method_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void method_new(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (args[0] != context.builtin(CoreObject::BoundMethodType)) {
         type_error(context, U"method.__new__ requires method type", out);
@@ -749,7 +749,7 @@ void method_new(Attachment &context, Handle, std::span<const Value> args, Return
     RootScope roots(context);
     context.allocate_instance<BoundMethodObject>(roots.root(args[0]), out, args[1], args[2]);
 }
-void call_bridge(Attachment &context, Handle function, std::span<const Value> args, ReturnSlot &out)
+void call_bridge(Attachment &context, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     auto owner = context.payload<NativeFunctionObject>(function).captures[0];
     if (!is_subtype(context, context.type_of(args[0]), owner)) {

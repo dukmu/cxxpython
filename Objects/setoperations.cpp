@@ -65,7 +65,7 @@ void set_update_impl(Attachment &ctx, Handle self, Handle iterable, ReturnSlot &
 
 enum class set_op_kind { Union, Intersection, Difference, Symmetric };
 
-bool set_op_receiver(Attachment &ctx, Handle function, Value self, bool mutable_only,
+bool set_op_receiver(Attachment &ctx, Value function, Value self, bool mutable_only,
                      ReturnSlot &out)
 {
     const auto expected = ctx.payload<NativeFunctionObject>(function).captures[0];
@@ -368,7 +368,7 @@ void set_op_result(Attachment &ctx, Handle self, std::span<const Value> sources,
 }
 
 template <set_op_kind Op, bool Update, bool Variadic>
-void set_op_method(Attachment &ctx, Handle function, std::span<const Value> args, ReturnSlot &out)
+void set_op_method(Attachment &ctx, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     if (!set_op_receiver(ctx, function, args[0], Update, out))
         return;
@@ -434,7 +434,7 @@ void set_op_method(Attachment &ctx, Handle function, std::span<const Value> args
 }
 
 template <set_op_kind Op, bool Inplace, bool Reverse>
-void set_op_operator(Attachment &ctx, Handle function, std::span<const Value> args, ReturnSlot &out)
+void set_op_operator(Attachment &ctx, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     if (!set_op_receiver(ctx, function, args[0], Inplace, out))
         return;
@@ -458,7 +458,7 @@ void set_op_operator(Attachment &ctx, Handle function, std::span<const Value> ar
 
 enum class set_op_relation { Subset, Superset, Disjoint };
 template <set_op_relation Relation>
-void set_op_relation_method(Attachment &ctx, Handle function, std::span<const Value> args,
+void set_op_relation_method(Attachment &ctx, Value function, std::span<const Value> args,
                             ReturnSlot &out)
 {
     if (!set_op_receiver(ctx, function, args[0], false, out))

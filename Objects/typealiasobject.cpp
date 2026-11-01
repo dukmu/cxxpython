@@ -25,7 +25,7 @@ std::optional<Value> parameters(Attachment &c, Value value)
     return value;
 }
 
-void alias_new(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void alias_new(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto type = roots.root(args[0]), name = roots.root(args[1]), value = roots.root(args[2]);
@@ -117,12 +117,12 @@ void alias_value(Attachment &c, Value value, ReturnSlot &out)
         c.load(self.get(c), alias.value, out);
 }
 
-void alias_repr(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void alias_repr(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     alias_name(c, args[0], out);
 }
 
-void alias_getitem(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void alias_getitem(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -137,7 +137,7 @@ void alias_getitem(Attachment &c, Handle, std::span<const Value> args, ReturnSlo
 }
 
 template <bool Reverse>
-void alias_union(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void alias_union(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     make_union(c, roots.root(args[Reverse ? 1 : 0]), roots.root(args[Reverse ? 0 : 1]), out);

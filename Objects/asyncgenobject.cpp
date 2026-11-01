@@ -282,13 +282,13 @@ void request_resume(Attachment &ctx, Value self_value, Value sent_value,
     }
 }
 
-void aiter(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void aiter(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (check_generator(ctx, args[0], out))
         out.ok(args[0]);
 }
 template <bool throwing, bool closing>
-void make_request(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void make_request(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check_generator(ctx, args[0], out))
         return;
@@ -301,26 +301,26 @@ void make_request(Attachment &ctx, Handle, std::span<const Value> args, ReturnSl
             ctx.builtin(throwing ? CoreObject::AsyncGenAThrowType : CoreObject::AsyncGenASendType)),
         out, gen.get(ctx), argument.get(ctx), throwing, closing);
 }
-void request_iter(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void request_iter(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (check_request(ctx, args[0], out))
         out.ok(args[0]);
 }
-void request_next(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void request_next(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     request_resume(ctx, args[0], ctx.builtin(CoreObject::None), {}, out);
 }
-void request_send(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void request_send(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     request_resume(ctx, args[0], args[1], {}, out);
 }
-void request_throw(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void request_throw(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     const auto tuple = roots.root(args[1]);
     request_resume(ctx, args[0], ctx.builtin(CoreObject::None), tuple, out);
 }
-void request_close(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void request_close(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check_request(ctx, args[0], out))
         return;

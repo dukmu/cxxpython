@@ -137,7 +137,7 @@ class CoreWith : public testing::Test {
             context.builtin(enter_error ? CoreObject::True : CoreObject::False)};
         make_native_function(
             context, "enter", enter,
-            [](Attachment &c, Handle fn, std::span<const Value>, ReturnSlot &out) {
+            [](Attachment &c, Value fn, std::span<const Value>, ReturnSlot &out) {
                 const auto &v = c.payload<NativeFunctionObject>(fn).captures;
                 record(c, v[0], v[1]);
                 c.collect();
@@ -155,7 +155,7 @@ class CoreWith : public testing::Test {
             saved.get(context), context.builtin(exit_error ? CoreObject::True : CoreObject::False)};
         make_native_function(
             context, "exit", exit,
-            [](Attachment &c, Handle fn, std::span<const Value> args, ReturnSlot &out) {
+            [](Attachment &c, Value fn, std::span<const Value> args, ReturnSlot &out) {
                 const auto &v = c.payload<NativeFunctionObject>(fn).captures;
                 cxxpython::core::make_tuple(c, args.subspan(1), out);
                 write_cell(c, v[3], out.result().value());
@@ -187,7 +187,7 @@ class CoreWith : public testing::Test {
                                               : context.builtin(CoreObject::None)};
         make_native_function(
             context, "with descriptor", get,
-            [](Attachment &c, Handle fn, std::span<const Value> args, ReturnSlot &out) {
+            [](Attachment &c, Value fn, std::span<const Value> args, ReturnSlot &out) {
                 const auto &v = c.payload<NativeFunctionObject>(fn).captures;
                 record(c, v[1], v[2]);
                 RootScope roots(c);
@@ -345,7 +345,7 @@ TEST_F(CoreWith, ReturnIgnoresExitTruthConversionAndReleasesItsCachedOperand)
     unary.parameters = {{U"self"}};
     make_native_function(
         context, "must not test truth", unary,
-        [](Attachment &c, Handle, std::span<const Value>, ReturnSlot &out) {
+        [](Attachment &c, Value, std::span<const Value>, ReturnSlot &out) {
             raise_error(c, CoreObject::ValueErrorType, U"unexpected truth", out);
         },
         {}, out);
@@ -404,7 +404,7 @@ TEST_F(CoreWith, BindingFailureInsideTheRegisteredBodyStillCallsExit)
     std::array captures{owner.instance.get(context)};
     make_native_function(
         context, "bind target", setter,
-        [](Attachment &c, Handle fn, std::span<const Value> args, ReturnSlot &out) {
+        [](Attachment &c, Value fn, std::span<const Value> args, ReturnSlot &out) {
             RootScope roots(c);
             make_str(c, U"__class__", out);
             auto name = roots.root(out.result().value());
@@ -480,7 +480,7 @@ TEST_F(CoreWith, ImplicitDescriptorLookupPrecedesEnterAndIgnoresInstanceAttribut
     hook.parameters = {{U"self"}, {U"name"}};
     make_native_function(
         context, "attribute hook", hook,
-        [](Attachment &c, Handle, std::span<const Value>, ReturnSlot &out) {
+        [](Attachment &c, Value, std::span<const Value>, ReturnSlot &out) {
             raise_error(c, CoreObject::RuntimeErrorType, U"must not use instance hook", out);
         },
         {}, out);
@@ -570,7 +570,7 @@ TEST_F(CoreWith, ExitBoundBeforeEnterRemainsRootedAfterEnterReplacesItsTypeAttri
     std::array captures{owner.type.get(context), changed.get(context)};
     make_native_function(
         context, "replace exit during enter", enter,
-        [](Attachment &c, Handle fn, std::span<const Value>, ReturnSlot &out) {
+        [](Attachment &c, Value fn, std::span<const Value>, ReturnSlot &out) {
             const auto &v = c.payload<NativeFunctionObject>(fn).captures;
             RootScope roots(c);
             make_str(c, U"__exit__", out);
@@ -652,7 +652,7 @@ TEST_F(CoreWith, SuppressionTruthCallbackSeesTheOriginalErrorAndRestoresOuterHan
     std::array captures{second.get(context)};
     make_native_function(
         context, "truth during exit", unary,
-        [](Attachment &c, Handle fn, std::span<const Value>, ReturnSlot &out) {
+        [](Attachment &c, Value fn, std::span<const Value>, ReturnSlot &out) {
             EXPECT_EQ(c.handled_exception(), c.payload<NativeFunctionObject>(fn).captures[0]);
             c.collect();
             out.ok(c.builtin(CoreObject::True));
@@ -697,7 +697,7 @@ TEST_F(CoreWith, AllocationFailureAfterEnterCanBeSuppressedByAnAllocationFreeExi
     enter.parameters = {{U"self"}};
     make_native_function(
         context, "arm OOM", enter,
-        [](Attachment &c, Handle, std::span<const Value>, ReturnSlot &out) {
+        [](Attachment &c, Value, std::span<const Value>, ReturnSlot &out) {
             c.set_allocation_limit(0);
             out.ok(c.builtin(CoreObject::None));
         },
@@ -708,7 +708,7 @@ TEST_F(CoreWith, AllocationFailureAfterEnterCanBeSuppressedByAnAllocationFreeExi
     std::array captures{exited.get(context)};
     make_native_function(
         context, "exit without allocation", exit,
-        [](Attachment &c, Handle fn, std::span<const Value> args, ReturnSlot &out) {
+        [](Attachment &c, Value fn, std::span<const Value> args, ReturnSlot &out) {
             EXPECT_EQ(args[2], c.builtin(CoreObject::MemoryError));
             EXPECT_EQ(c.handled_exception(), args[2]);
             write_cell(c, c.payload<NativeFunctionObject>(fn).captures[0],
@@ -722,7 +722,7 @@ TEST_F(CoreWith, AllocationFailureAfterEnterCanBeSuppressedByAnAllocationFreeExi
     auto self = roots.root(out.result().value());
     make_native_function(
         context, "allocate body value", {},
-        [](Attachment &c, Handle, std::span<const Value>, ReturnSlot &out) {
+        [](Attachment &c, Value, std::span<const Value>, ReturnSlot &out) {
             make_str(c, U"allocation fails", out);
         },
         {}, out);

@@ -47,7 +47,7 @@ bool input_bytes(Attachment &c, Handle source, std::string &data, ReturnSlot &ou
     return false;
 }
 
-void create(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void create(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     if (!c.has_layout<TypeObject>(args[0]) ||
@@ -66,7 +66,7 @@ void create(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
     c.allocate_instance<BytesIOObject>(roots.root(args[0]), out, owner.get(c), std::move(storage));
 }
 
-void initialize(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void initialize(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -98,7 +98,7 @@ void initialize(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &
 
 enum class ReadKind { Read, Line, Value };
 template <ReadKind kind>
-void read(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void read(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -154,7 +154,7 @@ void read(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
         make_bytes(c, std::move(data), out);
 }
 
-void write(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void write(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -221,7 +221,7 @@ void write(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
         make_int(c, static_cast<std::int64_t>(data.size()), out);
 }
 
-void readinto(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void readinto(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -261,7 +261,7 @@ void readinto(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &ou
     make_int(c, static_cast<std::int64_t>(data.size()), out);
 }
 
-void seek(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void seek(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -297,7 +297,7 @@ void seek(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
         make_int(c, position, out);
 }
 
-void tell(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void tell(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -314,7 +314,7 @@ void tell(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
         make_int(c, position, out);
 }
 
-void truncate(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void truncate(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -350,7 +350,7 @@ void truncate(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &ou
         make_int(c, size, out);
 }
 
-void close(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void close(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -378,7 +378,7 @@ void closed_get(Attachment &c, Value value, ReturnSlot &out)
     out.ok(c.builtin(closed ? CoreObject::True : CoreObject::False));
 }
 
-void capability(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void capability(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -391,7 +391,7 @@ void capability(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &
         out.ok(c.builtin(CoreObject::True));
 }
 
-void getbuffer(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void getbuffer(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;

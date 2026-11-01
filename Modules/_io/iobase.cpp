@@ -72,7 +72,7 @@ void closed_get(Attachment &c, Value value, ReturnSlot &out)
     out.ok(c.builtin(found ? CoreObject::True : CoreObject::False));
 }
 template <bool Close>
-void flush_close(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void flush_close(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;
@@ -101,7 +101,7 @@ void flush_close(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &ou
         }
     }
 }
-void finalize(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void finalize(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;
@@ -121,7 +121,7 @@ void finalize(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
                   changed);
     io_call(c, self, U"close", {}, out);
 }
-template <bool Enter> void context(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+template <bool Enter> void context(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;
@@ -133,13 +133,13 @@ template <bool Enter> void context(Attachment &c, Handle, std::span<const Value>
     } else
         io_call(c, self, U"close", {}, out);
 }
-void iterator(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void iterator(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     RootScope roots(c);
     if (!closed(c, roots.root(a[0]), out))
         out.ok(a[0]);
 }
-void next_line(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void next_line(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;
@@ -154,7 +154,7 @@ void next_line(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
         stop_iteration(c, out);
 }
 template <bool Tty>
-void false_method(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void false_method(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;
@@ -165,14 +165,14 @@ void false_method(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &o
     }
     out.ok(c.builtin(CoreObject::False));
 }
-void unsupported(Attachment &c, Handle function, std::span<const Value> a, ReturnSlot &out)
+void unsupported(Attachment &c, Value function, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;
     auto name = c.payload<NativeFunctionObject>(function).name;
     io_unsupported(c, std::u32string(name.begin(), name.end()), out);
 }
-void tell(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void tell(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;
@@ -180,14 +180,14 @@ void tell(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
     const Value values[] = {c.builtin(CoreObject::IntZero), c.builtin(CoreObject::IntOne)};
     io_call(c, roots.root(a[0]), U"seek", values, out);
 }
-void check_closed(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void check_closed(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     RootScope roots(c);
     if (!closed(c, roots.root(a[0]), out))
         out.ok(c.builtin(CoreObject::None));
 }
 template <bool Read>
-void check_mode(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void check_mode(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;
@@ -203,7 +203,7 @@ void check_mode(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out
     else
         out.ok(result.value());
 }
-void readlines(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void readlines(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;
@@ -253,7 +253,7 @@ void readlines(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
     }
     out.ok(list.get(c));
 }
-void writelines(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void writelines(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     RootScope roots(c);
     auto self = roots.root(a[0]);
@@ -280,7 +280,7 @@ void writelines(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out
     }
     out.ok(c.builtin(CoreObject::None));
 }
-void readline(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void readline(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;
@@ -309,12 +309,12 @@ void readline(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
     }
     make_bytes(c, std::move(result), out);
 }
-void raw_unimplemented(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+void raw_unimplemented(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (receiver(c, a[0], out))
         raise_error(c, CoreObject::NotImplementedErrorType, U"", out);
 }
-template <bool All> void raw_read(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
+template <bool All> void raw_read(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
 {
     if (!receiver(c, a[0], out))
         return;

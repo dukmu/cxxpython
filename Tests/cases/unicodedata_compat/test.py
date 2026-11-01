@@ -31,3 +31,12 @@ for call in (lambda: u.category(3), lambda: u.name('ab'),
     except Exception as exc:
         print(type(exc).__name__, ascii(str(exc)))
 print(ascii(u.lookup(b'LATIN CAPITAL LETTER A')))
+
+for operation in (lambda: type(old)(),
+                  lambda: setattr(type(old), '__new__', object.__new__)):
+    try:
+        operation()
+    except TypeError as exc:
+        print(type(exc).__name__)
+    else:
+        raise AssertionError('UCD construction and mutation must be rejected')

@@ -32,7 +32,7 @@ bool check_awaitable(Attachment &ctx, Value value, ReturnSlot &out)
     return false;
 }
 
-void awaitable_iter(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void awaitable_iter(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (check_awaitable(ctx, args[0], out))
         out.ok(args[0]);
@@ -48,7 +48,7 @@ struct ExecutionGuard {
 
 enum class Operation { Next, Send, Throw, Close };
 template <Operation operation>
-void awaitable_resume(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void awaitable_resume(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check_awaitable(ctx, args[0], out))
         return;
@@ -147,7 +147,7 @@ void async_next(Attachment &ctx, Handle iterator, bool for_loop, ReturnSlot &out
 } // namespace
 
 namespace detail {
-void builtin_aiter(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void builtin_aiter(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     async_iter(ctx, roots.root(args[0]), false, out);
@@ -183,7 +183,7 @@ void get_async_next(Attachment &ctx, Handle iterator, ReturnSlot &out)
         .suppress_context.store(true, std::memory_order_release);
 }
 
-void builtin_anext(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void builtin_anext(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     const auto iterator = roots.root(args[0]);

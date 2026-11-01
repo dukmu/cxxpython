@@ -34,7 +34,7 @@ void missing_key(Attachment &context, Handle key, ReturnSlot &out)
     if (!failed(out))
         out.raised(out.value());
 }
-void getitem(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void getitem(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!dictionary(context, args[0], out))
         return;
@@ -50,7 +50,7 @@ void getitem(Attachment &context, Handle, std::span<const Value> args, ReturnSlo
         }
     missing_key(context, key, out);
 }
-void proxy_getitem(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void proxy_getitem(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!proxy(context, args[0], out))
         return;
@@ -72,7 +72,7 @@ void proxy_forward(Attachment &context, std::span<const Value> args, const char3
     }
     call(context, roots.root(method.value()), {args.subspan(1)}, out);
 }
-void proxy_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void proxy_new(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     auto type = roots.root(args[0]), source = roots.root(args[1]);
@@ -93,7 +93,7 @@ void proxy_new(Attachment &context, Handle, std::span<const Value> args, ReturnS
     context.allocate_instance<MappingProxyObject>(type, out, source.get(context));
 }
 template <CompareOp op>
-void proxy_compare(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void proxy_compare(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!proxy(context, args[0], out))
         return;
@@ -104,7 +104,7 @@ void proxy_compare(Attachment &context, Handle, std::span<const Value> args, Ret
         right = roots.root(context.payload<MappingProxyObject>(right).mapping);
     detail::rich_compare_owned(context, left, right, op, out);
 }
-void setitem(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void setitem(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!dictionary(context, args[0], out))
         return;
@@ -112,7 +112,7 @@ void setitem(Attachment &context, Handle, std::span<const Value> args, ReturnSlo
     detail::dict_store_owned(context, roots.root(args[0]), roots.root(args[1]), roots.root(args[2]),
                              out);
 }
-void delitem(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void delitem(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!dictionary(context, args[0], out))
         return;
@@ -137,7 +137,7 @@ template <bool Proxy> bool receiver(Attachment &context, Value self, ReturnSlot 
     return dictionary(context, self, out);
 }
 template <bool Proxy>
-void get(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void get(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver<Proxy>(context, args[0], out))
         return;
@@ -151,7 +151,7 @@ void get(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &o
     if (out.tag() == ResultTag::Empty)
         out.ok(args[2]);
 }
-void setdefault(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void setdefault(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!dictionary(context, args[0], out))
         return;
@@ -159,7 +159,7 @@ void setdefault(Attachment &context, Handle, std::span<const Value> args, Return
     detail::dict_setdefault_owned(context, roots.root(args[0]), roots.root(args[1]),
                                   roots.root(args[2]), out);
 }
-void pop(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void pop(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!dictionary(context, args[0], out))
         return;
@@ -178,7 +178,7 @@ void pop(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &o
             out.ok(defaults[0]);
     }
 }
-void clear(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void clear(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!dictionary(context, args[0], out))
         return;
@@ -186,7 +186,7 @@ void clear(Attachment &context, Handle, std::span<const Value> args, ReturnSlot 
     dict_clear(context, roots.root(args[0]), out);
 }
 template <bool Proxy>
-void contains(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void contains(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver<Proxy>(context, args[0], out))
         return;
@@ -203,7 +203,7 @@ void contains(Attachment &context, Handle, std::span<const Value> args, ReturnSl
         out.ok(context.builtin(out.tag() == ResultTag::Ok ? CoreObject::True : CoreObject::False));
 }
 template <bool Proxy>
-void copy(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void copy(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver<Proxy>(context, args[0], out))
         return;
@@ -351,7 +351,7 @@ bool merge(Attachment &context, Handle self, Handle source, ReturnSlot &out, boo
             return false;
     }
 }
-void update(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void update(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!dictionary(context, args[0], out))
         return;
@@ -370,7 +370,7 @@ void update(Attachment &context, Handle, std::span<const Value> args, ReturnSlot
     out.ok(context.builtin(CoreObject::None));
 }
 template <bool Reflected>
-void union_with(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void union_with(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!dictionary(context, args[0], out))
         return;
@@ -391,7 +391,7 @@ void union_with(Attachment &context, Handle, std::span<const Value> args, Return
     if (merge(context, target, right, out))
         out.ok(target.get(context));
 }
-void inplace_union(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void inplace_union(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!dictionary(context, args[0], out))
         return;
@@ -400,7 +400,7 @@ void inplace_union(Attachment &context, Handle, std::span<const Value> args, Ret
     if (merge(context, self, roots.root(args[1]), out))
         out.ok(self.get(context));
 }
-void create(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void create(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!context.has_layout<TypeObject>(args[0]) ||
         !is_subtype(context, args[0], context.builtin(CoreObject::DictType))) {
@@ -412,7 +412,7 @@ void create(Attachment &context, Handle, std::span<const Value> args, ReturnSlot
     context.allocate_instance<DictObject>(roots.root(args[0]), out);
 }
 template <bool Proxy>
-void iterator(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void iterator(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver<Proxy>(context, args[0], out))
         return;
@@ -425,7 +425,7 @@ void iterator(Attachment &context, Handle, std::span<const Value> args, ReturnSl
                                DictViewKind::Keys, out);
 }
 template <DictViewKind Kind, bool Proxy>
-void view(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void view(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver<Proxy>(context, args[0], out))
         return;
@@ -444,7 +444,7 @@ void view(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &
                                                                   : CoreObject::DictItemsType));
     context.allocate_instance<DictViewObject>(type, out, mapping<Proxy>(context, args[0]), Kind);
 }
-void view_iterator(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void view_iterator(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!context.has_layout<DictViewObject>(args[0])) {
         raise_error(context, CoreObject::TypeErrorType, U"view iterator requires a dictionary view",
@@ -455,7 +455,7 @@ void view_iterator(Attachment &context, Handle, std::span<const Value> args, Ret
     const auto &view = context.payload<DictViewObject>(args[0]);
     detail::make_dict_iterator(context, roots.root(view.dictionary), view.kind, out);
 }
-void view_length(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void view_length(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!context.has_layout<DictViewObject>(args[0])) {
         raise_error(context, CoreObject::TypeErrorType, U"view length requires a dictionary view",
@@ -466,14 +466,14 @@ void view_length(Attachment &context, Handle, std::span<const Value> args, Retur
              detail::dictionary_size(context, context.payload<DictViewObject>(args[0]).dictionary),
              out);
 }
-void proxy_length(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void proxy_length(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!proxy(context, args[0], out))
         return;
     RootScope roots(context);
     length(context, roots.root(context.payload<MappingProxyObject>(args[0]).mapping), out);
 }
-void next(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void next(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!context.has_layout<DictIteratorObject>(args[0])) {
         raise_error(context, CoreObject::TypeErrorType,
@@ -483,7 +483,7 @@ void next(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &
     RootScope roots(context);
     detail::next_dict_item(context, roots.root(args[0]), out);
 }
-void self_iter(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void self_iter(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!context.has_layout<DictIteratorObject>(args[0])) {
         raise_error(context, CoreObject::TypeErrorType,
@@ -492,7 +492,7 @@ void self_iter(Attachment &context, Handle, std::span<const Value> args, ReturnS
     }
     out.ok(args[0]);
 }
-void equal(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void equal(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!dictionary(context, args[0], out))
         return;
@@ -538,7 +538,7 @@ void equal(Attachment &context, Handle, std::span<const Value> args, ReturnSlot 
 }
 // CPython 3.12.14 dict_fromkeys: subclass construction and writes stay ordinary
 // calls, so overridden constructors/setitem and their failures remain visible.
-void fromkeys(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void fromkeys(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     if (!context.has_layout<TypeObject>(args[0]) ||

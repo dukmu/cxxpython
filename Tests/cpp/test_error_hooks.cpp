@@ -14,7 +14,7 @@ namespace {
 using namespace cxxpython::core;
 using namespace cxxpython::core::detail;
 
-void allocation_failure(Attachment &, Handle, std::span<const Value>, ReturnSlot &)
+void allocation_failure(Attachment &, Value, std::span<const Value>, ReturnSlot &)
 {
     throw std::bad_alloc();
 }

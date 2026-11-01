@@ -109,7 +109,7 @@ bool number(Attachment &c, Value value, int &result, ReturnSlot &out, bool valid
     return true;
 }
 
-Handle state_of(Attachment &c, Handle function, RootScope &roots)
+Handle state_of(Attachment &c, Value function, RootScope &roots)
 {
     return roots.root(c.payload<NativeFunctionObject>(function).captures[0]);
 }
@@ -180,7 +180,7 @@ bool claim(Attachment &c, Handle owner, ReturnSlot &out)
     return true;
 }
 
-void default_interrupt(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void default_interrupt(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     int signal;
     if (!number(c, args[0], signal, out, false))
@@ -191,7 +191,7 @@ void default_interrupt(Attachment &c, Handle, std::span<const Value> args, Retur
         out.raised(out.value());
 }
 
-void get_handler(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+void get_handler(Attachment &c, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     int signal;
     if (!number(c, args[0], signal, out))
@@ -203,7 +203,7 @@ void get_handler(Attachment &c, Handle function, std::span<const Value> args, Re
         out.ok(c.builtin(CoreObject::None));
 }
 
-void set_handler(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+void set_handler(Attachment &c, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     int signal;
     if (!number(c, args[0], signal, out))
@@ -255,7 +255,7 @@ void set_handler(Attachment &c, Handle function, std::span<const Value> args, Re
         out.ok(previous.get(c));
 }
 
-void raise_signal(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void raise_signal(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     int signal;
     if (!number(c, args[0], signal, out, false))
@@ -268,7 +268,7 @@ void raise_signal(Attachment &c, Handle, std::span<const Value> args, ReturnSlot
         out.ok(c.builtin(CoreObject::None));
 }
 
-void valid_signals(Attachment &c, Handle, std::span<const Value>, ReturnSlot &out)
+void valid_signals(Attachment &c, Value, std::span<const Value>, ReturnSlot &out)
 {
     RootScope roots(c);
     sigset_t valid;

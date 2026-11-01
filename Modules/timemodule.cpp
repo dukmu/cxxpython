@@ -21,7 +21,7 @@ namespace {
 constexpr std::int64_t billion = 1000000000;
 
 template <clockid_t Clock, bool Nanoseconds>
-void clock_entry(Attachment &ctx, Handle, std::span<const Value>, ReturnSlot &out)
+void clock_entry(Attachment &ctx, Value, std::span<const Value>, ReturnSlot &out)
 {
     timespec value{};
     if (clock_gettime(Clock, &value) != 0) {
@@ -45,7 +45,7 @@ void clock_entry(Attachment &ctx, Handle, std::span<const Value>, ReturnSlot &ou
     }
 }
 
-void sleep_entry(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void sleep_entry(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     std::int64_t nanos;
@@ -84,7 +84,7 @@ void sleep_entry(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlo
     out.ok(ctx.builtin(CoreObject::None));
 }
 
-void clock_info(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void clock_info(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!ctx.has_layout<StrObject>(args[0])) {
         RootScope roots(ctx);

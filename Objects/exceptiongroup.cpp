@@ -90,7 +90,7 @@ template <std::size_t Index> void field(Attachment &ctx, Value self, ReturnSlot 
         raise_error(ctx, CoreObject::AttributeErrorType,
                     Index == exception_group_message_slot ? U"message" : U"exceptions", out);
 }
-void group_new(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void group_new(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto cls = roots.root(args[0]);
@@ -175,7 +175,7 @@ void group_new(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot 
     ctx.store(self.get(ctx), ctx.instance_slot(self.get(ctx), exception_group_exceptions_slot),
               children.get(ctx));
 }
-void group_init(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void group_init(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     const auto self = roots.root(args[0]);
@@ -193,7 +193,7 @@ void group_init(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot
     ctx.store(self.get(ctx), ctx.payload<ExceptionObject>(self).args, arguments.get(ctx));
     out.ok(ctx.builtin(CoreObject::None));
 }
-void group_str(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void group_str(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     const auto self = roots.root(args[0]);
@@ -219,7 +219,7 @@ void group_str(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot 
                  (count > 1 ? U" sub-exceptions)" : U" sub-exception)"),
              out);
 }
-void derive(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void derive(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     const auto self = roots.root(args[0]);
@@ -445,7 +445,7 @@ void create_group(Attachment &ctx, Handle children, ReturnSlot &out)
     call(ctx, roots.root(ctx.builtin(CoreObject::BaseExceptionGroupType)), {args}, out);
 }
 template <bool Rest>
-void split(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void split(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     const auto self = roots.root(args[0]), condition = roots.root(args[1]);
@@ -465,7 +465,7 @@ void split(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out
     } else
         out.ok(match.value());
 }
-void class_getitem(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void class_getitem(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     make_generic_alias(ctx, roots.root(args[0]), roots.root(args[1]), out);

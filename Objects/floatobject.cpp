@@ -238,7 +238,7 @@ bool detail::float_as_double(Attachment &context, Value input, double &number, R
 
 namespace {
 
-void float_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void float_new(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!context.has_layout<TypeObject>(args[0]) ||
         !is_subtype(context, args[0], context.builtin(CoreObject::FloatType))) {
@@ -330,14 +330,14 @@ void float_new(Attachment &context, Handle, std::span<const Value> args, ReturnS
     context.allocate_instance<FloatObject>(cls, out, number);
 }
 
-void float_bool(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void float_bool(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     const auto *value = require_float(context, args[0], out);
     if (value)
         out.ok(context.builtin(value->value != 0.0 ? CoreObject::True : CoreObject::False));
 }
 
-void integer_float(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void integer_float(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!is_int(context, args[0])) {
         type_error(context, U"int.__float__ requires an int", out);
@@ -348,7 +348,7 @@ void integer_float(Attachment &context, Handle, std::span<const Value> args, Ret
         make_float(context, number, out);
 }
 
-void float_identity(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void float_identity(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     const auto *value = require_float(context, args[0], out);
     if (!value)
@@ -358,7 +358,7 @@ void float_identity(Attachment &context, Handle, std::span<const Value> args, Re
     else
         make_float(context, value->value, out);
 }
-void float_getnewargs(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void float_getnewargs(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     const auto *value = require_float(context, args[0], out);
     if (!value)
@@ -372,13 +372,13 @@ void float_getnewargs(Attachment &context, Handle, std::span<const Value> args, 
     cxxpython::core::make_tuple(context, arguments, out);
 }
 
-void float_negative(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void float_negative(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     const auto *value = require_float(context, args[0], out);
     if (value)
         make_float(context, -value->value, out);
 }
-void float_absolute(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void float_absolute(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     const auto *value = require_float(context, args[0], out);
     if (value)
@@ -398,7 +398,7 @@ bool operand_double(Attachment &context, Value value, double &number, ReturnSlot
 }
 
 template <BinaryOp Op, bool Reflected>
-void float_arithmetic(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void float_arithmetic(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     const auto *self = require_float(context, args[0], out);
     if (!self)
@@ -487,8 +487,7 @@ void float_arithmetic(Attachment &context, Handle, std::span<const Value> args, 
 }
 
 template <bool Reflected>
-void float_divmod(Attachment &context, Handle function, std::span<const Value> args,
-                  ReturnSlot &out)
+void float_divmod(Attachment &context, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     ReturnSlot quotient(context), remainder(context);
     float_arithmetic<BinaryOp::FloorDivide, Reflected>(context, function, args, quotient);
@@ -526,7 +525,7 @@ void publish_integral_float(Attachment &context, double value, ReturnSlot &out)
     detail::publish_integer(context, detail::Integer(value), out);
 }
 
-void float_int(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void float_int(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     const auto *value = require_float(context, args[0], out);
     if (value)
@@ -534,7 +533,7 @@ void float_int(Attachment &context, Handle, std::span<const Value> args, ReturnS
 }
 
 template <bool Ceiling>
-void float_integral_round(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void float_integral_round(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     const auto *value = require_float(context, args[0], out);
     if (value)
@@ -542,7 +541,7 @@ void float_integral_round(Attachment &context, Handle, std::span<const Value> ar
                                Ceiling ? std::ceil(value->value) : std::floor(value->value), out);
 }
 
-void float_round(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void float_round(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     const auto *object = require_float(context, args[0], out);
     if (!object)
@@ -629,7 +628,7 @@ void float_round(Attachment &context, Handle, std::span<const Value> args, Retur
     make_float(context, std::copysign(result, value), out);
 }
 
-void float_repr(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void float_repr(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     const auto *value = require_float(context, args[0], out);
     if (!value)
@@ -675,7 +674,7 @@ void float_repr(Attachment &context, Handle, std::span<const Value> args, Return
     make_str(context, {text.begin(), text.end()}, out);
 }
 
-void float_hash(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void float_hash(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     const auto *value = require_float(context, args[0], out);
     if (!value)
@@ -716,7 +715,7 @@ void float_hash(Attachment &context, Handle, std::span<const Value> args, Return
 }
 
 template <CompareOp Op>
-void float_compare(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void float_compare(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     const auto *left = require_float(context, args[0], out);
     if (!left)

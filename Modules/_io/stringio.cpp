@@ -28,7 +28,7 @@ bool receiver(Attachment &c, Value value, ReturnSlot &out)
     raise_error(c, CoreObject::TypeErrorType, U"expected StringIO object", out);
     return false;
 }
-void create(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void create(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     if (!c.has_layout<TypeObject>(args[0]) ||
@@ -70,7 +70,7 @@ std::u32string translate(std::u32string_view input, int mode, unsigned &seen)
     return result;
 }
 
-void initialize(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void initialize(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -121,7 +121,7 @@ void initialize(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &
 
 enum class ReadKind { Read, Line, Value };
 template <ReadKind kind>
-void read(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void read(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -191,7 +191,7 @@ void read(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
         make_str(c, std::move(text), out);
 }
 
-void write(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void write(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -264,7 +264,7 @@ void write(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
         make_int(c, static_cast<std::int64_t>(input.size()), out);
 }
 
-void seek(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void seek(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -299,7 +299,7 @@ void seek(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
     else
         make_int(c, position, out);
 }
-void tell(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void tell(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -315,7 +315,7 @@ void tell(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
     else
         make_int(c, position, out);
 }
-void truncate(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void truncate(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -345,7 +345,7 @@ void truncate(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &ou
     else
         make_int(c, size, out);
 }
-void close(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void close(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;
@@ -401,7 +401,7 @@ void newlines_get(Attachment &c, Value value, ReturnSlot &out)
         cxxpython::core::make_tuple(c, items, out);
     }
 }
-void capability(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void capability(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(c, args[0], out))
         return;

@@ -189,7 +189,7 @@ bool nonblocking(int fd, bool enabled)
     return flags >= 0 &&
            ::fcntl(fd, F_SETFL, enabled ? flags | O_NONBLOCK : flags & ~O_NONBLOCK) == 0;
 }
-void create(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void create(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     if (!c.has_layout<TypeObject>(args[0]) ||
@@ -211,7 +211,7 @@ void create(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
     c.store(self.get(c), c.payload<SocketObject>(self).resource, state.value());
     out.ok(self.get(c));
 }
-void initialize(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+void initialize(Attachment &c, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto self = roots.root(args[0]);
@@ -305,7 +305,7 @@ template <int Field> void field(Attachment &c, Value self, ReturnSlot &out)
     auto &state = *c.payload<SocketResource>(owner.value()).state;
     make_int(c, Field == 0 ? state.family : Field == 1 ? state.kind : state.protocol, out);
 }
-void fileno(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void fileno(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     ReturnSlot owner(c);
     if (!resource(c, args[0], owner))
@@ -320,7 +320,7 @@ void fileno(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
     make_int(c, fd, out);
 }
 template <bool Detach>
-void close_socket(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void close_socket(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     ReturnSlot owner(c);
     if (!resource(c, args[0], owner))
@@ -345,7 +345,7 @@ void close_socket(Attachment &c, Handle, std::span<const Value> args, ReturnSlot
         out.ok(c.builtin(CoreObject::None));
 }
 template <bool Set, bool Blocking>
-void timeout_entry(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void timeout_entry(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     ReturnSlot owner(c);
@@ -461,7 +461,7 @@ bool perform(Attachment &c, int fd, short events, std::int64_t timeout,
     }
 }
 template <bool Bind, bool Ex = false>
-void address_operation(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+void address_operation(Attachment &c, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     ReturnSlot owner(c);
@@ -512,7 +512,7 @@ void address_operation(Attachment &c, Handle function, std::span<const Value> ar
         out.ok(c.builtin(CoreObject::None));
 }
 template <bool Peer>
-void get_address(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void get_address(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     ReturnSlot owner(c);
     if (!resource(c, args[0], owner))
@@ -538,7 +538,7 @@ void get_address(Attachment &c, Handle, std::span<const Value> args, ReturnSlot 
         socket_address_value(c, reinterpret_cast<sockaddr *>(&address.storage), address.size, out);
 }
 template <bool Shutdown>
-void simple_operation(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void simple_operation(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     int argument;
     if (!integer(c, args[1], argument, out))
@@ -563,7 +563,7 @@ void simple_operation(Attachment &c, Handle, std::span<const Value> args, Return
     else
         out.ok(c.builtin(CoreObject::None));
 }
-void accept_socket(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void accept_socket(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     ReturnSlot owner(c), address_value(c), fd_value(c);
@@ -599,7 +599,7 @@ void accept_socket(Attachment &c, Handle, std::span<const Value> args, ReturnSlo
         accepted.release();
 }
 template <bool Into, bool From>
-void receive(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void receive(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     std::int64_t size;
@@ -679,7 +679,7 @@ void receive(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out
         out.ok(received.value());
 }
 template <bool All, bool To = false>
-void send(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+void send(Attachment &c, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     std::string data;
@@ -745,7 +745,7 @@ void send(Attachment &c, Handle function, std::span<const Value> args, ReturnSlo
     } while (offset < data.size());
     out.ok(c.builtin(CoreObject::None));
 }
-template <bool Set> void option(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+template <bool Set> void option(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     int level, name;
@@ -835,7 +835,7 @@ template <bool Set> void option(Attachment &c, Handle, std::span<const Value> ar
     }
 }
 template <bool Set>
-void default_timeout(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+void default_timeout(Attachment &c, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     auto &state = c.payload<SocketDefaults>(c.payload<NativeFunctionObject>(function).captures[0]);
     if constexpr (Set) {
@@ -853,7 +853,7 @@ void default_timeout(Attachment &c, Handle function, std::span<const Value> args
     }
 }
 template <bool Close>
-void descriptor_operation(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void descriptor_operation(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     int fd;
     if (!integer(c, args[0], fd, out))
@@ -877,7 +877,7 @@ void descriptor_operation(Attachment &c, Handle, std::span<const Value> args, Re
             duplicate.release();
     }
 }
-void socket_pair(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+void socket_pair(Attachment &c, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     int family, kind, protocol;

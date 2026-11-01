@@ -27,7 +27,7 @@ std::u32string type_name(Attachment &ctx, Handle value)
     return ctx.payload<StrObject>(std::get<Value>(name)).value.substr(0, 100);
 }
 
-void error(Attachment &ctx, Handle function, std::u32string message, ReturnSlot &out)
+void error(Attachment &ctx, Value function, std::u32string message, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto type = roots.root(ctx.payload<NativeFunctionObject>(function).captures[0]);
@@ -112,7 +112,7 @@ int base64_digit(unsigned char c)
     return -1;
 }
 
-void a2b_uu(Attachment &ctx, Handle function, std::span<const Value> args, ReturnSlot &out)
+void a2b_uu(Attachment &ctx, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     std::string data, result;
@@ -155,7 +155,7 @@ void a2b_uu(Attachment &ctx, Handle function, std::span<const Value> args, Retur
     make_bytes(ctx, std::move(result), out);
 }
 
-void b2a_uu(Attachment &ctx, Handle function, std::span<const Value> args, ReturnSlot &out)
+void b2a_uu(Attachment &ctx, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto source = roots.root(args[0]), option = roots.root(args[1]);
@@ -184,7 +184,7 @@ void b2a_uu(Attachment &ctx, Handle function, std::span<const Value> args, Retur
     make_bytes(ctx, std::move(result), out);
 }
 
-void a2b_qp(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void a2b_qp(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto source = roots.root(args[0]), option = roots.root(args[1]);
@@ -222,7 +222,7 @@ void a2b_qp(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &ou
     make_bytes(ctx, std::move(result), out);
 }
 
-void b2a_qp(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void b2a_qp(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto source = roots.root(args[0]), quote_arg = roots.root(args[1]),
@@ -288,7 +288,7 @@ void b2a_qp(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &ou
     make_bytes(ctx, std::move(result), out);
 }
 
-void a2b_base64(Attachment &ctx, Handle function, std::span<const Value> args, ReturnSlot &out)
+void a2b_base64(Attachment &ctx, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto source = roots.root(args[0]);
@@ -364,7 +364,7 @@ void a2b_base64(Attachment &ctx, Handle function, std::span<const Value> args, R
     make_bytes(ctx, std::move(result), out);
 }
 
-void b2a_base64(Attachment &ctx, Handle function, std::span<const Value> args, ReturnSlot &out)
+void b2a_base64(Attachment &ctx, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto source = roots.root(args[0]);
@@ -393,7 +393,7 @@ void b2a_base64(Attachment &ctx, Handle function, std::span<const Value> args, R
     make_bytes(ctx, std::move(result), out);
 }
 
-void unhexlify(Attachment &ctx, Handle function, std::span<const Value> args, ReturnSlot &out)
+void unhexlify(Attachment &ctx, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     std::string data, result;
@@ -431,7 +431,7 @@ bool integer(Attachment &ctx, Handle arg, std::int64_t &value, ReturnSlot &out)
     return true;
 }
 
-void hexlify(Attachment &ctx, Handle function, std::span<const Value> args, ReturnSlot &out)
+void hexlify(Attachment &ctx, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto source = roots.root(args[0]), sep = roots.root(args[1]), group = roots.root(args[2]);
@@ -488,7 +488,7 @@ void hexlify(Attachment &ctx, Handle function, std::span<const Value> args, Retu
     make_bytes(ctx, std::move(result), out);
 }
 
-template <bool Hqx> void crc(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+template <bool Hqx> void crc(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto source = roots.root(args[0]), seed = roots.root(args[1]);

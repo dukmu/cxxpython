@@ -93,7 +93,7 @@ void check_bound(Attachment &c, Value bound, ReturnSlot &out)
 }
 
 template <bool ParamSpec>
-void parameter_new(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void parameter_new(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     const auto id = ParamSpec ? CoreObject::ParamSpecType : CoreObject::TypeVarType;
     if (args[0] != c.builtin(id) || !valid_name(c, args[1], out)) {
@@ -139,7 +139,7 @@ void parameter_new(Attachment &c, Handle, std::span<const Value> args, ReturnSlo
     parameter_module(c, roots.root(out.value()), out);
 }
 
-void tuple_new(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void tuple_new(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (args[0] != c.builtin(CoreObject::TypeVarTupleType)) {
         raise_error(c, CoreObject::TypeErrorType, U"invalid TypeVarTuple class", out);
@@ -189,7 +189,7 @@ template <bool Keywords> void paramspec_view(Attachment &c, Value self, ReturnSl
     detail::make_paramspec_attribute(c, roots.root(self), Keywords, out);
 }
 template <class T>
-void parameter_repr(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void parameter_repr(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     const auto &object = c.payload<T>(args[0]);
     if constexpr (std::is_same_v<T, TypeVarTupleObject>)
@@ -205,16 +205,16 @@ void parameter_repr(Attachment &c, Handle, std::span<const Value> args, ReturnSl
                  out);
 }
 template <class T>
-void parameter_reduce(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void parameter_reduce(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     parameter_name<T>(c, args[0], out);
 }
-void reject_base(Attachment &c, Handle, std::span<const Value>, ReturnSlot &out)
+void reject_base(Attachment &c, Value, std::span<const Value>, ReturnSlot &out)
 {
     raise_error(c, CoreObject::TypeErrorType, U"Cannot subclass a type parameter instance", out);
 }
 template <bool ParamSpec, bool Prepare = false>
-void substitute(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void substitute(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     typing_call(c,
                 Prepare     ? U"_paramspec_prepare_subst"
@@ -222,17 +222,17 @@ void substitute(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &
                             : U"_typevar_subst",
                 {args, {}}, out);
 }
-void tuple_substitute(Attachment &c, Handle, std::span<const Value>, ReturnSlot &out)
+void tuple_substitute(Attachment &c, Value, std::span<const Value>, ReturnSlot &out)
 {
     raise_error(c, CoreObject::TypeErrorType, U"Substitution of bare TypeVarTuple is not supported",
                 out);
 }
-void tuple_prepare(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void tuple_prepare(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     typing_call(c, U"_typevartuple_prepare_subst", {args, {}}, out);
 }
 template <bool Reverse>
-void parameter_union(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void parameter_union(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     const std::array values{args[Reverse ? 1 : 0], args[Reverse ? 0 : 1]};
     typing_call(c, U"_make_union", {values, {}}, out);
@@ -251,7 +251,7 @@ void unpack(Attachment &c, Handle self, ReturnSlot &out)
     if (out.tag() == ResultTag::Ok)
         get_item(c, roots.root(out.value()), self, out);
 }
-void tuple_iter(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void tuple_iter(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     unpack(c, roots.root(args[0]), out);
@@ -262,7 +262,7 @@ void tuple_iter(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &
     get_iter(c, roots.root(out.value()), out);
 }
 template <bool Initialize>
-void generic_policy(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void generic_policy(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     std::vector<Value> values{args[0]};

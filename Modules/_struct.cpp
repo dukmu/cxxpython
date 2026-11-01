@@ -177,7 +177,7 @@ bool compile_format(Attachment &ctx, Value value, Format &format, ReturnSlot &ou
     return true;
 }
 
-void calcsize(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void calcsize(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     Format format;
     if (compile_format(ctx, args[0], format, out))
@@ -308,7 +308,7 @@ bool pack_values(Attachment &ctx, const Format &format, std::span<const Value> a
     return true;
 }
 
-void pack(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void pack(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     Format format;
     if (!compile_format(ctx, args[0], format, out))
@@ -379,7 +379,7 @@ void unpack_values(Attachment &ctx, const Format &format, std::string_view bytes
     cxxpython::core::make_tuple(ctx, std::span<const Value>(values), out);
 }
 
-void unpack(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void unpack(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     Format format;
     if (!compile_format(ctx, args[0], format, out))
@@ -400,7 +400,7 @@ Format object_format(const StructObject &object)
     return {object.format, object.fields, object.size, object.count, object.little_endian};
 }
 
-void struct_new(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void struct_new(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto type = roots.root(args[0]);
@@ -428,7 +428,7 @@ void struct_format(Attachment &ctx, Value self, ReturnSlot &out)
     make_str(ctx, std::u32string(format.begin(), format.end()), out);
 }
 
-void struct_pack(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void struct_pack(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     auto format = object_format(ctx.payload<StructObject>(args[0]));
     std::string bytes;
@@ -436,7 +436,7 @@ void struct_pack(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlo
         make_bytes(ctx, std::move(bytes), out);
 }
 
-void struct_unpack(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void struct_unpack(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     auto format = object_format(ctx.payload<StructObject>(args[0]));
     RootScope roots(ctx);
@@ -493,14 +493,14 @@ void unpack_from_impl(Attachment &ctx, const Format &format, Value buffer, Value
         unpack_values(ctx, format, std::string_view(bytes).substr(offset, format.size), out);
 }
 
-void unpack_from(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void unpack_from(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     Format format;
     if (compile_format(ctx, args[0], format, out))
         unpack_from_impl(ctx, format, args[1], args[2], out);
 }
 
-void struct_unpack_from(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void struct_unpack_from(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     unpack_from_impl(ctx, object_format(ctx.payload<StructObject>(args[0])), args[1], args[2], out);
 }
@@ -545,14 +545,14 @@ void pack_into_impl(Attachment &ctx, const Format &format, Value buffer, Value o
     out.ok(ctx.builtin(CoreObject::None));
 }
 
-void pack_into(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void pack_into(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     Format format;
     if (compile_format(ctx, args[0], format, out))
         pack_into_impl(ctx, format, args[1], args[2], ctx.payload<TupleObject>(args[3]).items, out);
 }
 
-void struct_pack_into(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void struct_pack_into(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     pack_into_impl(ctx, object_format(ctx.payload<StructObject>(args[0])), args[1], args[2],
                    ctx.payload<TupleObject>(args[3]).items, out);
@@ -591,7 +591,7 @@ void iter_unpack_impl(Attachment &ctx, Handle compiled, Handle buffer, ReturnSlo
         buffer.get(ctx), std::move(exported));
 }
 
-void iter_unpack(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void iter_unpack(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     Format format;
@@ -605,18 +605,18 @@ void iter_unpack(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlo
     iter_unpack_impl(ctx, roots.root(compiled.value()), buffer, out);
 }
 
-void struct_iter_unpack(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void struct_iter_unpack(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     iter_unpack_impl(ctx, roots.root(args[0]), roots.root(args[1]), out);
 }
 
-void iterator_self(Attachment &, Handle, std::span<const Value> args, ReturnSlot &out)
+void iterator_self(Attachment &, Value, std::span<const Value> args, ReturnSlot &out)
 {
     out.ok(args[0]);
 }
 
-void iterator_next(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void iterator_next(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto self = roots.root(args[0]);
@@ -661,7 +661,7 @@ void iterator_next(Attachment &ctx, Handle, std::span<const Value> args, ReturnS
     unpack_values(ctx, format, bytes, out);
 }
 
-void clearcache(Attachment &ctx, Handle, std::span<const Value>, ReturnSlot &out)
+void clearcache(Attachment &ctx, Value, std::span<const Value>, ReturnSlot &out)
 {
     out.ok(ctx.builtin(CoreObject::None));
 }

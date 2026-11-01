@@ -185,7 +185,7 @@ std::shared_ptr<const ModuleDefinition> find_definition(Attachment &context,
     return found == state.definitions.end() ? nullptr : found->second;
 }
 
-void builtin_import(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void builtin_import(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     import_name(context, roots.root(args[0]), roots.root(args[1]), roots.root(args[3]),
@@ -204,7 +204,7 @@ void import_error_set(Attachment &context, Value error, std::optional<Value> val
     context.store(error, context.instance_slot(error, Index), value);
     out.ok(context.builtin(CoreObject::None));
 }
-void import_error_str(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void import_error_str(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     const auto self = roots.root(args[0]);

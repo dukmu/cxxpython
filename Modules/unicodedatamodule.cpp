@@ -156,7 +156,7 @@ struct NamedSequence {
 #include "internal/unicodedata_sequences.hpp"
 
 template <Property P, bool Old = false>
-void property(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void property(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     constexpr std::size_t offset = Old ? 1 : 0;
@@ -429,7 +429,7 @@ std::u32string normalized(std::u32string_view input, bool compatibility, bool co
 }
 
 template <bool Check, bool Old = false>
-void normalize(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void normalize(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     constexpr std::size_t offset = Old ? 1 : 0;
@@ -469,7 +469,7 @@ void normalize(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &o
 }
 
 template <bool Old = false>
-void lookup(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void lookup(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto input = roots.root(args[Old ? 1 : 0]);
@@ -605,7 +605,7 @@ struct UCD {
     void trace(Tracer &) const noexcept {}
 };
 
-void ucd_new(Attachment &c, Handle, std::span<const Value>, ReturnSlot &out)
+void ucd_new(Attachment &c, Value, std::span<const Value>, ReturnSlot &out)
 {
     raise_error(c, CoreObject::TypeErrorType, U"cannot create 'unicodedata.UCD' instances", out);
 }
@@ -681,9 +681,7 @@ void initialize_unicodedata(Attachment &c, Handle module, ReturnSlot &out)
         out.raised(wrapper_key.exception());
         return;
     }
-    dict_store(c, type_dict, roots.root(wrapper_key.value()), rooted_wrapper, out);
-    if (failed(out))
-        return;
+    name_store(c, type_dict.get(c), wrapper_key.value(), rooted_wrapper.get(c));
     install_native_field(c, core, type, U"unidata_version", ucd_version, nullptr);
     for (const auto &entry : entries) {
         SignatureLayout sig;

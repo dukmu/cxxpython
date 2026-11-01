@@ -225,7 +225,7 @@ template <class T> bool check_self(Attachment &ctx, Value value, ReturnSlot &out
 }
 
 template <class T>
-void iterator_self(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void iterator_self(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (check_self<T>(ctx, args[0], out))
         out.ok(args[0]);
@@ -253,15 +253,15 @@ void chain_make(Attachment &ctx, Value cls, Value iterable, ReturnSlot &out)
     }
     ctx.allocate_instance<Chain>(type, out, input.value());
 }
-void chain_new(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void chain_new(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     chain_make(ctx, args[0], args[1], out);
 }
-void chain_from(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void chain_from(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     chain_make(ctx, args[0], args[1], out);
 }
-void chain_next(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void chain_next(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check_self<Chain>(ctx, args[0], out))
         return;
@@ -312,7 +312,7 @@ void chain_next(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot
     }
 }
 
-void repeat_new(Attachment &ctx, Handle function, std::span<const Value> args, ReturnSlot &out)
+void repeat_new(Attachment &ctx, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check_class<Repeat>(ctx, args[0], out))
         return;
@@ -338,7 +338,7 @@ void repeat_new(Attachment &ctx, Handle function, std::span<const Value> args, R
     }
     ctx.allocate_instance<Repeat>(type, out, element.get(ctx), count);
 }
-void repeat_next(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void repeat_next(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check_self<Repeat>(ctx, args[0], out))
         return;
@@ -356,7 +356,7 @@ void repeat_next(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlo
         --state.remaining;
     out.ok(state.element);
 }
-void repeat_hint(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void repeat_hint(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check_self<Repeat>(ctx, args[0], out))
         return;
@@ -380,7 +380,7 @@ bool slice_index(Attachment &ctx, Value value, std::int64_t &number)
     index(ctx, roots.root(value), converted);
     return !failed(converted) && int_fits_signed(ctx, converted.value(), number);
 }
-void islice_new(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void islice_new(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check_class<Islice>(ctx, args[0], out))
         return;
@@ -422,7 +422,7 @@ void islice_new(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot
     }
     ctx.allocate_instance<Islice>(type, out, input.value(), start, stop, step);
 }
-void islice_next(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void islice_next(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check_self<Islice>(ctx, args[0], out))
         return;
@@ -474,7 +474,7 @@ void islice_next(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlo
     out.ok(item.value());
 }
 
-void starmap_new(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void starmap_new(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check_class<Starmap>(ctx, args[0], out))
         return;
@@ -489,7 +489,7 @@ void starmap_new(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlo
     }
     ctx.allocate_instance<Starmap>(type, out, input.value(), callable.get(ctx));
 }
-void starmap_next(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void starmap_next(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check_self<Starmap>(ctx, args[0], out))
         return;
@@ -519,7 +519,7 @@ void starmap_next(Attachment &ctx, Handle, std::span<const Value> args, ReturnSl
 }
 
 template <PredicateMode Mode>
-void predicate_new(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void predicate_new(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     using State = PredicateIterator<Mode>;
     if (!check_class<State>(ctx, args[0], out))
@@ -536,7 +536,7 @@ void predicate_new(Attachment &ctx, Handle, std::span<const Value> args, ReturnS
     ctx.allocate_instance<State>(type, out, input.value(), predicate.get(ctx));
 }
 template <PredicateMode Mode>
-void predicate_next(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void predicate_next(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     using State = PredicateIterator<Mode>;
     if (!check_self<State>(ctx, args[0], out))
@@ -615,7 +615,7 @@ void predicate_next(Attachment &ctx, Handle, std::span<const Value> args, Return
         }
     }
 }
-void compress_new(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void compress_new(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check_class<Compress>(ctx, args[0], out))
         return;
@@ -634,7 +634,7 @@ void compress_new(Attachment &ctx, Handle, std::span<const Value> args, ReturnSl
     }
     ctx.allocate_instance<Compress>(type, out, data.value(), selectors.value());
 }
-void compress_next(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void compress_next(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check_self<Compress>(ctx, args[0], out))
         return;
@@ -671,7 +671,7 @@ void compress_next(Attachment &ctx, Handle, std::span<const Value> args, ReturnS
         }
     }
 }
-void accumulate_new(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void accumulate_new(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check_class<Accumulate>(ctx, args[0], out))
         return;
@@ -688,7 +688,7 @@ void accumulate_new(Attachment &ctx, Handle, std::span<const Value> args, Return
         initial = first.get(ctx);
     ctx.allocate_instance<Accumulate>(type, out, input.value(), function.get(ctx), initial);
 }
-void accumulate_next(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void accumulate_next(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check_self<Accumulate>(ctx, args[0], out))
         return;
@@ -733,7 +733,7 @@ void accumulate_next(Attachment &ctx, Handle, std::span<const Value> args, Retur
     ctx.store(self.get(ctx), state.total, result.value());
     out.ok(result.value());
 }
-void batched_new(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void batched_new(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check_class<Batched>(ctx, args[0], out))
         return;
@@ -762,7 +762,7 @@ void batched_new(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlo
     }
     ctx.allocate_instance<Batched>(type, out, input.value(), count);
 }
-void batched_next(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void batched_next(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check_self<Batched>(ctx, args[0], out))
         return;
@@ -804,7 +804,7 @@ void batched_next(Attachment &ctx, Handle, std::span<const Value> args, ReturnSl
     }
     cxxpython::core::make_tuple(ctx, values, out);
 }
-void cycle_new(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void cycle_new(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check_class<Cycle>(ctx, args[0], out))
         return;
@@ -823,7 +823,7 @@ void cycle_new(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot 
     }
     ctx.allocate_instance<Cycle>(type, out, input.value(), cache.value());
 }
-void cycle_next(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void cycle_next(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check_self<Cycle>(ctx, args[0], out))
         return;
@@ -875,7 +875,7 @@ bool numeric(Attachment &ctx, Value value)
            type_attribute(ctx, type.get(ctx), U"__int__").has_value() ||
            type_attribute(ctx, type.get(ctx), U"__float__").has_value();
 }
-void count_new(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void count_new(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check_class<Count>(ctx, args[0], out))
         return;
@@ -893,7 +893,7 @@ void count_new(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot 
                 int_fits_signed(ctx, step.get(ctx), stride) && stride == 1;
     ctx.allocate_instance<Count>(type, out, start.get(ctx), step.get(ctx), number, fast);
 }
-void count_next(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void count_next(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check_self<Count>(ctx, args[0], out))
         return;
@@ -930,7 +930,7 @@ void count_next(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot
     out.ok(current.value());
 }
 
-void pairwise_new(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void pairwise_new(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!ctx.has_layout<TypeObject>(args[0]) ||
         ctx.payload<TypeObject>(args[0]).instance_layout.native_family !=
@@ -958,13 +958,13 @@ bool receiver(Attachment &ctx, Value value, ReturnSlot &out)
     return false;
 }
 
-void pairwise_iter(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void pairwise_iter(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (receiver(ctx, args[0], out))
         out.ok(args[0]);
 }
 
-void pairwise_next(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void pairwise_next(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(ctx, args[0], out))
         return;
@@ -1016,7 +1016,7 @@ void pairwise_next(Attachment &ctx, Handle, std::span<const Value> args, ReturnS
 }
 
 // The module namespace retains this function and its type capture on reload.
-void state_anchor(Attachment &ctx, Handle, std::span<const Value>, ReturnSlot &out)
+void state_anchor(Attachment &ctx, Value, std::span<const Value>, ReturnSlot &out)
 {
     out.ok(ctx.builtin(CoreObject::None));
 }

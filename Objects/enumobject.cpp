@@ -40,7 +40,7 @@ void not_reversible(Attachment &context, Handle type, ReturnSlot &out)
     raise_error(context, CoreObject::TypeErrorType, U"'" + text + U"' object is not reversible",
                 out);
 }
-void reversed_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void reversed_new(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     const auto cls = roots.root(args[0]), sequence = roots.root(args[1]);
@@ -85,7 +85,7 @@ void reversed_new(Attachment &context, Handle, std::span<const Value> args, Retu
         context.payload<SequenceIteratorObject>(out.value())
             .index.store(static_cast<std::size_t>(count), std::memory_order_relaxed);
 }
-void list_reversed(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void list_reversed(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!context.has_layout<ListObject>(args[0]) ||
         !is_subtype(context, context.type_of(args[0]), context.builtin(CoreObject::ListType))) {
@@ -103,13 +103,13 @@ void list_reversed(Attachment &context, Handle, std::span<const Value> args, Ret
             .index.store(count, std::memory_order_relaxed);
 }
 template <CoreObject Type>
-void iter(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void iter(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (iterator_receiver(context, args[0], Type, out))
         out.ok(args[0]);
 }
 template <CoreObject Type>
-void next(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void next(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!iterator_receiver(context, args[0], Type, out))
         return;
@@ -164,7 +164,7 @@ void next(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &
     }
 }
 template <CoreObject Type>
-void reverse_hint(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void reverse_hint(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!iterator_receiver(context, args[0], Type, out))
         return;
@@ -201,7 +201,7 @@ bool check_type(Attachment &context, Value value, CoreObject type, ReturnSlot &o
     raise_error(context, CoreObject::TypeErrorType, U"invalid iterator type", out);
     return false;
 }
-void enumerate_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void enumerate_new(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check_type(context, args[0], CoreObject::EnumerateType, out))
         return;
@@ -221,7 +221,7 @@ void enumerate_new(Attachment &context, Handle, std::span<const Value> args, Ret
     }
     context.allocate_instance<EnumObject>(cls, out, iterator.value(), initial.get(context));
 }
-void enumerate_next(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void enumerate_next(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!context.has_layout<EnumObject>(args[0]) ||
         !is_subtype(context, context.type_of(args[0]),
@@ -262,7 +262,7 @@ void enumerate_next(Attachment &context, Handle, std::span<const Value> args, Re
     }
 }
 template <CoreObject Type>
-void multi_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void multi_new(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check_type(context, args[0], Type, out))
         return;
@@ -320,7 +320,7 @@ void zip_mismatch(Attachment &context, std::size_t index, bool longer, ReturnSlo
                 out);
 }
 template <CoreObject Type>
-void multi_next(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void multi_next(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!context.has_layout<MultiIteratorObject>(args[0]) ||
         !is_subtype(context, context.type_of(args[0]), context.builtin(Type))) {
@@ -373,7 +373,7 @@ void multi_next(Attachment &context, Handle, std::span<const Value> args, Return
         call(context, roots.root(*state.callable), {values, {}}, out);
 }
 template <CoreObject Type, class Layout>
-void other_iter(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void other_iter(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!context.has_layout<Layout>(args[0]) ||
         !is_subtype(context, context.type_of(args[0]), context.builtin(Type))) {
@@ -387,7 +387,7 @@ void other_iter(Attachment &context, Handle, std::span<const Value> args, Return
 // CPython 3.12.14 Python/bltinmodule.c filter_new/filter_next/filter_reduce.
 // One child and predicate use MultiIteratorObject's immutable traced edges.
 // Child protocols own cursor synchronization; no filter lock spans callbacks.
-void filter_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void filter_new(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check_type(context, args[0], CoreObject::FilterType, out))
         return;
@@ -427,7 +427,7 @@ void filter_new(Attachment &context, Handle, std::span<const Value> args, Return
     context.allocate_instance<MultiIteratorObject>(cls, out, std::vector<Value>{iterator.value()},
                                                    predicate.get(context), false);
 }
-void filter_next(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void filter_next(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!context.has_layout<MultiIteratorObject>(args[0]) ||
         !is_subtype(context, context.type_of(args[0]), context.builtin(CoreObject::FilterType))) {
@@ -473,7 +473,7 @@ void filter_next(Attachment &context, Handle, std::span<const Value> args, Retur
         context.poll();
     }
 }
-void filter_reduce(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void filter_reduce(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!context.has_layout<MultiIteratorObject>(args[0]) ||
         !is_subtype(context, context.type_of(args[0]), context.builtin(CoreObject::FilterType))) {

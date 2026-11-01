@@ -16,7 +16,7 @@ bool slice_receiver(Attachment &context, Value value, ReturnSlot &out)
     raise_error(context, CoreObject::TypeErrorType, U"slice descriptor requires a slice", out);
     return false;
 }
-void slice_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void slice_new(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     const auto &values = context.payload<TupleObject>(args[1]).items;
     if (args[0] != context.builtin(CoreObject::SliceType) || values.empty() || values.size() > 3) {
@@ -37,7 +37,7 @@ void slice_field(Attachment &context, Value self, ReturnSlot &out)
     if (slice_receiver(context, self, out))
         out.ok(context.payload<SliceObject>(self).*Field);
 }
-void slice_repr(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void slice_repr(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!slice_receiver(context, args[0], out))
         return;
@@ -59,7 +59,7 @@ void slice_repr(Attachment &context, Handle, std::span<const Value> args, Return
     }
     make_str(context, text + U")", out);
 }
-void slice_reduce(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void slice_reduce(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!slice_receiver(context, args[0], out))
         return;
@@ -73,7 +73,7 @@ void slice_reduce(Attachment &context, Handle, std::span<const Value> args, Retu
     cxxpython::core::make_tuple(context, result, out);
 }
 template <CompareOp Op>
-void slice_compare(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void slice_compare(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!slice_receiver(context, args[0], out))
         return;
@@ -96,12 +96,12 @@ void slice_compare(Attachment &context, Handle, std::span<const Value> args, Ret
     cxxpython::core::make_tuple(context, bv, second);
     rich_compare(context, roots.root(first.value()), roots.root(second.value()), Op, out);
 }
-void slice_indices_method(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void slice_indices_method(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     detail::slice_indices(context, roots.root(args[0]), roots.root(args[1]), out);
 }
-void slice_hash(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void slice_hash(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!slice_receiver(context, args[0], out))
         return;

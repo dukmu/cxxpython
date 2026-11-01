@@ -237,7 +237,7 @@ TEST(ParallelGenerators, RunningResumesRejectInsteadOfWaitingForTheFunctionBody)
     const Value captures[] = {gate.get(owner)};
     make_native_function(
         owner, "block_generator", {},
-        [](Attachment &context, Handle function, std::span<const Value>, ReturnSlot &out) {
+        [](Attachment &context, Value function, std::span<const Value>, ReturnSlot &out) {
             const auto &data = context.payload<ResumeGate>(
                 context.payload<NativeFunctionObject>(function).captures[0]);
             data.entered->count_down();

@@ -107,7 +107,7 @@ struct TupleBuilder {
     }
 };
 
-void metadata(Attachment &c, Handle, std::span<const Value>, ReturnSlot &out)
+void metadata(Attachment &c, Value, std::span<const Value>, ReturnSlot &out)
 {
     RootScope roots(c);
     std::vector<Handle> rows;
@@ -128,7 +128,7 @@ void metadata(Attachment &c, Handle, std::span<const Value>, ReturnSlot &out)
     make_tuple(c, std::span<const Value>(values), out);
 }
 
-void code_info(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void code_info(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto code = roots.root(args[0]);
@@ -159,7 +159,7 @@ void code_info(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &o
     result.finish(out);
 }
 
-void local_names(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void local_names(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto code = roots.root(args[0]);
@@ -176,7 +176,7 @@ void local_names(Attachment &c, Handle, std::span<const Value> args, ReturnSlot 
     make_tuple(c, std::span<const Value>(names), out);
 }
 
-void instructions(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void instructions(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto code = roots.root(args[0]);
@@ -211,7 +211,7 @@ void instructions(Attachment &c, Handle, std::span<const Value> args, ReturnSlot
     make_tuple(c, std::span<const Value>(values), out);
 }
 
-void effect(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void effect(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     for (auto arg : args) {
         if (c.type_of(arg) != c.builtin(CoreObject::IntType)) {
@@ -250,7 +250,7 @@ void initialize_opcode(Attachment &c, Handle module, ReturnSlot &out)
     const auto dict = roots.root(module_dict(c, module.get(c)));
     struct Entry {
         const char *name;
-        void (*function)(Attachment &, Handle, std::span<const Value>, ReturnSlot &);
+        NativeEntry function;
         unsigned arity;
     };
     for (const auto &entry :

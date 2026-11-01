@@ -330,20 +330,20 @@ void resume(Attachment &ctx, Value self_value, Operation operation, std::span<co
         convert_stop_iteration(ctx, coroutine, out);
 }
 
-void iter(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void iter(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (generator(ctx, args[0], out))
         out.ok(args[0]);
 }
-void next(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void next(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     resume(ctx, args[0], Operation::Next, {}, out);
 }
-void send(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void send(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     resume(ctx, args[0], Operation::Send, args.subspan(1), out);
 }
-void throw_(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void throw_(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!generator(ctx, args[0], out))
         return;
@@ -352,7 +352,7 @@ void throw_(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &ou
     resume(ctx, args[0], Operation::Throw, ctx.payload<TupleObject>(arguments).items, out,
            arguments);
 }
-void close(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void close(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     resume(ctx, args[0], Operation::Close, {}, out);
 }
@@ -419,7 +419,7 @@ void set_name(Attachment &ctx, Value self, std::optional<Value> value, ReturnSlo
     ctx.store(self, field == Field::Name ? gen.name : gen.qualname, *value);
     out.ok(ctx.builtin(CoreObject::None));
 }
-void repr_generator(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void repr_generator(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!generator(ctx, args[0], out))
         return;
@@ -438,7 +438,7 @@ void repr_generator(Attachment &ctx, Handle, std::span<const Value> args, Return
                  std::u32string(buffer, converted.ptr) + U">",
              out);
 }
-void await_wrapper(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void await_wrapper(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!generator(ctx, args[0], out))
         return;
@@ -446,12 +446,12 @@ void await_wrapper(Attachment &ctx, Handle, std::span<const Value> args, ReturnS
     ctx.allocate_instance<SequenceIteratorObject>(
         roots.root(ctx.builtin(CoreObject::CoroutineWrapperType)), out, args[0]);
 }
-void wrapper_iter(Attachment &, Handle, std::span<const Value> args, ReturnSlot &out)
+void wrapper_iter(Attachment &, Value, std::span<const Value> args, ReturnSlot &out)
 {
     out.ok(args[0]);
 }
 template <Operation op>
-void wrapper_resume(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void wrapper_resume(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     const auto self = roots.root(args[0]);

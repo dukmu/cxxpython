@@ -141,7 +141,7 @@ void set_exception_traceback(Attachment &context, Value self, std::optional<Valu
                   optional_traceback(context, *value));
     out.ok(context.builtin(CoreObject::None));
 }
-void with_traceback(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void with_traceback(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!context.has_layout<ExceptionObject>(args[0]) ||
         !is_subtype(context, context.type_of(args[0]),
@@ -253,7 +253,7 @@ bool position(Attachment &context, Value value, std::int64_t &converted, ReturnS
     }
     return true;
 }
-void traceback_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void traceback_new(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (args[0] != context.builtin(CoreObject::TracebackType)) {
         type_error(context, U"traceback.__new__ requires the traceback type", out);

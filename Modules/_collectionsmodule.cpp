@@ -87,7 +87,7 @@ bool check(Attachment &c, Value self, ReturnSlot &out)
     return false;
 }
 
-void create(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+void create(Attachment &c, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto base = c.payload<NativeFunctionObject>(function).captures[0];
@@ -119,8 +119,7 @@ void append_item(Attachment &c, Handle self, Value value, bool left)
     });
 }
 
-template <bool Left>
-void append(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+template <bool Left> void append(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check(c, args[0], out))
         return;
@@ -131,7 +130,7 @@ void append(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
     out.ok(c.builtin(CoreObject::None));
 }
 
-template <bool Left> void pop(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+template <bool Left> void pop(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check(c, args[0], out))
         return;
@@ -154,7 +153,7 @@ template <bool Left> void pop(Attachment &c, Handle, std::span<const Value> args
         raise_error(c, CoreObject::IndexErrorType, U"pop from an empty deque", out);
 }
 
-void clear(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void clear(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check(c, args[0], out))
         return;
@@ -168,7 +167,7 @@ void clear(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
     out.ok(c.builtin(CoreObject::None));
 }
 
-void size(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void size(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check(c, args[0], out))
         return;
@@ -233,8 +232,7 @@ template <bool Left> bool extend_from(Attachment &c, Handle self, Handle input, 
     }
 }
 
-template <bool Left>
-void extend(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+template <bool Left> void extend(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check(c, args[0], out))
         return;
@@ -243,7 +241,7 @@ void extend(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
         out.ok(c.builtin(CoreObject::None));
 }
 
-void deque_copy(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void deque_copy(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check(c, args[0], out))
         return;
@@ -259,7 +257,7 @@ void deque_copy(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &
     call(c, roots.root(c.type_of(self)), {arguments}, out);
 }
 
-void deque_inplace_add(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void deque_inplace_add(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check(c, args[0], out))
         return;
@@ -269,7 +267,7 @@ void deque_inplace_add(Attachment &c, Handle, std::span<const Value> args, Retur
         out.ok(self.get(c));
 }
 
-void initialize(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void initialize(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check(c, args[0], out))
         return;
@@ -304,7 +302,7 @@ std::list<Value>::iterator position(DequeObject::Storage &s, std::size_t at)
         return std::next(s.items.begin(), static_cast<std::ptrdiff_t>(at));
     return std::prev(s.items.end(), static_cast<std::ptrdiff_t>(s.items.size() - at));
 }
-template <ItemOp Op> void item(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+template <ItemOp Op> void item(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check(c, args[0], out))
         return;
@@ -363,7 +361,7 @@ template <ItemOp Op> void item(Attachment &c, Handle, std::span<const Value> arg
         out.ok(c.builtin(CoreObject::None));
 }
 
-void rotate(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void rotate(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check(c, args[0], out))
         return;
@@ -393,7 +391,7 @@ void rotate(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
     out.ok(c.builtin(CoreObject::None));
 }
 
-void reverse(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void reverse(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check(c, args[0], out))
         return;
@@ -403,7 +401,7 @@ void reverse(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out
 }
 
 template <bool Reverse>
-void iterator(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+void iterator(Attachment &c, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check(c, args[0], out))
         return;
@@ -422,12 +420,12 @@ void iterator(Attachment &c, Handle function, std::span<const Value> args, Retur
     });
 }
 
-void iter_self(Attachment &, Handle, std::span<const Value> args, ReturnSlot &out)
+void iter_self(Attachment &, Value, std::span<const Value> args, ReturnSlot &out)
 {
     out.ok(args[0]);
 }
 
-void next(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void next(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!c.has_layout<DequeIterator>(args[0])) {
         raise_error(c, CoreObject::TypeErrorType, U"expected deque iterator", out);
@@ -467,7 +465,7 @@ void next(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
 
 enum class Search { Count, Index, Remove, Contains };
 template <Search Mode>
-void search(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void search(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check(c, args[0], out))
         return;
@@ -574,7 +572,7 @@ void search(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
     }
 }
 
-void representation(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void representation(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check(c, args[0], out))
         return;
@@ -645,7 +643,7 @@ void representation(Attachment &c, Handle, std::span<const Value> args, ReturnSl
 }
 
 template <CompareOp Op>
-void compare(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void compare(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check(c, args[0], out))
         return;
@@ -731,7 +729,7 @@ void compare(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out
     out.ok(c.builtin(result_value ? CoreObject::True : CoreObject::False));
 }
 
-void tuplegetter_new(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+void tuplegetter_new(Attachment &c, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto type = c.payload<NativeFunctionObject>(function).captures[0];
@@ -747,7 +745,7 @@ void tuplegetter_new(Attachment &c, Handle function, std::span<const Value> args
     c.allocate_instance<TupleGetter>(roots.root(type), out, offset, args[2]);
 }
 
-void tuplegetter_get(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void tuplegetter_get(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!c.has_layout<TupleGetter>(args[0])) {
         raise_error(c, CoreObject::TypeErrorType, U"expected _tuplegetter", out);
@@ -771,7 +769,7 @@ void tuplegetter_get(Attachment &c, Handle, std::span<const Value> args, ReturnS
 }
 
 template <bool Delete>
-void tuplegetter_set(Attachment &c, Handle, std::span<const Value>, ReturnSlot &out)
+void tuplegetter_set(Attachment &c, Value, std::span<const Value>, ReturnSlot &out)
 {
     raise_error(c, CoreObject::AttributeErrorType,
                 Delete ? U"can't delete attribute" : U"can't set attribute", out);
@@ -790,7 +788,7 @@ void tuplegetter_doc_set(Attachment &c, Value self, std::optional<Value> value, 
     out.ok(c.builtin(CoreObject::None));
 }
 
-void tuplegetter_repr(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void tuplegetter_repr(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto self = roots.root(args[0]);
@@ -813,7 +811,7 @@ void tuplegetter_repr(Attachment &c, Handle, std::span<const Value> args, Return
     make_str(c, std::move(text), out);
 }
 
-void tuplegetter_reduce(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void tuplegetter_reduce(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto self = roots.root(args[0]);
@@ -837,7 +835,7 @@ void tuplegetter_reduce(Attachment &c, Handle, std::span<const Value> args, Retu
     make_tuple(c, result, out);
 }
 
-void count_elements(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void count_elements(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto mapping = roots.root(args[0]), source = roots.root(args[1]);
@@ -917,7 +915,7 @@ void count_elements(Attachment &c, Handle, std::span<const Value> args, ReturnSl
     out.ok(c.builtin(CoreObject::None));
 }
 
-bool defaultdict_receiver(Attachment &c, Handle function, Value self, ReturnSlot &out)
+bool defaultdict_receiver(Attachment &c, Value function, Value self, ReturnSlot &out)
 {
     auto type = c.payload<NativeFunctionObject>(function).captures[0];
     if (c.has_layout<DictObject>(self) && is_subtype(c, c.type_of(self), type))
@@ -926,7 +924,7 @@ bool defaultdict_receiver(Attachment &c, Handle function, Value self, ReturnSlot
     return false;
 }
 
-void defaultdict_init(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+void defaultdict_init(Attachment &c, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     if (!defaultdict_receiver(c, function, args[0], out))
         return;
@@ -958,7 +956,7 @@ void defaultdict_init(Attachment &c, Handle function, std::span<const Value> arg
     call(c, dict_init, {arguments, named}, out);
 }
 
-void defaultdict_missing(Attachment &c, Handle function, std::span<const Value> args,
+void defaultdict_missing(Attachment &c, Value function, std::span<const Value> args,
                          ReturnSlot &out)
 {
     if (!defaultdict_receiver(c, function, args[0], out))
@@ -987,7 +985,7 @@ void defaultdict_missing(Attachment &c, Handle function, std::span<const Value> 
         out.ok(value.get(c));
 }
 
-void defaultdict_repr(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+void defaultdict_repr(Attachment &c, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     if (!defaultdict_receiver(c, function, args[0], out))
         return;
@@ -1035,7 +1033,7 @@ void defaultdict_repr(Attachment &c, Handle function, std::span<const Value> arg
     make_str(c, std::move(text), out);
 }
 
-void defaultdict_copy(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
+void defaultdict_copy(Attachment &c, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     if (!defaultdict_receiver(c, function, args[0], out))
         return;
@@ -1048,7 +1046,7 @@ void defaultdict_copy(Attachment &c, Handle function, std::span<const Value> arg
     const Value arguments[] = {factory.value(), self.get(c)};
     call(c, roots.root(c.type_of(self)), {arguments}, out);
 }
-void state_anchor(Attachment &c, Handle, std::span<const Value>, ReturnSlot &out)
+void state_anchor(Attachment &c, Value, std::span<const Value>, ReturnSlot &out)
 {
     out.ok(c.builtin(CoreObject::None));
 }

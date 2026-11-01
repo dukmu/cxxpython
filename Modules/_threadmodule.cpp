@@ -52,14 +52,14 @@ bool failed(ReturnSlot &out)
     return out.tag() == ResultTag::Raised;
 }
 
-void allocate_lock(Attachment &ctx, Handle function, std::span<const Value>, ReturnSlot &out)
+void allocate_lock(Attachment &ctx, Value function, std::span<const Value>, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto type = roots.root(ctx.payload<NativeFunctionObject>(function).captures[0]);
     ctx.allocate_instance<Lock>(type, out);
 }
 
-void set_sentinel(Attachment &ctx, Handle function, std::span<const Value> args, ReturnSlot &out)
+void set_sentinel(Attachment &ctx, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     allocate_lock(ctx, function, args, out);
     RootScope roots(ctx);
@@ -74,12 +74,12 @@ void set_sentinel(Attachment &ctx, Handle function, std::span<const Value> args,
         });
 }
 
-void threads_allowed(Attachment &ctx, Handle, std::span<const Value>, ReturnSlot &out)
+void threads_allowed(Attachment &ctx, Value, std::span<const Value>, ReturnSlot &out)
 {
     out.ok(ctx.builtin(CoreObject::True));
 }
 
-void stack_size(Attachment &ctx, Handle function, std::span<const Value> args, ReturnSlot &out)
+void stack_size(Attachment &ctx, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     // CPython 3.12 also restores the default on the no-argument call.
     std::optional<std::size_t> replacement = 0;
@@ -172,7 +172,7 @@ bool parse_acquire(Attachment &ctx, std::span<const Value> args, bool &blocking,
     return true;
 }
 
-void acquire(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void acquire(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto self = roots.root(args[0]);
@@ -209,7 +209,7 @@ void acquire(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &o
     out.ok(ctx.builtin(acquired ? CoreObject::True : CoreObject::False));
 }
 
-void release(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void release(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto self = roots.root(args[0]);
@@ -233,7 +233,7 @@ void release(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &o
         out.ok(ctx.builtin(CoreObject::None));
 }
 
-void locked(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void locked(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto self = roots.root(args[0]);
@@ -251,7 +251,7 @@ void locked(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &ou
     out.ok(ctx.builtin(value ? CoreObject::True : CoreObject::False));
 }
 
-void rlock_new(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void rlock_new(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     if (!ctx.has_layout<TypeObject>(args[0]) ||
@@ -264,7 +264,7 @@ void rlock_new(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot 
     ctx.allocate_instance<RLock>(roots.root(args[0]), out);
 }
 
-void rlock_acquire(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void rlock_acquire(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto self = roots.root(args[0]);
@@ -318,7 +318,7 @@ void rlock_acquire(Attachment &ctx, Handle, std::span<const Value> args, ReturnS
         out.ok(ctx.builtin(acquired ? CoreObject::True : CoreObject::False));
 }
 
-void rlock_release(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void rlock_release(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto self = roots.root(args[0]);
@@ -345,7 +345,7 @@ void rlock_release(Attachment &ctx, Handle, std::span<const Value> args, ReturnS
         out.ok(ctx.builtin(CoreObject::None));
 }
 
-void rlock_count(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void rlock_count(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto self = roots.root(args[0]);
@@ -364,7 +364,7 @@ void rlock_count(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlo
     make_int_decimal(ctx, std::to_string(count), out);
 }
 
-void rlock_owned(Attachment &ctx, Handle function, std::span<const Value> args, ReturnSlot &out)
+void rlock_owned(Attachment &ctx, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     ReturnSlot count(ctx);
     rlock_count(ctx, function, args, count);
@@ -376,7 +376,7 @@ void rlock_owned(Attachment &ctx, Handle function, std::span<const Value> args, 
     truth(ctx, roots.root(count.value()), out);
 }
 
-void rlock_save(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void rlock_save(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto self = roots.root(args[0]);
@@ -418,7 +418,7 @@ void rlock_save(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot
     make_tuple(ctx, items, out);
 }
 
-void rlock_restore(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void rlock_restore(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto self = roots.root(args[0]);
@@ -461,7 +461,7 @@ void rlock_restore(Attachment &ctx, Handle, std::span<const Value> args, ReturnS
     out.ok(ctx.builtin(CoreObject::None));
 }
 
-void rlock_repr(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void rlock_repr(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto self = roots.root(args[0]);
@@ -498,22 +498,22 @@ void rlock_repr(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot
              out);
 }
 
-void rlock_fork(Attachment &ctx, Handle, std::span<const Value>, ReturnSlot &out)
+void rlock_fork(Attachment &ctx, Value, std::span<const Value>, ReturnSlot &out)
 {
     raise_error(ctx, CoreObject::NotImplementedErrorType,
                 U"RLock reinitialization after fork is not supported", out);
 }
 
-void ident(Attachment &ctx, Handle, std::span<const Value>, ReturnSlot &out)
+void ident(Attachment &ctx, Value, std::span<const Value>, ReturnSlot &out)
 {
     make_int_decimal(ctx, std::to_string(static_cast<unsigned long>(pthread_self())), out);
 }
-void native_id(Attachment &ctx, Handle, std::span<const Value>, ReturnSlot &out)
+void native_id(Attachment &ctx, Value, std::span<const Value>, ReturnSlot &out)
 {
     make_int(ctx, static_cast<std::int64_t>(syscall(SYS_gettid)), out);
 }
 
-void thread_exit(Attachment &ctx, Handle, std::span<const Value>, ReturnSlot &out)
+void thread_exit(Attachment &ctx, Value, std::span<const Value>, ReturnSlot &out)
 {
     RootScope roots(ctx);
     ReturnSlot exception(ctx);
@@ -574,7 +574,7 @@ void *thread_bootstrap(void *data) noexcept
     return nullptr;
 }
 
-void thread_start(Attachment &ctx, Handle function, std::span<const Value> args, ReturnSlot &out)
+void thread_start(Attachment &ctx, Value function, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto callable = roots.root(args[0]);

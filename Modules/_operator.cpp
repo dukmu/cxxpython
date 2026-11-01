@@ -6,7 +6,7 @@
 
 namespace cxxpython::core::detail {
 namespace {
-void index_entry(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void index_entry(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     index(ctx, roots.root(args[0]), out);

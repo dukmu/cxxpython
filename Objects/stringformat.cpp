@@ -274,7 +274,7 @@ struct Formatter {
     }
 };
 
-void format_method(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void format_method(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     try {
         RootScope roots(ctx);
@@ -695,7 +695,7 @@ struct PercentFormatter {
     }
 };
 
-void mod_method(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void mod_method(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     try {
         RootScope roots(ctx);

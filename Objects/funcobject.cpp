@@ -102,7 +102,7 @@ void function_annotations_set(Attachment &context, Value receiver, std::optional
     context.store(receiver, context.payload<FunctionObject>(receiver).annotations, value);
     out.ok(context.builtin(CoreObject::None));
 }
-void function_repr(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void function_repr(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!c.has_layout<FunctionObject>(args[0])) {
         raise_error(c, CoreObject::TypeErrorType, U"function repr requires a function", out);

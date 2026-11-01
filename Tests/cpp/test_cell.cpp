@@ -103,7 +103,7 @@ TEST_F(CoreCells, SharedNativeClosuresObserveOneCellAcrossMutationAndCollection)
     std::array captures{shared.get(context)};
     make_native_function(
         context, "closure", {},
-        [](Attachment &c, Handle fn, std::span<const Value>, ReturnSlot &result) {
+        [](Attachment &c, Value fn, std::span<const Value>, ReturnSlot &result) {
             c.collect();
             if (!read_cell(c, c.payload<NativeFunctionObject>(fn).captures[0], result))
                 raise_error(c, CoreObject::ValueErrorType, U"empty closure", result);
@@ -168,7 +168,7 @@ TEST_F(CoreCells, SetNameSeesTheFilledCellAndCanMutateIt)
     std::array captures{shared.get(context)};
     make_native_function(
         context, "__set_name__", signature,
-        [](Attachment &c, Handle fn, std::span<const Value> args, ReturnSlot &result) {
+        [](Attachment &c, Value fn, std::span<const Value> args, ReturnSlot &result) {
             auto shared = c.payload<NativeFunctionObject>(fn).captures[0];
             ReturnSlot contents(c);
             ASSERT_TRUE(read_cell(c, shared, contents));
@@ -204,7 +204,7 @@ TEST_F(CoreCells, FailedCallbackLeavesThePublishedCellSideEffectIntact)
     signature.parameters = {{U"cls"}};
     make_native_function(
         context, "__init_subclass__", signature,
-        [](Attachment &c, Handle, std::span<const Value>, ReturnSlot &result) {
+        [](Attachment &c, Value, std::span<const Value>, ReturnSlot &result) {
             raise_error(c, CoreObject::RuntimeErrorType, U"hook failed", result);
         },
         {}, out);
@@ -247,7 +247,7 @@ TEST_F(CoreCells, AllocationFailuresNeverPublishAnUnpreparedDefinitionThroughThe
     signature.parameters = {{U"cls"}};
     make_native_function(
         context, "__new__", signature,
-        [](Attachment &c, Handle, std::span<const Value>, ReturnSlot &result) {
+        [](Attachment &c, Value, std::span<const Value>, ReturnSlot &result) {
             result.ok(c.builtin(CoreObject::None));
         },
         {}, out);

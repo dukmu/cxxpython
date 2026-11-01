@@ -186,7 +186,7 @@ bool repr_item(Attachment &ctx, Handle item, std::u32string &text, ReturnSlot &o
     return true;
 }
 
-void union_repr(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void union_repr(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(ctx, args[0], out))
         return;
@@ -206,7 +206,7 @@ void union_repr(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot
 }
 
 template <bool Negate>
-void union_compare(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void union_compare(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(ctx, args[0], out))
         return;
@@ -233,7 +233,7 @@ void union_compare(Attachment &ctx, Handle, std::span<const Value> args, ReturnS
                  Negate ? CompareOp::Ne : CompareOp::Eq, out);
 }
 
-void union_hash(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void union_hash(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(ctx, args[0], out))
         return;
@@ -253,7 +253,7 @@ void union_hash(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot
 }
 
 template <bool Reverse>
-void union_or(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void union_or(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(ctx, args[0], out))
         return;
@@ -261,7 +261,7 @@ void union_or(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &
     make_union(ctx, roots.root(args[Reverse ? 1 : 0]), roots.root(args[Reverse ? 0 : 1]), out);
 }
 
-void union_new(Attachment &ctx, Handle, std::span<const Value>, ReturnSlot &out)
+void union_new(Attachment &ctx, Value, std::span<const Value>, ReturnSlot &out)
 {
     raise_error(ctx, CoreObject::TypeErrorType, U"cannot create 'types.UnionType' instances", out);
 }
@@ -348,7 +348,7 @@ std::u32string decimal(std::size_t value)
     return {text.begin(), text.end()};
 }
 
-void union_getitem(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void union_getitem(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(ctx, args[0], out))
         return;

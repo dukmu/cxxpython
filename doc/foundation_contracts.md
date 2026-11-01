@@ -909,6 +909,17 @@ address and deque consumers share it while retaining their own range/synchroniza
 policies. Conversion warnings now share the Python policy bridge in Python/errors.cpp;
 the documented warnings.warn replacement difference remains.
 
+NativeEntry's C++ function parameter is a borrowed Value, like its argument span.
+The dispatcher retains the selected callable in its private snapshot scope;
+an immutable MethodDescriptor's traced function edge keeps native metadata/code
+alive without a second function root. This remains true across collecting hooks,
+NativeWait, slot replacement and release of caller-owned input scopes. Callbacks
+must create their own root/transfer to retain a Value beyond the call. Binding,
+receiver admission, depth guards and checked returns are unchanged. This changes
+the internal C++ callback signature and requires rebuilding C++ native modules;
+the versioned C11 extension ABI is unchanged. No compatibility adapter or unsafe
+derived Handle is provided.
+
 Ordinary native type methods publish owner-bearing MethodDescriptorObjects;
 protocol lookup preserves their native/sequence role and invokes the underlying
 entry through the normal binder. Native static/class wrappers retain their own

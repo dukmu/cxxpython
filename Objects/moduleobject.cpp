@@ -42,7 +42,7 @@ void initialize(Attachment &context, Handle module, Handle name, Value doc, Retu
             return;
     }
 }
-void module_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void module_new(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(context);
     auto type = roots.root(args[0]);
@@ -61,7 +61,7 @@ void module_new(Attachment &context, Handle, std::span<const Value> args, Return
                   dictionary.value());
     out.ok(module.get(context));
 }
-void module_init(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void module_init(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(context, args[0], out))
         return;
@@ -73,7 +73,7 @@ void module_init(Attachment &context, Handle, std::span<const Value> args, Retur
     RootScope roots(context);
     initialize(context, roots.root(args[0]), roots.root(args[1]), args[2], out);
 }
-void module_repr(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void module_repr(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(context, args[0], out))
         return;
@@ -88,7 +88,7 @@ void module_repr(Attachment &context, Handle, std::span<const Value> args, Retur
         text = U"<module '" + context.payload<StrObject>(out.value()).value + U"'>";
     make_str(context, std::move(text), out);
 }
-void module_getattr(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+void module_getattr(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!receiver(context, args[0], out))
         return;

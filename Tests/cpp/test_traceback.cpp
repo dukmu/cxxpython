@@ -145,7 +145,7 @@ TEST_F(CoreTraceback, NativeReentryAddsEachPythonFrameExactlyOnce)
     std::array captures{leaf.get(context)};
     make_native_function(
         context, "reenter", {},
-        [](Attachment &c, Handle fn, std::span<const Value>, ReturnSlot &out) {
+        [](Attachment &c, Value fn, std::span<const Value>, ReturnSlot &out) {
             RootScope roots(c);
             auto target = roots.root(c.payload<NativeFunctionObject>(fn).captures[0]);
             call(c, target, {}, out);
@@ -267,7 +267,7 @@ TEST_F(CoreTraceback, ConstructorUsesTheSharedBinderAndIndexConversion)
     unary.parameters = {{U"self", ParameterKind::PositionalOnly}};
     make_native_function(
         context, "position index", unary,
-        [](Attachment &c, Handle, std::span<const Value>, ReturnSlot &out) {
+        [](Attachment &c, Value, std::span<const Value>, ReturnSlot &out) {
             c.collect();
             out.ok(c.builtin(CoreObject::IntOne));
         },

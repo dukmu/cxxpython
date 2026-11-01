@@ -7,7 +7,7 @@
 
 namespace cxxpython::core {
 namespace {
-void getweakrefcount(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void getweakrefcount(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto target = roots.root(args[0]);
@@ -16,7 +16,7 @@ void getweakrefcount(Attachment &c, Handle, std::span<const Value> args, ReturnS
     make_int(c, static_cast<std::int64_t>(values.size()), out);
 }
 
-void getweakrefs(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void getweakrefs(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto target = roots.root(args[0]);
@@ -24,12 +24,12 @@ void getweakrefs(Attachment &c, Handle, std::span<const Value> args, ReturnSlot 
     c.weakrefs(target, roots, values);
     make_list(c, values, out);
 }
-void make_proxy(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void make_proxy(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     detail::make_weakproxy(c, roots.root(args[0]), roots.root(args[1]), out);
 }
-void remove_dead_weakref(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
+void remove_dead_weakref(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
     auto dictionary = roots.root(args[0]), key = roots.root(args[1]);

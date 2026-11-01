@@ -4,7 +4,7 @@
 
 namespace cxxpython::core::detail {
 namespace {
-void identity(Attachment &, Handle, std::span<const Value> args, ReturnSlot &out)
+void identity(Attachment &, Value, std::span<const Value> args, ReturnSlot &out)
 {
     out.ok(args[0]);
 }

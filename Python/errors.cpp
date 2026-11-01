@@ -128,7 +128,7 @@ template <std::size_t I> void field(Attachment &ctx, Value self, ReturnSlot &out
 {
     out.ok(ctx.payload<TupleObject>(self).items[I]);
 }
-void args_repr(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void args_repr(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     const auto self = roots.root(args[0]);
@@ -162,7 +162,7 @@ void args_repr(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot 
     ctx.leave_repr(self.get(ctx));
 }
 
-void args_new(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void args_new(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto cls = roots.root(args[0]);
@@ -392,7 +392,7 @@ bool unraisable_default(Attachment &ctx, Handle exception, Handle trace, Handle 
     return true;
 }
 
-void default_unraisable(Attachment &ctx, Handle fn, std::span<const Value> args, ReturnSlot &out)
+void default_unraisable(Attachment &ctx, Value fn, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto value = roots.root(args[0]);
@@ -407,7 +407,7 @@ void default_unraisable(Attachment &ctx, Handle fn, std::span<const Value> args,
                        roots.root(fields[4]), out);
 }
 
-void default_excepthook(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &out)
+void default_excepthook(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto exception = roots.root(args[1]);
