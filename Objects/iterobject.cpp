@@ -1,5 +1,6 @@
 #include "cxxpython/calliterobject.hpp"
 #include "cxxpython/protocol.hpp"
+#include "internal/abstract.hpp"
 
 #include <algorithm>
 #include <limits>
@@ -53,13 +54,15 @@ NextStatus iter_next(Attachment &context, Handle iterator, ReturnSlot &out)
 {
     return iter_next(context, iterator.get(context), out);
 }
-NextStatus iter_next(Attachment &context, Value iterator, ReturnSlot &out)
+namespace {
+NextStatus iter_next_impl(Attachment &context, Handle self, ReturnSlot &out, RootScope &roots)
 {
-    out.check_caller(context);
     try {
-        RootScope roots(context);
-        const auto self = roots.root(iterator);
-        auto slot = detail::resolve_protocol(context, context.type_of(self), Protocol::Next, roots);
+        const auto receiver = self.get(context);
+        out.reset(context);
+        context.poll();
+        auto slot =
+            detail::resolve_protocol(context, context.type_of(receiver), Protocol::Next, roots);
         detail::invoke_protocol(context, self, slot, {}, out, roots);
     } catch (const std::bad_alloc &) {
         out.raised(context.builtin(CoreObject::MemoryError));
@@ -70,6 +73,24 @@ NextStatus iter_next(Attachment &context, Value iterator, ReturnSlot &out)
                       context.builtin(CoreObject::StopIterationType))
                ? NextStatus::Done
                : NextStatus::Raised;
+}
+} // namespace
+NextStatus detail::iter_next_owned(Attachment &context, Handle iterator, ReturnSlot &out)
+{
+    out.check_caller(context);
+    RootScope roots(context);
+    return iter_next_impl(context, iterator, out, roots);
+}
+NextStatus iter_next(Attachment &context, Value iterator, ReturnSlot &out)
+{
+    out.check_caller(context);
+    try {
+        RootScope roots(context);
+        return iter_next_impl(context, roots.root(iterator), out, roots);
+    } catch (const std::bad_alloc &) {
+        out.raised(context.builtin(CoreObject::MemoryError));
+        return NextStatus::Raised;
+    }
 }
 namespace {
 template <class T, CoreObject Type> bool sequence(Attachment &context, Value value, ReturnSlot &out)

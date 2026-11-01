@@ -41,7 +41,7 @@ bool fill(Attachment &ctx, Handle table, Handle iterable, ReturnSlot &out)
     }
     auto it = roots.root(iterator.value());
     for (;;) {
-        auto status = iter_next(ctx, it, item);
+        auto status = detail::iter_next_owned(ctx, it, item);
         if (status == NextStatus::Done)
             return true;
         if (status == NextStatus::Raised) {
@@ -135,7 +135,7 @@ void repr_set(Attachment &ctx, Handle, std::span<const Value> args, ReturnSlot &
     auto iterator = roots.root(iter.value());
     std::vector<Handle> items;
     for (;;) {
-        auto status = iter_next(ctx, iterator, item);
+        auto status = detail::iter_next_owned(ctx, iterator, item);
         if (status == NextStatus::Done)
             break;
         if (status == NextStatus::Raised) {

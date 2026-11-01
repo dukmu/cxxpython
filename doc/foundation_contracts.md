@@ -877,6 +877,15 @@ checked returns, deprecation warnings and original errors (struct translates
 conversion failure to its own error). Inputs/results survive collecting and
 replacing callbacks. The entry snapshots its input before clearing output and
 polls explicitly, so allocation-free reduction loops still acknowledge GC epochs.
+The Value conversion entry owns the same input snapshot as the Handle entry;
+native callers with a traced result/tuple can avoid an intermediate Handle.
+The internal iter_next_owned entry borrows an independent live iterator Handle
+from its native caller, while public iteration still snapshots inputs. Both
+entries use the same checked protocol dispatch, clear the previous output after
+owning/validating the iterator, and poll before lookup: even a
+native iterator returning permanent objects without allocation must acknowledge
+collection requests. Reusable reduction result slots are cleared before the next
+callback and after exhaustion; they do not retain the previous item/exception.
 
 Ordinary native type methods publish owner-bearing MethodDescriptorObjects;
 protocol lookup preserves their native/sequence role and invokes the underlying

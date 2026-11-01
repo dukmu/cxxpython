@@ -45,7 +45,7 @@ void set_update_impl(Attachment &ctx, Handle self, Handle iterable, ReturnSlot &
         }
         auto it = roots.root(iterator.value());
         for (;;) {
-            auto status = iter_next(ctx, it, item);
+            auto status = detail::iter_next_owned(ctx, it, item);
             if (status == NextStatus::Done)
                 break;
             if (status == NextStatus::Raised) {
@@ -109,7 +109,7 @@ bool set_op_walk(Attachment &ctx, Handle source, bool dict_fast, F &&visit, Retu
     }
     auto it = roots.root(iterator.value());
     for (;;) {
-        auto status = iter_next(ctx, it, item);
+        auto status = detail::iter_next_owned(ctx, it, item);
         if (status == NextStatus::Done)
             return true;
         if (status == NextStatus::Raised) {

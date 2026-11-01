@@ -1,6 +1,7 @@
 #include "cxxpython/execution.hpp"
 #include "cxxpython/floatobject.hpp"
 #include "cxxpython/unionobject.hpp"
+#include "internal/abstract.hpp"
 #include "internal/aiterobject.hpp"
 #include "internal/ioopen.hpp"
 #include "internal/listsort.hpp"
@@ -284,16 +285,22 @@ void builtin_min_max(Attachment &context, Handle, std::span<const Value> args, R
         return;
     }
     auto iterator = roots.root(iterator_result.value());
+    ReturnSlot item(context), item_key(context), comparison(context), truth_result(context);
     for (;;) {
         RootScope iteration(context);
-        ReturnSlot item(context), item_key(context), comparison(context), truth_result(context);
-        auto status = iter_next(context, iterator, item);
+        item.reset();
+        item_key.reset();
+        comparison.reset();
+        truth_result.reset();
+        auto status = detail::iter_next_owned(context, iterator, item);
         if (status == NextStatus::Raised) {
             out.raised(item.exception());
             return;
         }
-        if (status == NextStatus::Done)
+        if (status == NextStatus::Done) {
+            item.reset();
             break;
+        }
         auto item_handle = iteration.root(item.value());
         if (key && key->get(context) != context.builtin(CoreObject::None)) {
             const std::array call_args{item_handle.get(context)};
@@ -306,14 +313,14 @@ void builtin_min_max(Attachment &context, Handle, std::span<const Value> args, R
             item_key.ok(item_handle.get(context));
         bool replace = best.tag() == ResultTag::Empty;
         if (!replace) {
-            rich_compare(context, iteration.root(item_key.value()),
-                         iteration.root(best_key.value()), Minimum ? CompareOp::Lt : CompareOp::Gt,
-                         comparison);
+            detail::rich_compare_owned(context, iteration.root(item_key.value()),
+                                       iteration.root(best_key.value()),
+                                       Minimum ? CompareOp::Lt : CompareOp::Gt, comparison);
             if (failed(comparison)) {
                 out.raised(comparison.exception());
                 return;
             }
-            truth(context, iteration.root(comparison.value()), truth_result);
+            detail::truth_owned(context, iteration.root(comparison.value()), truth_result);
             if (failed(truth_result)) {
                 out.raised(truth_result.exception());
                 return;
@@ -371,15 +378,17 @@ void builtin_sum(Attachment &context, Handle, std::span<const Value> args, Retur
                                                                                 : Mode::General);
     double sum = mode == Mode::Float ? context.payload<FloatObject>(start).value : 0.0;
     double correction = 0.0;
+    ReturnSlot item(context), next(context);
     for (;;) {
-        RootScope iteration(context);
-        ReturnSlot item(context), next(context);
-        auto status = iter_next(context, iterator, item);
+        item.reset();
+        next.reset();
+        auto status = detail::iter_next_owned(context, iterator, item);
         if (status == NextStatus::Raised) {
             out.raised(item.exception());
             return;
         }
         if (status == NextStatus::Done) {
+            item.reset();
             if (mode == Mode::Float) {
                 if (correction && std::isfinite(correction))
                     sum += correction;
@@ -388,7 +397,7 @@ void builtin_sum(Attachment &context, Handle, std::span<const Value> args, Retur
                 out.ok(result.value());
             return;
         }
-        auto value = iteration.root(item.value());
+        auto value = item.value();
         if (mode == Mode::Integer &&
             (context.type_of(value) == context.builtin(CoreObject::IntType) ||
              context.type_of(value) == context.builtin(CoreObject::BoolType))) {
@@ -408,7 +417,7 @@ void builtin_sum(Attachment &context, Handle, std::span<const Value> args, Retur
                 sum = t;
                 continue;
             }
-            if (is_int(context, value.get(context)) && !context.payload<IntObject>(value).large) {
+            if (is_int(context, value) && !context.payload<IntObject>(value).large) {
                 sum += static_cast<double>(context.payload<IntObject>(value).small);
                 continue;
             }
@@ -417,7 +426,7 @@ void builtin_sum(Attachment &context, Handle, std::span<const Value> args, Retur
             make_float(context, sum, result);
         }
         auto previous_mode = mode;
-        binary(context, iteration.root(result.value()), value, BinaryOp::Add, next);
+        binary(context, result.value(), value, BinaryOp::Add, next);
         if (failed(next)) {
             out.raised(next.exception());
             return;
@@ -462,19 +471,22 @@ void builtin_all_any(Attachment &context, Handle, std::span<const Value> args, R
         return;
     }
     auto iterator = roots.root(iterator_result.value());
+    ReturnSlot item(context), result(context);
     for (;;) {
-        RootScope iteration(context);
-        ReturnSlot item(context), result(context);
-        auto status = iter_next(context, iterator, item);
+        item.reset();
+        result.reset();
+        auto status = detail::iter_next_owned(context, iterator, item);
         if (status == NextStatus::Raised) {
             out.raised(item.exception());
             return;
         }
         if (status == NextStatus::Done) {
+            item.reset();
             out.ok(context.builtin(Any ? CoreObject::False : CoreObject::True));
             return;
         }
-        truth(context, iteration.root(item.value()), result);
+        truth(context, item.value(), result);
+        item.reset();
         if (failed(result)) {
             out.raised(result.exception());
             return;

@@ -19,6 +19,7 @@ void make_float(Attachment &context, double value, ReturnSlot &out);
 namespace detail {
 // On success, out is reset; on failure, it contains the raised exception.
 bool float_as_double(Attachment &context, Handle input, double &value, ReturnSlot &out);
+bool float_as_double(Attachment &context, Value input, double &value, ReturnSlot &out);
 bool parse_float(std::u32string_view text, double &value);
 void install_floats(Attachment &context, std::span<const Handle> core);
 } // namespace detail

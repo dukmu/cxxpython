@@ -1,9 +1,13 @@
 #include "cxxpython/compiler.hpp"
+#include "internal/abstract.hpp"
 
 #include <gtest/gtest.h>
 
+#include <atomic>
+#include <chrono>
 #include <future>
 #include <latch>
+#include <thread>
 
 namespace {
 using namespace cxxpython::core;
@@ -163,6 +167,180 @@ TEST_F(CoreIteration, ValueIteratorSurvivesAliasedOutputAndSeesNextReplacement)
     context.allocate_instance<InstanceObject>(type, out);
     EXPECT_EQ(iter_next(context, out.value(), out), NextStatus::Raised);
     EXPECT_EQ(context.type_of(out.exception()), context.builtin(CoreObject::ValueErrorType));
+}
+
+TEST_F(CoreIteration, OwnedIteratorRevalidatesAndReusesResultSlot)
+{
+    ReturnSlot out(context);
+    create_type(context, {U"OwnedIterator"}, out);
+    const auto type = roots.root(out.value());
+    create_type(context, {U"ReplacementIterator"}, out);
+    const auto replacement = roots.root(out.value());
+    SignatureLayout unary;
+    unary.parameters = {{U"self", ParameterKind::PositionalOnly}};
+    make_native_function(
+        context, "item", unary,
+        [](Attachment &c, Handle, std::span<const Value> args, ReturnSlot &result) {
+            c.collect();
+            result.ok(args[0]);
+        },
+        {}, out);
+    set_attribute(context, type, text(U"__next__"), roots.root(out.value()), out);
+    context.allocate_instance<InstanceObject>(type, out);
+    const auto iterator = roots.root(out.value());
+    EXPECT_EQ(detail::iter_next_owned(context, iterator, out), NextStatus::Item);
+    EXPECT_EQ(out.value(), iterator.get(context));
+
+    make_native_function(
+        context, "stop", unary,
+        [](Attachment &c, Handle, std::span<const Value>, ReturnSlot &result) {
+            c.collect();
+            raise_error(c, CoreObject::StopIterationType, U"finished", result);
+        },
+        {}, out);
+    set_attribute(context, type, text(U"__next__"), roots.root(out.value()), out);
+    EXPECT_EQ(detail::iter_next_owned(context, iterator, out), NextStatus::Done);
+    EXPECT_EQ(context.type_of(out.exception()), context.builtin(CoreObject::StopIterationType));
+
+    make_native_function(
+        context, "error", unary,
+        [](Attachment &c, Handle, std::span<const Value>, ReturnSlot &result) {
+            c.collect();
+            raise_error(c, CoreObject::ValueErrorType, U"failure", result);
+        },
+        {}, out);
+    set_attribute(context, replacement, text(U"__next__"), roots.root(out.value()), out);
+    set_attribute(context, iterator, text(U"__class__"), replacement, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(detail::iter_next_owned(context, iterator, out), NextStatus::Raised);
+    EXPECT_EQ(context.type_of(out.exception()), context.builtin(CoreObject::ValueErrorType));
+
+    Interpreter other;
+    Attachment foreign(other);
+    foreign.bootstrap_core();
+    ReturnSlot foreign_out(foreign);
+    foreign_out.ok(foreign.builtin(CoreObject::True));
+    EXPECT_THROW(detail::iter_next_owned(context, iterator, foreign_out), std::logic_error);
+    EXPECT_EQ(foreign_out.value(), foreign.builtin(CoreObject::True));
+    {
+        NoSafepoint guard(context);
+        EXPECT_THROW(detail::iter_next_owned(context, iterator, out), std::logic_error);
+    }
+}
+
+TEST_F(CoreIteration, OwnedNativeNextAllowsConcurrentCollectionProgress)
+{
+    ReturnSlot out(context);
+    create_type(context, {U"NativeIterator"}, out);
+    const auto type = roots.root(out.value());
+    SignatureLayout unary;
+    unary.parameters = {{U"self", ParameterKind::PositionalOnly}};
+    make_native_function(
+        context, "next", unary,
+        [](Attachment &c, Handle, std::span<const Value>, ReturnSlot &result) {
+            result.ok(c.builtin(CoreObject::False));
+        },
+        {}, out);
+    set_attribute(context, type, text(U"__next__"), roots.root(out.value()), out);
+    context.allocate_instance<InstanceObject>(type, out);
+    const auto iterator = roots.root(out.value());
+    auto token = context.make_transfer(iterator);
+    std::atomic<bool> stop{false}, running{false}, failed{false};
+    std::promise<void> ready;
+    bool collected_in_time = false;
+    bool running_at_collection = false;
+    {
+        NativeWait wait(context);
+        auto worker = std::async(std::launch::async, [&, token = std::move(token)]() mutable {
+            Attachment thread(interpreter);
+            RootScope local(thread);
+            ReturnSlot result(thread);
+            thread.receive(token, result);
+            const auto owned_iterator = local.root(result.value());
+            result.reset();
+            running.store(true, std::memory_order_release);
+            bool first = true;
+            while (!stop.load(std::memory_order_acquire)) {
+                const bool ok =
+                    detail::iter_next_owned(thread, owned_iterator, result) == NextStatus::Item &&
+                    result.value() == thread.builtin(CoreObject::False);
+                if (first) {
+                    ready.set_value();
+                    first = false;
+                }
+                if (!ok) {
+                    failed.store(true, std::memory_order_release);
+                    break;
+                }
+            }
+            running.store(false, std::memory_order_release);
+        });
+        ready.get_future().get();
+        auto collector = std::async(std::launch::async, [&] {
+            Attachment thread(interpreter);
+            thread.collect();
+        });
+        collected_in_time =
+            collector.wait_for(std::chrono::seconds(5)) == std::future_status::ready;
+        running_at_collection = running.load(std::memory_order_acquire);
+        stop.store(true, std::memory_order_release);
+        worker.get();
+        collector.get();
+    }
+    EXPECT_TRUE(collected_in_time);
+    EXPECT_TRUE(running_at_collection);
+    EXPECT_FALSE(failed.load(std::memory_order_acquire));
+}
+
+TEST_F(CoreIteration, NextDropsPreviousOutputBeforeAcknowledgingCollection)
+{
+    ReturnSlot out(context), weak(context);
+    create_type(context, {U"Iterator"}, out);
+    const auto type = roots.root(out.value());
+    SignatureLayout unary;
+    unary.parameters = {{U"self", ParameterKind::PositionalOnly}};
+    make_native_function(
+        context, "next", unary,
+        [](Attachment &c, Handle, std::span<const Value>, ReturnSlot &result) {
+            result.ok(c.builtin(CoreObject::False));
+        },
+        {}, out);
+    set_attribute(context, type, text(U"__next__"), roots.root(out.value()), out);
+    context.allocate_instance<InstanceObject>(type, out);
+    const auto iterator = roots.root(out.value());
+    context.allocate_instance<InstanceObject>(type, out);
+    {
+        RootScope temporary(context);
+        const auto target = temporary.root(out.value());
+        const std::array args{target.get(context)};
+        call(context, temporary.root(context.builtin(CoreObject::WeakRefType)), {args, {}}, weak);
+        ASSERT_EQ(weak.tag(), ResultTag::Ok);
+    }
+    const auto reference = roots.root(weak.value());
+    std::promise<void> ready, go;
+    auto start = go.get_future();
+    std::future<void> collector;
+    {
+        NativeWait wait(context);
+        collector = std::async(std::launch::async, [&] {
+            Attachment thread(interpreter);
+            ready.set_value();
+            start.get();
+            thread.collect();
+        });
+        ready.get_future().get();
+    }
+    go.set_value();
+    while (interpreter.gc_state().phase != GcPhase::Requesting)
+        std::this_thread::yield();
+    EXPECT_EQ(detail::iter_next_owned(context, iterator, out), NextStatus::Item);
+    {
+        NativeWait wait(context);
+        collector.get();
+    }
+    call(context, reference, {}, weak);
+    ASSERT_EQ(weak.tag(), ResultTag::Ok);
+    EXPECT_EQ(weak.value(), context.builtin(CoreObject::None));
 }
 
 TEST(ParallelIteration, SharedBuiltinIteratorClaimsEachItemOnceDuringGc)

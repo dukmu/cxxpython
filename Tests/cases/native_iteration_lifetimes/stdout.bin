@@ -1,0 +1,23 @@
+fsum 2.0
+fsum events ['before', ('float', 2), ('after', True)] dead True finalized [2]
+sum 3 ['first', 'second', 'finish']
+min 1 ['first', 'second', 'finish']
+max 2 ['first', 'second', 'finish']
+all True ['first', 'second', 'finish']
+any True ['first']
+list [1, 2] ['first', 'second', 'finish']
+tuple (1, 2) ['first', 'second', 'finish']
+list retained [True] True
+list released True [9]
+tuple retained [True] True
+tuple released True [9]
+fsum ValueError iterator failure
+sum ValueError iterator failure
+min ValueError iterator failure
+max ValueError iterator failure
+all ValueError iterator failure
+any ValueError iterator failure
+list ValueError iterator failure
+tuple ValueError iterator failure
+terminal released True
+empty sumprod 0

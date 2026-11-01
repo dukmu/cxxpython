@@ -602,7 +602,7 @@ void detail::rich_compare_owned(Attachment &context, Handle a, Handle b, Compare
             }
             auto iterator = roots.root(result.value());
             for (;;) {
-                auto status = iter_next(context, iterator, result);
+                auto status = detail::iter_next_owned(context, iterator, result);
                 if (status == NextStatus::Raised) {
                     out.raised(result.exception());
                     return;

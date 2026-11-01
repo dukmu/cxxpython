@@ -6,6 +6,7 @@
 #include "cxxpython/floatobject.hpp"
 #include "cxxpython/moduleobject.hpp"
 #include "cxxpython/protocol.hpp"
+#include "internal/abstract.hpp"
 #include "internal/errors.hpp"
 
 #include <algorithm>
@@ -73,29 +74,31 @@ double rounded_dot(TripleLength total)
 void math_fsum(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(c);
-    ReturnSlot iterator_result(c);
-    get_iter(c, roots.root(args[0]), iterator_result);
-    if (failed(iterator_result)) {
-        out.raised(iterator_result.exception());
+    ReturnSlot item(c);
+    get_iter(c, roots.root(args[0]), item);
+    if (failed(item)) {
+        out.raised(item.exception());
         return;
     }
-    const auto iterator = roots.root(iterator_result.value());
+    const auto iterator = roots.root(item.value());
+    item.reset();
     std::vector<double> partials;
     partials.reserve(32);
     double special_sum = 0.0, inf_sum = 0.0;
     for (;;) {
-        RootScope iteration(c);
-        ReturnSlot item(c);
-        const auto status = iter_next(c, iterator, item);
+        const auto status = iter_next_owned(c, iterator, item);
         if (status == NextStatus::Raised) {
             out.raised(item.exception());
             return;
         }
-        if (status == NextStatus::Done)
+        if (status == NextStatus::Done) {
+            item.reset();
             break;
+        }
         double x;
-        if (!float_as_double(c, iteration.root(item.value()), x, out))
+        if (!float_as_double(c, item.value(), x, out))
             return;
+        item.reset();
         const double saved = x;
         std::size_t count = 0;
         for (double y : partials) {
@@ -215,10 +218,8 @@ void math_hypot(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &
     double maximum = 0.0;
     bool found_nan = false;
     for (std::size_t i = 0; i != count; ++i) {
-        RootScope iteration(c);
         double x;
-        if (!float_as_double(c, iteration.root(c.payload<TupleObject>(coordinates).items[i]), x,
-                             out))
+        if (!float_as_double(c, c.payload<TupleObject>(coordinates).items[i], x, out))
             return;
         x = std::fabs(x);
         values.push_back(x);
@@ -269,11 +270,9 @@ void math_dist(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &o
     double maximum = 0.0;
     bool found_nan = false;
     for (std::size_t i = 0; i != count; ++i) {
-        RootScope iteration(c);
         double px, qx;
-        if (!float_as_double(c, iteration.root(c.payload<TupleObject>(p_values).items[i]), px,
-                             out) ||
-            !float_as_double(c, iteration.root(c.payload<TupleObject>(q_values).items[i]), qx, out))
+        if (!float_as_double(c, c.payload<TupleObject>(p_values).items[i], px, out) ||
+            !float_as_double(c, c.payload<TupleObject>(q_values).items[i], qx, out))
             return;
         const double x = std::fabs(px - qx);
         differences.push_back(x);
@@ -306,15 +305,18 @@ void math_prod(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &o
         mode = Mode::Float;
         float_total = c.payload<FloatObject>(start).value;
     }
+    ReturnSlot item(c), next(c);
     for (;;) {
         RootScope iteration(c);
-        ReturnSlot item(c), next(c);
-        const auto status = iter_next(c, iterator, item);
+        item.reset();
+        next.reset();
+        const auto status = iter_next_owned(c, iterator, item);
         if (status == NextStatus::Raised) {
             out.raised(item.exception());
             return;
         }
         if (status == NextStatus::Done) {
+            item.reset();
             if (mode == Mode::Integer)
                 make_int(c, integer_total, out);
             else if (mode == Mode::Float)
@@ -410,19 +412,26 @@ void math_sumprod(Attachment &c, Handle, std::span<const Value> args, ReturnSlot
     bool float_enabled = true, float_in_use = false;
     long int_total = 0;
     TripleLength float_total;
+    ReturnSlot p_item(c), q_item(c), term(c);
     for (;;) {
         RootScope iteration(c);
-        ReturnSlot p_item(c), q_item(c), term(c);
-        const auto ps = iter_next(c, p_iterator, p_item);
+        p_item.reset();
+        q_item.reset();
+        term.reset();
+        const auto ps = iter_next_owned(c, p_iterator, p_item);
         if (ps == NextStatus::Raised) {
             out.raised(p_item.exception());
             return;
         }
-        const auto qs = iter_next(c, q_iterator, q_item);
+        if (ps == NextStatus::Done)
+            p_item.reset();
+        const auto qs = iter_next_owned(c, q_iterator, q_item);
         if (qs == NextStatus::Raised) {
             out.raised(q_item.exception());
             return;
         }
+        if (qs == NextStatus::Done)
+            q_item.reset();
         if ((ps == NextStatus::Done) != (qs == NextStatus::Done)) {
             raise_error(c, CoreObject::ValueErrorType, U"Inputs are not the same length", out);
             return;

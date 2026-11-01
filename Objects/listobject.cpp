@@ -153,7 +153,7 @@ bool extend_list(Attachment &context, Handle self, Handle source, ReturnSlot &ou
                 throw std::bad_alloc();
             values.reserve(*hint);
             for (;;) {
-                const auto status = iter_next(context, it, value);
+                const auto status = detail::iter_next_owned(context, it, value);
                 if (status == NextStatus::Done)
                     break;
                 if (status == NextStatus::Raised) {
@@ -168,7 +168,7 @@ bool extend_list(Attachment &context, Handle self, Handle source, ReturnSlot &ou
         }
         reserve_extra(context, self, *hint);
         for (;;) {
-            const auto status = iter_next(context, it, value);
+            const auto status = detail::iter_next_owned(context, it, value);
             if (status == NextStatus::Done)
                 break;
             if (status == NextStatus::Raised) {
@@ -287,7 +287,7 @@ bool replacement_items(Attachment &context, Handle self, Handle source, RootScop
         throw std::bad_alloc();
     values.reserve(*hint);
     for (;;) {
-        const auto status = iter_next(context, it, value);
+        const auto status = detail::iter_next_owned(context, it, value);
         if (status == NextStatus::Done)
             return true;
         if (status == NextStatus::Raised) {

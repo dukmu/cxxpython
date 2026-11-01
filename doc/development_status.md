@@ -1,5 +1,73 @@
 # Development Status
 
+## 2026-11-01 Owned Iteration And Reduction Result Reuse
+
+Continues the active performance/cleanup goal after pushed a230e7a. Terra
+contributed focused tests and a bounded lifetime review; parent owns runtime
+integration, final verification and measurements. Both agents are closed.
+
+- Added an internal iter_next_owned entry for callers already holding an
+  independent iterator root. Public iteration retains its input snapshot; both
+  entries share checked protocol dispatch, resolve metadata after polling, and
+  preserve replacement of __next__ and __class__. Native allocation-free loops
+  now explicitly acknowledge GC requests without a GIL or collector bypass.
+- Existing math/builtin reductions reuse result slots across iterations and
+  clear them before the next callback. The shared double conversion accepts a
+  Value while still owning its input, avoiding intermediate Handles for traced
+  results and immutable tuple elements. Container consumers reuse their existing
+  iterator roots; no new cache, Python object type, allocator policy or ABI.
+- A differential fixture exposed retained StopIteration.value in sumprod: the
+  first exhausted result remained rooted while the second iterator collected.
+  The pre-fix executable reports terminal released False instead of CPython's
+  True, retained in .cache/native-iteration-exhaustion-before.log. Clear exhausted
+  results immediately, including prod's final-result path. This uses explicit
+  collection rather than assuming CPython's immediate reference-count deletion.
+- Review also found the previous output survived the new GC poll. The common
+  iteration entry now clears it after input admission and before polling. A
+  native weakref test queues another attachment's collection, then verifies the
+  discarded item dies at that rendezvous. Other new contracts cover allocation-
+  free GC progress, output aliasing, independent roots, foreign output rejection,
+  NoSafepoint admission and collecting/replacing/error callbacks.
+- Final Clang 21.1.8 -Werror builds pass. Release native acceptance is 369/369;
+  ASan/UBSan/LSan and TSan are each 353/353. Direct Python fixtures are 55/55 on
+  Release and ASan, 23/23 on TSan; the new fixture matches pinned CPython 3.12.14.
+  Formatting and diff checks pass. Logs are .cache/native-iteration-acceptance-*.
+  Initial test-call API compilation errors and sandbox-only LSan enumeration
+  failure were corrected; no warnings, sanitizer checks or budgets were relaxed.
+- After all builds/tests/agents exited, measured math_reduce, dict_int, allocate
+  and local matrix at one/four workers, three processes and nine values per
+  configuration with natural GC. Reused the a230e7a raw baseline; no new CPython
+  baseline or unrelated workload campaign. Raw runs/generated reports are in
+  .cache/benchmarks/native-iteration and native-iteration-comparison. Standard
+  pyperf comparison (.cache/native-iteration-pyperf.log) reports math_reduce
+  1.18x faster at one worker and 1.08x at four; the six other comparisons are not
+  significant. Median reduction times are 5.379/4.051 ms. Matrix medians are
+  397.846/167.286 ms, scaling 2.378x with four-worker CPU/wall 3.050. Native math's
+  four-worker CPU/wall is 0.796, not independent Python CPU-parallel evidence.
+- Separate perf 6.8 sampling retained 647 samples without loss, commands, callers
+  and matching build-id ELF under native-iteration-math-profile-1/perf-buildid.
+  Iteration is 58.58% inclusive, method-descriptor invocation 32.92% inclusive,
+  and Value root acquisition 10.82% self; these overlap and include startup and
+  warmup, not independent overhead percentages. The next dependency is reducing
+  repeated work in generic native protocol/root admission, not arithmetic sample
+  special cases. Absolute CPython gaps remain; this is a stable improvement, not
+  completion of the performance goal or resumption of full compatibility work.
+
+## 2026-11-01 Cache Cleanup
+
+Removed the consumed b81cc98 comparison executable, pip bytecode caches and
+empty logs. Replaced the duplicate a230e7a perf ELF copy with a hardlink to the
+retained immutable executable, preserving the build-id lookup and profile
+reproducibility. Disk use decreased from 2,106,988 KiB to 2,077,348 KiB.
+
+Kept the active Release/ASan/TSan incremental builds, Clang 21.1.8 toolchain,
+Boost headers, CPython 3.12.14 source/reference interpreter, perf 6.8.12 wrapper
+and dependencies, benchmark environment, raw measurements and validation logs.
+The Android TLS reproduction and symbols matching retained profiles also remain.
+No build/test process was running at cleanup. Tool startup/import checks passed;
+no runtime source or benchmark input was changed, and no regression rerun was
+needed. The performance/cleanup goal remains active, not complete.
+
 ## 2026-11-01 Native Dispatch Classification And Shared Double Conversion
 
 Continues the active performance/cleanup goal after pushed b81cc98. Terra owns

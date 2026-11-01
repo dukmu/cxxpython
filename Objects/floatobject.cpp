@@ -183,12 +183,16 @@ bool conversion_warning(Attachment &context, const std::u32string &message, Retu
 
 } // namespace
 
-// Adapted from CPython 3.12.14 PyFloat_AsDouble (PSF license).
 bool detail::float_as_double(Attachment &context, Handle input, double &number, ReturnSlot &out)
+{
+    return float_as_double(context, input.get(context), number, out);
+}
+// Adapted from CPython 3.12.14 PyFloat_AsDouble (PSF license).
+bool detail::float_as_double(Attachment &context, Value input, double &number, ReturnSlot &out)
 {
     out.check_caller(context);
     RootScope roots(context);
-    auto value = roots.root(input.get(context));
+    auto value = roots.root(input);
     out.reset(context);
     context.poll();
     if (const auto *data = maybe_float(context, value.get(context))) {

@@ -100,6 +100,44 @@ TEST_F(CoreNumbers, AllocationFreeNativeConversionsAcknowledgeGcRequests)
     }
 }
 
+TEST_F(CoreNumbers, ValueDoubleConversionKeepsSoleOutputInputAcrossCollection)
+{
+    ReturnSlot out(context);
+    create_type(context, {"Number"}, out);
+    const auto cls = roots.root(out.value());
+    make_float(context, 4.5, out);
+    const auto marker = roots.root(out.value());
+    SignatureLayout signature;
+    signature.parameters = {{U"self", ParameterKind::PositionalOnly}};
+    const std::array captures{cls.get(context), marker.get(context)};
+    make_native_function(
+        context, "collecting float", signature,
+        [](Attachment &c, Handle fn, std::span<const Value> args, ReturnSlot &result) {
+            c.collect();
+            const auto &captured = c.payload<NativeFunctionObject>(fn).captures;
+            EXPECT_EQ(c.type_of(args[0]), captured[0]);
+            result.ok(captured[1]);
+        },
+        captures, out);
+    const auto method = roots.root(out.value());
+    make_str(context, U"__float__", out);
+    set_attribute(context, cls, roots.root(out.value()), method, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    context.allocate_instance<InstanceObject>(cls, out);
+    double number = 0.0;
+    ASSERT_TRUE(detail::float_as_double(context, out.value(), number, out));
+    EXPECT_EQ(number, 4.5);
+    EXPECT_EQ(out.tag(), ResultTag::Empty);
+
+    Interpreter other;
+    Attachment foreign(other);
+    foreign.bootstrap_core();
+    out.ok(context.builtin(CoreObject::True));
+    EXPECT_THROW(detail::float_as_double(context, foreign.builtin(CoreObject::False), number, out),
+                 std::logic_error);
+    EXPECT_EQ(out.value(), context.builtin(CoreObject::True));
+}
+
 TEST_F(CoreNumbers, BoxedIdentityAndBoolAreNotConfusedWithUnboundOrInt)
 {
     auto zero = integer("0");

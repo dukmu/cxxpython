@@ -256,7 +256,7 @@ bool merge(Attachment &context, Handle self, Handle source, ReturnSlot &out, boo
         }
         auto keys = roots.root(iterator.value());
         for (;;) {
-            const auto status = iter_next(context, keys, key);
+            const auto status = detail::iter_next_owned(context, keys, key);
             if (status == NextStatus::Done)
                 return true;
             if (status == NextStatus::Raised) {
@@ -310,7 +310,7 @@ bool merge(Attachment &context, Handle self, Handle source, ReturnSlot &out, boo
     }
     auto entries = roots.root(iterator.value());
     for (;;) {
-        const auto status = iter_next(context, entries, next);
+        const auto status = detail::iter_next_owned(context, entries, next);
         if (status == NextStatus::Done)
             return true;
         if (status == NextStatus::Raised) {
@@ -325,7 +325,7 @@ bool merge(Attachment &context, Handle self, Handle source, ReturnSlot &out, boo
         }
         const auto items = pair.root(iterator.value());
         auto read = [&](ReturnSlot &item) {
-            const auto result = iter_next(context, items, item);
+            const auto result = detail::iter_next_owned(context, items, item);
             if (result == NextStatus::Raised)
                 out.raised(item.exception());
             else if (result == NextStatus::Done)
@@ -335,7 +335,7 @@ bool merge(Attachment &context, Handle self, Handle source, ReturnSlot &out, boo
         };
         if (!read(key) || !read(value))
             return false;
-        const auto extra = iter_next(context, items, next);
+        const auto extra = detail::iter_next_owned(context, items, next);
         if (extra == NextStatus::Raised) {
             out.raised(next.exception());
             return false;
@@ -561,7 +561,7 @@ void fromkeys(Attachment &context, Handle, std::span<const Value> args, ReturnSl
     auto sequence = roots.root(iterator.value());
     auto value = roots.root(args[2]);
     for (;;) {
-        auto status = iter_next(context, sequence, item);
+        auto status = detail::iter_next_owned(context, sequence, item);
         if (status == NextStatus::Done)
             break;
         if (status == NextStatus::Raised) {
