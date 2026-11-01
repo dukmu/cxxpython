@@ -373,6 +373,11 @@ TEST_F(CoreDict, OwnedOperationsKeepCallerRootsThroughCollectingCallbacks)
     dict_lookup(context, dictionary, reused, out);
     ASSERT_EQ(out.tag(), ResultTag::Ok);
     EXPECT_EQ(out.value(), value.get(context));
+    dict_store(context, dictionary, key, key, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    dict_lookup(context, dictionary, key, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(out.value(), key.get(context));
     context.collect();
     EXPECT_EQ(context.type_of(key.get(context)), cls.get(context));
     EXPECT_EQ(context.type_of(reused.get(context)), cls.get(context));
@@ -544,5 +549,49 @@ TEST_F(CoreDict, BindingRollbackIsNonallocatingAndPreservesReplacement)
     dict_lookup(context, dictionary, key, out);
     ASSERT_EQ(out.tag(), ResultTag::Ok);
     EXPECT_EQ(out.value(), value.get(context));
+}
+
+TEST_F(CoreDict, BindingIdentityAndCachedHashSurviveReplacementAndCollection)
+{
+    ReturnSlot out(context);
+    context.allocate_instance<DictObject>(roots.root(context.builtin(CoreObject::DictType)), out);
+    const auto dictionary = roots.root(out.value());
+    make_str(context, U"stable binding", out);
+    const auto key = roots.root(out.value());
+    make_str(context, U"stable binding", out);
+    const auto equal_key = roots.root(out.value());
+    make_int(context, 41, out);
+    const auto first = roots.root(out.value());
+    make_int(context, 42, out);
+    const auto second = roots.root(out.value());
+
+    detail::DictBinding inserted, replaced, found;
+    detail::dict_store_binding(context, dictionary, key, first, inserted, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    detail::dict_store_binding(context, dictionary, equal_key, second, replaced, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(inserted.identity, replaced.identity);
+    EXPECT_EQ(inserted.hash, replaced.hash);
+    context.collect();
+    context.set_allocation_limit(0);
+    detail::dict_lookup_binding(context, dictionary, equal_key, found, out);
+    const auto tag = out.tag();
+    const auto result = out.value();
+    context.set_allocation_limit(std::numeric_limits<std::size_t>::max());
+    ASSERT_EQ(tag, ResultTag::Ok);
+    EXPECT_EQ(result, second.get(context));
+    EXPECT_EQ(found.identity, inserted.identity);
+    EXPECT_EQ(found.hash, inserted.hash);
+    const auto &storage = *context.payload<DictObject>(dictionary.get(context)).contents;
+    ASSERT_EQ(storage.names.size(), 1U);
+    EXPECT_EQ(storage.names.front().entry.key, key.get(context));
+    EXPECT_EQ(storage.names.front().entry.hash, inserted.hash);
+    EXPECT_EQ(storage.names.front().entry.identity, inserted.identity);
+    EXPECT_FALSE(detail::dict_erase_binding(context, dictionary, inserted, first));
+    EXPECT_TRUE(detail::dict_erase_binding(context, dictionary, inserted, second));
+    detail::dict_store_binding(context, dictionary, equal_key, first, replaced, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_NE(replaced.identity, inserted.identity);
+    EXPECT_EQ(replaced.hash, inserted.hash);
 }
 } // namespace

@@ -4,6 +4,9 @@
 
 #include <boost/intrusive/set.hpp>
 
+#include <limits>
+#include <utility>
+
 namespace cxxpython::core {
 // The owning list and both indexes refer to this single stable native allocation.
 // Snapshots copy only Entry, never the hooks or the owning-list iterator.
@@ -27,10 +30,10 @@ struct DictObject::Node {
         }
     };
     struct HashKey {
-        using type = std::int64_t;
-        const type &operator()(const Node &node) const noexcept
+        using type = std::pair<std::int64_t, std::uint64_t>;
+        type operator()(const Node &node) const noexcept
         {
-            return node.entry.hash;
+            return {node.entry.hash, node.entry.identity};
         }
     };
 };
@@ -49,6 +52,11 @@ struct DictObject::Storage {
     Index index;
     HashIndex hashes;
     std::uint64_t next_identity = 1, keys_version = 0;
+    auto equal_hashes(std::int64_t hash)
+    {
+        return std::pair{hashes.lower_bound({hash, 0}),
+                         hashes.upper_bound({hash, std::numeric_limits<std::uint64_t>::max()})};
+    }
     std::size_t external_bytes() const noexcept
     {
         return sizeof(Storage) + names.size() * (sizeof(Node) + 2 * sizeof(void *));

@@ -279,13 +279,11 @@ bool dict_erase_binding(Attachment &context, Handle dictionary, DictBinding bind
     auto &data = *context.payload<DictObject>(target).contents;
     std::list<DictObject::Node> entries;
     return namespace_locked(context, data, [&] {
-        const auto [begin, end] = data.hashes.equal_range(binding.hash);
-        for (auto at = begin; at != end; ++at)
-            if (at->entry.identity == binding.identity && at->entry.value == value) {
-                remove_entry(context, target, data, *at, entries);
-                return true;
-            }
-        return false;
+        const auto at = data.hashes.find({binding.hash, binding.identity});
+        if (at == data.hashes.end() || at->entry.value != value)
+            return false;
+        remove_entry(context, target, data, *at, entries);
+        return true;
     });
 }
 void discard_name_table(Attachment &context, Value dictionary)
@@ -408,13 +406,12 @@ ResultView access_dictionary(Attachment &context, Handle dictionary, Handle key,
                 bool compare = true;
                 if (string && metadata.storage()) {
                     const auto &table = context.payload<DictStorage>(*metadata.storage());
-                    const auto at = table.index.find(*text);
-                    if (at != table.index.end() && context.type_of(entries[at->second].key) ==
-                                                       context.builtin(CoreObject::StrType)) {
-                        found = at->second;
+                    if (table.exact_string_keys) {
+                        const auto at = table.index.find(*text);
+                        if (at != table.index.end())
+                            found = at->second;
                         compare = false;
-                    } else if (table.exact_string_keys)
-                        compare = false;
+                    }
                 }
                 if (compare) {
                     for (std::size_t i = 0; i < entries.size(); ++i) {
@@ -483,6 +480,9 @@ ResultView access_dictionary(Attachment &context, Handle dictionary, Handle key,
                 if (found == data.index.end() ||
                     context.type_of(found->entry.key) != context.builtin(CoreObject::StrType))
                     return false;
+                if (data.hashes.lower_bound({found->entry.hash, 0}) !=
+                    data.hashes.iterator_to(*found))
+                    return false;
                 finish(*found);
                 return true;
             }))
@@ -490,24 +490,37 @@ ResultView access_dictionary(Attachment &context, Handle dictionary, Handle key,
         if (string && !cached_hash)
             hash_value = detail::name_hash(context, *text);
         std::list<DictObject::Node> prepared;
-        if (operation == DictOperation::Store || operation == DictOperation::SetDefault) {
-            prepared.emplace_back(
-                DictObject::Entry{key.get(context), value->get(context), hash_value}, text);
-            prepared.back().order = prepared.begin();
-        }
         for (;;) {
+            if (namespace_locked(context, data, [&] {
+                    const auto first = data.hashes.lower_bound({hash_value, 0});
+                    if (first == data.hashes.end() || first->entry.hash != hash_value)
+                        return operation == DictOperation::Lookup ||
+                               operation == DictOperation::Erase;
+                    // A later identity match must still observe earlier equality callbacks.
+                    if (first->entry.key != key.get(context))
+                        return false;
+                    finish(*first);
+                    return true;
+                }))
+                return out.result();
             RootScope iteration(context);
             std::vector<DictObject::Entry> candidates;
             std::uint64_t version;
             for (;;) {
-                const auto count =
-                    namespace_locked(context, data, [&] { return data.hashes.count(hash_value); });
+                const auto count = namespace_locked(context, data, [&] {
+                    version = data.keys_version;
+                    const auto [begin, end] = data.equal_hashes(hash_value);
+                    return static_cast<std::size_t>(std::distance(begin, end));
+                });
+                if (!count)
+                    break;
                 candidates.reserve(count);
                 if (namespace_locked(context, data, [&] {
-                        if (data.hashes.count(hash_value) > candidates.capacity())
+                        const auto [begin, end] = data.equal_hashes(hash_value);
+                        if (static_cast<std::size_t>(std::distance(begin, end)) >
+                            candidates.capacity())
                             return false;
                         version = data.keys_version;
-                        const auto [begin, end] = data.hashes.equal_range(hash_value);
                         for (auto at = begin; at != end; ++at)
                             candidates.push_back(at->entry);
                         return true;
@@ -520,6 +533,11 @@ ResultView access_dictionary(Attachment &context, Handle dictionary, Handle key,
             }
             bool restart = false;
             for (const auto &entry : candidates) {
+                if (!namespace_locked(context, data, [&] {
+                        return data.keys_version == version ||
+                               data.hashes.find({hash_value, entry.identity}) != data.hashes.end();
+                    }))
+                    continue;
                 detail::container_equal_owned(context, iteration.root(entry.key), key, temporary);
                 if (temporary.tag() == ResultTag::Raised) {
                     out.raised(temporary.exception());
@@ -528,35 +546,49 @@ ResultView access_dictionary(Attachment &context, Handle dictionary, Handle key,
                 if (temporary.value() != context.builtin(CoreObject::True))
                     continue;
                 const bool committed = namespace_locked(context, data, [&] {
-                    const auto [begin, end] = data.hashes.equal_range(hash_value);
-                    for (auto at = begin; at != end; ++at)
-                        if (at->entry.identity == entry.identity) {
-                            finish(*at);
-                            return true;
-                        }
-                    return false;
+                    const auto at = data.hashes.find({hash_value, entry.identity});
+                    if (at == data.hashes.end())
+                        return false;
+                    finish(*at);
+                    return true;
                 });
                 if (committed)
                     return out.result();
                 restart = true;
                 break;
             }
-            if (!restart && namespace_locked(context, data, [&] {
-                    if (data.keys_version != version)
-                        return false;
-                    if (operation == DictOperation::Store ||
-                        operation == DictOperation::SetDefault) {
-                        detail::insert_entry(context, dictionary.get(context), data, prepared);
-                        if (binding)
-                            *binding = {data.names.back().entry.hash,
-                                        data.names.back().entry.identity};
-                        out.ok(operation == DictOperation::SetDefault
-                                   ? value->get(context)
-                                   : context.builtin(CoreObject::None));
-                    }
-                    return true;
-                }))
-                return out.result();
+            if (!restart) {
+                if ((operation == DictOperation::Store || operation == DictOperation::SetDefault) &&
+                    prepared.empty()) {
+                    prepared.emplace_back(
+                        DictObject::Entry{key.get(context), value->get(context), hash_value}, text);
+                    prepared.back().order = prepared.begin();
+                }
+                if (namespace_locked(context, data, [&] {
+                        if (data.keys_version != version) {
+                            auto [at, end] = data.equal_hashes(hash_value);
+                            for (const auto &entry : candidates) {
+                                if (at == end || at->entry.identity != entry.identity)
+                                    return false;
+                                ++at;
+                            }
+                            if (at != end)
+                                return false;
+                        }
+                        if (operation == DictOperation::Store ||
+                            operation == DictOperation::SetDefault) {
+                            detail::insert_entry(context, dictionary.get(context), data, prepared);
+                            if (binding)
+                                *binding = {data.names.back().entry.hash,
+                                            data.names.back().entry.identity};
+                            out.ok(operation == DictOperation::SetDefault
+                                       ? value->get(context)
+                                       : context.builtin(CoreObject::None));
+                        }
+                        return true;
+                    }))
+                    return out.result();
+            }
             context.poll();
         }
     } catch (const std::bad_alloc &) {

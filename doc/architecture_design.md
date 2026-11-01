@@ -224,6 +224,18 @@ detaches its hooks before freeing it; snapshots still copy only lightweight
 Entry values. Include/internal/dict.hpp hides these native links, indexes and
 storage from public object headers. Constructor/destructor/traversal and byte
 accounting live beside the storage operations in dictstorage.cpp.
+The hash index orders existing nodes by (hash, stable identity), so callback
+revalidation and conditional rollback find an identity without a linear bucket
+scan. Empty-hash misses and first-candidate identity hits finish in one short
+commit without materializing collision snapshots. Exact-string index hits must
+also be the first hash candidate; mixed snapshots only use the name shortcut
+when every key is an exact string. Earlier user equality callbacks and errors
+therefore remain observable. Nodes are prepared outside the lock only after an
+insertion is actually needed. General collision snapshots root all candidates;
+after reentry they skip deleted identities, and a miss validates its hash range
+rather than retrying forever on unrelated-key insertions. Python callbacks never
+run under a storage lock. Mutation can change probe order: the native balanced
+tree does not promise CPython's physical-table callback counts after reinsertion.
 `Objects/setobject.cpp` owns set and
 frozenset construction, representation/hash, lookup and element mutation;
 `Objects/setoperations.cpp` owns their bulk algebra and method/operator bindings.

@@ -1,5 +1,87 @@
 # Development Status
 
+## 2026-11-01 Dictionary Identity Hits And Collision Revalidation
+
+Continues the active performance/cleanup goal after pushed 63b1426. Parent owns
+storage/index changes and acceptance; Terra supplied native binding/root tests
+and direct collision probes against pinned CPython and the immutable baseline,
+and is closed. Parent extended the probes for removed candidates and progress.
+
+- Ordinary dictionary operations finish empty-hash misses and first-candidate
+  identity hits in a short commit without collision vectors/roots. A later
+  identity match cannot skip earlier equality callbacks. Insertion nodes are
+  prepared outside the lock only after comparisons establish a missing key;
+  replacement/setdefault hits do not preallocate an unused node. Contended
+  insertion can still prepare a node before another writer wins; this is not a
+  claim that every complete operation is free of native allocation.
+- Reused the existing intrusive index with a (hash, stable identity) key. This
+  preserves hash/insertion order and supports O(log n) identity revalidation and
+  conditional rollback without a third index or quadratic collision scans. The
+  node/storage fields, owning list, rooted snapshots and GC traversal are unchanged.
+  No runtime class, allocator/pool, global lock, GIL, Python RC, native extension
+  ABI or collector-policy change. This is not an amortized-O(1) hash-table claim.
+- Fixed a baseline correctness defect: exact-string index hits could skip an
+  earlier custom colliding key's equality callback and swallow its exception.
+  A mutable name hit must also be the first hash candidate; mixed immutable
+  snapshots only use name lookup when all keys are exact strings. The new fixture
+  checks all seven item/get/store/setdefault/erase/pop/contains operations, both
+  ordinary and raising comparisons, while preserving same-object shortcuts and
+  required hash calls. These failures reproduce on 63b1426, not just the new code.
+- Fixed two more reproduced baseline defects. A callback clearing the dictionary
+  could leave later deleted candidates being compared and raising spuriously;
+  changed snapshots now check live identities before invoking them. Failed lookup
+  could retry forever when equality continually inserted unrelated-hash keys;
+  commit validates its actual hash-range identities instead of rejecting every
+  dictionary-wide version change. The regression bounds the old repetition by
+  raising after four comparisons; production has no retry limit or hidden fallback.
+- Structural mutation tests check result/size, initial callbacks, deleted-key
+  exclusion and progress, not CPython's exact physical probe count after a
+  delete/reinsert. The original full traces remain in dict-probe-fixture logs:
+  native balanced-tree order can differ from CPython's perturbation table after
+  mutation. Fixed-topology collision traces remain strict CPython goldens. No
+  committed regression was removed or weakened to hide the discovered defects.
+- Strict Clang 21.1.8 IPO Release passes all 363 selected native contracts: 15
+  focused dict cases plus 348 other contracts, including 16 bootstrap/promotion
+  fault shards, without repeating the focused group. ASan/UBSan/LSan and TSan
+  each pass 347 relevant native contracts. Release passes 31 distinct direct
+  Python cases (new focused fixture plus 30 others); ASan passes all 31, TSan
+  passes 13 targeted scripts. No sanitizer reports, timeouts or budget changes.
+  Each build only recompiles storage and its native test, five build actions;
+  formatting/diff checks pass. Unrelated parser/full-loader/library campaigns
+  were not repeated. Evidence is .cache/dict-probe-{release,asan,tsan}-*.log.
+- Direct before/after sys.getsizeof reports are identical: empty dict 216 bytes,
+  64 integer keys 7384, 64 string keys 7384. These are accounted object/storage
+  bytes, not allocator transient counts or RSS. Logs are dict-probe-footprint-*.
+- After all builds/tests exited, ran only affected dict_int size=512, allocate
+  size=100000 and matrix N=64 at one/four workers, three processes, one warmup and
+  three values/process. Reused retained 63b1426 raw baselines, not a fresh
+  interleaved A/B or repeated CPython/I/O/startup campaign. Natural GC and result
+  validation remain on; raw runs/generated reports and standard pyperf comparisons
+  are .cache/benchmarks/dict-probe-{integer,allocation,matrix}{,-comparison}.
+- Integer medians are 134.381/57.725 ms versus 145.100/59.624. Standard pyperf
+  finds about 1.09x single-worker improvement, not a significant four-worker change.
+  Scaling is 2.328x, four-worker CPU/wall 2.779 and variation 8.5%. Allocate gives
+  682.538/277.656 versus 694.556/278.614, neither significant; scaling 2.458x,
+  CPU/wall 2.975. Matrix gives 399.642/158.961 versus 406.824/162.689, also not
+  significant; scaling 2.514x, CPU/wall 3.156. No blanket workload speedup claim.
+  The retained single-worker CPython integer median is 2.591 ms, still about a
+  52x absolute gap. CPU-parallel gains remain; performance acceptance is unfinished.
+- One separate 32-loop integer software profile retains 945 samples, including
+  startup/warmup, in dict-probe-integer-profile-1. Self shares are dictionary
+  access 7.51%, root-acquisition symbols 7.51%/1.69%, protocol invocation 5.19%,
+  VM run 4.44%, layout checks 4.02%, resolution 2.86% and type lookup 2.65%.
+  Shares are not allocation counts, hardware-cache rates or GC wall-time fractions.
+  Caller attribution is incomplete even with the existing DWARF capture; VM run
+  has a 0x19e8-byte stack frame while perf's default dump is 8192 bytes. Larger
+  stack capture/unwind quality needs validation before attributing whole dispatch
+  chains or expanding native metadata caches. Do not keep repacking this dict
+  path based only on relative self percentages. The performance goal stays active;
+  the full compatibility route stays paused. matrix.py is unchanged and untracked.
+
+Retired the consumed edfbd2f comparison executable and its old raw integer perf
+capture, retaining their self/caller text, profile.jsonl and timing records. The
+63b1426 comparison executable, latest raw profile, tools and active builds remain.
+
 ## 2026-11-01 Snapshot VM Operands At One ObjectOps Boundary
 
 Continues the active performance/cleanup goal after pushed edfbd2f. Parent owns
