@@ -1,5 +1,61 @@
 # Development Status
 
+## 2026-11-01 Share Attribute Dispatch And Borrow Frame Inputs
+
+Continues the performance/cleanup goal after 5b3431b. Two Terra workers supplied
+the outer attribute dispatcher/VM integration/direct fixture and the private call
+header extraction; parent completed the default implementation and validation.
+Both workers are closed.
+
+- Attribute get/set/delete share one dispatcher rather than three copies of
+  protocol selection, fallback and result handling. Public Handle entries still
+  validate and snapshot inputs before output reset or callbacks. VM attribute
+  instructions borrow their running Frame/Code inputs until the operation has
+  returned; they do not pop live operands before collecting Python hooks finish.
+- Default native attribute wrappers borrow dispatch-owned arguments. MRO reads,
+  descriptor precedence, instance dictionaries and bound-method delegation share
+  that ownership path; dictionary operations reuse their independently rooted
+  inputs instead of snapshotting them twice. Selected descriptors, type metadata
+  and dictionary snapshots retain their precise operation-local roots. Receiver,
+  name/subtype, epoch, depth and native-return checks remain in place. No GIL,
+  cache tier, object layout change or benchmark-specific numeric path was added.
+- Private call preparation and binder declarations moved from objects.hpp into
+  Include/internal/call.hpp; its three actual users include that boundary. Public
+  layouts and execution contracts are unchanged. The new Python fixture covers
+  collecting get/set/delete descriptors, metaclasses, AttributeError-only fallback,
+  other hook exceptions, class changes and joined threads with captured errors.
+  Its stdout was generated with the pinned CPython 3.12.14, not hand-authored.
+- One strict Clang 21.1.8 Release main build passes the 62 affected native tests
+  and six direct Python scenarios. The ASan/UBSan/LSan product build passes four
+  selected collecting/ownership scenarios with leak checking enabled. No full
+  regression or TSan rebuild was performed: shared-field synchronization and GC
+  epoch implementation did not change. Format and diff checks pass. Evidence is
+  retained in .cache/attribute-owned-{release-native,release-scripts,asan-scripts}.log.
+- Only the changed interpreter ran the affected object_protocol/allocate/file_io
+  campaign: one/four workers, fixed total work, natural GC, three processes and
+  nine values/configuration. All 18 planned runs passed. Historical interpreters
+  and CPython performance were NOT executed again. Reports generated from retained
+  raw data live in .cache/benchmarks/attribute-owned and attribute-owned-comparison;
+  standard analysis is .cache/attribute-owned-pyperf.log. No tables were copied.
+- pyperf finds object-one 1.16x faster, allocate-one/four 1.04x/1.06x faster and
+  file-I/O-one 1.11x faster against the retained frame-borrow campaign. Object-four
+  and file-I/O-four differences are not significant. Current object medians are
+  64.338/30.541 ms, scaling 2.107x with four-worker CPU/wall 1.948; its 11.9% RSD
+  warning and all samples remain. This improves a generic runtime path but does
+  not close the large CPython gap or establish improved multiworker scaling.
+- One current-only software CPU capture retains 468 samples, zero lost, and its
+  matching ELF under .cache/benchmarks/attribute-owned-object-profile and the perf
+  build-id cache. Root acquisition, malloc/free, attribute bridging and GC sweep
+  remain visible costs; sample shares are not cumulative pauses or hardware-cache
+  measurements. Recompressed regenerated ASan debug sections without stripping
+  symbols or deleting useful tools/builds/evidence. matrix.py remains untouched,
+  untracked and excluded; no matrix benchmark was repeated.
+
+The goal remains active. Use the retained capture to address general allocation/
+object-protocol costs next, rather than another round of old baseline execution.
+The full compatibility route stays paused; dill still requires real marshal/Code
+support and is not claimed compatible by this performance node.
+
 ## 2026-11-01 Share Call Preparation And Transfer Frame Locals
 
 Continues performance/cleanup after 4f00bca. Parent integrated frame creation and

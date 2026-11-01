@@ -186,11 +186,15 @@ hash consumers reuse the normalized native hash rather than box it only to
 immediately unbox it; the public hash operation still returns a managed int.
 The same callbacks, normalization/errors and short synchronized commits apply.
 Public ObjectOps snapshot Value inputs before any output reset/callback; Handle
-forms validate and delegate. Arithmetic, unary, comparison, truth and item bodies
+forms validate and delegate. Arithmetic, unary, comparison, truth, item and attribute bodies
 also have private owned entries that borrow Values from the running VM Frame
 instead of registering a duplicate input-root set. The Frame's traced operand
 stack is not trimmed or overwritten until the complete operation returns, and a
-running frame cannot be cleared. Namespace stores borrow their Frame/Code-owned
+running frame cannot be cleared. Attribute get/set/delete share one dispatcher;
+their default native wrappers borrow dispatch-owned arguments rather than root
+them again. Dynamically selected descriptors, types and dictionary snapshots
+retain operation-local roots, including mixed-key and collecting callbacks.
+Namespace stores borrow their Frame/Code-owned
 mapping/name edges under the same rule. Descriptor snapshot roots, callbacks,
 epoch revalidation, depth/return checks and the VM instruction exception boundary
 are unchanged; no borrowed operand may rely on the output being reset. Iteration resolves
@@ -663,8 +667,10 @@ not a logger/time-specific attribute. Shared attribute errors use declared nativ
 module metadata while Python class names remain unqualified. Full builtin/method
 reflection and logging.config/network handler dependencies remain unfinished.
 
-Runtime contracts are in `Include/cxxpython/`. Compiler-private implementation
-structures belong in `Include/internal/`. All C++ interfaces remain unstable.
+Runtime contracts are in `Include/cxxpython/`. Compiler- and runtime-private
+implementation structures belong in `Include/internal/`; private call preparation
+and argument binding declarations live in `Include/internal/call.hpp`. All C++
+interfaces remain unstable.
 `Include/cxxpython/extension.h` specifies the experimental C11 extension ABI;
 there is no CPython ABI compatibility promise.
 

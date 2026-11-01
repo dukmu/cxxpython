@@ -9,6 +9,7 @@
 #include "cxxpython/typevarobject.hpp"
 #include "internal/abstract.hpp"
 #include "internal/aiterobject.hpp"
+#include "internal/call.hpp"
 #include "internal/errors.hpp"
 #include "internal/exceptiongroup.hpp"
 #include "internal/patternmatching.hpp"
@@ -1392,17 +1393,16 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
             case Opcode::LoadAttr:
             case Opcode::StoreAttr:
             case Opcode::DeleteAttr: {
-                RootScope roots(context);
-                const auto name = roots.root(activation.names()[operand]);
+                const auto name = activation.names()[operand];
                 const auto base = data.sp - (opcode == Opcode::StoreAttr ? 2 : 1);
-                const auto object = roots.root(data.operands[base]);
+                const auto object = data.operands[base];
                 if (opcode == Opcode::LoadAttr)
-                    get_attribute(context, object, name, result);
+                    detail::get_attribute_owned(context, object, name, result);
                 else if (opcode == Opcode::StoreAttr)
-                    set_attribute(context, object, name, roots.root(data.operands[base + 1]),
-                                  result);
+                    detail::set_attribute_owned(context, object, name, data.operands[base + 1],
+                                                result);
                 else
-                    del_attribute(context, object, name, result);
+                    detail::del_attribute_owned(context, object, name, result);
                 if (raised(result)) {
                     activation.raising(result.exception());
                     break;

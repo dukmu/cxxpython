@@ -1,3 +1,4 @@
+#include "internal/call.hpp"
 #include "internal/abstract.hpp"
 #include "internal/codecs.hpp"
 #include "internal/errors.hpp"
@@ -517,15 +518,15 @@ bool dictionary_field(Attachment &context, Value object, ReturnSlot &out)
     context.load(object, *field, out);
     return true;
 }
-bool attribute_name(Attachment &context, Handle name, ReturnSlot &out)
+bool attribute_name(Attachment &context, Value name, ReturnSlot &out)
 {
-    if (context.has_layout<StrObject>(name.get(context)) &&
+    if (context.has_layout<StrObject>(name) &&
         is_subtype(context, context.type_of(name), context.builtin(CoreObject::StrType)))
         return true;
     type_error(context, U"attribute name must be string", out);
     return false;
 }
-void lookup_attribute(Attachment &context, Value type, Handle name, ReturnSlot &out)
+void lookup_attribute(Attachment &context, Value type, Value name, ReturnSlot &out)
 {
     RootScope roots(context);
     roots.root(type);
@@ -548,15 +549,14 @@ void lookup_attribute(Attachment &context, Value type, Handle name, ReturnSlot &
             }
         }
         if (auto dictionary = view.dictionary()) {
-            dict_lookup(context, roots.root(*dictionary), name, out);
+            detail::dict_lookup_owned(context, roots.root(*dictionary), roots.root(name), out);
             if (out.tag() != ResultTag::Empty)
                 return;
         }
     }
 }
-void get_default(Attachment &context, Handle object, Handle name, bool type_lookup, ReturnSlot &out)
+void get_default(Attachment &context, Value value, Value name, bool type_lookup, ReturnSlot &out)
 {
-    auto value = object.get(context);
     RootScope roots(context);
     auto type_root = roots.root(context.type_of(value));
     const auto type = type_root.get(context);
@@ -591,7 +591,8 @@ void get_default(Attachment &context, Handle object, Handle name, bool type_look
     } else {
         ReturnSlot dictionary(context);
         if (dictionary_field(context, value, dictionary) && dictionary.tag() == ResultTag::Ok) {
-            dict_lookup(context, roots.root(dictionary.value()), name, out);
+            detail::dict_lookup_owned(context, roots.root(dictionary.value()), roots.root(name),
+                                      out);
             if (out.tag() != ResultTag::Empty)
                 return;
         }
@@ -601,8 +602,8 @@ void get_default(Attachment &context, Handle object, Handle name, bool type_look
         return;
     }
     if (type == context.builtin(CoreObject::BoundMethodType)) {
-        get_attribute(context, roots.root(context.payload<BoundMethodObject>(value).function), name,
-                      out);
+        detail::get_attribute_owned(context, context.payload<BoundMethodObject>(value).function,
+                                    name, out);
         return;
     }
     const auto label =
@@ -614,10 +615,9 @@ void get_default(Attachment &context, Handle object, Handle name, bool type_look
                 out);
 }
 
-void change_default(Attachment &context, Handle object, Handle name, std::optional<Handle> value,
+void change_default(Attachment &context, Value target, Value name, std::optional<Value> value,
                     bool type_mutation, ReturnSlot &out)
 {
-    auto target = object.get(context);
     const auto &text = context.payload<StrObject>(name).value;
     RootScope roots(context);
     if (type_mutation) {
@@ -648,7 +648,7 @@ void change_default(Attachment &context, Handle object, Handle name, std::option
         }
         std::vector<Value> args{target};
         if (value)
-            args.push_back(value->get(context));
+            args.push_back(*value);
         detail::invoke_protocol(context, *descriptor, slot, args, out, roots);
         if (!raised(out))
             out.ok(context.builtin(CoreObject::None));
@@ -686,9 +686,10 @@ void change_default(Attachment &context, Handle object, Handle name, std::option
         }
     }
     if (value)
-        dict_store(context, roots.root(dictionary.value()), name, *value, out);
+        detail::dict_store_owned(context, roots.root(dictionary.value()), roots.root(name),
+                                 roots.root(*value), out);
     else {
-        dict_erase(context, roots.root(dictionary.value()), name, out);
+        detail::dict_erase_owned(context, roots.root(dictionary.value()), roots.root(name), out);
         if (out.tag() == ResultTag::Empty)
             raise_error(context, CoreObject::AttributeErrorType, text, out);
         else if (!raised(out))
@@ -702,6 +703,35 @@ bool type_receiver(Attachment &context, Value value)
 }
 
 enum class AttributeOperation { Get, Set, Delete };
+void attribute_dispatch(Attachment &context, Value self, Value name, Value value,
+                        AttributeOperation operation, ReturnSlot &out)
+{
+    out.reset(context);
+    if (!attribute_name(context, name, out))
+        return;
+    RootScope roots(context);
+    const auto type = context.type_of(self);
+    const auto protocol = operation == AttributeOperation::Get   ? Protocol::GetAttribute
+                          : operation == AttributeOperation::Set ? Protocol::SetAttribute
+                                                                 : Protocol::DelAttribute;
+    std::array args{name, value};
+    const auto arguments =
+        std::span<const Value>(args).first(operation == AttributeOperation::Set ? 2 : 1);
+    auto slot = detail::resolve_protocol(context, type, protocol, roots);
+    if (slot.state == SlotState::Missing)
+        type_error(context, U"missing special method", out);
+    else
+        detail::invoke_protocol(context, self, slot, arguments, out, roots);
+    if (operation == AttributeOperation::Get) {
+        if (raised(out) && is_subtype(context, context.type_of(out.exception()),
+                                      context.builtin(CoreObject::AttributeErrorType))) {
+            auto fallback = detail::resolve_protocol(context, type, Protocol::GetAttr, roots);
+            if (fallback.state != SlotState::Missing)
+                detail::invoke_protocol(context, self, fallback, arguments, out, roots);
+        }
+    } else if (!raised(out))
+        out.ok(context.builtin(CoreObject::None));
+}
 void attribute_bridge(Attachment &context, Value function, std::span<const Value> args,
                       AttributeOperation operation, ReturnSlot &out)
 {
@@ -712,17 +742,14 @@ void attribute_bridge(Attachment &context, Value function, std::span<const Value
         type_error(context, U"attribute wrapper requires a compatible receiver", out);
         return;
     }
-    RootScope roots(context);
-    auto self = roots.root(args[0]);
-    auto name = roots.root(args[1]);
-    if (!attribute_name(context, name, out))
+    // Dispatch retains native arguments through this call, including collecting hooks.
+    if (!attribute_name(context, args[1], out))
         return;
     if (operation == AttributeOperation::Get)
-        get_default(context, self, name, type_mode, out);
+        get_default(context, args[0], args[1], type_mode, out);
     else
-        change_default(context, self, name,
-                       operation == AttributeOperation::Delete ? std::optional<Handle>{}
-                                                               : roots.root(args[2]),
+        change_default(context, args[0], args[1],
+                       operation == AttributeOperation::Delete ? std::optional<Value>{} : args[2],
                        type_mode, out);
 }
 void attribute_get(Attachment &context, Value fn, std::span<const Value> args, ReturnSlot &out)
@@ -926,23 +953,7 @@ ResultView get_attribute(Attachment &context, Handle object, Handle name, Return
         RootScope roots(context);
         auto self = roots.root(object.get(context));
         auto rooted_name = roots.root(name.get(context));
-        out.reset(context);
-        if (!attribute_name(context, rooted_name, out))
-            return;
-        auto value = self.get(context);
-        auto type = context.type_of(value);
-        std::array args{rooted_name.get(context)};
-        auto slot = detail::resolve_protocol(context, type, Protocol::GetAttribute, roots);
-        if (slot.state == SlotState::Missing)
-            type_error(context, U"missing special method", out);
-        else
-            detail::invoke_protocol(context, value, slot, args, out, roots);
-        if (raised(out) && is_subtype(context, context.type_of(out.exception()),
-                                      context.builtin(CoreObject::AttributeErrorType))) {
-            auto fallback = detail::resolve_protocol(context, type, Protocol::GetAttr, roots);
-            if (fallback.state != SlotState::Missing)
-                detail::invoke_protocol(context, value, fallback, args, out, roots);
-        }
+        detail::get_attribute_owned(context, self.get(context), rooted_name.get(context), out);
     });
 }
 ResultView set_attribute(Attachment &context, Handle object, Handle name, Handle value,
@@ -953,18 +964,8 @@ ResultView set_attribute(Attachment &context, Handle object, Handle name, Handle
         auto self = roots.root(object.get(context));
         auto rooted_name = roots.root(name.get(context));
         auto rooted_value = roots.root(value.get(context));
-        out.reset(context);
-        if (!attribute_name(context, rooted_name, out))
-            return;
-        std::array args{rooted_name.get(context), rooted_value.get(context)};
-        auto slot =
-            detail::resolve_protocol(context, context.type_of(self), Protocol::SetAttribute, roots);
-        if (slot.state == SlotState::Missing)
-            type_error(context, U"missing special method", out);
-        else
-            detail::invoke_protocol(context, self, slot, args, out, roots);
-        if (!raised(out))
-            out.ok(context.builtin(CoreObject::None));
+        detail::set_attribute_owned(context, self.get(context), rooted_name.get(context),
+                                    rooted_value.get(context), out);
     });
 }
 ResultView del_attribute(Attachment &context, Handle object, Handle name, ReturnSlot &out)
@@ -973,19 +974,22 @@ ResultView del_attribute(Attachment &context, Handle object, Handle name, Return
         RootScope roots(context);
         auto self = roots.root(object.get(context));
         auto rooted_name = roots.root(name.get(context));
-        out.reset(context);
-        if (!attribute_name(context, rooted_name, out))
-            return;
-        std::array args{rooted_name.get(context)};
-        auto slot =
-            detail::resolve_protocol(context, context.type_of(self), Protocol::DelAttribute, roots);
-        if (slot.state == SlotState::Missing)
-            type_error(context, U"missing special method", out);
-        else
-            detail::invoke_protocol(context, self, slot, args, out, roots);
-        if (!raised(out))
-            out.ok(context.builtin(CoreObject::None));
+        detail::del_attribute_owned(context, self.get(context), rooted_name.get(context), out);
     });
+}
+
+void detail::get_attribute_owned(Attachment &context, Value object, Value name, ReturnSlot &out)
+{
+    attribute_dispatch(context, object, name, name, AttributeOperation::Get, out);
+}
+void detail::set_attribute_owned(Attachment &context, Value object, Value name, Value value,
+                                 ReturnSlot &out)
+{
+    attribute_dispatch(context, object, name, value, AttributeOperation::Set, out);
+}
+void detail::del_attribute_owned(Attachment &context, Value object, Value name, ReturnSlot &out)
+{
+    attribute_dispatch(context, object, name, name, AttributeOperation::Delete, out);
 }
 
 namespace detail {

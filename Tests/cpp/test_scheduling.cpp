@@ -1,4 +1,5 @@
 #include "cxxpython/execution.hpp"
+#include "internal/call.hpp"
 
 #include <gtest/gtest.h>
 

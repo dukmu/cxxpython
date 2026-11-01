@@ -536,43 +536,10 @@ void install_execution(Attachment &context, std::span<const Handle> core);
 void execute_function(Attachment &context, Handle function, CallArgsView args,
                       std::optional<Value> receiver, ReturnSlot &out);
 void execute_class_body(Attachment &context, Handle function, Handle mapping, ReturnSlot &out);
-struct FunctionDefaults {
-    std::span<const Value> positional;
-    std::optional<Value> keywords;
-};
-struct PreparedPythonCall {
-    Handle function;
-    std::optional<Handle> receiver;
-    std::vector<Value> positional;
-    std::vector<KeywordArg> keywords;
-    std::optional<CallArgsView> borrowed_arguments;
-    CallArgsView arguments() const noexcept
-    {
-        return borrowed_arguments.value_or(CallArgsView{positional, keywords});
-    }
-};
-// A prepared target borrows the caller's RootScope; otherwise out owns
-// the completed value/exception. No prepared target is a Python value.
-std::optional<PreparedPythonCall> prepare_call(Attachment &context, Value callable,
-                                               CallArgsView args, RootScope &roots,
-                                               ReturnSlot &out);
-// VM inputs and argument buffers remain live through immediate frame creation.
-// Temporary receiver-prefix buffers are still copied by ordinary dispatch.
-std::optional<PreparedPythonCall> prepare_frame_call(Attachment &, Value, CallArgsView, RootScope &,
-                                                     ReturnSlot &);
 void validate_return(Attachment &context, ReturnSlot &out);
 void link_exception_context(Attachment &context, Value exception);
 void append_traceback(Attachment &context, Handle exception, Handle frame, ReturnSlot &out);
 void install_exception_runtime(Attachment &context, std::span<const Handle> core);
-bool bind_arguments(Attachment &context, const SignatureLayout &signature, CallArgsView args,
-                    std::optional<Value> receiver, RootScope &roots, std::vector<Value> &bound,
-                    ReturnSlot &out, std::optional<FunctionDefaults> defaults = {});
-// Locals must be empty slots sized for the entire frame, including *args/**kwargs. The caller
-// roots arguments and receiver through frame creation; locals are not themselves GC roots.
-bool bind_frame_arguments(Attachment &context, const SignatureLayout &signature, CallArgsView args,
-                          std::optional<Value> receiver, RootScope &roots,
-                          std::vector<std::optional<Value>> &locals, ReturnSlot &out,
-                          std::optional<FunctionDefaults> defaults = {});
 void install_instance_dictionary(Attachment &context, Handle type);
 void install_instance_weakrefs(Attachment &context, Handle type);
 void install_slot_descriptors(Attachment &context, Handle type, std::size_t first);
