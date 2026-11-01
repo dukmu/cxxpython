@@ -381,10 +381,8 @@ void slice_item(Attachment &context, Handle self, Handle key, std::optional<Hand
     }
 }
 template <ItemOperation Operation>
-void item(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
+void item_kernel(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
-    if (!receiver(context, args[0], out))
-        return;
     RootScope roots(context);
     const auto self = roots.root(args[0]);
     if constexpr (Operation != ItemOperation::Pop) {
@@ -430,6 +428,12 @@ void item(Attachment &context, Value, std::span<const Value> args, ReturnSlot &o
         raise_error(context, CoreObject::IndexErrorType, U"list index out of range", out);
     else if constexpr (Operation == ItemOperation::Delete)
         out.ok(context.builtin(CoreObject::None));
+}
+template <ItemOperation Operation>
+void item(Attachment &context, Value function, std::span<const Value> args, ReturnSlot &out)
+{
+    if (receiver(context, args[0], out))
+        item_kernel<Operation>(context, function, args, out);
 }
 void size(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
@@ -753,6 +757,26 @@ void make_list(Attachment &context, std::span<const Value> values, ReturnSlot &o
                                           std::vector<Value>(values.begin(), values.end()));
 }
 namespace detail {
+bool try_list_item(Attachment &context, const ResolvedSlot &slot, std::span<const Value> args,
+                   ReturnSlot &out)
+{
+    if (args.empty() || context.type_of(args[0]) != context.builtin(CoreObject::ListType) ||
+        !context.has_layout<ListObject>(args[0]))
+        return false;
+    switch (slot.protocol) {
+    case Protocol::GetItem:
+        return try_native_operation(context, slot, args, item<ItemOperation::Get>,
+                                    item_kernel<ItemOperation::Get>, out);
+    case Protocol::SetItem:
+        return try_native_operation(context, slot, args, item<ItemOperation::Set>,
+                                    item_kernel<ItemOperation::Set>, out);
+    case Protocol::DelItem:
+        return try_native_operation(context, slot, args, item<ItemOperation::Delete>,
+                                    item_kernel<ItemOperation::Delete>, out);
+    default:
+        return false;
+    }
+}
 void sort_list(Attachment &context, Handle self, Handle key, bool reverse, ReturnSlot &out)
 {
     RootScope roots(context);

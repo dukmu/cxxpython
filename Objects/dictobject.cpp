@@ -34,10 +34,8 @@ void missing_key(Attachment &context, Handle key, ReturnSlot &out)
     if (!failed(out))
         out.raised(out.value());
 }
-void getitem(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
+void getitem_kernel(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
-    if (!dictionary(context, args[0], out))
-        return;
     RootScope roots(context);
     const auto self = roots.root(args[0]), key = roots.root(args[1]);
     detail::dict_lookup_owned(context, self, key, out);
@@ -49,6 +47,11 @@ void getitem(Attachment &context, Value, std::span<const Value> args, ReturnSlot
             return;
         }
     missing_key(context, key, out);
+}
+void getitem(Attachment &context, Value function, std::span<const Value> args, ReturnSlot &out)
+{
+    if (dictionary(context, args[0], out))
+        getitem_kernel(context, function, args, out);
 }
 void proxy_getitem(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
@@ -104,18 +107,19 @@ void proxy_compare(Attachment &context, Value, std::span<const Value> args, Retu
         right = roots.root(context.payload<MappingProxyObject>(right).mapping);
     detail::rich_compare_owned(context, left, right, op, out);
 }
-void setitem(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
+void setitem_kernel(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
-    if (!dictionary(context, args[0], out))
-        return;
     RootScope roots(context);
     detail::dict_store_owned(context, roots.root(args[0]), roots.root(args[1]), roots.root(args[2]),
                              out);
 }
-void delitem(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
+void setitem(Attachment &context, Value function, std::span<const Value> args, ReturnSlot &out)
 {
-    if (!dictionary(context, args[0], out))
-        return;
+    if (dictionary(context, args[0], out))
+        setitem_kernel(context, function, args, out);
+}
+void delitem_kernel(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
+{
     RootScope roots(context);
     auto key = roots.root(args[1]);
     detail::dict_erase_owned(context, roots.root(args[0]), key, out);
@@ -123,6 +127,11 @@ void delitem(Attachment &context, Value, std::span<const Value> args, ReturnSlot
         missing_key(context, key, out);
     else if (!failed(out))
         out.ok(context.builtin(CoreObject::None));
+}
+void delitem(Attachment &context, Value function, std::span<const Value> args, ReturnSlot &out)
+{
+    if (dictionary(context, args[0], out))
+        delitem_kernel(context, function, args, out);
 }
 template <bool Proxy> Value mapping(Attachment &context, Value self)
 {
@@ -584,6 +593,23 @@ void detail::dict_merge(Attachment &context, Handle self, Handle source, bool un
 {
     if (merge(context, self, source, out, false, unique))
         out.ok(context.builtin(CoreObject::None));
+}
+bool detail::try_dict_item(Attachment &context, const ResolvedSlot &slot,
+                           std::span<const Value> args, ReturnSlot &out)
+{
+    if (args.empty() || context.type_of(args[0]) != context.builtin(CoreObject::DictType) ||
+        !context.has_layout<DictObject>(args[0]))
+        return false;
+    switch (slot.protocol) {
+    case Protocol::GetItem:
+        return try_native_operation(context, slot, args, getitem, getitem_kernel, out);
+    case Protocol::SetItem:
+        return try_native_operation(context, slot, args, setitem, setitem_kernel, out);
+    case Protocol::DelItem:
+        return try_native_operation(context, slot, args, delitem, delitem_kernel, out);
+    default:
+        return false;
+    }
 }
 void detail::install_dictionaries(Attachment &context, std::span<const Handle> core)
 {

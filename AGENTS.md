@@ -40,10 +40,10 @@ compiler, VM, and extension platform implemented in a C/C++ mix.
   Do not mark a whole milestone complete based on a narrower passing slice.
 - The user has directed a route pause after the current network stable point.
   The full frontend/import/library/product/N4-N6 route is now paused, not complete.
-  Performance and code cleanup replaced library expansion. The user now requests
-  pausing that goal after publishing the current native-callback stable point;
-  stop implementation after its commit/push until the user resumes work. Neither
-  pause means completion. Retain the full delivery scope in Plan 2 sections
+  Performance and code cleanup replaced library expansion. After reviewing the
+  native-callback stable point, the user resumed that goal and requested broader
+  execution-path improvements instead of repeated micro-cleanups. Keep the full
+  compatibility route paused; retain its delivery scope in Plan 2 sections
   0.8 and 11.2. Improve Python exception diagnostics, repeated Modules conversion/
   installation code, header boundaries, measured cache locality and allocation
   reuse while preserving semantics, precise roots and shared-heap CPU parallelism.
@@ -53,6 +53,10 @@ compiler, VM, and extension platform implemented in a C/C++ mix.
   preferably through Terra and unchanged fixed CPython sources with direct
   dependency tests. This does not resume the complete compatibility roadmap or
   authorize benchmark-specific library workarounds.
+- The user also requests unchanged upstream dill compatibility. Pin its upstream
+  release and license, expose actual dependencies, and fix runtime gaps instead
+  of patching the pure Python package. Do not claim support from a staged copy
+  or weaken the native Code/Function contracts to imitate CPython private bytecode.
 - `Grammar/python.gram` and `Grammar/Tokens` are fixed CPython 3.12.14 inputs.
   Use the vendored pegen grammar reader/left-recursion analysis and the standalone
   C++ output backend in `Tools/peg_generator/`; do not add handwritten grammar

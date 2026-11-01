@@ -80,6 +80,113 @@ class CoreProtocols : public testing::Test {
 
 class ProtocolNativeDepth : public testing::TestWithParam<bool> {};
 
+TEST_F(CoreProtocols, BuiltinKernelsFollowInternalMethodAndSignatureChanges)
+{
+    const auto cls = builtin(CoreObject::IntType);
+    const auto space = roots.root(*TypeView(context, cls).dictionary());
+    const auto key = text(U"__add__");
+    const auto original = roots.root(*detail::name_lookup(context, space.get(context), U"__add__"));
+    const auto subtract = roots.root(*detail::name_lookup(context, space.get(context), U"__sub__"));
+    const auto left = integer(401), right = integer(301);
+    const auto slot = resolve_protocol(context, cls, Protocol::Add, roots);
+    ReturnSlot out(context);
+    ASSERT_TRUE(detail::try_int_binary(context, left.get(context), right.get(context),
+                                       BinaryOp::Add, slot, out));
+    EXPECT_EQ(int_decimal(context, out.value()), "702");
+
+    detail::name_store(context, space.get(context), key.get(context), subtract.get(context));
+    out.ok(context.builtin(CoreObject::True));
+    EXPECT_FALSE(detail::try_int_binary(context, left.get(context), right.get(context),
+                                        BinaryOp::Add, slot, out));
+    EXPECT_EQ(out.value(), context.builtin(CoreObject::True));
+    binary(context, left, right, BinaryOp::Add, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(int_decimal(context, out.value()), "100");
+
+    const auto function = context.payload<MethodDescriptorObject>(original).function;
+    const auto entry = context.payload<NativeFunctionObject>(function).entry;
+    SignatureLayout signature;
+    signature.parameters = {{U"self", ParameterKind::PositionalOnly},
+                            {U"other", ParameterKind::KeywordOnly}};
+    make_native_function(context, "keyword-only add", signature, entry, {}, out);
+    make_method_descriptor(context, cls, roots.root(out.value()), out);
+    detail::name_store(context, space.get(context), key.get(context), out.value());
+    binary(context, left, right, BinaryOp::Add, out);
+    error(out, CoreObject::TypeErrorType);
+
+    context.allocate_instance<MethodDescriptorObject>(builtin(CoreObject::MethodDescriptorType),
+                                                      out, function,
+                                                      context.builtin(CoreObject::FloatType));
+    detail::name_store(context, space.get(context), key.get(context), out.value());
+    binary(context, left, right, BinaryOp::Add, out);
+    error(out, CoreObject::TypeErrorType);
+
+    detail::name_store(context, space.get(context), key.get(context), original.get(context));
+    binary(context, left, right, BinaryOp::Add, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(int_decimal(context, out.value()), "702");
+}
+
+TEST_F(CoreProtocols, BuiltinKernelsKeepCheckedReturnsAndUnwindNativeCalls)
+{
+    const auto slot = resolve_protocol(context, builtin(CoreObject::IntType), Protocol::Add, roots);
+    const auto descriptor = slot.descriptor.get(context);
+    const auto function = context.payload<MethodDescriptorObject>(descriptor).function;
+    const auto expected = context.payload<NativeFunctionObject>(function).entry;
+    const std::array args{integer(401).get(context), integer(301).get(context)};
+    ReturnSlot out(context);
+    EXPECT_THROW(detail::try_native_operation(
+                     context, slot, args, expected,
+                     [](Attachment &, Value, std::span<const Value>, ReturnSlot &) {}, out),
+                 std::logic_error);
+    EXPECT_THROW(detail::try_native_operation(
+                     context, slot, args, expected,
+                     [](Attachment &, Value, std::span<const Value>, ReturnSlot &) {
+                         throw std::bad_alloc();
+                     },
+                     out),
+                 std::bad_alloc);
+    ASSERT_TRUE(detail::try_native_operation(
+        context, slot, args, expected,
+        [](Attachment &c, Value fn, std::span<const Value> values, ReturnSlot &result) {
+            c.collect();
+            EXPECT_EQ(c.payload<NativeFunctionObject>(fn).name, "__add__");
+            result.ok(values[1]);
+        },
+        out));
+    EXPECT_EQ(out.value(), args[1]);
+}
+
+TEST_P(ProtocolNativeDepth, BuiltinKernelsConsumeAndUnwindDepth)
+{
+    HeapConfig config;
+    config.max_call_depth = GetParam() ? 1000 : 1;
+    config.max_native_depth = GetParam() ? 1 : 1000;
+    Interpreter interpreter{config};
+    Attachment context{interpreter};
+    context.bootstrap_core();
+    RootScope roots(context);
+    ReturnSlot out(context);
+    make_int(context, 401, out);
+    const auto left = roots.root(out.value());
+    make_int(context, 301, out);
+    const auto right = roots.root(out.value());
+    if (GetParam())
+        ASSERT_TRUE(context.enter_native_call());
+    else
+        ASSERT_TRUE(context.enter_call());
+    binary(context, left, right, BinaryOp::Add, out);
+    ASSERT_EQ(out.tag(), ResultTag::Raised);
+    EXPECT_EQ(context.type_of(out.exception()), context.builtin(CoreObject::RecursionErrorType));
+    if (GetParam())
+        context.leave_native_call();
+    else
+        context.leave_call();
+    binary(context, left, right, BinaryOp::Add, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    EXPECT_EQ(int_decimal(context, out.value()), "702");
+}
+
 struct UnpublishedProtocolProbe {
     ObjectHeader header;
     UnpublishedProtocolProbe(InitialType head, Attachment &context, RootScope &roots) : header(head)
@@ -392,6 +499,8 @@ TEST_F(CoreProtocols, ReflectedFallbackResolvesAgainAfterLeftCallbackMutatesRigh
         },
         captures, out);
     put(left_type, U"__add__", roots.root(out.result().value()));
+    // Replacing an existing numeric slot must re-resolve its current method.
+    method(right_type, U"__radd__", text(U"stale reflected result"), 1);
     binary(context, a, b, BinaryOp::Add, out);
     ASSERT_EQ(out.result().tag(), ResultTag::Ok);
     EXPECT_EQ(context.payload<StrObject>(out.result().value()).value, U"fresh reflected result");

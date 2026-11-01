@@ -3,6 +3,16 @@
 #include "cxxpython/protocol.hpp"
 
 namespace cxxpython::core::detail {
+// Inputs and the resolved descriptor remain independently rooted by the caller.
+// Only the actual canonical method, complete signature and current receiver/epoch
+// may use its shared builtin kernel; otherwise dispatch has no side effects.
+bool try_native_operation(Attachment &, const ResolvedSlot &, std::span<const Value>,
+                          NativeEntry expected, NativeEntry kernel, ReturnSlot &);
+bool try_int_binary(Attachment &, Value, Value, BinaryOp, const ResolvedSlot &, ReturnSlot &);
+bool try_float_binary(Attachment &, Value, Value, BinaryOp, const ResolvedSlot &, ReturnSlot &);
+bool try_list_item(Attachment &, const ResolvedSlot &, std::span<const Value>, ReturnSlot &);
+bool try_sequence_item(Attachment &, const ResolvedSlot &, std::span<const Value>, ReturnSlot &);
+bool try_dict_item(Attachment &, const ResolvedSlot &, std::span<const Value>, ReturnSlot &);
 // Internal callers retain operands in independent live roots until return.
 // No operand may depend on out, which these operations reset. Public entries
 // snapshot their inputs first; native callers may reuse their existing roots.

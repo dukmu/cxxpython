@@ -920,6 +920,16 @@ the internal C++ callback signature and requires rebuilding C++ native modules;
 the versioned C11 extension ABI is unchanged. No compatibility adapter or unsafe
 derived Handle is provided.
 
+Implicit builtin ObjectOps and explicit methods share their arithmetic and item
+kernels. The short path still resolves the real method and requires an exact
+builtin receiver/layout, current epoch/type, canonical native entry, matching
+descriptor owner and complete positional signature. Replacements, subclasses,
+mixed numeric types and default-argument binding retain ordinary dispatch.
+Selected descriptors and operands stay independently rooted; call/native depth
+guards and ready-return checks are shared with ordinary calls. Container kernels
+retain their existing index/slice callbacks, storage locks and rooted reads.
+No extra cache, native-entry-pointer cache or VM opcode is introduced.
+
 Ordinary native type methods publish owner-bearing MethodDescriptorObjects;
 protocol lookup preserves their native/sequence role and invokes the underlying
 entry through the normal binder. Native static/class wrappers retain their own

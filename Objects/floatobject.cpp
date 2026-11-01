@@ -2,6 +2,7 @@
 #include "cxxpython/complexobject.hpp"
 #include "cxxpython/memoryobject.hpp"
 #include "cxxpython/protocol.hpp"
+#include "internal/abstract.hpp"
 #include "internal/errors.hpp"
 #include "internal/long.hpp"
 
@@ -397,17 +398,8 @@ bool operand_double(Attachment &context, Value value, double &number, ReturnSlot
     return false;
 }
 
-template <BinaryOp Op, bool Reflected>
-void float_arithmetic(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
+template <BinaryOp Op> void float_kernel(Attachment &context, double a, double b, ReturnSlot &out)
 {
-    const auto *self = require_float(context, args[0], out);
-    if (!self)
-        return;
-    double a = self->value, b;
-    if (!operand_double(context, args[1], b, out))
-        return;
-    if constexpr (Reflected)
-        std::swap(a, b);
     if constexpr (Op == BinaryOp::TrueDivide || Op == BinaryOp::FloorDivide ||
                   Op == BinaryOp::Modulo)
         if (b == 0.0) {
@@ -484,6 +476,25 @@ void float_arithmetic(Attachment &context, Value, std::span<const Value> args, R
         }
     }
     make_float(context, result, out);
+}
+template <BinaryOp Op, bool Reflected>
+void float_arithmetic(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
+{
+    const auto *self = require_float(context, args[0], out);
+    if (!self)
+        return;
+    double a = self->value, b;
+    if (!operand_double(context, args[1], b, out))
+        return;
+    if constexpr (Reflected)
+        std::swap(a, b);
+    float_kernel<Op>(context, a, b, out);
+}
+template <BinaryOp Op>
+void float_exact(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
+{
+    float_kernel<Op>(context, context.payload<FloatObject>(args[0]).value,
+                     context.payload<FloatObject>(args[1]).value, out);
 }
 
 template <bool Reflected>
@@ -757,6 +768,51 @@ void float_compare(Attachment &context, Value, std::span<const Value> args, Retu
     out.ok(context.builtin(result ? CoreObject::True : CoreObject::False));
 }
 } // namespace
+
+bool detail::try_float_binary(Attachment &context, Value left, Value right, BinaryOp op,
+                              const ResolvedSlot &slot, ReturnSlot &out)
+{
+    if (slot.state != SlotState::Native || slot.native_kind != NativeSlotKind::Ordinary ||
+        context.type_of(left) != context.builtin(CoreObject::FloatType) ||
+        context.type_of(right) != context.builtin(CoreObject::FloatType) ||
+        !context.try_payload<FloatObject>(left) || !context.try_payload<FloatObject>(right))
+        return false;
+    NativeEntry expected = nullptr, kernel = nullptr;
+    switch (op) {
+    case BinaryOp::Add:
+        expected = float_arithmetic<BinaryOp::Add, false>;
+        kernel = float_exact<BinaryOp::Add>;
+        break;
+    case BinaryOp::Subtract:
+        expected = float_arithmetic<BinaryOp::Subtract, false>;
+        kernel = float_exact<BinaryOp::Subtract>;
+        break;
+    case BinaryOp::Multiply:
+        expected = float_arithmetic<BinaryOp::Multiply, false>;
+        kernel = float_exact<BinaryOp::Multiply>;
+        break;
+    case BinaryOp::FloorDivide:
+        expected = float_arithmetic<BinaryOp::FloorDivide, false>;
+        kernel = float_exact<BinaryOp::FloorDivide>;
+        break;
+    case BinaryOp::Modulo:
+        expected = float_arithmetic<BinaryOp::Modulo, false>;
+        kernel = float_exact<BinaryOp::Modulo>;
+        break;
+    case BinaryOp::TrueDivide:
+        expected = float_arithmetic<BinaryOp::TrueDivide, false>;
+        kernel = float_exact<BinaryOp::TrueDivide>;
+        break;
+    case BinaryOp::Power:
+        expected = float_arithmetic<BinaryOp::Power, false>;
+        kernel = float_exact<BinaryOp::Power>;
+        break;
+    default:
+        return false;
+    }
+    const std::array args{left, right};
+    return try_native_operation(context, slot, args, expected, kernel, out);
+}
 
 bool is_float(Attachment &context, Value value)
 {

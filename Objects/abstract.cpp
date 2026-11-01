@@ -1,4 +1,5 @@
 #include "internal/abstract.hpp"
+#include "cxxpython/floatobject.hpp"
 #include "cxxpython/genericaliasobject.hpp"
 #include "internal/errors.hpp"
 
@@ -185,24 +186,52 @@ bool binary_numeric(Attachment &context, Handle a, Handle b, BinaryOp op, Return
     const auto ltype = context.type_of(a), rtype = context.type_of(b);
     const bool different = ltype != rtype;
     bool right_first = false;
+    bool right_available = false;
     if (different) {
         RootScope roots(context);
         const auto left = roots.root(ltype), right = roots.root(rtype);
-        if (is_subtype(context, right, left)) {
-            const auto reflected = resolve(context, b, ids[1], roots);
-            const auto normal = resolve(context, b, ids[0], roots);
-            if ((reflected.state != SlotState::Missing && !sequence_slot(reflected)) ||
-                (normal.state != SlotState::Missing && !sequence_slot(normal)))
-                right_first = reflected_override(context, left, right, ids[1], out);
+        // CPython captures numeric-slot eligibility before calling Python, but
+        // the eligible slot's actual method is looked up again after callbacks.
+        for (;;) {
+            RootScope probe(context);
+            const auto reflected = resolve(context, b, ids[1], probe);
+            const auto normal = resolve(context, b, ids[0], probe);
+            if (reflected.epoch == normal.epoch && normal.epoch == context.type_epoch()) {
+                right_available =
+                    (reflected.state != SlotState::Missing && !sequence_slot(reflected)) ||
+                    (normal.state != SlotState::Missing && !sequence_slot(normal));
+                break;
+            }
+            context.poll();
+            std::this_thread::yield();
+        }
+        if (right_available && is_subtype(context, right, left)) {
+            right_first = reflected_override(context, left, right, ids[1], out);
             if (raised(out))
                 return true;
         }
+    }
+    if (!different && (ltype == context.builtin(CoreObject::IntType) ||
+                       ltype == context.builtin(CoreObject::FloatType))) {
+        RootScope roots(context);
+        const auto slot = resolve(context, a, ids[0], roots);
+        if (slot.state == SlotState::Missing || sequence_slot(slot))
+            return false;
+        const auto left = a.get(context), right = b.get(context);
+        if ((ltype == context.builtin(CoreObject::IntType)
+                 ? detail::try_int_binary(context, left, right, op, slot, out)
+                 : detail::try_float_binary(context, left, right, op, slot, out)))
+            return true;
+        const std::array args{right};
+        detail::invoke_protocol(context, a, slot, args, out, roots);
+        return implemented(context, out);
     }
     if (right_first && attempt(context, b, a, ids[1], out, SlotPhase::Numeric))
         return true;
     if (attempt(context, a, b, ids[0], out, SlotPhase::Numeric))
         return true;
-    return different && !right_first && attempt(context, b, a, ids[1], out, SlotPhase::Numeric);
+    return right_available && !right_first &&
+           attempt(context, b, a, ids[1], out, SlotPhase::Numeric);
 }
 bool sequence_binary(Attachment &context, Handle a, Handle b, BinaryOp op, bool inplace,
                      ReturnSlot &out)
@@ -811,6 +840,19 @@ ResultView get_item(Attachment &context, Value value, Value key, ReturnSlot &out
         const auto self = roots.root(value);
         const auto item = roots.root(key);
         auto slot = resolve(context, self, Protocol::GetItem, roots);
+        const std::array native_args{self.get(context), item.get(context)};
+        const auto type = context.type_of(self);
+        if (type == context.builtin(CoreObject::ListType)) {
+            if (detail::try_list_item(context, slot, native_args, out))
+                return;
+        } else if (type == context.builtin(CoreObject::TupleType) ||
+                   type == context.builtin(CoreObject::StrType)) {
+            if (detail::try_sequence_item(context, slot, native_args, out))
+                return;
+        } else if (type == context.builtin(CoreObject::DictType)) {
+            if (detail::try_dict_item(context, slot, native_args, out))
+                return;
+        }
         std::array args{item.get(context)};
         if (slot.state == SlotState::Missing &&
             is_subtype(context, context.type_of(self), context.type_type())) {
@@ -877,6 +919,13 @@ ResultView set_item(Attachment &context, Value value, Value key, Value item, Ret
         const auto index = roots.root(key);
         const auto stored = roots.root(item);
         auto slot = resolve(context, self, Protocol::SetItem, roots);
+        const std::array native_args{self.get(context), index.get(context), stored.get(context)};
+        const auto type = context.type_of(self);
+        if ((type == context.builtin(CoreObject::ListType) &&
+             detail::try_list_item(context, slot, native_args, out)) ||
+            (type == context.builtin(CoreObject::DictType) &&
+             detail::try_dict_item(context, slot, native_args, out)))
+            return;
         std::array args{index.get(context), stored.get(context)};
         detail::invoke_protocol(context, self, slot, args, out, roots);
     });
@@ -892,6 +941,13 @@ ResultView del_item(Attachment &context, Value value, Value key, ReturnSlot &out
         const auto self = roots.root(value);
         const auto index = roots.root(key);
         auto slot = resolve(context, self, Protocol::DelItem, roots);
+        const std::array native_args{self.get(context), index.get(context)};
+        const auto type = context.type_of(self);
+        if ((type == context.builtin(CoreObject::ListType) &&
+             detail::try_list_item(context, slot, native_args, out)) ||
+            (type == context.builtin(CoreObject::DictType) &&
+             detail::try_dict_item(context, slot, native_args, out)))
+            return;
         std::array args{index.get(context)};
         detail::invoke_protocol(context, self, slot, args, out, roots);
     });

@@ -103,10 +103,8 @@ template <class T, CoreObject Type> bool sequence(Attachment &context, Value val
     return false;
 }
 template <class T, CoreObject Type>
-void sequence_item(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
+void sequence_item_kernel(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
-    if (!sequence<T, Type>(context, args[0], out))
-        return;
     RootScope roots(context);
     const auto self = roots.root(args[0]);
     if (context.type_of(args[1]) == context.builtin(CoreObject::SliceType)) {
@@ -173,6 +171,13 @@ void sequence_item(Attachment &context, Value, std::span<const Value> args, Retu
         out.ok(data.items[position]);
     else
         make_str(context, std::u32string(1, data.value[position]), out);
+}
+template <class T, CoreObject Type>
+void sequence_item(Attachment &context, Value function, std::span<const Value> args,
+                   ReturnSlot &out)
+{
+    if (sequence<T, Type>(context, args[0], out))
+        sequence_item_kernel<T, Type>(context, function, args, out);
 }
 template <class T, CoreObject Type, CoreObject Iterator>
 void sequence_iter(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
@@ -456,6 +461,22 @@ void tuple_repeat(Attachment &context, Value, std::span<const Value> args, Retur
 }
 } // namespace
 namespace detail {
+bool try_sequence_item(Attachment &context, const ResolvedSlot &slot, std::span<const Value> args,
+                       ReturnSlot &out)
+{
+    if (slot.protocol != Protocol::GetItem || args.empty())
+        return false;
+    const auto type = context.type_of(args[0]);
+    if (type == context.builtin(CoreObject::TupleType) && context.has_layout<TupleObject>(args[0]))
+        return try_native_operation(context, slot, args,
+                                    sequence_item<TupleObject, CoreObject::TupleType>,
+                                    sequence_item_kernel<TupleObject, CoreObject::TupleType>, out);
+    if (type == context.builtin(CoreObject::StrType) && context.has_layout<StrObject>(args[0]))
+        return try_native_operation(context, slot, args,
+                                    sequence_item<StrObject, CoreObject::StrType>,
+                                    sequence_item_kernel<StrObject, CoreObject::StrType>, out);
+    return false;
+}
 void make_call_iterator(Attachment &c, Handle callable, Handle sentinel, ReturnSlot &out)
 {
     const auto type = c.type_of(callable);

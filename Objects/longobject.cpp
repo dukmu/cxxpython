@@ -1,6 +1,7 @@
 #include "cxxpython/floatobject.hpp"
 #include "cxxpython/memoryobject.hpp"
 #include "cxxpython/protocol.hpp"
+#include "internal/abstract.hpp"
 #include "internal/long.hpp"
 
 #include <bit>
@@ -146,21 +147,11 @@ void int_bits(Attachment &context, Value, std::span<const Value> args, ReturnSlo
     }
     publish(context, std::move(result), out);
 }
-template <bool Reflected>
-void true_divide(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
+void true_divide_kernel(Attachment &context, const IntObject &a, const IntObject &b,
+                        ReturnSlot &out)
 {
-    const auto *self = maybe_integer(context, args[0]);
-    if (!self) {
-        type_error(context, out);
-        return;
-    }
-    const auto *other = maybe_integer(context, args[1]);
-    if (!other) {
-        out.ok(context.builtin(CoreObject::NotImplemented));
-        return;
-    }
-    Integer numerator = expanded(*(Reflected ? other : self));
-    Integer denominator = expanded(*(Reflected ? self : other));
+    Integer numerator = expanded(a);
+    Integer denominator = expanded(b);
     if (denominator == 0) {
         raise_error(context, CoreObject::ZeroDivisionErrorType, U"division by zero", out);
         return;
@@ -210,21 +201,9 @@ void true_divide(Attachment &context, Value, std::span<const Value> args, Return
     }
     make_float(context, negative ? -result : result, out);
 }
-template <BinaryOp Op, bool Reflected>
-void arithmetic(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
+template <BinaryOp Op>
+void arithmetic_kernel(Attachment &context, const IntObject &a, const IntObject &b, ReturnSlot &out)
 {
-    const auto *self = maybe_integer(context, args[0]);
-    if (!self) {
-        type_error(context, out);
-        return;
-    }
-    const auto *other = maybe_integer(context, args[1]);
-    if (!other) {
-        out.ok(context.builtin(CoreObject::NotImplemented));
-        return;
-    }
-    const auto &a = *(Reflected ? other : self);
-    const auto &b = *(Reflected ? self : other);
     if constexpr (Op == BinaryOp::FloorDivide || Op == BinaryOp::Modulo)
         if (!b.large && b.small == 0) {
             raise_error(context, CoreObject::ZeroDivisionErrorType,
@@ -284,21 +263,12 @@ void arithmetic(Attachment &context, Value, std::span<const Value> args, ReturnS
     }
     publish(context, std::move(result), out);
 }
-template <BinaryOp Op, bool Reflected>
-void integer_extended(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
+template <BinaryOp Op>
+void integer_extended_kernel(Attachment &context, const IntObject &left, const IntObject &right,
+                             ReturnSlot &out)
 {
-    const auto *self = maybe_integer(context, args[0]);
-    if (!self) {
-        type_error(context, out);
-        return;
-    }
-    const auto *other = maybe_integer(context, args[1]);
-    if (!other) {
-        out.ok(context.builtin(CoreObject::NotImplemented));
-        return;
-    }
-    Integer a = expanded(*(Reflected ? other : self));
-    Integer b = expanded(*(Reflected ? self : other));
+    Integer a = expanded(left);
+    Integer b = expanded(right);
     Integer result;
     if constexpr (Op == BinaryOp::BitAnd)
         result = a & b;
@@ -364,6 +334,54 @@ void integer_extended(Attachment &context, Value, std::span<const Value> args, R
         }
     }
     publish(context, std::move(result), out);
+}
+template <BinaryOp Op>
+void int_kernel(Attachment &context, const IntObject &a, const IntObject &b, ReturnSlot &out)
+{
+    if constexpr (Op == BinaryOp::TrueDivide)
+        true_divide_kernel(context, a, b, out);
+    else if constexpr (Op == BinaryOp::Add || Op == BinaryOp::Subtract ||
+                       Op == BinaryOp::Multiply || Op == BinaryOp::FloorDivide ||
+                       Op == BinaryOp::Modulo)
+        arithmetic_kernel<Op>(context, a, b, out);
+    else
+        integer_extended_kernel<Op>(context, a, b, out);
+}
+template <BinaryOp Op, bool Reflected>
+void int_method(Attachment &context, std::span<const Value> args, ReturnSlot &out)
+{
+    const auto *self = maybe_integer(context, args[0]);
+    if (!self) {
+        type_error(context, out);
+        return;
+    }
+    const auto *other = maybe_integer(context, args[1]);
+    if (!other) {
+        out.ok(context.builtin(CoreObject::NotImplemented));
+        return;
+    }
+    int_kernel<Op>(context, *(Reflected ? other : self), *(Reflected ? self : other), out);
+}
+template <bool Reflected>
+void true_divide(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
+{
+    int_method<BinaryOp::TrueDivide, Reflected>(context, args, out);
+}
+template <BinaryOp Op, bool Reflected>
+void arithmetic(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
+{
+    int_method<Op, Reflected>(context, args, out);
+}
+template <BinaryOp Op, bool Reflected>
+void integer_extended(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
+{
+    int_method<Op, Reflected>(context, args, out);
+}
+template <BinaryOp Op>
+void int_exact(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
+{
+    int_kernel<Op>(context, context.payload<IntObject>(args[0]),
+                   context.payload<IntObject>(args[1]), out);
 }
 template <BinaryOp Op>
 void bool_bitwise(Attachment &context, Value function, std::span<const Value> args, ReturnSlot &out)
@@ -1054,6 +1072,70 @@ void bool_new(Attachment &context, Value, std::span<const Value> args, ReturnSlo
     }
 }
 } // namespace
+
+bool detail::try_int_binary(Attachment &context, Value left, Value right, BinaryOp op,
+                            const ResolvedSlot &slot, ReturnSlot &out)
+{
+    if (slot.state != SlotState::Native || slot.native_kind != NativeSlotKind::Ordinary ||
+        context.type_of(left) != context.builtin(CoreObject::IntType) ||
+        context.type_of(right) != context.builtin(CoreObject::IntType) ||
+        !context.try_payload<IntObject>(left) || !context.try_payload<IntObject>(right))
+        return false;
+    NativeEntry expected = nullptr, kernel = nullptr;
+    switch (op) {
+    case BinaryOp::Add:
+        expected = arithmetic<BinaryOp::Add, false>;
+        kernel = int_exact<BinaryOp::Add>;
+        break;
+    case BinaryOp::Subtract:
+        expected = arithmetic<BinaryOp::Subtract, false>;
+        kernel = int_exact<BinaryOp::Subtract>;
+        break;
+    case BinaryOp::Multiply:
+        expected = arithmetic<BinaryOp::Multiply, false>;
+        kernel = int_exact<BinaryOp::Multiply>;
+        break;
+    case BinaryOp::FloorDivide:
+        expected = arithmetic<BinaryOp::FloorDivide, false>;
+        kernel = int_exact<BinaryOp::FloorDivide>;
+        break;
+    case BinaryOp::Modulo:
+        expected = arithmetic<BinaryOp::Modulo, false>;
+        kernel = int_exact<BinaryOp::Modulo>;
+        break;
+    case BinaryOp::TrueDivide:
+        expected = true_divide<false>;
+        kernel = int_exact<BinaryOp::TrueDivide>;
+        break;
+    case BinaryOp::Power:
+        // The optional modulus is still bound by the ordinary method adapter.
+        return false;
+    case BinaryOp::LeftShift:
+        expected = integer_extended<BinaryOp::LeftShift, false>;
+        kernel = int_exact<BinaryOp::LeftShift>;
+        break;
+    case BinaryOp::RightShift:
+        expected = integer_extended<BinaryOp::RightShift, false>;
+        kernel = int_exact<BinaryOp::RightShift>;
+        break;
+    case BinaryOp::BitAnd:
+        expected = integer_extended<BinaryOp::BitAnd, false>;
+        kernel = int_exact<BinaryOp::BitAnd>;
+        break;
+    case BinaryOp::BitXor:
+        expected = integer_extended<BinaryOp::BitXor, false>;
+        kernel = int_exact<BinaryOp::BitXor>;
+        break;
+    case BinaryOp::BitOr:
+        expected = integer_extended<BinaryOp::BitOr, false>;
+        kernel = int_exact<BinaryOp::BitOr>;
+        break;
+    default:
+        return false;
+    }
+    const std::array args{left, right};
+    return try_native_operation(context, slot, args, expected, kernel, out);
+}
 void detail::publish_integer(Attachment &context, Integer value, ReturnSlot &out)
 {
     publish(context, std::move(value), out);

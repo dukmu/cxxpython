@@ -1,0 +1,212 @@
+add -7 3 -4 -4
+add 7 -3 4 4
+add 9223372036854775807 2 9223372036854775809 9223372036854775809
+add -9223372036854775808 2 -9223372036854775806 -9223372036854775806
+add 1267650600228229401496703205376 3 1267650600228229401496703205379 1267650600228229401496703205379
+add True False 1 1
+add zero 1 1
+sub -7 3 -10 -10
+sub 7 -3 10 10
+sub 9223372036854775807 2 9223372036854775805 9223372036854775805
+sub -9223372036854775808 2 -9223372036854775810 -9223372036854775810
+sub 1267650600228229401496703205376 3 1267650600228229401496703205373 1267650600228229401496703205373
+sub True False 1 1
+sub zero 1 1
+mul -7 3 -21 -21
+mul 7 -3 -21 -21
+mul 9223372036854775807 2 18446744073709551614 18446744073709551614
+mul -9223372036854775808 2 -18446744073709551616 -18446744073709551616
+mul 1267650600228229401496703205376 3 3802951800684688204490109616128 3802951800684688204490109616128
+mul True False 0 0
+mul zero 0 0
+truediv -7 3 -2.3333333333333335 -2.3333333333333335
+truediv 7 -3 -2.3333333333333335 -2.3333333333333335
+truediv 9223372036854775807 2 4.611686018427388e+18 4.611686018427388e+18
+truediv -9223372036854775808 2 -4.611686018427388e+18 -4.611686018427388e+18
+truediv 1267650600228229401496703205376 3 4.2255020007607644e+29 4.2255020007607644e+29
+truediv True False ZeroDivisionError ZeroDivisionError
+truediv zero ZeroDivisionError ZeroDivisionError
+floordiv -7 3 -3 -3
+floordiv 7 -3 -3 -3
+floordiv 9223372036854775807 2 4611686018427387903 4611686018427387903
+floordiv -9223372036854775808 2 -4611686018427387904 -4611686018427387904
+floordiv 1267650600228229401496703205376 3 422550200076076467165567735125 422550200076076467165567735125
+floordiv True False ZeroDivisionError ZeroDivisionError
+floordiv zero ZeroDivisionError ZeroDivisionError
+mod -7 3 2 2
+mod 7 -3 -2 -2
+mod 9223372036854775807 2 1 1
+mod -9223372036854775808 2 0 0
+mod 1267650600228229401496703205376 3 1 1
+mod True False ZeroDivisionError ZeroDivisionError
+mod zero ZeroDivisionError ZeroDivisionError
+pow -7 3 -343 -343
+pow 7 -3 0.0029154518950437317 0.0029154518950437317
+pow 9223372036854775807 2 85070591730234615847396907784232501249 85070591730234615847396907784232501249
+pow -9223372036854775808 2 85070591730234615865843651857942052864 85070591730234615865843651857942052864
+pow 1267650600228229401496703205376 3 2037035976334486086268445688409378161051468393665936250636140449354381299763336706183397376 2037035976334486086268445688409378161051468393665936250636140449354381299763336706183397376
+pow True False 1 1
+pow zero 1 1
+lshift -7 3 -56 -56
+lshift 7 -3 ValueError ValueError
+lshift 9223372036854775807 2 36893488147419103228 36893488147419103228
+lshift -9223372036854775808 2 -36893488147419103232 -36893488147419103232
+lshift 1267650600228229401496703205376 3 10141204801825835211973625643008 10141204801825835211973625643008
+lshift True False 1 1
+lshift zero 1 1
+rshift -7 3 -1 -1
+rshift 7 -3 ValueError ValueError
+rshift 9223372036854775807 2 2305843009213693951 2305843009213693951
+rshift -9223372036854775808 2 -2305843009213693952 -2305843009213693952
+rshift 1267650600228229401496703205376 3 158456325028528675187087900672 158456325028528675187087900672
+rshift True False 1 1
+rshift zero 1 1
+and -7 3 1 1
+and 7 -3 5 5
+and 9223372036854775807 2 2 2
+and -9223372036854775808 2 0 0
+and 1267650600228229401496703205376 3 0 0
+and True False False False
+and zero 0 0
+or -7 3 -5 -5
+or 7 -3 -1 -1
+or 9223372036854775807 2 9223372036854775807 9223372036854775807
+or -9223372036854775808 2 -9223372036854775806 -9223372036854775806
+or 1267650600228229401496703205376 3 1267650600228229401496703205379 1267650600228229401496703205379
+or True False True True
+or zero 1 1
+xor -7 3 -6 -6
+xor 7 -3 -6 -6
+xor 9223372036854775807 2 9223372036854775805 9223372036854775805
+xor -9223372036854775808 2 -9223372036854775806 -9223372036854775806
+xor 1267650600228229401496703205376 3 1267650600228229401496703205379 1267650600228229401496703205379
+xor True False True True
+xor zero 1 1
+float add -7.5 2.0 -5.5 -5.5
+float add 7.5 -2.0 5.5 5.5
+float add 1.0 0.0 1.0 1.0
+float add -0.0 2.0 2.0 2.0
+float add inf 2.0 inf inf
+float add nan 2.0 nan nan
+float add 3 2.5 5.5 5.5
+float add 3.5 2 5.5 5.5
+float sub -7.5 2.0 -9.5 -9.5
+float sub 7.5 -2.0 9.5 9.5
+float sub 1.0 0.0 1.0 1.0
+float sub -0.0 2.0 -2.0 -2.0
+float sub inf 2.0 inf inf
+float sub nan 2.0 nan nan
+float sub 3 2.5 0.5 0.5
+float sub 3.5 2 1.5 1.5
+float mul -7.5 2.0 -15.0 -15.0
+float mul 7.5 -2.0 -15.0 -15.0
+float mul 1.0 0.0 0.0 0.0
+float mul -0.0 2.0 -0.0 -0.0
+float mul inf 2.0 inf inf
+float mul nan 2.0 nan nan
+float mul 3 2.5 7.5 7.5
+float mul 3.5 2 7.0 7.0
+float truediv -7.5 2.0 -3.75 -3.75
+float truediv 7.5 -2.0 -3.75 -3.75
+float truediv 1.0 0.0 ZeroDivisionError ZeroDivisionError
+float truediv -0.0 2.0 -0.0 -0.0
+float truediv inf 2.0 inf inf
+float truediv nan 2.0 nan nan
+float truediv 3 2.5 1.2 1.2
+float truediv 3.5 2 1.75 1.75
+float floordiv -7.5 2.0 -4.0 -4.0
+float floordiv 7.5 -2.0 -4.0 -4.0
+float floordiv 1.0 0.0 ZeroDivisionError ZeroDivisionError
+float floordiv -0.0 2.0 -0.0 -0.0
+float floordiv inf 2.0 nan nan
+float floordiv nan 2.0 nan nan
+float floordiv 3 2.5 1.0 1.0
+float floordiv 3.5 2 1.0 1.0
+float mod -7.5 2.0 0.5 0.5
+float mod 7.5 -2.0 -0.5 -0.5
+float mod 1.0 0.0 ZeroDivisionError ZeroDivisionError
+float mod -0.0 2.0 0.0 0.0
+float mod inf 2.0 nan nan
+float mod nan 2.0 nan nan
+float mod 3 2.5 0.5 0.5
+float mod 3.5 2 1.5 1.5
+float pow -7.5 2.0 56.25 56.25
+float pow 7.5 -2.0 0.017777777777777778 0.017777777777777778
+float pow 1.0 0.0 1.0 1.0
+float pow -0.0 2.0 0.0 0.0
+float pow inf 2.0 inf inf
+float pow nan 2.0 nan nan
+float pow 3 2.5 15.588457268119896 15.588457268119896
+float pow 3.5 2 12.25 12.25
+float lshift -7.5 2.0 TypeError TypeError
+float lshift 7.5 -2.0 TypeError TypeError
+float lshift 1.0 0.0 TypeError TypeError
+float lshift -0.0 2.0 TypeError TypeError
+float lshift inf 2.0 TypeError TypeError
+float lshift nan 2.0 TypeError TypeError
+float lshift 3 2.5 TypeError TypeError
+float lshift 3.5 2 TypeError TypeError
+float rshift -7.5 2.0 TypeError TypeError
+float rshift 7.5 -2.0 TypeError TypeError
+float rshift 1.0 0.0 TypeError TypeError
+float rshift -0.0 2.0 TypeError TypeError
+float rshift inf 2.0 TypeError TypeError
+float rshift nan 2.0 TypeError TypeError
+float rshift 3 2.5 TypeError TypeError
+float rshift 3.5 2 TypeError TypeError
+float and -7.5 2.0 TypeError TypeError
+float and 7.5 -2.0 TypeError TypeError
+float and 1.0 0.0 TypeError TypeError
+float and -0.0 2.0 TypeError TypeError
+float and inf 2.0 TypeError TypeError
+float and nan 2.0 TypeError TypeError
+float and 3 2.5 TypeError TypeError
+float and 3.5 2 TypeError TypeError
+float or -7.5 2.0 TypeError TypeError
+float or 7.5 -2.0 TypeError TypeError
+float or 1.0 0.0 TypeError TypeError
+float or -0.0 2.0 TypeError TypeError
+float or inf 2.0 TypeError TypeError
+float or nan 2.0 TypeError TypeError
+float or 3 2.5 TypeError TypeError
+float or 3.5 2 TypeError TypeError
+float xor -7.5 2.0 TypeError TypeError
+float xor 7.5 -2.0 TypeError TypeError
+float xor 1.0 0.0 TypeError TypeError
+float xor -0.0 2.0 TypeError TypeError
+float xor inf 2.0 TypeError TypeError
+float xor nan 2.0 TypeError TypeError
+float xor 3 2.5 TypeError TypeError
+float xor 3.5 2 TypeError TypeError
+dispatch add radd child-radd
+inplace iadd
+subclass fallback 6 5 3.5 4
+replace during dispatch replacement
+deleted dispatch TypeError
+installed dispatch replacement
+existing forward slot replacement
+delete during dispatch TypeError
+precedence derived-radd
+inherited precedence base-add
+replaced precedence replacement
+read 3 [1, 3]
+read error IndexError
+read error IndexError
+read error TypeError
+read error ValueError
+read 3 (1, 3)
+read error IndexError
+read error IndexError
+read error TypeError
+read error ValueError
+read d bd
+read error IndexError
+read error IndexError
+read error TypeError
+read error ValueError
+mutated [8, 9, 30]
+write error IndexError
+write error IndexError
+write error ValueError
+rooted result ['kept']
+threads [7400, 7400] 200 True

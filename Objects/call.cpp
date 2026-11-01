@@ -1,4 +1,4 @@
-#include "cxxpython/protocol.hpp"
+#include "internal/abstract.hpp"
 #include "internal/codecs.hpp"
 #include "internal/errors.hpp"
 
@@ -792,6 +792,32 @@ void invoke_protocol_impl(Attachment &context, Handle self, const ResolvedSlot &
                         current.native_call);
 }
 } // namespace
+
+bool detail::try_native_operation(Attachment &context, const ResolvedSlot &slot,
+                                  std::span<const Value> args, NativeEntry expected,
+                                  NativeEntry kernel, ReturnSlot &out)
+{
+    if (slot.state != SlotState::Native || slot.native_call != NativeCallKind::MethodDescriptor ||
+        args.size() != protocol_definition(slot.protocol).arity + 1)
+        return false;
+    const auto type = context.type_of(args[0]);
+    if (slot.type.get(context) != type || slot.epoch != context.type_epoch())
+        return false;
+    const auto &descriptor = context.payload<MethodDescriptorObject>(slot.descriptor.get(context));
+    if (descriptor.owner != type)
+        return false;
+    const auto function = descriptor.function;
+    const auto &native = context.payload<NativeFunctionObject>(function);
+    if (native.entry != expected || native.binding != NativeFunctionBinding::Descriptor ||
+        !native.signature.accepts_complete_positional(args.size()))
+        return false;
+    CallDepth depth(context, out);
+    if (depth.entered) {
+        kernel(context, function, args, out);
+        validate_return(context, out);
+    }
+    return true;
+}
 
 ResultView call(Attachment &context, Handle callable, CallArgsView args, ReturnSlot &out)
 {
