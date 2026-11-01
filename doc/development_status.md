@@ -1,5 +1,48 @@
 # Development Status
 
+## 2026-11-01 Dill Native Protocols And Console Exception Recovery
+
+Continued after 9930158 instead of stopping at the recorded upstream failures.
+
+- Native bound methods now use the existing builtin-function representation,
+  with rooted receivers, complete argument binding and entry/capture-aware
+  equality/hash. They no longer masquerade as Python MethodType, which sent dill
+  down the wrong reducer. Explicit MethodType wrapping retains both receivers.
+  Default native getstate detection preserves constructor validation.
+- Added standard enumerate and sequence/dictionary iterator reductions and state
+  restoration. Dictionary reduction copies the cursor under its existing lock,
+  then consumes only the rooted copy. Deque reduction memoizes the empty object
+  before listitems, preserving maxlen, self-cycles and subclass state. Lock type
+  immutability, subclass restrictions and state repr now match the reference.
+- TextIO.tell returns the underlying byte position only after all decoded output
+  is consumed and decoder bytes/flags are empty/zero; pending multibyte/newline
+  and stateful-codec states retain real cookies. This fixes unchanged dill file
+  roundtrips rather than special-casing their filenames or encoding.
+- Added real POSIX uname/readonly uname_result, OSError's IOError and
+  EnvironmentError aliases, unchanged numbers.py and platform.py with one actual
+  cxxpython-version metadata branch. Unknown build/compiler fields stay empty.
+- The user identified code console failure after NameError. Reproduced the
+  secondary AttributeError in unchanged traceback.py: sys.stdlib_module_names
+  was absent. Added its frozenset from the generated pinned CPython name list,
+  including platform-disabled standard modules as CPython does. No diagnostic
+  fallback hides the error. Pipe and PTY entry tests now execute an undefined
+  name, display NameError, continue execution and exit normally.
+- Strict Clang/Werror build passes 20 focused script cases and 43 native call,
+  scheduling/iteration contracts, plus the expanded opt-in dill roundtrip.
+  Actual unchanged test_dictviews.py, test_threads.py and test_file.py now pass.
+  test_sources.py advances past missing numbers/IOError to its importable-source
+  assertion. The final sys metadata change passes two script cases, three
+  collect-every-allocation SysHooks contracts and both CLI error-recovery tests.
+  Format/source-diff checks pass; no new timing or sanitizer campaign was run.
+  Evidence: .cache/dill-followup-*, .cache/code-module-*.
+- Third-party scripts now use per-test temporary working directories after an
+  upstream file test left _test_file.txt in the repository. Removed only that
+  generated file and the diagnostic EOF probe; reusable .cache state is 1.7 GiB.
+- The complete __bases__/descendant-MRO publication change continues in the
+  isolated .cache/worktrees/type-bases source checkout, without another build.
+  Its unfinished fixture is not exposed to the main default suite. The active
+  dill/pdb goal continues; user matrix.py is untouched and uncommitted.
+
 ## 2026-11-01 Dill Roundtrip And Shared Debugger/Code Foundation
 
 Performance work remains paused. This checkpoint implements the real dill

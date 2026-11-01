@@ -257,6 +257,55 @@ void deque_copy(Attachment &c, Value, std::span<const Value> args, ReturnSlot &o
     call(c, roots.root(c.type_of(self)), {arguments}, out);
 }
 
+// CPython 3.12.14 deque_reduce: listitems follows memoization of the empty deque,
+// rather than embedding elements in constructor arguments (which breaks cycles).
+void deque_reduce(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!check(c, args[0], out))
+        return;
+    RootScope roots(c);
+    const auto self = roots.root(args[0]);
+    ReturnSlot key(c), getter(c), state(c), items(c), limit(c), arguments(c);
+    make_str(c, U"__getstate__", key);
+    if (key.tag() == ResultTag::Raised) {
+        out.raised(key.exception());
+        return;
+    }
+    get_attribute(c, self, roots.root(key.value()), getter);
+    if (getter.tag() == ResultTag::Raised) {
+        out.raised(getter.exception());
+        return;
+    }
+    call(c, roots.root(getter.value()), {}, state);
+    if (state.tag() == ResultTag::Raised) {
+        out.raised(state.exception());
+        return;
+    }
+    get_iter(c, self, items);
+    if (items.tag() == ResultTag::Raised) {
+        out.raised(items.exception());
+        return;
+    }
+    maxlen(c, self.get(c), limit);
+    if (limit.tag() == ResultTag::Raised) {
+        out.raised(limit.exception());
+        return;
+    }
+    if (limit.value() == c.builtin(CoreObject::None))
+        arguments.ok(c.builtin(CoreObject::EmptyTuple));
+    else {
+        const Value values[] = {c.builtin(CoreObject::EmptyTuple), limit.value()};
+        cxxpython::core::make_tuple(c, values, arguments);
+        if (arguments.tag() == ResultTag::Raised) {
+            out.raised(arguments.exception());
+            return;
+        }
+    }
+    const auto type = roots.root(c.type_of(self));
+    const Value result[] = {type.get(c), arguments.value(), state.value(), items.value()};
+    cxxpython::core::make_tuple(c, result, out);
+}
+
 void deque_inplace_add(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check(c, args[0], out))
@@ -1170,6 +1219,7 @@ void initialize_collections(Attachment &c, Handle module, ReturnSlot &out)
     install(deque_type, U"extendleft", pair, extend<true>);
     install(deque_type, U"copy", unary, deque_copy);
     install(deque_type, U"__copy__", unary, deque_copy);
+    install(deque_type, U"__reduce__", unary, deque_reduce);
     install(deque_type, U"__iadd__", pair, deque_inplace_add);
     install(deque_type, U"clear", unary, clear);
     install(deque_type, U"__len__", unary, size);

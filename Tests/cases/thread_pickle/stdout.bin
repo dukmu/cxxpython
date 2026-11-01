@@ -1,0 +1,12 @@
+types True _thread lock False
+unlocked False True
+acquire True True True
+constructor rejected
+type immutable
+subclass rejected
+rlock type True
+recursive True True 2 True
+repr state 2 True
+released 2 True False
+restored 2 True
+final 0 False

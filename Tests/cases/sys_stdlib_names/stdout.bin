@@ -1,0 +1,4 @@
+True True
+True
+True True True
+NameError: name 'missing_name' is not defined

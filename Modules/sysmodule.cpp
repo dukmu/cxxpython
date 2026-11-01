@@ -11,6 +11,7 @@
 #include "internal/codecs.hpp"
 #include "internal/errors.hpp"
 #include "internal/import.hpp"
+#include "internal/stdlib_module_names.hpp"
 
 #include <algorithm>
 #include <bit>
@@ -750,6 +751,21 @@ void initialize_sys_hooks(Attachment &ctx, Handle sys, ReturnSlot &out)
     }
     cxxpython::core::make_tuple(ctx, builtin_modules, function);
     if (!store(U"builtin_module_names"))
+        return;
+    std::vector<Value> stdlib_modules;
+    for (auto name : stdlib_module_names) {
+        make_str(ctx, name, function);
+        stdlib_modules.push_back(roots.root(function.value()).get(ctx));
+    }
+    cxxpython::core::make_tuple(ctx, stdlib_modules, function);
+    const auto names = roots.root(function.value());
+    const std::array arguments{names.get(ctx)};
+    call(ctx, roots.root(ctx.builtin(CoreObject::FrozenSetType)), {arguments}, function);
+    if (failed(function)) {
+        out.raised(function.exception());
+        return;
+    }
+    if (!store(U"stdlib_module_names"))
         return;
     SignatureLayout audit;
     audit.parameters = {{U"event", ParameterKind::PositionalOnly}};

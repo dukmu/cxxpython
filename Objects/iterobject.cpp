@@ -1,8 +1,10 @@
 #include "cxxpython/calliterobject.hpp"
 #include "cxxpython/protocol.hpp"
 #include "internal/abstract.hpp"
+#include "internal/reversed.hpp"
 
 #include <algorithm>
+#include <array>
 #include <limits>
 
 namespace cxxpython::core {
@@ -288,6 +290,132 @@ void iterator_self(Attachment &, Value, std::span<const Value> args, ReturnSlot 
 {
     out.ok(args[0]);
 }
+// Reduction shapes and state bounds follow CPython 3.12.14's iterobject.c,
+// enumobject.c, listobject.c, tupleobject.c and unicodeobject.c (PSF license).
+void iterator_reduction(Attachment &context, Handle constructor, std::span<const Value> args,
+                        std::optional<Handle> state, ReturnSlot &out)
+{
+    RootScope roots(context);
+    for (auto value : args)
+        roots.root(value);
+    ReturnSlot arguments(context);
+    cxxpython::core::make_tuple(context, args, arguments);
+    const std::array result{constructor.get(context), arguments.value(),
+                            state ? state->get(context) : context.builtin(CoreObject::None)};
+    cxxpython::core::make_tuple(context, std::span(result).first(state ? 3 : 2), out);
+}
+template <class F>
+decltype(auto) list_iterator_locked(Attachment &context, ListObject::Storage &data, F &&body)
+{
+    for (;;) {
+        std::unique_lock lock(data.mutex, std::try_to_lock);
+        if (lock.owns_lock()) {
+            NoSafepoint commit(context);
+            return body();
+        }
+        NativeWait parked(context);
+        data.mutex.lock();
+        data.mutex.unlock();
+    }
+}
+template <CoreObject Type>
+void sequence_reduce(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!sequence<SequenceIteratorObject, Type>(context, args[0], out))
+        return;
+    RootScope roots(context);
+    const auto self = roots.root(args[0]);
+    const auto iter = detail::name_lookup(context, context.builtin(CoreObject::Builtins), U"iter");
+    if (!iter) {
+        raise_error(context, CoreObject::RuntimeErrorType, U"lost builtins.iter", out);
+        return;
+    }
+    const auto constructor = roots.root(*iter);
+    auto &iterator = context.payload<SequenceIteratorObject>(self);
+    ReturnSlot owner(context), state(context);
+    std::size_t position = 0;
+    auto snapshot = [&] {
+        context.load(self.get(context), iterator.owner, owner);
+        position = iterator.index.load(std::memory_order_relaxed);
+    };
+    if constexpr (Type == CoreObject::ListIteratorType) {
+        context.load(self.get(context), iterator.owner, owner);
+        if (owner.tag() == ResultTag::Ok) {
+            const auto list = roots.root(owner.value());
+            list_iterator_locked(context, *context.payload<ListObject>(list).contents, snapshot);
+        }
+    } else
+        snapshot();
+    if (owner.tag() == ResultTag::Ok) {
+        make_int(context, static_cast<std::int64_t>(position), state);
+        const std::array values{owner.value()};
+        iterator_reduction(context, constructor, values, roots.root(state.value()), out);
+    } else {
+        if constexpr (Type == CoreObject::ListIteratorType)
+            make_list(context, {}, owner);
+        else if constexpr (Type == CoreObject::StrIteratorType)
+            make_str(context, U"", owner);
+        else
+            owner.ok(context.builtin(CoreObject::EmptyTuple));
+        const std::array values{owner.value()};
+        iterator_reduction(context, constructor, values, {}, out);
+    }
+}
+template <CoreObject Type>
+void sequence_setstate(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!sequence<SequenceIteratorObject, Type>(context, args[0], out))
+        return;
+    RootScope roots(context);
+    const auto self = roots.root(args[0]), value = roots.root(args[1]);
+    if (!is_int(context, value.get(context))) {
+        raise_error(context, CoreObject::TypeErrorType, U"an integer is required", out);
+        return;
+    }
+    std::int64_t position;
+    if (!int_fits_signed(context, value.get(context), position) ||
+        position < std::numeric_limits<std::intptr_t>::min() ||
+        position > std::numeric_limits<std::intptr_t>::max()) {
+        raise_error(context, CoreObject::OverflowErrorType,
+                    U"Python int too large to convert to C ssize_t", out);
+        return;
+    }
+    auto selected = static_cast<std::size_t>(std::max<std::int64_t>(0, position));
+    auto &iterator = context.payload<SequenceIteratorObject>(self);
+    ReturnSlot owner(context);
+    context.load(self.get(context), iterator.owner, owner);
+    if (owner.tag() == ResultTag::Ok) {
+        const auto source = roots.root(owner.value());
+        if constexpr (Type == CoreObject::ListIteratorType) {
+            auto &data = *context.payload<ListObject>(source).contents;
+            list_iterator_locked(context, data, [&] {
+                context.load(self.get(context), iterator.owner, owner);
+                if (owner.tag() == ResultTag::Ok)
+                    iterator.index.store(std::min(selected, data.items.size()),
+                                         std::memory_order_relaxed);
+            });
+        } else {
+            if constexpr (Type == CoreObject::TupleIteratorType)
+                selected = std::min(selected, context.payload<TupleObject>(source).items.size());
+            else if constexpr (Type == CoreObject::StrIteratorType)
+                selected = std::min(selected, context.payload<StrObject>(source).value.size());
+            iterator.index.store(selected, std::memory_order_relaxed);
+        }
+    }
+    out.ok(context.builtin(CoreObject::None));
+}
+void enumerate_reduce(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!sequence<EnumObject, CoreObject::EnumerateType>(context, args[0], out))
+        return;
+    RootScope roots(context);
+    const auto self = roots.root(args[0]), constructor = roots.root(context.type_of(self));
+    const auto &iterator = context.payload<EnumObject>(self);
+    ReturnSlot index(context);
+    context.load(self.get(context), iterator.index, index);
+    const std::array values{iterator.iterator, index.value()};
+    iterator_reduction(context, constructor, values, {}, out);
+}
 void indexed_next(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!sequence<SequenceIteratorObject, CoreObject::SequenceIteratorType>(context, args[0], out))
@@ -544,6 +672,23 @@ void install_iteration(Attachment &context, std::span<const Handle> core)
                              unary, iterator_self);
     install_native_attribute(context, core, at(CoreObject::SequenceIteratorType), U"__next__",
                              unary, indexed_next);
+    const auto install_reduction = [&](CoreObject type, NativeEntry reduce, NativeEntry restore) {
+        install_native_attribute(context, core, at(type), U"__reduce__", unary, reduce);
+        auto signature = unary;
+        signature.parameters.push_back({U"state", ParameterKind::PositionalOnly});
+        install_native_attribute(context, core, at(type), U"__setstate__", signature, restore);
+    };
+    install_reduction(CoreObject::ListIteratorType, sequence_reduce<CoreObject::ListIteratorType>,
+                      sequence_setstate<CoreObject::ListIteratorType>);
+    install_reduction(CoreObject::TupleIteratorType, sequence_reduce<CoreObject::TupleIteratorType>,
+                      sequence_setstate<CoreObject::TupleIteratorType>);
+    install_reduction(CoreObject::StrIteratorType, sequence_reduce<CoreObject::StrIteratorType>,
+                      sequence_setstate<CoreObject::StrIteratorType>);
+    install_reduction(CoreObject::SequenceIteratorType,
+                      sequence_reduce<CoreObject::SequenceIteratorType>,
+                      sequence_setstate<CoreObject::SequenceIteratorType>);
+    install_native_attribute(context, core, at(CoreObject::EnumerateType), U"__reduce__", unary,
+                             enumerate_reduce);
     install_native_field(context, core, at(CoreObject::StopIterationType), U"value", stop_value,
                          stop_value_set);
 }

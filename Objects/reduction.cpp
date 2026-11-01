@@ -201,8 +201,18 @@ void common_reduce(Attachment &c, Handle self, std::int64_t protocol, ReturnSlot
     }
     auto getter = roots.root(helper.value());
     const auto original = type_attribute(c, c.object_type(), U"__getstate__");
-    if (c.has_layout<BoundMethodObject>(getter.get(c)) &&
-        c.payload<BoundMethodObject>(getter).function == *original) {
+    bool default_getter = c.has_layout<BoundMethodObject>(getter.get(c)) &&
+                          c.payload<BoundMethodObject>(getter).function == *original;
+    if (c.has_layout<NativeFunctionObject>(getter.get(c))) {
+        const auto &bound = c.payload<NativeFunctionObject>(getter);
+        const auto definition = c.has_layout<MethodDescriptorObject>(*original)
+                                    ? c.payload<MethodDescriptorObject>(*original).function
+                                    : *original;
+        const auto &native = c.payload<NativeFunctionObject>(definition);
+        default_getter = bound.bound_self == self.get(c) && bound.entry == native.entry &&
+                         bound.captures == native.captures;
+    }
+    if (default_getter) {
         default_state(c, self,
                       !hasargs && !c.has_layout<ListObject>(self.get(c)) &&
                           !c.has_layout<DictObject>(self.get(c)),

@@ -251,6 +251,31 @@ void locked(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out
     out.ok(ctx.builtin(value ? CoreObject::True : CoreObject::False));
 }
 
+void lock_repr(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(ctx);
+    const auto self = roots.root(args[0]);
+    if (!ctx.has_layout<Lock>(self.get(ctx))) {
+        raise_error(ctx, CoreObject::TypeErrorType, U"lock method requires a lock instance", out);
+        return;
+    }
+    auto &lock = ctx.payload<Lock>(self);
+    bool is_locked;
+    {
+        NativeWait wait(ctx);
+        std::lock_guard guard(lock.mutex);
+        is_locked = lock.locked;
+    }
+    char address[2 + 2 * sizeof(std::uintptr_t) + 1];
+    std::snprintf(address, sizeof(address), "%p", static_cast<void *>(&lock));
+    const std::string suffix(address);
+    make_str(
+        ctx,
+        (is_locked ? U"<locked _thread.lock object at " : U"<unlocked _thread.lock object at ") +
+            std::u32string(suffix.begin(), suffix.end()) + U">",
+        out);
+}
+
 void rlock_new(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
@@ -672,6 +697,8 @@ void initialize_thread(Attachment &ctx, Handle module, ReturnSlot &out)
         core.push_back(roots.root(ctx.builtin(static_cast<CoreObject>(i))));
     NativeTypeSpec spec{{"lock"}, LayoutDescriptor::of<Lock>()};
     spec.type.module = U"_thread";
+    spec.type.immutable = true;
+    spec.type.subclassable = false;
     ReturnSlot value(ctx), minus_one(ctx);
     auto dictionary = roots.root(module_dict(ctx, module.get(ctx)));
     const auto previous = name_lookup(ctx, dictionary.get(ctx), U"allocate_lock");
@@ -706,6 +733,7 @@ void initialize_thread(Attachment &ctx, Handle module, ReturnSlot &out)
         install_native_attribute(ctx, core, type, U"__exit__", exit_signature, release);
         for (auto name : {U"locked", U"locked_lock"})
             install_native_attribute(ctx, core, type, name, unary, locked);
+        install_native_attribute(ctx, core, type, U"__repr__", unary, lock_repr);
     }
     const auto old_rlock = name_lookup(ctx, dictionary.get(ctx), U"RLock");
     const bool reuse_rlock = old_rlock && ctx.has_layout<TypeObject>(*old_rlock) &&

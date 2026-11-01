@@ -1,0 +1,34 @@
+list -5 [1, 2, 3]
+list 0 [1, 2, 3]
+list 1 [2, 3]
+list True [2, 3]
+list 100 []
+TypeError
+TypeError
+TypeError
+OverflowError
+OverflowError
+exhausted state validated
+tuple -5 [1, 2, 3]
+tuple 0 [1, 2, 3]
+tuple 1 [2, 3]
+tuple True [2, 3]
+tuple 100 []
+TypeError
+TypeError
+TypeError
+OverflowError
+OverflowError
+exhausted state validated
+str -5 ['a', 'b', 'c']
+str 0 ['a', 'b', 'c']
+str 1 ['b', 'c']
+str True ['b', 'c']
+str 100 []
+TypeError
+TypeError
+TypeError
+OverflowError
+OverflowError
+exhausted state validated
+[2, 3, 4, 5] [2, 3, 4, 5]

@@ -1,0 +1,11 @@
+reduction shape and constructor arguments
+protocol 0 values maxlen cycles subclass state
+protocol 1 values maxlen cycles subclass state
+protocol 2 values maxlen cycles subclass state
+protocol 3 values maxlen cycles subclass state
+protocol 4 values maxlen cycles subclass state
+protocol 5 values maxlen cycles subclass state
+live iterator detects mutation
+state error state failure
+iterator error iterator failure
+state callback may mutate deque

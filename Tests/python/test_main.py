@@ -51,6 +51,15 @@ class MainTests(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(result.stdout, argv0 + "\n42\n")
 
+    def test_code_module_entry(self):
+        result = self.execute("-m", "code", "-q",
+                              input="missing_name\nvalue = 6\nprint(value * 7)\n")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout, ">>> >>> >>> 42\n>>> ")
+        self.assertIn("NameError: name 'missing_name' is not defined", result.stderr)
+        self.assertTrue(result.stderr.endswith("\nnow exiting InteractiveConsole...\n"))
+        self.assertNotIn("AttributeError", result.stderr)
+
     def test_standard_stream_bootstrap_uses_the_configured_library(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

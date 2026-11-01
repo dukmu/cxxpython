@@ -3,6 +3,7 @@
 import argparse
 from pathlib import Path
 import subprocess
+import tempfile
 
 
 def main():
@@ -28,8 +29,9 @@ def main():
                    f'sys.argv = {[str(script)]!r}; __file__ = {str(script)!r}; '
                    "exec(compile(open(__file__).read(), __file__, 'exec'))")
         try:
-            result = subprocess.run([str(binary), '-c', command], capture_output=True,
-                                    text=True, timeout=args.timeout)
+            with tempfile.TemporaryDirectory(prefix='cxxpython-dill-') as scratch:
+                result = subprocess.run([str(binary), '-c', command], capture_output=True,
+                                        text=True, cwd=scratch, timeout=args.timeout)
         except subprocess.TimeoutExpired:
             print(f'FAIL {script.name}: exceeded {args.timeout:g} seconds', flush=True)
             failures += 1

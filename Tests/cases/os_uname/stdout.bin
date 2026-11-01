@@ -1,0 +1,8 @@
+type True posix uname_result
+shape 5 5 5 0
+fields True
+strings True
+repeat True
+readonly
+constructor posix.uname_result(sysname=1, nodename=2, release=3, version=4, machine=5) 3 5
+bad sequence posix.uname_result() takes a 5-sequence (2-sequence given)

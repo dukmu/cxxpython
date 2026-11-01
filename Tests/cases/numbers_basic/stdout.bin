@@ -1,0 +1,12 @@
+bool True True True True True
+int True True True True True
+float True True True False False
+complex True True False False False
+str False False False False False
+'  ' '\t'
+True
+False
+True
+True
+True
+abstract Integral

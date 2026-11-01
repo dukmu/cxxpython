@@ -26,6 +26,10 @@
 #include <sys/ioctl.h>
 #include <sys/random.h>
 #include <sys/stat.h>
+#if defined(__unix__) || defined(__APPLE__) || defined(__ANDROID__)
+#include <sys/utsname.h>
+#define CXXPYTHON_HAVE_UNAME 1
+#endif
 #include <unistd.h>
 
 extern char **environ;
@@ -470,6 +474,88 @@ std::u32string fs_decode(const std::string &s)
     }
     return result;
 }
+#if defined(CXXPYTHON_HAVE_UNAME)
+constexpr const char32_t *uname_fields[] = {U"sysname", U"nodename", U"release", U"version",
+                                            U"machine"};
+void uname_repr(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(c);
+    const auto self = roots.root(args[0]);
+    std::u32string text = U"posix.uname_result(";
+    ReturnSlot item(c);
+    for (std::size_t i = 0; i < 5; ++i) {
+        if (i)
+            text += U", ";
+        text += uname_fields[i];
+        text += U"=";
+        repr(c, roots.root(c.payload<TupleObject>(self).items[i]), item);
+        if (failed(item)) {
+            out.raised(item.exception());
+            return;
+        }
+        text += c.payload<StrObject>(item.value()).value;
+    }
+    make_str(c, text + U")", out);
+}
+void uname_new(Attachment &c, Value function, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(c);
+    const auto type = roots.root(args[0]);
+    if (type.get(c) != c.payload<NativeFunctionObject>(function).captures[0]) {
+        raise_error(c, CoreObject::TypeErrorType, U"invalid posix.uname_result type", out);
+        return;
+    }
+    if (!c.has_layout<DictObject>(args[2])) {
+        raise_error(c, CoreObject::TypeErrorType,
+                    U"posix.uname_result() takes a dict as second arg, if any", out);
+        return;
+    }
+    ReturnSlot sequence(c);
+    const std::array input{args[1]};
+    call(c, roots.root(c.builtin(CoreObject::TupleType)), {input}, sequence);
+    if (failed(sequence)) {
+        out.raised(sequence.exception());
+        return;
+    }
+    const auto &items = c.payload<TupleObject>(sequence.value()).items;
+    if (items.size() != 5) {
+        const auto count = std::to_string(items.size());
+        raise_error(c, CoreObject::TypeErrorType,
+                    U"posix.uname_result() takes a 5-sequence (" +
+                        std::u32string(count.begin(), count.end()) + U"-sequence given)",
+                    out);
+        return;
+    }
+    c.allocate_instance<TupleObject>(type, out, items);
+}
+void uname_entry(Attachment &c, Value function, std::span<const Value>, ReturnSlot &out)
+{
+    struct utsname info {};
+    int error;
+    {
+        NativeWait wait(c);
+        error = ::uname(&info) == 0 ? 0 : errno;
+    }
+    if (error) {
+        raise_os_error(c, error, out);
+        return;
+    }
+    RootScope roots(c);
+    const auto type = roots.root(c.payload<NativeFunctionObject>(function).captures[0]);
+    ReturnSlot item(c);
+    std::vector<Value> values;
+    for (const char *field :
+         {info.sysname, info.nodename, info.release, info.version, info.machine}) {
+        make_str(c, fs_decode(field), item);
+        if (failed(item)) {
+            out.raised(item.exception());
+            return;
+        }
+        values.push_back(roots.root(item.value()).get(c));
+    }
+    c.allocate_instance<TupleObject>(type, out, std::move(values));
+}
+#endif
 void cwd(Attachment &c, Value function, std::span<const Value>, ReturnSlot &out)
 {
     bool bytes = c.payload<NativeFunctionObject>(function).name == "getcwdb";
@@ -1320,6 +1406,48 @@ void initialize_posix(Attachment &c, Handle module, ReturnSlot &out)
     dict_store(c, dict, roots.root(name.value()), terminal_type, out);
     if (failed(out))
         return;
+#if defined(CXXPYTHON_HAVE_UNAME)
+    TypeSpec uname_spec{U"uname_result", base};
+    uname_spec.module = U"posix";
+    uname_spec.slots = std::vector<std::u32string>{};
+    uname_spec.immutable = true;
+    uname_spec.subclassable = false;
+    create_native_type(c, NativeTypeSpec{uname_spec, LayoutDescriptor::of<TupleObject>()}, value);
+    if (failed(value)) {
+        out.raised(value.exception());
+        return;
+    }
+    const auto uname_type = roots.root(value.value());
+    const NativeGetter uname_getters[] = {terminal_field<0>, terminal_field<1>, terminal_field<2>,
+                                          terminal_field<3>, terminal_field<4>};
+    for (std::size_t i = 0; i < 5; ++i)
+        install_native_field(c, core, uname_type, uname_fields[i], uname_getters[i]);
+    install_native_attribute(c, core, uname_type, U"__repr__", signature({{U"self", only}}),
+                             uname_repr);
+    install_native_attribute(
+        c, core, uname_type, U"__new__",
+        signature({{U"cls", only},
+                   {U"sequence"},
+                   {U"dict", ParameterKind::PositionalOrKeyword, defaults.get(c)}}),
+        uname_new, {uname_type.get(c)});
+    const auto uname_dict = roots.root(*TypeView(c, uname_type).dictionary());
+    const auto uname_constructor = roots.root(*name_lookup(c, uname_dict.get(c), U"__new__"));
+    c.allocate_instance<StaticMethodObject>(roots.root(c.builtin(CoreObject::StaticMethodType)),
+                                            value, uname_constructor.get(c));
+    make_str(c, U"__new__", name);
+    name_store(c, uname_dict.get(c), name.value(), value.value());
+    for (const auto &[field, number] :
+         {std::pair{U"n_fields", 5}, {U"n_sequence_fields", 5}, {U"n_unnamed_fields", 0}}) {
+        make_int(c, number, value);
+        const auto number_handle = roots.root(value.value());
+        make_str(c, field, name);
+        name_store(c, uname_dict.get(c), name.value(), number_handle.get(c));
+    }
+    make_str(c, U"uname_result", name);
+    dict_store(c, dict, roots.root(name.value()), uname_type, out);
+    if (failed(out) || !install("uname", {}, uname_entry, {uname_type.get(c)}))
+        return;
+#endif
     make_int(c, STDOUT_FILENO, value);
     auto stdout_fd = roots.root(value.value());
     if (!install("get_terminal_size", signature({{U"fd", only, stdout_fd.get(c)}}),

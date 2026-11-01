@@ -1175,6 +1175,31 @@ void tell(Attachment &c, Value, std::span<const Value> a, ReturnSlot &out)
         return;
     }
     auto decoder = edge(c, self, s.decoder, r);
+    if (s.used == s.pending.size()) {
+        ReturnSlot current(c);
+        if (!method(c, decoder, U"getstate", {}, current)) {
+            out.raised(current.exception());
+            return;
+        }
+        auto current_state = r.root(current.value());
+        if (!c.has_layout<TupleObject>(current_state.get(c)) ||
+            c.payload<TupleObject>(current_state).items.size() != 2) {
+            raise_error(c, CoreObject::TypeErrorType, U"decoder getstate() must return a 2-tuple",
+                        out);
+            return;
+        }
+        const auto &items = c.payload<TupleObject>(current_state).items;
+        if (!is_bytes(c, items[0])) {
+            raise_error(c, CoreObject::TypeErrorType, U"decoder state buffer must be bytes", out);
+            return;
+        }
+        std::int64_t current_flags;
+        if (c.payload<BytesObject>(items[0]).value.empty() && c.has_layout<IntObject>(items[1]) &&
+            int_fits_signed(c, items[1], current_flags) && current_flags == 0) {
+            method(c, buffer, U"tell", {}, out);
+            return;
+        }
+    }
     Handle state = r.root(c.builtin(CoreObject::None));
     std::int64_t pos = 0;
     std::int64_t feed = 0, skip = 0, eof = 0;

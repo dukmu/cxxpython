@@ -764,7 +764,9 @@ void build_core_objects(Attachment &context, std::span<ReturnSlot *const> output
                             {U"Ellipsis", CoreObject::Ellipsis},
                             {U"True", CoreObject::True},
                             {U"False", CoreObject::False},
-                            {U"NotImplemented", CoreObject::NotImplemented}}) {
+                            {U"NotImplemented", CoreObject::NotImplemented},
+                            {U"IOError", CoreObject::OSErrorType},
+                            {U"EnvironmentError", CoreObject::OSErrorType}}) {
         context.allocate_instance<StrObject>(at(CoreObject::StrType), text, name);
         publish(text.value(), at(id).get(context));
     }

@@ -247,7 +247,8 @@ TEST_F(CoreCalls, InstanceLookupBindsFunctionsAndClassLookupDoesNot)
     get_attribute(context, self, name, out);
     ASSERT_EQ(out.result().tag(), ResultTag::Ok);
     auto method = roots.root(out.result().value());
-    EXPECT_EQ(context.payload<BoundMethodObject>(method).self, self.get(context));
+    EXPECT_EQ(context.type_of(method), context.builtin(CoreObject::NativeFunctionType));
+    EXPECT_EQ(context.payload<NativeFunctionObject>(method).bound_self, self.get(context));
     call(context, method, {}, out);
     EXPECT_EQ(out.result().value(), self.get(context));
     set(self, U"method", text(U"shadowed"));

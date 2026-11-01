@@ -1,0 +1,6 @@
+list cursor round trips
+tuple cursor round trips
+str cursor round trips
+enumerate arbitrary indexes
+enumerate subclass
+[2, 3] [2, 3]

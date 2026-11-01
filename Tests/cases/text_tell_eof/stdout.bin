@@ -1,0 +1,8 @@
+ascii 150 150
+ascii eof ''
+unicode 'aé\nb' 6
+first aé
+roundtrip '\nb' True 6
+utf-8 8191 'éZ' True
+utf-8 8191 '\nZ' True
+utf-16 4095 'B' True

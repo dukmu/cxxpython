@@ -1,0 +1,13 @@
+native types True True True
+receiver True True
+not Python method True True
+equality True True True False
+called [3] [('a', 7), ('b', 7)]
+explicit method [3, 4]
+pickle 0 True {'a': 7}
+pickle 1 True {'a': 7}
+pickle 2 True {'a': 7}
+pickle 3 True {'a': 7}
+pickle 4 True {'a': 7}
+pickle 5 True {'a': 7}
+Python method True True

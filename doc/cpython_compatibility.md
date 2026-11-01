@@ -50,6 +50,12 @@ acceptance evidence; this list is not a generated support matrix.
 
 ## Unmodified Third-Party Packages
 
+Native bound callables expose BuiltinFunctionType, not Python MethodType. Their
+receiver/entry/captured environment define equality and hashing; ordinary Python
+methods retain their separate function/receiver protocol. Standard iterator and
+deque reductions now preserve cursors, maxlen, cycles and subclass state. The
+unchanged dill dict-view, thread and file scripts exercise these paths directly.
+
 The user requests unmodified upstream dill, not a runtime-specific fork. The
 fixed probe target is official dill 0.4.1; its source and license remain in the
 ignored dependency cache, outside `Lib/`. The opt-in acceptance script is

@@ -312,6 +312,15 @@ void invoke_native(Attachment &context, Value function, const NativeFunctionObje
                    CallArgsView args, std::optional<Value> receiver, ReturnSlot &out,
                    RootScope &roots)
 {
+    if (native.binding == NativeFunctionBinding::Function && native.bound_self) {
+        if (receiver) {
+            std::vector<Value> prefixed{*receiver};
+            prefixed.insert(prefixed.end(), args.positional.begin(), args.positional.end());
+            invoke_native(context, function, native, {prefixed, args.keywords}, {}, out, roots);
+            return;
+        }
+        receiver = native.bound_self;
+    }
     std::vector<Value> bound;
     const auto count = args.positional.size() + (receiver ? 1 : 0);
     if (args.keywords.empty() && native.signature.accepts_complete_positional(count)) {
@@ -786,9 +795,20 @@ void bind_native_callable(Attachment &context, Value callable, std::optional<Val
         return;
     }
     RootScope roots(context);
+    if (context.type_of(callable) != context.builtin(CoreObject::FunctionType)) {
+        const auto function = roots.root(
+            context.type_of(callable) == context.builtin(CoreObject::MethodDescriptorType)
+                ? context.payload<MethodDescriptorObject>(callable).function
+                : callable);
+        const auto &native = context.payload<NativeFunctionObject>(function);
+        detail::allocate_function(
+            context, roots.root(context.builtin(CoreObject::NativeFunctionType)), native.name,
+            native.signature, native.entry, native.captures, out, native.sequence_owner,
+            NativeFunctionBinding::Function, receiver, native.numeric_kind);
+        return;
+    }
     context.allocate_instance<BoundMethodObject>(
-        roots.root(context.builtin(CoreObject::BoundMethodType)), out, callable, *receiver,
-        context.type_of(callable) != context.builtin(CoreObject::FunctionType));
+        roots.root(context.builtin(CoreObject::BoundMethodType)), out, callable, *receiver, false);
 }
 void function_get(Attachment &context, Value wrapper, std::span<const Value> args, ReturnSlot &out)
 {

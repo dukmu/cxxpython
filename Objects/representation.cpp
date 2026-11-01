@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <bit>
 #include <charconv>
+#include <functional>
 #include <limits>
 
 namespace cxxpython::core {
@@ -509,6 +510,55 @@ void tuple_compare(Attachment &context, Value, std::span<const Value> args, Retu
     }
     order_result<Op>(context, (left.size() > right.size()) - (left.size() < right.size()), out);
 }
+void native_receiver(Attachment &c, Value self, ReturnSlot &out)
+{
+    const auto &function = c.payload<NativeFunctionObject>(self);
+    if (function.bound_self)
+        out.ok(*function.bound_self);
+    else
+        c.load(self, function.module_owner, out);
+}
+template <bool NotEqual>
+void native_compare(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!instance_of<NativeFunctionObject, CoreObject::NativeFunctionType>(c, args[0])) {
+        type_error(c, out);
+        return;
+    }
+    if (!instance_of<NativeFunctionObject, CoreObject::NativeFunctionType>(c, args[1])) {
+        out.ok(c.builtin(CoreObject::NotImplemented));
+        return;
+    }
+    ReturnSlot left_self(c), right_self(c);
+    native_receiver(c, args[0], left_self);
+    native_receiver(c, args[1], right_self);
+    const auto &left = c.payload<NativeFunctionObject>(args[0]);
+    const auto &right = c.payload<NativeFunctionObject>(args[1]);
+    const bool same_self =
+        left_self.tag() == right_self.tag() &&
+        (left_self.tag() == ResultTag::Empty || left_self.value() == right_self.value());
+    const bool equal = same_self && left.entry == right.entry && left.captures == right.captures &&
+                       left.sequence_owner == right.sequence_owner;
+    out.ok(c.builtin(equal != NotEqual ? CoreObject::True : CoreObject::False));
+}
+void native_hash(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!instance_of<NativeFunctionObject, CoreObject::NativeFunctionType>(c, args[0])) {
+        type_error(c, out);
+        return;
+    }
+    ReturnSlot receiver(c);
+    native_receiver(c, args[0], receiver);
+    const auto &function = c.payload<NativeFunctionObject>(args[0]);
+    auto value = std::hash<NativeEntry>{}(function.entry);
+    if (receiver.tag() == ResultTag::Ok)
+        value ^= std::rotr(reinterpret_cast<std::uintptr_t>(receiver.value().object()), 4);
+    for (auto capture : function.captures)
+        value = std::rotl(value, 7) ^ reinterpret_cast<std::uintptr_t>(capture.object());
+    if (function.sequence_owner)
+        value ^= reinterpret_cast<std::uintptr_t>(function.sequence_owner->object());
+    make_int(c, signed_hash(value), out);
+}
 template <bool NotEqual>
 void method_compare(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
 {
@@ -682,6 +732,11 @@ void install_value_protocols(Attachment &context, std::span<const Handle> core)
     install(object, U"__str__", object_str);
     install(object, U"__sizeof__", object_sizeof);
     install_reduction(context, core);
+    install(at(CoreObject::NativeFunctionType), U"__hash__", native_hash);
+    install_native_attribute(context, core, at(CoreObject::NativeFunctionType), U"__eq__", pair,
+                             native_compare<false>);
+    install_native_attribute(context, core, at(CoreObject::NativeFunctionType), U"__ne__", pair,
+                             native_compare<true>);
     install(at(CoreObject::BoundMethodType), U"__hash__", method_hash);
     install_native_attribute(context, core, at(CoreObject::BoundMethodType), U"__eq__", pair,
                              method_compare<false>);

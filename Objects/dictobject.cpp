@@ -1,4 +1,5 @@
 #include "internal/abstract.hpp"
+#include "internal/dict.hpp"
 
 #include <tuple>
 
@@ -501,6 +502,79 @@ void self_iter(Attachment &context, Value, std::span<const Value> args, ReturnSl
     }
     out.ok(args[0]);
 }
+void iterator_reduce(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!context.has_layout<DictIteratorObject>(args[0]) ||
+        (context.type_of(args[0]) != context.builtin(CoreObject::DictKeyIteratorType) &&
+         context.type_of(args[0]) != context.builtin(CoreObject::DictValueIteratorType) &&
+         context.type_of(args[0]) != context.builtin(CoreObject::DictItemIteratorType))) {
+        raise_error(context, CoreObject::TypeErrorType,
+                    U"dict iterator descriptor requires dict iterator", out);
+        return;
+    }
+    RootScope roots(context);
+    const auto self = roots.root(args[0]);
+    auto &iterator = context.payload<DictIteratorObject>(self);
+    ReturnSlot owner(context), copy(context), snapshot(context), remaining(context);
+    context.load(self.get(context), iterator.dictionary, owner);
+    if (owner.tag() == ResultTag::Empty)
+        make_list(context, {}, remaining);
+    else {
+        const auto dictionary = roots.root(owner.value());
+        context.allocate_instance<DictIteratorObject>(roots.root(context.type_of(self)), copy,
+                                                      dictionary.get(context), iterator.kind);
+        const auto clone = roots.root(copy.value());
+        auto &state = context.payload<DictIteratorObject>(clone);
+        auto &data = *context.payload<DictObject>(dictionary).contents;
+        // CPython 3.12.14 dictiter_reduce consumes a copy, never the source.
+        // Copy cursor fields under the same lock used by next_dict_item; the
+        // managed clone owns both dictionary and immutable metadata snapshot.
+        for (;;) {
+            std::unique_lock lock(data.mutex, std::try_to_lock);
+            if (lock.owns_lock()) {
+                NoSafepoint commit(context);
+                context.load(self.get(context), iterator.dictionary, owner);
+                if (owner.tag() == ResultTag::Empty) {
+                    state.exhausted = true;
+                    context.store(clone.get(context), state.dictionary, {});
+                } else {
+                    state.cursor = iterator.cursor;
+                    state.version = iterator.version;
+                    state.last_identity = iterator.last_identity;
+                    state.expected_size = iterator.expected_size;
+                    state.remaining = iterator.remaining;
+                    state.position = iterator.position;
+                    state.invalid = iterator.invalid;
+                    state.exhausted = iterator.exhausted;
+                    context.load(self.get(context), iterator.snapshot, snapshot);
+                    if (snapshot.tag() == ResultTag::Ok)
+                        context.store(clone.get(context), state.snapshot, snapshot.value());
+                }
+                break;
+            }
+            NativeWait parked(context);
+            data.mutex.lock();
+            data.mutex.unlock();
+        }
+        const std::array values{clone.get(context)};
+        call(context, roots.root(context.builtin(CoreObject::ListType)), {values}, remaining);
+        if (failed(remaining)) {
+            out.raised(remaining.exception());
+            return;
+        }
+    }
+    const auto iter = detail::name_lookup(context, context.builtin(CoreObject::Builtins), U"iter");
+    if (!iter) {
+        raise_error(context, CoreObject::RuntimeErrorType, U"lost builtins.iter", out);
+        return;
+    }
+    const auto constructor = roots.root(*iter);
+    ReturnSlot arguments(context);
+    const std::array values{remaining.value()};
+    cxxpython::core::make_tuple(context, values, arguments);
+    const std::array result{constructor.get(context), arguments.value()};
+    cxxpython::core::make_tuple(context, result, out);
+}
 void equal(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
 {
     if (!dictionary(context, args[0], out))
@@ -709,6 +783,7 @@ void detail::install_dictionaries(Attachment &context, std::span<const Handle> c
                       CoreObject::DictItemIteratorType}) {
         install(type, U"__iter__", unary, self_iter);
         install(type, U"__next__", unary, next);
+        install(type, U"__reduce__", unary, iterator_reduce);
     }
     for (auto type : {CoreObject::DictType, CoreObject::DictKeysType, CoreObject::DictValuesType,
                       CoreObject::DictItemsType}) {
