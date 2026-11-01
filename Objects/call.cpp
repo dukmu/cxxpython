@@ -12,7 +12,8 @@ namespace {
 void invoke(Attachment &, Handle, CallArgsView, std::optional<Value>, ReturnSlot &, RootScope &,
             std::optional<detail::PreparedPythonCall> * = nullptr);
 void invoke_special_impl(Attachment &, Handle, Handle, CallArgsView, ReturnSlot &, RootScope &,
-                         std::optional<detail::PreparedPythonCall> * = nullptr);
+                         std::optional<detail::PreparedPythonCall> * = nullptr,
+                         NativeCallKind = NativeCallKind::Generic);
 void bind_native_callable(Attachment &, Value, std::optional<Value>, ReturnSlot &);
 using detail::bind_descriptor;
 using detail::special;
@@ -367,28 +368,36 @@ struct CallDepth {
 };
 void invoke_special_impl(Attachment &context, Handle self, Handle target, CallArgsView args,
                          ReturnSlot &out, RootScope &roots,
-                         std::optional<detail::PreparedPythonCall> *preparation)
+                         std::optional<detail::PreparedPythonCall> *preparation,
+                         NativeCallKind native_call)
 {
     const auto receiver = self.get(context);
     const auto descriptor = target.get(context);
-    const auto type = context.type_of(descriptor);
-    // Reuse this classification; native targets still share the ordinary binder and guards.
-    if (type == context.builtin(CoreObject::NativeFunctionType)) {
-        const auto &native = context.payload<NativeFunctionObject>(descriptor);
-        if (native.binding == NativeFunctionBinding::Descriptor) {
-            CallDepth depth(context, out);
-            if (depth.entered)
-                invoke_native(context, target, native, args, receiver, out, roots);
-            return;
-        }
+    std::optional<Value> type;
+    if (native_call == NativeCallKind::Generic) {
+        type = context.type_of(descriptor);
+        if (*type == context.builtin(CoreObject::NativeFunctionType))
+            native_call = context.payload<NativeFunctionObject>(descriptor).binding ==
+                                  NativeFunctionBinding::Descriptor
+                              ? NativeCallKind::Descriptor
+                              : NativeCallKind::Function;
+        else if (*type == context.builtin(CoreObject::MethodDescriptorType))
+            native_call = NativeCallKind::MethodDescriptor;
     }
-    if (type == context.builtin(CoreObject::MethodDescriptorType)) {
+    if (native_call != NativeCallKind::Generic) {
         CallDepth depth(context, out);
-        if (depth.entered)
+        if (!depth.entered)
+            return;
+        if (native_call == NativeCallKind::MethodDescriptor)
             invoke_method_descriptor(context, descriptor, args, receiver, out, roots);
+        else
+            invoke_native(context, target, context.payload<NativeFunctionObject>(descriptor), args,
+                          native_call == NativeCallKind::Descriptor ? std::optional{receiver}
+                                                                    : std::nullopt,
+                          out, roots);
         return;
     }
-    if (type == context.builtin(CoreObject::FunctionType))
+    if (*type == context.builtin(CoreObject::FunctionType))
         invoke(context, target, args, receiver, out, roots, preparation);
     else {
         ReturnSlot bound(context);
@@ -779,7 +788,8 @@ void invoke_protocol_impl(Attachment &context, Handle self, const ResolvedSlot &
         type_error(context, U"operation is missing or explicitly disabled", out);
         return;
     }
-    invoke_special_impl(context, self, target, {args, {}}, out, roots);
+    invoke_special_impl(context, self, target, {args, {}}, out, roots, nullptr,
+                        current.native_call);
 }
 } // namespace
 

@@ -406,8 +406,12 @@ the target is `builtins` and the `__builtins__` execution namespace.
   real frame/stacklevel/skip-file behavior have reference scripts. The two
   upstream backends differ in private registry key layout; tests compare public
   emission/invalidations rather than claiming C-backend internal identity.
-  Concurrent catch_warnings is not made thread-local by this port. Native warning
-  emission, parser/conversion warnings, -W options and full upstream tests remain.
+  Concurrent catch_warnings is not made thread-local by this port. Native
+  math/struct conversion warnings now call this Python policy, retaining filters,
+  caller locations and collecting/erroring showwarning hooks. Unlike CPython's
+  internal native warning entry, replacing warnings.warn also affects this bridge.
+  A shared native warning entry is the removal condition for that difference;
+  other parser/conversion warnings, -W options and full upstream tests remain.
 - sys.version_info is a native readonly tuple subtype, including named fields,
   repr, comparisons/hash and constructor/subclass restrictions. version and
   hexversion report the pinned language baseline, while version identifies

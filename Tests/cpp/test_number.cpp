@@ -1,8 +1,11 @@
 #include "cxxpython/floatobject.hpp"
 #include "cxxpython/protocol.hpp"
 
+#include <atomic>
 #include <cmath>
+#include <future>
 #include <gtest/gtest.h>
+#include <limits>
 
 namespace {
 using namespace cxxpython::core;
@@ -34,6 +37,68 @@ class CoreNumbers : public testing::Test {
         EXPECT_EQ(int_decimal(context, out.result().value()), expected);
     }
 };
+
+TEST_F(CoreNumbers, NativeDoubleConversionNeedsNoManagedResultAllocation)
+{
+    auto input = integer("9007199254740993");
+    ReturnSlot out(context);
+    make_float(context, -0.0, out);
+    auto negative_zero = roots.root(out.value());
+    const auto objects = context.stats().objects;
+    context.set_allocation_limit(0);
+    double number = 1.0;
+    out.raised(context.builtin(CoreObject::MemoryError));
+    ASSERT_TRUE(detail::float_as_double(context, input, number, out));
+    EXPECT_EQ(number, 9007199254740992.0);
+    EXPECT_EQ(out.tag(), ResultTag::Empty);
+    ASSERT_TRUE(detail::float_as_double(context, negative_zero, number, out));
+    EXPECT_EQ(number, 0.0);
+    EXPECT_TRUE(std::signbit(number));
+    EXPECT_EQ(context.stats().objects, objects);
+    context.set_allocation_limit(std::numeric_limits<std::size_t>::max());
+
+    Interpreter other;
+    Attachment foreign(other);
+    foreign.bootstrap_core();
+    ReturnSlot foreign_out(foreign);
+    foreign_out.ok(foreign.builtin(CoreObject::True));
+    EXPECT_THROW(detail::float_as_double(context, input, number, foreign_out), std::logic_error);
+    EXPECT_EQ(foreign_out.value(), foreign.builtin(CoreObject::True));
+    {
+        NoSafepoint guard(context);
+        EXPECT_THROW(detail::float_as_double(context, input, number, out), std::logic_error);
+    }
+}
+
+TEST_F(CoreNumbers, AllocationFreeNativeConversionsAcknowledgeGcRequests)
+{
+    const auto value = integer("300").get(context);
+    std::atomic<bool> stop = false;
+    std::promise<void> entered;
+    auto ready = entered.get_future();
+    auto worker = std::async(std::launch::async, [&] {
+        Attachment thread(interpreter);
+        RootScope local(thread);
+        const auto input = local.root(value);
+        ReturnSlot out(thread);
+        double number = 0.0;
+        entered.set_value();
+        do {
+            EXPECT_TRUE(detail::float_as_double(thread, input, number, out));
+        } while (!stop.load(std::memory_order_acquire));
+        return number;
+    });
+    {
+        NativeWait wait(context);
+        ready.get();
+    }
+    context.collect();
+    stop.store(true, std::memory_order_release);
+    {
+        NativeWait wait(context);
+        EXPECT_EQ(worker.get(), 300.0);
+    }
+}
 
 TEST_F(CoreNumbers, BoxedIdentityAndBoolAreNotConfusedWithUnboundOrInt)
 {

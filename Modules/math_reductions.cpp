@@ -24,31 +24,6 @@ bool failed(const ReturnSlot &value)
     return value.tag() == ResultTag::Raised;
 }
 
-bool real_number(Attachment &c, Handle value, double &number, ReturnSlot &out)
-{
-    if (is_float(c, value.get(c))) {
-        number = c.payload<FloatObject>(value).value;
-        return true;
-    }
-    RootScope roots(c);
-    const auto type = roots.root(c.type_of(value));
-    if (!type_attribute(c, type.get(c), U"__float__") &&
-        !type_attribute(c, type.get(c), U"__index__")) {
-        raise_error(c, CoreObject::TypeErrorType,
-                    U"must be real number, not " + diagnostic_type_name(c, type), out);
-        return false;
-    }
-    ReturnSlot converted(c);
-    const std::array args{value.get(c)};
-    call(c, roots.root(c.builtin(CoreObject::FloatType)), {args, {}}, converted);
-    if (failed(converted)) {
-        out.raised(converted.exception());
-        return false;
-    }
-    number = c.payload<FloatObject>(converted.value()).value;
-    return true;
-}
-
 bool native_long(Attachment &c, Value value, long &number)
 {
     std::int64_t integer;
@@ -119,7 +94,7 @@ void math_fsum(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &o
         if (status == NextStatus::Done)
             break;
         double x;
-        if (!real_number(c, iteration.root(item.value()), x, out))
+        if (!float_as_double(c, iteration.root(item.value()), x, out))
             return;
         const double saved = x;
         std::size_t count = 0;
@@ -242,7 +217,8 @@ void math_hypot(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &
     for (std::size_t i = 0; i != count; ++i) {
         RootScope iteration(c);
         double x;
-        if (!real_number(c, iteration.root(c.payload<TupleObject>(coordinates).items[i]), x, out))
+        if (!float_as_double(c, iteration.root(c.payload<TupleObject>(coordinates).items[i]), x,
+                             out))
             return;
         x = std::fabs(x);
         values.push_back(x);
@@ -295,8 +271,9 @@ void math_dist(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &o
     for (std::size_t i = 0; i != count; ++i) {
         RootScope iteration(c);
         double px, qx;
-        if (!real_number(c, iteration.root(c.payload<TupleObject>(p_values).items[i]), px, out) ||
-            !real_number(c, iteration.root(c.payload<TupleObject>(q_values).items[i]), qx, out))
+        if (!float_as_double(c, iteration.root(c.payload<TupleObject>(p_values).items[i]), px,
+                             out) ||
+            !float_as_double(c, iteration.root(c.payload<TupleObject>(q_values).items[i]), qx, out))
             return;
         const double x = std::fabs(px - qx);
         differences.push_back(x);
@@ -491,13 +468,13 @@ void math_sumprod(Attachment &c, Handle, std::span<const Value> args, ReturnSlot
                         qt == c.builtin(CoreObject::BoolType))) {
                 a = c.payload<FloatObject>(pv).value;
                 ReturnSlot conversion(c);
-                eligible = real_number(c, qv, b, conversion);
+                eligible = float_as_double(c, qv, b, conversion);
             } else if (!finished && q_float &&
                        (pt == c.builtin(CoreObject::IntType) ||
                         pt == c.builtin(CoreObject::BoolType))) {
                 b = c.payload<FloatObject>(qv).value;
                 ReturnSlot conversion(c);
-                eligible = real_number(c, pv, a, conversion);
+                eligible = float_as_double(c, pv, a, conversion);
             }
             if (eligible) {
                 const auto next = extended_dot(a, b, float_total);

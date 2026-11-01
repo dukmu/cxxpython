@@ -1,5 +1,6 @@
 #include "cxxpython/floatobject.hpp"
 #include "cxxpython/complexobject.hpp"
+#include "cxxpython/import.hpp"
 #include "cxxpython/memoryobject.hpp"
 #include "cxxpython/protocol.hpp"
 #include "internal/errors.hpp"
@@ -147,6 +148,126 @@ bool integer_to_double(Attachment &context, Value value, double &number, ReturnS
     return true;
 }
 
+bool conversion_warning(Attachment &context, const std::u32string &message, ReturnSlot &out)
+{
+    RootScope roots(context);
+    ReturnSlot module(context), warn(context), text(context), warning(context);
+    import_module(context, U"warnings", module);
+    if (module.tag() == ResultTag::Raised) {
+        out.raised(module.exception());
+        return false;
+    }
+    make_str(context, U"warn", text);
+    if (text.tag() == ResultTag::Raised) {
+        out.raised(text.exception());
+        return false;
+    }
+    get_attribute(context, roots.root(module.value()), roots.root(text.value()), warn);
+    if (warn.tag() == ResultTag::Raised) {
+        out.raised(warn.exception());
+        return false;
+    }
+    make_str(context, message, text);
+    if (text.tag() == ResultTag::Raised) {
+        out.raised(text.exception());
+        return false;
+    }
+    const std::array args{text.value(), context.builtin(CoreObject::DeprecationWarningType)};
+    call(context, roots.root(warn.value()), {args, {}}, warning);
+    if (warning.tag() == ResultTag::Raised) {
+        out.raised(warning.exception());
+        return false;
+    }
+    return true;
+}
+
+} // namespace
+
+// Adapted from CPython 3.12.14 PyFloat_AsDouble (PSF license).
+bool detail::float_as_double(Attachment &context, Handle input, double &number, ReturnSlot &out)
+{
+    out.check_caller(context);
+    RootScope roots(context);
+    auto value = roots.root(input.get(context));
+    out.reset(context);
+    context.poll();
+    if (const auto *data = maybe_float(context, value.get(context))) {
+        number = data->value;
+        return true;
+    }
+    if (context.type_of(value) == context.builtin(CoreObject::IntType))
+        return integer_to_double(context, value.get(context), number, out);
+
+    auto method = type_attribute(context, context.type_of(value), U"__float__");
+    ReturnSlot converted(context);
+    if (method) {
+        invoke_special(context, value, roots.root(*method), {{}, {}}, converted);
+    } else {
+        auto slot =
+            resolve_protocol(context, roots.root(context.type_of(value)), Protocol::Index, roots);
+        if (slot.state == SlotState::Missing) {
+            type_error(
+                context,
+                U"must be real number, not " +
+                    diagnostic_type_name(context, roots.root(context.type_of(value))).substr(0, 50),
+                out);
+            return false;
+        }
+        invoke_protocol(context, value, slot, {}, converted, roots);
+    }
+    if (converted.tag() == ResultTag::Raised) {
+        out.raised(converted.exception());
+        return false;
+    }
+    if (!method) {
+        if (!is_int(context, converted.value())) {
+            auto result_type = roots.root(context.type_of(converted.value()));
+            type_error(context,
+                       U"__index__ returned non-int (type " +
+                           diagnostic_type_name(context, result_type).substr(0, 200) + U")",
+                       out);
+            return false;
+        }
+        if (context.type_of(converted.value()) != context.builtin(CoreObject::IntType)) {
+            const auto result_type = roots.root(context.type_of(converted.value()));
+            const auto message = U"__index__ returned non-int (type " +
+                                 diagnostic_type_name(context, result_type).substr(0, 200) +
+                                 U").  The ability to return an instance of a strict subclass of "
+                                 U"int is deprecated, and may be removed in a future version of "
+                                 U"Python.";
+            if (!conversion_warning(context, message, out))
+                return false;
+        }
+        return integer_to_double(context, converted.value(), number, out);
+    }
+    const auto *data = maybe_float(context, converted.value());
+    if (!data) {
+        auto input_type = roots.root(context.type_of(value));
+        auto result_type = roots.root(context.type_of(converted.value()));
+        type_error(context,
+                   diagnostic_type_name(context, input_type).substr(0, 50) +
+                       U".__float__ returned non-float (type " +
+                       diagnostic_type_name(context, result_type).substr(0, 50) + U")",
+                   out);
+        return false;
+    }
+    if (context.type_of(converted.value()) != context.builtin(CoreObject::FloatType)) {
+        const auto input_type = roots.root(context.type_of(value));
+        const auto result_type = roots.root(context.type_of(converted.value()));
+        const auto message = diagnostic_type_name(context, input_type).substr(0, 50) +
+                             U".__float__ returned non-float (type " +
+                             diagnostic_type_name(context, result_type).substr(0, 50) +
+                             U").  The ability to return an instance of a strict subclass of float "
+                             U"is deprecated, and may be removed in a future version of Python.";
+        if (!conversion_warning(context, message, out))
+            return false;
+    }
+    number = context.payload<FloatObject>(converted.value()).value;
+    return true;
+}
+
+namespace {
+
 void float_new(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     if (!context.has_layout<TypeObject>(args[0]) ||
@@ -244,6 +365,17 @@ void float_bool(Attachment &context, Handle, std::span<const Value> args, Return
     const auto *value = require_float(context, args[0], out);
     if (value)
         out.ok(context.builtin(value->value != 0.0 ? CoreObject::True : CoreObject::False));
+}
+
+void integer_float(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
+{
+    if (!is_int(context, args[0])) {
+        type_error(context, U"int.__float__ requires an int", out);
+        return;
+    }
+    double number;
+    if (integer_to_double(context, args[0], number, out))
+        make_float(context, number, out);
 }
 
 void float_identity(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &out)
@@ -674,6 +806,8 @@ void detail::install_floats(Attachment &context, std::span<const Handle> core)
     auto at = [&](CoreObject id) { return core[static_cast<std::size_t>(id)]; };
     SignatureLayout unary;
     unary.parameters = {{U"self", ParameterKind::PositionalOnly}};
+    install_native_attribute(context, core, at(CoreObject::IntType), U"__float__", unary,
+                             integer_float);
     auto pair = unary;
     pair.parameters.push_back({U"other", ParameterKind::PositionalOnly});
     auto install = [&](std::u32string name, NativeEntry entry, bool binary = false) {

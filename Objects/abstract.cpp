@@ -312,12 +312,19 @@ ResolvedSlot detail::resolve_protocol(Attachment &context, Value value, Protocol
                                  ? SlotState::Native
                                  : SlotState::PythonDescriptor;
                 auto kind = NativeSlotKind::Ordinary;
+                auto native_call = NativeCallKind::Generic;
                 if (state == SlotState::Native) {
                     const auto function_value =
                         attribute_type == context.builtin(CoreObject::MethodDescriptorType)
                             ? context.payload<MethodDescriptorObject>(attribute->value).function
                             : attribute->value;
                     const auto &function = context.payload<NativeFunctionObject>(function_value);
+                    native_call =
+                        attribute_type == context.builtin(CoreObject::MethodDescriptorType)
+                            ? NativeCallKind::MethodDescriptor
+                        : function.binding == NativeFunctionBinding::Descriptor
+                            ? NativeCallKind::Descriptor
+                            : NativeCallKind::Function;
                     if (function.sequence_owner &&
                         is_subtype(context, attribute->owner, *function.sequence_owner))
                         kind = NativeSlotKind::Sequence;
@@ -328,7 +335,8 @@ ResolvedSlot detail::resolve_protocol(Attachment &context, Value value, Protocol
                                   roots.root(attribute->owner),
                                   roots.root(attribute->value),
                                   epoch,
-                                  kind};
+                                  kind,
+                                  native_call};
                 context.cache_protocol(slot);
                 return slot;
             }

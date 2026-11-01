@@ -607,6 +607,63 @@ TEST_F(CoreProtocols, SequenceNativeRoleSurvivesCacheAndTracksDescriptorChanges)
     EXPECT_EQ(restored->native_kind, NativeSlotKind::Sequence);
 }
 
+TEST_F(CoreProtocols, CachedNativeCallKindsPreserveBindingAndReceiverChecks)
+{
+    for (const auto binding :
+         {NativeFunctionBinding::Function, NativeFunctionBinding::Descriptor}) {
+        auto cls = type();
+        auto obj = instance(cls);
+        auto marker = integer(17);
+        SignatureLayout signature;
+        if (binding == NativeFunctionBinding::Descriptor)
+            signature.parameters = {{U"self"}};
+        const std::array captures{marker.get(context),
+                                  context.builtin(binding == NativeFunctionBinding::Descriptor
+                                                      ? CoreObject::True
+                                                      : CoreObject::False)};
+        ReturnSlot out(context);
+        make_native_function(
+            context, "cached binding", signature,
+            [](Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &result) {
+                const auto &captured = c.payload<NativeFunctionObject>(function).captures;
+                EXPECT_EQ(args.size(), captured[1] == c.builtin(CoreObject::True) ? 1U : 0U);
+                c.collect();
+                result.ok(c.payload<NativeFunctionObject>(function).captures[0]);
+            },
+            captures, out, binding);
+        put(cls, U"__len__", roots.root(out.value()));
+        context.set_gc_enabled(false);
+        auto slot = resolve_protocol(context, cls, Protocol::Len, roots);
+        const auto kind = binding == NativeFunctionBinding::Descriptor ? NativeCallKind::Descriptor
+                                                                       : NativeCallKind::Function;
+        EXPECT_EQ(slot.native_call, kind);
+        const auto cached = context.cached_protocol(cls, Protocol::Len, roots);
+        ASSERT_TRUE(cached);
+        EXPECT_EQ(cached->native_call, kind);
+        invoke_protocol(context, obj, slot, {}, out);
+        ASSERT_EQ(out.tag(), ResultTag::Ok);
+        EXPECT_EQ(out.value(), marker.get(context));
+        detail::invoke_protocol(context, obj, slot, {}, out, roots);
+        ASSERT_EQ(out.tag(), ResultTag::Ok);
+        EXPECT_EQ(out.value(), marker.get(context));
+
+        auto tuple_len =
+            resolve_protocol(context, builtin(CoreObject::TupleType), Protocol::Len, roots);
+        EXPECT_EQ(tuple_len.native_call, NativeCallKind::MethodDescriptor);
+        put(cls, U"__len__", tuple_len.descriptor);
+        invoke_protocol(context, obj, slot, {}, out);
+        error(out, CoreObject::TypeErrorType);
+        EXPECT_EQ(resolve_protocol(context, cls, Protocol::Len, roots).native_call,
+                  NativeCallKind::MethodDescriptor);
+
+        put(cls, U"__len__", builtin(CoreObject::None));
+        EXPECT_EQ(resolve_protocol(context, cls, Protocol::Len, roots).native_call,
+                  NativeCallKind::Generic);
+        invoke_protocol(context, obj, slot, {}, out);
+        error(out, CoreObject::TypeErrorType);
+    }
+}
+
 TEST_F(CoreProtocols, ResolvedTypeAndSnapshotHaveIndependentRootsOnMissAndHit)
 {
     context.set_gc_enabled(false);

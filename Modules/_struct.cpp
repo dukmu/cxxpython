@@ -249,20 +249,11 @@ bool pack_values(Attachment &ctx, const Format &format, std::span<const Value> a
                 }
                 bits = converted.value() == ctx.builtin(CoreObject::True);
             } else if (field.code == 'e' || field.code == 'f' || field.code == 'd') {
-                if (ctx.has_layout<StrObject>(value.get(ctx)) || is_bytes(ctx, value.get(ctx)) ||
-                    is_bytearray(ctx, value.get(ctx))) {
-                    raise_error(ctx, CoreObject::TypeErrorType, U"required argument is not a float",
-                                out);
+                double number_value;
+                if (!detail::float_as_double(ctx, value, number_value, converted)) {
+                    format_error(ctx, U"required argument is not a float", out);
                     return false;
                 }
-                auto type = roots.root(ctx.builtin(CoreObject::FloatType));
-                Value number = value.get(ctx);
-                call(ctx, type, {{&number, 1}, {}}, converted);
-                if (converted.tag() == ResultTag::Raised) {
-                    out.raised(converted.exception());
-                    return false;
-                }
-                double number_value = ctx.payload<FloatObject>(converted.value()).value;
                 if (field.code == 'e') {
                     if (!detail::half_bits(number_value, bits)) {
                         raise_error(ctx, CoreObject::OverflowErrorType,

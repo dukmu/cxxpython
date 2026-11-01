@@ -15,26 +15,6 @@
 
 namespace cxxpython::core::detail {
 namespace {
-bool number(Attachment &c, Handle value, double &result, ReturnSlot &out)
-{
-    RootScope roots(c);
-    auto type = c.type_of(value);
-    if (!is_float(c, value.get(c)) && !is_int(c, value.get(c)) &&
-        !type_attribute(c, type, U"__float__") && !type_attribute(c, type, U"__index__")) {
-        raise_error(c, CoreObject::TypeErrorType, U"must be real number", out);
-        return false;
-    }
-    ReturnSlot converted(c);
-    const std::array args{value.get(c)};
-    call(c, roots.root(c.builtin(CoreObject::FloatType)), {args, {}}, converted);
-    if (converted.tag() == ResultTag::Raised) {
-        out.raised(converted.exception());
-        return false;
-    }
-    result = c.payload<FloatObject>(converted.value()).value;
-    return true;
-}
-
 // Adapted from CPython 3.12.14 Modules/mathmodule.c (PSF license).
 constexpr double lanczos_g = 6.024680040776729583740234375;
 constexpr double lanczos_half = 5.524680040776729583740234375;
@@ -215,7 +195,7 @@ bool log_value(Attachment &c, Handle value, LogKind kind, double &result, Return
             return true;
         }
     }
-    if (!number(c, value, x, out))
+    if (!float_as_double(c, value, x, out))
         return false;
     if (x <= 0) {
         raise_error(c, CoreObject::ValueErrorType, U"math domain error", out);
@@ -293,7 +273,7 @@ template <Op op> void unary(Attachment &c, Handle, std::span<const Value> args, 
 {
     RootScope roots(c);
     double x;
-    if (!number(c, roots.root(args[0]), x, out))
+    if (!float_as_double(c, roots.root(args[0]), x, out))
         return;
     if constexpr (op == Op::Isfinite || op == Op::Isinf || op == Op::Isnan) {
         bool value = op == Op::Isfinite ? std::isfinite(x)
@@ -385,7 +365,7 @@ void binary_math(Attachment &c, Handle, std::span<const Value> args, ReturnSlot 
     auto first = roots.root(args[0]);
     auto second = roots.root(args[1]);
     double x, y;
-    if (!number(c, first, x, out))
+    if (!float_as_double(c, first, x, out))
         return;
     if constexpr (op == Binary::Ldexp) {
         if (!is_int(c, second.get(c))) {
@@ -416,7 +396,7 @@ void binary_math(Attachment &c, Handle, std::span<const Value> args, ReturnSlot 
             return;
         }
     } else {
-        if (!number(c, second, y, out))
+        if (!float_as_double(c, second, y, out))
             return;
         if constexpr (op == Binary::Copysign)
             y = std::copysign(x, y);
@@ -452,7 +432,7 @@ void rounding(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &ou
         return;
     }
     double x;
-    if (!number(c, value, x, out))
+    if (!float_as_double(c, value, x, out))
         return;
     ReturnSlot rounded(c);
     make_float(c, mode == 0 ? std::floor(x) : std::ceil(x), rounded);

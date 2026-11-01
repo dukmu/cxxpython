@@ -108,6 +108,16 @@ def _dict_int(size):
     return _prepare(size, job, expected * size)
 
 
+def _math_reduce(size):
+    import math
+    values = tuple(range(256))
+
+    def job(index):
+        return math.fsum(values)
+
+    return _prepare(size, job, sum(values) * size)
+
+
 def _cycles(size):
     def job(index):
         obj = [index]
@@ -208,6 +218,7 @@ CASES = {
     'fannkuch': {'group': 'cpu', 'size': 4, 'description': 'pyperformance fannkuch algorithm, independent n=7 jobs (upstream default n=9)', 'prepare': _fannkuch},
     'allocate': {'group': 'gc', 'size': 100000, 'description': 'Short-lived containers with natural GC', 'prepare': _allocate},
     'dict_int': {'group': 'gc', 'size': 512, 'description': 'Independent 64-key integer dictionaries: construct, update, delete, sum; natural GC', 'prepare': _dict_int},
+    'math_reduce': {'group': 'library', 'size': 128, 'description': 'math.fsum over 256 integer values per fixed-total job; natural GC', 'prepare': _math_reduce},
     'cycles': {'group': 'gc', 'size': 100000, 'description': 'Self-cycles followed by explicit gc.collect', 'prepare': _cycles},
     'file_io': {'group': 'io', 'size': 128, 'description': 'Create, write, read and unlink files in cwd; page cache, not durable storage', 'prepare': _file_io},
     'regex': {'group': 'library', 'size': 128, 'description': 'Shared compiled regex full matches', 'prepare': _regex},

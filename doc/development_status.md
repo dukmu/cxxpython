@@ -1,5 +1,88 @@
 # Development Status
 
+## 2026-11-01 Native Dispatch Classification And Shared Double Conversion
+
+Continues the active performance/cleanup goal after pushed b81cc98. Terra owns
+the first shared conversion and direct reference fixture; parent completes the
+warning/error integration, missing int.__float__, GC progress, protocol strategy,
+acceptance and measurement. The agent is closed. Full compatibility remains paused.
+
+- ResolvedSlot and its existing thread-private weak cache retain NativeCallKind
+  derived from immutable callable type/binding metadata. Invocation reuses this
+  classification under the existing epoch/current-class revalidation, then uses
+  the same binder, method receiver admission, depth guards and return validation.
+  Ordinary special calls classify once through that same body. Generic defaults
+  retain source callers without explicit dispatch metadata. No additional cache,
+  entry-pointer cache, managed class, GIL, Python RC or C extension ABI change.
+- math scalar/reduction and struct packing now use one float_as_double helper,
+  removing their constructor-call/unbox duplication and the old one-line local
+  wrappers. Exact native values need no managed result object. Float subclasses
+  use native contents, while non-floats honor __float__ and __index__ with checked
+  results and overflow. Struct preserves its own error replacement. Literal
+  parsing remains in float(), not this numeric C double interface.
+- The new differential fixture exposed missing int.__float__: inherited integer
+  conversion wrongly fell back to an overridden __index__. Registered the real
+  native method using the existing checked/rounded integer conversion, including
+  explicit int.__float__, bool and inherited/subclass behavior; no math-specific
+  bypass. The immutable b81cc98 executable fails the fixture on its first float-
+  subclass override, retained in native-dispatch2-fixture-before.log.
+- Strict float/int subclass returns emit deprecation warnings through the existing
+  Python warnings policy, with tested message/category/location, warning-as-error
+  and collecting/failing showwarning hooks. Replacing warnings.warn still affects
+  this bridge unlike CPython's native warning entry; the compatibility ledger
+  records this difference and its shared-native-entry removal condition. Other
+  constructor/index warning gaps are not marked complete.
+- The helper snapshots input before resetting output and explicitly polls.
+  Eliminating allocation must not remove cooperative GC progress from native
+  reduction loops. New native contracts verify zero managed allocations, signed
+  zero/rounding, foreign output preservation, NoSafepoint rejection and another
+  attachment's collection during an allocation-free conversion loop. Protocol
+  tests cover both native binding modes, cache promotion, strategy replacement,
+  generic fallback and method-descriptor receiver rejection.
+- Strict Clang 21.1.8 IPO Release passes 364 relevant native contracts including
+  bootstrap/promotion fault shards; ASan/UBSan/LSan and TSan each pass 348. Release
+  and ASan each pass 51 direct Python scenarios; TSan passes 19 targeted scripts.
+  The new fixture matches pinned CPython 3.12.14. Host benchmark contracts pass
+  all 15 tests. Formatting/diff checks pass, with no warning suppression, sanitizer
+  reports, test timeout or budget increase. Evidence is .cache/native-dispatch2-*.
+  The initial strict build caught two undeclared bridge APIs, corrected to public
+  import_module/get_attribute; the initial ASan fixture caught the missing int
+  method. Final checks use corrected binaries, not those intermediate artifacts.
+- Added math_reduce to the existing engineering suite: size counts complete fsum
+  reductions of 256 integer values, partitioned across workers. This is native
+  iteration/coercion work, not pure-Python parallel proof. Captured its necessary
+  fresh b81cc98/CPython baseline before building, and reused retained b81cc98
+  matrix/dictionary/allocation runs. After all builds/tests/analysis exited, ran
+  only these four affected cases at one/four workers, three processes, one warmup
+  and three values/process, with natural GC and validation. No full I/O/startup
+  campaign, discarded values or favorable rerun.
+- Raw/generated results are .cache/benchmarks/native-dispatch2{,-baseline,
+  -comparison,-math-before}; standard comparisons are native-dispatch2-{core,
+  math}-pyperf.log. Math medians change from 153.767/68.248 ms to 6.444/4.419;
+  standard pyperf reports 24.13x/17.41x improvement. The old four-worker 31.5%
+  variation/outlier is retained. The CPython single-worker median remains 0.274
+  ms with 18.3% variation; the absolute gap is still substantial. This does not
+  meet the overall performance acceptance gate.
+- Standard pyperf finds about 1.04x improvement for matrix single-worker and
+  allocation four-worker, and 1.07x for dictionary four-worker; their other three
+  comparisons are not significant. Matrix medians are 386.541/164.794 ms, fixed-
+  work scaling 2.346x and four-worker CPU/wall 3.206. Math's short four-worker
+  CPU/wall is only 0.804, not evidence of Python CPU parallelism; matrix supplies
+  the relevant retained shared-heap proof. No individual-cache-only attribution
+  is claimed for this combined runtime/conversion change.
+- Source auditing confirms only the added math workload/catalog differ from the
+  retained existing workload snapshot; prior case bodies and external matrix
+  input are unchanged. The generated source warning stays visible. One separate
+  512-loop math software profile retains 775 samples with working perf 6.8 caller
+  chains. iter_next is 55.23% inclusive, float_as_double 16.13%, integer_to_double
+  5.29%; root-acquire symbols are 11.23%/4.26% self. Inclusive costs overlap and
+  include startup/warmup, not independent overhead or hardware-cache rates. The
+  next dependency is per-element iteration/root-slot churn, not tuning integer
+  literals or enlarging caches from self percentages. Profile and matching ELF
+  build-id state are retained; .cache/deps/perf-6.8/run-perf preserves the local
+  dependency and repository build-id directory. matrix.py remains untracked and
+  unchanged. The performance goal stays active.
+
 ## 2026-11-01 Reuse Resolved Protocol Roots And Recover Perf Callers
 
 Continues the performance/cleanup goal after pushed dcc86c8. The preceding cache

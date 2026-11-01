@@ -238,6 +238,7 @@ struct ThreadRecord {
         Protocol protocol = Protocol::Count;
         SlotState state = SlotState::Missing;
         NativeSlotKind native_kind = NativeSlotKind::Ordinary;
+        NativeCallKind native_call = NativeCallKind::Generic;
         std::uint64_t epoch = 0;
     };
     explicit ThreadRecord(std::uint64_t identity)
@@ -1936,7 +1937,8 @@ std::optional<ResolvedSlot> Attachment::cached_protocol(Value value, Protocol pr
                         entry.owner ? roots.root(Value(*entry.owner)) : Handle{},
                         entry.descriptor ? roots.root(Value(*entry.descriptor)) : Handle{},
                         epoch,
-                        entry.native_kind};
+                        entry.native_kind,
+                        entry.native_call};
 }
 void Attachment::cache_protocol(const ResolvedSlot &slot)
 {
@@ -1945,7 +1947,8 @@ void Attachment::cache_protocol(const ResolvedSlot &slot)
     const auto descriptor =
         slot.state != SlotState::Missing ? slot.descriptor.get(*this).object() : nullptr;
     thread_record_->protocol_entry(type, slot.protocol) = {
-        type.object(), owner, descriptor, slot.protocol, slot.state, slot.native_kind, slot.epoch};
+        type.object(),    owner,     descriptor, slot.protocol, slot.state, slot.native_kind,
+        slot.native_call, slot.epoch};
 }
 void Attachment::invalidate_types()
 {

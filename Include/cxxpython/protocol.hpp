@@ -79,6 +79,7 @@ struct ProtocolDefinition {
     bool none_disables = false;
 };
 enum class SlotState { Missing, Disabled, Native, PythonDescriptor };
+enum class NativeCallKind { Generic, Function, Descriptor, MethodDescriptor };
 struct ResolvedSlot {
     Protocol protocol;
     SlotState state;
@@ -88,6 +89,7 @@ struct ResolvedSlot {
     std::uint64_t epoch;
     // Lookup metadata for numeric/sequence ordering; invocation still validates epoch/self.
     NativeSlotKind native_kind = NativeSlotKind::Ordinary;
+    NativeCallKind native_call = NativeCallKind::Generic;
 };
 enum class CompareOp { Eq, Ne, Lt, Le, Gt, Ge, Is, IsNot, In, NotIn };
 enum class BinaryOp {

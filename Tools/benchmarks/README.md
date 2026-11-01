@@ -55,6 +55,10 @@ CPU utilization in CPU workloads are reported rather than silently removed.
   dictionaries, then validates the remaining values by sum. Size counts complete
   dictionaries, not keys or jobs per thread. This exercises multi-entry/non-string
   storage alongside allocate's one-string-key dictionary; natural GC stays enabled.
+- `math_reduce` runs math.fsum over an immutable tuple of 256 integers per job.
+  Size counts complete reductions, partitioned across workers rather than repeated
+  per thread. It measures native iteration/coercion and reduction with natural GC,
+  not pure Python bytecode parallelism; matrix/nbody remain separate CPU evidence.
 - `file_io` creates/writes/reads/unlinks the same total number of files for every
   thread count. It measures filesystem/page-cache workflows, not durable storage
   or device throughput; it does not call fsync.

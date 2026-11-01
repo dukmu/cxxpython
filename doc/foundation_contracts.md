@@ -862,6 +862,22 @@ resolution keeps result roots independent of its input Handle, including when
 both belong to the same RootScope. Internal Value resolution avoids only the
 temporary input-type root; it does not borrow the result's lifetime.
 
+ResolvedSlot also retains NativeCallKind: generic descriptor, native function,
+binding native descriptor or owner-checked method descriptor. Lookup derives this
+scalar from immutable native callable metadata and the existing weak cache retains
+it under the same type/epoch identity. Invocation still revalidates the selected
+slot and uses the common binder, receiver/depth and return checks. This does not
+cache a native entry pointer or add managed edges; public slots default to generic
+classification when constructed without this optional dispatch metadata.
+
+Native math/reduction/struct consumers use the shared float_as_double conversion
+rather than constructing a boxed float only to read it back. Float subclasses
+use their immutable payload; other values honor __float__ then __index__, with
+checked returns, deprecation warnings and original errors (struct translates
+conversion failure to its own error). Inputs/results survive collecting and
+replacing callbacks. The entry snapshots its input before clearing output and
+polls explicitly, so allocation-free reduction loops still acknowledge GC epochs.
+
 Ordinary native type methods publish owner-bearing MethodDescriptorObjects;
 protocol lookup preserves their native/sequence role and invokes the underlying
 entry through the normal binder. Native static/class wrappers retain their own
