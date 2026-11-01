@@ -267,6 +267,10 @@ class VerifiedCode final {
   public:
     VerifiedCode(VerifiedCode &&) noexcept = default;
     VerifiedCode(const VerifiedCode &) = delete;
+    static VerifiedCode from_parts(const CodeSpec &, std::vector<Instruction>,
+                                   std::vector<SourcePosition>, std::vector<CallLayout>,
+                                   std::vector<RegionLayout>, std::size_t constants,
+                                   std::size_t names, std::size_t stack_capacity);
     std::span<const Instruction> instructions() const noexcept
     {
         return instructions_;
@@ -341,18 +345,28 @@ class VerifiedCode final {
     {
         return first_line_;
     }
+    std::optional<std::size_t> entry_stack_depth(std::size_t pc) const noexcept
+    {
+        if (pc >= entry_depths_.size() ||
+            entry_depths_[pc] == std::numeric_limits<std::uint32_t>::max())
+            return {};
+        return entry_depths_[pc];
+    }
+    std::optional<RegionToken> scope_at(std::size_t pc) const noexcept;
     std::size_t external_bytes() const noexcept;
 
   private:
     friend class CodeBuilder;
     VerifiedCode(std::vector<Instruction> instructions, std::vector<SourcePosition> positions,
                  std::vector<CallLayout> calls, std::vector<RegionLayout> regions,
-                 SignatureLayout signature, std::vector<std::u32string> locals,
-                 std::vector<std::u32string> cellvars, std::vector<std::u32string> freevars,
-                 std::size_t stack, std::uint32_t first_line, CodeKind kind, bool generator,
-                 bool coroutine, std::uint32_t future_flags, bool nested)
+                 std::vector<std::uint32_t> entry_depths, SignatureLayout signature,
+                 std::vector<std::u32string> locals, std::vector<std::u32string> cellvars,
+                 std::vector<std::u32string> freevars, std::size_t stack, std::uint32_t first_line,
+                 CodeKind kind, bool generator, bool coroutine, std::uint32_t future_flags,
+                 bool nested)
         : instructions_(std::move(instructions)), positions_(std::move(positions)),
-          calls_(std::move(calls)), regions_(std::move(regions)), signature_(std::move(signature)),
+          calls_(std::move(calls)), regions_(std::move(regions)),
+          entry_depths_(std::move(entry_depths)), signature_(std::move(signature)),
           locals_(std::move(locals)), cellvars_(std::move(cellvars)),
           freevars_(std::move(freevars)), max_stack_(stack), first_line_(first_line), kind_(kind),
           generator_(generator), coroutine_(coroutine), future_flags_(future_flags), nested_(nested)
@@ -373,6 +387,7 @@ class VerifiedCode final {
     std::vector<SourcePosition> positions_;
     std::vector<CallLayout> calls_;
     std::vector<RegionLayout> regions_;
+    std::vector<std::uint32_t> entry_depths_;
     SignatureLayout signature_;
     std::vector<std::u32string> locals_;
     std::vector<std::u32string> cellvars_, freevars_;
@@ -390,13 +405,15 @@ struct CodeObject {
     ObjectHeader header;
     const VerifiedCode program;
     const Value constants, varnames, name, qualname, filename, call_keywords, names, docstring,
-        cellvars, freevars;
+        cellvars, freevars, bytecode, linetable, exceptiontable;
     CodeObject(InitialType head, VerifiedCode code, Value consts, Value variables, Value name,
                Value qualname, Value filename, Value call_keywords, Value names, Value docstring,
-               Value cellvars, Value freevars)
+               Value cellvars, Value freevars, Value bytecode, Value linetable,
+               Value exceptiontable)
         : header(head), program(std::move(code)), constants(consts), varnames(variables),
           name(name), qualname(qualname), filename(filename), call_keywords(call_keywords),
-          names(names), docstring(docstring), cellvars(cellvars), freevars(freevars)
+          names(names), docstring(docstring), cellvars(cellvars), freevars(freevars),
+          bytecode(bytecode), linetable(linetable), exceptiontable(exceptiontable)
     {}
     void trace(Tracer &tracer) const noexcept;
     std::size_t external_bytes() const noexcept
@@ -564,6 +581,13 @@ struct FrameObject {
     const Value function, code;
     AtomicGcEdge back;
     AtomicGcEdge delegate;
+    AtomicGcEdge trace_function;
+    std::atomic<bool> trace_lines{true}, trace_opcodes{false};
+    bool trace_call_pending = true, trace_exception_pending = false;
+    bool trace_jump_pending = false, trace_skip_line = false;
+    bool trace_locals_accessed = false;
+    std::size_t trace_last_pc = std::numeric_limits<std::size_t>::max();
+    std::size_t trace_last_line = 0;
     std::vector<std::optional<Value>> locals;
     std::vector<OperandSlot> operands;
     std::vector<Value> cells;

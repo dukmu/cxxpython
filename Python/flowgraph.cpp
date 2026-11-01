@@ -1,4 +1,5 @@
 #include "cxxpython/execution.hpp"
+#include "internal/codeobject.hpp"
 
 #include <algorithm>
 #include <bit>
@@ -143,10 +144,48 @@ std::size_t verify(const CodeSpec &spec, std::span<const Instruction> instructio
                    std::span<const SourcePosition> positions, std::span<const CallLayout> calls,
                    std::span<const RegionLayout> regions,
                    std::span<const std::optional<RegionToken>> scopes, std::size_t constants,
-                   std::size_t name_count)
+                   std::size_t name_count, std::vector<std::uint32_t> &entry_depths)
 {
     if (instructions.empty())
         invalid(CodeErrorKind::EmptyCode, "empty instruction sequence");
+    if (positions.size() != instructions.size() || scopes.size() != instructions.size())
+        invalid(CodeErrorKind::SourcePosition, "instruction metadata length mismatch");
+    for (std::size_t id = 0; id < regions.size(); ++id) {
+        const auto &region = regions[id];
+        if (region.kind < RegionKind::Loop || region.kind > RegionKind::With ||
+            region.enter_pc >= region.leave_pc || region.leave_pc >= instructions.size() ||
+            region.after_pc > instructions.size() || region.normal_pc > instructions.size())
+            invalid(CodeErrorKind::RegionBounds, "invalid region boundaries");
+        if (instructions[region.enter_pc].opcode !=
+                (region.kind == RegionKind::With ? Opcode::EnterWith : Opcode::EnterRegion) ||
+            instructions[region.enter_pc].operand != id ||
+            instructions[region.leave_pc].opcode != Opcode::LeaveRegion ||
+            instructions[region.leave_pc].operand != id)
+            invalid(CodeErrorKind::RegionStructure, "missing region boundary instruction");
+        if (region.parent) {
+            if (region.parent->region >= regions.size() ||
+                region.parent->phase > RegionPhase::Cleanup ||
+                regions[region.parent->region].depth >= regions.size() ||
+                region.depth != regions[region.parent->region].depth + 1)
+                invalid(CodeErrorKind::RegionStructure, "invalid region ancestry");
+        } else if (region.depth != 1)
+            invalid(CodeErrorKind::RegionStructure, "invalid root region depth");
+        if (region.kind == RegionKind::Loop) {
+            if (region.after_pc != region.leave_pc + 1)
+                invalid(CodeErrorKind::RegionStructure, "invalid loop boundary");
+        } else if (region.handler_pc <= region.leave_pc ||
+                   region.end_handler_pc < region.handler_pc ||
+                   region.end_handler_pc >= instructions.size() ||
+                   region.after_pc != region.end_handler_pc + 1)
+            invalid(CodeErrorKind::RegionStructure, "invalid handler boundaries");
+        if (region.kind != RegionKind::Loop &&
+            (instructions[region.end_handler_pc].opcode != Opcode::EndHandler ||
+             instructions[region.end_handler_pc].operand != id))
+            invalid(CodeErrorKind::RegionStructure, "missing handler boundary instruction");
+    }
+    for (const auto &scope : scopes)
+        if (scope && (scope->region >= regions.size() || scope->phase > RegionPhase::Cleanup))
+            invalid(CodeErrorKind::RegionBounds, "invalid instruction region");
     if (!spec.first_line)
         invalid(CodeErrorKind::SourcePosition, "first line must be positive");
     if (spec.future_flags & ~supported_future_flags)
@@ -483,6 +522,13 @@ std::size_t verify(const CodeSpec &spec, std::span<const Instruction> instructio
                  instruction.operand},
                 scopes[pc], height);
     }
+    entry_depths.assign(heights.size(), std::numeric_limits<std::uint32_t>::max());
+    for (std::size_t pc = 0; pc < heights.size(); ++pc)
+        if (heights[pc]) {
+            if (*heights[pc] >= std::numeric_limits<std::uint32_t>::max())
+                invalid(CodeErrorKind::SizeLimit, "stack depth exceeds the native code limit", pc);
+            entry_depths[pc] = static_cast<std::uint32_t>(*heights[pc]);
+        }
     return maximum;
 }
 } // namespace
@@ -529,12 +575,79 @@ StackEffect instruction_effect(Instruction instruction, std::span<const CallLayo
     return {inputs + arguments + defaults, definition.pops + arguments + defaults,
             definition.pushes};
 }
+VerifiedCode VerifiedCode::from_parts(const CodeSpec &spec, std::vector<Instruction> instructions,
+                                      std::vector<SourcePosition> positions,
+                                      std::vector<CallLayout> calls,
+                                      std::vector<RegionLayout> regions, std::size_t constants,
+                                      std::size_t names, std::size_t stack_capacity)
+{
+    std::vector<std::pair<std::uint32_t, RegionToken>> handlers;
+    for (std::size_t i = 0; i < regions.size(); ++i)
+        if (regions[i].kind != RegionKind::Loop)
+            handlers.push_back({regions[i].handler_pc,
+                                {static_cast<std::uint32_t>(i),
+                                 regions[i].kind == RegionKind::Except ? RegionPhase::Handler
+                                                                       : RegionPhase::Cleanup}});
+    std::sort(handlers.begin(), handlers.end(),
+              [](const auto &a, const auto &b) { return a.first < b.first; });
+    std::vector<std::optional<RegionToken>> scopes;
+    scopes.reserve(instructions.size());
+    std::optional<RegionToken> scope;
+    std::size_t handler = 0;
+    for (std::size_t pc = 0; pc < instructions.size(); ++pc) {
+        if (handler < handlers.size() && handlers[handler].first == pc) {
+            scope = handlers[handler++].second;
+            if (handler < handlers.size() && handlers[handler].first == pc)
+                invalid(CodeErrorKind::RegionStructure, "overlapping handler entries");
+        }
+        scopes.push_back(scope);
+        const auto [opcode, operand] = instructions[pc];
+        if (opcode == Opcode::EnterRegion || opcode == Opcode::EnterWith ||
+            opcode == Opcode::LeaveRegion || opcode == Opcode::EndHandler) {
+            if (operand >= regions.size())
+                invalid(CodeErrorKind::RegionBounds, "region index out of bounds", pc);
+            scope = opcode == Opcode::EnterRegion || opcode == Opcode::EnterWith
+                        ? std::optional{RegionToken{operand, RegionPhase::Protected}}
+                        : regions[operand].parent;
+        }
+    }
+    std::vector<std::uint32_t> entry_depths;
+    const auto maximum = verify(spec, instructions, positions, calls, regions, scopes, constants,
+                                names, entry_depths);
+    if (stack_capacity < maximum)
+        invalid(CodeErrorKind::StackUnderflow,
+                "stack size is smaller than the verified requirement");
+    return VerifiedCode(std::move(instructions), std::move(positions), std::move(calls),
+                        std::move(regions), std::move(entry_depths), spec.signature, spec.locals,
+                        spec.cellvars, spec.freevars, stack_capacity, spec.first_line, spec.kind,
+                        spec.generator, spec.coroutine, spec.future_flags, spec.nested);
+}
+std::optional<RegionToken> VerifiedCode::scope_at(std::size_t pc) const noexcept
+{
+    std::optional<RegionToken> result;
+    std::size_t depth = 0;
+    for (std::size_t i = 0; i < regions_.size(); ++i) {
+        const auto &region = regions_[i];
+        std::optional<RegionPhase> phase;
+        if (pc > region.enter_pc && pc <= region.leave_pc)
+            phase = RegionPhase::Protected;
+        else if (region.kind != RegionKind::Loop && pc >= region.handler_pc &&
+                 pc <= region.end_handler_pc)
+            phase = region.kind == RegionKind::Except ? RegionPhase::Handler : RegionPhase::Cleanup;
+        if (phase && region.depth > depth) {
+            result = RegionToken{static_cast<std::uint32_t>(i), *phase};
+            depth = region.depth;
+        }
+    }
+    return result;
+}
 std::size_t VerifiedCode::external_bytes() const noexcept
 {
     auto bytes = instructions_.capacity() * sizeof(Instruction) +
                  positions_.capacity() * sizeof(SourcePosition) +
                  calls_.capacity() * sizeof(CallLayout) +
                  regions_.capacity() * sizeof(RegionLayout) +
+                 entry_depths_.capacity() * sizeof(std::uint32_t) +
                  (locals_.capacity() + cellvars_.capacity() + freevars_.capacity()) *
                      sizeof(std::u32string) +
                  cell_locals_.capacity() * sizeof(std::optional<std::uint32_t>) +
@@ -550,7 +663,7 @@ std::size_t VerifiedCode::external_bytes() const noexcept
 void CodeObject::trace(Tracer &tracer) const noexcept
 {
     for (auto value : {constants, varnames, name, qualname, filename, call_keywords, names,
-                       docstring, cellvars, freevars})
+                       docstring, cellvars, freevars, bytecode, linetable, exceptiontable})
         tracer.visit(value);
 }
 CodeBuilder::CodeBuilder(Attachment &context, CodeSpec spec)
@@ -674,12 +787,16 @@ void CodeBuilder::freeze(ReturnSlot &out)
         }
         regions.push_back(layout);
     }
-    const auto maximum = verify(spec_, instructions, positions_, calls, regions, scopes_,
-                                constants_.size(), names_.size());
+    std::vector<std::uint32_t> entry_depths;
+    const auto maximum = [&] {
+        NativeWait parked(context_);
+        return verify(spec_, instructions, positions_, calls, regions, scopes_, constants_.size(),
+                      names_.size(), entry_depths);
+    }();
     VerifiedCode verified(std::move(instructions), positions_, std::move(calls), std::move(regions),
-                          spec_.signature, spec_.locals, spec_.cellvars, spec_.freevars, maximum,
-                          spec_.first_line, spec_.kind, spec_.generator, spec_.coroutine,
-                          spec_.future_flags, spec_.nested);
+                          std::move(entry_depths), spec_.signature, spec_.locals, spec_.cellvars,
+                          spec_.freevars, maximum, spec_.first_line, spec_.kind, spec_.generator,
+                          spec_.coroutine, spec_.future_flags, spec_.nested);
     RootScope roots(context_);
     ReturnSlot temporary(context_);
     cxxpython::core::make_tuple(context_, constants_, temporary);
@@ -736,11 +853,18 @@ void CodeBuilder::freeze(ReturnSlot &out)
         call_keywords = roots.root(temporary.value());
     }
     auto type = roots.root(context_.builtin(CoreObject::CodeType));
+    const auto images = detail::encode_code(context_, verified, varnames.get(context_),
+                                            call_keywords.get(context_), docstring.get(context_));
+    std::vector<Value> encoded;
+    for (const auto &image : images) {
+        make_bytes(context_, image, temporary);
+        encoded.push_back(roots.root(temporary.value()).get(context_));
+    }
     context_.allocate_instance<CodeObject>(
         type, out, std::move(verified), constants.get(context_), varnames.get(context_),
         name.get(context_), qualname.get(context_), filename.get(context_),
         call_keywords.get(context_), global_names.get(context_), docstring.get(context_),
-        cellvars.get(context_), freevars.get(context_));
+        cellvars.get(context_), freevars.get(context_), encoded[0], encoded[1], encoded[2]);
 }
 void CodeBuilder::call(std::uint32_t positional, std::span<const std::u32string> keywords,
                        SourcePosition source)

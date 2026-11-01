@@ -116,7 +116,14 @@ def get_instructions(x, *, first_line=None, show_caches=False, adaptive=False):
         else:
             starts = None
             positions = Positions()
-        argrepr = "" if arg is None else repr(argval)
+        if domain == "Constant":
+            argrepr = repr(argval)
+        elif domain in ("Local", "Name", "Cell"):
+            argrepr = str(argval)
+        elif domain == "Target":
+            argrepr = "to " + repr(argval)
+        else:
+            argrepr = ""
         yield Instruction(opname[op], op, arg, argval, argrepr, offset, starts,
                           offset in targets, positions)
 
@@ -153,9 +160,21 @@ def code_info(x):
 def show_code(co, *, file=None):
     print(code_info(co), file=file)
 
+def _print_instructions(instructions, *, lasti=None, file=None):
+    instructions = list(instructions)
+    lines = [instruction.starts_line for instruction in instructions
+             if instruction.starts_line is not None]
+    lineno_width = max(3, len(str(max(lines)))) if lines else 0
+    offset_width = max(4, len(str(instructions[-1].offset))) if instructions else 4
+    for instruction in instructions:
+        if lineno_width and instruction.starts_line is not None and instruction.offset > 0:
+            print(file=file)
+        print(instruction._disassemble(lineno_width, instruction.offset == lasti,
+                                       offset_width), file=file)
+
 def disassemble(co, lasti=-1, *, file=None, show_caches=False, adaptive=False):
-    for instruction in get_instructions(co, show_caches=show_caches, adaptive=adaptive):
-        print(instruction._disassemble(mark_as_current=instruction.offset == lasti), file=file)
+    _print_instructions(get_instructions(co, show_caches=show_caches, adaptive=adaptive),
+                        lasti=lasti, file=file)
 
 disco = disassemble
 
@@ -234,7 +253,19 @@ class Bytecode:
 
     def dis(self):
         output = io.StringIO()
-        for instruction in self:
-            print(instruction._disassemble(mark_as_current=instruction.offset == self.current_offset),
-                  file=output)
+        _print_instructions(self, lasti=self.current_offset, file=output)
         return output.getvalue()
+
+def main(args=None):
+    import argparse
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('infile', type=argparse.FileType('rb'), nargs='?', default='-')
+    args = parser.parse_args(args=args)
+    with args.infile as infile:
+        source = infile.read()
+    code = compile(source, args.infile.name, "exec")
+    dis(code)
+
+if __name__ == "__main__":
+    main()

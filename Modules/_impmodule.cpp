@@ -1,7 +1,9 @@
+#include "cxxpython/memoryobject.hpp"
 #include "internal/builtinexec.hpp"
 #include "internal/compiler.hpp"
 #include "internal/import.hpp"
 
+#include <bit>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -19,6 +21,80 @@ bool string(Attachment &context, Value value, ReturnSlot &out)
         return true;
     raise_error(context, CoreObject::TypeErrorType, U"expected a string", out);
     return false;
+}
+
+// CPython 3.12 Python/pyhash.c _Py_KeyedHash uses SipHash-1-3 with k1=0.
+// CPython is distributed under the PSF license; see doc/licenses/python-3.12.14.txt.
+std::uint64_t source_digest(std::uint64_t key, const std::string &data)
+{
+    std::uint64_t a = 0x736f6d6570736575ULL ^ key, b = 0x646f72616e646f6dULL;
+    std::uint64_t c = 0x6c7967656e657261ULL ^ key, d = 0x7465646279746573ULL;
+    auto round = [&] {
+        a += b;
+        b = std::rotl(b, 13) ^ a;
+        a = std::rotl(a, 32);
+        c += d;
+        d = std::rotl(d, 16) ^ c;
+        a += d;
+        d = std::rotl(d, 21) ^ a;
+        c += b;
+        b = std::rotl(b, 17) ^ c;
+        c = std::rotl(c, 32);
+    };
+    std::size_t position = 0;
+    while (data.size() - position >= 8) {
+        std::uint64_t word = 0;
+        for (unsigned i = 0; i < 8; ++i)
+            word |= static_cast<std::uint64_t>(static_cast<unsigned char>(data[position + i]))
+                    << (i * 8);
+        d ^= word;
+        round();
+        a ^= word;
+        position += 8;
+    }
+    std::uint64_t tail = static_cast<std::uint64_t>(data.size()) << 56;
+    for (std::size_t i = 0; i < data.size() - position; ++i)
+        tail |= static_cast<std::uint64_t>(static_cast<unsigned char>(data[position + i]))
+                << (i * 8);
+    d ^= tail;
+    round();
+    a ^= tail;
+    c ^= 0xff;
+    round();
+    round();
+    round();
+    return a ^ b ^ c ^ d;
+}
+
+void source_hash(Attachment &context, Value, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(context);
+    auto key = roots.root(args[0]);
+    auto source = roots.root(args[1]);
+    ReturnSlot indexed(context);
+    index(context, key, indexed);
+    if (failed(indexed)) {
+        out.raised(indexed.exception());
+        return;
+    }
+    std::int64_t value;
+    if (!int_fits_signed(context, indexed.value(), value)) {
+        raise_error(context, CoreObject::OverflowErrorType,
+                    U"Python int too large to convert to C long", out);
+        return;
+    }
+    std::string data;
+    if (!detail::buffer_bytes(context, source, data, out)) {
+        if (!failed(out))
+            raise_error(context, CoreObject::TypeErrorType, U"a bytes-like object is required",
+                        out);
+        return;
+    }
+    const auto digest = source_digest(static_cast<std::uint64_t>(value), data);
+    std::string result(8, '\0');
+    for (unsigned i = 0; i < 8; ++i)
+        result[i] = static_cast<char>((digest >> (i * 8)) & 0xff);
+    make_bytes(context, std::move(result), out);
 }
 std::optional<SourceBuffer> read_source(Attachment &context, const std::string &path,
                                         ReturnSlot &out)
@@ -392,6 +468,7 @@ void initialize_imp(Attachment &context, Handle module, ReturnSlot &out)
         return !failed(out);
     };
     if (!install("exec_code", U"exec_code", pair, exec_code) ||
+        !install("source_hash", U"source_hash", pair, source_hash) ||
         !install("source_to_code", U"source_to_code", pair, source_to_code) ||
         !install("_get_source", U"_get_source", unary, file_source) ||
         !install("_registered_data", U"_registered_data", unary, registered_data) ||

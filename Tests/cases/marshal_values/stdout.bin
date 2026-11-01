@@ -1,0 +1,43 @@
+4
+NoneType True
+bool True
+bool True
+ellipsis True
+type True
+int True
+int True
+int True
+int True
+int True
+int True
+float True
+float True
+complex True
+str True
+str True
+str True
+str True
+bytes True
+bytes True
+tuple True
+tuple True
+list True
+list True
+dict True
+dict True
+set True
+set True
+frozenset True
+frozenset True
+-1
+4294967296
+32769
+1.5
+(1.5+2.25j)
+'中'
+'abc'
+'abc'
+(1, None)
+bytes True
+bytes True
+bytes True

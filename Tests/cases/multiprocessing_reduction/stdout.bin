@@ -1,0 +1,6 @@
+basic [1, 'two', None, {'three': 3}]
+cycle True
+reducers 11 22
+partial 32
+socket registered True
+socket reducer True

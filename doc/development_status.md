@@ -1,5 +1,60 @@
 # Development Status
 
+## 2026-11-01 Dill Roundtrip And Shared Debugger/Code Foundation
+
+Performance work remains paused. This checkpoint implements the real dill
+dependencies and the shared Code/Frame foundation also needed by the user's
+pdb, dis, py_compile and sys.flags requests. The fixed dill 0.4.1 package remains
+unchanged outside Lib.
+
+- Moved Code reflection into Objects/codeobject.cpp. CodeType and replace decode
+  versioned native instruction/location/exception images through the existing
+  verifier. Legacy delta and empty location tables reconstruct executable Code;
+  CPython wordcode is not accepted. The image contract is in doc/code_format.md.
+- Added native marshal value/graph/Code serialization and a real array exporter,
+  comparisons, mutation and pickle protocols. Unchanged multiprocessing reduction
+  sources, tempfile, pickletools and doctest close actual import dependencies.
+  Process creation and descriptor transfer are not implemented by copying policy.
+- Added thread-private rooted tracing, call/line/return/exception/opcode events,
+  Frame trace controls and verified line jumps. f_locals claims dormant frames,
+  rejects foreign running-frame reads and writes trace-callback edits back to
+  fast locals/Cells. No interpreter execution lock or reference counting added.
+- Pinned pdb/bdb/cmd/shlex/getopt now run interactive break/step/next, local edits,
+  postmortem and exception inspection. dis has a real module CLI and CPython-style
+  columns, preserving native opcode names and instruction-index offsets.
+- py_compile and import loaders roundtrip native caches with timestamp or source
+  hash invalidation and distinct magic/cache tag. Added real compile optimization
+  levels and _imp.source_hash. sys.flags exposes 18 readonly sequence fields and
+  reflects supported -i/-q startup options; integer conversion limits remain 0.
+- Strict Clang 21.1.8/Werror build passes. 31 new script scenarios pass; the final
+  legacy-location and configuration-independent sys.flags changes pass their two
+  updated fixtures, and the final product passes the opt-in expanded dill graph,
+  Code/function/default/closure/recursive-global/class/method/array roundtrip.
+  27 targeted native verifier, Frame ownership, allocation-failure and scheduling
+  contracts pass. Format and diff checks pass. No full-suite, new sanitizer or
+  performance campaign is claimed for this checkpoint. Logs: .cache/dill-final-*,
+  .cache/sys-flags-cli.log and .cache/dill-format*.log.
+- Added Tests/python/test_dill.py to execute actual unchanged upstream scripts in
+  real __main__ namespaces. The first complete run passes 15/30; its function
+  constructor-format failure is then fixed and test_functions.py passes. Remaining
+  failures drive continued work: inherited-type publication, native callable/lock
+  serialization, source/weakref behavior and real library dependencies. The active
+  dill/pdb goal remains active; this checkpoint is not the end of that work.
+- Excluded the pending type_bases fixture and untouched user matrix.py. Reused
+  the existing toolchain/reference/build caches instead of recreating baselines.
+
+## 2026-11-01 Multiprocessing Reduction Foundation
+
+Copied unchanged CPython 3.12.14 multiprocessing package initialization, context,
+process and reduction sources. The direct reduction fixture's golden is generated
+by the pinned CPython and covers basic and cyclic values, registered and copyreg
+reducers, partials and socket reducer registration. The existing cxxpython binary
+imports socket, pickle, threading, signal and _weakrefset, but importing the
+package stops at the missing native Unix `array` module. The fixture therefore
+does not yet pass on cxxpython. Real array support is the next import dependency;
+socket descriptor transfer also needs ancillary I/O and resource sharing. No
+process, fork, or socket-transfer support is claimed. No build was run.
+
 ## 2026-11-01 Close GC Classifier Work And Switch To Dill/Pdb
 
 The user stopped performance optimization, then explicitly authorized closing and

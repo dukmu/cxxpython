@@ -74,6 +74,8 @@ add_library(cxxpython_core
     Modules/itertools_groups.cpp
     Modules/_collectionsmodule.cpp
     Modules/_contextvarsmodule.cpp
+    Modules/marshal.cpp
+    Modules/arraymodule.cpp
     Modules/binascii.cpp
     Modules/main.cpp
     Modules/sysmodule.cpp
@@ -99,6 +101,7 @@ add_library(cxxpython_core
     Modules/time_calendar.cpp
     Python/symtable.cpp
     Python/flowgraph.cpp
+    Objects/codeobject.cpp
     Python/ceval.cpp
     Python/specialize.cpp
     Python/traceback.cpp

@@ -1,0 +1,9 @@
+gettrace True
+call call True False
+exception ValueError oops True
+return 42
+events line True True return
+disabled True
+failure trace failed True
+memory failure trace allocation True True
+flags False True

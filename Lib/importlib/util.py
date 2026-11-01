@@ -6,7 +6,8 @@ relative name resolution uses the string operations available in this runtime.
 
 import sys
 import _imp
-from ._bootstrap import ModuleSpec, SourceFileLoader, NativeLoader, module_from_spec, _find_spec
+from ._bootstrap import ModuleSpec, SourceFileLoader, SourcelessFileLoader, NativeLoader, module_from_spec, _find_spec
+from ._bootstrap_external import MAGIC_NUMBER, cache_from_source, source_from_cache, source_hash
 
 
 def resolve_name(name, package):
@@ -78,6 +79,8 @@ def spec_from_file_location(name, location=None, *, loader=None,
             loader = NativeLoader(name, location)
         elif location[-3:] == '.py':
             loader = SourceFileLoader(name, location)
+        elif location[-4:] == '.pyc':
+            loader = SourcelessFileLoader(name, location)
         else:
             return None
     if submodule_search_locations is _POPULATE:

@@ -688,6 +688,13 @@ class Attachment final {
     CallExecutor call_executor() const;
     std::optional<Value> current_frame() const;
     std::optional<Value> handled_exception() const;
+    void load_trace_function(ReturnSlot &out);
+    void set_trace_function(std::optional<Handle> function);
+    bool tracing_enabled() const noexcept;
+    bool enter_tracing(Value frame, bool line_event);
+    void leave_tracing() noexcept;
+    bool tracing_line_frame(Value frame) const noexcept;
+    bool tracing_frame(Value frame) const noexcept;
     std::uint64_t keyed_hash(std::span<const std::byte> data) const;
     detail::ImportState &imports();
     // Borrowed identities only; callers keep their objects rooted throughout.
@@ -779,6 +786,9 @@ class Attachment final {
     std::vector<Value> repr_stack_;
     std::optional<Value> current_frame_;
     std::optional<Value> handled_exception_;
+    // Borrowed while the activation's ReturnSlot roots the traced Frame.
+    std::optional<Value> tracing_frame_;
+    bool tracing_line_event_ = false;
     std::size_t no_safepoint_depth_ = 0;
     bool allocation_in_progress_ = false;
 };

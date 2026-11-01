@@ -1,0 +1,5 @@
+foreign read completed
+resume rejected
+clear rejected
+suspended 42
+cleared True

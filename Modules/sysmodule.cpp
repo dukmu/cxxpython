@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <bit>
 #include <cfloat>
+#include <iterator>
 #include <limits>
 
 namespace cxxpython::core::detail {
@@ -28,18 +29,39 @@ constexpr const char32_t *version_names[] = {U"major", U"minor", U"micro", U"rel
 constexpr const char32_t *float_names[] = {U"max",     U"max_exp",    U"max_10_exp", U"min",
                                            U"min_exp", U"min_10_exp", U"dig",        U"mant_dig",
                                            U"epsilon", U"radix",      U"rounds"};
+constexpr const char32_t *flags_names[] = {U"debug",
+                                           U"inspect",
+                                           U"interactive",
+                                           U"optimize",
+                                           U"dont_write_bytecode",
+                                           U"no_user_site",
+                                           U"no_site",
+                                           U"ignore_environment",
+                                           U"verbose",
+                                           U"bytes_warning",
+                                           U"quiet",
+                                           U"hash_randomization",
+                                           U"isolated",
+                                           U"dev_mode",
+                                           U"utf8_mode",
+                                           U"warn_default_encoding",
+                                           U"safe_path",
+                                           U"int_max_str_digits"};
 template <std::size_t I> void info_field(Attachment &ctx, Value self, ReturnSlot &out)
 {
     out.ok(ctx.payload<TupleObject>(self).items[I]);
 }
-template <bool Float>
+template <int Kind>
 void info_repr(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
 {
     RootScope roots(ctx);
     auto self = roots.root(args[0]);
-    const auto names = Float ? std::span<const char32_t *const>(float_names)
-                             : std::span<const char32_t *const>(version_names);
-    std::u32string text = Float ? U"sys.float_info(" : U"sys.version_info(";
+    const auto names = Kind == 2   ? std::span<const char32_t *const>(flags_names)
+                       : Kind == 1 ? std::span<const char32_t *const>(float_names)
+                                   : std::span<const char32_t *const>(version_names);
+    std::u32string text = Kind == 2   ? U"sys.flags("
+                          : Kind == 1 ? U"sys.float_info("
+                                      : U"sys.version_info(";
     ReturnSlot item(ctx);
     for (std::size_t i = 0; i < names.size(); ++i) {
         if (i)
@@ -59,6 +81,10 @@ void info_repr(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &
 void version_new(Attachment &ctx, Value, std::span<const Value>, ReturnSlot &out)
 {
     raise_error(ctx, CoreObject::TypeErrorType, U"cannot create 'sys.version_info' instances", out);
+}
+void flags_new(Attachment &ctx, Value, std::span<const Value>, ReturnSlot &out)
+{
+    raise_error(ctx, CoreObject::TypeErrorType, U"cannot create 'sys.flags' instances", out);
 }
 void float_info_new(Attachment &ctx, Value function, std::span<const Value> args, ReturnSlot &out)
 {
@@ -91,14 +117,14 @@ void float_info_new(Attachment &ctx, Value function, std::span<const Value> args
     }
     ctx.allocate_instance<TupleObject>(type, out, items);
 }
-void make_info_type(Attachment &ctx, bool floating, ReturnSlot &out)
+void make_info_type(Attachment &ctx, bool floating, ReturnSlot &out, bool flags = false)
 {
     RootScope roots(ctx);
     std::vector<Handle> core;
     for (std::size_t i = 0; i < core_count; ++i)
         core.push_back(roots.root(ctx.builtin(static_cast<CoreObject>(i))));
     const Handle bases[] = {roots.root(ctx.builtin(CoreObject::TupleType))};
-    TypeSpec spec{floating ? U"float_info" : U"version_info", bases};
+    TypeSpec spec{flags ? U"flags" : floating ? U"float_info" : U"version_info", bases};
     spec.module = U"sys";
     spec.slots = std::vector<std::u32string>{};
     spec.subclassable = false;
@@ -110,17 +136,22 @@ void make_info_type(Attachment &ctx, bool floating, ReturnSlot &out)
         return;
     }
     auto type = roots.root(temporary.value());
-    const auto names = floating ? std::span<const char32_t *const>(float_names)
-                                : std::span<const char32_t *const>(version_names);
-    const NativeGetter getters[] = {info_field<0>, info_field<1>, info_field<2>, info_field<3>,
-                                    info_field<4>, info_field<5>, info_field<6>, info_field<7>,
-                                    info_field<8>, info_field<9>, info_field<10>};
+    const auto names = flags      ? std::span<const char32_t *const>(flags_names)
+                       : floating ? std::span<const char32_t *const>(float_names)
+                                  : std::span<const char32_t *const>(version_names);
+    const NativeGetter getters[] = {info_field<0>,  info_field<1>,  info_field<2>,  info_field<3>,
+                                    info_field<4>,  info_field<5>,  info_field<6>,  info_field<7>,
+                                    info_field<8>,  info_field<9>,  info_field<10>, info_field<11>,
+                                    info_field<12>, info_field<13>, info_field<14>, info_field<15>,
+                                    info_field<16>, info_field<17>};
     for (std::size_t i = 0; i < names.size(); ++i)
         install_native_field(ctx, core, type, names[i], getters[i]);
     SignatureLayout signature;
     signature.parameters = {{U"self", ParameterKind::PositionalOnly}};
     install_native_attribute(ctx, core, type, U"__repr__", signature,
-                             floating ? info_repr<true> : info_repr<false>);
+                             flags      ? info_repr<2>
+                             : floating ? info_repr<1>
+                                        : info_repr<0>);
     signature.parameters[0].name = U"cls";
     if (floating) {
         ctx.allocate_instance<DictObject>(roots.root(ctx.builtin(CoreObject::DictType)), temporary);
@@ -133,7 +164,10 @@ void make_info_type(Attachment &ctx, bool floating, ReturnSlot &out)
         signature.varkwargs = U"kwargs";
     }
     install_native_attribute(ctx, core, type, U"__new__", signature,
-                             floating ? float_info_new : version_new, {type.get(ctx)});
+                             flags      ? flags_new
+                             : floating ? float_info_new
+                                        : version_new,
+                             {type.get(ctx)});
     auto dictionary = roots.root(*TypeView(ctx, type).dictionary());
     auto constructor = roots.root(*name_lookup(ctx, dictionary.get(ctx), U"__new__"));
     ctx.allocate_instance<StaticMethodObject>(
@@ -151,6 +185,29 @@ void make_info_type(Attachment &ctx, bool floating, ReturnSlot &out)
         name_store(ctx, dictionary.get(ctx), temporary.value(), value.get(ctx));
     }
     out.ok(type.get(ctx));
+}
+void make_flags(Attachment &ctx, Handle type, bool interactive, bool quiet, ReturnSlot &out)
+{
+    RootScope roots(ctx);
+    ReturnSlot item(ctx);
+    std::vector<Value> values;
+    for (std::size_t i = 0; i < std::size(flags_names); ++i) {
+        if (i == 13 || i == 16)
+            item.ok(ctx.builtin(CoreObject::False));
+        else
+            make_int(ctx,
+                     (i == 1 || i == 2) ? interactive
+                     : i == 10          ? quiet
+                     : i == 11          ? 1
+                                        : 0,
+                     item);
+        if (failed(item)) {
+            out.raised(item.exception());
+            return;
+        }
+        values.push_back(roots.root(item.value()).get(ctx));
+    }
+    ctx.allocate_instance<TupleObject>(type, out, std::move(values));
 }
 void make_version_info(Attachment &ctx, ReturnSlot &out)
 {
@@ -210,6 +267,21 @@ void sys_exception(Attachment &ctx, Value, std::span<const Value>, ReturnSlot &o
 void recursion_limit(Attachment &ctx, Value, std::span<const Value>, ReturnSlot &out)
 {
     make_int(ctx, static_cast<std::int64_t>(ctx.call_depth_limit()), out);
+}
+void sys_settrace(Attachment &ctx, Value, std::span<const Value> args, ReturnSlot &out)
+{
+    RootScope roots(ctx);
+    if (args[0] == ctx.builtin(CoreObject::None))
+        ctx.set_trace_function({});
+    else
+        ctx.set_trace_function(roots.root(args[0]));
+    out.ok(ctx.builtin(CoreObject::None));
+}
+void sys_gettrace(Attachment &ctx, Value, std::span<const Value>, ReturnSlot &out)
+{
+    ctx.load_trace_function(out);
+    if (out.tag() == ResultTag::Empty)
+        out.ok(ctx.builtin(CoreObject::None));
 }
 
 void sys_exc_info(Attachment &ctx, Value, std::span<const Value>, ReturnSlot &out)
@@ -712,6 +784,16 @@ void initialize_sys_hooks(Attachment &ctx, Handle sys, ReturnSlot &out)
                          NativeFunctionBinding::Function);
     if (!store(U"getrecursionlimit"))
         return;
+    SignatureLayout trace_signature;
+    trace_signature.parameters = {{U"function", ParameterKind::PositionalOnly}};
+    make_native_function(ctx, "settrace", trace_signature, sys_settrace, {}, function,
+                         NativeFunctionBinding::Function);
+    if (!store(U"settrace"))
+        return;
+    make_native_function(ctx, "gettrace", {}, sys_gettrace, {}, function,
+                         NativeFunctionBinding::Function);
+    if (!store(U"gettrace"))
+        return;
     SignatureLayout exit_signature;
     exit_signature.parameters = {
         {U"status", ParameterKind::PositionalOnly, ctx.builtin(CoreObject::None)}};
@@ -790,6 +872,19 @@ void initialize_sys_hooks(Attachment &ctx, Handle sys, ReturnSlot &out)
     }
     if (!store(U"float_info"))
         return;
+    make_info_type(ctx, false, function, true);
+    if (failed(function)) {
+        out.raised(function.exception());
+        return;
+    }
+    const auto flags_type = roots.root(function.value());
+    make_flags(ctx, flags_type, false, false, function);
+    if (failed(function)) {
+        out.raised(function.exception());
+        return;
+    }
+    if (!store(U"flags"))
+        return;
     make_str(ctx, U"3.12.14 (cxxpython)", function);
     if (!store(U"version"))
         return;
@@ -822,6 +917,25 @@ void initialize_sys_hooks(Attachment &ctx, Handle sys, ReturnSlot &out)
     if (failed(out))
         return;
     install_error_hooks(ctx, sys, out);
+}
+void configure_sys_flags(Attachment &ctx, Handle sys, bool interactive, bool quiet, ReturnSlot &out)
+{
+    RootScope roots(ctx);
+    ReturnSlot key(ctx), flags(ctx);
+    make_str(ctx, U"flags", key);
+    const auto name = roots.root(key.value());
+    get_attribute(ctx, sys, name, flags);
+    if (failed(flags)) {
+        out.raised(flags.exception());
+        return;
+    }
+    const auto type = roots.root(ctx.type_of(flags.value()));
+    make_flags(ctx, type, interactive, quiet, flags);
+    if (failed(flags)) {
+        out.raised(flags.exception());
+        return;
+    }
+    set_attribute(ctx, sys, name, roots.root(flags.value()), out);
 }
 void display_value(Attachment &ctx, Handle value, ReturnSlot &out)
 {

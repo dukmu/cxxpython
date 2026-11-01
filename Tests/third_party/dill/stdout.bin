@@ -4,4 +4,7 @@ object graph ok
 code ok
 function ok
 closure ok
+recursive globals ok
 class ok
+bound method ok
+array ok

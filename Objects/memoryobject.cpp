@@ -1,6 +1,7 @@
 #include "cxxpython/memoryobject.hpp"
 #include "cxxpython/picklebufobject.hpp"
 #include "cxxpython/protocol.hpp"
+#include "internal/arraymodule.hpp"
 #include "internal/memoryformat.hpp"
 
 #include <bit>
@@ -613,6 +614,22 @@ bool detail::export_buffer(Attachment &c, Handle source, BufferExport &result, R
             return storage->bytes.size();
         });
         result.count = static_cast<std::int64_t>(result.length);
+        result.lease = std::move(token);
+        return true;
+    }
+    if (c.has_layout<ArrayObject>(source.get(c))) {
+        result.owner.ok(source.get(c));
+        auto &array = c.payload<ArrayObject>(source);
+        auto storage = array.contents;
+        auto token = std::make_shared<MemoryViewExport>(nullptr);
+        result.format.assign(1, array.typecode == 'u' ? 'w' : array.typecode);
+        result.stride = static_cast<std::int64_t>(array.itemsize);
+        result.length = locked(c, *storage, [&] {
+            token->storage = storage;
+            ++storage->exports;
+            return storage->bytes.size();
+        });
+        result.count = static_cast<std::int64_t>(result.length / array.itemsize);
         result.lease = std::move(token);
         return true;
     }

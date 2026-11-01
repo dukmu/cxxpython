@@ -252,7 +252,7 @@ bool source_text(Attachment &context, Value source, std::string &text, ReturnSlo
 }
 
 void freeze_source(Attachment &context, Value source, std::string filename, InputMode mode,
-                   ReturnSlot &out, std::uint32_t flags)
+                   ReturnSlot &out, std::uint32_t flags, int optimize = 0)
 {
     std::string text;
     if (!source_text(context, source, text, out))
@@ -265,7 +265,7 @@ void freeze_source(Attachment &context, Value source, std::string filename, Inpu
         std::optional<SourceUnit> unit;
         {
             NativeWait parked(context);
-            unit.emplace(SourceBuffer(std::move(text), std::move(filename)), mode, flags);
+            unit.emplace(SourceBuffer(std::move(text), std::move(filename)), mode, flags, optimize);
         }
         unit->freeze(context, out);
     } catch (const SourceError &error) {
@@ -292,7 +292,7 @@ void parse_ast_source(Attachment &context, Value source, std::string filename,
     }
 }
 void freeze_ast(Attachment &context, Handle source, std::string filename, InputMode mode,
-                ReturnSlot &out, std::uint32_t flags)
+                ReturnSlot &out, std::uint32_t flags, int optimize = 0)
 {
     auto tree = detail::snapshot_ast(context, source, mode, out);
     if (!tree)
@@ -301,7 +301,7 @@ void freeze_ast(Attachment &context, Handle source, std::string filename, InputM
         std::optional<SourceUnit> unit;
         {
             NativeWait parked(context);
-            unit.emplace(SourceBuffer({}, std::move(filename)), *tree, mode, flags);
+            unit.emplace(SourceBuffer({}, std::move(filename)), *tree, mode, flags, optimize);
         }
         unit->freeze(context, out);
     } catch (const SourceError &error) {
@@ -363,7 +363,7 @@ void compile_builtin(Attachment &context, Value, std::span<const Value> args, Re
         return;
     }
     const bool only_ast = (flags & 0x400) != 0;
-    if ((!only_ast && (optimize > 0 || feature != -1 || (flags & 0x2000))) ||
+    if ((!only_ast && (feature != -1 || (flags & 0x2000))) ||
         (only_ast && feature != -1 && feature < 12)) {
         raise_error(context, CoreObject::ValueErrorType,
                     U"compile(): requested option is not supported", out);
@@ -402,14 +402,14 @@ void compile_builtin(Attachment &context, Value, std::span<const Value> args, Re
     if (detail::is_ast(context, args[0])) {
         freeze_ast(context, roots.root(args[0]),
                    source_utf8(context.payload<StrObject>(args[1]).value), input_mode, out,
-                   effective_flags);
+                   effective_flags, optimize > 0 ? static_cast<int>(optimize) : 0);
         return;
     }
     freeze_source(context, args[0], source_utf8(context.payload<StrObject>(args[1]).value),
                   mode == U"eval"     ? InputMode::Eval
                   : mode == U"single" ? InputMode::Single
                                       : InputMode::Exec,
-                  out, effective_flags);
+                  out, effective_flags, optimize > 0 ? static_cast<int>(optimize) : 0);
 }
 
 template <bool Eval>

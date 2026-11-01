@@ -1,0 +1,11 @@
+iterator error stopped [1, 2, 3, 4, 5]
+conversion error [1, 2, 3, 4, 5, 6]
+self extend [1, 2, 3, 4, 5, 6, 1, 2, 3, 4, 5, 6]
+different type [1, 2, 3, 4, 5, 6, 1, 2, 3, 4, 5, 6]
+view i 4 False 1 6
+shared 42 43
+resize blocked 12
+child holds export 43
+released 99
+unicode buffer w 4 8
+unicode scalar unsupported

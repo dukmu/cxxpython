@@ -1,0 +1,6 @@
+[('PROTO', 2, 0), ('BININT1', 42, 2), ('STOP', None, 4)]
+    0: \x80 PROTO      2
+    2: K    BININT1    42
+    4: .    STOP
+highest protocol among opcodes = 2
+True

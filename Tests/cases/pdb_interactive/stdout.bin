@@ -1,0 +1,15 @@
+> <pdb-interactive>(6)target()
+-> value = 10
+(Pdb) Breakpoint 1 at <pdb-interactive>:7
+(Pdb) > <pdb-interactive>(7)target()
+-> value = child(value)
+(Pdb) 10
+(Pdb) (Pdb) --Call--
+> <pdb-interactive>(1)child()
+-> def child(value):
+(Pdb) > <pdb-interactive>(2)child()
+-> result = value + 1
+(Pdb) > <pdb-interactive>(3)child()
+-> return result
+(Pdb) 21
+(Pdb) result: 21

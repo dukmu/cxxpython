@@ -18,6 +18,7 @@ void FrameObject::trace(Tracer &tracer) const noexcept
     tracer.visit(code);
     tracer.visit(back);
     tracer.visit(delegate);
+    tracer.visit(trace_function);
     if (namespace_mapping)
         tracer.visit(*namespace_mapping);
     if (locals_snapshot)

@@ -84,8 +84,9 @@ struct Node;
 class SourceUnit final {
   public:
     explicit SourceUnit(SourceBuffer source, InputMode mode = InputMode::Exec,
-                        std::uint32_t flags = 0);
-    SourceUnit(SourceBuffer source, const ast::Node &tree, InputMode mode, std::uint32_t flags);
+                        std::uint32_t flags = 0, int optimize = 0);
+    SourceUnit(SourceBuffer source, const ast::Node &tree, InputMode mode, std::uint32_t flags,
+               int optimize = 0);
     ~SourceUnit();
     SourceUnit(SourceUnit &&) noexcept;
     SourceUnit &operator=(SourceUnit &&) noexcept;
@@ -95,7 +96,8 @@ class SourceUnit final {
     void freeze(Attachment &context, ReturnSlot &out) const;
 
   private:
-    void compile_tree(SourceBuffer source, const ast::Node &, InputMode, std::uint32_t flags);
+    void compile_tree(SourceBuffer source, const ast::Node &, InputMode, std::uint32_t flags,
+                      int optimize);
     std::unique_ptr<const detail::SourceProgram> program_;
 };
 struct RunRequest {

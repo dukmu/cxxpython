@@ -1,6 +1,9 @@
 #include "cxxpython/execution.hpp"
+#include "internal/abstract.hpp"
+#include "internal/builtinexec.hpp"
 #include "internal/call.hpp"
 
+#include <future>
 #include <gtest/gtest.h>
 
 namespace {
@@ -78,6 +81,77 @@ class CoreScheduling : public testing::Test {
         EXPECT_EQ(out.result().tag(), ResultTag::Empty);
     }
 };
+
+TEST_F(CoreScheduling, FrameLocalsClaimsSuspendedFramesAndRejectsForeignOwner)
+{
+    const auto fn = identity();
+    const auto code = context.payload<FunctionObject>(fn).code;
+    ReturnSlot result(context);
+    context.allocate_instance<FrameObject>(builtin(CoreObject::FrameType), result, fn.get(context),
+                                           code, 1, 1, context.builtin(CoreObject::None));
+    const auto frame = roots.root(result.value());
+    auto &data = context.payload<FrameObject>(frame);
+    const auto value = integer(42);
+    data.locals[0] = value.get(context);
+    data.state.store(FrameState::Suspended, std::memory_order_release);
+
+    context.set_allocation_limit(0);
+    EXPECT_THROW(detail::frame_locals(context, frame, result), std::bad_alloc);
+    context.set_allocation_limit(std::numeric_limits<std::size_t>::max());
+    EXPECT_EQ(data.state.load(std::memory_order_acquire), FrameState::Suspended);
+    EXPECT_EQ(data.owner.load(std::memory_order_relaxed), std::thread::id{});
+    detail::frame_locals(context, frame, result);
+    ASSERT_EQ(result.tag(), ResultTag::Ok);
+    EXPECT_EQ(data.state.load(std::memory_order_acquire), FrameState::Suspended);
+    EXPECT_EQ(data.owner.load(std::memory_order_relaxed), std::thread::id{});
+    const auto mapping = roots.root(result.value());
+    detail::dict_lookup_owned(context, mapping, text(U"value"), result);
+    ASSERT_EQ(result.tag(), ResultTag::Ok);
+    EXPECT_EQ(result.value(), value.get(context));
+
+    auto transfer = context.make_transfer(frame);
+    std::promise<void> acquired, release;
+    auto released = release.get_future();
+    auto worker = std::async(
+        std::launch::async, [token = std::move(transfer), &acquired, &released]() mutable {
+            Attachment other(token);
+            ReturnSlot received(other);
+            other.receive(token, received);
+            auto &target = other.payload<FrameObject>(received.value());
+            auto expected = FrameState::Suspended;
+            const bool claimed = target.state.compare_exchange_strong(expected, FrameState::Running,
+                                                                      std::memory_order_acquire);
+            EXPECT_TRUE(claimed);
+            if (claimed)
+                target.owner.store(std::this_thread::get_id(), std::memory_order_relaxed);
+            {
+                NativeWait wait(other);
+                acquired.set_value();
+                released.wait();
+            }
+            if (claimed) {
+                target.owner.store({}, std::memory_order_relaxed);
+                target.state.store(FrameState::Suspended, std::memory_order_release);
+            }
+        });
+    {
+        NativeWait wait(context);
+        acquired.get_future().wait();
+    }
+    detail::frame_locals(context, frame, result);
+    EXPECT_EQ(result.tag(), ResultTag::Raised);
+    if (result.tag() == ResultTag::Raised)
+        EXPECT_EQ(context.type_of(result.exception()),
+                  context.builtin(CoreObject::RuntimeErrorType));
+    release.set_value();
+    {
+        NativeWait wait(context);
+        worker.get();
+    }
+    detail::frame_locals(context, frame, result);
+    EXPECT_EQ(result.tag(), ResultTag::Ok);
+    EXPECT_EQ(data.state.load(std::memory_order_acquire), FrameState::Suspended);
+}
 
 TEST_F(CoreScheduling, CallMetadataValidatesSiteBoundsArityAndStackEffect)
 {

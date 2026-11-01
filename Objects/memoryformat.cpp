@@ -94,6 +94,8 @@ std::size_t memory_format_size(char code) noexcept
         return sizeof(float);
     case 'd':
         return sizeof(double);
+    case 'w':
+        return sizeof(wchar_t);
     default:
         return 0;
     }
@@ -141,6 +143,10 @@ void unpack_memory_format(Attachment &c, char code, std::string_view bytes, Retu
         return;
     case 'c':
         make_bytes(c, std::string(bytes.substr(0, 1)), out);
+        return;
+    case 'w':
+        raise_error(c, CoreObject::NotImplementedErrorType, U"memoryview: format w not supported",
+                    out);
         return;
     default:
         throw std::logic_error("invalid native memory format");
@@ -207,6 +213,10 @@ bool pack_memory_format(Attachment &c, char code, Handle value, std::string &byt
             return true;
         }
         raise_error(c, CoreObject::TypeErrorType, U"memoryview: invalid type for format 'c'", out);
+        return false;
+    case 'w':
+        raise_error(c, CoreObject::NotImplementedErrorType, U"memoryview: format w not supported",
+                    out);
         return false;
     default:
         throw std::logic_error("invalid native memory format");

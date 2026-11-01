@@ -1,0 +1,9 @@
+assigned 3
+result 2
+events [1, 2, 4]
+outside rejected
+loop entry rejected
+protected 1
+block entry rejected 5
+block entry rejected 7
+blocks 2

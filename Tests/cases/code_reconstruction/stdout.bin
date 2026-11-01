@@ -1,0 +1,11 @@
+{'result': 36} negative kept doc
+['finally', 'finally']
+closure 42
+outer 12
+no locations True 42
+legacy locations 42
+generator [1, 2]
+module 42
+renamed <copy>
+negative rejected
+truncated rejected

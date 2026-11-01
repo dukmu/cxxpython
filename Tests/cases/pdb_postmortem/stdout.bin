@@ -1,0 +1,7 @@
+> <pdb-postmortem>(3)fail()
+-> raise ValueError('debug failure')
+(Pdb) > <pdb-postmortem>(3)fail()
+-> raise ValueError('debug failure')
+(Pdb) 7
+(Pdb) 'builtins'
+(Pdb) 

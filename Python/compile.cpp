@@ -103,7 +103,8 @@ bool equal_pattern_keys(const PatternKey &left, const PatternKey &right)
 }
 class GraphPass final {
   public:
-    explicit GraphPass(SourceProgram &program) : program_(program)
+    explicit GraphPass(SourceProgram &program, int optimize)
+        : program_(program), optimize_(optimize)
     {
         program_.graphs.resize(program_.scopes.size());
     }
@@ -436,7 +437,8 @@ class GraphPass final {
                     literal(node, value.span);
                 else if constexpr (std::is_same_v<T, NameExpr>) {
                     if (node.name == U"__debug__")
-                        literal({Literal::Kind::True, {}}, value.span);
+                        literal({optimize_ ? Literal::Kind::False : Literal::Kind::True, {}},
+                                value.span);
                     else
                         name(node.name, value.span, Opcode::LoadFast, Opcode::LoadGlobal);
                 } else if constexpr (std::is_same_v<T, UnaryExpr>) {
@@ -1198,7 +1200,7 @@ class GraphPass final {
         for (std::size_t index = 0; index < body.size(); ++index) {
             const auto &statement = body[index];
             if (!index && statement.get() == first_statement_) {
-                if (scope_ == 0) {
+                if (scope_ == 0 && optimize_ < 2) {
                     literal({Literal::Kind::String, *program_.graphs[scope_].docstring},
                             statement->span);
                     const auto &symbols = program_.scopes[scope_].symbols;
@@ -1425,6 +1427,8 @@ class GraphPass final {
                             emit(Opcode::Call, span, 1);
                         name(node.binding, span, Opcode::StoreFast, Opcode::StoreGlobal);
                     } else if constexpr (std::is_same_v<T, AssertStmt>) {
+                        if (optimize_)
+                            return;
                         const auto done = block(), failed = block();
                         test(*node.test, done, failed);
                         select(failed);
@@ -1581,7 +1585,8 @@ class GraphPass final {
             if (const auto *expression = std::get_if<ExprStmt>(&body.front()->node))
                 if (const auto *literal = std::get_if<Literal>(&expression->value->node);
                     literal && literal->kind == Literal::Kind::String) {
-                    program_.graphs[scope].docstring = literal->text;
+                    if (optimize_ < 2)
+                        program_.graphs[scope].docstring = literal->text;
                     first_statement_ = body.front().get();
                 }
         if (definition) {
@@ -1639,6 +1644,7 @@ class GraphPass final {
         }
     }
     SourceProgram &program_;
+    int optimize_;
     std::size_t scope_ = 0, block_ = 0;
     std::vector<std::size_t> loops_;
     std::vector<std::size_t> star_handlers_;
@@ -1736,21 +1742,21 @@ void materialize_literal(Attachment &context, const Literal &value, ReturnSlot &
 } // namespace cxxpython::core::detail
 
 namespace cxxpython::core {
-SourceUnit::SourceUnit(SourceBuffer source, InputMode mode, std::uint32_t flags)
+SourceUnit::SourceUnit(SourceBuffer source, InputMode mode, std::uint32_t flags, int optimize)
 {
     const auto syntax_mode = mode == InputMode::Eval     ? syntax::InputMode::Eval
                              : mode == InputMode::Single ? syntax::InputMode::Single
                                                          : syntax::InputMode::File;
     auto tree = ast::parse(source, syntax_mode, flags);
-    compile_tree(std::move(source), *tree, mode, flags);
+    compile_tree(std::move(source), *tree, mode, flags, optimize);
 }
 SourceUnit::SourceUnit(SourceBuffer source, const ast::Node &tree, InputMode mode,
-                       std::uint32_t flags)
+                       std::uint32_t flags, int optimize)
 {
-    compile_tree(std::move(source), tree, mode, flags);
+    compile_tree(std::move(source), tree, mode, flags, optimize);
 }
 void SourceUnit::compile_tree(SourceBuffer source, const ast::Node &tree, InputMode mode,
-                              std::uint32_t flags)
+                              std::uint32_t flags, int optimize)
 {
     auto program = std::make_unique<detail::SourceProgram>(
         detail::SourceProgram{std::move(source), mode, {}, {}, flags & supported_future_flags});
@@ -1787,7 +1793,7 @@ void SourceUnit::compile_tree(SourceBuffer source, const ast::Node &tree, InputM
         }
     }
     detail::analyze_scopes(*program, body);
-    detail::GraphPass(*program).build(body);
+    detail::GraphPass(*program, optimize).build(body);
     program_ = std::move(program);
 }
 SourceUnit::~SourceUnit() = default;

@@ -1,0 +1,6 @@
+1234     >>    12 LOAD_NAME                2 (value)
+     -->       13 JUMP                     8 (to 8)
+               14 RETURN
+dis module stdin matches Bytecode
+dis module file matches Bytecode
+dis name and source-line formatting ok

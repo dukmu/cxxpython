@@ -159,6 +159,9 @@ int pymain(int argc, char **argv)
         if (out.tag() == ResultTag::Raised)
             return report_exception(context, out.exception());
         const auto sys = roots.root(out.value());
+        configure_sys_flags(context, sys, options.interactive, options.quiet, out);
+        if (out.tag() == ResultTag::Raised)
+            return report_exception(context, out.exception());
         {
             ReturnSlot key(context), paths(context), first(context);
             make_str(context, U"path", key);

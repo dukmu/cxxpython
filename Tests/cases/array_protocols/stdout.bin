@@ -1,0 +1,21 @@
+repr array('i') array('i', [1, -2])
+unicode array('u', 'Aλ')
+subclass repr NamedArray('i', [3])
+eq True
+ne True
+ordering True True True True
+prefix True
+not array False True
+nan False False
+unhashable True
+fromlist rollback [1, 2, 3]
+fromlist requires list
+reduce True ('i', [1, 2, 3]) None True
+pickle 0 True i [1, 2, 3]
+pickle 1 True i [1, 2, 3]
+pickle 2 True i [1, 2, 3]
+pickle 3 True i [1, 2, 3]
+pickle 4 True i [1, 2, 3]
+pickle 5 True i [1, 2, 3]
+pickle unicode AB
+pickle subtype True [8, 9] saved

@@ -1,0 +1,5 @@
+[1, 'two', b'three']
+True
+EOFError
+None
+(42, 'abc')

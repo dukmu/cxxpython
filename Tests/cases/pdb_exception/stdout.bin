@@ -1,0 +1,9 @@
+> <pdb-exception>(2)target()
+-> try:
+(Pdb) > <pdb-exception>(3)target()
+-> raise ValueError('traced failure')
+(Pdb) ValueError: traced failure
+> <pdb-exception>(3)target()
+-> raise ValueError('traced failure')
+(Pdb) (<class 'ValueError'>, ValueError('traced failure'))
+(Pdb) handled

@@ -4,6 +4,7 @@
 #include "cxxpython/typealiasobject.hpp"
 #include "cxxpython/weakrefobject.hpp"
 #include "internal/abc.hpp"
+#include "internal/arraymodule.hpp"
 #include "internal/astmodule.hpp"
 #include "internal/atexitmodule.hpp"
 #include "internal/binascii.hpp"
@@ -12,6 +13,7 @@
 #include "internal/compiler.hpp"
 #include "internal/contextvars.hpp"
 #include "internal/errnomodule.hpp"
+#include "internal/marshal.hpp"
 #include "internal/signalmodule.hpp"
 #ifdef CXXPYTHON_HAVE_CURSES
 #include "internal/cursesmodule.hpp"
@@ -295,6 +297,8 @@ detail::ImportState::ImportState()
                                      {U"itertools", detail::initialize_itertools},
                                      {U"_collections", detail::initialize_collections},
                                      {U"_contextvars", detail::initialize_contextvars},
+                                     {U"marshal", detail::initialize_marshal},
+                                     {U"array", detail::initialize_array},
                                      {U"binascii", detail::install_binascii},
                                      {U"posix", detail::initialize_posix},
                                      {U"errno", detail::initialize_errno},

@@ -1,8 +1,7 @@
 """Minimal import policy, adapted from CPython 3.12's importlib._bootstrap.
 
 CPython is distributed under the Python Software Foundation License; see
-doc/licenses/python-3.12.14.txt.  Bytecode cache paths are not inferred:
-``cached`` stays None unless explicitly assigned.
+doc/licenses/python-3.12.14.txt.
 
 Loader callbacks take a module for execution, or a module name for source and
 code retrieval.  A missing code callback falls back to compiling source.
@@ -20,7 +19,7 @@ import _imp
 import builtins
 
 SOURCE_SUFFIXES = ['.py']
-BYTECODE_SUFFIXES = []  # No CPython .pyc or private bytecode cache is loaded.
+BYTECODE_SUFFIXES = ['.pyc']
 DEBUG_BYTECODE_SUFFIXES = BYTECODE_SUFFIXES
 OPTIMIZED_BYTECODE_SUFFIXES = BYTECODE_SUFFIXES
 EXTENSION_SUFFIXES = _imp.extension_suffixes()
@@ -70,6 +69,15 @@ class ModuleSpec:
 
     @property
     def cached(self):
+        if self._cached is None and self._set_fileattr and self.origin:
+            if self.origin.endswith('.py'):
+                external = sys.modules.get('importlib._bootstrap_external')
+                os = sys.modules.get('os')
+                if (external is not None and hasattr(external, 'cache_from_source') and
+                        os is not None and hasattr(os, 'path')):
+                    self._cached = external.cache_from_source(self.origin)
+            elif self.origin.endswith('.pyc'):
+                self._cached = self.origin
         return self._cached
 
     @cached.setter
@@ -136,6 +144,68 @@ class SourceFileLoader(_SourceLoader):
     def is_package(self, fullname):
         self.get_filename(fullname)
         return self.path.rpartition('/')[2] == '__init__.py'
+
+    def get_data(self, path):
+        with open(path, 'rb') as stream:
+            return stream.read()
+
+    def path_stats(self, path):
+        import os
+        stat = os.stat(path)
+        return {'mtime': stat.st_mtime, 'size': stat.st_size}
+
+    def source_to_code(self, data, path, *, _optimize=-1):
+        return builtins.compile(data, path, 'exec', dont_inherit=True, optimize=_optimize)
+
+    def get_code(self, fullname):
+        self.get_filename(fullname)
+        if self._get_code_callback is not None:
+            return self._get_code_callback(fullname)
+        # os and the cache helpers themselves must be importable before this
+        # policy can use their filesystem and marshal dependencies.
+        os = sys.modules.get('os')
+        if (fullname == 'importlib._bootstrap_external' or os is None or
+                not hasattr(os, 'path') or not hasattr(os, 'stat')):
+            return _SourceLoader.get_code(self, fullname)
+        from . import _bootstrap_external as external
+        source = self.get_data(self.path)
+        stats = self.path_stats(self.path)
+        cache = external.cache_from_source(self.path)
+        try:
+            data = self.get_data(cache)
+            flags = external._classify_pyc(data, fullname)
+            if flags & 1:
+                valid = not flags & 2 or data[8:16] == external.source_hash(source)
+            else:
+                valid = (data[8:12] == external._pack_uint32(stats['mtime']) and
+                         data[12:16] == external._pack_uint32(stats['size']))
+            if valid:
+                return external._compile_bytecode(data, fullname)
+        except (OSError, ImportError, EOFError, ValueError, TypeError):
+            pass
+        code = self.source_to_code(source, self.path)
+        if not getattr(sys, 'dont_write_bytecode', False):
+            try:
+                os.makedirs(os.path.dirname(cache), exist_ok=True)
+                data = external._code_to_timestamp_pyc(code, stats['mtime'], stats['size'])
+                external._write_atomic(cache, data, external._calc_mode(self.path))
+            except (OSError, ImportError, TypeError, ValueError):
+                pass
+        return code
+
+
+class SourcelessFileLoader(_SourceLoader):
+    def is_package(self, fullname):
+        self.get_filename(fullname)
+        return self.path.rpartition('/')[2] == '__init__.pyc'
+
+    def get_code(self, fullname):
+        self.get_filename(fullname)
+        from . import _bootstrap_external as external
+        with open(self.path, 'rb') as stream:
+            data = stream.read()
+        external._classify_pyc(data, fullname)
+        return external._compile_bytecode(data, fullname)
 
 
 class MemorySourceLoader(_SourceLoader):
@@ -499,7 +569,8 @@ def _install():
     # publishing, and overwrite partial installation on a failed-boot retry.
     meta_path = [RegistryFinder, PathFinder]
     path_hooks = [FileFinder.path_hook(
-        (NativeLoader, EXTENSION_SUFFIXES), (SourceFileLoader, SOURCE_SUFFIXES))]
+        (NativeLoader, EXTENSION_SUFFIXES), (SourceFileLoader, SOURCE_SUFFIXES),
+        (SourcelessFileLoader, BYTECODE_SUFFIXES))]
     cache = {}
     sys.meta_path = meta_path
     sys.path_hooks = path_hooks

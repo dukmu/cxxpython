@@ -1,0 +1,9 @@
+break 7
+continue
+p value
+!value = 20
+step
+next
+next
+p result
+continue

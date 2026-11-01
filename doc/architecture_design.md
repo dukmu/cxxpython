@@ -100,6 +100,11 @@ binding and complete signature. Epoch invalidation and sweep clearing still
 apply, and the actual descriptor remains rooted during execution. This is not a
 second executor, a public tagged Value ABI or a workload-specific opcode.
 
+Code reflection and construction live in `Objects/codeobject.cpp`, outside the
+execution loop. CodeType reconstructs immutable native instruction, location and
+region images through the existing verifier; its bytecode is not CPython
+wordcode. The versioned image and offset contract is specified in `doc/code_format.md`.
+
 Frame activation also retains immutable Code tuple views for constants/names/
 closure metadata. Attribute special methods share the ordinary protocol cache,
 descriptor binding and epoch refresh; user methods do not become numeric entries.

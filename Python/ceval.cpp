@@ -9,7 +9,9 @@
 #include "cxxpython/typevarobject.hpp"
 #include "internal/abstract.hpp"
 #include "internal/aiterobject.hpp"
+#include "internal/builtinexec.hpp"
 #include "internal/call.hpp"
+#include "internal/codeobject.hpp"
 #include "internal/errors.hpp"
 #include "internal/exceptiongroup.hpp"
 #include "internal/patternmatching.hpp"
@@ -19,6 +21,7 @@
 
 #include <algorithm>
 #include <charconv>
+#include <utility>
 
 namespace cxxpython::core {
 namespace detail {
@@ -34,6 +37,9 @@ class FrameActivation final {
           generator_(generator)
     {
         auto &data = context.payload<FrameObject>(root_);
+        data.trace_call_pending = true;
+        data.trace_last_pc = std::numeric_limits<std::size_t>::max();
+        data.trace_last_line = 0;
         context.store(root_, data.back, previous_);
         inherited(data, previous_exception_);
         data.state.store(FrameState::Running, std::memory_order_relaxed);
@@ -107,6 +113,7 @@ class FrameActivation final {
         if (!context_.enter_call())
             return false;
         auto &child = context_.payload<FrameObject>(frame);
+        child.trace_call_pending = true;
         context_.store(frame.get(context_), child.back, current());
         child.handled_exception = context_.handled_exception_;
         child.state.store(FrameState::Running, std::memory_order_relaxed);
@@ -150,6 +157,7 @@ class FrameActivation final {
             data.resume_throw_args.reset();
         }
         data.reason = ExceptionRaise{exception};
+        data.trace_exception_pending = true;
         data.pending_call.reset();
         if (traceback && exception != context_.builtin(CoreObject::MemoryError)) {
             RootScope roots(context_);
@@ -420,6 +428,57 @@ void import_locals(Attachment &context, FrameObject &frame, const CodeObject &co
     }
     out.ok(mapping.get(context));
 }
+void trace_locals_to_fast(Attachment &context, FrameObject &frame, const CodeObject &code,
+                          ReturnSlot &out)
+{
+    if (frame.namespace_mapping || !frame.locals_snapshot) {
+        out.ok(context.builtin(CoreObject::None));
+        return;
+    }
+    RootScope roots(context);
+    const auto mapping = roots.root(*frame.locals_snapshot);
+    const auto cell_locals = code.program.cell_locals();
+    auto load = [&](const std::u32string &name, ReturnSlot &value) {
+        RootScope key_roots(context);
+        ReturnSlot key(context);
+        make_str(context, name, key);
+        if (raised(key)) {
+            out.raised(key.exception());
+            return false;
+        }
+        detail::dict_lookup_owned(context, mapping, key_roots.root(key.value()), value);
+        if (raised(value)) {
+            out.raised(value.exception());
+            return false;
+        }
+        return true;
+    };
+    for (std::size_t i = 0; i < frame.locals.size(); ++i) {
+        ReturnSlot value(context);
+        if (!load(code.program.local_names()[i], value))
+            return;
+        const auto cell = std::find(cell_locals.begin(), cell_locals.end(), i);
+        if (cell != cell_locals.end()) {
+            const auto offset = static_cast<std::size_t>(cell - cell_locals.begin());
+            if (offset < frame.cells.size())
+                context.store(
+                    frame.cells[offset], context.payload<CellObject>(frame.cells[offset]).contents,
+                    value.tag() == ResultTag::Empty ? std::optional<Value>{}
+                                                    : std::optional<Value>{value.value()});
+        } else
+            frame.locals[i] = value.tag() == ResultTag::Empty ? std::optional<Value>{}
+                                                              : std::optional<Value>{value.value()};
+    }
+    for (std::size_t i = cell_locals.size(); i < frame.cells.size(); ++i) {
+        ReturnSlot value(context);
+        if (!load(code.program.free_names()[i - cell_locals.size()], value))
+            return;
+        context.store(frame.cells[i], context.payload<CellObject>(frame.cells[i]).contents,
+                      value.tag() == ResultTag::Empty ? std::optional<Value>{}
+                                                      : std::optional<Value>{value.value()});
+    }
+    out.ok(context.builtin(CoreObject::None));
+}
 void import_star(Attachment &context, Handle from, Handle mapping, ReturnSlot &out)
 {
     RootScope roots(context);
@@ -617,6 +676,122 @@ DelegateResult delegate_step(Attachment &context, Value frame_value, FrameObject
         out.ok(context.builtin(CoreObject::None));
     return DelegateResult::Returned;
 }
+void trace_memory_error(Attachment &context, detail::FrameActivation &activation, ReturnSlot &out)
+{
+    context.set_trace_function({});
+    context.store(activation.current(), activation.frame().trace_function, {});
+    out.raised(context.builtin(CoreObject::MemoryError));
+}
+bool trace_event_impl(Attachment &context, detail::FrameActivation &activation,
+                      const char32_t *event, Value argument, bool call_event, ReturnSlot &out)
+{
+    if (!context.tracing_enabled())
+        return true;
+    ReturnSlot global(context), callback(context);
+    context.load_trace_function(global);
+    if (global.tag() == ResultTag::Empty ||
+        !context.enter_tracing(activation.current(), std::u32string_view(event) == U"line"))
+        return true;
+    struct TraceGuard {
+        Attachment &context;
+        ~TraceGuard()
+        {
+            context.leave_tracing();
+        }
+    } guard{context};
+    const auto frame = activation.current();
+    if (call_event)
+        callback.ok(global.value());
+    else
+        context.load(frame, activation.frame().trace_function, callback);
+    if (callback.tag() == ResultTag::Empty)
+        return true;
+    RootScope roots(context);
+    const auto frame_root = roots.root(frame);
+    const auto argument_root = roots.root(argument);
+    auto &data = activation.frame();
+    data.trace_locals_accessed = false;
+    if (data.locals_snapshot && !data.namespace_mapping) {
+        ReturnSlot refreshed(context);
+        import_locals(context, data, activation.code(), refreshed);
+        if (raised(refreshed)) {
+            context.set_trace_function({});
+            context.store(frame, data.trace_function, {});
+            out.raised(refreshed.exception());
+            return false;
+        }
+    }
+    ReturnSlot name(context);
+    make_str(context, event, name);
+    if (!raised(name)) {
+        const std::array args{frame_root.get(context), name.value(), argument_root.get(context)};
+        call(context, roots.root(callback.value()), {args, {}}, out);
+    } else
+        out.raised(name.exception());
+    if (data.trace_locals_accessed) {
+        data.trace_locals_accessed = false;
+        ReturnSlot written(context);
+        trace_locals_to_fast(context, data, activation.code(), written);
+        if (raised(written) && !raised(out))
+            out.raised(written.exception());
+    }
+    if (raised(out)) {
+        context.set_trace_function({});
+        context.store(frame_root.get(context), activation.frame().trace_function, {});
+        return false;
+    }
+    if (out.value() != context.builtin(CoreObject::None))
+        context.store(frame_root.get(context), activation.frame().trace_function, out.value());
+    return true;
+}
+bool trace_event(Attachment &context, detail::FrameActivation &activation, const char32_t *event,
+                 Value argument, bool call_event, ReturnSlot &out)
+{
+    try {
+        return trace_event_impl(context, activation, event, argument, call_event, out);
+    } catch (const std::bad_alloc &) {
+        trace_memory_error(context, activation, out);
+        return false;
+    }
+}
+bool trace_exception_impl(Attachment &context, detail::FrameActivation &activation, Value exception,
+                          ReturnSlot &out)
+{
+    if (!context.tracing_enabled())
+        return true;
+    ReturnSlot global(context), local(context);
+    context.load_trace_function(global);
+    if (global.tag() == ResultTag::Empty)
+        return true;
+    context.load(activation.current(), activation.frame().trace_function, local);
+    if (local.tag() == ResultTag::Empty)
+        return true;
+    RootScope roots(context);
+    const auto error = roots.root(exception);
+    ReturnSlot traceback(context), tuple(context);
+    context.load(exception, context.payload<ExceptionObject>(exception).traceback, traceback);
+    const auto trace = roots.root(
+        traceback.tag() == ResultTag::Ok ? traceback.value() : context.builtin(CoreObject::None));
+    const std::array values{context.type_of(error), error.get(context), trace.get(context)};
+    cxxpython::core::make_tuple(context, values, tuple);
+    if (raised(tuple)) {
+        context.set_trace_function({});
+        context.store(activation.current(), activation.frame().trace_function, {});
+        out.raised(tuple.exception());
+        return false;
+    }
+    return trace_event(context, activation, U"exception", tuple.value(), false, out);
+}
+bool trace_exception(Attachment &context, detail::FrameActivation &activation, Value exception,
+                     ReturnSlot &out)
+{
+    try {
+        return trace_exception_impl(context, activation, exception, out);
+    } catch (const std::bad_alloc &) {
+        trace_memory_error(context, activation, out);
+        return false;
+    }
+}
 void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &out)
 {
     ReturnSlot result(context), numeric_method(context);
@@ -634,6 +809,25 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
         auto &data = activation.frame();
         const auto &code = activation.code();
         try {
+            if (data.trace_call_pending) {
+                data.trace_call_pending = false;
+                if (!trace_event(context, activation, U"call", context.builtin(CoreObject::None),
+                                 true, result)) {
+                    activation.raising(result.exception());
+                    continue;
+                }
+            }
+            if (data.trace_exception_pending) {
+                data.trace_exception_pending = false;
+                if (data.reason) {
+                    if (const auto *error = std::get_if<ExceptionRaise>(&*data.reason)) {
+                        if (!trace_exception(context, activation, error->exception, result)) {
+                            activation.raising(result.exception());
+                            continue;
+                        }
+                    }
+                }
+            }
             if (data.reason) {
                 context.poll();
                 if (data.unwind(context)) {
@@ -641,9 +835,19 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                     continue;
                 }
                 if (const auto *returned = std::get_if<FunctionReturn>(&*data.reason)) {
+                    if (!trace_event(context, activation, U"return", returned->value, false,
+                                     result)) {
+                        activation.raising(result.exception());
+                        continue;
+                    }
                     if (activation.returned(returned->value, out))
                         return;
                 } else if (const auto *error = std::get_if<ExceptionRaise>(&*data.reason)) {
+                    if (!trace_event(context, activation, U"return",
+                                     context.builtin(CoreObject::None), false, result)) {
+                        activation.raising(result.exception());
+                        continue;
+                    }
                     if (activation.failed(error->exception, out))
                         return;
                 } else
@@ -651,6 +855,34 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 continue;
             }
             data.last_instruction.store(data.pc, std::memory_order_release);
+            const bool skip_line = std::exchange(data.trace_skip_line, false);
+            if (context.tracing_enabled()) {
+                const auto pc = data.pc;
+                const auto line = code.program.positions()[pc].line;
+                const bool new_line =
+                    line && (line != data.trace_last_line || pc <= data.trace_last_pc);
+                data.trace_last_pc = pc;
+                if (line)
+                    data.trace_last_line = line;
+                if (!skip_line && new_line && data.trace_lines.load() &&
+                    !trace_event(context, activation, U"line", context.builtin(CoreObject::None),
+                                 false, result)) {
+                    data.trace_jump_pending = false;
+                    activation.raising(result.exception());
+                    continue;
+                }
+                if (data.trace_jump_pending) {
+                    data.trace_jump_pending = false;
+                    data.trace_skip_line = true;
+                    continue;
+                }
+                if (data.trace_opcodes.load() &&
+                    !trace_event(context, activation, U"opcode", context.builtin(CoreObject::None),
+                                 false, result)) {
+                    activation.raising(result.exception());
+                    continue;
+                }
+            }
             const auto [opcode, operand] = code.program.instructions()[data.pc++];
             if (opcode == Opcode::Binary || opcode == Opcode::Inplace) {
                 const bool numeric =
@@ -1794,6 +2026,11 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 [[fallthrough]];
             }
             case Opcode::YieldValue:
+                if (!trace_event(context, activation, U"return", data.operands[data.sp - 1], false,
+                                 result)) {
+                    activation.raising(result.exception());
+                    break;
+                }
                 out.ok(data.operands[data.sp - 1]);
                 data.operands[data.sp - 1] = context.builtin(CoreObject::None);
                 activation.suspend();
@@ -1828,6 +2065,12 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 const bool throwing = data.resume_exception || data.resume_throw_args;
                 const auto status = delegate_step(context, activation.current(), data, result);
                 if (status == DelegateResult::Yielded) {
+                    ReturnSlot traced(context);
+                    if (!trace_event(context, activation, U"return", result.value(), false,
+                                     traced)) {
+                        activation.raising(traced.exception());
+                        break;
+                    }
                     --data.pc;
                     out.ok(result.value());
                     activation.suspend();
@@ -1868,144 +2111,6 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
         }
     }
 }
-void code_name(Attachment &c, Value value, ReturnSlot &out)
-{
-    out.ok(c.payload<CodeObject>(value).name);
-}
-void code_qualname(Attachment &c, Value value, ReturnSlot &out)
-{
-    out.ok(c.payload<CodeObject>(value).qualname);
-}
-void code_filename(Attachment &c, Value value, ReturnSlot &out)
-{
-    out.ok(c.payload<CodeObject>(value).filename);
-}
-void code_constants(Attachment &c, Value value, ReturnSlot &out)
-{
-    out.ok(c.payload<CodeObject>(value).constants);
-}
-void code_varnames(Attachment &c, Value value, ReturnSlot &out)
-{
-    out.ok(c.payload<CodeObject>(value).varnames);
-}
-void code_names(Attachment &c, Value value, ReturnSlot &out)
-{
-    out.ok(c.payload<CodeObject>(value).names);
-}
-void code_cellvars(Attachment &c, Value value, ReturnSlot &out)
-{
-    out.ok(c.payload<CodeObject>(value).cellvars);
-}
-void code_freevars(Attachment &c, Value value, ReturnSlot &out)
-{
-    out.ok(c.payload<CodeObject>(value).freevars);
-}
-void code_stacksize(Attachment &c, Value value, ReturnSlot &out)
-{
-    make_int(c, static_cast<std::int64_t>(c.payload<CodeObject>(value).program.max_stack()), out);
-}
-void code_firstline(Attachment &c, Value value, ReturnSlot &out)
-{
-    make_int(c, c.payload<CodeObject>(value).program.first_line(), out);
-}
-void code_flags(Attachment &c, Value value, ReturnSlot &out)
-{
-    make_int(c, c.payload<CodeObject>(value).program.flags(), out);
-}
-void parameter_count(Attachment &c, Value value, std::optional<ParameterKind> kind, ReturnSlot &out)
-{
-    const auto &parameters = c.payload<CodeObject>(value).program.signature().parameters;
-    const auto count =
-        std::count_if(parameters.begin(), parameters.end(), [&](const auto &parameter) {
-            return kind ? parameter.kind == *kind : parameter.kind != ParameterKind::KeywordOnly;
-        });
-    make_int(c, count, out);
-}
-void code_argcount(Attachment &c, Value value, ReturnSlot &out)
-{
-    parameter_count(c, value, {}, out);
-}
-void code_posonlycount(Attachment &c, Value value, ReturnSlot &out)
-{
-    parameter_count(c, value, ParameterKind::PositionalOnly, out);
-}
-void code_kwonlycount(Attachment &c, Value value, ReturnSlot &out)
-{
-    parameter_count(c, value, ParameterKind::KeywordOnly, out);
-}
-void code_nlocals(Attachment &c, Value value, ReturnSlot &out)
-{
-    make_int(c,
-             static_cast<std::int64_t>(c.payload<CodeObject>(value).program.local_names().size()),
-             out);
-}
-template <bool Lines>
-void code_locations(Attachment &c, Value, std::span<const Value> args, ReturnSlot &out)
-{
-    RootScope roots(c);
-    auto self = roots.root(args[0]);
-    if (c.type_of(self) != c.builtin(CoreObject::CodeType) ||
-        !c.has_layout<CodeObject>(self.get(c))) {
-        type_error(c, U"code position methods require a code object", out);
-        return;
-    }
-    const auto positions = c.payload<CodeObject>(self).program.positions();
-    std::vector<Value> rows;
-    for (std::size_t start = 0; start < positions.size();) {
-        RootScope row_roots(c);
-        ReturnSlot value(c);
-        std::vector<Value> fields;
-        auto number = [&](std::optional<std::int64_t> n) {
-            if (n)
-                make_int(c, *n, value);
-            else
-                value.ok(c.builtin(CoreObject::None));
-            if (raised(value)) {
-                out.raised(value.exception());
-                return false;
-            }
-            fields.push_back(row_roots.root(value.value()).get(c));
-            return true;
-        };
-        const auto position = positions[start];
-        auto end = start + 1;
-        if constexpr (Lines) {
-            while (end < positions.size() && positions[end].line == position.line) {
-                if ((end & 4095) == 0)
-                    c.poll();
-                ++end;
-            }
-            if (!number(static_cast<std::int64_t>(start)) ||
-                !number(static_cast<std::int64_t>(end)) ||
-                !number(position.line ? std::optional<std::int64_t>{position.line} : std::nullopt))
-                return;
-        } else {
-            for (const auto n :
-                 {position.line, position.end_line, position.column, position.end_column})
-                if (!number(position.line && n != std::numeric_limits<std::uint32_t>::max()
-                                ? std::optional<std::int64_t>{n}
-                                : std::nullopt))
-                    return;
-        }
-        cxxpython::core::make_tuple(c, fields, value);
-        if (raised(value)) {
-            out.raised(value.exception());
-            return;
-        }
-        rows.push_back(roots.root(value.value()).get(c));
-        start = end;
-        if ((start & 4095) == 0)
-            c.poll();
-    }
-    // The existing tuple iterator owns the immutable snapshot, not borrowed Code data.
-    ReturnSlot snapshot(c);
-    cxxpython::core::make_tuple(c, rows, snapshot);
-    if (raised(snapshot)) {
-        out.raised(snapshot.exception());
-        return;
-    }
-    get_iter(c, roots.root(snapshot.value()), out);
-}
 void frame_code(Attachment &c, Value value, ReturnSlot &out)
 {
     out.ok(c.payload<FrameObject>(value).code);
@@ -2013,6 +2118,11 @@ void frame_code(Attachment &c, Value value, ReturnSlot &out)
 void frame_globals(Attachment &c, Value value, ReturnSlot &out)
 {
     out.ok(c.payload<FunctionObject>(c.payload<FrameObject>(value).function).globals);
+}
+void frame_get_locals(Attachment &c, Value value, ReturnSlot &out)
+{
+    RootScope roots(c);
+    detail::frame_locals(c, roots.root(value), out);
 }
 void frame_builtins(Attachment &c, Value value, ReturnSlot &out)
 {
@@ -2024,6 +2134,38 @@ void frame_back(Attachment &c, Value value, ReturnSlot &out)
     if (out.tag() == ResultTag::Empty)
         out.ok(c.builtin(CoreObject::None));
 }
+void frame_trace(Attachment &c, Value value, ReturnSlot &out)
+{
+    c.load(value, c.payload<FrameObject>(value).trace_function, out);
+    if (out.tag() == ResultTag::Empty)
+        out.ok(c.builtin(CoreObject::None));
+}
+void frame_set_trace(Attachment &c, Value self, std::optional<Value> value, ReturnSlot &out)
+{
+    if (value && *value == c.builtin(CoreObject::None))
+        value.reset();
+    c.store(self, c.payload<FrameObject>(self).trace_function, value);
+    out.ok(c.builtin(CoreObject::None));
+}
+template <bool Opcodes> void frame_trace_flag(Attachment &c, Value self, ReturnSlot &out)
+{
+    auto &frame = c.payload<FrameObject>(self);
+    const bool enabled = (Opcodes ? frame.trace_opcodes : frame.trace_lines).load();
+    out.ok(c.builtin(enabled ? CoreObject::True : CoreObject::False));
+}
+template <bool Opcodes>
+void frame_set_trace_flag(Attachment &c, Value self, std::optional<Value> value, ReturnSlot &out)
+{
+    if (!value ||
+        (*value != c.builtin(CoreObject::True) && *value != c.builtin(CoreObject::False))) {
+        type_error(c, U"attribute value type must be bool", out);
+        return;
+    }
+    auto &frame = c.payload<FrameObject>(self);
+    (Opcodes ? frame.trace_opcodes : frame.trace_lines)
+        .store(*value == c.builtin(CoreObject::True));
+    out.ok(c.builtin(CoreObject::None));
+}
 void frame_lineno(Attachment &c, Value value, ReturnSlot &out)
 {
     const auto &frame = c.payload<FrameObject>(value);
@@ -2032,6 +2174,69 @@ void frame_lineno(Attachment &c, Value value, ReturnSlot &out)
     auto line =
         lasti != std::numeric_limits<std::size_t>::max() ? program.positions()[lasti].line : 0;
     make_int(c, line ? line : program.first_line(), out);
+}
+void frame_set_lineno(Attachment &c, Value self, std::optional<Value> value, ReturnSlot &out)
+{
+    if (!value) {
+        raise_error(c, CoreObject::AttributeErrorType, U"cannot delete attribute", out);
+        return;
+    }
+    if (c.type_of(*value) != c.builtin(CoreObject::IntType)) {
+        raise_error(c, CoreObject::ValueErrorType, U"lineno must be an integer", out);
+        return;
+    }
+    if (!c.tracing_line_frame(self)) {
+        raise_error(c, CoreObject::ValueErrorType,
+                    U"f_lineno can only be set in a line trace function", out);
+        return;
+    }
+    std::int64_t requested;
+    if (!int_fits_signed(c, *value, requested) || requested < std::numeric_limits<int>::min() ||
+        requested > std::numeric_limits<int>::max()) {
+        raise_error(c, CoreObject::ValueErrorType, U"lineno out of range", out);
+        return;
+    }
+    auto &frame = c.payload<FrameObject>(self);
+    if (frame.state.load(std::memory_order_acquire) != FrameState::Running ||
+        frame.owner.load(std::memory_order_relaxed) != std::this_thread::get_id()) {
+        raise_error(c, CoreObject::ValueErrorType, U"frame is not running on this thread", out);
+        return;
+    }
+    const auto &program = c.payload<CodeObject>(frame.code).program;
+    if (requested < program.first_line()) {
+        raise_error(c, CoreObject::ValueErrorType, U"line comes before the current code block",
+                    out);
+        return;
+    }
+    const auto positions = program.positions();
+    std::uint32_t target_line = std::numeric_limits<std::uint32_t>::max();
+    for (const auto &position : positions)
+        if (position.line && position.line >= static_cast<std::uint64_t>(requested))
+            target_line = std::min(target_line, position.line);
+    if (target_line == std::numeric_limits<std::uint32_t>::max()) {
+        raise_error(c, CoreObject::ValueErrorType, U"line comes after the current code block", out);
+        return;
+    }
+    const auto current = frame.pc;
+    const auto current_depth = program.entry_stack_depth(current);
+    if (!current_depth || *current_depth != 0 || frame.sp != 0) {
+        raise_error(c, CoreObject::ValueErrorType, U"incompatible stacks", out);
+        return;
+    }
+    for (std::size_t pc = 0; pc < positions.size(); ++pc) {
+        if (positions[pc].line != target_line)
+            continue;
+        const auto depth = program.entry_stack_depth(pc);
+        if (depth && *depth == 0 && program.scope_at(pc) == program.scope_at(current)) {
+            frame.pc = pc;
+            frame.last_instruction.store(pc, std::memory_order_release);
+            frame.trace_jump_pending = true;
+            out.ok(c.builtin(CoreObject::None));
+            return;
+        }
+        break;
+    }
+    raise_error(c, CoreObject::ValueErrorType, U"incompatible stacks or execution regions", out);
 }
 void frame_lasti(Attachment &c, Value value, ReturnSlot &out)
 {
@@ -2087,6 +2292,7 @@ void frame_clear(Attachment &c, Value, std::span<const Value> args, ReturnSlot &
         local.reset();
     frame.cells.clear();
     frame.locals_snapshot.reset();
+    c.store(self.get(c), frame.trace_function, {});
     frame.trim_stack(c, 0);
     frame.owner.store({}, std::memory_order_relaxed);
     frame.state.store(FrameState::Completed, std::memory_order_release);
@@ -2185,7 +2391,43 @@ namespace detail {
 void frame_locals(Attachment &context, Handle frame, ReturnSlot &out)
 {
     auto &data = context.payload<FrameObject>(frame);
+    if (data.namespace_mapping) {
+        out.ok(*data.namespace_mapping);
+        return;
+    }
+    auto state = data.state.load(std::memory_order_acquire);
+    bool claimed = false;
+    for (;;) {
+        if (state == FrameState::Running) {
+            if (data.owner.load(std::memory_order_relaxed) != std::this_thread::get_id()) {
+                raise_error(context, CoreObject::RuntimeErrorType,
+                            U"cannot inspect locals of a frame running on another thread", out);
+                return;
+            }
+            break;
+        }
+        if (data.state.compare_exchange_weak(state, FrameState::Running, std::memory_order_acquire,
+                                             std::memory_order_acquire)) {
+            data.owner.store(std::this_thread::get_id(), std::memory_order_relaxed);
+            claimed = true;
+            break;
+        }
+    }
+    struct Claim {
+        FrameObject &frame;
+        FrameState previous;
+        bool claimed;
+        ~Claim()
+        {
+            if (claimed) {
+                frame.owner.store({}, std::memory_order_relaxed);
+                frame.state.store(previous, std::memory_order_release);
+            }
+        }
+    } claim{data, state, claimed};
     import_locals(context, data, context.payload<CodeObject>(data.code), out);
+    if (!raised(out) && context.tracing_frame(frame.get(context)))
+        data.trace_locals_accessed = true;
 }
 
 void execute_class_body(Attachment &context, Handle function, Handle mapping, ReturnSlot &out)
@@ -2279,36 +2521,24 @@ void install_execution(Attachment &context, std::span<const Handle> core)
                      NativeSetter setter = nullptr) {
         install_native_field(context, core, at(kind), std::move(name), getter, setter);
     };
-    field(CoreObject::CodeType, U"co_name", code_name);
-    field(CoreObject::CodeType, U"co_qualname", code_qualname);
-    field(CoreObject::CodeType, U"co_filename", code_filename);
-    field(CoreObject::CodeType, U"co_consts", code_constants);
-    field(CoreObject::CodeType, U"co_varnames", code_varnames);
-    field(CoreObject::CodeType, U"co_stacksize", code_stacksize);
-    field(CoreObject::CodeType, U"co_firstlineno", code_firstline);
-    field(CoreObject::CodeType, U"co_flags", code_flags);
-    field(CoreObject::CodeType, U"co_argcount", code_argcount);
-    field(CoreObject::CodeType, U"co_posonlyargcount", code_posonlycount);
-    field(CoreObject::CodeType, U"co_kwonlyargcount", code_kwonlycount);
-    field(CoreObject::CodeType, U"co_nlocals", code_nlocals);
-    field(CoreObject::CodeType, U"co_names", code_names);
-    field(CoreObject::CodeType, U"co_cellvars", code_cellvars);
-    field(CoreObject::CodeType, U"co_freevars", code_freevars);
+    install_code_descriptors(context, core);
     install_function_descriptors(context, core);
     field(CoreObject::FrameType, U"f_code", frame_code);
     field(CoreObject::FrameType, U"f_back", frame_back);
+    field(CoreObject::FrameType, U"f_trace", frame_trace, frame_set_trace);
+    field(CoreObject::FrameType, U"f_trace_lines", frame_trace_flag<false>,
+          frame_set_trace_flag<false>);
+    field(CoreObject::FrameType, U"f_trace_opcodes", frame_trace_flag<true>,
+          frame_set_trace_flag<true>);
     field(CoreObject::FrameType, U"f_globals", frame_globals);
+    field(CoreObject::FrameType, U"f_locals", frame_get_locals);
     field(CoreObject::FrameType, U"f_builtins", frame_builtins);
-    field(CoreObject::FrameType, U"f_lineno", frame_lineno);
+    field(CoreObject::FrameType, U"f_lineno", frame_lineno, frame_set_lineno);
     field(CoreObject::FrameType, U"f_lasti", frame_lasti);
     SignatureLayout unary;
     unary.parameters = {{U"self", ParameterKind::PositionalOnly}};
     install_native_attribute(context, core, at(CoreObject::FrameType), U"clear", unary,
                              frame_clear);
-    install_native_attribute(context, core, at(CoreObject::CodeType), U"co_positions", unary,
-                             code_locations<false>);
-    install_native_attribute(context, core, at(CoreObject::CodeType), U"co_lines", unary,
-                             code_locations<true>);
     for (auto kind : {CoreObject::CodeType, CoreObject::FrameType})
         install_native_attribute(context, core, at(kind), U"__repr__", unary, execution_repr,
                                  {at(kind).get(context)});

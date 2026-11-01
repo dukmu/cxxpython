@@ -1,0 +1,6 @@
+repr True
+metadata 18 18 0 18
+sequence 0 (0, 1, 0) True True
+bools bool bool
+readonly
+constructor cannot create 'sys.flags' instances

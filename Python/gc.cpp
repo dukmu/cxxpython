@@ -318,6 +318,8 @@ struct ThreadRecord {
     WeakRefObject *weak_callbacks = nullptr;
     ObjectHeader *exit_sentinel = nullptr;
     ObjectHeader *current_context = nullptr;
+    ObjectHeader *trace_function = nullptr;
+    bool tracing = false;
     void (*release_exit_sentinel)(ObjectHeader *) noexcept = nullptr;
     // Borrowed identities, not roots. Sweep clears them before reuse.
     std::array<ProtocolEntry, 64> protocols;
@@ -642,6 +644,7 @@ struct State {
             thread->protocols.fill({});
             mark(thread->exit_sentinel);
             mark(thread->current_context);
+            mark(thread->trace_function);
             for (const auto &cell : thread->roots.cells)
                 if (cell.scope && cell.tag != ResultTag::Empty)
                     mark(cell.object);
@@ -960,6 +963,46 @@ std::optional<Value> Attachment::handled_exception() const
 {
     require_attached();
     return handled_exception_;
+}
+void Attachment::load_trace_function(ReturnSlot &out)
+{
+    out.check_caller(*this);
+    require_safepoint();
+    auto *function = thread_record_->trace_function;
+    out.store_root_noexcept(function ? ResultTag::Ok : ResultTag::Empty, function);
+}
+void Attachment::set_trace_function(std::optional<Handle> function)
+{
+    require_safepoint();
+    thread_record_->trace_function = function ? function->get(*this).object() : nullptr;
+}
+bool Attachment::tracing_enabled() const noexcept
+{
+    return thread_record_->trace_function && !thread_record_->tracing;
+}
+bool Attachment::enter_tracing(Value frame, bool line_event)
+{
+    require_safepoint();
+    if (thread_record_->tracing)
+        return false;
+    thread_record_->tracing = true;
+    tracing_frame_ = frame;
+    tracing_line_event_ = line_event;
+    return true;
+}
+void Attachment::leave_tracing() noexcept
+{
+    tracing_frame_.reset();
+    tracing_line_event_ = false;
+    thread_record_->tracing = false;
+}
+bool Attachment::tracing_line_frame(Value frame) const noexcept
+{
+    return tracing_line_event_ && tracing_frame_ == frame;
+}
+bool Attachment::tracing_frame(Value frame) const noexcept
+{
+    return tracing_frame_ == frame;
 }
 
 std::uint64_t Attachment::keyed_hash(std::span<const std::byte> data) const
