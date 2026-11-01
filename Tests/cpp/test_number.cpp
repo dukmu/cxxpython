@@ -1,5 +1,6 @@
 #include "cxxpython/floatobject.hpp"
 #include "cxxpython/protocol.hpp"
+#include "internal/abstract.hpp"
 
 #include <atomic>
 #include <cmath>
@@ -72,32 +73,120 @@ TEST_F(CoreNumbers, NativeDoubleConversionNeedsNoManagedResultAllocation)
 
 TEST_F(CoreNumbers, AllocationFreeNativeConversionsAcknowledgeGcRequests)
 {
-    const auto value = integer("300").get(context);
-    std::atomic<bool> stop = false;
-    std::promise<void> entered;
-    auto ready = entered.get_future();
-    auto worker = std::async(std::launch::async, [&] {
-        Attachment thread(interpreter);
-        RootScope local(thread);
-        const auto input = local.root(value);
-        ReturnSlot out(thread);
-        double number = 0.0;
-        entered.set_value();
-        do {
-            EXPECT_TRUE(detail::float_as_double(thread, input, number, out));
-        } while (!stop.load(std::memory_order_acquire));
-        return number;
-    });
-    {
-        NativeWait wait(context);
-        ready.get();
+    for (const bool integral : {false, true}) {
+        const auto value = integer("300").get(context);
+        std::atomic<bool> stop = false;
+        std::promise<void> entered;
+        auto ready = entered.get_future();
+        auto worker = std::async(std::launch::async, [&] {
+            Attachment thread(interpreter);
+            RootScope local(thread);
+            const auto input = local.root(value);
+            ReturnSlot out(thread);
+            double number = 0.0;
+            std::int64_t index = 0;
+            entered.set_value();
+            do {
+                if (integral)
+                    EXPECT_TRUE(detail::index_as_int64(thread, input, index, out));
+                else
+                    EXPECT_TRUE(detail::float_as_double(thread, input, number, out));
+            } while (!stop.load(std::memory_order_acquire));
+            return integral ? static_cast<double>(index) : number;
+        });
+        {
+            NativeWait wait(context);
+            ready.get();
+        }
+        context.collect();
+        stop.store(true, std::memory_order_release);
+        {
+            NativeWait wait(context);
+            EXPECT_EQ(worker.get(), 300.0);
+        }
     }
-    context.collect();
-    stop.store(true, std::memory_order_release);
-    {
-        NativeWait wait(context);
-        EXPECT_EQ(worker.get(), 300.0);
+}
+
+TEST_F(CoreNumbers, NativeIndexConversionDoesNotAllocateOrNormalizeIntegerInputs)
+{
+    ReturnSlot out(context);
+    const auto small = integer("9007199254740993");
+    const auto minimum = integer("-9223372036854775808");
+    const auto maximum = integer("9223372036854775807");
+    const std::array bases{builtin(CoreObject::IntType)};
+    create_type(context, {U"IndexInt", bases}, out);
+    const auto cls = roots.root(out.value());
+    context.allocate_instance<IntObject>(cls, out, std::int64_t{300});
+    const auto subclass = roots.root(out.value());
+    const auto before = context.stats().objects;
+    context.set_allocation_limit(0);
+    std::int64_t number = 0;
+    for (const auto &[input, expected] :
+         {std::pair{small, std::int64_t{9007199254740993}},
+          std::pair{minimum, std::numeric_limits<std::int64_t>::min()},
+          std::pair{maximum, std::numeric_limits<std::int64_t>::max()},
+          std::pair{subclass, std::int64_t{300}},
+          std::pair{builtin(CoreObject::True), std::int64_t{1}}}) {
+        out.ok(input.get(context));
+        ASSERT_TRUE(detail::index_as_int64(context, out.value(), number, out));
+        EXPECT_EQ(number, expected);
+        EXPECT_EQ(out.tag(), ResultTag::Empty);
     }
+    EXPECT_EQ(context.stats().objects, before);
+    context.set_allocation_limit(std::numeric_limits<std::size_t>::max());
+    const auto too_large = integer("9223372036854775808");
+    const auto too_small = integer("-9223372036854775809");
+    EXPECT_TRUE(detail::index_as_int64(context, too_large, number, out, std::nullopt));
+    EXPECT_EQ(number, std::numeric_limits<std::int64_t>::max());
+    EXPECT_TRUE(detail::index_as_int64(context, too_small, number, out, std::nullopt));
+    EXPECT_EQ(number, std::numeric_limits<std::int64_t>::min());
+    EXPECT_FALSE(detail::index_as_int64(context, too_large, number, out, CoreObject::IndexErrorType,
+                                        std::nullopt));
+    EXPECT_EQ(context.type_of(out.exception()), context.builtin(CoreObject::IndexErrorType));
+    {
+        NoSafepoint guard(context);
+        EXPECT_THROW(detail::index_as_int64(context, small, number, out), std::logic_error);
+    }
+    Interpreter other;
+    Attachment foreign(other);
+    foreign.bootstrap_core();
+    ReturnSlot foreign_out(foreign);
+    foreign_out.ok(foreign.builtin(CoreObject::True));
+    EXPECT_THROW(detail::index_as_int64(context, small, number, foreign_out), std::logic_error);
+    EXPECT_EQ(foreign_out.value(), foreign.builtin(CoreObject::True));
+    out.ok(context.builtin(CoreObject::True));
+    EXPECT_THROW(detail::index_as_int64(context, foreign.builtin(CoreObject::False), number, out),
+                 std::logic_error);
+    EXPECT_EQ(out.value(), context.builtin(CoreObject::True));
+}
+
+TEST_F(CoreNumbers, ValueIndexConversionKeepsSoleOutputInputAcrossCollection)
+{
+    ReturnSlot out(context);
+    create_type(context, {U"Index"}, out);
+    const auto cls = roots.root(out.value());
+    const auto marker = integer("300");
+    SignatureLayout signature;
+    signature.parameters = {{U"self", ParameterKind::PositionalOnly}};
+    const std::array captures{cls.get(context), marker.get(context)};
+    make_native_function(
+        context, "collecting index", signature,
+        [](Attachment &c, Handle fn, std::span<const Value> args, ReturnSlot &result) {
+            c.collect();
+            const auto &captured = c.payload<NativeFunctionObject>(fn).captures;
+            EXPECT_EQ(c.type_of(args[0]), captured[0]);
+            result.ok(captured[1]);
+        },
+        captures, out);
+    const auto method = roots.root(out.value());
+    make_str(context, U"__index__", out);
+    set_attribute(context, cls, roots.root(out.value()), method, out);
+    ASSERT_EQ(out.tag(), ResultTag::Ok);
+    context.allocate_instance<InstanceObject>(cls, out);
+    std::int64_t number = 0;
+    ASSERT_TRUE(detail::index_as_int64(context, out.value(), number, out));
+    EXPECT_EQ(number, 300);
+    EXPECT_EQ(out.tag(), ResultTag::Empty);
 }
 
 TEST_F(CoreNumbers, ValueDoubleConversionKeepsSoleOutputInputAcrossCollection)

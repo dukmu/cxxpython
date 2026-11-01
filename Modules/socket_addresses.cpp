@@ -4,6 +4,7 @@
 #include "cxxpython/import.hpp"
 #include "cxxpython/memoryobject.hpp"
 #include "cxxpython/protocol.hpp"
+#include "internal/abstract.hpp"
 #include "internal/compiler.hpp"
 #include "internal/errors.hpp"
 #include "internal/long.hpp"
@@ -46,25 +47,10 @@ void gai_error(Attachment &c, Handle type, int code, ReturnSlot &out)
 {
     native_error(c, type, code, gai_strerror(code), out);
 }
-bool integer(Attachment &c, Value value, std::int64_t &n, ReturnSlot &out)
-{
-    RootScope roots(c);
-    ReturnSlot result(c);
-    index(c, roots.root(value), result);
-    if (failed(result)) {
-        out.raised(result.exception());
-        return false;
-    }
-    if (!int_fits_signed(c, result.value(), n)) {
-        raise_error(c, CoreObject::OverflowErrorType, U"integer out of range", out);
-        return false;
-    }
-    return true;
-}
 bool native_int(Attachment &c, Value value, int &n, ReturnSlot &out)
 {
     std::int64_t converted;
-    if (!integer(c, value, converted, out))
+    if (!index_as_int64(c, value, converted, out))
         return false;
     if (converted < INT_MIN || converted > INT_MAX) {
         raise_error(c, CoreObject::OverflowErrorType, U"Python int too large to convert to C int",
@@ -97,7 +83,7 @@ Handle capture(Attachment &c, Handle function, std::size_t i, RootScope &roots)
 bool bounded(Attachment &c, Value value, std::int64_t max, int &n, ReturnSlot &out)
 {
     std::int64_t x;
-    if (!integer(c, value, x, out))
+    if (!index_as_int64(c, value, x, out))
         return false;
     if (x < 0 || x > max) {
         raise_error(c, CoreObject::OverflowErrorType, U"integer out of range", out);
@@ -116,7 +102,7 @@ void byteorder(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
             return;
         }
     }
-    if (!integer(c, a[0], n, out))
+    if (!index_as_int64(c, a[0], n, out))
         return;
     if (n < 0 || n > (wide ? 0xffffffffLL : 0xffff)) {
         raise_error(c, CoreObject::OverflowErrorType, U"integer out of range", out);
@@ -201,7 +187,7 @@ bool socket_address(Attachment &c, int family, Value address, SocketAddress &res
     if (items.size() > 2 && !bounded(c, items[2], 0xfffff, flow, out))
         return false;
     if (items.size() > 3) {
-        if (!integer(c, items[3], scope, out))
+        if (!index_as_int64(c, items[3], scope, out))
             return false;
         if (scope < 0 || scope > 0xffffffffLL) {
             raise_error(c, CoreObject::OverflowErrorType, U"scopeid out of range", out);
@@ -397,7 +383,7 @@ void getaddrinfo_entry(Attachment &c, Handle function, std::span<const Value> a,
     if (!service_none) {
         if (c.has_layout<IntObject>(a[1])) {
             std::int64_t port;
-            if (!integer(c, a[1], port, out))
+            if (!index_as_int64(c, a[1], port, out))
                 return;
             service = std::to_string(port);
         } else if (!string_value(c, a[1], service, out))

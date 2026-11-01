@@ -3,6 +3,7 @@
 #include "cxxpython/import.hpp"
 #include "cxxpython/moduleobject.hpp"
 #include "cxxpython/protocol.hpp"
+#include "internal/abstract.hpp"
 #include "internal/errors.hpp"
 #include "internal/iomodule.hpp"
 #include "internal/sysmodule.hpp"
@@ -157,13 +158,12 @@ bool read_terminal_input(Attachment &ctx, Handle input, Handle output, std::opti
             return false;
         if (!io_call(ctx, stream, U"fileno", {}, descriptor))
             return false;
-        index(ctx, roots.root(descriptor.value()), converted);
-        if (failed(converted)) {
+        std::int64_t fd;
+        if (!index_as_int64(ctx, descriptor.value(), fd, converted, std::nullopt)) {
             out.raised(converted.exception());
             return true;
         }
-        std::int64_t fd;
-        if (!int_fits_signed(ctx, converted.value(), fd) || fd != expected)
+        if (fd != expected)
             return false;
     }
     {

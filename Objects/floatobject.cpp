@@ -1,6 +1,5 @@
 #include "cxxpython/floatobject.hpp"
 #include "cxxpython/complexobject.hpp"
-#include "cxxpython/import.hpp"
 #include "cxxpython/memoryobject.hpp"
 #include "cxxpython/protocol.hpp"
 #include "internal/errors.hpp"
@@ -143,39 +142,6 @@ bool integer_to_double(Attachment &context, Value value, double &number, ReturnS
     if (std::isinf(number)) {
         raise_error(context, CoreObject::OverflowErrorType, U"int too large to convert to float",
                     out);
-        return false;
-    }
-    return true;
-}
-
-bool conversion_warning(Attachment &context, const std::u32string &message, ReturnSlot &out)
-{
-    RootScope roots(context);
-    ReturnSlot module(context), warn(context), text(context), warning(context);
-    import_module(context, U"warnings", module);
-    if (module.tag() == ResultTag::Raised) {
-        out.raised(module.exception());
-        return false;
-    }
-    make_str(context, U"warn", text);
-    if (text.tag() == ResultTag::Raised) {
-        out.raised(text.exception());
-        return false;
-    }
-    get_attribute(context, roots.root(module.value()), roots.root(text.value()), warn);
-    if (warn.tag() == ResultTag::Raised) {
-        out.raised(warn.exception());
-        return false;
-    }
-    make_str(context, message, text);
-    if (text.tag() == ResultTag::Raised) {
-        out.raised(text.exception());
-        return false;
-    }
-    const std::array args{text.value(), context.builtin(CoreObject::DeprecationWarningType)};
-    call(context, roots.root(warn.value()), {args, {}}, warning);
-    if (warning.tag() == ResultTag::Raised) {
-        out.raised(warning.exception());
         return false;
     }
     return true;

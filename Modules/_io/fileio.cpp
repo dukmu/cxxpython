@@ -1,5 +1,6 @@
 // FileIO contracts follow CPython 3.12.14 Modules/_io/fileio.c (PSF license).
 #include "internal/fileio.hpp"
+#include "internal/abstract.hpp"
 #include "internal/errors.hpp"
 #include "internal/iomodule.hpp"
 
@@ -163,7 +164,7 @@ void initialize(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out
     opened.owned = closefd;
     if (type_attribute(c, c.type_of(a[1]), U"__index__")) {
         std::int64_t fd;
-        if (!io_index(c, roots.root(a[1]), fd, out))
+        if (!index_as_int64(c, a[1], fd, out))
             return;
         if (fd < 0) {
             raise_error(c, CoreObject::ValueErrorType, U"negative file descriptor", out);
@@ -324,10 +325,10 @@ template <bool Truncate> void seek(Attachment &c, Handle, std::span<const Value>
     auto self = roots.root(a[0]);
     std::int64_t offset = 0, whence = 0;
     const bool current = Truncate && a[1] == c.builtin(CoreObject::None);
-    if (!current && !io_index(c, roots.root(a[1]), offset, out))
+    if (!current && !index_as_int64(c, a[1], offset, out))
         return;
     if constexpr (!Truncate)
-        if (!io_index(c, roots.root(a[2]), whence, out))
+        if (!index_as_int64(c, a[2], whence, out))
             return;
     if (whence < INT_MIN || whence > INT_MAX) {
         raise_error(c, CoreObject::OverflowErrorType, U"whence out of range", out);
@@ -372,7 +373,7 @@ template <bool All> void read(Attachment &c, Handle, std::span<const Value> a, R
     auto self = roots.root(a[0]);
     std::int64_t size = -1;
     if constexpr (!All)
-        if (a[1] != c.builtin(CoreObject::None) && !io_index(c, roots.root(a[1]), size, out))
+        if (a[1] != c.builtin(CoreObject::None) && !index_as_int64(c, a[1], size, out))
             return;
     std::string data;
     int error = 0;

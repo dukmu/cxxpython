@@ -7,6 +7,7 @@
 #include "cxxpython/moduleobject.hpp"
 #include "cxxpython/protocol.hpp"
 #include "cxxpython/type.hpp"
+#include "internal/abstract.hpp"
 
 #include <algorithm>
 #include <array>
@@ -103,11 +104,6 @@ Handle raw(Attachment &c, Handle self, AtomicGcEdge &edge, RootScope &roots)
     c.load(self.get(c), edge, value);
     return roots.root(value.value());
 }
-bool integer(Attachment &c, Value value, std::int64_t &number, ReturnSlot &out)
-{
-    RootScope roots(c);
-    return detail::io_index(c, roots.root(value), number, out);
-}
 bool raw_seek(Attachment &c, Handle object, std::int64_t offset, int whence, ReturnSlot &out)
 {
     RootScope roots(c);
@@ -153,7 +149,7 @@ std::int64_t raw_write(Attachment &c, Handle stream, std::string_view data, Retu
     if (result.value() == c.builtin(CoreObject::None))
         return -2;
     std::int64_t count;
-    if (!integer(c, result.value(), count, out))
+    if (!detail::index_as_int64(c, result.value(), count, out))
         return -1;
     if (count <= 0 || static_cast<std::uint64_t>(count) > data.size()) {
         raise_error(c, CoreObject::OSErrorType, U"raw write() returned invalid length", out);
@@ -211,7 +207,7 @@ std::int64_t fill(Attachment &c, Handle self, BufferedIOObject &s, ReturnSlot &o
     if (result.value() == c.builtin(CoreObject::None))
         return -2;
     std::int64_t count;
-    if (!integer(c, result.value(), count, out))
+    if (!detail::index_as_int64(c, result.value(), count, out))
         return -1;
     if (count < 0 || static_cast<std::uint64_t>(count) > s.capacity) {
         raise_error(c, CoreObject::OSErrorType, U"raw readinto() returned invalid length", out);
@@ -243,7 +239,7 @@ void initialize(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out
         return;
     std::int64_t size;
     constexpr bool pair = kind == Kind::Pair;
-    if (!integer(c, a[pair ? 3 : 2], size, out))
+    if (!detail::index_as_int64(c, a[pair ? 3 : 2], size, out))
         return;
     if (size <= 0) {
         raise_error(c, CoreObject::ValueErrorType, U"buffer size must be strictly positive", out);
@@ -316,7 +312,7 @@ template <ReadMode mode> void read(Attachment &c, Handle, std::span<const Value>
     RootScope roots(c);
     auto self = roots.root(a[0]);
     std::int64_t size = -1;
-    if (a[1] != c.builtin(CoreObject::None) && !integer(c, a[1], size, out))
+    if (a[1] != c.builtin(CoreObject::None) && !detail::index_as_int64(c, a[1], size, out))
         return;
     if constexpr (mode == ReadMode::Peek)
         size = -1;
@@ -505,7 +501,7 @@ void tell(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
         return;
     }
     std::int64_t pos;
-    if (!integer(c, result.value(), pos, out))
+    if (!detail::index_as_int64(c, result.value(), pos, out))
         return;
     make_int(c,
              pos - static_cast<std::int64_t>(s.input.size() - s.position) +
@@ -519,7 +515,8 @@ void seek(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
     RootScope roots(c);
     auto self = roots.root(a[0]);
     std::int64_t offset, whence;
-    if (!integer(c, a[1], offset, out) || !integer(c, a[2], whence, out))
+    if (!detail::index_as_int64(c, a[1], offset, out) ||
+        !detail::index_as_int64(c, a[2], whence, out))
         return;
     if (whence < 0 || whence > 2) {
         raise_error(c, CoreObject::ValueErrorType, U"invalid whence", out);

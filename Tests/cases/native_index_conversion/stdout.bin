@@ -1,0 +1,25 @@
+DeprecationWarning __index__ returned non-int (type IntSubclass).  The ability to return an instance of a strict subclass of int is deprecated, and may be removed in a future version of Python.
+DeprecationWarning __index__ returned non-int (type bool).  The ability to return an instance of a strict subclass of int is deprecated, and may be removed in a future version of Python.
+ValueError index callback failed
+TypeError __index__ returned non-int (type str)
+TypeError __index__ returned non-int (type float)
+IndexError cannot fit 'Index' into an index-sized integer
+IndexError cannot fit 'Index' into an index-sized integer
+IndexError cannot fit 'Index' into an index-sized integer
+OverflowError cannot fit 'Index' into an index-sized integer
+IndexError cannot fit 'Index' into an index-sized integer
+IndexError cannot fit 'Index' into an index-sized integer
+IndexError cannot fit 'Index' into an index-sized integer
+OverflowError cannot fit 'Index' into an index-sized integer
+ValueError slice step cannot be zero
+OverflowError Python int too large to convert to C ssize_t
+OverflowError Python int too large to convert to C ssize_t
+OverflowError Python int too large to convert to C ssize_t
+ValueError index callback failed
+ValueError index callback failed
+OverflowError Python int too large to convert to C ssize_t
+ValueError index callback failed
+IndexError cannot fit 'Index' into an index-sized integer
+collecting index warning DeprecationWarning
+DeprecationWarning __index__ returned non-int (type IntSubclass).  The ability to return an instance of a strict subclass of int is deprecated, and may be removed in a future version of Python.
+native index conversion ok

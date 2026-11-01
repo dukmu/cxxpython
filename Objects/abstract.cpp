@@ -345,37 +345,103 @@ ResolvedSlot detail::resolve_protocol(Attachment &context, Value value, Protocol
         std::this_thread::yield();
     }
 }
-void detail::index_owned(Attachment &context, Handle self, ReturnSlot &out)
+namespace {
+// _PyNumber_Index semantics: retain integer subclasses for native consumers.
+void index_integer(Attachment &context, Handle self, ReturnSlot &out)
 {
     RootScope roots(context);
+    const auto value = self.get(context);
     out.reset(context);
-    if (is_int(context, self.get(context))) {
-        copy_int(context, self.get(context), out);
+    context.poll();
+    if (is_int(context, value)) {
+        out.ok(value);
         return;
     }
     auto slot = resolve(context, self, Protocol::Index, roots);
     if (slot.state == SlotState::Missing || slot.state == SlotState::Disabled) {
-        const auto text = detail::diagnostic_type_name(context, roots.root(context.type_of(self)));
+        const auto text =
+            detail::diagnostic_type_name(context, roots.root(context.type_of(self))).substr(0, 200);
         type_error(context, U"'" + text + U"' object cannot be interpreted as an integer", out);
         return;
     }
-    ReturnSlot result(context);
-    detail::invoke_protocol(context, self, slot, {}, result, roots);
-    if (raised(result)) {
-        out.raised(result.exception());
+    detail::invoke_protocol(context, self, slot, {}, out, roots);
+    if (raised(out))
         return;
-    }
-    if (!is_int(context, result.value())) {
+    if (!is_int(context, out.value())) {
         type_error(
             context,
             U"__index__ returned non-int (type " +
-                detail::diagnostic_type_name(context, roots.root(context.type_of(result.value()))) +
+                detail::diagnostic_type_name(context, roots.root(context.type_of(out.value())))
+                    .substr(0, 200) +
                 U")",
             out);
         return;
     }
-    copy_int(context, result.value(), out);
+    if (context.type_of(out.value()) != context.builtin(CoreObject::IntType)) {
+        const auto returned = roots.root(out.value());
+        const auto name =
+            detail::diagnostic_type_name(context, roots.root(context.type_of(returned)))
+                .substr(0, 200);
+        detail::conversion_warning(
+            context,
+            U"__index__ returned non-int (type " + name +
+                U").  The ability to return an instance of a strict subclass of int "
+                U"is deprecated, and may be removed in a future version of Python.",
+            out);
+    }
 }
+} // namespace
+void detail::index_owned(Attachment &context, Handle self, ReturnSlot &out)
+{
+    index_integer(context, self, out);
+    if (!raised(out) && context.type_of(out.value()) != context.builtin(CoreObject::IntType))
+        copy_int(context, out.value(), out);
+}
+
+bool detail::index_as_int64(Attachment &context, Handle input, std::int64_t &number,
+                            ReturnSlot &out, std::optional<CoreObject> overflow,
+                            std::optional<std::u32string_view> message)
+{
+    return index_as_int64(context, input.get(context), number, out, overflow, message);
+}
+
+bool detail::index_as_int64(Attachment &context, Value input, std::int64_t &number, ReturnSlot &out,
+                            std::optional<CoreObject> overflow,
+                            std::optional<std::u32string_view> message)
+{
+    out.check_caller(context);
+    RootScope roots(context);
+    const auto self = roots.root(input);
+    out.reset(context);
+    context.poll();
+    const auto convert = [&](Value integer) {
+        if (int_fits_signed(context, integer, number))
+            return true;
+        if (!overflow) {
+            number = int_sign(context, integer) < 0 ? std::numeric_limits<std::int64_t>::min()
+                                                    : std::numeric_limits<std::int64_t>::max();
+            return true;
+        }
+        const auto text = message
+                              ? std::u32string(*message)
+                              : U"cannot fit '" +
+                                    diagnostic_type_name(context, roots.root(context.type_of(self)))
+                                        .substr(0, 200) +
+                                    U"' into an index-sized integer";
+        raise_error(context, *overflow, text, out);
+        return false;
+    };
+    if (is_int(context, input))
+        return convert(input);
+    ReturnSlot result(context);
+    index_integer(context, self, result);
+    if (raised(result)) {
+        out.raised(result.exception());
+        return false;
+    }
+    return convert(result.value());
+}
+
 ResultView index(Attachment &context, Handle value, ReturnSlot &out)
 {
     return guarded(context, out, [&] {

@@ -32,26 +32,6 @@ bool receiver(Attachment &context, Value value, ReturnSlot &out)
     raise_error(context, CoreObject::TypeErrorType, U"list descriptor requires a list", out);
     return false;
 }
-bool integer(Attachment &context, Handle value, std::int64_t &number, CoreObject overflow,
-             ReturnSlot &out, bool clip = false)
-{
-    ReturnSlot converted(context);
-    detail::index_owned(context, value, converted);
-    if (failed(converted)) {
-        out.raised(converted.exception());
-        return false;
-    }
-    if (int_fits_signed(context, converted.value(), number))
-        return true;
-    if (clip) {
-        number = int_sign(context, converted.value()) < 0
-                     ? std::numeric_limits<std::int64_t>::min()
-                     : std::numeric_limits<std::int64_t>::max();
-        return true;
-    }
-    raise_error(context, overflow, U"list index or count is too large", out);
-    return false;
-}
 void reserve_extra(Attachment &context, Handle self, std::size_t extra)
 {
     auto &data = *context.payload<ListObject>(self).contents;
@@ -212,7 +192,7 @@ void insert(Attachment &context, Handle, std::span<const Value> args, ReturnSlot
         return;
     RootScope roots(context);
     std::int64_t at;
-    if (!integer(context, roots.root(args[1]), at, CoreObject::OverflowErrorType, out))
+    if (!detail::index_as_int64(context, args[1], at, out))
         return;
     insert_values(context, roots.root(args[0]), args.subspan(2), at);
     out.ok(context.builtin(CoreObject::None));
@@ -417,10 +397,14 @@ void item(Attachment &context, Handle, std::span<const Value> args, ReturnSlot &
         }
     }
     std::int64_t at;
-    if (!integer(context, roots.root(args[1]), at,
-                 Operation == ItemOperation::Pop ? CoreObject::OverflowErrorType
-                                                 : CoreObject::IndexErrorType,
-                 out))
+    if (!detail::index_as_int64(
+            context, args[1], at, out,
+            Operation == ItemOperation::Pop ? CoreObject::OverflowErrorType
+                                            : CoreObject::IndexErrorType,
+            Operation == ItemOperation::Pop
+                ? std::optional<
+                      std::u32string_view>{U"Python int too large to convert to C ssize_t"}
+                : std::nullopt))
         return;
     auto &data = *context.payload<ListObject>(self).contents;
     const bool found = locked(context, data, [&] {
@@ -613,11 +597,11 @@ void search(Attachment &context, Handle, std::span<const Value> args, ReturnSlot
                         U"index expected at most three arguments", out);
             return;
         }
-        if (!bounds.empty() && !integer(context, roots.root(bounds[0]), start,
-                                        CoreObject::OverflowErrorType, out, true))
+        if (!bounds.empty() &&
+            !detail::index_as_int64(context, bounds[0], start, out, std::nullopt))
             return;
-        if (bounds.size() == 2 && !integer(context, roots.root(bounds[1]), stop,
-                                           CoreObject::OverflowErrorType, out, true))
+        if (bounds.size() == 2 &&
+            !detail::index_as_int64(context, bounds[1], stop, out, std::nullopt))
             return;
         const auto size = static_cast<std::int64_t>(detail::list_size(context, self));
         if (start < 0)
@@ -709,7 +693,8 @@ void repeat(Attachment &context, Handle, std::span<const Value> args, ReturnSlot
     RootScope roots(context);
     const auto self = roots.root(args[0]);
     std::int64_t count;
-    if (!integer(context, roots.root(args[1]), count, CoreObject::OverflowErrorType, out))
+    if (!detail::index_as_int64(context, args[1], count, out, CoreObject::OverflowErrorType,
+                                std::nullopt))
         return;
     const auto repeats = static_cast<std::size_t>(std::max<std::int64_t>(0, count));
     std::vector<Value> prepared;

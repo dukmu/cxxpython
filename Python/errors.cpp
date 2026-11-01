@@ -2,6 +2,7 @@
 // PSF license: doc/licenses/python-3.12.14.txt.
 #include "internal/errors.hpp"
 
+#include "cxxpython/import.hpp"
 #include "cxxpython/objects.hpp"
 #include "cxxpython/protocol.hpp"
 #include "internal/compiler.hpp"
@@ -16,6 +17,39 @@
 #include <vector>
 
 namespace cxxpython::core::detail {
+bool conversion_warning(Attachment &context, const std::u32string &message, ReturnSlot &out)
+{
+    RootScope roots(context);
+    ReturnSlot module(context), warn(context), text(context), warning(context);
+    import_module(context, U"warnings", module);
+    if (module.tag() == ResultTag::Raised) {
+        out.raised(module.exception());
+        return false;
+    }
+    make_str(context, U"warn", text);
+    if (text.tag() == ResultTag::Raised) {
+        out.raised(text.exception());
+        return false;
+    }
+    get_attribute(context, roots.root(module.value()), roots.root(text.value()), warn);
+    if (warn.tag() == ResultTag::Raised) {
+        out.raised(warn.exception());
+        return false;
+    }
+    make_str(context, message, text);
+    if (text.tag() == ResultTag::Raised) {
+        out.raised(text.exception());
+        return false;
+    }
+    const std::array args{text.value(), context.builtin(CoreObject::DeprecationWarningType)};
+    call(context, roots.root(warn.value()), {args, {}}, warning);
+    if (warning.tag() == ResultTag::Raised) {
+        out.raised(warning.exception());
+        return false;
+    }
+    return true;
+}
+
 void raise_os_error(Attachment &c, int error, ReturnSlot &out, std::optional<Value> filename,
                     std::optional<Value> filename2)
 {

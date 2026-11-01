@@ -4,6 +4,7 @@
 #include "cxxpython/moduleobject.hpp"
 #include "cxxpython/protocol.hpp"
 #include "cxxpython/type.hpp"
+#include "internal/abstract.hpp"
 
 #include <algorithm>
 #include <deque>
@@ -84,22 +85,6 @@ bool check(Attachment &c, Value self, ReturnSlot &out)
         return true;
     raise_error(c, CoreObject::TypeErrorType, U"expected a deque", out);
     return false;
-}
-
-bool as_index(Attachment &c, Handle value, std::int64_t &number, ReturnSlot &out)
-{
-    ReturnSlot result(c);
-    index(c, value, result);
-    if (result.tag() == ResultTag::Raised) {
-        out.raised(result.exception());
-        return false;
-    }
-    if (!int_fits_signed(c, result.value(), number)) {
-        raise_error(c, CoreObject::OverflowErrorType,
-                    U"Python int too large to convert to C ssize_t", out);
-        return false;
-    }
-    return true;
 }
 
 void create(Attachment &c, Handle function, std::span<const Value> args, ReturnSlot &out)
@@ -293,7 +278,7 @@ void initialize(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &
     auto input = roots.root(args[1]);
     std::int64_t limit = -1;
     if (args[2] != c.builtin(CoreObject::None)) {
-        if (!as_index(c, roots.root(args[2]), limit, out))
+        if (!index_as_int64(c, args[2], limit, out))
             return;
         if (limit < 0) {
             raise_error(c, CoreObject::ValueErrorType, U"maxlen must be non-negative", out);
@@ -326,7 +311,13 @@ template <ItemOp Op> void item(Attachment &c, Handle, std::span<const Value> arg
     RootScope roots(c);
     auto self = roots.root(args[0]);
     std::int64_t n;
-    if (!as_index(c, roots.root(args[1]), n, out))
+    if (!index_as_int64(
+            c, args[1], n, out,
+            Op == ItemOp::Insert ? CoreObject::OverflowErrorType : CoreObject::IndexErrorType,
+            Op == ItemOp::Insert
+                ? std::optional<
+                      std::u32string_view>{U"Python int too large to convert to C ssize_t"}
+                : std::nullopt))
         return;
     if constexpr (Op == ItemOp::Set || Op == ItemOp::Insert)
         roots.root(args[2]);
@@ -376,9 +367,8 @@ void rotate(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     if (!check(c, args[0], out))
         return;
-    RootScope roots(c);
     std::int64_t n;
-    if (!as_index(c, roots.root(args[1]), n, out))
+    if (!index_as_int64(c, args[1], n, out))
         return;
     auto &s = *c.payload<DequeObject>(args[0]).contents;
     locked(c, s, [&] {
@@ -486,8 +476,7 @@ void search(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
     auto needle = roots.root(args[1]);
     std::int64_t start = 0, stop = std::numeric_limits<std::int64_t>::max();
     if constexpr (Mode == Search::Index) {
-        if (!as_index(c, roots.root(args[2]), start, out) ||
-            !as_index(c, roots.root(args[3]), stop, out))
+        if (!index_as_int64(c, args[2], start, out) || !index_as_int64(c, args[3], stop, out))
             return;
     }
     auto &s = *c.payload<DequeObject>(self).contents;
@@ -752,7 +741,7 @@ void tuplegetter_new(Attachment &c, Handle function, std::span<const Value> args
         return;
     }
     std::int64_t offset;
-    if (!as_index(c, roots.root(args[1]), offset, out))
+    if (!index_as_int64(c, args[1], offset, out))
         return;
     roots.root(args[2]);
     c.allocate_instance<TupleGetter>(roots.root(type), out, offset, args[2]);
@@ -957,19 +946,16 @@ void defaultdict_init(Attachment &c, Handle function, std::span<const Value> arg
         }
     }
     roots.root(factory);
-    ReturnSlot rest(c);
     auto remaining = std::span<const Value>(values).subspan(values.empty() ? 0 : 1);
-    make_tuple(c, remaining, rest);
-    if (rest.tag() == ResultTag::Raised) {
-        out.raised(rest.exception());
-        return;
-    }
-    auto input = roots.root(rest.value());
     c.store(self.get(c), c.instance_slot(self.get(c), 0), factory);
     auto dict_init = roots.root(c.payload<NativeFunctionObject>(function).captures[1]);
-    const Value bound[] = {self.get(c), input.get(c), keywords.get(c)};
-    auto entry = c.payload<NativeFunctionObject>(dict_init).entry;
-    entry(c, dict_init, std::span<const Value>(bound, 3), out);
+    std::vector<Value> arguments{self.get(c)};
+    arguments.insert(arguments.end(), remaining.begin(), remaining.end());
+    DictView view(c, keywords.get(c));
+    std::vector<KeywordArg> named;
+    for (const auto &entry : view.entries())
+        named.push_back({entry.key, entry.value});
+    call(c, dict_init, {arguments, named}, out);
 }
 
 void defaultdict_missing(Attachment &c, Handle function, std::span<const Value> args,

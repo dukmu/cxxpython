@@ -4,6 +4,7 @@
 #include "cxxpython/import.hpp"
 #include "cxxpython/moduleobject.hpp"
 #include "cxxpython/protocol.hpp"
+#include "internal/abstract.hpp"
 #include "internal/iomodule.hpp"
 
 #include <algorithm>
@@ -120,7 +121,7 @@ void io_open(Attachment &c, Handle function, std::span<const Value> args, Return
         return;
     }
     std::int64_t buffering;
-    if (!io_index(c, roots.root(args[2]), buffering, out))
+    if (!index_as_int64(c, args[2], buffering, out))
         return;
     type.ok(types[0]);
     std::u32string rawmode(1, access);
@@ -157,7 +158,7 @@ void io_open(Attachment &c, Handle function, std::span<const Value> args, Return
             cleanup(c, stream, out);
             return;
         }
-        if (!io_index(c, roots.root(value.value()), buffering, out)) {
+        if (!index_as_int64(c, value.value(), buffering, out)) {
             cleanup(c, stream, out);
             return;
         }

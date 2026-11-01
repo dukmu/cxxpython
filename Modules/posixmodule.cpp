@@ -6,6 +6,7 @@
 #include "cxxpython/floatobject.hpp"
 #include "cxxpython/import.hpp"
 #include "cxxpython/protocol.hpp"
+#include "internal/abstract.hpp"
 #include "internal/compiler.hpp"
 #include "internal/errors.hpp"
 #include "internal/long.hpp"
@@ -36,25 +37,10 @@ bool failed(ReturnSlot &out)
     return out.tag() == ResultTag::Raised;
 }
 
-bool integer(Attachment &c, Value value, std::int64_t &number, ReturnSlot &out)
-{
-    RootScope roots(c);
-    ReturnSlot indexed(c);
-    index(c, roots.root(value), indexed);
-    if (failed(indexed)) {
-        out.raised(indexed.exception());
-        return false;
-    }
-    if (!int_fits_signed(c, indexed.value(), number)) {
-        raise_error(c, CoreObject::OverflowErrorType, U"integer out of range", out);
-        return false;
-    }
-    return true;
-}
 bool descriptor(Attachment &c, Value value, int &fd, ReturnSlot &out)
 {
     std::int64_t n;
-    if (!integer(c, value, n, out))
+    if (!index_as_int64(c, value, n, out))
         return false;
     if (n < INT_MIN || n > INT_MAX) {
         raise_error(c, CoreObject::OverflowErrorType, U"file descriptor out of range", out);
@@ -105,7 +91,7 @@ void inheritable_entry(Attachment &c, Handle, std::span<const Value> args, Retur
 void urandom_entry(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
 {
     std::int64_t size;
-    if (!integer(c, args[0], size, out))
+    if (!index_as_int64(c, args[0], size, out))
         return;
     if (size < 0) {
         raise_error(c, CoreObject::ValueErrorType, U"negative argument not allowed", out);
@@ -337,10 +323,10 @@ template <Op op> void entry(Attachment &c, Handle, std::span<const Value> a, Ret
         if (!descriptor(c, a[0], fd, out))
             return;
     if constexpr (op == Op::Open || op == Op::Mkdir || op == Op::Read || op == Op::Seek)
-        if (!integer(c, a[1], n, out))
+        if (!index_as_int64(c, a[1], n, out))
             return;
     if constexpr (op == Op::Open || op == Op::Seek)
-        if (!integer(c, a[2], extra, out))
+        if (!index_as_int64(c, a[2], extra, out))
             return;
     if constexpr (op == Op::Open || op == Op::Mkdir || op == Op::Seek) {
         if (n < INT_MIN || n > INT_MAX || extra < INT_MIN || extra > INT_MAX) {
@@ -720,7 +706,7 @@ void access_entry(Attachment &c, Handle, std::span<const Value> args, ReturnSlot
     std::string target;
     int directory = AT_FDCWD;
     std::int64_t numeric_mode;
-    if (!path(c, args[0], target, out) || !integer(c, args[1], numeric_mode, out))
+    if (!path(c, args[0], target, out) || !index_as_int64(c, args[1], numeric_mode, out))
         return;
     if (numeric_mode < INT_MIN || numeric_mode > INT_MAX) {
         raise_error(c, CoreObject::OverflowErrorType, U"Python int too large to convert to C long",

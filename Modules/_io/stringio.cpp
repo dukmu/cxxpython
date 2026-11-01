@@ -1,6 +1,7 @@
 #include "internal/memoryio.hpp"
 
 #include "cxxpython/type.hpp"
+#include "internal/abstract.hpp"
 
 #include <algorithm>
 #include <limits>
@@ -129,7 +130,7 @@ void read(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
     std::int64_t size = -1;
     if constexpr (kind != ReadKind::Value) {
         if (args[1] != c.builtin(CoreObject::None) &&
-            !detail::io_index(c, roots.root(args[1]), size, out))
+            !detail::index_as_int64(c, args[1], size, out))
             return;
     }
     auto &s = c.payload<StringIOObject>(self);
@@ -270,8 +271,8 @@ void seek(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &out)
     RootScope roots(c);
     auto self = roots.root(args[0]);
     std::int64_t offset, whence;
-    if (!detail::io_index(c, roots.root(args[1]), offset, out) ||
-        !detail::io_index(c, roots.root(args[2]), whence, out))
+    if (!detail::index_as_int64(c, args[1], offset, out) ||
+        !detail::index_as_int64(c, args[2], whence, out))
         return;
     auto &s = c.payload<StringIOObject>(self);
     std::int64_t position = 0;
@@ -322,7 +323,7 @@ void truncate(Attachment &c, Handle, std::span<const Value> args, ReturnSlot &ou
     auto self = roots.root(args[0]);
     std::int64_t size = -1;
     bool current = args[1] == c.builtin(CoreObject::None);
-    if (!current && !detail::io_index(c, roots.root(args[1]), size, out))
+    if (!current && !detail::index_as_int64(c, args[1], size, out))
         return;
     auto &s = c.payload<StringIOObject>(self);
     int status = locked(c, s, [&] {

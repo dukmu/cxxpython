@@ -15,6 +15,7 @@ using UnraisableHookArgs = TupleObject;
 void raise_os_error(Attachment &, int, ReturnSlot &, std::optional<Value> filename = {},
                     std::optional<Value> filename2 = {});
 std::u32string diagnostic_type_name(Attachment &, Handle type);
+bool conversion_warning(Attachment &, const std::u32string &message, ReturnSlot &);
 
 void write_unraisable(Attachment &ctx, Handle exception, std::optional<Handle> object,
                       std::optional<Handle> err_msg = {});

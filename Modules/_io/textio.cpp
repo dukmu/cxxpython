@@ -5,6 +5,7 @@
 #include "cxxpython/moduleobject.hpp"
 #include "cxxpython/protocol.hpp"
 #include "cxxpython/type.hpp"
+#include "internal/abstract.hpp"
 
 #include <array>
 #include <condition_variable>
@@ -313,7 +314,7 @@ void setstate(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
         }
     }
     std::int64_t pending;
-    if (!detail::io_index(c, bit_root, pending, out))
+    if (!detail::index_as_int64(c, bit_root, pending, out))
         return;
     s.pending_cr = pending != 0;
     out.ok(c.builtin(CoreObject::None));
@@ -823,7 +824,7 @@ bool fill(Attachment &c, Handle self, Stream &s, ReturnSlot &out)
             out.raised(pos.exception());
             return false;
         }
-        if (!detail::io_index(c, r.root(pos.value()), s.snapshot_pos, out))
+        if (!detail::index_as_int64(c, pos.value(), s.snapshot_pos, out))
             return false;
         if (!method(c, decoder, U"getstate", {}, state)) {
             out.raised(state.exception());
@@ -871,7 +872,7 @@ template <bool line> void read(Attachment &c, Handle, std::span<const Value> a, 
     RootScope r(c);
     auto self = r.root(a[0]);
     std::int64_t limit = -1;
-    if (a[1] != c.builtin(CoreObject::None) && !detail::io_index(c, r.root(a[1]), limit, out))
+    if (a[1] != c.builtin(CoreObject::None) && !detail::index_as_int64(c, a[1], limit, out))
         return;
     auto &s = c.payload<Stream>(self);
     Claim claim(c, s, out);
@@ -1194,7 +1195,7 @@ void tell(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
             out.raised(position.exception());
             return;
         }
-        if (!detail::io_index(c, r.root(position.value()), pos, out))
+        if (!detail::index_as_int64(c, position.value(), pos, out))
             return;
     }
     if (!c.has_layout<TupleObject>(state.get(c)) ||
@@ -1240,7 +1241,7 @@ bool cookie_field(Attachment &c, RootScope &r, Handle cookie, int shift, int bit
         !calc(c, r, mask, integer(c, r, 1), BinaryOp::Subtract, mask, out) ||
         !calc(c, r, shifted, mask, BinaryOp::BitAnd, shifted, out))
         return false;
-    return detail::io_index(c, shifted, value, out);
+    return detail::index_as_int64(c, shifted, value, out);
 }
 void seek(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
 {
@@ -1250,11 +1251,11 @@ void seek(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
     auto self = r.root(a[0]);
     auto cookie = r.root(a[1]);
     std::int64_t whence;
-    if (!detail::io_index(c, r.root(a[2]), whence, out))
+    if (!detail::index_as_int64(c, a[2], whence, out))
         return;
     if (whence == 1) {
         std::int64_t offset;
-        if (!detail::io_index(c, cookie, offset, out))
+        if (!detail::index_as_int64(c, cookie, offset, out))
             return;
         if (offset != 0) {
             detail::io_unsupported(c, U"can't do nonzero cur-relative seeks", out);

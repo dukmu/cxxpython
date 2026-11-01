@@ -1,4 +1,5 @@
 #include "cxxpython/protocol.hpp"
+#include "internal/abstract.hpp"
 #include "internal/long.hpp"
 
 #include <algorithm>
@@ -130,17 +131,8 @@ void slice_hash(Attachment &context, Handle, std::span<const Value> args, Return
 }
 bool clipped_index(Attachment &context, Value value, std::int64_t &result, ReturnSlot &out)
 {
-    RootScope roots(context);
-    ReturnSlot converted(context);
-    index(context, roots.root(value), converted);
-    if (converted.tag() == ResultTag::Raised) {
-        out.raised(converted.exception());
+    if (!detail::index_as_int64(context, value, result, out, std::nullopt))
         return false;
-    }
-    if (!int_fits_signed(context, converted.value(), result))
-        result = int_sign(context, converted.value()) < 0
-                     ? std::numeric_limits<std::intptr_t>::min()
-                     : std::numeric_limits<std::intptr_t>::max();
     result = std::clamp<std::int64_t>(result, std::numeric_limits<std::intptr_t>::min(),
                                       std::numeric_limits<std::intptr_t>::max());
     return true;

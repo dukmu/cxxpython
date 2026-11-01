@@ -3,24 +3,11 @@
 
 #include "cxxpython/bytearrayobject.hpp"
 #include "cxxpython/protocol.hpp"
+#include "internal/abstract.hpp"
 
 #include <algorithm>
 
 namespace cxxpython::core::detail {
-bool io_index(Attachment &c, Handle value, std::int64_t &number, ReturnSlot &out)
-{
-    ReturnSlot result(c);
-    index(c, value, result);
-    if (result.tag() == ResultTag::Raised) {
-        out.raised(result.exception());
-        return false;
-    }
-    if (!int_fits_signed(c, result.value(), number)) {
-        raise_error(c, CoreObject::OverflowErrorType, U"integer out of range", out);
-        return false;
-    }
-    return true;
-}
 bool io_call(Attachment &c, Handle self, std::u32string_view name, std::span<const Value> args,
              ReturnSlot &out)
 {
@@ -222,7 +209,7 @@ void readlines(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
         return;
     RootScope roots(c);
     std::int64_t hint = -1;
-    if (a[1] != c.builtin(CoreObject::None) && !io_index(c, roots.root(a[1]), hint, out))
+    if (a[1] != c.builtin(CoreObject::None) && !index_as_int64(c, a[1], hint, out))
         return;
     ReturnSlot result(c), line(c), size(c), iterator(c);
     make_list(c, {}, result);
@@ -300,7 +287,7 @@ void readline(Attachment &c, Handle, std::span<const Value> a, ReturnSlot &out)
     RootScope roots(c);
     auto self = roots.root(a[0]);
     std::int64_t limit = -1;
-    if (a[1] != c.builtin(CoreObject::None) && !io_index(c, roots.root(a[1]), limit, out))
+    if (a[1] != c.builtin(CoreObject::None) && !index_as_int64(c, a[1], limit, out))
         return;
     std::string result;
     ReturnSlot item(c);
@@ -362,7 +349,7 @@ template <bool All> void raw_read(Attachment &c, Handle, std::span<const Value> 
         make_bytes(c, std::move(data), out);
     } else {
         std::int64_t size = -1;
-        if (a[1] != c.builtin(CoreObject::None) && !io_index(c, roots.root(a[1]), size, out))
+        if (a[1] != c.builtin(CoreObject::None) && !index_as_int64(c, a[1], size, out))
             return;
         if (size < 0) {
             io_call(c, self, U"readall", {}, out);
@@ -385,7 +372,7 @@ template <bool All> void raw_read(Attachment &c, Handle, std::span<const Value> 
             return;
         }
         std::int64_t n;
-        if (!io_index(c, roots.root(count.value()), n, out))
+        if (!index_as_int64(c, count.value(), n, out))
             return;
         if (n < 0 || n > size) {
             raise_error(c, CoreObject::ValueErrorType, U"readinto() returned invalid length", out);

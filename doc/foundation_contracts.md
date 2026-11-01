@@ -895,6 +895,20 @@ slot while retaining a separate rooted owner read. A lost atomic index claim
 clears that candidate before polling/retrying; allocation failure does not consume
 a character. It does not add a per-item temporary result cell.
 
+Native index conversion shares the CPython 3.12.14 Objects/abstract.c distinction
+between an integer protocol result and public exact-int normalization. Native
+index_as_int64 consumers read int/bool/subclass payloads without copying them or
+honoring overridden __index__; non-integers invoke the protocol once. Strict
+integer subclass returns warn before use, and public index() normalizes them.
+Inputs and protocol results remain rooted across collecting warning hooks.
+The native helper snapshots before output reset/poll, leaves out Empty on success,
+and supports caller-selected overflow exceptions/messages or saturating clipping.
+Its width remains the existing int64 native-conversion contract, not a new
+32-bit platform compatibility claim. List/tuple/string/slice, I/O, POSIX, socket
+address and deque consumers share it while retaining their own range/synchronization
+policies. Conversion warnings now share the Python policy bridge in Python/errors.cpp;
+the documented warnings.warn replacement difference remains.
+
 Ordinary native type methods publish owner-bearing MethodDescriptorObjects;
 protocol lookup preserves their native/sequence role and invokes the underlying
 entry through the normal binder. Native static/class wrappers retain their own
@@ -904,7 +918,11 @@ functions with that actual module before completing its import lease; re-exporte
 functions keep their original association. Mutable __module__ values are separate
 from the fixed module owner, not derived by scanning sys.modules. Callable
 reductions use ordinary names/getattr with precise roots, not a pickle-specific
-registry of C function addresses.
+registry of C function addresses. defaultdict forwards its underlying dictionary
+initialization through the same binder/receiver/depth/return-checked call path,
+using a rooted keyword snapshot; it does not cast a captured method descriptor to
+NativeFunctionObject or execute its raw entry. default_factory is updated before
+forwarding, including when dictionary initialization raises.
 
 ## Code, Frames And Closures
 

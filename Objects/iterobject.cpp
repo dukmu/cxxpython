@@ -149,12 +149,10 @@ void sequence_item(Attachment &context, Handle, std::span<const Value> args, Ret
         }
         return;
     }
-    ReturnSlot converted(context);
-    index(context, roots.root(args[1]), converted);
-    if (converted.tag() == ResultTag::Raised) {
-        out.raised(converted.exception());
+    std::int64_t position;
+    if (!detail::index_as_int64(context, args[1], position, out, CoreObject::IndexErrorType,
+                                std::nullopt))
         return;
-    }
     const auto &data = context.payload<T>(args[0]);
     const auto length = [&] {
         if constexpr (Type == CoreObject::TupleType)
@@ -162,11 +160,6 @@ void sequence_item(Attachment &context, Handle, std::span<const Value> args, Ret
         else
             return data.value.size();
     }();
-    std::int64_t position;
-    if (!int_fits_signed(context, converted.value(), position)) {
-        raise_error(context, CoreObject::IndexErrorType, U"sequence index is out of range", out);
-        return;
-    }
     if (position < 0)
         position += static_cast<std::int64_t>(length);
     if (position < 0 || static_cast<std::size_t>(position) >= length) {

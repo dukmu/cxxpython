@@ -1,5 +1,74 @@
 # Development Status
 
+## 2026-11-01 Shared Native Index Conversion And Module Cleanup
+
+Continues the performance/cleanup goal after pushed 6248fbc, following its
+retained Matrix get_item/index conversion callers. Terra migrated module consumers,
+added the CPython fixture and repaired the discovered defaultdict legacy entry;
+parent owns the shared kernel, integration, native contracts and measurements.
+All three agents are closed. Full compatibility remains paused, not complete.
+
+- Shared index_as_int64 snapshots input before resetting output and polling;
+  success leaves out Empty. int/bool/subclass inputs use their stored integer,
+  ignoring overridden __index__, without normalization allocation. Other objects
+  invoke the actual protocol once and retain the result across collecting warning
+  hooks. Public index() still returns an exact int and preserves exact-int
+  identity. Exact int already avoided managed copies before this node; the hot
+  path also eliminates redundant scopes/checks/result cells, not just allocation.
+- Following fixed CPython 3.12.14 Objects/abstract.c, split integer-result lookup
+  from public normalization and added missing strict-subclass return warnings.
+  Float and index now share the existing Python warning-policy bridge in
+  Python/errors.cpp instead of duplicating it. Filter/error/collecting-hook
+  behavior is tested; replacing warnings.warn still differs from CPython's
+  native warning entry and remains recorded in the compatibility ledger.
+- List/tuple/string/slice, deque, I/O, POSIX and socket address consumers share
+  signed conversion, retaining their range checks and synchronization. Removed
+  io_index, its I/O-header declaration, and duplicate module conversion wrappers.
+  Optional exception/message policies preserve clipping and now give reference
+  index-sized/C-size overflow diagnostics. The existing int64 conversion width
+  is unchanged; no new 32-bit platform acceptance is claimed. No GIL, Python RC,
+  collector policy, native C ABI, cache or workload-specific shortcut was added.
+- The new direct fixture covers exact identity, bool/int subclasses, mutation and
+  collecting __index__, wrong returns/errors, large signed indices, clipping,
+  containers, BytesIO/deque, collecting warnings and warning-as-error. Previous
+  6248fbc fails it on missing warnings (.cache/native-index-before.log). Native
+  contracts prove signed precision/limits, zero managed allocation, output alias
+  ownership, foreign/protected rejection and allocation-free index GC progress.
+- Broader affected scripts exposed a pre-existing defaultdict failure, reproduced
+  on the retained 6248fbc ELF (.cache/native-index-defaultdict-before.log). Its
+  initializer treated a captured MethodDescriptor as NativeFunctionObject and
+  called a raw entry. It now forwards self/remaining arguments/rooted keyword
+  snapshots through common call(), preserving default_factory assignment before
+  underlying init failure. Raw NativeEntry execution in Modules is gone; the
+  remaining actual calls are in Objects/call.cpp's shared dispatcher.
+- Clang 21.1.8 -Werror builds and formatting pass. Shared-kernel native acceptance
+  passes Release 379/379, ASan/UBSan/LSan and TSan each 363/363. After the final
+  collections-only repair, reran its eight relevant script cases on all three
+  builds, plus seven Release socket cases blocked by sandbox EPERM in the first
+  run. Reused unaffected results rather than repeating the full suite: distinct
+  affected Python coverage passes 95 cases on Release/ASan and 37 on TSan. Initial
+  runs/failures and final targeted reruns remain in .cache/native-index-*. No
+  expected outputs, warning budgets or sanitizer settings were weakened.
+- Quiet compute/allocation measurements reuse the 6248fbc raw baseline with three
+  processes and nine values per configuration, one/four workers and natural GC.
+  Generated raw/report/comparison artifacts are .cache/benchmarks/native-index
+  and native-index-comparison. Standard pyperf reports Matrix 1.09x faster at
+  one worker and 1.12x at four; the six other compute/allocation comparisons are
+  not significant. Matrix medians are 349.378/144.662 ms, scaling 2.415x with
+  four-worker CPU/wall 3.116, preserving shared-heap Python CPU parallelism.
+- Newly affected file_io received a same-session old/new comparison using the
+  already-retained 6248fbc build-id 8abfeb0c848ca87e936eec2b8b3f4e97cc13e892 ELF,
+  not a historical rebuild or repeated CPython campaign. Raw/generated evidence
+  is native-index-io: pyperf reports four workers 1.06x faster, one worker not
+  significant. New medians are 7.446/5.286 ms; I/O concurrency is not separate
+  Python CPU-parallel proof. Matching final ELF is retained in perf-buildid.
+
+This node addresses measured generic indexing overhead and an actual unmigrated
+native call, not the whole absolute-performance gap. The next dependency remains
+common native dispatch/root admission and its contribution to Matrix, using the
+retained callers rather than new workload-specific branches. The service goal
+stays active; matrix.py stays local/untracked and is not part of the commit.
+
 ## 2026-11-01 Protocol Root Promotion And Native Iterator Output Reuse
 
 Continues the performance/cleanup goal after pushed a765f6a. Terra supplied the

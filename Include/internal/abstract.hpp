@@ -11,6 +11,16 @@ void truth_owned(Attachment &, Handle, ReturnSlot &);
 void rich_compare_owned(Attachment &, Handle, Handle, CompareOp, ReturnSlot &);
 void container_equal_owned(Attachment &, Handle, Handle, ReturnSlot &);
 NextStatus iter_next_owned(Attachment &, Handle, ReturnSlot &);
+// Owns its input; success leaves out Empty. No overflow exception means clipping;
+// no message selects CPython's input-type/index-sized overflow diagnostic.
+bool index_as_int64(
+    Attachment &, Value, std::int64_t &, ReturnSlot &,
+    std::optional<CoreObject> overflow = CoreObject::OverflowErrorType,
+    std::optional<std::u32string_view> message = U"Python int too large to convert to C ssize_t");
+bool index_as_int64(
+    Attachment &, Handle, std::int64_t &, ReturnSlot &,
+    std::optional<CoreObject> overflow = CoreObject::OverflowErrorType,
+    std::optional<std::u32string_view> message = U"Python int too large to convert to C ssize_t");
 // Success returns the normalized native hash with out Empty; failure leaves Raised.
 std::optional<std::int64_t> hash_word(Attachment &, Handle, ReturnSlot &);
 ResultView dict_lookup_owned(Attachment &, Handle, Handle, ReturnSlot &);
