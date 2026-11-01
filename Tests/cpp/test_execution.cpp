@@ -72,6 +72,33 @@ class CoreExecution : public testing::Test {
     }
 };
 
+TEST_F(CoreExecution, FrameTakesBoundLocalsStorageAndTracesIt)
+{
+    CodeSpec spec;
+    spec.locals = {U"kept", U"unbound"};
+    CodeBuilder builder(context, spec);
+    builder.emit(Opcode::LoadFast, 0);
+    builder.emit(Opcode::Return);
+    const auto program = code(builder), callable = function(program);
+    auto kept = text(U"only retained by transferred locals");
+    std::vector<std::optional<Value>> locals{kept.get(context), {}};
+    const auto *storage = locals.data();
+    ReturnSlot out(context);
+    context.allocate_instance<FrameObject>(builtin(CoreObject::FrameType), out,
+                                           callable.get(context), program.get(context),
+                                           std::move(locals), 1, context.builtin(CoreObject::None));
+    const auto frame = roots.root(out.value());
+    roots.release(kept);
+    out.reset();
+    context.collect();
+    const auto &data = context.payload<FrameObject>(frame);
+    EXPECT_EQ(data.locals.data(), storage);
+    ASSERT_TRUE(data.locals[0]);
+    EXPECT_FALSE(data.locals[1]);
+    EXPECT_EQ(context.payload<StrObject>(*data.locals[0]).value,
+              U"only retained by transferred locals");
+}
+
 TEST_F(CoreExecution, ScalarOperandsAreNotGcPointersAndTrimRestoresBoxedSlots)
 {
     CodeBuilder builder(context);

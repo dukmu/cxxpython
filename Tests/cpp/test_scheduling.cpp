@@ -226,6 +226,27 @@ TEST_F(CoreScheduling, PreparedTargetOwnsItsSnapshotsInTheCallerRootScope)
     error(out, CoreObject::TypeErrorType);
 }
 
+TEST_F(CoreScheduling, FramePreparationBorrowsCallerBuffersAndPublicPreparationCopiesThem)
+{
+    const auto fn = identity(), value = text(U"caller-owned input");
+    const std::array args{value.get(context)};
+    RootScope prepared_roots(context);
+    ReturnSlot out(context);
+    auto borrowed =
+        detail::prepare_frame_call(context, fn.get(context), {args}, prepared_roots, out);
+    ASSERT_TRUE(borrowed);
+    ASSERT_TRUE(borrowed->borrowed_arguments);
+    EXPECT_TRUE(borrowed->positional.empty());
+    EXPECT_EQ(borrowed->arguments().positional.data(), args.data());
+    context.collect();
+    EXPECT_EQ(borrowed->arguments().positional[0], value.get(context));
+    auto owned = detail::prepare_call(context, fn.get(context), {args}, prepared_roots, out);
+    ASSERT_TRUE(owned);
+    EXPECT_FALSE(owned->borrowed_arguments);
+    EXPECT_NE(owned->arguments().positional.data(), args.data());
+    EXPECT_EQ(owned->arguments().positional[0], value.get(context));
+}
+
 TEST_F(CoreScheduling, ChildFrameBackEdgesKeepParkedOperandsAndContinuationsRooted)
 {
     ReturnSlot out(context);
@@ -391,6 +412,63 @@ Handle recursive_function(Attachment &context, RootScope &roots)
     auto globals = roots.root(out.result().value());
     make_function(context, {code, globals}, out);
     return roots.root(out.result().value());
+}
+
+TEST(CoreSchedulingDepth, BorrowedBoundCallsRetainBothAdmissionLimits)
+{
+    for (bool native_limit : {false, true}) {
+        for (std::size_t limit : {2U, 3U}) {
+            Interpreter interpreter({.collect_every_allocation = true,
+                                     .max_call_depth = native_limit ? 64 : limit,
+                                     .max_native_depth = native_limit ? limit : 64});
+            Attachment context(interpreter);
+            context.bootstrap_core();
+            RootScope roots(context);
+            ReturnSlot out(context);
+            auto make = [&](CodeBuilder &builder) {
+                builder.freeze(out);
+                const auto code = roots.root(out.value());
+                context.allocate_instance<DictObject>(
+                    roots.root(context.builtin(CoreObject::DictType)), out);
+                const auto globals = roots.root(out.value());
+                make_function(context, {code, globals}, out);
+                return roots.root(out.value());
+            };
+            CodeSpec spec;
+            spec.signature.parameters = {{U"self"}};
+            spec.locals = {U"self"};
+            CodeBuilder body(context, spec);
+            body.emit(Opcode::LoadFast, 0);
+            body.emit(Opcode::Return);
+            const auto function = make(body);
+            const auto receiver = roots.root(context.builtin(CoreObject::True));
+            context.allocate_instance<BoundMethodObject>(
+                roots.root(context.builtin(CoreObject::BoundMethodType)), out,
+                function.get(context), receiver.get(context));
+            const auto method = roots.root(out.value());
+            CodeBuilder bound(context);
+            bound.emit(Opcode::LoadConst, bound.constant(method));
+            bound.call(0);
+            bound.emit(Opcode::Return);
+            call(context, make(bound), {}, out);
+            if (limit == 2) {
+                ASSERT_EQ(out.tag(), ResultTag::Raised);
+                EXPECT_EQ(context.type_of(out.exception()),
+                          context.builtin(CoreObject::RecursionErrorType));
+            } else {
+                ASSERT_EQ(out.tag(), ResultTag::Ok);
+                EXPECT_EQ(out.value(), receiver.get(context));
+            }
+            CodeBuilder direct(context);
+            direct.emit(Opcode::LoadConst, direct.constant(function));
+            direct.emit(Opcode::LoadConst, direct.constant(receiver));
+            direct.call(1);
+            direct.emit(Opcode::Return);
+            call(context, make(direct), {}, out);
+            ASSERT_EQ(out.tag(), ResultTag::Ok);
+            EXPECT_EQ(out.value(), receiver.get(context));
+        }
+    }
 }
 
 TEST(CoreSchedulingDepth, ThousandsOfPythonCallsDoNotConsumeNativeRecursionDepth)

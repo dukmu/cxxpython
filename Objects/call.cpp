@@ -10,10 +10,10 @@ namespace {
 // The entry owns all inputs in roots before dispatch can reset out or run Python.
 // Internal binding and callable unwrapping share that same scope.
 void invoke(Attachment &, Handle, CallArgsView, std::optional<Value>, ReturnSlot &, RootScope &,
-            std::optional<detail::PreparedPythonCall> * = nullptr);
+            std::optional<detail::PreparedPythonCall> * = nullptr, bool = false);
 void invoke_special_impl(Attachment &, Value, Handle, CallArgsView, ReturnSlot &, RootScope &,
                          std::optional<detail::PreparedPythonCall> * = nullptr,
-                         NativeCallKind = NativeCallKind::Generic);
+                         NativeCallKind = NativeCallKind::Generic, bool = false);
 void bind_native_callable(Attachment &, Value, std::optional<Value>, ReturnSlot &);
 using detail::bind_descriptor;
 using detail::special;
@@ -137,9 +137,12 @@ void bind_descriptor(Attachment &context, Value descriptor, std::optional<Value>
 }
 } // namespace detail
 namespace detail {
-bool bind_arguments(Attachment &context, const SignatureLayout &signature, CallArgsView args,
-                    std::optional<Value> receiver, RootScope &roots, std::vector<Value> &bound,
-                    ReturnSlot &out, std::optional<FunctionDefaults> defaults)
+namespace {
+template <class Emit>
+bool bind_argument_slots(Attachment &context, const SignatureLayout &signature, CallArgsView args,
+                         std::optional<Value> receiver, RootScope &roots,
+                         std::span<std::optional<Value>> slots, Emit emit, bool root_fast,
+                         ReturnSlot &out, std::optional<FunctionDefaults> defaults)
 {
     const std::size_t prefix = receiver ? 1 : 0;
     const std::size_t given = args.positional.size() + prefix;
@@ -147,11 +150,11 @@ bool bind_arguments(Attachment &context, const SignatureLayout &signature, CallA
         return receiver && index == 0 ? *receiver : args.positional[index - prefix];
     };
     if (args.keywords.empty() && signature.accepts_complete_positional(given)) {
-        bound.reserve(given);
         for (std::size_t i = 0; i < given; ++i) {
             const auto value = positional(i);
-            roots.root(value);
-            bound.push_back(value);
+            if (root_fast)
+                roots.root(value);
+            emit(i, value);
         }
         return true;
     }
@@ -162,7 +165,6 @@ bool bind_arguments(Attachment &context, const SignatureLayout &signature, CallA
         type_error(context, U"too many positional arguments", out);
         return false;
     }
-    std::vector<std::optional<Value>> slots(signature.parameters.size());
     DictView keyword_defaults(context, defaults ? defaults->keywords : std::optional<Value>{});
     for (std::size_t i = 0; i < std::min(given, positional_count); ++i)
         slots[i] = positional(i);
@@ -214,7 +216,7 @@ bool bind_arguments(Attachment &context, const SignatureLayout &signature, CallA
             return false;
         }
         roots.root(*value);
-        bound.push_back(*value);
+        emit(i, *value);
     }
     ReturnSlot extra_positional(context);
     if (signature.varargs) {
@@ -222,26 +224,67 @@ bool bind_arguments(Attachment &context, const SignatureLayout &signature, CallA
         for (std::size_t i = positional_count; i < given; ++i)
             rest.push_back(positional(i));
         cxxpython::core::make_tuple(context, rest, extra_positional);
-        bound.push_back(roots.root(extra_positional.value()).get(context));
+        emit(signature.parameters.size(), roots.root(extra_positional.value()).get(context));
     }
     if (signature.varkwargs)
-        bound.push_back(roots.root(extra_keywords.value()).get(context));
+        emit(signature.parameters.size() + (signature.varargs ? 1 : 0),
+             roots.root(extra_keywords.value()).get(context));
     return true;
 }
-std::optional<PreparedPythonCall> prepare_call(Attachment &context, Value callable,
-                                               CallArgsView args, RootScope &roots, ReturnSlot &out)
+} // namespace
+bool bind_arguments(Attachment &context, const SignatureLayout &signature, CallArgsView args,
+                    std::optional<Value> receiver, RootScope &roots, std::vector<Value> &bound,
+                    ReturnSlot &out, std::optional<FunctionDefaults> defaults)
+{
+    std::vector<std::optional<Value>> slots;
+    if (!args.keywords.empty() ||
+        !signature.accepts_complete_positional(args.positional.size() + (receiver ? 1 : 0)))
+        slots.resize(signature.parameters.size());
+    else
+        bound.reserve(args.positional.size() + (receiver ? 1 : 0));
+    return bind_argument_slots(
+        context, signature, args, receiver, roots, slots,
+        [&bound](std::size_t, Value value) { bound.push_back(value); }, true, out, defaults);
+}
+bool bind_frame_arguments(Attachment &context, const SignatureLayout &signature, CallArgsView args,
+                          std::optional<Value> receiver, RootScope &roots,
+                          std::vector<std::optional<Value>> &locals, ReturnSlot &out,
+                          std::optional<FunctionDefaults> defaults)
+{
+    return bind_argument_slots(
+        context, signature, args, receiver, roots,
+        std::span(locals).first(signature.parameters.size()),
+        [&locals](std::size_t index, Value value) { locals[index] = value; }, false, out, defaults);
+}
+namespace {
+std::optional<PreparedPythonCall> prepare_call_impl(Attachment &context, Value callable,
+                                                    CallArgsView args, RootScope &roots,
+                                                    ReturnSlot &out, bool borrow_arguments)
 {
     out.check_caller(context);
     try {
         auto target = roots.root(callable);
-        root_arguments(roots, args);
+        if (!borrow_arguments)
+            root_arguments(roots, args);
         std::optional<PreparedPythonCall> preparation;
-        invoke(context, target, args, {}, out, roots, &preparation);
+        invoke(context, target, args, {}, out, roots, &preparation, borrow_arguments);
         return preparation;
     } catch (const std::bad_alloc &) {
         out.raised(context.builtin(CoreObject::MemoryError));
         return {};
     }
+}
+} // namespace
+std::optional<PreparedPythonCall> prepare_call(Attachment &context, Value callable,
+                                               CallArgsView args, RootScope &roots, ReturnSlot &out)
+{
+    return prepare_call_impl(context, callable, args, roots, out, false);
+}
+std::optional<PreparedPythonCall> prepare_frame_call(Attachment &context, Value callable,
+                                                     CallArgsView args, RootScope &roots,
+                                                     ReturnSlot &out)
+{
+    return prepare_call_impl(context, callable, args, roots, out, true);
 }
 } // namespace detail
 namespace detail {
@@ -348,7 +391,7 @@ using CallDepth = detail::NativeCallScope;
 void invoke_special_impl(Attachment &context, Value receiver, Handle target, CallArgsView args,
                          ReturnSlot &out, RootScope &roots,
                          std::optional<detail::PreparedPythonCall> *preparation,
-                         NativeCallKind native_call)
+                         NativeCallKind native_call, bool borrow_arguments)
 {
     const auto descriptor = target.get(context);
     std::optional<Value> type;
@@ -376,7 +419,7 @@ void invoke_special_impl(Attachment &context, Value receiver, Handle target, Cal
         return;
     }
     if (*type == context.builtin(CoreObject::FunctionType))
-        invoke(context, target, args, receiver, out, roots, preparation);
+        invoke(context, target, args, receiver, out, roots, preparation, borrow_arguments);
     else {
         ReturnSlot bound(context);
         bind_descriptor(context, descriptor, receiver, context.type_of(receiver), bound);
@@ -384,12 +427,13 @@ void invoke_special_impl(Attachment &context, Value receiver, Handle target, Cal
             out.raised(bound.exception());
             return;
         }
-        invoke(context, roots.root(bound.value()), args, {}, out, roots, preparation);
+        invoke(context, roots.root(bound.value()), args, {}, out, roots, preparation,
+               borrow_arguments);
     }
 }
 void invoke(Attachment &context, Handle target, CallArgsView args, std::optional<Value> receiver,
             ReturnSlot &out, RootScope &roots,
-            std::optional<detail::PreparedPythonCall> *preparation)
+            std::optional<detail::PreparedPythonCall> *preparation, bool borrow_arguments)
 {
     CallDepth depth(context, out);
     if (!depth.entered)
@@ -403,10 +447,13 @@ void invoke(Attachment &context, Handle target, CallArgsView args, std::optional
     }
     if (type == context.builtin(CoreObject::FunctionType)) {
         if (preparation) {
-            detail::PreparedPythonCall prepared{target,
-                                                {},
-                                                {args.positional.begin(), args.positional.end()},
-                                                {args.keywords.begin(), args.keywords.end()}};
+            detail::PreparedPythonCall prepared{target, {}, {}, {}, {}};
+            if (borrow_arguments)
+                prepared.borrowed_arguments = args;
+            else {
+                prepared.positional.assign(args.positional.begin(), args.positional.end());
+                prepared.keywords.assign(args.keywords.begin(), args.keywords.end());
+            }
             if (receiver)
                 prepared.receiver = roots.root(*receiver);
             *preparation = std::move(prepared);
@@ -419,12 +466,13 @@ void invoke(Attachment &context, Handle target, CallArgsView args, std::optional
     if (receiver && type != context.builtin(CoreObject::MethodDescriptorType)) {
         std::vector<Value> prefixed{*receiver};
         prefixed.insert(prefixed.end(), args.positional.begin(), args.positional.end());
-        invoke(context, target, {prefixed, args.keywords}, {}, out, roots, preparation);
+        invoke(context, target, {prefixed, args.keywords}, {}, out, roots, preparation, false);
         return;
     }
     if (type == context.builtin(CoreObject::BoundMethodType)) {
         auto &method = context.payload<BoundMethodObject>(callable);
-        invoke(context, roots.root(method.function), args, method.self, out, roots, preparation);
+        invoke(context, roots.root(method.function), args, method.self, out, roots, preparation,
+               borrow_arguments);
         return;
     }
     if (type == context.builtin(CoreObject::MethodDescriptorType)) {
@@ -441,7 +489,7 @@ void invoke(Attachment &context, Handle target, CallArgsView args, std::optional
         return;
     }
     invoke_special_impl(context, target.get(context), roots.root(*attribute), args, out, roots,
-                        preparation);
+                        preparation, NativeCallKind::Generic, borrow_arguments);
 }
 
 bool data_descriptor(Attachment &context, Value attribute)

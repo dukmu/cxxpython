@@ -1,0 +1,7 @@
+direct
+('self', 'first', 'last')
+('expanded self', 'expanded arg', 'expanded kw')
+(['prefix', 'argument'], 'keyword')
+suspended
+ValueError error payload
+after error

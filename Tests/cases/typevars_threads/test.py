@@ -12,10 +12,13 @@ for lock in done:
 shared = []
 refs = []
 errors = []
+exited = [None, None]
 
 
 def producer():
     try:
+        exited[0] = _thread._set_sentinel()
+        exited[0].acquire()
         values = [TypeVar('T'), ParamSpec('P'), TypeVarTuple('Ts')]
         for value in values:
             value.owner = 'producer'
@@ -31,6 +34,8 @@ def producer():
 
 def consumer():
     try:
+        exited[1] = _thread._set_sentinel()
+        exited[1].acquire()
         ready.acquire()
         if len(shared) == 3:
             for value in shared:
@@ -51,6 +56,9 @@ _thread.start_new_thread(producer, ())
 _thread.start_new_thread(consumer, ())
 for lock in done:
     lock.acquire()
+# Work acknowledgement is not thread exit; wait for thread-state/root retirement.
+for sentinel in exited:
+    sentinel.acquire()
 print('errors', errors)
 print('handoff', [(value.__name__, value.owner, value.seen) for value in shared])
 print('alive', [ref() is value for ref, value in zip(refs, shared)])

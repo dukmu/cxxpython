@@ -1,5 +1,74 @@
 # Development Status
 
+## 2026-11-01 Share Call Preparation And Transfer Frame Locals
+
+Continues performance/cleanup after 4f00bca. Parent integrated frame creation and
+call preparation; one Terra worker supplied the shared binder and direct fixture.
+Worker is closed. This node is retained as call/buffer cleanup, not a speedup claim.
+
+- Python and native binding share one keyword/default/variadic/error algorithm.
+  Python uses its final optional-Value locals buffer as binding scratch, then
+  transfers that buffer into Frame. The native vector<Value> ABI is unchanged.
+  Complete positional calls neither load unused mutable defaults nor duplicate
+  already-owned inputs. Other signatures preserve rooted default snapshots and
+  newly allocated variadic objects. Cells and binding still complete before the
+  managed Frame is allocated; no partially bound Frame or frame-identity pool.
+- VM call preparation lends its live Frame/buffers through ordinary dispatch.
+  PreparedPythonCall explicitly distinguishes borrowed argument views from owned
+  vectors. Public prepare_call still snapshots inputs and owns argument buffers.
+  Receiver-prefix temporaries force owned preparation before their native vector
+  expires. Callable binding, native returns and function/bound-wrapper recursion
+  admission remain in the same dispatcher, not a second VM classifier/guard.
+- The first experiment added such a classifier and duplicated its depth admission
+  in ceval. Its retained campaign showed no significant object improvement and
+  approximately 6%/8% slower one-worker allocate/file_io. Removed that experiment
+  and moved borrowing into shared dispatch. The failed direction and measurements
+  remain under .cache/frame-calls-* and .cache/benchmarks/frame-calls, not replaced
+  by a favorable same-code rerun.
+- Broad initial Release acceptance passed 506 native tests and 541/542 scripts.
+  The weak TypeVar handoff test acknowledged work in finally but did not join the
+  workers; its last loop local could still be live at main-thread collection.
+  Added standard _thread._set_sentinel waits for thread-state/root retirement.
+  Its original expected output is unchanged and passes fixed CPython/current
+  executables. Failure/referrer diagnostics remain in frame-calls-typevars logs.
+  No runtime yield, weakened collection assertion or GIL was added to mask it.
+- Final shared-dispatch acceptance passes 89 affected Release native tests and
+  nine direct scripts. ASan/UBSan/LSan passes the three changed native ownership/
+  depth contracts and four affected direct scenarios; TSan passes those four
+  scenarios. These include arbitrary-callable receiver-prefix lifetime, default
+  mutation, closures, generators, collecting callbacks and thread retirement.
+  Initial broader sanitizer evidence remains separately identified, including an
+  interrupted invocation with a misspelled fixture name; only final selected
+  successes above describe the final dispatcher. Formatting/diff checks pass.
+- The user rejected repeated old-version execution. Cancelled the planned paired
+  benchmark and recorded this rule in AGENTS.md. Final performance executes only
+  the changed interpreter on object_protocol/allocate/file_io, one/four workers,
+  natural GC, three processes and nine values/configuration. All 18 planned runs
+  pass; references are existing retained raw data, not rerun old/CPython targets.
+  Generated reports are .cache/benchmarks/frame-borrow and frame-borrow-comparison;
+  standard analysis is .cache/frame-borrow-pyperf.log. No tables were hand-written.
+- Final comparison finds one-worker allocate 1.02x slower; the other five
+  comparisons are not significant. This is the limited measured regression of
+  this cleanup, not evidence that fewer native copies improved absolute runtime.
+  Object medians are 75.210/33.795 ms, scaling 2.225x with four-worker CPU/wall
+  2.094. Object-four/file-I/O-one/four RSDs of 14.2%/11.2%/18.3% remain with all
+  samples and warnings. Created managed-object counts are unchanged. The retained
+  CPython object ratios remain 40.522/13.401, so performance acceptance is open.
+- A separate final object capture retains 550 software CPU samples and zero
+  losses under .cache/benchmarks/frame-borrow-object-profile. Root acquisition is
+  6.36%/3.64% self, execution 6.00%, attribute bridging 2.55%, protocol promotion
+  2.55% and malloc 4.00%. These sampled worker costs are not summed GC pauses or
+  hardware-cache measurements. Keep matching final ELF 024c13a7...; removed the
+  unprofiled intermediate ELF and compressed regenerated sanitizer debug sections.
+  Useful builds/tools/raw evidence remain about 1.7 GiB. matrix.py stays unchanged,
+  untracked and excluded from commits.
+
+The goal remains active. Do not spend another node tuning this preparation flag
+or repeating old baselines. Next address the larger general attribute/ObjectOps
+path and its repeated input-root/binding layers, using the existing capture.
+The full compatibility route remains paused; dill dependencies remain recorded
+without claiming marshal/CodeType support from this cleanup.
+
 ## 2026-11-01 Borrow Type Namespaces And Terminate Reentrant Lookups
 
 Continues the active performance/cleanup goal after 1f806cc, using its general

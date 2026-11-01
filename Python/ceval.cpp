@@ -297,17 +297,22 @@ void make_frame(Attachment &context, Handle function, CallArgsView args,
 {
     RootScope roots(context);
     const auto &callable = context.payload<FunctionObject>(function);
-    auto code = roots.root(callable.code);
-    ReturnSlot default_values(context), keyword_values(context);
-    context.load(function.get(context), callable.defaults, default_values);
-    auto defaults =
-        roots.root(default_values.tag() == ResultTag::Ok ? default_values.value()
-                                                         : context.builtin(CoreObject::EmptyTuple));
-    std::optional<Value> keywords;
-    context.load(function.get(context), callable.kwdefaults, keyword_values);
-    if (keyword_values.tag() == ResultTag::Ok)
-        keywords = keyword_values.value();
-    const auto &program = context.payload<CodeObject>(code).program;
+    const auto &program = context.payload<CodeObject>(callable.code).program;
+    std::optional<ReturnSlot> default_values, keyword_values;
+    detail::FunctionDefaults values{};
+    const auto given = args.positional.size() + (receiver ? 1 : 0);
+    if (!args.keywords.empty() || !program.signature().accepts_complete_positional(given)) {
+        default_values.emplace(context);
+        keyword_values.emplace(context);
+        context.load(function.get(context), callable.defaults, *default_values);
+        const auto defaults = default_values->tag() == ResultTag::Ok
+                                  ? default_values->value()
+                                  : context.builtin(CoreObject::EmptyTuple);
+        values.positional = context.payload<TupleObject>(defaults).items;
+        context.load(function.get(context), callable.kwdefaults, *keyword_values);
+        if (keyword_values->tag() == ResultTag::Ok)
+            values.keywords = keyword_values->value();
+    }
     std::optional<Value> mapping;
     ReturnSlot space(context);
     if (namespace_mapping)
@@ -319,10 +324,9 @@ void make_frame(Attachment &context, Handle function, CallArgsView args,
                                               space);
         mapping = space.value();
     }
-    std::vector<Value> bound;
-    detail::FunctionDefaults values{context.payload<TupleObject>(defaults).items, keywords};
-    if (!detail::bind_arguments(context, program.signature(), args, receiver, roots, bound, out,
-                                values))
+    std::vector<std::optional<Value>> bound(program.local_names().size());
+    if (!detail::bind_frame_arguments(context, program.signature(), args, receiver, roots, bound,
+                                      out, values))
         return;
     std::vector<Value> cells;
     cells.reserve(program.cell_names().size() + program.free_names().size());
@@ -330,23 +334,20 @@ void make_frame(Attachment &context, Handle function, CallArgsView args,
         const auto type = roots.root(context.builtin(CoreObject::CellType));
         ReturnSlot cell(context);
         for (auto local : program.cell_locals()) {
-            context.allocate_instance<CellObject>(type, cell,
-                                                  local && *local < bound.size()
-                                                      ? std::optional<Value>{bound[*local]}
-                                                      : std::optional<Value>{});
+            context.allocate_instance<CellObject>(
+                type, cell,
+                local && *local < bound.size() ? bound[*local] : std::optional<Value>{});
             cells.push_back(roots.root(cell.value()).get(context));
         }
     }
     if (callable.closure)
         for (auto cell : context.payload<TupleObject>(*callable.closure).items)
             cells.push_back(cell);
-    context.allocate_instance<FrameObject>(
-        roots.root(context.builtin(CoreObject::FrameType)), out, function.get(context),
-        code.get(context), program.local_names().size(), program.max_stack(),
-        context.builtin(CoreObject::None), program.max_regions(), std::move(cells), mapping);
+    context.allocate_instance<FrameObject>(roots.root(context.builtin(CoreObject::FrameType)), out,
+                                           function.get(context), callable.code, std::move(bound),
+                                           program.max_stack(), context.builtin(CoreObject::None),
+                                           program.max_regions(), std::move(cells), mapping);
     auto &data = context.payload<FrameObject>(out.value());
-    for (std::size_t i = 0; i < bound.size(); ++i)
-        data.locals[i] = bound[i];
     for (auto local : program.cell_locals())
         if (local)
             data.locals[*local].reset();
@@ -1543,14 +1544,14 @@ void run(Attachment &context, detail::FrameActivation &activation, ReturnSlot &o
                 CallArgsView args{positional, named};
                 data.pending_call = base;
                 auto prepared =
-                    detail::prepare_call(context, data.operands[base], args, roots, result);
+                    detail::prepare_frame_call(context, data.operands[base], args, roots, result);
                 if (prepared) {
                     ReturnSlot child(context);
-                    make_frame(
-                        context, prepared->function, {prepared->positional, prepared->keywords},
-                        prepared->receiver ? std::optional<Value>{prepared->receiver->get(context)}
-                                           : std::optional<Value>{},
-                        child);
+                    make_frame(context, prepared->function, prepared->arguments(),
+                               prepared->receiver
+                                   ? std::optional<Value>{prepared->receiver->get(context)}
+                                   : std::optional<Value>{},
+                               child);
                     if (raised(child)) {
                         activation.raising(child.exception());
                         break;

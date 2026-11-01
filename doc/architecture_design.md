@@ -198,6 +198,19 @@ directly from the checked type Value and lends its owning operation scope to
 invocation, like arithmetic. Prepared calls snapshot a Value target into their
 existing caller-owned root scope, retaining the copied argument buffers needed
 by callable/receiver unwrapping. No borrowed Frame data escapes that preparation.
+VM CALL lends the still-live caller Frame's argument buffers through that same
+dispatcher, without another callable classification or depth-guard implementation.
+Prepared results explicitly distinguish these borrowed views from owned vectors.
+Receiver-prefix temporaries force owned preparation before their buffers expire;
+public preparation still snapshots its inputs and owns its argument buffers.
+Function, bound-wrapper and arbitrary-callable depth admission is unchanged.
+Python and native argument binding share one keyword/default/variadic algorithm;
+the Python destination is the final locals buffer, transferred into Frame rather
+than copied through another bound-value vector. Complete positional calls do not
+read unused mutable defaults or duplicate the caller's input roots. Other calls
+retain default snapshots and newly created variadic objects as before. Frames are
+still allocated only after successful binding and cell construction, not exposed
+as partially bound managed objects. Frame identities are not pooled or recycled.
 Internal protocol resolution accepts the receiver's already checked type Value
 without first creating a throwaway type Handle. The cache validates the borrowed
 Value and promotes fresh type/owner/descriptor roots; public Handle resolution

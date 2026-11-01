@@ -101,6 +101,8 @@ compiler, VM, and extension platform implemented in a C/C++ mix.
   in scope, but genuine shared-heap CPU parallelism must be preserved.
 - Do not rerun the full performance suite for every stable commit. Reuse retained
   baselines; measure affected hot paths, new workloads or concrete regressions.
+  Do not routinely rerun old executables to pair each new measurement; use their
+  retained raw runs. The user explicitly rejected repeating old baselines.
   Correctness-only changes need relevant regression tests, not unrelated CPU probes.
   Following the latest user correction, form complete VM/dill dependency slices
   before validation: one primary Clang build during development, then targeted

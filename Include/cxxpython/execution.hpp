@@ -584,7 +584,14 @@ struct FrameObject {
     FrameObject(InitialType head, Value function, Value code, std::size_t local_count,
                 std::size_t stack_count, Value padding, std::size_t max_regions = 0,
                 std::vector<Value> cells = {}, std::optional<Value> namespace_mapping = {})
-        : header(head), function(function), code(code), locals(local_count),
+        : FrameObject(head, function, code, std::vector<std::optional<Value>>(local_count),
+                      stack_count, padding, max_regions, std::move(cells), namespace_mapping)
+    {}
+    FrameObject(InitialType head, Value function, Value code,
+                std::vector<std::optional<Value>> local_values, std::size_t stack_count,
+                Value padding, std::size_t max_regions = 0, std::vector<Value> cells = {},
+                std::optional<Value> namespace_mapping = {})
+        : header(head), function(function), code(code), locals(std::move(local_values)),
           operands(stack_count, padding), cells(std::move(cells)),
           namespace_mapping(namespace_mapping)
     {
