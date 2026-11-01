@@ -3,20 +3,35 @@
 #include "cxxpython/protocol.hpp"
 
 namespace cxxpython::core::detail {
+// The Interpreter retains the builtin type and its immutable MRO. The actual
+// descriptor owns its function/lease and has an independent root in the caller's
+// scope, even if an internal namespace update removes or replaces the method.
+struct BuiltinSlot {
+    CoreObject type;
+    Protocol protocol;
+    SlotState state;
+    Handle descriptor;
+    std::uint64_t epoch;
+    NativeSlotKind native_kind;
+    NativeCallKind native_call;
+};
+BuiltinSlot resolve_builtin_slot(Attachment &, CoreObject, Protocol, RootScope &);
 // Receiver/arguments belong to the caller's independent roots or running Frame;
 // slot roots remain in roots. Revalidation and binding keep the same contract.
 void invoke_protocol(Attachment &, Value, const ResolvedSlot &, std::span<const Value>,
                      ReturnSlot &, RootScope &);
+void invoke_protocol(Attachment &, Value, const BuiltinSlot &, std::span<const Value>, ReturnSlot &,
+                     RootScope &);
 // Inputs and the resolved descriptor remain independently rooted by the caller.
 // Only the actual canonical method, complete signature and current receiver/epoch
 // may use its shared builtin kernel; otherwise dispatch has no side effects.
-bool try_native_operation(Attachment &, const ResolvedSlot &, std::span<const Value>,
+bool try_native_operation(Attachment &, const BuiltinSlot &, std::span<const Value>,
                           NativeEntry expected, NativeEntry kernel, ReturnSlot &);
-bool try_int_binary(Attachment &, Value, Value, BinaryOp, const ResolvedSlot &, ReturnSlot &);
-bool try_float_binary(Attachment &, Value, Value, BinaryOp, const ResolvedSlot &, ReturnSlot &);
-bool try_list_item(Attachment &, const ResolvedSlot &, std::span<const Value>, ReturnSlot &);
-bool try_sequence_item(Attachment &, const ResolvedSlot &, std::span<const Value>, ReturnSlot &);
-bool try_dict_item(Attachment &, const ResolvedSlot &, std::span<const Value>, ReturnSlot &);
+bool try_int_binary(Attachment &, Value, Value, BinaryOp, const BuiltinSlot &, ReturnSlot &);
+bool try_float_binary(Attachment &, Value, Value, BinaryOp, const BuiltinSlot &, ReturnSlot &);
+bool try_list_item(Attachment &, const BuiltinSlot &, std::span<const Value>, ReturnSlot &);
+bool try_sequence_item(Attachment &, const BuiltinSlot &, std::span<const Value>, ReturnSlot &);
+bool try_dict_item(Attachment &, const BuiltinSlot &, std::span<const Value>, ReturnSlot &);
 // Internal callers retain operands in independent live roots or a running Frame
 // until return. These owners must not be cleared by resetting out or callbacks.
 // No operand may depend on out, which these operations reset. Public entries

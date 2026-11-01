@@ -461,7 +461,7 @@ void tuple_repeat(Attachment &context, Value, std::span<const Value> args, Retur
 }
 } // namespace
 namespace detail {
-bool try_sequence_item(Attachment &context, const ResolvedSlot &slot, std::span<const Value> args,
+bool try_sequence_item(Attachment &context, const BuiltinSlot &slot, std::span<const Value> args,
                        ReturnSlot &out)
 {
     if (slot.protocol != Protocol::GetItem || args.empty())

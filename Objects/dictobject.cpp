@@ -594,7 +594,7 @@ void detail::dict_merge(Attachment &context, Handle self, Handle source, bool un
     if (merge(context, self, source, out, false, unique))
         out.ok(context.builtin(CoreObject::None));
 }
-bool detail::try_dict_item(Attachment &context, const ResolvedSlot &slot,
+bool detail::try_dict_item(Attachment &context, const BuiltinSlot &slot,
                            std::span<const Value> args, ReturnSlot &out)
 {
     if (args.empty() || context.type_of(args[0]) != context.builtin(CoreObject::DictType) ||

@@ -764,46 +764,62 @@ void call_bridge(Attachment &context, Value function, std::span<const Value> arg
     RootScope roots(context);
     call(context, roots.root(args[0]), {positional, keywords}, out);
 }
-void invoke_protocol_impl(Attachment &context, Value self, const ResolvedSlot &slot,
+Value protocol_type(Attachment &context, const ResolvedSlot &slot)
+{
+    return slot.type.get(context);
+}
+Value protocol_type(Attachment &context, const detail::BuiltinSlot &slot)
+{
+    if (slot.state != SlotState::Missing)
+        (void)slot.descriptor.get(context);
+    return context.builtin(slot.type);
+}
+template <class Slot>
+void invoke_protocol_impl(Attachment &context, Value self, const Slot &slot,
                           std::span<const Value> args, ReturnSlot &out, RootScope &roots,
                           bool own_descriptor)
 {
     if (args.size() != protocol_definition(slot.protocol).arity)
         throw std::invalid_argument("protocol arity mismatch");
-    const auto original_type = slot.type.get(context);
+    const auto original_type = protocol_type(context, slot);
     const auto receiver_type = context.type_of(self);
-    std::optional<ResolvedSlot> refreshed;
-    if (slot.epoch != context.type_epoch() || original_type != receiver_type)
-        refreshed = detail::resolve_protocol(context, receiver_type, slot.protocol, roots);
-    const auto &current = refreshed ? *refreshed : slot;
-    auto target = current.descriptor;
-    if (current.state != SlotState::Missing) {
+    auto state = slot.state;
+    auto target = slot.descriptor;
+    auto native_call = slot.native_call;
+    if (slot.epoch != context.type_epoch() || original_type != receiver_type) {
+        const auto refreshed =
+            detail::resolve_protocol(context, receiver_type, slot.protocol, roots);
+        state = refreshed.state;
+        target = refreshed.descriptor;
+        native_call = refreshed.native_call;
+    }
+    if (state != SlotState::Missing) {
         const auto descriptor = target.get(context);
         // Internal ObjectOps keeps the snapshot scope alive; public inputs may be released.
         if (own_descriptor)
             target = roots.root(descriptor);
     }
     out.reset(context);
-    if (current.state == SlotState::Missing || current.state == SlotState::Disabled) {
+    if (state == SlotState::Missing || state == SlotState::Disabled) {
         type_error(context, U"operation is missing or explicitly disabled", out);
         return;
     }
-    invoke_special_impl(context, self, target, {args, {}}, out, roots, nullptr,
-                        current.native_call);
+    invoke_special_impl(context, self, target, {args, {}}, out, roots, nullptr, native_call);
 }
 } // namespace
 
-bool detail::try_native_operation(Attachment &context, const ResolvedSlot &slot,
+bool detail::try_native_operation(Attachment &context, const BuiltinSlot &slot,
                                   std::span<const Value> args, NativeEntry expected,
                                   NativeEntry kernel, ReturnSlot &out)
 {
     if (slot.state != SlotState::Native || slot.native_call != NativeCallKind::MethodDescriptor ||
         args.size() != protocol_definition(slot.protocol).arity + 1)
         return false;
+    const auto selected = slot.descriptor.get(context);
     const auto type = context.type_of(args[0]);
-    if (slot.type.get(context) != type || slot.epoch != context.type_epoch())
+    if (context.builtin(slot.type) != type || slot.epoch != context.type_epoch())
         return false;
-    const auto &descriptor = context.payload<MethodDescriptorObject>(slot.descriptor.get(context));
+    const auto &descriptor = context.payload<MethodDescriptorObject>(selected);
     if (descriptor.owner != type)
         return false;
     const auto function = descriptor.function;
@@ -834,6 +850,11 @@ void detail::invoke_protocol(Attachment &context, Handle self, const ResolvedSlo
     detail::invoke_protocol(context, self.get(context), slot, args, out, roots);
 }
 void detail::invoke_protocol(Attachment &context, Value self, const ResolvedSlot &slot,
+                             std::span<const Value> args, ReturnSlot &out, RootScope &roots)
+{
+    invoke_protocol_impl(context, self, slot, args, out, roots, false);
+}
+void detail::invoke_protocol(Attachment &context, Value self, const BuiltinSlot &slot,
                              std::span<const Value> args, ReturnSlot &out, RootScope &roots)
 {
     invoke_protocol_impl(context, self, slot, args, out, roots, false);

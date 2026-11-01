@@ -1,5 +1,65 @@
 # Development Status
 
+## 2026-11-01 Builtin Protocol Snapshots Reuse Permanent Core Roots
+
+Continues performance/cleanup after b0b69f0. Its fresh Matrix profile put protocol
+cache promotion at 6.72% self. Parent implemented builtin lookup/ownership and
+shared fallback; one Terra worker migrated kernel signatures and supplied native
+contracts. Worker closed. This is an execution-path change, not library expansion.
+
+- Private BuiltinSlot distinguishes exact builtin ownership from public
+  ResolvedSlot. The Interpreter permanently traces the builtin type and immutable
+  MRO; a warm hit promotes only the actual descriptor, retaining its function,
+  captures and native lease. Missing hits need no descriptor root. The same weak
+  cache/epoch/sweep clearing remains in use, with ordinary cold resolution.
+  Public slots still promote three independent roots and user-class entries do
+  not become permanent roots. No native entry pointer cache or global lock added.
+- Actual receiver/epoch, descriptor owner, canonical entry/binding/signature,
+  both depth guards and checked returns remain. Kernel rejection, including int
+  power's optional modulus and replaced methods, shares ordinary protocol refresh
+  and binding with the smaller snapshot, not another full lookup or executor.
+  Item selection is shared across get/set/delete rather than duplicated branches.
+  Borrowed operands and synchronized container reads retain their old contracts.
+- Native tests cover one-root hits, Missing/no-root hits, cold misses, publication
+  and sweep invalidation, descriptor/function survival after namespace deletion,
+  foreign/protected destinations and unchanged public three-root/weak-class
+  behavior. Original signature/owner/replacement, stale-output preservation,
+  return/exception and depth tests migrated without weakening their assertions.
+- An added stats assertion initially left a second same-OS-thread Attachment
+  Active, causing a 15-second test timeout. Wrapped the observation in NativeWait
+  for that attachment, also fixing the same issue in the new destination test.
+  The failed .cache/builtin-slot-release-focus.log remains; the final seven-case
+  focus and compressed ASan/TSan rechecks pass with unchanged budgets.
+- Strict Clang 21.1.8 Release/ASan/UBSan/LSan/TSan builds pass. Each passes 497
+  affected native tests, with the same unchanged bootstrap/readiness and exhaustive
+  cold-import shard exclusions as b0b69f0. Release passes all 530 scripts; ASan
+  passes 115 affected scripts, TSan 50. Format/diff checks pass. Evidence is
+  .cache/builtin-slot-*.log. No sanitizer, timeout or expected output was relaxed.
+- With builds/tests stopped, measured only the new executable on the existing
+  five workloads at one/four workers, three processes and nine values/config,
+  natural GC and fixed total work. All 30 planned worker runs pass validation.
+  Reused b0b69f0 raw baselines rather than rebuilding history/repeating CPython.
+  Raw/generated reports and comparisons are .cache/benchmarks/builtin-slot and
+  builtin-slot-comparison; analysis is .cache/builtin-slot-pyperf.log.
+- Standard pyperf finds one-worker Matrix 1.05x faster; the other nine comparisons
+  are not significant, with no significant regression found. Generated Matrix
+  medians are 251.012/107.320 ms, scaling 2.339x with four-worker CPU/wall 2.678.
+  nbody four-worker RSD is 11.8%; all samples and warnings remain. No favorable
+  rerun replaced these results. The matching b0b69f0 ELF (85283c50...) and final
+  Release ELF remain in perf-buildid for diagnosis.
+- A separate Matrix capture retains 884 software CPU samples, zero lost. Cached
+  builtin and ordinary promotion are each 1.70% self; dispatch, root acquisition,
+  range iteration and allocation/sweep remain visible. These are sampled self
+  percentages, not additive caller totals, cache-miss counters or total GC pauses.
+  Capture/callers remain under .cache/benchmarks/builtin-slot-matrix-profile.
+- Recompressed regenerated sanitizer debug sections, retaining code, symbols,
+  toolchains, builds and raw evidence. Post-compression focus tests pass and total
+  .cache remains about 1.6 GiB. matrix.py is unchanged, untracked and excluded.
+
+The performance goal stays active; this does not claim absolute CPython parity or
+completion of the full compatibility roadmap. Continue from the remaining measured
+execution/allocation costs under the same precise-root, epoch and no-GIL contracts.
+
 ## 2026-11-01 Borrow Frame-Owned Operands Through ObjectOps
 
 Continues the active performance/cleanup goal after 6097832. Fresh shared-kernel

@@ -31,6 +31,9 @@ class RootScope;
 struct WeakRefObject;
 enum class Protocol : std::size_t;
 struct ResolvedSlot;
+namespace detail {
+struct BuiltinSlot;
+}
 enum class CoreObject : std::size_t {
     PropertyType,
     NoneType,
@@ -653,6 +656,8 @@ class Attachment final {
     void invalidate_types();
     std::optional<ResolvedSlot> cached_protocol(Handle type, Protocol protocol, RootScope &roots);
     std::optional<ResolvedSlot> cached_protocol(Value type, Protocol protocol, RootScope &roots);
+    std::optional<detail::BuiltinSlot> cached_builtin_protocol(CoreObject type, Protocol protocol,
+                                                               RootScope &roots);
     void cache_protocol(const ResolvedSlot &slot);
     std::uint64_t publication_epoch(PublicationDomain domain) const;
     bool begin_publication(PublicationDomain domain, std::uint64_t epoch);

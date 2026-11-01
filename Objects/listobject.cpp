@@ -757,7 +757,7 @@ void make_list(Attachment &context, std::span<const Value> values, ReturnSlot &o
                                           std::vector<Value>(values.begin(), values.end()));
 }
 namespace detail {
-bool try_list_item(Attachment &context, const ResolvedSlot &slot, std::span<const Value> args,
+bool try_list_item(Attachment &context, const BuiltinSlot &slot, std::span<const Value> args,
                    ReturnSlot &out)
 {
     if (args.empty() || context.type_of(args[0]) != context.builtin(CoreObject::ListType) ||

@@ -178,6 +178,16 @@ the native definition's numeric/sequence role, including the defining-owner
 subtype rule. Hot arithmetic reads that scalar instead of projecting the same
 immutable native metadata again. Sweep clearing and namespace-epoch invalidation
 are unchanged; this is not another cache layer or a Python slot-table redesign.
+Exact builtin operation kernels instead use a private BuiltinSlot snapshot from
+that same weak entry. The Interpreter already retains its core type and immutable
+MRO, so the snapshot uses a CoreObject identifier and independently roots only the
+actual descriptor. Its traced function edge retains metadata/captures/code leases
+even if an internal publication deletes the namespace entry. Missing slots need
+no descriptor root. Cold lookup uses ordinary resolution; epochs and sweep still
+invalidate the same cache. Kernel rejection and optional-argument/custom-method
+fallback share ordinary protocol invocation, including refresh and binding, not
+a second executor or an extra full lookup. This ownership shortcut does not apply
+to user classes or change public ResolvedSlot's three independent roots.
 Freshly classified native special methods enter the shared call-depth guard and
 native binder directly, without classifying the callable again. Explicit and
 implicit method-descriptor calls share one defining-owner receiver check;

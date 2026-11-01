@@ -1074,7 +1074,7 @@ void bool_new(Attachment &context, Value, std::span<const Value> args, ReturnSlo
 } // namespace
 
 bool detail::try_int_binary(Attachment &context, Value left, Value right, BinaryOp op,
-                            const ResolvedSlot &slot, ReturnSlot &out)
+                            const BuiltinSlot &slot, ReturnSlot &out)
 {
     if (slot.state != SlotState::Native || slot.native_kind != NativeSlotKind::Ordinary ||
         context.type_of(left) != context.builtin(CoreObject::IntType) ||

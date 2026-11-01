@@ -88,7 +88,8 @@ TEST_F(CoreProtocols, BuiltinKernelsFollowInternalMethodAndSignatureChanges)
     const auto original = roots.root(*detail::name_lookup(context, space.get(context), U"__add__"));
     const auto subtract = roots.root(*detail::name_lookup(context, space.get(context), U"__sub__"));
     const auto left = integer(401), right = integer(301);
-    const auto slot = resolve_protocol(context, cls, Protocol::Add, roots);
+    const auto slot =
+        detail::resolve_builtin_slot(context, CoreObject::IntType, Protocol::Add, roots);
     ReturnSlot out(context);
     ASSERT_TRUE(detail::try_int_binary(context, left.get(context), right.get(context),
                                        BinaryOp::Add, slot, out));
@@ -129,7 +130,8 @@ TEST_F(CoreProtocols, BuiltinKernelsFollowInternalMethodAndSignatureChanges)
 
 TEST_F(CoreProtocols, BuiltinKernelsKeepCheckedReturnsAndUnwindNativeCalls)
 {
-    const auto slot = resolve_protocol(context, builtin(CoreObject::IntType), Protocol::Add, roots);
+    const auto slot =
+        detail::resolve_builtin_slot(context, CoreObject::IntType, Protocol::Add, roots);
     const auto descriptor = slot.descriptor.get(context);
     const auto function = context.payload<MethodDescriptorObject>(descriptor).function;
     const auto expected = context.payload<NativeFunctionObject>(function).entry;
@@ -872,8 +874,17 @@ TEST(ProtocolCache, HitRootsInAnotherAttachmentSurviveInputScopeAndCollection)
         type_value = type.get(context);
         owner_value = owner.get(context);
         descriptor_value = descriptor.get(context);
+        std::size_t before;
+        {
+            NativeWait wait(receiver);
+            before = context.stats().roots;
+        }
         cached = context.cached_protocol(*type_value, Protocol::Len, results);
         ASSERT_TRUE(cached);
+        {
+            NativeWait wait(receiver);
+            EXPECT_EQ(context.stats().roots, before + 3);
+        }
     }
     {
         NativeWait wait(context);
@@ -890,6 +901,135 @@ TEST(ProtocolCache, HitRootsInAnotherAttachmentSurviveInputScopeAndCollection)
     results.release(cached->owner);
     EXPECT_EQ(cached->descriptor.get(receiver), *descriptor_value);
     results.release(cached->descriptor);
+}
+
+TEST(ProtocolCache, BuiltinHitRootsOnlyDescriptorAndInvalidatesOnPublicationAndSweep)
+{
+    Interpreter interpreter;
+    Attachment context(interpreter);
+    context.bootstrap_core();
+    context.set_gc_enabled(false);
+    context.collect();
+    RootScope results(context);
+    const auto before = context.stats().roots;
+    EXPECT_FALSE(context.cached_builtin_protocol(CoreObject::IntType, Protocol::Add, results));
+    EXPECT_FALSE(context.cached_builtin_protocol(CoreObject::IntType, Protocol::Iter, results));
+    EXPECT_EQ(context.stats().roots, before);
+
+    {
+        RootScope input(context);
+        const auto resolved =
+            detail::resolve_builtin_slot(context, CoreObject::IntType, Protocol::Add, input);
+        ASSERT_EQ(resolved.state, SlotState::Native);
+        const auto before_hit = context.stats().roots;
+        auto hit = context.cached_builtin_protocol(CoreObject::IntType, Protocol::Add, results);
+        ASSERT_TRUE(hit);
+        EXPECT_EQ(context.stats().roots, before_hit + 1);
+        EXPECT_EQ(hit->descriptor.get(context), resolved.descriptor.get(context));
+
+        auto cls = input.root(context.builtin(CoreObject::IntType));
+        auto space = input.root(*TypeView(context, cls).dictionary());
+        ReturnSlot out(context);
+        make_str(context, U"__add__", out);
+        auto key = input.root(out.value());
+        auto original = input.root(resolved.descriptor.get(context));
+        ASSERT_TRUE(detail::name_erase(context, space.get(context), U"__add__"));
+        EXPECT_FALSE(context.cached_builtin_protocol(CoreObject::IntType, Protocol::Add, input));
+        detail::name_store(context, space.get(context), key.get(context), original.get(context));
+        EXPECT_FALSE(context.cached_builtin_protocol(CoreObject::IntType, Protocol::Add, input));
+        detail::resolve_builtin_slot(context, CoreObject::IntType, Protocol::Add, input);
+        ASSERT_TRUE(context.cached_builtin_protocol(CoreObject::IntType, Protocol::Add, input));
+    }
+    context.collect();
+    EXPECT_FALSE(context.cached_builtin_protocol(CoreObject::IntType, Protocol::Add, results));
+    {
+        RootScope input(context);
+        const auto missing =
+            detail::resolve_builtin_slot(context, CoreObject::IntType, Protocol::Iter, input);
+        ASSERT_EQ(missing.state, SlotState::Missing);
+        const auto before_hit = context.stats().roots;
+        const auto hit =
+            context.cached_builtin_protocol(CoreObject::IntType, Protocol::Iter, results);
+        ASSERT_TRUE(hit);
+        EXPECT_EQ(hit->state, SlotState::Missing);
+        EXPECT_EQ(context.stats().roots, before_hit);
+    }
+    context.collect();
+    EXPECT_FALSE(context.cached_builtin_protocol(CoreObject::IntType, Protocol::Iter, results));
+}
+
+TEST(ProtocolCache, BuiltinDescriptorRootProtectsFunctionAfterNamespaceRemoval)
+{
+    Interpreter interpreter;
+    Attachment context(interpreter);
+    context.bootstrap_core();
+    context.set_gc_enabled(false);
+    RootScope results(context);
+    std::optional<detail::BuiltinSlot> hit;
+    {
+        RootScope input(context);
+        const auto cls = input.root(context.builtin(CoreObject::IntType));
+        const auto space = input.root(*TypeView(context, cls).dictionary());
+        const auto resolved =
+            detail::resolve_builtin_slot(context, CoreObject::IntType, Protocol::Add, input);
+        hit = context.cached_builtin_protocol(CoreObject::IntType, Protocol::Add, results);
+        ASSERT_TRUE(hit);
+        EXPECT_EQ(hit->descriptor.get(context), resolved.descriptor.get(context));
+        ASSERT_TRUE(detail::name_erase(context, space.get(context), U"__add__"));
+    }
+    context.collect();
+    const auto &descriptor = context.payload<MethodDescriptorObject>(hit->descriptor);
+    const auto &function = context.payload<NativeFunctionObject>(descriptor.function);
+    EXPECT_EQ(descriptor.owner, context.builtin(CoreObject::IntType));
+    EXPECT_EQ(function.name, "__add__");
+    EXPECT_NE(function.entry, nullptr);
+    EXPECT_TRUE(function.signature.accepts_complete_positional(2));
+}
+
+TEST(ProtocolCache, BuiltinHitRejectsInvalidDestinationScope)
+{
+    Interpreter interpreter;
+    Attachment context(interpreter);
+    context.bootstrap_core();
+    context.set_gc_enabled(false);
+    RootScope input(context);
+    detail::resolve_builtin_slot(context, CoreObject::IntType, Protocol::Add, input);
+
+    Interpreter other;
+    Attachment foreign(other);
+    foreign.bootstrap_core();
+    RootScope foreign_roots(foreign);
+    auto sentinel = foreign_roots.root(foreign.builtin(CoreObject::IntType));
+    const auto foreign_count = foreign.stats().roots;
+    EXPECT_THROW(context.cached_builtin_protocol(CoreObject::IntType, Protocol::Add, foreign_roots),
+                 std::logic_error);
+    EXPECT_EQ(foreign.stats().roots, foreign_count);
+    EXPECT_EQ(sentinel.get(foreign), foreign.builtin(CoreObject::IntType));
+
+    Attachment receiver(interpreter);
+    RootScope receiver_roots(receiver);
+    auto existing = receiver_roots.root(receiver.builtin(CoreObject::IntType));
+    std::size_t count;
+    {
+        NativeWait wait(receiver);
+        count = context.stats().roots;
+        EXPECT_THROW(
+            context.cached_builtin_protocol(CoreObject::IntType, Protocol::Add, receiver_roots),
+            std::logic_error);
+    }
+    {
+        NoSafepoint guard(receiver);
+        EXPECT_THROW(
+            context.cached_builtin_protocol(CoreObject::IntType, Protocol::Add, receiver_roots),
+            std::logic_error);
+        EXPECT_EQ(existing.get(receiver), receiver.builtin(CoreObject::IntType));
+    }
+    {
+        NativeWait wait(receiver);
+        EXPECT_EQ(context.stats().roots, count);
+    }
+    ASSERT_TRUE(
+        context.cached_builtin_protocol(CoreObject::IntType, Protocol::Add, receiver_roots));
 }
 
 TEST_F(CoreProtocols, HitRejectsInvalidDestinationScopeWithoutChangingItsRoots)

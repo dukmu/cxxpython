@@ -950,6 +950,17 @@ guards and ready-return checks are shared with ordinary calls. Container kernels
 retain their existing index/slice callbacks, storage locks and rooted reads.
 No extra cache, native-entry-pointer cache or VM opcode is introduced.
 
+Private BuiltinSlot represents this builtin-only ownership separately from public
+ResolvedSlot. Its CoreObject identifier selects a type permanently traced by the
+Interpreter, including its immutable MRO. A cache hit roots the actual descriptor
+once, retaining its function and native lease through callbacks, deletion and GC;
+a Missing hit owns no managed descriptor. Cold resolution still uses the normal
+lookup, and noncanonical/optional-argument binding reuses the same snapshot through
+common protocol invocation. The same epoch/current-receiver revalidation applies.
+Foreign or protected destination arenas are rejected before root promotion.
+Public slots still own three independent roots, even when type and owner coincide;
+user-class entries remain weak and are cleared before sweep/address reuse.
+
 Ordinary native type methods publish owner-bearing MethodDescriptorObjects;
 protocol lookup preserves their native/sequence role and invokes the underlying
 entry through the normal binder. Native static/class wrappers retain their own

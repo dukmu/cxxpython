@@ -127,7 +127,7 @@ ResolvedSlot resolve(Attachment &context, Handle value, Protocol id, RootScope &
     return resolve(context, value.get(context), id, roots);
 }
 enum class SlotPhase { Any, Numeric, Sequence };
-bool sequence_slot(const ResolvedSlot &slot)
+template <class Slot> bool sequence_slot(const Slot &slot)
 {
     return slot.state == SlotState::Native && slot.native_kind == NativeSlotKind::Sequence;
 }
@@ -218,7 +218,9 @@ bool binary_numeric(Attachment &context, Value a, Value b, BinaryOp op, ReturnSl
     if (!different && (ltype == context.builtin(CoreObject::IntType) ||
                        ltype == context.builtin(CoreObject::FloatType))) {
         RootScope roots(context);
-        const auto slot = resolve(context, a, ids[0], roots);
+        const auto type = ltype == context.builtin(CoreObject::IntType) ? CoreObject::IntType
+                                                                        : CoreObject::FloatType;
+        const auto slot = detail::resolve_builtin_slot(context, type, ids[0], roots);
         if (slot.state == SlotState::Missing || sequence_slot(slot))
             return false;
         if ((ltype == context.builtin(CoreObject::IntType)
@@ -376,6 +378,14 @@ ResolvedSlot detail::resolve_protocol(Attachment &context, Value value, Protocol
         context.poll();
         std::this_thread::yield();
     }
+}
+detail::BuiltinSlot detail::resolve_builtin_slot(Attachment &context, CoreObject type, Protocol id,
+                                                 RootScope &roots)
+{
+    if (auto cached = context.cached_builtin_protocol(type, id, roots))
+        return *cached;
+    const auto slot = detail::resolve_protocol(context, context.builtin(type), id, roots);
+    return {type, id, slot.state, slot.descriptor, slot.epoch, slot.native_kind, slot.native_call};
 }
 namespace {
 // _PyNumber_Index semantics: retain integer subclasses for native consumers.
@@ -859,6 +869,31 @@ ResultView power(Attachment &context, Handle base, Handle exponent, Handle modul
         type_error(context, U"unsupported operand types for modular power", out);
     });
 }
+namespace {
+bool builtin_item(Attachment &context, Value type, Protocol protocol, std::span<const Value> args,
+                  ReturnSlot &out, RootScope &roots)
+{
+    CoreObject id;
+    if (type == context.builtin(CoreObject::ListType))
+        id = CoreObject::ListType;
+    else if (type == context.builtin(CoreObject::DictType))
+        id = CoreObject::DictType;
+    else if (protocol == Protocol::GetItem && type == context.builtin(CoreObject::TupleType))
+        id = CoreObject::TupleType;
+    else if (protocol == Protocol::GetItem && type == context.builtin(CoreObject::StrType))
+        id = CoreObject::StrType;
+    else
+        return false;
+    const auto slot = detail::resolve_builtin_slot(context, id, protocol, roots);
+    const bool invoked =
+        id == CoreObject::ListType   ? detail::try_list_item(context, slot, args, out)
+        : id == CoreObject::DictType ? detail::try_dict_item(context, slot, args, out)
+                                     : detail::try_sequence_item(context, slot, args, out);
+    if (!invoked)
+        detail::invoke_protocol(context, args[0], slot, args.subspan(1), out, roots);
+    return true;
+}
+} // namespace
 ResultView get_item(Attachment &context, Handle value, Handle key, ReturnSlot &out)
 {
     return get_item(context, value.get(context), key.get(context), out);
@@ -877,19 +912,11 @@ void detail::get_item_owned(Attachment &context, Value value, Value key, ReturnS
     RootScope roots(context);
     out.reset(context);
     const auto type = context.type_of(value);
-    auto slot = detail::resolve_protocol(context, type, Protocol::GetItem, roots);
     const std::array native_args{value, key};
-    if (type == context.builtin(CoreObject::ListType)) {
-        if (detail::try_list_item(context, slot, native_args, out))
-            return;
-    } else if (type == context.builtin(CoreObject::TupleType) ||
-               type == context.builtin(CoreObject::StrType)) {
-        if (detail::try_sequence_item(context, slot, native_args, out))
-            return;
-    } else if (type == context.builtin(CoreObject::DictType)) {
-        if (detail::try_dict_item(context, slot, native_args, out))
-            return;
-    }
+    if (builtin_item(context, type, Protocol::GetItem, native_args, out, roots))
+        return;
+    const auto slot =
+        detail::resolve_protocol(context, context.type_of(value), Protocol::GetItem, roots);
     std::array args{key};
     if (slot.state == SlotState::Missing &&
         is_subtype(context, context.type_of(value), context.type_type())) {
@@ -963,13 +990,11 @@ void detail::set_item_owned(Attachment &context, Value value, Value key, Value i
     RootScope roots(context);
     out.reset(context);
     const auto type = context.type_of(value);
-    auto slot = detail::resolve_protocol(context, type, Protocol::SetItem, roots);
     const std::array native_args{value, key, item};
-    if ((type == context.builtin(CoreObject::ListType) &&
-         detail::try_list_item(context, slot, native_args, out)) ||
-        (type == context.builtin(CoreObject::DictType) &&
-         detail::try_dict_item(context, slot, native_args, out)))
+    if (builtin_item(context, type, Protocol::SetItem, native_args, out, roots))
         return;
+    const auto slot =
+        detail::resolve_protocol(context, context.type_of(value), Protocol::SetItem, roots);
     std::array args{key, item};
     detail::invoke_protocol(context, value, slot, args, out, roots);
 }
@@ -991,13 +1016,11 @@ void detail::del_item_owned(Attachment &context, Value value, Value key, ReturnS
     RootScope roots(context);
     out.reset(context);
     const auto type = context.type_of(value);
-    auto slot = detail::resolve_protocol(context, type, Protocol::DelItem, roots);
     const std::array native_args{value, key};
-    if ((type == context.builtin(CoreObject::ListType) &&
-         detail::try_list_item(context, slot, native_args, out)) ||
-        (type == context.builtin(CoreObject::DictType) &&
-         detail::try_dict_item(context, slot, native_args, out)))
+    if (builtin_item(context, type, Protocol::DelItem, native_args, out, roots))
         return;
+    const auto slot =
+        detail::resolve_protocol(context, context.type_of(value), Protocol::DelItem, roots);
     std::array args{key};
     detail::invoke_protocol(context, value, slot, args, out, roots);
 }

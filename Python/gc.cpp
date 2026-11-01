@@ -3,6 +3,7 @@
 #include "cxxpython/runtime.hpp"
 #include "cxxpython/type.hpp"
 #include "cxxpython/weakrefobject.hpp"
+#include "internal/abstract.hpp"
 #include "internal/errors.hpp"
 #include "internal/import.hpp"
 
@@ -1950,6 +1951,27 @@ std::optional<ResolvedSlot> Attachment::cached_protocol(Value value, Protocol pr
                         epoch,
                         entry.native_kind,
                         entry.native_call};
+}
+std::optional<detail::BuiltinSlot>
+Attachment::cached_builtin_protocol(CoreObject type, Protocol protocol, RootScope &roots)
+{
+    const auto value = builtin(type);
+    const auto epoch = state_->type_epoch.load(std::memory_order_acquire);
+    const auto entry = thread_record_->protocol_entry(value, protocol);
+    if ((epoch & 1) || entry.type != value.object() || entry.protocol != protocol ||
+        entry.epoch != epoch)
+        return {};
+    auto &destination = roots.context_;
+    destination.require_safepoint();
+    if (destination.state_.get() != state_.get())
+        invalid_heap_access("value does not belong to this interpreter");
+    Handle descriptor;
+    if (entry.descriptor) {
+        descriptor = destination.acquire_cell(&roots, entry.descriptor, roots.head_);
+        roots.head_ = descriptor.cell_;
+    }
+    return detail::BuiltinSlot{type,  protocol,          entry.state,      descriptor,
+                               epoch, entry.native_kind, entry.native_call};
 }
 void Attachment::cache_protocol(const ResolvedSlot &slot)
 {
