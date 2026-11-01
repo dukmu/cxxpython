@@ -602,9 +602,8 @@ struct State {
         }
         return std::move(edges.visible);
     }
-    static bool python_finalizer(Allocation &allocation) noexcept
+    static bool python_finalizer(ObjectHeader *type) noexcept
     {
-        auto *type = allocation.object()->type.object_.load(std::memory_order_relaxed);
         if (!type ||
             Allocation::from(type).span->layout.native_family != &native_layout_id<TypeObject>)
             return false;
@@ -677,6 +676,8 @@ struct State {
             finalizer_tail = &allocation;
         };
         Allocation *native_head = nullptr, *native_tail = nullptr;
+        ObjectHeader *previous_type = nullptr;
+        bool previous_finalizer = false;
         // Weak death is decided from program roots, before quarantine retains
         // the complete candidate graph. Classify finalizers in the same pass,
         // but do not mark their graphs until every weak target is checked.
@@ -702,7 +703,14 @@ struct State {
             }
             if (allocation.finalization != Allocation::Finalization::Unseen)
                 return;
-            if (python_finalizer(allocation))
+            // Types cannot change during STW. Adjacent allocations commonly
+            // share a type; retain this answer only for the current heap pass.
+            auto *type = allocation.object()->type.object_.load(std::memory_order_relaxed);
+            if (type != previous_type) {
+                previous_type = type;
+                previous_finalizer = python_finalizer(type);
+            }
+            if (previous_finalizer)
                 queue_finalizer(allocation);
             else if (allocation.span->layout.finalize) {
                 allocation.finalizer_next = nullptr;

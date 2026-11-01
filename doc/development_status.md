@@ -1,5 +1,51 @@
 # Development Status
 
+## 2026-11-01 Close GC Classifier Work And Switch To Dill/Pdb
+
+The user stopped performance optimization, then explicitly authorized closing and
+committing the pending work first. Performance is paused, not complete. The active
+service goal is now real unchanged-upstream dill compatibility and interactive pdb;
+Plan 2 section 0.15 and AGENTS.md record that change.
+
+- Retained only a local last-type answer during the STW finalizer candidate pass.
+  Adjacent allocations of the same type do not repeat the immutable MRO check.
+  No answer survives the pass, and no object layout, root, synchronization, weak
+  death/quarantine order or finalizer state transition changed. The new direct
+  fixture covers inherited __del__ addition/replacement/removal, mixed types,
+  repeated batches and dead weak references. Its oracle matches fixed CPython.
+- Rejected the Frame small-buffer experiment. Boost's container violated the
+  standard-layout payload assertion; no assertion or compiler diagnostic was
+  disabled. A standard-layout array/vector/span replacement passed its tests but
+  showed no significant improvement against retained attribute-owned runs, while
+  one-worker allocate collections increased from 41 to 44. Removed all Frame
+  layout, dependency and container changes rather than retain an unproven cost.
+- Also rejected canonical native attribute admission after its campaign showed
+  material regressions. Removed that helper, API and experiment-only native test;
+  ordinary attribute dispatch is exactly the preceding stable implementation.
+  Failed/neutral measurements remain in .cache/benchmarks/frame-inline and
+  native-attributes with generated comparisons and pyperf analysis. No old
+  interpreter or CPython performance baseline was rerun or replaced by a favorable
+  same-code sample. No final-node speedup or CPython parity is claimed.
+- Development evidence is explicitly intermediate: the Frame candidate passed
+  135 native/10 script tests plus five native/five script ASan/UBSan/LSan checks;
+  native-admission candidate passed 69 native/eight script tests plus six selected
+  sanitizer scripts. The retained GC classifier is identical in these runs, but
+  they are not represented as full final-binary regression results.
+- The final strict Clang 21.1.8 product build passes five direct scenarios:
+  gc_finalizer_type_changes, finalizer_nested_type, weakref_finalize_parallel,
+  attribute_owned_operations and vm_numeric_temporaries. Logs are retained in
+  .cache/gc-classifier-final-{build,scripts}.log. Format/diff checks pass. No further
+  timing or full sanitizer rebuild was added after the user stopped optimization.
+  Compressed regenerated ASan debug sections and removed its obsolete 70 MiB
+  intermediate native-test executable; reusable tools/build inputs/evidence remain.
+  matrix.py stays untouched, untracked and excluded from commits.
+- Two Terra workers prepared the next task, then paused writes for this commit.
+  One has not modified tracing code; the other copied pinned CPython pdb/bdb/cmd/
+  shlex into four untracked Lib files, excluded from this performance closure.
+  The current unchanged dill probe reaches a real missing marshal import; staged
+  pdb sources do not yet prove tracing or interactive support. Resume those tasks
+  after this commit, not another performance experiment.
+
 ## 2026-11-01 Share Attribute Dispatch And Borrow Frame Inputs
 
 Continues the performance/cleanup goal after 5b3431b. Two Terra workers supplied

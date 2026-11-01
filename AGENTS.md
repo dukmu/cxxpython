@@ -41,15 +41,15 @@ compiler, VM, and extension platform implemented in a C/C++ mix.
 - Advance through N0-N6 and the complete M0-M9 acceptance gates. Record actual tests,
   remaining gates and the next dependency in `doc/development_status.md`.
   Do not mark a whole milestone complete based on a narrower passing slice.
-- The user has directed a route pause after the current network stable point.
-  The full frontend/import/library/product/N4-N6 route is now paused, not complete.
-  Performance and code cleanup replaced library expansion. After reviewing the
-  native-callback stable point, the user resumed that goal and requested broader
-  execution-path improvements instead of repeated micro-cleanups. Keep the full
-  compatibility route paused; retain its delivery scope in Plan 2 sections
-  0.8 and 11.2. Improve Python exception diagnostics, repeated Modules conversion/
-  installation code, header boundaries, measured cache locality and allocation
-  reuse while preserving semantics, precise roots and shared-heap CPU parallelism.
+- The active stage is real dill and pdb compatibility. The user stopped
+  performance optimization and authorized only closing/committing its current
+  pending changes first. Do not resume performance experiments automatically.
+  Keep dill's pinned upstream source unchanged; complete its runtime dependencies,
+  object/function/closure/code round trips and pdb's actual interactive tracing,
+  breakpoints, stepping, stack and exception inspection. Use direct Python cases.
+  The broader frontend/import/library/product/N4-N6 route remains paused, not
+  complete; retain its scope in Plan 2 sections 0.8 and 11.2. Preserve semantics,
+  precise roots and shared-heap CPU parallelism throughout this compatibility work.
   The user-supplied root matrix.py is local performance input, not a deliverable:
   do not commit it. Keep raw measurements under .cache/ and generate any tables.
 - The user permits closing small missing features/libraries during this work,

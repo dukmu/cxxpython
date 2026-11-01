@@ -424,6 +424,10 @@ After tracing Python finalizer/callback graphs, only the native candidate chain
 is checked for resources still unreachable. Its links are separate from the mark
 worklist, and rescued candidates leave the chain without changing finalizer state.
 Immutable type/MRO snapshots supply instance finalizers.
+During the STW candidate pass, adjacent objects of the same type reuse the last
+finalizer-presence result. This local answer expires before mutators resume;
+class changes, resurrection and later collections never reuse it. Weak death,
+quarantine tracing and native-resource classification keep their existing order.
 `Objects/weakrefobject.cpp` owns weak reference protocols;
 `Objects/weakproxyobject.cpp` forwards proxy operations
 through rooted referents. `Modules/_weakref.cpp` exposes that native capability.
